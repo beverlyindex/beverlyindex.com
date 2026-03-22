@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nav Test</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0a0a14;color:#fff;min-height:300vh}
+#debug{position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-family:monospace;font-size:11px;padding:8px;z-index:999999;max-height:40vh;overflow-y:auto;border-top:2px solid #0f0}
+.nav{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(10,10,20,.98)}
+.nav-inner{padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{color:#fff;text-decoration:none;font-size:18px;font-weight:700}
+.nav-links{display:none}
+.menu-btn{display:block;background:none;border:2px solid #0f0;color:#0f0;padding:12px 20px;font-size:16px;font-weight:700;border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.nav.menu-open{position:fixed;top:0;left:0;right:0;bottom:0;overflow-y:auto;background:rgba(10,10,20,.99);transition:none}
+.nav.menu-open .nav-inner{flex-wrap:wrap}
+.nav.menu-open .nav-links{display:flex!important;flex-direction:column;width:100%;padding:20px 0;gap:0;order:3}
+.nav.menu-open .nav-links li{list-style:none;width:100%}
+.nav.menu-open .nav-links li a{display:block;padding:16px 20px;color:#fff;font-size:18px;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.1)}
+.nav.menu-open .dropdown-menu{display:none;position:static;padding:0;background:transparent}
+.nav.menu-open .dropdown.open .dropdown-menu{display:block}
+.nav.menu-open .dropdown-menu a{color:#2A9D8F;padding:12px 20px 12px 40px;font-size:16px}
+.content{padding:100px 24px}
+</style>
+</head>
+<body>
+<nav class="nav" id="nav">
+<div class="nav-inner">
+<a href="#" class="nav-logo">Beverly Index</a>
+<ul class="nav-links" id="links">
+<li class="dropdown"><a href="#">Science</a><div class="dropdown-menu"><a href="#">NOST</a><a href="#">NOSS</a></div></li>
+<li class="dropdown"><a href="#">Experience</a><div class="dropdown-menu"><a href="#">DreamWeaver</a><a href="#">Empyrean</a></div></li>
+<li><a href="#">CNAP</a></li>
+<li><a href="#">About</a></li>
+</ul>
+<button class="menu-btn" id="btn">MENU</button>
+</div>
+</nav>
+<div class="content">
+<h1 style="margin-top:40px">Nav Test</h1>
+<p style="color:#888;margin:20px 0">Tap MENU. Debug log shows every event. Screenshot the green log after tapping.</p>
+<p style="color:#444">Lorem ipsum dolor sit amet consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Repeat text for scroll testing. Lorem ipsum dolor sit amet consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet consectetur adipiscing elit.</p>
+</div>
+<div id="debug">DEBUG LOG:<br></div>
+<script data-cfasync="false">
+var db=document.getElementById('debug');
+function log(m){db.innerHTML+=new Date().toLocaleTimeString()+' '+m+'<br>';db.scrollTop=db.scrollHeight;}
+var open=false;
+var nav=document.getElementById('nav');
+var btn=document.getElementById('btn');
+log('INIT w='+window.innerWidth);
+document.addEventListener('click',function(e){
+var t=e.target;
+log('CLICK tag='+t.tagName+' class='+t.className+' id='+t.id);
+if(t.closest('.menu-btn')||t.id==='btn'){
+open=!open;
+log('TOGGLE open='+open);
+if(open){nav.classList.add('menu-open');btn.textContent='CLOSE';document.body.style.overflow='hidden';}
+else{nav.classList.remove('menu-open');btn.textContent='MENU';document.body.style.overflow='';var d=nav.querySelectorAll('.dropdown.open');for(var i=0;i<d.length;i++)d[i].classList.remove('open');}
+log('nav classes='+nav.className);
+log('links display='+getComputedStyle(document.getElementById('links')).display);
+return;
+}
+if(!open)return;
+var dl=e.target.closest('.dropdown > a');
+if(dl){e.preventDefault();var p=dl.parentElement;p.classList.toggle('open');log('DROPDOWN '+dl.textContent+' open='+p.classList.contains('open'));return;}
+var sub=e.target.closest('.dropdown-menu a');
+if(sub){log('SUBMENU '+sub.textContent);return;}
+});
+btn.addEventListener('touchend',function(e){log('TOUCHEND on button');});
+</script>
+</body>
+</html>
