@@ -92,7 +92,7 @@ async function auditPage(browser, pagePath) {
       const isLarge = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700);
       const threshold = isLarge ? 3 : 4.5;
 
-      // Walk up to find effective background
+      // Walk up to find effective background (checks both backgroundColor and gradients)
       let bgEl = el;
       let bgColor = null;
       while (bgEl) {
@@ -101,6 +101,16 @@ async function auditPage(browser, pagePath) {
         if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
           bgColor = bg;
           break;
+        }
+        // Check for gradient backgrounds: extract dominant color from linear-gradient
+        const bgImg = bgStyle.backgroundImage;
+        if (bgImg && bgImg !== 'none' && bgImg.includes('gradient')) {
+          // Extract the first rgb/rgba color from the gradient
+          const gradMatch = bgImg.match(/rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[\d.]+)?\s*\)/);
+          if (gradMatch) {
+            bgColor = gradMatch[0];
+            break;
+          }
         }
         bgEl = bgEl.parentElement;
       }
