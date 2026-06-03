@@ -7,7 +7,7 @@ Do not edit REMIEL, NOSS scoring, Beverly Index computation, LOGOS calibration,
 R2X translation, or core pipeline. (Not expected in this static site; standing guard.)
 
 ## Commit policy
-- Author: Randolph R Beverly Jr (rrbjr@remielengine.ai).
+- Author: Randolph R Beverly Jr (rrbjr@beverlyindexai.com).
 - Never add a Co-Authored-By line or any "Generated with Claude Code" trailer.
 - Suffix every commit message with: Beverly Index LLC
 - One atomic task per commit.
