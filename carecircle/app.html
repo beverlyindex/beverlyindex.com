@@ -765,13 +765,60 @@ function resize(){
 }
 addEventListener('resize', ()=>{ resize(); if(data) buildNodes(false); if(MODE==='caseload') buildCaseload(); });
 
+let focusPanY=0, focusPanYT=0, focusZoom=1, focusZoomT=1, focusFrames=0;
 function project(n){
   const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
   let x=n.x*cy+n.z*sy, z=-n.x*sy+n.z*cy;
   let y=n.y*cp-z*sp; z=n.y*sp+z*cp;
-  z+=dist;
+  z+=dist*focusZoom;
   const s=FOV/Math.max(60,FOV+z);
-  return {sx:x*s+W/2+panX, sy:y*s+H/2+panY, s, z};
+  return {sx:x*s+W/2+panX, sy:y*s+H/2+panY+focusPanY, s, z};
+}
+function clearAbove(){
+  const small=Math.min(W,H)<700;
+  let top=20;
+  try{
+    const mt=document.getElementById('mTop');
+    if(mt.offsetParent!==null||getComputedStyle(mt).display!=='none')
+      top=Math.max(top, mt.getBoundingClientRect().bottom);
+    const hr=document.getElementById('hudRight');
+    if(getComputedStyle(hr).display!=='none')
+      top=Math.max(top, hr.getBoundingClientRect().bottom);
+    top=Math.max(top, document.getElementById('hudLeft').getBoundingClientRect().bottom);
+    const sw=document.getElementById('mSearchWrap');
+    if(sw.classList.contains('open')) top=Math.max(top, sw.getBoundingClientRect().bottom);
+  }catch(e){}
+  if(MODE==='patient'&&REG.length>1) top+=(small?46:52);   /* roster row */
+  return top+8;
+}
+function reframeForCard(){
+  requestAnimationFrame(()=>{
+    const info=$id('info');
+    if(!info.classList.contains('show')){ clearReframe(); return; }
+    const r=info.getBoundingClientRect();
+    const top=clearAbove();
+    const avail=Math.max(120, r.top-top-14);
+    focusPanYT=(top+avail/2)-(H/2+panY);
+    focusFrames=0;   /* let the zoom fitter re-evaluate */
+  });
+}
+function clearReframe(){ focusPanYT=0; focusZoomT=1; }
+function stepFocus(){
+  focusPanY+=(focusPanYT-focusPanY)*0.12;
+  focusZoom+=(focusZoomT-focusZoom)*0.10;
+  if($id('info').classList.contains('show') && MODE==='patient' && expanded && (focusFrames++%18)===0){
+    /* fit check: do the spheres spill past the card or the top chrome? */
+    const r=$id('info').getBoundingClientRect();
+    const top=clearAbove(), floor=r.top-12;
+    let lo=1e9, hi=-1e9;
+    NODES.forEach(n=>{ if(!n.pr) return; lo=Math.min(lo,n.pr.sy-24); hi=Math.max(hi,n.pr.sy+30); });
+    if(hi>-1e8){
+      const availH=Math.max(120, floor-top);
+      const span=hi-lo;
+      if(span>availH*1.02) focusZoomT=Math.min(2.1, focusZoom*span/(availH*0.94));
+      else if(span<availH*0.7 && focusZoomT>1) focusZoomT=Math.max(1, focusZoom*span/(availH*0.86));
+    }
+  }
 }
 
 /* category direction anchors on the sphere */
@@ -1045,6 +1092,7 @@ let loopWarned=false;
 function loop(){
   try{
     const t=performance.now()/1000;
+    stepFocus();
     stepPhys();
     if(spin&&!dragging&&expanded) yaw+=0.0022;
     draw(t);
@@ -1056,7 +1104,7 @@ function loop(){
 }
 
 /* ---------------- interaction (Master Tool contract) ---------------- */
-let dragging=false,lastX=0,lastY=0,startX=0,startY=0,moved=0,lastCenterTap=0;
+let dragging=false,lastX=0,lastY=0,startX=0,startY=0,moved=0,lastCenterTap=-1e9,gestureSeq=0,lastTapSeq=-1;
 function pick(mx,my){
   let best=null,bestZ=Infinity;
   NODES.forEach(n=>{
@@ -1071,6 +1119,7 @@ function pick(mx,my){
   return best;
 }
 cvs.addEventListener('pointerdown',e=>{
+  gestureSeq++;
   dragging=true;lastX=e.clientX;lastY=e.clientY;startX=e.clientX;startY=e.clientY;moved=0;
   cvs.classList.add('grabbing'); cvs.setPointerCapture(e.pointerId);
 });
@@ -1079,7 +1128,7 @@ cvs.addEventListener('pointermove',e=>{
     const dx=e.clientX-lastX,dy=e.clientY-lastY;
     moved=Math.max(moved, Math.hypot(e.clientX-startX, e.clientY-startY));
     if(MODE==='caseload'){
-      clPanY=Math.min(0, Math.max(-(clMaxY-H+180), clPanY+dy));
+      clPanY=Math.min(0, Math.max(-(clMaxY-H+(Math.min(W,H)<700?230:180)), clPanY+dy));
     }
     else if(e.shiftKey){panX+=dx;panY+=dy;}
     else{yaw+=dx*0.0055;pitch+=dy*0.0055;pitch=Math.max(-1.45,Math.min(1.45,pitch));}
@@ -1096,6 +1145,8 @@ cvs.addEventListener('pointermove',e=>{
 cvs.addEventListener('pointerup',e=>{
   dragging=false;cvs.classList.remove('grabbing');
   if(moved<10){
+    if(gestureSeq===lastTapSeq) return;   /* this gesture's tap already processed */
+    lastTapSeq=gestureSeq;
     if(MODE==='patient' && ROSTER.length){
       const hitR=ROSTER.find(o=>(e.clientX-o.x)**2+(e.clientY-o.y)**2<=(o.r+12)*(o.r+12));
       if(hitR){ if(hitR.chip) setMode('caseload'); else openPatient(hitR.id); return; }
@@ -1113,7 +1164,7 @@ cvs.addEventListener('pointerup',e=>{
       lastCenterTap=now; tapPatient();
     }
     else if(n) selectNode(n);
-    else { selected=null; $id('info').classList.remove('show'); updateActionStrip(); }
+    else { selected=null; $id('info').classList.remove('show'); updateActionStrip(); clearReframe(); }
   }
 });
 cvs.addEventListener('wheel',e=>{e.preventDefault(); dist=Math.max(320,Math.min(1500,dist+e.deltaY*0.7));},{passive:false});
@@ -1125,7 +1176,7 @@ function resetView(){
     x.classList.toggle('active', x.dataset.state==='all'));
   renderLegend();
   yaw=0.4; pitch=-0.18; dist=defaultDist(); panX=0; panY=0;
-  selected=null; $id('info').classList.remove('show'); updateActionStrip();
+  selected=null; $id('info').classList.remove('show'); updateActionStrip(); clearReframe();
   showBanner('Full circle restored.',1600);
 }
 $id('btnReset').onclick=resetView;
@@ -1174,6 +1225,7 @@ function openPatientCard(){
   info.style.borderColor=pc; info.style.boxShadow='0 0 18px '+pc+'33';
   $id('iName').style.color=pc;
   updateActionStrip();
+  reframeForCard();
 }
 function contactName(id){ const c=data.contacts.find(x=>x.id===id); return c?c.name:'—'; }
 function selectNode(n){
@@ -1199,14 +1251,15 @@ function selectNode(n){
   $id('ibNote').onclick=()=>{ openOv('ovLog'); $id('logText').value=P.name+': '; $id('logText').focus(); };
   $id('ibDel').onclick=()=>{ if(confirm('Remove '+P.name+' from the circle?')){
     data.contacts=data.contacts.filter(x=>x!==P); saveSoon(); refreshAll();
-    info.classList.remove('show'); selected=null; updateActionStrip(); } };
+    info.classList.remove('show'); selected=null; updateActionStrip(); clearReframe(); } };
   info.classList.add('show');
   info.style.borderColor=sphereColor(P);
   info.style.boxShadow='0 0 18px '+sphereColor(P)+'33';
   $id('iName').style.color=sphereColor(P);
   updateActionStrip();
+  reframeForCard();
 }
-$id('infoClose').onclick=()=>{selected=null;$id('info').classList.remove('show');updateActionStrip();};
+$id('infoClose').onclick=()=>{selected=null;$id('info').classList.remove('show');updateActionStrip();clearReframe();};
 
 /* ---------------- legend / filters / keys ---------------- */
 function renderLegend(){
@@ -1286,9 +1339,11 @@ function buildCaseload(){
 }
 let clMaxY=0;
 function drawCaseload(t){
+  const smallCl=Math.min(W,H)<700;
+  const floorCl=H-(smallCl?165:40);
   clNodes.forEach(cn=>{
     const e=cn.e, x=cn.x, y=cn.y+clPanY, r=cn.r;
-    if(y<60||y>H-30) { cn.sy=-999; return; }
+    if(y<60||y>floorCl) { cn.sy=-999; return; }
     cn.sy=y;
     const col = e.urgent?'#ff6b6b': e.watch?'#f2b84e':'#ffd24d';
     const pulse = e.urgent? (reduced?0.6:(0.5+0.5*Math.sin(t*7+cn.x))) : (reduced?0.5:(0.5+0.5*Math.sin(t*1.2+cn.x)));
@@ -1328,14 +1383,16 @@ function drawRoster(t){
   ROSTER=[];
   if(MODE!=='patient' || REG.length<2) return;
   const small=Math.min(W,H)<700;
-  if((rosterYFrame++%90)===0||!rosterYCache){
+  if((rosterYFrame++%30)===0||!rosterYCache){
     try{
       const hr=document.getElementById('hudRight');
       const hb=(hr.offsetParent!==null)? hr.getBoundingClientRect().bottom : 0;
       const lb=document.getElementById('hudLeft').getBoundingClientRect().bottom;
       const mt=document.getElementById('mTop');
       const mb=(mt.offsetParent!==null)? mt.getBoundingClientRect().bottom : 0;
-      rosterYCache=Math.max(hb,lb,mb)+30;
+      const sw=document.getElementById('mSearchWrap');
+      const sb=sw.classList.contains('open')? sw.getBoundingClientRect().bottom : 0;
+      rosterYCache=Math.max(hb,lb,mb,sb)+30;
     }catch(e){ rosterYCache=small?150:110; }
   }
   const rr=small?12:14, gap=small?58:74, y=rosterYCache;
@@ -1392,6 +1449,7 @@ async function openPatient(id){
   data = normalizeData(d) || blankData();
   expanded=true; buildNodes(true); computeNextAction(); renderLegend();
   yaw=0.4; pitch=-0.18; dist=defaultDist(); panX=0; panY=0;
+  focusPanY=0; focusPanYT=0; focusZoom=1; focusZoomT=1;
   setMode('patient');
   $id('subLine').textContent=(data.recipient.name||'New patient')+
     (REG.length>1?' is front and center \u2014 tap a roster sphere to switch patients.':' \u2014 tap a sphere for its card.');
