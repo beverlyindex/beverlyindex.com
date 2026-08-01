@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Beverly Index — Private Access</title>
+<style>
+  :root{ --navy:#002147; --gold:#b8924e; --ink:#eef1f7; --dim:#9aa6b8; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{background:radial-gradient(ellipse at 50% 35%, #0a1e3d 0%, var(--navy) 45%, #001022 100%);
+    color:var(--ink); font-family:"Hanken Grotesk","Segoe UI",system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:20px;}
+  .card{width:min(400px,92vw); text-align:center;}
+  .mark{font-family:Fraunces,Georgia,serif; letter-spacing:.14em; font-size:13px;
+    color:var(--gold); text-transform:uppercase; margin-bottom:6px;}
+  h1{font-family:Fraunces,Georgia,serif; font-weight:600; font-size:26px; margin-bottom:8px;}
+  h1 span{color:var(--gold);}
+  p.sub{color:var(--dim); font-size:13.5px; line-height:1.6; margin-bottom:26px;}
+  input{width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(184,146,78,.45);
+    border-radius:10px; color:var(--ink); font-size:19px; letter-spacing:.18em; text-align:center;
+    padding:13px 14px; outline:none; text-transform:uppercase;}
+  input:focus{border-color:var(--gold);}
+  button{margin-top:14px; width:100%; background:var(--gold); border:none; color:#0b1526;
+    font-size:15px; font-weight:600; padding:13px; border-radius:10px; cursor:pointer;}
+  button:hover{filter:brightness(1.08);}
+  .err{color:#ff9b9b; font-size:13px; margin-top:12px; min-height:18px;}
+  .foot{margin-top:30px; color:var(--dim); font-size:11.5px;}
+  .foot a{color:var(--dim);}
+  .shake{animation:sh .35s;}
+  @keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="mark">Beverly Index</div>
+  <h1>Care<span>Circle</span></h1>
+  <p class="sub">This tool is in private evaluation. Enter your access code to continue.</p>
+  <input id="code" autocomplete="off" spellcheck="false" placeholder="CC-XXXX-XXXX" aria-label="Access code">
+  <button id="go">Enter</button>
+  <div class="err" id="err"></div>
+  <div class="foot"><a href="https://beverly-index.com">← Return to beverly-index.com</a></div>
+</div>
+<script>
+const KEYS={
+  'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6':'primary',
+  '2dfff49a919dda77992069e38094e3e2e8a699a3ac8e080d45664465d1700ffb':'tester'
+};
+async function hashCode(c){
+  const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('carecircle:'+c));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function attempt(){
+  const el=document.getElementById('code'), err=document.getElementById('err');
+  const code=el.value.trim().toUpperCase();
+  if(!code) return;
+  if(!(window.crypto&&crypto.subtle)){ err.textContent='This gate requires a secure (https) connection.'; return; }
+  const who=KEYS[await hashCode(code)];
+  if(who){
+    sessionStorage.setItem('cc:access', code);
+    sessionStorage.setItem('cc:who', who);
+    location.replace('app.html');
+  } else {
+    err.textContent='That code was not recognized.';
+    el.value=''; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); el.focus();
+  }
+}
+document.getElementById('go').onclick=attempt;
+document.getElementById('code').addEventListener('keydown',e=>{ if(e.key==='Enter') attempt(); });
+document.getElementById('code').focus();
+</script>
+</body>
+</html>
