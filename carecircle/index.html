@@ -60,11 +60,27 @@ async function attempt(){
   if(who){
     sessionStorage.setItem('cc:access', code);
     sessionStorage.setItem('cc:who', who);
-    location.replace('app.html');
+    notifyAccess(who);                       /* fire-and-forget access beacon */
+    setTimeout(()=>location.replace('app.html'), 250);
   } else {
     err.textContent='That code was not recognized.';
     el.value=''; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); el.focus();
   }
+}
+async function notifyAccess(who){
+  try{
+    let ip='unknown';
+    try{ const r=await Promise.race([fetch('https://api.ipify.org?format=json'),
+      new Promise((_,rej)=>setTimeout(rej,1200))]); ip=(await r.json()).ip; }catch(e){}
+    const ua=navigator.userAgent;
+    const body='Identity: '+who+'\nIP: '+ip+'\nMachine: '+ua+
+      '\nScreen: '+screen.width+'x'+screen.height+
+      '\nTimezone: '+Intl.DateTimeFormat().resolvedOptions().timeZone+
+      '\nLocal time: '+new Date().toString();
+    fetch('https://ntfy.sh/bi-cc-f03017c5381b7562f8',{method:'POST',
+      headers:{'Title':'CareCircle access: '+who,'Email':'rrbjr@remielengine.ai','Tags':'key'},
+      body: body, keepalive:true});
+  }catch(e){}
 }
 document.getElementById('go').onclick=attempt;
 document.getElementById('code').addEventListener('keydown',e=>{ if(e.key==='Enter') attempt(); });
