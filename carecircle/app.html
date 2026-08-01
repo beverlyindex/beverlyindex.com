@@ -257,6 +257,8 @@
     <button class="btn" id="btnLog">Log</button>
     <button class="btn" id="btnEmg">Emergency</button>
     <button class="btn" id="btnManage">Manage</button>
+    <button class="btn" id="btnPatients" title="Your caseload">Patients</button>
+    <button class="btn gold" id="btnAddPatient" style="display:none">+ Add patient</button>
     <button class="btn danger" id="btnExit" title="Leave CareCircle">Exit</button>
   </div>
   <div id="stateFilters">
@@ -476,7 +478,9 @@
       <button class="btn" id="impBtn">Import backup</button>
       <input id="impFile" type="file" accept=".json" style="display:none">
       <button class="btn" id="sampleBtn">Load sample data</button>
-      <button class="btn danger" id="wipeBtn">Start fresh</button>
+      <button class="btn" id="expAllBtn">Export whole caseload</button>
+      <button class="btn danger" id="wipeBtn">Start fresh (this patient)</button>
+      <button class="btn danger" id="delPatBtn">Remove this patient</button>
     </div>
     <div class="sub" id="storeNote" style="margin-top:6px"></div>
   </div>
@@ -529,28 +533,48 @@ SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, bo
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
 let memOnly=false;
 const store = {
-  async load(){
-    if (window.storage){ try{ const r=await window.storage.get('carecircle:data'); if(r&&r.value) return JSON.parse(r.value); }catch(e){} }
-    try{ const v=localStorage.getItem('carecircle:data'); if(v) return JSON.parse(v); }catch(e){}
+  async loadKey(k){
+    if (window.storage){ try{ const r=await window.storage.get(k); if(r&&r.value) return JSON.parse(r.value); }catch(e){} }
+    try{ const v=localStorage.getItem(k); if(v) return JSON.parse(v); }catch(e){}
     return null;
   },
-  async save(d){
+  async saveKey(k,d){
     const s=JSON.stringify(d);
-    if (window.storage){ try{ await window.storage.set('carecircle:data', s); return true; }catch(e){} }
-    try{ localStorage.setItem('carecircle:data', s); return true; }catch(e){}
+    if (window.storage){ try{ await window.storage.set(k, s); return true; }catch(e){} }
+    try{ localStorage.setItem(k, s); return true; }catch(e){}
     memOnly=true; return false;
-  }
+  },
+  syncSaveKey(k,d){ try{ localStorage.setItem(k, JSON.stringify(d)); }catch(e){}
+    if(window.storage){ try{ window.storage.set(k, JSON.stringify(d)); }catch(e){} } }
 };
+/* ---- caseload registry ---- */
+let REG=[], activeId=null, MODE='patient';
+const dataKey = id => 'carecircle:data:'+id;
+function regEntry(id){ return REG.find(r=>r.id===id); }
+function updateRegSummary(){
+  if(!activeId||!data) return;
+  const e=regEntry(activeId); if(!e) return;
+  e.name=data.recipient.name||'Unnamed patient';
+  e.updated=Date.now();
+  e.urgent=!!patientUrgent || data.contacts.some(c=>c.state==='urgent');
+  e.watch=data.contacts.some(c=>c.state==='watch');
+  e.next=nextActionText||'';
+}
 let saveT=null, dirty=false;
 function saveSoon(){ dirty=true; clearTimeout(saveT); saveT=setTimeout(async()=>{
-  const ok=await store.save(data); dirty=false;
-  if(!ok) showBanner('Storage unavailable here — use Manage → Export to keep a backup.',6000);
+  updateRegSummary();
+  const ok=await store.saveKey(dataKey(activeId), data); dirty=false;
+  await store.saveKey('carecircle:registry', REG);
+  await store.saveKey('carecircle:active', activeId);
+  if(!ok) showBanner('Storage unavailable here \u2014 use Manage \u2192 Export to keep a backup.',6000);
 },300); }
 /* never lose the last edit: synchronous flush when the tab hides or closes */
 function flushNow(){
-  if(!dirty||!data) return;
-  try{ localStorage.setItem('carecircle:data', JSON.stringify(data)); dirty=false; }catch(e){}
-  if(window.storage){ try{ window.storage.set('carecircle:data', JSON.stringify(data)); }catch(e){} }
+  if(!data) return;
+  updateRegSummary();
+  if(dirty){ store.syncSaveKey(dataKey(activeId), data); dirty=false; }
+  store.syncSaveKey('carecircle:registry', REG);
+  store.syncSaveKey('carecircle:active', activeId);
 }
 addEventListener('pagehide', flushNow);
 addEventListener('beforeunload', flushNow);
@@ -650,7 +674,7 @@ function resize(){
   DPR=Math.min(devicePixelRatio||1,2); W=innerWidth; H=innerHeight;
   cvs.width=W*DPR; cvs.height=H*DPR; cvs.style.width=W+'px'; cvs.style.height=H+'px';
 }
-addEventListener('resize', ()=>{ resize(); if(data) buildNodes(false); });
+addEventListener('resize', ()=>{ resize(); if(data) buildNodes(false); if(MODE==='caseload') buildCaseload(); });
 
 function project(n){
   const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
@@ -778,6 +802,14 @@ function contactNextAction(P){
 }
 function updateActionStrip(){
   const lbl=document.querySelector('#todayStrip .lbl');
+  if(MODE==='caseload'){
+    const u=REG.filter(e=>e.urgent).length, w=REG.filter(e=>!e.urgent&&e.watch).length;
+    lbl.textContent='Caseload';
+    $id('todayNext').innerHTML=REG.length+' patient'+(REG.length===1?'':'s')+
+      (u?' \u00b7 <b>'+u+' urgent</b>':'')+(w?' \u00b7 '+w+' watch':'')+
+      ((!u&&!w)?' \u00b7 all quiet':'');
+    return;
+  }
   if(selected&&selected.p2){
     lbl.textContent='Next · '+(selected.p2.name||'').split(' ')[0];
     $id('todayNext').innerHTML=esc(contactNextAction(selected.p2));
@@ -809,6 +841,7 @@ function draw(t){
   g.addColorStop(0,'#0a0f1a'); g.addColorStop(0.55,'#05070c'); g.addColorStop(1,'#000000');
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
+  if(MODE==='caseload'){ drawCaseload(t); return; }
   const center={x:0,y:0,z:0}; const cp=project(center);
   NODES.forEach(n=>{ n.pr=project(n); });
   const ordered=[...NODES].sort((a,b)=>b.pr.z-a.pr.z);
@@ -955,7 +988,10 @@ cvs.addEventListener('pointermove',e=>{
   if(dragging){
     const dx=e.clientX-lastX,dy=e.clientY-lastY;
     moved=Math.max(moved, Math.hypot(e.clientX-startX, e.clientY-startY));
-    if(e.shiftKey){panX+=dx;panY+=dy;}
+    if(MODE==='caseload'){
+      clPanY=Math.min(0, Math.max(-(clMaxY-H+180), clPanY+dy));
+    }
+    else if(e.shiftKey){panX+=dx;panY+=dy;}
     else{yaw+=dx*0.0055;pitch+=dy*0.0055;pitch=Math.max(-1.45,Math.min(1.45,pitch));}
     lastX=e.clientX;lastY=e.clientY;
   }else{
@@ -970,6 +1006,11 @@ cvs.addEventListener('pointermove',e=>{
 cvs.addEventListener('pointerup',e=>{
   dragging=false;cvs.classList.remove('grabbing');
   if(moved<10){
+    if(MODE==='caseload'){
+      const hitCl=clNodes.find(cn=>cn.sy>-500 && (e.clientX-cn.x)**2+(e.clientY-cn.sy)**2<=(cn.r+16)*(cn.r+16));
+      if(hitCl) openPatient(hitCl.e.id);
+      return;
+    }
     if(!expanded){ tapPatient(); return; }
     const n=pick(e.clientX,e.clientY);
     if(n==='CENTER'){
@@ -1086,9 +1127,10 @@ function renderLegend(){
 }
 document.querySelectorAll('#stateFilters .btn[data-state]').forEach(b=>{
   b.onclick=()=>{stateFilter=b.dataset.state;
-    document.querySelectorAll('#stateFilters .btn[data-state]').forEach(x=>x.classList.toggle('active',x===b));};
+    document.querySelectorAll('#stateFilters .btn[data-state]').forEach(x=>x.classList.toggle('active',x===b));
+    if(MODE==='caseload') buildCaseload();};
 });
-$id('q').addEventListener('input',e=>query=e.target.value.trim());
+$id('q').addEventListener('input',e=>{query=e.target.value.trim(); if(MODE==='caseload') buildCaseload();});
 addEventListener('keydown',e=>{
   if(e.key==='/'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();$id('q').focus();}
   if(e.key==='Escape'){document.querySelectorAll('.ov.show').forEach(o=>o.classList.remove('show'));
@@ -1107,6 +1149,99 @@ document.querySelectorAll('.ovClose').forEach(b=>b.onclick=()=>$id(b.dataset.clo
 $id('btnMeds').onclick=()=>openOv('ovMeds'); $id('btnSched').onclick=()=>openOv('ovSched');
 $id('btnLog').onclick=()=>openOv('ovLog'); $id('btnEmg').onclick=()=>openOv('ovEmg');
 $id('btnManage').onclick=()=>openOv('ovManage'); $id('btnTI').onclick=()=>openOv('ovTI');
+/* ---- caseload mode ---- */
+let clNodes=[], clPanY=0, clDrag=false;
+function setMode(m){
+  MODE=m;
+  const patientOnly=['btnTI','btnMeds','btnSched','btnLog','btnEmg','btnManage'];
+  patientOnly.forEach(i=>$id(i).style.display = m==='patient' ? '' : 'none');
+  $id('btnAddPatient').style.display = m==='caseload' ? '' : 'none';
+  $id('btnPatients').style.display = (m==='patient' && REG.length>0) ? '' : 'none';
+  $id('legend').style.display = m==='patient' ? '' : 'none';
+  document.querySelectorAll('.ov.show').forEach(o=>o.classList.remove('show'));
+  $id('info').classList.remove('show'); selected=null;
+  if(m==='caseload'){
+    clPanY=0; buildCaseload();
+    $id('subLine').textContent='Your caseload \u2014 red pulses first. Tap a patient to open their circle.';
+  }
+  updateActionStrip();
+}
+function clSorted(){
+  return [...REG].sort((a,b)=>{
+    const ra=a.urgent?0:a.watch?1:2, rb=b.urgent?0:b.watch?1:2;
+    return ra-rb || (a.name||'').localeCompare(b.name||'');
+  });
+}
+function buildCaseload(){
+  const list=clSorted().filter(e=>{
+    if(stateFilter==='urgent'&&!e.urgent) return false;
+    if(stateFilter==='watch'&&!(e.watch||e.urgent)) return false;
+    if(query && !(e.name||'').toLowerCase().includes(query.toLowerCase())) return false;
+    return true;
+  });
+  const n=list.length||1;
+  const small=Math.min(W,H)<700;
+  const cell=small?110:150, r=small?20:24;
+  const cols=Math.max(1, Math.min(Math.floor((W-60)/cell), Math.ceil(Math.sqrt(n*W/Math.max(300,H-220)))));
+  const rows=Math.ceil(n/cols);
+  const x0=W/2-((Math.min(cols,n)-1)*cell)/2, y0=Math.max(150, H/2-((rows-1)*cell)/2);
+  clNodes=list.map((e,i)=>({e, r,
+    x:x0+(i%cols)*cell + ((Math.floor(i/cols)%2)?cell*0.18:0),
+    y:y0+Math.floor(i/cols)*cell }));
+  clMaxY=y0+(rows-1)*cell;
+}
+let clMaxY=0;
+function drawCaseload(t){
+  clNodes.forEach(cn=>{
+    const e=cn.e, x=cn.x, y=cn.y+clPanY, r=cn.r;
+    if(y<60||y>H-30) { cn.sy=-999; return; }
+    cn.sy=y;
+    const col = e.urgent?'#ff6b6b': e.watch?'#f2b84e':'#ffd24d';
+    const pulse = e.urgent? (reduced?0.6:(0.5+0.5*Math.sin(t*7+cn.x))) : (reduced?0.5:(0.5+0.5*Math.sin(t*1.2+cn.x)));
+    ctx.globalCompositeOperation='lighter';
+    const halo=r*(3.4+(e.urgent?pulse*1.6:pulse*0.5));
+    const gg=ctx.createRadialGradient(x,y,0,x,y,halo);
+    gg.addColorStop(0,col+'cc'); gg.addColorStop(0.2,col+'77'); gg.addColorStop(0.5,col+'26'); gg.addColorStop(1,col+'00');
+    ctx.globalAlpha=0.55+(e.urgent?0.3*pulse:0.1*pulse);
+    ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(x,y,halo,0,7); ctx.fill();
+    ctx.globalAlpha=0.30; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
+    const core=ctx.createRadialGradient(x,y,0,x,y,r*0.62);
+    core.addColorStop(0,col); core.addColorStop(0.7,col+'55'); core.addColorStop(1,col+'00');
+    ctx.globalAlpha=0.55; ctx.fillStyle=core; ctx.beginPath(); ctx.arc(x,y,r*0.62,0,7); ctx.fill();
+    ctx.globalCompositeOperation='source-over';
+    ctx.globalAlpha=0.92; ctx.strokeStyle=col; ctx.lineWidth=1.6;
+    ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.stroke();
+    ctx.globalAlpha=1; ctx.fillStyle='#0a0d14';
+    ctx.font='700 12px "Segoe UI",system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(initials(e.name), x, y);
+    ctx.fillStyle='#e8ecf4'; ctx.font='600 12px "Segoe UI",system-ui,sans-serif';
+    ctx.fillText((e.name||'Unnamed'), x, y+r+14);
+    if(e.next){ ctx.fillStyle='rgba(139,148,168,.9)'; ctx.font='10.5px "Segoe UI",system-ui,sans-serif';
+      const nx=e.next.length>26? e.next.slice(0,25)+'\u2026':e.next;
+      ctx.fillText(nx, x, y+r+28); }
+  });
+  ctx.globalAlpha=1;
+}
+async function openPatient(id){
+  flushNow();
+  activeId=id;
+  let d=await store.loadKey(dataKey(id));
+  data = normalizeData(d) || blankData();
+  expanded=true; buildNodes(true); computeNextAction(); renderLegend();
+  yaw=0.4; pitch=-0.18; dist=defaultDist(); panX=0; panY=0;
+  setMode('patient');
+  $id('subLine').textContent=(data.recipient.name||'New patient')+' \u2014 tap a sphere for its card \u00b7 Patients returns to your caseload.';
+}
+$id('btnPatients').onclick=()=>{ flushNow(); setMode('caseload'); };
+$id('btnAddPatient').onclick=async()=>{
+  const id=uid();
+  REG.push({id, name:'New patient', updated:Date.now(), urgent:false, watch:false, next:''});
+  await store.saveKey('carecircle:registry', REG);
+  activeId=id; data=blankData(); dirty=true;
+  await openPatient(id);
+  openOv('ovManage'); setTimeout(()=>$id('pName').focus(),80);
+  showBanner('New patient created \u2014 start with their name.',3000);
+};
 $id('btnExit').onclick=()=>{
   if(!confirm('Exit CareCircle? Your data stays saved on this device.')) return;
   flushNow();
@@ -1504,13 +1639,51 @@ $id('impBtn').onclick=()=>$id('impFile').click();
 $id('impFile').onchange=e=>{
   const f=e.target.files[0]; if(!f)return;
   const rd=new FileReader();
-  rd.onload=()=>{try{const d=normalizeData(JSON.parse(rd.result));
+  rd.onload=async()=>{try{const raw=JSON.parse(rd.result);
+      if(raw&&raw.caseload&&Array.isArray(raw.patients)){
+        if(!confirm('Restore whole caseload ('+raw.patients.length+' patients)? This replaces the caseload on this device.')) return;
+        REG=[];
+        for(const p of raw.patients){ const d=normalizeData(p.data); if(!d) continue;
+          const id=p.id||uid();
+          await store.saveKey(dataKey(id), d);
+          REG.push({id, name:d.recipient.name||'Unnamed patient', updated:Date.now(),
+            urgent:d.contacts.some(c=>c.state==='urgent'), watch:d.contacts.some(c=>c.state==='watch'), next:''});
+        }
+        await store.saveKey('carecircle:registry', REG);
+        activeId=REG[0]?REG[0].id:null;
+        if(activeId) data=normalizeData(await store.loadKey(dataKey(activeId)))||blankData();
+        setMode(REG.length>1?'caseload':'patient'); renderManage();
+        showBanner('Caseload restored \u2014 '+REG.length+' patients.',3000); return;
+      }
+      const d=normalizeData(raw);
       if(!d)throw 0;
-      data=d; saveSoon(); refreshAll(); renderManage(); showBanner('Backup restored.',2500);
+      data=d; saveSoon(); refreshAll(); renderManage(); showBanner('Backup restored for this patient.',2500);
     }catch(err){showBanner('That file is not a CareCircle backup.',3500);}};
   rd.readAsText(f);
 };
 $id('sampleBtn').onclick=()=>{data=sampleData(); expanded=false; saveSoon(); refreshAll(); renderManage();};
+$id('expAllBtn').onclick=async()=>{
+  flushNow();
+  const patients=[];
+  for(const e of REG){ const d=await store.loadKey(dataKey(e.id)); if(d) patients.push({id:e.id, data:d}); }
+  const blob=new Blob([JSON.stringify({caseload:true, exported:todayStr(), patients},null,1)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='carecircle_caseload_'+todayStr()+'.json'; a.click();
+};
+$id('delPatBtn').onclick=async()=>{
+  const nm=data.recipient.name||'this patient';
+  if(REG.length<=1){ showBanner('This is your only patient \u2014 use Start fresh instead.',3500); return; }
+  if(!confirm('Remove '+nm+' and ALL their records from this device? Export a backup first if needed.')) return;
+  if(!confirm('This cannot be undone. Remove '+nm+'?')) return;
+  try{ localStorage.removeItem(dataKey(activeId)); }catch(e){}
+  if(window.storage){ try{ await window.storage.delete(dataKey(activeId)); }catch(e){} }
+  REG=REG.filter(e=>e.id!==activeId);
+  await store.saveKey('carecircle:registry', REG);
+  dirty=false; data=null; activeId=REG[0]?REG[0].id:null;
+  document.querySelectorAll('.ov.show').forEach(o=>o.classList.remove('show'));
+  if(activeId){ data=normalizeData(await store.loadKey(dataKey(activeId)))||blankData(); }
+  setMode('caseload'); showBanner(nm+' removed.',2500);
+};
 $id('wipeBtn').onclick=()=>{
   if(confirm('Start fresh? This clears everything. Export a backup first if you want to keep it.')){
     data=blankData(); expanded=false; saveSoon(); refreshAll(); renderManage();}
@@ -1548,16 +1721,33 @@ window.addEventListener('error', e=>{
 });
 (async function(){
   try{
-    data = normalizeData(await store.load()) || sampleData();
-  }catch(e){ data = sampleData(); }
+    REG = (await store.loadKey('carecircle:registry')) || [];
+    if(!Array.isArray(REG)) REG=[];
+    if(!REG.length){
+      const legacy = normalizeData(await store.loadKey('carecircle:data'));
+      const first = legacy || sampleData();
+      const id=uid();
+      REG=[{id, name:first.recipient.name||'Unnamed patient', updated:Date.now(),
+        urgent:false, watch:first.contacts.some(c=>c.state==='watch'), next:''}];
+      await store.saveKey(dataKey(id), first);
+      await store.saveKey('carecircle:registry', REG);
+      if(legacy){ try{ localStorage.removeItem('carecircle:data'); }catch(e){} }
+      activeId=id;
+    } else {
+      activeId = (await store.loadKey('carecircle:active'));
+      if(!regEntry(activeId)) activeId=REG[0].id;
+    }
+    data = normalizeData(await store.loadKey(dataKey(activeId))) || sampleData();
+  }catch(e){ data = sampleData(); if(!REG.length){REG=[{id:activeId=uid(),name:data.recipient.name||'Patient',updated:Date.now(),urgent:false,watch:false,next:''}];} }
   try{
     resize(); dist=defaultDist(); refreshAll();
     if(data.pin){
       if(window.crypto&&crypto.subtle){ $id('lock').classList.add('show'); $id('pinIn').focus(); }
       else showBanner('PIN check needs a secure (https) page \u2014 opening without it.',5000);
     }
+    setMode(REG.length>1 ? 'caseload' : 'patient');
     loop();
-    setInterval(computeNextAction, 60000);
+    setInterval(()=>{ computeNextAction(); if(MODE==='caseload'){ updateRegSummary(); buildCaseload(); } }, 60000);
   }catch(e){
     /* last-resort recovery: never leave a silent blank screen */
     try{
