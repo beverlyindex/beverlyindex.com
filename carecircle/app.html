@@ -17,6 +17,8 @@
   #scene.grabbing{cursor:grabbing;}
 
   .hud{position:absolute;z-index:5;}
+  #hudRight,#hudLeft{pointer-events:none;}
+  #hudRight .btn, #hudRight input{pointer-events:auto;}
   #hudLeft{top:14px;left:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;}
   #titleBar{max-width:min(430px, calc(100vw - 640px));pointer-events:none;}
   #titleBar img{display:block;width:108px;height:auto;margin-bottom:5px;}
@@ -949,6 +951,7 @@ function draw(t){
     ctx.fillStyle='rgba(232,236,244,.95)'; ctx.font='600 '+Math.round(14*s)+'px "Segoe UI",system-ui,sans-serif';
     ctx.fillText('Tap to open the circle', cp.sx, cp.sy+(rr+40)*s); }
     centerHit={x:cp.sx,y:cp.sy,r:rr*s};
+  drawRoster(t);
 }
 let centerHit={x:0,y:0,r:0};
 let loopWarned=false;
@@ -1006,6 +1009,10 @@ cvs.addEventListener('pointermove',e=>{
 cvs.addEventListener('pointerup',e=>{
   dragging=false;cvs.classList.remove('grabbing');
   if(moved<10){
+    if(MODE==='patient' && ROSTER.length){
+      const hitR=ROSTER.find(o=>(e.clientX-o.x)**2+(e.clientY-o.y)**2<=(o.r+12)*(o.r+12));
+      if(hitR){ if(hitR.chip) setMode('caseload'); else openPatient(hitR.id); return; }
+    }
     if(MODE==='caseload'){
       const hitCl=clNodes.find(cn=>cn.sy>-500 && (e.clientX-cn.x)**2+(e.clientY-cn.sy)**2<=(cn.r+16)*(cn.r+16));
       if(hitCl) openPatient(hitCl.e.id);
@@ -1222,6 +1229,72 @@ function drawCaseload(t){
   });
   ctx.globalAlpha=1;
 }
+let ROSTER=[];   /* hit targets: {x,y,r,id} or {chip:true,...} */
+let rosterYCache=0, rosterYFrame=0;
+function rosterList(){
+  return [...REG].filter(e=>e.id!==activeId).sort((a,b)=>{
+    const ra=a.urgent?0:a.watch?1:2, rb=b.urgent?0:b.watch?1:2;
+    return ra-rb || (a.name||'').localeCompare(b.name||'');
+  });
+}
+function drawRoster(t){
+  ROSTER=[];
+  if(MODE!=='patient' || REG.length<2) return;
+  const small=Math.min(W,H)<700;
+  if((rosterYFrame++%90)===0||!rosterYCache){
+    try{
+      const hb=document.getElementById('hudRight').getBoundingClientRect().bottom;
+      const lb=document.getElementById('hudLeft').getBoundingClientRect().bottom;
+      rosterYCache=Math.max(hb,lb)+30;
+    }catch(e){ rosterYCache=small?150:110; }
+  }
+  const rr=small?12:14, gap=small?58:74, y=rosterYCache;
+  const list=rosterList();
+  const maxVis=Math.max(2, Math.floor((W-(small?150:420))/gap));
+  const vis=list.slice(0,maxVis), more=list.length-vis.length;
+  const slots=vis.length+(more>0?1:0);
+  if(!slots) return;
+  const x0=W/2-((slots-1)*gap)/2;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  vis.forEach((e,i)=>{
+    const x=x0+i*gap;
+    const col=e.urgent?'#ff6b6b':e.watch?'#f2b84e':'#ffd24d';
+    const pulse=e.urgent?(reduced?0.6:(0.5+0.5*Math.sin(t*7+i))):0;
+    ctx.globalCompositeOperation='lighter';
+    const halo=rr*(2.6+pulse*1.4);
+    const gg=ctx.createRadialGradient(x,y,0,x,y,halo);
+    gg.addColorStop(0,col+'aa'); gg.addColorStop(0.4,col+'33'); gg.addColorStop(1,col+'00');
+    ctx.globalAlpha=0.5+0.35*pulse;
+    ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(x,y,halo,0,7); ctx.fill();
+    ctx.globalAlpha=0.28; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,rr,0,7); ctx.fill();
+    const core=ctx.createRadialGradient(x,y,0,x,y,rr*0.62);
+    core.addColorStop(0,col); core.addColorStop(0.7,col+'55'); core.addColorStop(1,col+'00');
+    ctx.globalAlpha=0.55; ctx.fillStyle=core; ctx.beginPath(); ctx.arc(x,y,rr*0.62,0,7); ctx.fill();
+    ctx.globalCompositeOperation='source-over';
+    ctx.globalAlpha=0.9; ctx.strokeStyle=col; ctx.lineWidth=1.3;
+    ctx.beginPath(); ctx.arc(x,y,rr,0,7); ctx.stroke();
+    ctx.globalAlpha=1; ctx.fillStyle='#0a0d14';
+    ctx.font='700 '+(small?9:10)+'px "Segoe UI",system-ui,sans-serif';
+    ctx.fillText(initials(e.name), x, y);
+    ctx.fillStyle='rgba(139,148,168,.95)';
+    ctx.font='600 '+(small?9.5:10.5)+'px "Segoe UI",system-ui,sans-serif';
+    ctx.fillText((e.name||'').split(' ')[0], x, y+rr+11);
+    ROSTER.push({x,y,r:rr,id:e.id});
+  });
+  if(more>0){
+    const x=x0+vis.length*gap;
+    ctx.globalAlpha=0.9; ctx.strokeStyle='#8b94a8'; ctx.lineWidth=1.3;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.arc(x,y,rr,0,7); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#e8ecf4'; ctx.font='700 '+(small?9:10)+'px "Segoe UI",system-ui,sans-serif';
+    ctx.fillText('+'+more, x, y);
+    ctx.fillStyle='rgba(139,148,168,.95)'; ctx.font='600 '+(small?9.5:10.5)+'px "Segoe UI",system-ui,sans-serif';
+    ctx.fillText('more', x, y+rr+11);
+    ROSTER.push({x,y,r:rr,chip:true});
+  }
+  ctx.globalAlpha=1;
+}
 async function openPatient(id){
   flushNow();
   activeId=id;
@@ -1230,7 +1303,8 @@ async function openPatient(id){
   expanded=true; buildNodes(true); computeNextAction(); renderLegend();
   yaw=0.4; pitch=-0.18; dist=defaultDist(); panX=0; panY=0;
   setMode('patient');
-  $id('subLine').textContent=(data.recipient.name||'New patient')+' \u2014 tap a sphere for its card \u00b7 Patients returns to your caseload.';
+  $id('subLine').textContent=(data.recipient.name||'New patient')+
+    (REG.length>1?' is front and center \u2014 tap a roster sphere to switch patients.':' \u2014 tap a sphere for its card.');
 }
 $id('btnPatients').onclick=()=>{ flushNow(); setMode('caseload'); };
 $id('btnAddPatient').onclick=async()=>{
@@ -1745,7 +1819,7 @@ window.addEventListener('error', e=>{
       if(window.crypto&&crypto.subtle){ $id('lock').classList.add('show'); $id('pinIn').focus(); }
       else showBanner('PIN check needs a secure (https) page \u2014 opening without it.',5000);
     }
-    setMode(REG.length>1 ? 'caseload' : 'patient');
+    setMode('patient'); if(REG.length>1) expanded=true;
     loop();
     setInterval(()=>{ computeNextAction(); if(MODE==='caseload'){ updateRegSummary(); buildCaseload(); } }, 60000);
   }catch(e){
