@@ -791,13 +791,23 @@ function clearAbove(){
   if(MODE==='patient'&&REG.length>1) top+=(small?46:52);   /* roster row */
   return top+8;
 }
+function panelsFloor(){
+  let floor=H;
+  const info=$id('info');
+  if(info.classList.contains('show')) floor=Math.min(floor, info.getBoundingClientRect().top);
+  const lg=$id('legend');
+  if(W<=700 && lg.classList.contains('open')) floor=Math.min(floor, lg.getBoundingClientRect().top);
+  return floor;
+}
+function panelsOpen(){
+  return $id('info').classList.contains('show') || (W<=700 && $id('legend').classList.contains('open'));
+}
 function reframeForCard(){
   requestAnimationFrame(()=>{
-    const info=$id('info');
-    if(!info.classList.contains('show')){ clearReframe(); return; }
-    const r=info.getBoundingClientRect();
+    if(!panelsOpen()){ clearReframe(); return; }
+    const floor=panelsFloor();
     const top=clearAbove();
-    const avail=Math.max(120, r.top-top-14);
+    const avail=Math.max(120, floor-top-14);
     focusPanYT=(top+avail/2)-(H/2+panY);
     focusFrames=0;   /* let the zoom fitter re-evaluate */
   });
@@ -806,10 +816,9 @@ function clearReframe(){ focusPanYT=0; focusZoomT=1; }
 function stepFocus(){
   focusPanY+=(focusPanYT-focusPanY)*0.12;
   focusZoom+=(focusZoomT-focusZoom)*0.10;
-  if($id('info').classList.contains('show') && MODE==='patient' && expanded && (focusFrames++%18)===0){
-    /* fit check: do the spheres spill past the card or the top chrome? */
-    const r=$id('info').getBoundingClientRect();
-    const top=clearAbove(), floor=r.top-12;
+  if(panelsOpen() && MODE==='patient' && expanded && (focusFrames++%18)===0){
+    /* fit check: do the spheres spill past the open panels or the top chrome? */
+    const top=clearAbove(), floor=panelsFloor()-12;
     let lo=1e9, hi=-1e9;
     NODES.forEach(n=>{ if(!n.pr) return; lo=Math.min(lo,n.pr.sy-24); hi=Math.max(hi,n.pr.sy+30); });
     if(hi>-1e8){
@@ -1164,7 +1173,7 @@ cvs.addEventListener('pointerup',e=>{
       lastCenterTap=now; tapPatient();
     }
     else if(n) selectNode(n);
-    else { selected=null; $id('info').classList.remove('show'); updateActionStrip(); clearReframe(); }
+    else { selected=null; $id('info').classList.remove('show'); updateActionStrip(); reframeForCard(); }
   }
 });
 cvs.addEventListener('wheel',e=>{e.preventDefault(); dist=Math.max(320,Math.min(1500,dist+e.deltaY*0.7));},{passive:false});
@@ -1251,7 +1260,7 @@ function selectNode(n){
   $id('ibNote').onclick=()=>{ openOv('ovLog'); $id('logText').value=P.name+': '; $id('logText').focus(); };
   $id('ibDel').onclick=()=>{ if(confirm('Remove '+P.name+' from the circle?')){
     data.contacts=data.contacts.filter(x=>x!==P); saveSoon(); refreshAll();
-    info.classList.remove('show'); selected=null; updateActionStrip(); clearReframe(); } };
+    info.classList.remove('show'); selected=null; updateActionStrip(); reframeForCard(); } };
   info.classList.add('show');
   info.style.borderColor=sphereColor(P);
   info.style.boxShadow='0 0 18px '+sphereColor(P)+'33';
@@ -1259,7 +1268,7 @@ function selectNode(n){
   updateActionStrip();
   reframeForCard();
 }
-$id('infoClose').onclick=()=>{selected=null;$id('info').classList.remove('show');updateActionStrip();clearReframe();};
+$id('infoClose').onclick=()=>{selected=null;$id('info').classList.remove('show');updateActionStrip();reframeForCard();};
 
 /* ---------------- legend / filters / keys ---------------- */
 function renderLegend(){
@@ -1499,7 +1508,7 @@ $id('msPatients').onclick=()=>{ flushNow(); setMode('caseload'); closeSheet(); }
 $id('msAdd').onclick=()=>{ closeSheet(); $id('btnAddPatient').onclick(); };
 $id('msManage').onclick=()=>{ closeSheet(); openOv('ovManage'); };
 $id('msExit').onclick=doExit;
-$id('legendChip').onclick=()=>$id('legend').classList.toggle('open');
+$id('legendChip').onclick=()=>{ $id('legend').classList.toggle('open'); reframeForCard(); };
 
 /* ============================================================
    PATIENT ROOM — complaints & new symptoms (instant, offline)
