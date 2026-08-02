@@ -361,7 +361,7 @@
 </div>
 
 <div class="ov" id="ovPhotos"><div class="ovCard">
-  <button class="x" data-close="ovPhotos" aria-label="Close">×</button>
+  <button class="x ovClose" data-close="ovPhotos" aria-label="Close">×</button>
   <h2>Photos <span class="gold2">· document what words can't</span></h2>
   <p class="sub">A fall, a bruise, a rash, a wound that's changing — capture it here, dated, and send it to the doctor or family in one step. Photos stay on this device.</p>
   <button class="btn gold" id="phAddBtn">+ Add photo</button>
@@ -369,7 +369,7 @@
   <div id="phGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:14px"></div>
 </div></div>
 <div class="ov" id="ovPhotoView"><div class="ovCard">
-  <button class="x" data-close="ovPhotoView" aria-label="Close">×</button>
+  <button class="x ovClose" data-close="ovPhotoView" aria-label="Close">×</button>
   <h2 id="pvDate">Photo</h2>
   <img id="pvImg" alt="Care photo" style="width:100%;border-radius:12px;border:1px solid var(--line);margin:8px 0">
   <input id="pvCap" placeholder="Caption — e.g., bruise on left forearm, day 2" style="width:100%;margin-bottom:10px">
@@ -670,7 +670,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.02 r12';
+const BUILD='2026.08.02 r12.1';
 function savedFlash(btnId, msg){
   const b=$id(btnId);
   if(b){ const t=b.textContent; b.textContent='\u2713 Saved'; b.classList.add('gold');
@@ -1689,12 +1689,15 @@ $id('phCap').addEventListener('change', e=>{
   img.src=URL.createObjectURL(f);
   e.target.value='';
 });
+document.querySelector('#ovPhotoView .x').onclick=()=>{
+  $id('ovPhotoView').classList.remove('show'); openOv('ovPhotos'); renderPhotos(); };
 $id('pvSave').onclick=async()=>{ if(!pvCur) return; pvCur.cap=$id('pvCap').value.trim();
   await phPut(pvCur); savedFlash('pvSave','Caption saved.'); renderPhotos(); };
 $id('pvDel').onclick=async()=>{ if(!pvCur) return;
   if(!confirm('Delete this photo from the device?')) return;
   await phDel(pvCur.id); pvCur=null;
-  document.getElementById('ovPhotoView').classList.remove('show'); renderPhotos();
+  document.getElementById('ovPhotoView').classList.remove('show');
+  openOv('ovPhotos'); renderPhotos();
   showBanner('Photo deleted.',1800); };
 $id('pvDl').onclick=()=>{ if(!pvCur) return;
   const a=document.createElement('a'); a.href=pvCur.data;
