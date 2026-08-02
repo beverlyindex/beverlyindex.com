@@ -257,6 +257,17 @@
     #moreSheet .btn{min-height:38px;}
     #msExit{width:100%;margin-top:14px;}
   }
+  #photoDock{margin-top:8px;background:rgba(20,26,38,.42);backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:12px;
+    padding:7px;display:flex;gap:6px;align-items:center;max-width:min(348px,88vw);}
+  #photoDock img{width:44px;height:44px;object-fit:cover;border-radius:8px;
+    border:1px solid var(--line);cursor:pointer;}
+  #photoDock .more{font-size:11px;color:var(--dim);padding:0 5px;cursor:pointer;}
+  #photoDock .who{font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;
+    color:var(--accent);writing-mode:vertical-rl;transform:rotate(180deg);margin-right:2px;}
+  @media (max-width:700px){
+    #photoDock{position:fixed;left:12px;right:auto;bottom:calc(96px + env(safe-area-inset-bottom));z-index:6;}
+  }
   @media print{
     body *{display:none !important;}
     body{overflow:visible;background:#fff;}
@@ -298,6 +309,7 @@
   <div class="lbl">Next action</div>
   <div id="todayNext">—</div>
 </div>
+<div id="photoDock" style="display:none"></div>
 </div>
 
 <div class="hud" id="hudRight">
@@ -420,6 +432,10 @@
   <div id="symChips" style="margin-top:10px"></div>
   <div class="fRow" style="margin-top:6px"><div class="fld">
     <label>In their words / what you observed</label>
+    <div class="fRow" style="margin:8px 0 4px">
+      <button class="btn" id="symPhBtn">Attach photo</button>
+      <span id="symPhCount" style="font-size:11.5px;color:var(--dim);align-self:center"></span>
+    </div>
     <textarea id="symNote" placeholder="e.g., Says her legs feel heavy since Tuesday; nearly fell at the sink."></textarea>
   </div></div>
   <div class="sec"><h3>Bring this forward to</h3>
@@ -670,7 +686,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.02 r12.1';
+const BUILD='2026.08.02 r13';
 function savedFlash(btnId, msg){
   const b=$id(btnId);
   if(b){ const t=b.textContent; b.textContent='\u2713 Saved'; b.classList.add('gold');
@@ -916,6 +932,8 @@ function panelsFloor(){
   if(info.classList.contains('show')) floor=Math.min(floor, info.getBoundingClientRect().top);
   const lg=$id('legend');
   if(W<=700 && lg.classList.contains('open')) floor=Math.min(floor, lg.getBoundingClientRect().top);
+  const pd=$id('photoDock');
+  if(W<=700 && pd.style.display!=='none') floor=Math.min(floor, pd.getBoundingClientRect().top);
   return floor;
 }
 function panelsOpen(){
@@ -1298,7 +1316,7 @@ cvs.addEventListener('pointerup',e=>{
       lastCenterTap=now; tapPatient();
     }
     else if(n) selectNode(n);
-    else { selected=null; $id('info').classList.remove('show'); updateActionStrip(); reframeForCard(); }
+    else { selected=null; $id('info').classList.remove('show'); updateActionStrip(); reframeForCard(); dockId=null; updatePhotoDock(); }
   }
 });
 cvs.addEventListener('wheel',e=>{e.preventDefault(); dist=Math.max(320,Math.min(1500,dist+e.deltaY*0.7));},{passive:false});
@@ -1352,7 +1370,8 @@ function openPatientCard(){
     const rep=data.symptoms.find(r=>!r.shared && r.items.some(i=>i.sev===3));
     if(rep) openShare(rep); else openOv('ovPatient'); };
   $id('ibSym').onclick=()=>openOv('ovPatient');
-  $id('ibPhotos').onclick=()=>{ openOv('ovPhotos'); renderPhotos(); };
+  $id('ibPhotos').onclick=()=>{ pickFor=null; openOv('ovPhotos'); renderPhotos(); };
+  dockId='patient'; updatePhotoDock();
   $id('ibTI').onclick=()=>openOv('ovTI');
   $id('ibEmg').onclick=()=>openOv('ovEmg');
   $id('ibEdit').onclick=()=>openOv('ovManage');
@@ -1380,9 +1399,13 @@ function selectNode(n){
   const urg=P.state==='urgent';
   $id('iActions').innerHTML='<button class="btn'+(urg?'':' gold')+'" id="ibDone"'+
     (urg?' style="border-color:#ff6b6b;color:#ff6b6b"':'')+'>✓ Action taken'+(urg?' — stops the pulse':'')+'</button>'+
+    '<button class="btn" id="ibSharePh">Send a photo</button>'+
     '<button class="btn" id="ibState">Status</button><button class="btn" id="ibNote">Log a note</button>'+
     '<button class="btn danger" id="ibDel">Remove</button>';
   $id('ibDone').onclick=()=>{ P.attended=Date.now(); if(P.state==='urgent')P.state='watch'; saveSoon(); selectNode(n); };
+  $id('ibSharePh').onclick=()=>{ pickFor=P.id; openOv('ovPhotos'); renderPhotos();
+    showBanner('Tap a photo to send it to '+P.name+'.',3200); };
+  dockId=P.id; updatePhotoDock();
   $id('ibState').onclick=()=>{ P.state=P.state==='stable'?'watch':P.state==='watch'?'urgent':'stable'; saveSoon(); selectNode(n); renderLegend(); };
   $id('ibNote').onclick=()=>{ openOv('ovLog'); $id('logText').value=P.name+': '; $id('logText').focus(); };
   $id('ibDel').onclick=()=>{ if(confirm('Remove '+P.name+' from the circle?')){
@@ -1395,7 +1418,7 @@ function selectNode(n){
   updateActionStrip();
   reframeForCard();
 }
-$id('infoClose').onclick=()=>{selected=null;$id('info').classList.remove('show');updateActionStrip();reframeForCard();};
+$id('infoClose').onclick=()=>{selected=null;$id('info').classList.remove('show');updateActionStrip();reframeForCard();dockId=null;updatePhotoDock();};
 
 /* ---------------- legend / filters / keys ---------------- */
 function renderLegend(){
@@ -1586,6 +1609,7 @@ async function openPatient(id){
   expanded=true; buildNodes(true); computeNextAction(); renderLegend();
   yaw=0.4; pitch=-0.18; dist=defaultDist(); panX=0; panY=0;
   focusPanY=0; focusPanYT=0; focusZoom=1; focusZoomT=1;
+  dockId=null; pickFor=null; updatePhotoDock();
   setMode('patient');
   $id('subLine').textContent=(data.recipient.name||'New patient')+
     (REG.length>1?' is front and center \u2014 tap a roster sphere to switch patients.':' \u2014 tap a sphere for its card.');
@@ -1634,7 +1658,8 @@ $id('msReset').onclick=()=>{ resetView(); closeSheet(); };
 $id('msPatients').onclick=()=>{ flushNow(); setMode('caseload'); closeSheet(); };
 $id('msAdd').onclick=()=>{ closeSheet(); $id('btnAddPatient').onclick(); };
 $id('msManage').onclick=()=>{ closeSheet(); openOv('ovManage'); };
-$id('msPhotos').onclick=()=>{ closeSheet(); openOv('ovPhotos'); renderPhotos(); };
+$id('msPhotos').onclick=()=>{ pickFor=null; closeSheet(); openOv('ovPhotos'); renderPhotos(); };
+$id('symPhBtn').onclick=()=>{ window.__symCapture=true; $id('phCap').click(); };
 $id('msExit').onclick=doExit;
 $id('msAlerts').onclick=enableAlerts;
 /* ---- photo store (IndexedDB: images are too big for localStorage) ---- */
@@ -1654,7 +1679,53 @@ async function phAll(){ const db=await mdb(); return new Promise((res,rej)=>{
 async function phDel(id){ const db=await mdb(); return new Promise((res,rej)=>{
   const tx=db.transaction('photos','readwrite'); tx.objectStore('photos').delete(id);
   tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }
-let pvCur=null;
+let pvCur=null, dockId=null, pickFor=null, symPhotoIds=[];
+function phFix(r){ r.about=r.about||'patient'; r.shared=r.shared||[]; return r; }
+async function phGet(id){ const db=await mdb(); return new Promise((res,rej)=>{
+  const q=db.transaction('photos').objectStore('photos').get(id);
+  q.onsuccess=()=>res(q.result?phFix(q.result):null); q.onerror=()=>rej(q.error); }); }
+async function photosFor(id){
+  let all=[]; try{ all=(await phAll()).map(phFix); }catch(e){ return []; }
+  if(!id) return [];
+  if(id==='patient') return all;   /* the patient's record holds every photo */
+  return all.filter(r=>r.about===id || r.shared.some(x=>x.id===id));
+}
+async function updatePhotoDock(){
+  const d=$id('photoDock');
+  if(!dockId || MODE!=='patient'){ d.style.display='none'; return; }
+  const list=await photosFor(dockId);
+  if(!list.length){ d.style.display='none'; return; }
+  const who = dockId==='patient' ? (data.recipient.name||'Patient') : (contactName(dockId)||'');
+  d.innerHTML='<span class="who">'+esc(who)+'</span>';
+  list.slice(0,4).forEach(rec=>{
+    const im=document.createElement('img'); im.src=rec.data; im.alt=rec.cap||'photo';
+    im.onclick=()=>{ pvCur=rec; $id('pvImg').src=rec.data; $id('pvCap').value=rec.cap||'';
+      $id('pvDate').textContent=new Date(rec.ts).toLocaleString(); openOv('ovPhotoView'); };
+    d.appendChild(im); });
+  if(list.length>4){ const m=document.createElement('span'); m.className='more';
+    m.textContent='+'+(list.length-4); m.onclick=()=>{ openOv('ovPhotos'); renderPhotos(); };
+    d.appendChild(m); }
+  d.style.display='flex';
+}
+async function shareRecTo(rec, contactId){
+  const nm=contactName(contactId)||'them';
+  const cap=(data.recipient.name||'Care')+' — '+(rec.cap||'care photo')+' · '+new Date(rec.ts).toLocaleString();
+  let sent=false;
+  try{
+    const blob=await (await fetch(rec.data)).blob();
+    const file=new File([blob],'carecircle_photo.jpg',{type:'image/jpeg'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], text:'For '+nm+': '+cap}); sent=true;
+    }
+  }catch(e){}
+  if(!sent){ const a=document.createElement('a'); a.href=rec.data; a.download='carecircle_photo.jpg'; a.click();
+    showBanner('Share sheet unavailable — photo downloaded; attach it to your message to '+nm+'.',4200); }
+  if(!rec.shared.some(x=>x.id===contactId)) rec.shared.push({id:contactId, ts:Date.now()});
+  await phPut(rec);
+  data.log.unshift({id:uid(), date:todayStr(), tags:['Photo'], text:'Photo shared with '+nm+(rec.cap?' — '+rec.cap:'')});
+  saveSoon(); updatePhotoDock();
+  showBanner('✓ Photo sent to '+nm+' and noted on their sphere.',2600);
+}
 async function renderPhotos(){
   const g=$id('phGrid'); g.innerHTML='<div class="sub">Loading…</div>';
   let list=[]; try{ list=await phAll(); }catch(e){ g.innerHTML='<div class="sub">Photo storage unavailable in this browser.</div>'; return; }
@@ -1663,7 +1734,10 @@ async function renderPhotos(){
     const im=document.createElement('img');
     im.src=rec.data; im.alt=rec.cap||'care photo';
     im.style.cssText='width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:pointer';
-    im.onclick=()=>{ pvCur=rec;
+    im.onclick=()=>{ if(pickFor){ const to=pickFor; pickFor=null;
+        document.getElementById('ovPhotos').classList.remove('show');
+        shareRecTo(phFix(rec), to); return; }
+      pvCur=rec;
       $id('pvImg').src=rec.data; $id('pvCap').value=rec.cap||'';
       $id('pvDate').textContent=new Date(rec.ts).toLocaleString();
       openOv('ovPhotoView'); };
@@ -1679,10 +1753,14 @@ $id('phCap').addEventListener('change', e=>{
     const cv=document.createElement('canvas');
     cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
     cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-    const rec={id:uid(), pat:activeId, ts:Date.now(), cap:'', data:cv.toDataURL('image/jpeg',0.82)};
+    const rec={id:uid(), pat:activeId, ts:Date.now(), cap:'', about:'patient', shared:[], data:cv.toDataURL('image/jpeg',0.82)};
     try{ await phPut(rec);
       data.log.unshift({date:todayStr(), text:'Photo added — open Photos to view or send.', tags:['Photo']});
-      saveSoon(); renderPhotos(); showBanner('\u2713 Photo saved on this device.',2200);
+      saveSoon(); renderPhotos(); updatePhotoDock();
+      if(window.__symCapture){ symPhotoIds.push(rec.id); window.__symCapture=false;
+        $id('symPhCount').textContent=symPhotoIds.length+' photo'+(symPhotoIds.length>1?'s':'')+' attached';
+        showBanner('\u2713 Photo attached to this report.',2000); }
+      else showBanner('\u2713 Photo saved on this device.',2200);
     }catch(err){ showBanner('Could not save the photo here.',3000); }
     URL.revokeObjectURL(img.src);
   };
@@ -1792,18 +1870,19 @@ $id('symSave').onclick=()=>{
   if(!symPicked.length){showBanner('Add at least one symptom first.',2500);return;}
   const to=[...document.querySelectorAll('#shareList input:checked')].map(i=>i.value);
   const rep={id:uid(), date:todayStr(), items:symPicked.map(s=>({name:s.name,sev:s.sev})),
-    note:$id('symNote').value.trim(), shared:false, sharedTo:to};
+    note:$id('symNote').value.trim(), shared:false, sharedTo:to, photoIds:symPhotoIds.slice()};
   data.symptoms.push(rep);
   data.log.push({id:uid(), date:todayStr(), tags:['Symptom'],
     text:'Reported: '+rep.items.map(i=>i.name+' ('+SEVL[i.sev]+')').join(', ')+(rep.note?' — '+rep.note:'')});
   saveSoon(); openShare(rep);
-  symPicked=[]; $id('symNote').value='';
+  symPicked=[]; $id('symNote').value=''; symPhotoIds=[]; $id('symPhCount').textContent='';
 };
 function symReportText(rep){
   const r=data.recipient;
   return 'Update on '+(r.name||'the patient')+' — '+new Date().toDateString()+'\n\n'+
     'New/observed symptoms:\n'+rep.items.map(i=>'  • '+i.name+' ('+SEVL[i.sev]+')').join('\n')+
     (rep.note?'\n\nIn context: '+rep.note:'')+
+    (rep.photoIds&&rep.photoIds.length?'\n\nPhotos attached: '+rep.photoIds.length:'')+
     '\n\nBackground: '+((r.conditions||[]).join(', ')||'—')+
     '\nCurrent meds: '+(data.meds.map(m=>m.name+' '+(m.dose||'')).join(', ')||'—')+
     '\n\nSent from CareCircle by the family caregiver.';
@@ -1814,6 +1893,28 @@ function openShare(rep){
   const tos=rep.sharedTo.map(id=>data.contacts.find(c=>c.id===id)).filter(Boolean);
   $id('shareSub').textContent= tos.length? 'For: '+tos.map(c=>c.name).join(', ') : 'Pick people in the report screen, or just copy the text.';
   const btns=$id('shareBtns'); btns.innerHTML='';
+  if(rep.photoIds && rep.photoIds.length){
+    const pb=document.createElement('button'); pb.className='btn gold';
+    pb.textContent='Send with photo'+(rep.photoIds.length>1?'s':'');
+    pb.onclick=async()=>{
+      try{
+        const files=[];
+        for(const id of rep.photoIds){ const r=await phGet(id); if(!r) continue;
+          const bl=await (await fetch(r.data)).blob();
+          files.push(new File([bl],'carecircle_'+id+'.jpg',{type:'image/jpeg'})); }
+        if(files.length && navigator.canShare && navigator.canShare({files})){
+          await navigator.share({files, text:symReportText(rep)});
+          for(const id of rep.photoIds){ const r=await phGet(id); if(!r) continue;
+            rep.sharedTo.forEach(cid=>{ if(!r.shared.some(x=>x.id===cid)) r.shared.push({id:cid,ts:Date.now()}); });
+            await phPut(r); }
+          rep.shared=true; saveSoon(); updatePhotoDock();
+          showBanner('✓ Report and photo sent.',2600); return;
+        }
+      }catch(e){}
+      showBanner('This browser can\'t attach photos to a share — send the text, then send photos from the sphere.',4600);
+    };
+    btns.appendChild(pb);
+  }
   const mark=()=>{rep.shared=true; saveSoon(); drawSymHist(); computeNextAction();};
   const cp=document.createElement('button'); cp.className='btn gold'; cp.textContent='Copy message';
   cp.onclick=async()=>{try{await navigator.clipboard.writeText(txt); mark(); showBanner('Copied — paste it anywhere.',2500);}catch(e){showBanner('Copy blocked — select the text manually.',3000);}};
