@@ -379,6 +379,7 @@
   <div class="rowBtns">
     <button class="btn" id="msManage">Manage</button>
   </div>
+  <button class="btn gold" id="msAlerts" style="width:100%;margin-top:6px">Enable alerts</button>
   <button class="btn danger" id="msExit">Exit CareCircle</button>
   <div style="text-align:center;margin-top:10px;font-size:10px;color:var(--dim)" id="msBuild"></div>
 </div></div>
@@ -543,6 +544,22 @@
       <div class="fld"><label>Name</label><input id="cName"></div>
       <div class="fld"><label>Category</label><select id="cCat"></select></div>
     </div>
+    <div class="qa" id="quickAdd">
+      <label style="display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Quick add — type a name, tap who they are</label>
+      <input id="qaName" placeholder="Name" style="width:100%;margin-bottom:7px">
+      <div class="rowBtns" id="qaChips" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn" data-qa="household">Lives with them</button>
+        <button class="btn" data-qa="familyNear">Family · near</button>
+        <button class="btn" data-qa="familyFar">Family · far</button>
+        <button class="btn" data-qa="community">Friend</button>
+        <button class="btn" data-qa="medical">Doctor</button>
+        <button class="btn" data-qa="pharmacy">Pharmacy</button>
+        <button class="btn" data-qa="homecare">Aide</button>
+        <button class="btn" data-qa="facility">Facility</button>
+        <button class="btn" data-qa="legal">Legal</button>
+      </div>
+      <div style="font-size:11px;color:var(--dim);margin:6px 0 14px">Phones and details can wait — tap the sphere later to fill them in.</div>
+    </div>
     <div class="fRow">
       <div class="fld"><label>Role</label><input id="cRole" placeholder="e.g., Primary physician / Tuesday backup"></div>
       <div class="fld"><label>Mobile / direct phone</label><input id="cPhone"></div>
@@ -569,6 +586,7 @@
       <input id="impFile" type="file" accept=".json" style="display:none">
       <button class="btn" id="sampleBtn">Load sample data</button>
       <button class="btn" id="expAllBtn">Export whole caseload</button>
+      <button class="btn gold" id="mgAlerts">Enable alerts</button>
       <span style="font-size:10.5px;color:var(--dim);align-self:center">build <span id="mgBuild"></span></span>
       <button class="btn danger" id="wipeBtn">Start fresh (this patient)</button>
       <button class="btn danger" id="delPatBtn">Remove this patient</button>
@@ -590,13 +608,15 @@
    Single file · no server · your data stays on your device
    ============================================================ */
 const CATS = [
-  {id:'family',   label:'Family & friends',  color:'#e8899a'},
-  {id:'medical',  label:'Medical',           color:'#6fa8ff'},
-  {id:'pharmacy', label:'Pharmacy',          color:'#6fd39a'},
-  {id:'homecare', label:'Home care',         color:'#b48cf2'},
-  {id:'facility', label:'Facilities',        color:'#f09a5c'},
-  {id:'legal',    label:'Legal & financial', color:'#c9b458'},
-  {id:'community',label:'Community',         color:'#5fc8c8'}
+  {id:'household', label:'Immediate — lives with them', color:'#ff5fa2'},
+  {id:'familyNear',label:'Family — nearby',            color:'#ef8fb8'},
+  {id:'familyFar', label:'Family — at a distance',     color:'#c79cb2'},
+  {id:'medical',  label:'Medical',              color:'#6fa8ff'},
+  {id:'pharmacy', label:'Pharmacy',             color:'#6fd39a'},
+  {id:'homecare', label:'Home care',            color:'#b48cf2'},
+  {id:'facility', label:'Facilities',           color:'#f09a5c'},
+  {id:'legal',    label:'Legal & financial',    color:'#c9b458'},
+  {id:'community',label:'Community & friends',  color:'#5fc8c8'}
 ];
 const catOf = id => CATS.find(c=>c.id===id) || CATS[0];
 const LOGTAGS = ['Mood','Eating','Sleep','Memory','Pain','Mobility','Symptom','Good day'];
@@ -622,7 +642,67 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.01 r10';
+const BUILD='2026.08.01 r11';
+/* ---- alerts ---- */
+let swReg=null;
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
+  navigator.serviceWorker.register('sw.js').then(r=>swReg=r).catch(()=>{});
+}
+function alertsOn(){ try{ return localStorage.getItem('cc:alerts')==='on' && typeof Notification!=='undefined' && Notification.permission==='granted'; }catch(e){ return false; } }
+async function enableAlerts(){
+  if(typeof Notification==='undefined'){ showBanner('This browser does not support alerts.',3000); return; }
+  const p=await Notification.requestPermission();
+  if(p==='granted'){ try{localStorage.setItem('cc:alerts','on');}catch(e){}
+    showBanner('Alerts on — dose times, refills, and urgent changes will notify you.',3500);
+    notify('CareCircle alerts are on','You will be notified here when something needs you.',false,'cc-hello');
+  } else showBanner('Alerts stay off until the browser is given permission.',3500);
+  syncAlertButtons();
+}
+function syncAlertButtons(){
+  const t=alertsOn()?'Alerts: on':'Enable alerts';
+  const a=$id('msAlerts'); if(a) a.textContent=t;
+  const b=$id('mgAlerts'); if(b) b.textContent=t;
+}
+let ALERTED={};
+try{ ALERTED=JSON.parse(localStorage.getItem('cc:alerted')||'{}'); }catch(e){}
+function alertOnce(key, title, body, urgent){
+  const now=Date.now();
+  Object.keys(ALERTED).forEach(k=>{ if(now-ALERTED[k]>2*86400000) delete ALERTED[k]; });
+  if(ALERTED[key]) return;
+  ALERTED[key]=now;
+  try{ localStorage.setItem('cc:alerted', JSON.stringify(ALERTED)); }catch(e){}
+  notify(title, body, urgent, key);
+}
+function notify(title, body, urgent, tag){
+  if(urgent) showBanner(title+' — '+body, 7000);
+  if(!alertsOn()) { if(!urgent) showBanner(title+' — '+body, 4500); return; }
+  const opts={body, tag:tag||('cc-'+Date.now()), requireInteraction:!!urgent, renotify:!!urgent};
+  if(swReg && swReg.showNotification){ swReg.showNotification(title, opts); }
+  else { try{ new Notification(title, opts); }catch(e){} }
+}
+function runAlertChecks(){
+  if(!data) return;
+  const td=todayStr(), now=new Date(), hm=now.toTimeString().slice(0,5);
+  const who=data.recipient.name||'the patient';
+  data.taken[td]=data.taken[td]||{};
+  const mins=t=>parseInt(t)*60+ +t.slice(3);
+  data.meds.forEach(m=>{ if(m.prn) return; (m.times||[]).forEach(tm=>{
+    const key=m.id+'_'+tm, dm=mins(hm)-mins(tm);
+    if(data.taken[td][key]) return;
+    if(dm>=0 && dm<6) alertOnce('dose:'+td+':'+key, who+' — medication time', tm+' · '+m.name+(m.dose?' '+m.dose:''), false);
+    if(dm>60) alertOnce('overdue:'+td+':'+key, who+' — dose overdue', m.name+' was due at '+tm+'. Give it or log why.', true);
+  });});
+  data.meds.forEach(m=>{ if(!m.refill) return;
+    const du=Math.round((new Date(m.refill+'T12:00')-now)/86400000);
+    if(du<=2) alertOnce('refill:'+td+':'+m.id, who+' — refill '+(du<0?'overdue':'due in '+du+'d'), m.name+' · contact the pharmacy.', du<0); });
+  data.appts.forEach(a=>{ if(a.date!==td||!a.time) return;
+    const dm=mins(a.time)-mins(hm);
+    if(dm>0 && dm<=60) alertOnce('appt:'+td+':'+a.id, who+' — appointment at '+a.time, (a.where||contactName(a.withId)||'')+' · in '+dm+' min. Bring the doctor brief.', false); });
+  data.symptoms.forEach(r=>{ if(!r.shared && r.items.some(i=>i.sev===3))
+    alertOnce('sev:'+(r.id||r.date), who+' — severe report not yet forwarded', 'Open the patient and forward it to the circle.', true); });
+  REG.forEach(e=>{ if(e.id!==activeId && e.urgent)
+    alertOnce('pat:'+td+':'+e.id, e.name+' needs attention', 'Urgent state in their circle — tap their sphere in the roster.', true); });
+}
 let memOnly=false;
 const store = {
   async loadKey(k){
@@ -684,9 +764,9 @@ function sampleData(){
       allergies:['Penicillin'], insurance:'Medicare + BlueCross supplement',
       poa:'POA: Anna (daughter) · Advance directive on file', notes:''},
     contacts:[
-      {id:anna,  name:'Anna', cat:'family', role:'Daughter · primary caregiver', phone:'555-0101', email:'anna@example.com', notes:'Lives 10 min away.', state:'stable', emergency:true, attended:null},
-      {id:marcus,name:'Marcus', cat:'family', role:'Son · weekend cover', phone:'555-0102', email:'marcus@example.com', notes:'Out of state; Sunday video call.', state:'stable', emergency:true, attended:null},
-      {id:neigh, name:'Ellen (neighbor)', cat:'family', role:'Next door · has a key', phone:'555-0110', email:'', notes:'Can check in within minutes.', state:'stable', emergency:false, attended:null},
+      {id:anna,  name:'Anna', cat:'household', role:'Daughter · lives with her', phone:'555-0101', email:'anna@example.com', notes:'Primary caregiver.', state:'stable', emergency:true, attended:null},
+      {id:marcus,name:'Marcus', cat:'familyFar', role:'Son · out of state', phone:'555-0102', email:'marcus@example.com', notes:'Out of state; Sunday video call.', state:'stable', emergency:true, attended:null},
+      {id:neigh, name:'Ellen (neighbor)', cat:'community', role:'Next door · has a key', phone:'555-0110', email:'', notes:'Can check in within minutes.', state:'stable', emergency:false, attended:null},
       {id:dJoan, name:'Dr. Joan Weiss', cat:'medical', role:'Primary physician', phone:'555-0201', email:'weiss@clinic.example', notes:'Portal for non-urgent questions.', state:'stable', emergency:false, attended:null},
       {id:dPatel,name:'Dr. R. Patel', cat:'medical', role:'Neurologist', phone:'555-0202', email:'', notes:'Cognitive assessment due — see Schedule.', state:'watch', emergency:false, attended:null},
       {id:phWal, name:'Main St Pharmacy', cat:'pharmacy', role:'All prescriptions', phone:'555-0301', email:'', notes:'Delivers Tuesdays. Ask for blister packs.', state:'stable', emergency:false, attended:null},
@@ -730,7 +810,9 @@ function normalizeData(d){
   r.allergies=Array.isArray(r.allergies)?r.allergies:[];
   r.insurance=r.insurance||''; r.poa=r.poa||''; r.notes=r.notes||''; r.phone=r.phone||'';
   d.contacts=Array.isArray(d.contacts)?d.contacts:[];
-  d.contacts.forEach(c=>{ c.id=c.id||uid(); c.name=c.name||'Unnamed'; c.cat=catOf(c.cat).id;
+  d.contacts.forEach(c=>{ c.id=c.id||uid(); c.name=c.name||'Unnamed';
+    if(c.cat==='family') c.cat='familyNear';
+    c.cat=catOf(c.cat).id;
     c.phone2=c.phone2||'';
     c.state=(c.state==='watch'||c.state==='urgent')?c.state:'stable';
     c.emergency=!!c.emergency; c.attended=c.attended||null; });
@@ -847,10 +929,13 @@ function defaultDist(){ return Math.min(W,H)<700 ? 600 : 570; }
 
 function buildNodes(fresh){
   const old={}; NODES.forEach(n=>{ if(n.p2) old[n.p2.id]=n; });
+  const N=Math.max(1,data.contacts.length);
   NODES = data.contacts.map((p,i)=>{
-    const d=catDir[p.cat]||catDir.family;
-    const j=(seed)=>Math.sin(seed*127.1+i*311.7)*0.55;
-    let tx=d[0]+j(1), ty=d[1]+j(2), tz=d[2]+j(3);
+    /* Fibonacci sphere: even spread no matter the category mix */
+    const fy=(1-2*(i+0.5)/N)*0.82;
+    const fr=Math.sqrt(Math.max(0,1-fy*fy));
+    const th=i*2.399963229728653 + Math.sin(i*127.1)*0.22;
+    let tx=Math.cos(th)*fr, ty=fy, tz=Math.sin(th)*fr;
     const RS=shellR(); const L=Math.hypot(tx,ty,tz)||1; tx=tx/L*RS; ty=ty/L*RS; tz=tz/L*RS;
     const prev=old[p.id];
     return { p2:p, tx,ty,tz,
@@ -1514,6 +1599,7 @@ $id('msPatients').onclick=()=>{ flushNow(); setMode('caseload'); closeSheet(); }
 $id('msAdd').onclick=()=>{ closeSheet(); $id('btnAddPatient').onclick(); };
 $id('msManage').onclick=()=>{ closeSheet(); openOv('ovManage'); };
 $id('msExit').onclick=doExit;
+$id('msAlerts').onclick=enableAlerts;
 $id('msBuild').textContent='CareCircle build '+BUILD;
 $id('legendChip').onclick=()=>{ $id('legend').classList.toggle('open'); reframeForCard(); };
 
@@ -1888,6 +1974,17 @@ $id('pSave').onclick=()=>{
   r.insurance=$id('pIns').value.trim(); r.poa=$id('pPoa').value.trim();
   data.sample=false; saveSoon(); refreshAll(); showBanner('Saved.',1500);
 };
+document.querySelectorAll('#qaChips [data-qa]').forEach(b=>{
+  b.onclick=()=>{
+    const name=$id('qaName').value.trim();
+    if(!name){ $id('qaName').focus(); return; }
+    data.contacts.push({id:uid(), name, cat:b.dataset.qa, role:'', phone:'', phone2:'',
+      email:'', notes:'', state:'stable', emergency:b.dataset.qa==='household', attended:null});
+    saveSoon(); refreshAll(); renderManage();
+    $id('qaName').value=''; $id('qaName').focus();
+    showBanner(name+' added to the circle.',1400);
+  };
+});
 $id('cAdd').onclick=()=>{
   const name=$id('cName').value.trim(); if(!name)return;
   data.contacts.push({id:uid(), name, cat:$id('cCat').value, role:$id('cRole').value.trim(),
@@ -1931,6 +2028,8 @@ $id('impFile').onchange=e=>{
 };
 $id('sampleBtn').onclick=()=>{data=sampleData(); expanded=false; saveSoon(); refreshAll(); renderManage();};
 $id('mgBuild').textContent=BUILD;
+$id('mgAlerts').onclick=enableAlerts;
+syncAlertButtons();
 $id('expAllBtn').onclick=async()=>{
   flushNow();
   const patients=[];
@@ -2006,7 +2105,7 @@ window.addEventListener('error', e=>{
       activeId = (await store.loadKey('carecircle:active'));
       if(!regEntry(activeId)) activeId=REG[0].id;
     }
-    data = normalizeData(await store.loadKey(dataKey(activeId))) || sampleData();
+    data = normalizeData(await store.loadKey(dataKey(activeId))) || normalizeData(sampleData());
   }catch(e){ data = sampleData(); if(!REG.length){REG=[{id:activeId=uid(),name:data.recipient.name||'Patient',updated:Date.now(),urgent:false,watch:false,next:''}];} }
   try{
     resize(); dist=defaultDist(); refreshAll();
@@ -2016,7 +2115,8 @@ window.addEventListener('error', e=>{
     }
     setMode('patient'); if(REG.length>1) expanded=true;
     loop();
-    setInterval(()=>{ computeNextAction(); if(MODE==='caseload'){ updateRegSummary(); buildCaseload(); } }, 60000);
+    setInterval(()=>{ computeNextAction(); runAlertChecks(); if(MODE==='caseload'){ updateRegSummary(); buildCaseload(); } }, 60000);
+    setTimeout(runAlertChecks, 4000);
   }catch(e){
     /* last-resort recovery: never leave a silent blank screen */
     try{
