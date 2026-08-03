@@ -1017,36 +1017,44 @@ function panelsFloor(){
 function panelsOpen(){
   return $id('info').classList.contains('show') || (W<=700 && $id('legend').classList.contains('open'));
 }
-function reframeForCard(){
-  requestAnimationFrame(()=>{
-    if(!panelsOpen()){ clearReframe(); return; }
-    const floor=panelsFloor();
-    const top=clearAbove();
-    const avail=Math.max(120, floor-top-14);
-    focusPanYT=(top+avail/2)-(H/2+panY);
-    focusFrames=0;   /* let the zoom fitter re-evaluate */
-  });
+/* Servo geometry cache: measured once on discrete events, not per frame */
+var _servoTop=0, _servoFloor=0, _servoDirty=false;
+var _SERVO_DEADBAND=8;
+function _servoMeasure(){
+  _servoTop=clearAbove(); _servoFloor=panelsFloor()-12; _servoDirty=false;
 }
-function clearReframe(){ focusPanYT=0; focusZoomT=1; }
+function reframeForCard(){
+  if(!panelsOpen()){ clearReframe(); return; }
+  _servoMeasure();
+  var avail=Math.max(120, _servoFloor-_servoTop-14);
+  var target=(_servoTop+avail/2)-(H/2+panY);
+  if(Math.abs(target-focusPanYT)>_SERVO_DEADBAND) focusPanYT=target;
+  focusFrames=0;
+}
+function clearReframe(){ focusPanYT=0; focusZoomT=1; _servoDirty=false; }
 function stepFocus(){
-  focusPanY+=(focusPanYT-focusPanY)*0.12;
-  focusZoom+=(focusZoomT-focusZoom)*0.10;
-  if(panelsOpen() && MODE==='patient' && expanded && (focusFrames++%6)===0){
-    /* fit check: do the spheres spill past the open panels or the top chrome? */
-    const top=clearAbove(), floor=panelsFloor()-12;
-    let lo=1e9, hi=-1e9;
+  /* ease to target with settling (deadband prevents oscillation) */
+  var dy=focusPanYT-focusPanY;
+  if(Math.abs(dy)>0.5) focusPanY+=dy*0.12; else focusPanY=focusPanYT;
+  var dz=focusZoomT-focusZoom;
+  if(Math.abs(dz)>0.005) focusZoom+=dz*0.10; else focusZoom=focusZoomT;
+  if(panelsOpen() && MODE==='patient' && expanded && (focusFrames++%12)===0){
+    /* fit check: only recalculate from cached geometry */
+    var top=_servoTop, floor=_servoFloor;
+    var lo=1e9, hi=-1e9;
     NODES.forEach(n=>{ if(!n.pr) return; lo=Math.min(lo,n.pr.sy-24); hi=Math.max(hi,n.pr.sy+30); });
     if(hi>-1e8){
-      const availH=Math.max(120, floor-top);
-      const span=hi-lo;
+      var availH=Math.max(120, floor-top);
+      var span=hi-lo;
       if(span>availH*1.02) focusZoomT=Math.min(2.1, focusZoom*span/(availH*0.94));
       else if(span<availH*0.7 && focusZoomT>1) focusZoomT=Math.max(1, focusZoom*span/(availH*0.86));
-      /* position servo: hold the cluster's edges inside the clear band at all times */
-      if(hi>floor) focusPanYT=focusPanY-(hi-floor)-6;
-      else if(lo<top) focusPanYT=focusPanY+(top-lo)+6;
+      if(hi>floor && (hi-floor)>_SERVO_DEADBAND) focusPanYT=focusPanY-(hi-floor)-6;
+      else if(lo<top && (top-lo)>_SERVO_DEADBAND) focusPanYT=focusPanY+(top-lo)+6;
     }
   }
 }
+/* Trigger servo remeasure on resize/orientation */
+addEventListener('resize',function(){ if(panelsOpen()) _servoDirty=true; });
 
 /* category direction anchors on the sphere */
 const catDir={};
