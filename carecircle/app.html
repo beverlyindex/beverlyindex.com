@@ -87,25 +87,12 @@
   #tip{position:absolute;z-index:7;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
     padding:5px 9px;font-size:11.5px;pointer-events:none;display:none;}
 
-  /* BLUF card + chip */
-  #blufCard{position:absolute;z-index:6;left:50%;transform:translateX(-50%);
-    background:rgba(20,26,38,.42);backdrop-filter:blur(10px) saturate(1.15);-webkit-backdrop-filter:blur(10px) saturate(1.15);
-    border:1px solid var(--line);border-radius:10px;padding:10px 14px;
-    width:min(320px,84vw);display:none;pointer-events:auto;}
-  #blufCard.show{display:block;}
-  #blufCard .blufLbl{color:var(--accent);font-weight:700;font-size:10px;text-transform:uppercase;
-    letter-spacing:1.4px;text-shadow:0 0 12px rgba(255,210,77,.45);margin-bottom:6px;}
-  .blufLine{display:flex;align-items:baseline;gap:8px;padding:5px 0;cursor:pointer;font-size:12.5px;line-height:1.4;border-radius:6px;}
+  /* BLUF lines in todayStrip */
+  .blufLine{display:flex;align-items:baseline;gap:8px;padding:3px 0;cursor:pointer;font-size:12px;line-height:1.35;border-radius:6px;}
   .blufLine:hover{background:rgba(255,255,255,.04);}
   .blufLine .blK{color:var(--accent);font-weight:700;font-size:10px;letter-spacing:.8px;min-width:36px;flex:none;}
   .blufLine .blV{color:var(--ink);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .blufLine .blV.stale{color:var(--dim);}
-  #blufChip{position:absolute;z-index:6;left:50%;transform:translateX(-50%);
-    background:rgba(20,26,38,.42);backdrop-filter:blur(10px) saturate(1.15);-webkit-backdrop-filter:blur(10px) saturate(1.15);
-    border:1px solid var(--line);border-radius:999px;padding:5px 14px;
-    display:none;cursor:pointer;pointer-events:auto;font-size:11.5px;color:var(--ink);white-space:nowrap;max-width:min(300px,80vw);overflow:hidden;text-overflow:ellipsis;}
-  #blufChip.show{display:block;}
-  #blufChip .chipDot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle;}
 
   /* mood logger overlay */
   #moodOv{position:fixed;inset:0;background:rgba(5,7,12,.88);z-index:22;display:none;
@@ -343,17 +330,15 @@
 </div>
 
 <div id="todayStrip">
-  <div class="lbl">Next action</div>
+  <div class="lbl" id="tsLbl">Next action</div>
   <div id="todayNext">—</div>
+  <div id="tsBluf" style="display:none">
+    <div class="blufLine" id="blufNow"><span class="blK">NOW</span><span class="blV" id="blufNowV">—</span></div>
+    <div class="blufLine" id="blufNext"><span class="blK">NEXT</span><span class="blV" id="blufNextV">—</span></div>
+    <div class="blufLine" id="blufMood"><span class="blK">MOOD</span><span class="blV" id="blufMoodV">—</span></div>
+  </div>
 </div>
 <div id="photoDock" style="display:none"></div>
-<div id="blufCard">
-  <div class="blufLbl">BLUF</div>
-  <div class="blufLine" id="blufNow"><span class="blK">NOW</span><span class="blV" id="blufNowV">—</span></div>
-  <div class="blufLine" id="blufNext"><span class="blK">NEXT</span><span class="blV" id="blufNextV">—</span></div>
-  <div class="blufLine" id="blufMood"><span class="blK">MOOD</span><span class="blV" id="blufMoodV">—</span></div>
-</div>
-<div id="blufChip"><span class="chipDot"></span><span id="blufChipText">—</span></div>
 </div>
 
 <div class="hud" id="hudRight">
@@ -741,7 +726,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.03 r16';
+const BUILD='2026.08.03 r17';
 
 /* ── Telemetry (access intelligence, no PHI) ── */
 var CC_URL='https://beverlyindex-com.vercel.app';
@@ -1027,10 +1012,6 @@ function panelsFloor(){
   if(W<=700 && lg.classList.contains('open')) floor=Math.min(floor, lg.getBoundingClientRect().top);
   const pd=$id('photoDock');
   if(W<=700 && pd.style.display!=='none') floor=Math.min(floor, pd.getBoundingClientRect().top);
-  const bc=$id('blufCard');
-  if(bc.classList.contains('show')) floor=Math.min(floor, bc.getBoundingClientRect().top);
-  const bch=$id('blufChip');
-  if(bch.classList.contains('show')) floor=Math.min(floor, bch.getBoundingClientRect().top);
   return floor;
 }
 function panelsOpen(){
@@ -1246,8 +1227,10 @@ function contactNextAction(P){
   return 'No pending action — all quiet';
 }
 function updateActionStrip(){
-  const lbl=document.querySelector('#todayStrip .lbl');
+  var lbl=$id('tsLbl');
+  /* In caseload or expanded mode: show original Next Action, hide BLUF */
   if(MODE==='caseload'){
+    $id('tsBluf').style.display='none'; $id('todayNext').style.display='';
     const u=REG.filter(e=>e.urgent).length, w=REG.filter(e=>!e.urgent&&e.watch).length;
     lbl.textContent='Caseload';
     $id('todayNext').innerHTML=REG.length+' patient'+(REG.length===1?'':'s')+
@@ -1255,28 +1238,41 @@ function updateActionStrip(){
       ((!u&&!w)?' \u00b7 all quiet':'');
     return;
   }
-  if(selected&&selected.p2){
-    lbl.textContent='Next · '+(selected.p2.name||'').split(' ')[0];
-    $id('todayNext').innerHTML=esc(contactNextAction(selected.p2));
-  } else {
-    lbl.textContent='Next action';
-    $id('todayNext').innerHTML=esc(nextActionText);
+  if(expanded){
+    $id('tsBluf').style.display='none'; $id('todayNext').style.display='';
+    if(selected&&selected.p2){
+      lbl.textContent='Next \u00b7 '+(selected.p2.name||'').split(' ')[0];
+      $id('todayNext').innerHTML=esc(contactNextAction(selected.p2));
+    } else {
+      lbl.textContent='Next action';
+      $id('todayNext').innerHTML=esc(nextActionText);
+    }
+    return;
   }
+  /* Pre-expansion: BLUF lines shown via updateBluf */
 }
 
-/* ── BLUF card logic ── */
-let _blufCardOpen=false;
+/* ── BLUF in todayStrip ── */
 function updateBluf(){
-  if(MODE==='caseload'){ hideBluf(); return; }
-  const b=_bluf, card=$id('blufCard'), chip=$id('blufChip');
-  /* NOW line */
-  const nowItem=b.needs[0];
+  if(MODE==='caseload'||expanded){
+    /* expanded or caseload: hide BLUF lines, show original Next Action */
+    $id('tsBluf').style.display='none';
+    $id('todayNext').style.display='';
+    return;
+  }
+  /* pre-expansion: show BLUF lines, hide single Next Action */
+  $id('todayNext').style.display='none';
+  $id('tsBluf').style.display='';
+  $id('tsLbl').textContent='';
+  var b=_bluf;
+  /* NOW */
+  var nowItem=b.needs[0];
   $id('blufNowV').textContent=nowItem?nowItem.text:'No immediate needs';
   $id('blufNowV').className='blV'+(nowItem?'':' stale');
-  /* NEXT line */
+  /* NEXT */
   $id('blufNextV').textContent=b.bigEvent?b.bigEvent.text:'Nothing scheduled';
   $id('blufNextV').className='blV'+(b.bigEvent?'':' stale');
-  /* MOOD line */
+  /* MOOD */
   var moodText='Not yet logged', moodStale=true;
   if(b.mood&&b.mood.level){
     var age=Date.now()-(b.mood.ts||0), ageStr='';
@@ -1288,36 +1284,11 @@ function updateBluf(){
   }
   $id('blufMoodV').textContent=moodText;
   $id('blufMoodV').className='blV'+(moodStale?' stale':'');
-  /* chip text = top-ranked single line */
-  var chipText=nowItem?nowItem.text:(b.bigEvent?b.bigEvent.text:'All clear');
-  $id('blufChipText').textContent=chipText;
-  var dot=chip.querySelector('.chipDot');
-  if(dot) dot.style.background=RING_COLORS[b.ring]||RING_COLORS.green;
-  /* show card in pre-expansion, chip in expanded */
-  if(!expanded){
-    card.classList.add('show'); chip.classList.remove('show'); _blufCardOpen=true;
-  } else {
-    card.classList.remove('show'); chip.classList.add('show'); _blufCardOpen=false;
-  }
-}
-function hideBluf(){ $id('blufCard').classList.remove('show'); $id('blufChip').classList.remove('show'); _blufCardOpen=false; }
-function positionBlufCard(){
-  /* Position BLUF card below the patient orb */
-  var card=$id('blufCard'), chip=$id('blufChip');
-  if(!centerHit||!centerHit.r) return;
-  var orbBottom=centerHit.y+centerHit.r+54;
-  card.style.top=orbBottom+'px';
-  chip.style.top=(expanded?(clearAbove()-6):orbBottom)+'px';
 }
 /* Tap handlers */
 $id('blufNow').onclick=function(){ t('bluf_tap'); var n=_bluf.needs[0]; if(n&&n.nav) openOv(n.nav); };
 $id('blufNext').onclick=function(){ t('bluf_tap'); openOv('ovSched'); };
 $id('blufMood').onclick=function(){ t('bluf_tap'); openMoodLogger(); };
-$id('blufChip').onclick=function(){ t('bluf_tap');
-  $id('blufChip').classList.remove('show');
-  $id('blufCard').classList.add('show'); _blufCardOpen=true;
-  positionBlufCard(); reframeForCard();
-};
 
 /* ── Mood logger ── */
 function openMoodLogger(){ $id('moodOv').classList.add('show'); }
@@ -1475,7 +1446,6 @@ function draw(t){
     ctx.fillStyle='rgba(232,236,244,.95)'; ctx.font='600 '+Math.round(14*s)+'px "Segoe UI",system-ui,sans-serif';
     ctx.fillText('Tap to open the circle', cp.sx, cp.sy+(rr+40)*s); }
     centerHit={x:cp.sx,y:cp.sy,r:rr*s};
-  positionBlufCard();
   drawRoster(t);
 }
 let centerHit={x:0,y:0,r:0};
@@ -1579,9 +1549,8 @@ function tapPatient(){
     $id('subLine').textContent = data.sample
       ? 'Sample circle shown — open Manage to make it yours. Everything stays on this device.'
       : 'Drag to turn · tap a sphere for its card · gold halo marks your next action.';
-    /* collapse BLUF card to chip */
-    $id('blufCard').classList.remove('show'); _blufCardOpen=false;
-    $id('blufChip').classList.add('show');
+    /* restore original Next Action strip on expansion */
+    updateBluf();
   }
   openPatientCard();
 }
