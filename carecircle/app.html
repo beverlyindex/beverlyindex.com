@@ -686,7 +686,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.03 r15';
+const BUILD='2026.08.03 r16';
 
 /* ── Telemetry (access intelligence, no PHI) ── */
 var CC_URL='https://beverlyindex-com.vercel.app';
@@ -1064,31 +1064,90 @@ function stepPhys(){
    rapid pulse = urgent · gold halo = the caregiver's next action */
 function attendedRecently(p){ return p.attended && (Date.now()-p.attended) < 86400000; }
 let nextActionNodeId=null, patientUrgent=false, nextActionText='—';
+let _bluf={ring:'green',needs:[],bigEvent:null,mood:null}; /* cached blufState result */
+const RING_COLORS={red:'#ff4444',yellow:'#e8a832',green:'#4ac47a'};
+function blufState(d){
+  /* Pure function: returns {ring,needs,bigEvent,mood} from patient data d.
+     Single source of truth for severity — consumed by ring, alerts, caseload sort. */
+  if(!d) return {ring:'green',needs:[],bigEvent:null,mood:null};
+  const now=new Date(), td=todayStr(), hm=now.toTimeString().slice(0,5);
+  const mins=v=>parseInt(v)*60+ +v.slice(3);
+  const taken=d.taken||{}; taken[td]=taken[td]||{};
+  const needs=[];
+  let ring='green';
+  /* ── RED triggers ── */
+  /* overdue dose (>60 min past, not taken) */
+  d.meds.forEach(m=>{ if(m.prn) return; (m.times||[]).forEach(tm=>{
+    if(tm<hm && !taken[td][m.id+'_'+tm]){
+      const dm=mins(hm)-mins(tm);
+      if(dm>60){ ring='red'; needs.push({type:'med',text:m.name+' overdue '+Math.floor(dm/60)+'h',nav:'ovMeds'}); }
+    }});});
+  /* severe unshared symptom report */
+  d.symptoms.forEach(r=>{ if(!r.shared && r.items && r.items.some(i=>i.sev===3)){
+    ring='red'; needs.push({type:'sym',text:'Severe report not forwarded',nav:'ovLog'}); }});
+  /* emergency-flagged condition */
+  if((d.recipient.conditions||[]).some(c=>/emergency|critical|acute/i.test(c))){
+    ring='red'; needs.push({type:'cond',text:'Emergency condition flagged',nav:'ovManage'}); }
+  /* ── YELLOW triggers (only if not already red) ── */
+  if(ring!=='red'){
+    /* dose due within 60 min */
+    d.meds.forEach(m=>{ if(m.prn) return; (m.times||[]).forEach(tm=>{
+      if(tm>=hm && !taken[td][m.id+'_'+tm]){
+        const dm=mins(tm)-mins(hm);
+        if(dm<=60){ ring='yellow'; needs.push({type:'med',text:m.name+' due in '+dm+'m',nav:'ovMeds'}); }
+      }});});
+    /* refill ≤ 2 days */
+    d.meds.forEach(m=>{ if(!m.refill) return;
+      const du=Math.round((new Date(m.refill+'T12:00')-now)/86400000);
+      if(du<=2){ ring='yellow'; needs.push({type:'refill',text:'Refill: '+m.name+(du<0?' overdue':' in '+du+'d'),nav:'ovMeds'}); }});
+    /* appointment ≤ 60 min */
+    d.appts.forEach(a=>{ if(a.date===td && a.time){
+      const dm=mins(a.time)-mins(hm);
+      if(dm>0 && dm<=60){ ring='yellow'; needs.push({type:'appt',text:(contactName(a.withId)||'Appt')+' in '+dm+'m',nav:'ovSched'}); }
+    }});
+    /* moderate symptom within 48h */
+    const twoDaysAgo=new Date(now-48*3600000).toISOString().slice(0,10);
+    d.symptoms.forEach(r=>{ if(r.date>=twoDaysAgo && r.items && r.items.some(i=>i.sev===2) && !r.shared){
+      ring='yellow'; needs.push({type:'sym',text:'Moderate report pending',nav:'ovLog'}); }});
+  }
+  /* ── bigEvent: next major schedule item ── */
+  let bigEvent=null;
+  const futAppt=d.appts.filter(a=>a.date>=td).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))[0];
+  if(futAppt){
+    const dt=new Date(futAppt.date+'T'+(futAppt.time||'12:00'));
+    const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const ampm=h=>{ const hh=parseInt(h); return (hh>12?hh-12:hh||12)+':'+h.slice(3)+' '+(hh>=12?'PM':'AM'); };
+    const label=contactName(futAppt.withId)||futAppt.where||'Appointment';
+    const when=futAppt.date===td?'Today'+(futAppt.time?' '+ampm(futAppt.time):'')
+      : dayNames[dt.getDay()]+(futAppt.time?' '+ampm(futAppt.time):'');
+    bigEvent={text:label+' \u2014 '+when, nav:'ovSched'};
+  }
+  /* ── mood: latest entry ── */
+  const mood=d.mood||null;
+  return {ring,needs,bigEvent,mood};
+}
 function computeNextAction(){
   const now=new Date(), t=todayStr(), hm=now.toTimeString().slice(0,5);
   data.taken[t]=data.taken[t]||{};
-  patientUrgent=false; nextActionNodeId=null;
-  /* overdue dose > 60 min → patient urgent */
-  let nextMed=null, overdue=false;
-  data.meds.forEach(m=>(m.times||[]).forEach(tm=>{
-    const key=m.id+'_'+tm;
-    if(!data.taken[t][key]){
-      if(tm<hm){ const mins=(parseInt(hm)*60+ +hm.slice(3)) - (parseInt(tm)*60+ +tm.slice(3)); if(mins>60) overdue=true; }
-      if(tm>=hm && (!nextMed||tm<nextMed.tm)) nextMed={m,tm};
-    }}));
-  if(overdue) patientUrgent=true;
-  /* refill within 2 days → pharmacy urgent */
+  /* compute bluf state (single source) */
+  _bluf=blufState(data);
+  patientUrgent=_bluf.ring==='red';
+  nextActionNodeId=null;
+  /* refill within 2 days → pharmacy urgent (side effect on contacts) */
   data.meds.forEach(m=>{ if(m.refill){
     const du=Math.round((new Date(m.refill+'T12:00')-now)/86400000);
     if(du<=2){ const ph=data.contacts.find(c=>c.id===m.pharm); if(ph) ph.state='urgent'; }
   }});
-  /* severe unshared symptom report → patient urgent */
-  if(data.symptoms.some(r=>!r.shared && r.items.some(i=>i.sev===3))) patientUrgent=true;
   /* choose the single next action + its node */
+  let nextMed=null;
+  data.meds.forEach(m=>(m.times||[]).forEach(tm=>{
+    const key=m.id+'_'+tm;
+    if(!data.taken[t][key] && tm>=hm && (!nextMed||tm<nextMed.tm)) nextMed={m,tm};
+  }));
   const appt=data.appts.filter(a=>a.date>=t).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))[0];
   const rout=data.routine.filter(r=>r.days.includes(now.getDay())&&r.time>=hm).sort((a,b)=>a.time.localeCompare(b.time))[0];
   const cands=[];
-  if(overdue) cands.push({k:'0', text:'Overdue dose — give it or log why', node:null});
+  if(patientUrgent) cands.push({k:'0', text:_bluf.needs[0]?_bluf.needs[0].text:'Needs attention', node:null});
   if(nextMed) cands.push({k:'1'+nextMed.tm, text:nextMed.tm+' · give '+nextMed.m.name, node:nextMed.m.pharm||null});
   if(rout) cands.push({k:'1'+rout.time, text:rout.time+' · '+rout.label, node:null});
   if(appt&&appt.date===t) cands.push({k:'1'+(appt.time||'99'), text:(appt.time||'')+' · appt: '+contactName(appt.withId), node:appt.withId});
@@ -1260,15 +1319,25 @@ function draw(t){
   ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=0.95; ctx.strokeStyle=pcol; ctx.lineWidth=2*s;
   ctx.beginPath(); ctx.arc(cp.sx,cp.sy,R,0,7); ctx.stroke();
+  /* SEVERITY RING — colored halo outside the rim */
+  var _rc=RING_COLORS[_bluf.ring]||RING_COLORS.green;
+  var _rp=reduced?0.5:(0.5+0.5*Math.sin(t*(_bluf.ring==='red'?3.5:1.8)));
+  var _rRad=(rr+(!expanded?8:5))*s;
+  ctx.globalCompositeOperation='lighter';
+  var _rg=ctx.createRadialGradient(cp.sx,cp.sy,_rRad-3*s,cp.sx,cp.sy,_rRad+6*s);
+  _rg.addColorStop(0,_rc+'00'); _rg.addColorStop(0.3,_rc+'55'); _rg.addColorStop(0.6,_rc+'33'); _rg.addColorStop(1,_rc+'00');
+  ctx.globalAlpha=0.5+0.35*_rp;
+  ctx.fillStyle=_rg; ctx.beginPath(); ctx.arc(cp.sx,cp.sy,_rRad+6*s,0,7); ctx.fill();
+  ctx.globalCompositeOperation='source-over';
+  ctx.globalAlpha=0.7+0.25*_rp; ctx.strokeStyle=_rc; ctx.lineWidth=2*s;
+  ctx.beginPath(); ctx.arc(cp.sx,cp.sy,_rRad,0,7); ctx.stroke();
+  /* end severity ring */
   ctx.fillStyle='#0a0d14'; ctx.font='700 '+Math.round(14*s)+'px "Segoe UI",system-ui,sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(initials(data.recipient.name||'?'), cp.sx, cp.sy);
   ctx.fillStyle=pcol; ctx.font='600 '+Math.round(13*s)+'px "Segoe UI",system-ui,sans-serif';
   ctx.fillText(data.recipient.name||'Tap to begin', cp.sx, cp.sy+R+16*s);
   if(!expanded){
-    const hb=reduced?0.5:(0.5+0.5*Math.sin(t*1.4));
-    ctx.strokeStyle='rgba(255,210,77,'+(0.25+0.35*hb)+')'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.arc(cp.sx,cp.sy,(rr+16+hb*8)*s,0,7); ctx.stroke();
     ctx.fillStyle='rgba(232,236,244,.95)'; ctx.font='600 '+Math.round(14*s)+'px "Segoe UI",system-ui,sans-serif';
     ctx.fillText('Tap to open the circle', cp.sx, cp.sy+(rr+40)*s); }
     centerHit={x:cp.sx,y:cp.sy,r:rr*s};
@@ -1541,7 +1610,8 @@ function drawCaseload(t){
     const e=cn.e, x=cn.x, y=cn.y+clPanY, r=cn.r;
     if(y<60||y>floorCl) { cn.sy=-999; return; }
     cn.sy=y;
-    const col = e.urgent?'#ff6b6b': e.watch?'#f2b84e':'#ffd24d';
+    const _clRing=e.urgent?'red':e.watch?'yellow':'green';
+    const col = RING_COLORS[_clRing]||'#ffd24d';
     const pulse = e.urgent? (reduced?0.6:(0.5+0.5*Math.sin(t*7+cn.x))) : (reduced?0.5:(0.5+0.5*Math.sin(t*1.2+cn.x)));
     ctx.globalCompositeOperation='lighter';
     const halo=r*(3.4+(e.urgent?pulse*1.6:pulse*0.5));
@@ -1556,6 +1626,15 @@ function drawCaseload(t){
     ctx.globalCompositeOperation='source-over';
     ctx.globalAlpha=0.92; ctx.strokeStyle=col; ctx.lineWidth=1.6;
     ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.stroke();
+    /* severity ring on caseload sphere */
+    var _crc=RING_COLORS[_clRing];
+    ctx.globalCompositeOperation='lighter';
+    var _crg=ctx.createRadialGradient(x,y,r,x,y,r+5);
+    _crg.addColorStop(0,_crc+'00'); _crg.addColorStop(0.4,_crc+'44'); _crg.addColorStop(1,_crc+'00');
+    ctx.globalAlpha=0.55; ctx.fillStyle=_crg; ctx.beginPath(); ctx.arc(x,y,r+5,0,7); ctx.fill();
+    ctx.globalCompositeOperation='source-over';
+    ctx.globalAlpha=0.6; ctx.strokeStyle=_crc; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.arc(x,y,r+3,0,7); ctx.stroke();
     ctx.globalAlpha=1; ctx.fillStyle='#0a0d14';
     ctx.font='700 12px "Segoe UI",system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(initials(e.name), x, y);
@@ -1616,6 +1695,10 @@ function drawRoster(t){
     ctx.globalCompositeOperation='source-over';
     ctx.globalAlpha=0.9; ctx.strokeStyle=col; ctx.lineWidth=1.3;
     ctx.beginPath(); ctx.arc(x,y,rr,0,7); ctx.stroke();
+    /* slim severity ring on roster sphere */
+    var _rrc=RING_COLORS[e.urgent?'red':e.watch?'yellow':'green'];
+    ctx.globalAlpha=0.5; ctx.strokeStyle=_rrc; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(x,y,rr+3,0,7); ctx.stroke();
     ctx.globalAlpha=1; ctx.fillStyle='#0a0d14';
     ctx.font='700 '+(small?9:10)+'px "Segoe UI",system-ui,sans-serif';
     ctx.fillText(initials(e.name), x, y);
