@@ -762,7 +762,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.03 r17';
+const BUILD='2026.08.03 r18';
 
 /* ── Telemetry (access intelligence, no PHI) ── */
 var CC_URL='https://beverlyindex-com.vercel.app';
@@ -1412,6 +1412,41 @@ function glowSprite(color, r){
 }
 function initials(name){ return (name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
 
+/* ── Alive motion: particles, shimmer, breath (non-measured layers) ── */
+var _particles=[];
+var _PART_MAX=Math.min(W,H)<700?40:120;
+function _initParticles(){
+  _PART_MAX=Math.min(W,H)<700?40:120;
+  _particles=[];
+  for(var i=0;i<_PART_MAX;i++){
+    _particles.push({x:Math.random()*W,y:Math.random()*H,
+      vx:(Math.random()-0.5)*0.15, vy:(Math.random()-0.5)*0.1,
+      r:Math.random()*1.2+0.4, a:Math.random()*0.12+0.03,
+      phase:Math.random()*6.28});
+  }
+}
+_initParticles();
+addEventListener('resize',function(){ _initParticles(); });
+var _shimmerLine=-1, _shimmerT=0, _shimmerNext=0;
+var _clusterBreath=0;
+
+function _drawParticles(t){
+  if(reduced) return;
+  ctx.globalCompositeOperation='lighter';
+  for(var i=0;i<_particles.length;i++){
+    var p=_particles[i];
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<-10) p.x=W+10; if(p.x>W+10) p.x=-10;
+    if(p.y<-10) p.y=H+10; if(p.y>H+10) p.y=-10;
+    var flicker=0.6+0.4*Math.sin(t*0.8+p.phase);
+    ctx.globalAlpha=p.a*flicker;
+    ctx.fillStyle='#1a4a7a';
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+  }
+  ctx.globalCompositeOperation='source-over';
+  ctx.globalAlpha=1;
+}
+
 function draw(t){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.globalCompositeOperation='source-over';
@@ -1419,6 +1454,11 @@ function draw(t){
   const g=ctx.createRadialGradient(W/2,H/2,40,W/2,H/2,Math.max(W,H)*0.78);
   g.addColorStop(0,'#071d3a'); g.addColorStop(0.45,'#031628'); g.addColorStop(0.8,'#010e22'); g.addColorStop(1,'#000a18');
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  /* depth particles behind everything */
+  _drawParticles(t);
+  /* cluster breath: gentle scale sway */
+  if(!reduced) _clusterBreath=Math.sin(t*0.6)*0.012+Math.sin(t*0.23)*0.006;
+  else _clusterBreath=0;
 
   if(MODE==='caseload'){ drawCaseload(t); return; }
   const center={x:0,y:0,z:0}; const cp=project(center);
@@ -1427,13 +1467,19 @@ function draw(t){
 
   /* links — additive glow, center to each sphere */
   ctx.globalCompositeOperation='lighter'; ctx.lineCap='round';
-  ordered.forEach(n=>{
+  /* link-line shimmer: one line at a time gets a traveling bright pulse */
+  if(!reduced && t>_shimmerNext && expanded){
+    _shimmerLine=Math.floor(Math.random()*ordered.length);
+    _shimmerT=t; _shimmerNext=t+3+Math.random()*4;
+  }
+  ordered.forEach((n,ni)=>{
     if(!visibleN(n)) return;
     const col=sphereColor(n.p2);
-    const a=Math.max(0.16, Math.min(0.7, n.pr.s*0.7));
+    var a=Math.max(0.16, Math.min(0.7, n.pr.s*0.7));
+    var shimmer=(!reduced && ni===_shimmerLine && (t-_shimmerT)<1.2)? 0.35*Math.sin((t-_shimmerT)*2.6) : 0;
     ctx.strokeStyle=(n.p2.emergency?'#ffd24d':col);
-    ctx.globalAlpha=a*(n.p2.emergency?0.7:0.55);
-    ctx.lineWidth=(n.p2.emergency?2.2:1.5)*n.pr.s;
+    ctx.globalAlpha=a*(n.p2.emergency?0.7:0.55)+shimmer;
+    ctx.lineWidth=((n.p2.emergency?2.2:1.5)+shimmer*1.5)*n.pr.s;
     ctx.beginPath();
     const mx=(cp.sx+n.pr.sx)/2, my=(cp.sy+n.pr.sy)/2 - 18*n.pr.s;
     ctx.moveTo(cp.sx,cp.sy); ctx.quadraticCurveTo(mx,my,n.pr.sx,n.pr.sy); ctx.stroke();
@@ -1512,13 +1558,22 @@ function draw(t){
   ctx.fillStyle=pgg; ctx.beginPath(); ctx.arc(cp.sx,cp.sy,ph,0,7); ctx.fill();
   ctx.globalAlpha=0.32; ctx.fillStyle=pcol;
   ctx.beginPath(); ctx.arc(cp.sx,cp.sy,R,0,7); ctx.fill();
-  const pcore=ctx.createRadialGradient(cp.sx,cp.sy,0,cp.sx,cp.sy,R*0.62);
-  pcore.addColorStop(0,pcol); pcore.addColorStop(0.7,pcol+'55'); pcore.addColorStop(1,pcol+'00');
-  ctx.globalAlpha=0.60; ctx.fillStyle=pcore;
+  /* refined core with brighter center and slow rotation */
+  var _coreOff=reduced?0:Math.sin(t*0.3)*R*0.08;
+  const pcore=ctx.createRadialGradient(cp.sx+_coreOff,cp.sy-_coreOff*0.6,0,cp.sx,cp.sy,R*0.62);
+  pcore.addColorStop(0,pcol); pcore.addColorStop(0.4,pcol+'aa'); pcore.addColorStop(0.7,pcol+'44'); pcore.addColorStop(1,pcol+'00');
+  ctx.globalAlpha=0.65; ctx.fillStyle=pcore;
   ctx.beginPath(); ctx.arc(cp.sx,cp.sy,R*0.62,0,7); ctx.fill();
   ctx.globalCompositeOperation='source-over';
   ctx.globalAlpha=0.95; ctx.strokeStyle=pcol; ctx.lineWidth=2*s;
   ctx.beginPath(); ctx.arc(cp.sx,cp.sy,R,0,7); ctx.stroke();
+  /* rim sheen: faint highlight sweeping around the rim ~10s cycle */
+  if(!reduced){
+    var _sheenA=t*0.628; /* ~10s full cycle */
+    ctx.globalAlpha=0.12+0.08*Math.sin(t*0.5);
+    ctx.strokeStyle=pcol; ctx.lineWidth=1.5*s;
+    ctx.beginPath(); ctx.arc(cp.sx,cp.sy,R,_sheenA,_sheenA+1.2); ctx.stroke();
+  }
   /* SEVERITY RING — colored halo outside the rim */
   var _rc=RING_COLORS[_bluf.ring]||RING_COLORS.green;
   var _rp=reduced?0.5:(0.5+0.5*Math.sin(t*(_bluf.ring==='red'?3.5:1.8)));
@@ -1547,6 +1602,7 @@ function draw(t){
 let centerHit={x:0,y:0,r:0};
 let loopWarned=false;
 function loop(){
+  if(document.hidden){ requestAnimationFrame(loop); return; } /* pause all when hidden */
   try{
     const t=performance.now()/1000;
     stepFocus();
