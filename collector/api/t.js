@@ -38,6 +38,8 @@ const EVENT_LABELS = {
   photo_shared: 'Photo shared',
   report_sent: 'Report sent',
   alerts_enabled: 'Alerts enabled',
+  mood_logged: 'Mood logged',
+  bluf_tap: 'BLUF tap',
   heartbeat: 'Heartbeat',
   session_end: 'Session end',
 };
