@@ -1020,18 +1020,23 @@ function panelsOpen(){
 /* Servo geometry cache: measured once on discrete events, not per frame */
 var _servoTop=0, _servoFloor=0, _servoDirty=false;
 var _SERVO_DEADBAND=8;
+var spotlight=false; /* true when open card leaves too-short band for cluster */
+var _SPOTLIGHT_THRESHOLD=180;
 function _servoMeasure(){
   _servoTop=clearAbove(); _servoFloor=panelsFloor()-12; _servoDirty=false;
 }
+/* Measure top chrome once on load and periodically */
+setTimeout(function(){ _servoTop=clearAbove(); },500);
 function reframeForCard(){
   if(!panelsOpen()){ clearReframe(); return; }
   _servoMeasure();
   var avail=Math.max(120, _servoFloor-_servoTop-14);
+  spotlight=(avail<_SPOTLIGHT_THRESHOLD);
   var target=(_servoTop+avail/2)-(H/2+panY);
   if(Math.abs(target-focusPanYT)>_SERVO_DEADBAND) focusPanYT=target;
   focusFrames=0;
 }
-function clearReframe(){ focusPanYT=0; focusZoomT=1; _servoDirty=false; }
+function clearReframe(){ focusPanYT=0; focusZoomT=1; _servoDirty=false; spotlight=false; }
 function stepFocus(){
   /* ease to target with settling (deadband prevents oscillation) */
   var dy=focusPanYT-focusPanY;
@@ -1054,7 +1059,7 @@ function stepFocus(){
   }
 }
 /* Trigger servo remeasure on resize/orientation */
-addEventListener('resize',function(){ if(panelsOpen()) _servoDirty=true; });
+addEventListener('resize',function(){ _servoTop=clearAbove(); if(panelsOpen()) _servoDirty=true; });
 
 /* category direction anchors on the sphere */
 const catDir={};
@@ -1167,10 +1172,11 @@ function blufState(d){
   if(futAppt){
     const dt=new Date(futAppt.date+'T'+(futAppt.time||'12:00'));
     const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const ampm=h=>{ const hh=parseInt(h); return (hh>12?hh-12:hh||12)+':'+h.slice(3)+' '+(hh>=12?'PM':'AM'); };
+    const ampm=h=>{ if(!h||h==='00:00') return ''; const hh=parseInt(h); return (hh>12?hh-12:hh||12)+':'+h.slice(3)+' '+(hh>=12?'PM':'AM'); };
     const label=contactName(futAppt.withId)||futAppt.where||'Appointment';
-    const when=futAppt.date===td?'Today'+(futAppt.time?' '+ampm(futAppt.time):'')
-      : dayNames[dt.getDay()]+(futAppt.time?' '+ampm(futAppt.time):'');
+    const timeStr=ampm(futAppt.time);
+    const when=futAppt.date===td?'Today'+(timeStr?' '+timeStr:'')
+      : dayNames[dt.getDay()]+(timeStr?' '+timeStr:'');
     bigEvent={text:label+' \u2014 '+when, nav:'ovSched'};
   }
   /* ── mood: latest entry ── */
@@ -1358,8 +1364,11 @@ function draw(t){
 
   /* contact spheres — luminous single-color stars (Roy technique) */
   ordered.forEach(n=>{
-    const on=visibleN(n); if(!expanded) return;
+    var on=visibleN(n); if(!expanded) return;
+    if(spotlight && !(selected&&selected===n)) on=false; /* spotlight: fade all except selected */
     const p=n.pr, P=n.p2, s=p.s;
+    /* top chrome clipping: fade spheres behind header */
+    if(p.sy<_servoTop && on) on=false;
     const col=sphereColor(P);
     const r=Math.max(2,n.r*s);
     ctx.globalCompositeOperation='lighter';
@@ -1442,7 +1451,8 @@ function draw(t){
   ctx.globalAlpha=0.5+0.35*_rp;
   ctx.fillStyle=_rg; ctx.beginPath(); ctx.arc(cp.sx,cp.sy,_rRad+6*s,0,7); ctx.fill();
   ctx.globalCompositeOperation='source-over';
-  ctx.globalAlpha=0.7+0.25*_rp; ctx.strokeStyle=_rc; ctx.lineWidth=2*s;
+  var _rLw=Math.min(W,H)<700?3:2; /* thicker ring on mobile for legibility */
+  ctx.globalAlpha=0.7+0.25*_rp; ctx.strokeStyle=_rc; ctx.lineWidth=_rLw*s;
   ctx.beginPath(); ctx.arc(cp.sx,cp.sy,_rRad,0,7); ctx.stroke();
   /* end severity ring */
   ctx.fillStyle='#0a0d14'; ctx.font='700 '+Math.round(14*s)+'px "Segoe UI",system-ui,sans-serif';
@@ -1566,9 +1576,11 @@ function openPatientCard(){
   const r=data.recipient, info=$id('info');
   $id('iName').textContent=r.name||'Care recipient';
   $id('iChips').innerHTML=(r.conditions||[]).map(c=>'<span class="chip">'+esc(c)+'</span>').join('');
-  $id('iPhone').innerHTML=r.born?'Born '+esc(r.born)+(r.blood?' · '+esc(r.blood):''):'';
-  $id('iNote').textContent=r.poa||'';
-  $id('iMeta').textContent=(r.allergies&&r.allergies.length)?'Allergies: '+r.allergies.join(', '):'';
+  var _bp=[]; if(r.born) _bp.push('Born '+esc(r.born)); if(r.blood&&!/unknown/i.test(r.blood)) _bp.push(esc(r.blood));
+  $id('iPhone').innerHTML=_bp.join(' · '); $id('iPhone').style.display=_bp.length?'':'none';
+  $id('iNote').textContent=r.poa||''; $id('iNote').style.display=r.poa?'':'none';
+  var _al=(r.allergies||[]).filter(a=>a&&!/unknown/i.test(a));
+  $id('iMeta').textContent=_al.length?'Allergies: '+_al.join(', '):''; $id('iMeta').style.display=_al.length?'':'none';
   let resolveBtns='';
   if(patientUrgent){
     const td=todayStr(), hm=new Date().toTimeString().slice(0,5);
@@ -1748,7 +1760,7 @@ function drawCaseload(t){
     _crg.addColorStop(0,_crc+'00'); _crg.addColorStop(0.4,_crc+'44'); _crg.addColorStop(1,_crc+'00');
     ctx.globalAlpha=0.55; ctx.fillStyle=_crg; ctx.beginPath(); ctx.arc(x,y,r+5,0,7); ctx.fill();
     ctx.globalCompositeOperation='source-over';
-    ctx.globalAlpha=0.6; ctx.strokeStyle=_crc; ctx.lineWidth=1.2;
+    ctx.globalAlpha=0.6; ctx.strokeStyle=_crc; ctx.lineWidth=smallCl?1.8:1.2;
     ctx.beginPath(); ctx.arc(x,y,r+3,0,7); ctx.stroke();
     ctx.globalAlpha=1; ctx.fillStyle='#0a0d14';
     ctx.font='700 12px "Segoe UI",system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -1812,7 +1824,7 @@ function drawRoster(t){
     ctx.beginPath(); ctx.arc(x,y,rr,0,7); ctx.stroke();
     /* slim severity ring on roster sphere */
     var _rrc=RING_COLORS[e.urgent?'red':e.watch?'yellow':'green'];
-    ctx.globalAlpha=0.5; ctx.strokeStyle=_rrc; ctx.lineWidth=1;
+    ctx.globalAlpha=0.5; ctx.strokeStyle=_rrc; ctx.lineWidth=small?1.5:1;
     ctx.beginPath(); ctx.arc(x,y,rr+3,0,7); ctx.stroke();
     ctx.globalAlpha=1; ctx.fillStyle='#0a0d14';
     ctx.font='700 '+(small?9:10)+'px "Segoe UI",system-ui,sans-serif';
