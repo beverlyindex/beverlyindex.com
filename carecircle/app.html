@@ -121,6 +121,7 @@
   #noteSave{flex:1;background:var(--accent);border:none;color:#0b1526;font-size:14px;
     font-weight:600;padding:10px;border-radius:10px;cursor:pointer;}
   #noteSave:hover{filter:brightness(1.08);}
+  #micHint{color:var(--urgent);font-size:11px;margin-top:6px;line-height:1.4;}
 
   /* mood logger overlay */
   #moodOv{position:fixed;inset:0;background:rgba(5,7,12,.88);z-index:22;display:none;
@@ -429,6 +430,7 @@
     <div class="nHdr"><span class="nTitle" id="noteTitle">Note</span><button class="nClose" id="noteClose">&times;</button></div>
     <textarea id="noteText" placeholder="Quick note…" rows="3"></textarea>
     <div id="noteBar"><button id="noteMic">&#127908;</button><button id="noteSave">Save</button></div>
+    <div id="micHint" style="display:none"></div>
   </div>
 </div>
 <div id="mTop">
@@ -762,7 +764,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.03 r18';
+const BUILD='2026.08.03 r19';
 
 /* ── Telemetry (access intelligence, no PHI) ── */
 var CC_URL='https://beverlyindex-com.vercel.app';
@@ -1359,7 +1361,7 @@ document.querySelectorAll('.moodBtn').forEach(function(btn){
 /* ── Quick Note ── */
 function openNoteComposer(){
   $id('noteTitle').textContent=(data.recipient.name||'Patient')+' \u2014 now';
-  $id('noteText').value='';
+  $id('noteText').value=''; _dictHint('');
   $id('noteOv').classList.add('show');
   setTimeout(function(){ $id('noteText').focus(); },80);
   /* hide mic if SpeechRecognition unavailable */
@@ -1380,12 +1382,15 @@ $id('noteSave').onclick=function(){
 $id('mNoteBtn').onclick=openNoteComposer;
 $id('dNoteBtn').onclick=openNoteComposer;
 /* dictation */
-var _dictRec=null;
-function _stopDictation(){ if(_dictRec){ try{_dictRec.stop();}catch(e){} _dictRec=null; $id('noteMic').classList.remove('on'); }}
+var _dictRec=null, _dictBusy=false;
+function _stopDictation(){ if(_dictRec){ try{_dictRec.stop();}catch(e){} } _dictRec=null; _dictBusy=false; $id('noteMic').classList.remove('on'); }
+function _dictHint(msg){ var h=$id('micHint'); h.textContent=msg; h.style.display=msg?'':'none'; }
 $id('noteMic').onclick=function(){
-  if(_dictRec){ _stopDictation(); return; }
+  if(_dictBusy) return; /* guard against double-tap / rapid toggle */
+  if(_dictRec){ _stopDictation(); _dictHint(''); return; }
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR) return;
+  _dictBusy=true; _dictHint('');
   _dictRec=new SR(); _dictRec.continuous=true; _dictRec.interimResults=true; _dictRec.lang=navigator.language||'en-US';
   var field=$id('noteText'), base=field.value;
   _dictRec.onresult=function(ev){
@@ -1393,9 +1398,17 @@ $id('noteMic').onclick=function(){
     for(var i=ev.resultIndex;i<ev.results.length;i++) tr+=ev.results[i][0].transcript;
     field.value=base+(base?' ':'')+tr;
   };
-  _dictRec.onerror=function(){ _stopDictation(); };
-  _dictRec.onend=function(){ _dictRec=null; $id('noteMic').classList.remove('on'); };
-  _dictRec.start(); $id('noteMic').classList.add('on');
+  _dictRec.onerror=function(ev){
+    var err=ev.error||'unknown';
+    console.log('[cc-mic] SpeechRecognition error:', err);
+    if(err==='not-allowed') _dictHint('Microphone blocked \u2014 allow mic access in browser settings');
+    else if(err==='network') _dictHint('Dictation service unreachable (VPN/network)');
+    /* no-speech, aborted, audio-capture: reset quietly */
+    _dictRec=null; _dictBusy=false; $id('noteMic').classList.remove('on');
+  };
+  _dictRec.onend=function(){ _dictRec=null; _dictBusy=false; $id('noteMic').classList.remove('on'); };
+  try{ _dictRec.start(); $id('noteMic').classList.add('on'); _dictBusy=false; }
+  catch(e){ console.log('[cc-mic] start failed:', e); _dictRec=null; _dictBusy=false; }
 };
 
 /* ---------------- galaxy renderer (additive bloom, ported style) ---------------- */
