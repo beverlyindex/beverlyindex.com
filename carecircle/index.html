@@ -43,6 +43,25 @@
   <div class="foot"><a href="https://beverly-index.com">← Return to beverly-index.com</a></div>
 </div>
 <script>
+/* ── Telemetry helper ── */
+var CC_URL=''; /* COLLECTOR_URL: set after Vercel deploy */
+var CC_TK=''; /* TELEMETRY_TOKEN: set after Vercel deploy */
+function t(ev,extra){
+  try{
+    var p={v:1,sid:sessionStorage.getItem('cc:sid')||'',code:'',ev:ev,ts:Date.now(),
+      n:{screen:screen.width+'x'+screen.height,tz:'',lang:navigator.language||'',
+         cores:navigator.hardwareConcurrency||0,build:'gate'}};
+    try{p.n.tz=Intl.DateTimeFormat().resolvedOptions().timeZone;}catch(e){}
+    if(extra) for(var k in extra) p[k]=extra[k];
+    if(!CC_URL) return;
+    if(CC_TK) p.tk=CC_TK;
+    var body=JSON.stringify(p);
+    if(navigator.sendBeacon){navigator.sendBeacon(CC_URL+'/api/t',new Blob([body],{type:'application/json'}));}
+    else{fetch(CC_URL+'/api/t',{method:'POST',headers:{'Content-Type':'application/json','x-cc-t':CC_TK},body:body,keepalive:true}).catch(function(){});}
+  }catch(e){}
+}
+(function(){var s=sessionStorage.getItem('cc:sid');if(!s){s=Math.random().toString(36).slice(2)+Date.now().toString(36);sessionStorage.setItem('cc:sid',s);}})();
+
 const KEYS={
   'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6':'primary',
   '2dfff49a919dda77992069e38094e3e2e8a699a3ac8e080d45664465d1700ffb':'tester'
@@ -60,9 +79,11 @@ async function attempt(){
   if(who){
     sessionStorage.setItem('cc:access', code);
     sessionStorage.setItem('cc:who', who);
+    t('gate_success',{code:who});
     notifyAccess(who);                       /* fire-and-forget access beacon */
     setTimeout(()=>location.replace('app.html'), 250);
   } else {
+    t('gate_fail',{code:'fail'});
     err.textContent='That code was not recognized.';
     el.value=''; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); el.focus();
   }

@@ -54,9 +54,10 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(204).end();
 
-  // Token guard
+  // Token guard (header preferred; body fallback for sendBeacon which can't set headers)
   const token = process.env.TELEMETRY_TOKEN;
-  if (token && req.headers['x-cc-t'] !== token) return res.status(204).end();
+  const provided = req.headers['x-cc-t'] || (req.body && req.body.tk) || '';
+  if (token && provided !== token) return res.status(204).end();
 
   // Per-IP soft rate limit
   const clientIp = getClientIp(req);
