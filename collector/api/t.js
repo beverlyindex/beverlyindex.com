@@ -7,7 +7,7 @@
  * via Resend for gate_success and session_end events.
  *
  * Always responds 204 regardless of outcome.
- * CORS restricted to https://beverly-index.com.
+ * CORS allows https://beverly-index.com and https://www.beverly-index.com.
  */
 
 const RESEND_URL = 'https://api.resend.com/emails';
@@ -43,13 +43,15 @@ const EVENT_LABELS = {
 };
 
 module.exports = async function handler(req, res) {
-  // CORS
+  // CORS — allow both bare and www origins
   const origin = req.headers['origin'] || '';
-  if (origin === 'https://beverly-index.com') {
-    res.setHeader('Access-Control-Allow-Origin', 'https://beverly-index.com');
+  const allowed = ['https://beverly-index.com', 'https://www.beverly-index.com'];
+  if (allowed.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-cc-t');
+  res.setHeader('Access-Control-Max-Age', '86400');
 
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(204).end();
