@@ -737,7 +737,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.05 r17.3';
+const BUILD='2026.08.05 r18';
 function savedFlash(btnId, msg){
   const b=$id(btnId);
   if(b){ const t=b.textContent; b.textContent='\u2713 Saved'; b.classList.add('gold');
@@ -996,16 +996,10 @@ function reframeForCard(){
   requestAnimationFrame(()=>{
     if(!panelsOpen()){ clearReframe(); return; }
     if(cardOwnsMobile()){
-      const cardTop=document.getElementById('info').getBoundingClientRect().top;
-      const top=clearAbove();
-      const avail=Math.max(110, cardTop-top-12);
-      focusPanYT=(top+avail/2)-(H/2+panY);
-      setTimeout(()=>{ if(!cardOwnsMobile()) return;
-        let lo=1e9, hi=-1e9;
-        NODES.forEach(n=>{ if(!n.pr) return; lo=Math.min(lo,n.pr.sy-24); hi=Math.max(hi,n.pr.sy+30); });
-        if(hi>-1e8){ const span=hi-lo;
-          if(span>avail*1.02) focusZoomT=Math.min(2.1, focusZoom*span/(avail*0.9)); }
-      }, 700);
+      /* fixed band: below chrome (~112px), above the 56vh card (top = 0.44*H). No rects, no timers. */
+      const bandTop=112, bandBot=H*0.37;
+      focusPanYT=((bandTop+bandBot)/2)-(H/2+panY);
+      focusZoomT=2.0;
       return;
     }
     const floor=panelsFloor();
@@ -1550,10 +1544,34 @@ function timeFromText(t,m){
     if(d<bd){bd=d;best=tm;}});
   return bd<=120?best:null;
 }
+function flagOverdose(m, text, td, parts, undos, logIds){
+  const rep={id:uid(), date:td, ts:Date.now(), shared:false, sharedTo:[], note:text,
+    items:[{name:'Possible medication overdose'+(m?': '+m.name:''), sev:3}]};
+  data.symptoms.push(rep);
+  undos.push(()=>{ data.symptoms=data.symptoms.filter(x=>x!==rep); });
+  const e={id:uid(), date:td, text:'⚠ Possible overdose'+(m?' — '+m.name:'')+': '+text, tags:['Ledger','Symptom']};
+  data.log.unshift(e); logIds.push(e.id);
+  parts.push('SAFETY: possible overdose flagged — sphere set urgent; forward this to the circle and call the prescriber or poison control');
+}
 function ingest(text){
   if(!text.trim()) return;
   const t=text.toLowerCase(), td=todayStr(); data.taken[td]=data.taken[td]||{};
   const a=ledAnchor, parts=[], undos=[], logIds=[];
+  /* safety first: overdose language is recognized in ANY scope, anchored or not */
+  if(/(overdos\w*|double[- ]?dos\w*|doubled|too many|too much|extra (dose|pill)|twice|second dose|again by mistake)/.test(t)){
+    let m=(a&&a.ctx&&a.ctx.medId)? data.meds.find(x=>x.id===a.ctx.medId)
+         : data.meds.find(x=>t.includes(x.name.toLowerCase().split(' ')[0]));
+    flagOverdose(m, text, td, parts, undos, logIds);
+    const rec={id:uid(), ts:Date.now(), scope:situScope, anchor:a?a.key:null, text, effects:parts.slice()};
+    data.ledger.unshift(rec);
+    undos.push(()=>{ data.log=data.log.filter(e=>!logIds.includes(e.id));
+      data.ledger=data.ledger.filter(e=>e!==rec); });
+    saveSoon(); computeNextAction(); renderSituations(); renderLedger(); renderLegend();
+    document.querySelectorAll('.sl.anch').forEach(x=>x.classList.remove('anch'));
+    ledAnchor=null; $id('ledText').value='';
+    receipt(parts, ()=>{ undos.forEach(u=>u()); });
+    return;
+  }
   function diary(line, tags){ const e={id:uid(), date:td, text:line, tags:tags||['Ledger']};
     data.log.unshift(e); logIds.push(e.id); }
   /* --- anchored medication intelligence --- */
@@ -1561,6 +1579,7 @@ function ingest(text){
     const m=data.meds.find(x=>x.id===a.ctx.medId);
     const tm=a.ctx.time;
     if(m && tm && /\b(gave|given|took|taken|done|administered|she got|he got|did it|got it)\b/.test(t)){
+      if(data.taken[td][m.id+'_'+tm]){ flagOverdose(m, text+' (this dose was already recorded as given today)', td, parts, undos, logIds); }
       data.taken[td][m.id+'_'+tm]=true;
       undos.push(()=>{ delete data.taken[td][m.id+'_'+tm]; });
       parts.push('dose marked given ('+m.name+' '+tm+')');
@@ -1608,7 +1627,9 @@ function ingest(text){
       let tm=timeFromText(t,m);
       if(!tm){ const hm=hmNow(); (m.times||[]).forEach(x=>{ if(!tm && !data.taken[td][m.id+'_'+x] && x<=hm) tm=x; });
         if(!tm) tm=(m.times||[])[0]; }
-      if(tm){ data.taken[td][m.id+'_'+tm]=true;
+      if(tm){
+        if(data.taken[td][m.id+'_'+tm]){ flagOverdose(m, text+' (this dose was already recorded as given today)', td, parts, undos, logIds); }
+        data.taken[td][m.id+'_'+tm]=true;
         undos.push(()=>{ delete data.taken[td][m.id+'_'+tm]; });
         parts.push('dose marked given ('+m.name+' '+tm+')');
         diary(m.name+' '+tm+' given \u2014 '+text, ['Ledger','Meds']); }
