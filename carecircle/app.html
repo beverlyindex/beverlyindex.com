@@ -737,7 +737,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.05 r17.1';
+const BUILD='2026.08.05 r17.2';
 function savedFlash(btnId, msg){
   const b=$id(btnId);
   if(b){ const t=b.textContent; b.textContent='\u2713 Saved'; b.classList.add('gold');
@@ -994,7 +994,7 @@ function panelsOpen(){
 }
 function reframeForCard(){
   requestAnimationFrame(()=>{
-    if(!panelsOpen()){ clearReframe(); return; }
+    if(!panelsOpen() || cardOwnsMobile()){ clearReframe(); return; }
     const floor=panelsFloor();
     const top=clearAbove();
     const avail=Math.max(120, floor-top-14);
@@ -1004,10 +1004,12 @@ function reframeForCard(){
   });
 }
 function clearReframe(){ focusPanYT=0; focusZoomT=1; }
+function cardOwnsMobile(){ return W<=700 && document.getElementById('info').classList.contains('show'); }
 function stepFocus(){
+  if(cardOwnsMobile()){ focusPanYT=0; focusZoomT=1; }
   focusPanY+=(focusPanYT-focusPanY)*0.12;
   focusZoom+=(focusZoomT-focusZoom)*0.10;
-  if(panelsOpen() && MODE==='patient' && expanded && (focusFrames++%6)===0){
+  if(!cardOwnsMobile() && panelsOpen() && MODE==='patient' && expanded && (focusFrames++%6)===0){
     /* fit check: do the spheres spill past the open panels or the top chrome? */
     const top=clearAbove(), floor=panelsFloor()-12;
     let lo=1e9, hi=-1e9;
