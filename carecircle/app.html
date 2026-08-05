@@ -737,7 +737,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.05 r17.2';
+const BUILD='2026.08.05 r17.3';
 function savedFlash(btnId, msg){
   const b=$id(btnId);
   if(b){ const t=b.textContent; b.textContent='\u2713 Saved'; b.classList.add('gold');
@@ -994,7 +994,20 @@ function panelsOpen(){
 }
 function reframeForCard(){
   requestAnimationFrame(()=>{
-    if(!panelsOpen() || cardOwnsMobile()){ clearReframe(); return; }
+    if(!panelsOpen()){ clearReframe(); return; }
+    if(cardOwnsMobile()){
+      const cardTop=document.getElementById('info').getBoundingClientRect().top;
+      const top=clearAbove();
+      const avail=Math.max(110, cardTop-top-12);
+      focusPanYT=(top+avail/2)-(H/2+panY);
+      setTimeout(()=>{ if(!cardOwnsMobile()) return;
+        let lo=1e9, hi=-1e9;
+        NODES.forEach(n=>{ if(!n.pr) return; lo=Math.min(lo,n.pr.sy-24); hi=Math.max(hi,n.pr.sy+30); });
+        if(hi>-1e8){ const span=hi-lo;
+          if(span>avail*1.02) focusZoomT=Math.min(2.1, focusZoom*span/(avail*0.9)); }
+      }, 700);
+      return;
+    }
     const floor=panelsFloor();
     const top=clearAbove();
     const avail=Math.max(120, floor-top-14);
@@ -1006,7 +1019,6 @@ function reframeForCard(){
 function clearReframe(){ focusPanYT=0; focusZoomT=1; }
 function cardOwnsMobile(){ return W<=700 && document.getElementById('info').classList.contains('show'); }
 function stepFocus(){
-  if(cardOwnsMobile()){ focusPanYT=0; focusZoomT=1; }
   focusPanY+=(focusPanYT-focusPanY)*0.12;
   focusZoom+=(focusZoomT-focusZoom)*0.10;
   if(!cardOwnsMobile() && panelsOpen() && MODE==='patient' && expanded && (focusFrames++%6)===0){
