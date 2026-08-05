@@ -292,6 +292,7 @@
     #infoCols{grid-template-columns:1fr}
     #ledgerPane{border-left:none;padding-left:0;border-top:1px solid var(--line);padding-top:9px;margin-top:4px}
     #ledEntries{max-height:84px}
+    #situList{max-height:30vh;overflow-y:auto}
   }
   #photoDock{margin-top:8px;background:rgba(20,26,38,.42);backdrop-filter:blur(10px);
     -webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:12px;
@@ -317,14 +318,15 @@
 /* Private-evaluation gate: this page only opens through the access door. */
 (function(){
   try{
-    var c=sessionStorage.getItem('cc:access');
+    var c=sessionStorage.getItem('cc:access')||localStorage.getItem('cc:access');
+    if(c){ try{localStorage.setItem('cc:access',c); sessionStorage.setItem('cc:access',c);}catch(e){} }
     if(!c){ location.replace('index.html'); document.documentElement.style.display='none'; return; }
     if(window.crypto&&crypto.subtle){
       crypto.subtle.digest('SHA-256', new TextEncoder().encode('carecircle:'+c)).then(function(b){
         var h=Array.prototype.map.call(new Uint8Array(b),function(x){return x.toString(16).padStart(2,'0')}).join('');
         var K={'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6':1,
                '2dfff49a919dda77992069e38094e3e2e8a699a3ac8e080d45664465d1700ffb':1};
-        if(!K[h]){ sessionStorage.removeItem('cc:access'); location.replace('index.html'); }
+        if(!K[h]){ sessionStorage.removeItem('cc:access'); localStorage.removeItem('cc:access'); location.replace('index.html'); }
       });
     }
   }catch(e){ location.replace('index.html'); }
@@ -673,7 +675,7 @@
   </div>
   <div class="sec"><h3>Data</h3>
     <div class="fRow">
-      <button class="btn" id="expBtn">Export backup (.json)</button>
+      <button class="btn" id="expBtn" onclick="try{localStorage.setItem('cc:lastExport',Date.now())}catch(e){}">Export backup (.json)</button>
       <button class="btn" id="impBtn">Import backup</button>
       <input id="impFile" type="file" accept=".json" style="display:none">
       <button class="btn" id="sampleBtn">Load sample data</button>
@@ -734,7 +736,7 @@ const SYMFLAT = [];
 SYMPTOMS.forEach(g=>{ const body=g[0]; g.slice(1).forEach(s=>SYMFLAT.push({s, body})); });
 
 /* ---------------- storage (window.storage → localStorage → memory) ---------------- */
-const BUILD='2026.08.05 r16.1';
+const BUILD='2026.08.05 r17';
 function savedFlash(btnId, msg){
   const b=$id(btnId);
   if(b){ const t=b.textContent; b.textContent='\u2713 Saved'; b.classList.add('gold');
@@ -1451,6 +1453,11 @@ function assess(scope){
     if(tot) L.push({sev:3, key:'prog', ctx:{type:'med'},
       text:done+' of '+tot+' doses given today'+(nxt?' · next '+nxt.tm+' '+nxt.m.name:''),
       act:()=>openOv('ovMeds')});
+    const lx=+localStorage.getItem('cc:lastExport')||0;
+    const days=lx?Math.floor((Date.now()-lx)/86400000):null;
+    if((days===null&&data.log.length>5)||days>7)
+      L.push({sev:2,key:'bk',ctx:{},text:'Back up the record \u2014 '+(days===null?'never exported':'last export '+days+'d ago'),
+        sub:'One tap in Manage keeps the diary safe if this phone is lost',act:()=>openOv('ovManage')});
     if(!L.some(l=>l.sev<3)){
       const last=data.log[0];
       L.push({sev:4, key:'quiet', ctx:{},
@@ -1519,6 +1526,14 @@ function receipt(parts, undoFn){
   r.style.display='block';
   clearTimeout(receipt._t); receipt._t=setTimeout(()=>{ r.style.display='none'; }, 9000);
 }
+function timeFromText(t,m){
+  const x=t.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+  if(!x||!m) return null;
+  let h=+x[1]; if(x[3]==='pm'&&h<12)h+=12; if(x[3]==='am'&&h===12)h=0;
+  let best=null,bd=1e9;(m.times||[]).forEach(tm=>{const d=Math.abs(m2i(tm)-(h*60+(+x[2]||0)));
+    if(d<bd){bd=d;best=tm;}});
+  return bd<=120?best:null;
+}
 function ingest(text){
   if(!text.trim()) return;
   const t=text.toLowerCase(), td=todayStr(); data.taken[td]=data.taken[td]||{};
@@ -1566,8 +1581,26 @@ function ingest(text){
       parts.push('action recorded on their sphere');
     }
   }
-  /* --- unanchored: pure diary --- */
-  else { diary(text); parts.push('diary entry'); }
+  /* --- unanchored: try medication intelligence before diary --- */
+  else {
+    const gave=/\b(gave|given|took|taken|had her|had his|administered|got it|did it)\b/.test(t);
+    let m=data.meds.find(x=>t.includes(x.name.toLowerCase().split(' ')[0]));
+    if(gave&&!m){ const unmet=[], _hm=hmNow(); data.meds.forEach(x=>{ if(x.prn) return;
+      (x.times||[]).forEach(tm=>{ if(tm<=_hm && !data.taken[td][x.id+'_'+tm]) unmet.push({m:x,tm}); });});
+      if(unmet.length===1) m=unmet[0].m; }
+    if(gave&&m){
+      let tm=timeFromText(t,m);
+      if(!tm){ const hm=hmNow(); (m.times||[]).forEach(x=>{ if(!tm && !data.taken[td][m.id+'_'+x] && x<=hm) tm=x; });
+        if(!tm) tm=(m.times||[])[0]; }
+      if(tm){ data.taken[td][m.id+'_'+tm]=true;
+        undos.push(()=>{ delete data.taken[td][m.id+'_'+tm]; });
+        parts.push('dose marked given ('+m.name+' '+tm+')');
+        diary(m.name+' '+tm+' given \u2014 '+text, ['Ledger','Meds']); }
+      else { diary(text); parts.push('diary entry'); }
+    } else if(gave){ diary(text);
+      parts.push('diary entry \u2014 several doses are due; say the medication name, or \u270e a line to aim the note'); }
+    else { diary(text); parts.push('diary entry'); }
+  }
   undos.push(()=>{ data.log=data.log.filter(e=>!logIds.includes(e.id));
     data.ledger=data.ledger.filter(e=>e!==rec); });
   const rec={id:uid(), ts:Date.now(), scope:situScope, anchor:a?a.key:null, text, effects:parts.slice()};
@@ -1882,7 +1915,7 @@ $id('btnAddPatient').onclick=async()=>{
 function doExit(){
   if(!confirm('Exit CareCircle? Your data stays saved on this device.')) return;
   flushNow();
-  sessionStorage.removeItem('cc:access'); sessionStorage.removeItem('cc:who');
+  sessionStorage.removeItem('cc:access'); localStorage.removeItem('cc:access'); sessionStorage.removeItem('cc:who');
   location.href='https://beverly-index.com';
 }
 $id('btnExit').onclick=doExit;
