@@ -3413,8 +3413,8 @@ function T(){ return I18N[GLANG]; }
    screen instead of asking her for data she has not got. */
 const GTOUR=[
  {id:'t_who',    target:'info'},
- {id:'t_flag',   target:'situList'},
- {id:'t_ledger', target:'ledText'},
+ {id:'t_flag',   target:'situList', open:()=>{ if(!expanded) tapPatient(); }},
+ {id:'t_ledger', target:'ledText', open:()=>{ if(!expanded) tapPatient(); }},
  {id:'t_orbs',   target:'legend'},
  {id:'t_brief',  target:'briefBtn', act:()=>$id('briefBtn').click()},
  {id:'t_yours',  target:'btnManage', mtarget:'tbMore'}
@@ -3792,9 +3792,13 @@ function guideAct(){
     guideRender(); return;
   }
   const st=cur.st;
-  if(st.open) st.open();
-  if(st.act){ st.act(); setTimeout(guideRender,300); return; }
+  if(st.act){ if(st.open) st.open(); st.act(); setTimeout(guideRender,300); return; }
   const id = (guideIsMobile() && st.mtarget) ? st.mtarget : st.target;
+  if(st.open){
+    st.open();                       /* opens the card or overlay first */
+    setTimeout(()=>guideDo(id, T()[st.id].cta), 320);
+    return;
+  }
   guideDo(id, T()[st.id].cta);
 }
 
@@ -3813,11 +3817,28 @@ function reachable(el){
 
 /* THE RULE: do the thing if we can; only point when the control is genuinely
    on screen. Never leave an instruction that cannot be acted on. */
-function guideDo(targetId, label, fallback){
+function guideDo(targetId, label, fallback, _retried){
   const el=$id(targetId);
   if(reachable(el)){ spotlight(targetId, label); return 'pointed'; }
+  /* A step may have just opened the card or an overlay that CONTAINS this
+     control. Opening is animated, so on the first frame the target is not
+     reachable yet. Give it one beat before deciding it is out of reach. */
+  if(!_retried){
+    setTimeout(()=>guideDo(targetId, label, fallback, true), 340);
+    return 'waiting';
+  }
   if(typeof fallback==='function'){ fallback(); return 'performed'; }
-  if(el && typeof el.click==='function'){ el.click(); return 'performed'; }
+  if(el){
+    /* a text field is not something you click — clicking a hidden textarea
+       is exactly what made "Answer it" look dead */
+    if(/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName||'')){
+      try{ el.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){}
+      el.focus();
+      showBanner(label, 3000);
+      return 'performed';
+    }
+    if(typeof el.click==='function'){ el.click(); return 'performed'; }
+  }
   showBanner(label, 3500);
   return 'announced';
 }
