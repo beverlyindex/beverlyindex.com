@@ -973,24 +973,19 @@ const AVATAR_CACHE = {};
 function loadAvatar(contactId) {
   if (AVATAR_CACHE[contactId] !== undefined) return;
   AVATAR_CACHE[contactId] = null;
-  try {
-    const req = indexedDB.open('remiel-media', 1);
-    req.onsuccess = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('photos')) return;
-      const tx = db.transaction('photos','readonly');
-      const get = tx.objectStore('photos').get('avatar:'+contactId);
-      get.onsuccess = () => {
-        if (get.result && get.result.data) {
-          const img = new Image();
-          img.onload = () => { AVATAR_CACHE[contactId] = img; };
-          img.src = get.result.data;
-        } else {
-          AVATAR_CACHE[contactId] = false;
-        }
-      };
+  mdb().then(db => {
+    const tx = db.transaction('photos','readonly');
+    const get = tx.objectStore('photos').get('avatar:'+contactId);
+    get.onsuccess = () => {
+      if (get.result && get.result.data) {
+        const img = new Image();
+        img.onload = () => { AVATAR_CACHE[contactId] = img; };
+        img.src = get.result.data;
+      } else {
+        AVATAR_CACHE[contactId] = false;
+      }
     };
-  } catch(e) { AVATAR_CACHE[contactId] = false; }
+  }).catch(() => { AVATAR_CACHE[contactId] = false; });
 }
 function clearAvatarCache(contactId) { delete AVATAR_CACHE[contactId]; }
 function alertOnce(key, title, body, urgent){
@@ -1944,7 +1939,7 @@ function openPersonCard(){
       const reader = new FileReader();
       reader.onload = () => {
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
           const sz = Math.min(256, img.width, img.height);
           const c = document.createElement('canvas');
           c.width = sz; c.height = sz;
@@ -1953,16 +1948,16 @@ function openPersonCard(){
           const sw = img.width * scale, sh = img.height * scale;
           cx.drawImage(img, (sz-sw)/2, (sz-sh)/2, sw, sh);
           const dataUrl = c.toDataURL('image/jpeg', 0.85);
-          const req = indexedDB.open('remiel-media', 1);
-          req.onsuccess = (ev) => {
-            const db = ev.target.result;
+          try {
+            const db = await mdb();
             const tx = db.transaction('photos','readwrite');
             tx.objectStore('photos').put({id: 'avatar:'+targetId, data: dataUrl, date: new Date().toISOString()});
             tx.oncomplete = () => {
               clearAvatarCache(targetId);
               showBanner(String.fromCharCode(10003)+' Photo saved!', 2000);
             };
-          };
+            tx.onerror = () => { showBanner('Could not save the photo.',3000); };
+          } catch(err) { showBanner('Could not save the photo.',3000); }
         };
         img.src = reader.result;
       };
@@ -2063,7 +2058,7 @@ function selectNode(n){
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const sz = Math.min(256, img.width, img.height);
         const c = document.createElement('canvas');
         c.width = sz; c.height = sz;
@@ -2072,16 +2067,16 @@ function selectNode(n){
         const sw = img.width * scale, sh = img.height * scale;
         cx.drawImage(img, (sz-sw)/2, (sz-sh)/2, sw, sh);
         const dataUrl = c.toDataURL('image/jpeg', 0.85);
-        const req = indexedDB.open('remiel-media', 1);
-        req.onsuccess = (ev) => {
-          const db = ev.target.result;
+        try {
+          const db = await mdb();
           const tx = db.transaction('photos','readwrite');
           tx.objectStore('photos').put({id: 'avatar:'+targetId, data: dataUrl, date: new Date().toISOString()});
           tx.oncomplete = () => {
             clearAvatarCache(targetId);
             showBanner(String.fromCharCode(10003)+' Photo saved for this person!', 2000);
           };
-        };
+          tx.onerror = () => { showBanner('Could not save the photo.',3000); };
+        } catch(err) { showBanner('Could not save the photo.',3000); }
       };
       img.src = reader.result;
     };
