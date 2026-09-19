@@ -2994,12 +2994,12 @@ async function importFromPhone() {
         try {
           const blob = c.icon[0];
           const reader = new FileReader();
-          reader.onload = () => {
-            const db = indexedDB.open('remiel-media', 1);
-            db.onsuccess = (e) => {
-              const tx = e.target.result.transaction('photos','readwrite');
+          reader.onload = async () => {
+            try {
+              const db = await mdb();
+              const tx = db.transaction('photos','readwrite');
               tx.objectStore('photos').put({id: 'avatar:'+entry.id, data: reader.result, date: new Date().toISOString()});
-            };
+            } catch(e) {}
           };
           reader.readAsDataURL(blob);
         } catch(e) {}
@@ -3027,14 +3027,14 @@ function importVCards(text) {
     };
     data.contacts.push(entry);
     if (c.photoB64) {
-      try {
-        const dataUrl = 'data:image/jpeg;base64,' + c.photoB64;
-        const db = indexedDB.open('remiel-media', 1);
-        db.onsuccess = (e) => {
-          const tx = e.target.result.transaction('photos','readwrite');
+      (async () => {
+        try {
+          const dataUrl = 'data:image/jpeg;base64,' + c.photoB64;
+          const db = await mdb();
+          const tx = db.transaction('photos','readwrite');
           tx.objectStore('photos').put({id: 'avatar:'+entry.id, data: dataUrl, date: new Date().toISOString()});
-        };
-      } catch(e) {}
+        } catch(e) {}
+      })();
     }
     added++;
   });
