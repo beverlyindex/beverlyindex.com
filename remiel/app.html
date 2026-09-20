@@ -53,6 +53,14 @@
     flex-shrink: 0;
     cursor: default;
     touch-action: none;
+    transition: width 0.5s cubic-bezier(0.22,1,0.36,1),
+                height 0.5s cubic-bezier(0.22,1,0.36,1);
+  }
+
+  /* ── Network mode — expanded stage ── */
+  .sphere-stage.network-mode {
+    width: min(560px, 92vw);
+    height: min(560px, 92vw);
   }
 
   canvas {
@@ -298,6 +306,49 @@
     15% { opacity: 0.6; }
     85% { opacity: 0.6; }
     100% { opacity: 0; }
+  }
+
+  /* ── Network hint (persistent, shown in network state) ── */
+  .network-hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.45;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  /* ── Back button (network/detail state) ── */
+  .back-btn {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 10;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-dim);
+    font-size: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s, opacity 0.3s;
+    font-family: inherit;
+    line-height: 1;
+    padding: 0;
+  }
+  .back-btn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.16);
+    color: var(--text);
   }
 
   /* ── Sphere shrink for BLUF transition ── */
@@ -737,7 +788,9 @@
     <div class="status-label" id="statusLabel">Status: Quiet</div>
     <div class="demo-cycler" id="demoCycler" onclick="cycleSev()">&#9656; cycle status (demo)</div>
   </div>
-  <div class="hold-hint" id="holdHint">tap to open &middot; hold to configure</div>
+  <div class="hold-hint" id="holdHint">tap to open your network</div>
+  <div class="network-hint" id="networkHint" hidden>tap any sphere &middot; drag to rotate</div>
+  <button class="back-btn" id="backBtn" hidden>&#8592;</button>
 </div>
 
 <!-- Overlay — appears on long-press -->
@@ -789,7 +842,7 @@
           color:var(--text); font-family:inherit; font-size:12px; padding:8px 14px;
           border-radius:18px; outline:none; text-align:center; letter-spacing:0.02em;
         "
-        oninput="sphereName = this.value.trim()"
+        oninput="sphereName = this.value.trim(); userSphereName = sphereName;"
         onkeydown="if(event.key==='Enter'){this.blur();}"
         onfocus="this.style.borderColor='rgba(0,212,255,0.4)'"
         onblur="this.style.borderColor='rgba(255,255,255,0.1)'"
@@ -939,12 +992,15 @@ const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
 function resize() {
   const box = stage.getBoundingClientRect();
-  // Canvas is square — use stage width (height includes label space below)
   const s = Math.floor(box.width);
   CV.width = s * DPR;
   CV.height = s * DPR;
   CV.style.width = s + 'px';
   CV.style.height = s + 'px';
+  // Rebuild network nodes for new size if in network mode
+  if (appState === 'network' && NODES.length > 0) {
+    rebuildNodeTargets();
+  }
 }
 resize();
 window.addEventListener('resize', () => { resize(); initFX(); });
@@ -958,8 +1014,8 @@ const CATS = {
 };
 let curCat = 'family';
 let pulseOn = true;
-let otherLabel = 'Other';   // user-editable custom category name
-let sphereName = '';         // user's name/identification for the sphere
+let otherLabel = 'Other';
+let sphereName = '';
 
 /* ── NOUS Severity levels (outer ring) ── */
 const SEVS = {
@@ -971,12 +1027,238 @@ const SEVS = {
 };
 let curSev = 4;
 
+/* ═══════════════════════════════════
+   REMIEL SENTINEL — Three-State System
+   ═══════════════════════════════════ */
+
+let appState = 'self'; // 'self' | 'network' | 'detail'
+let selectedContact = null;
+let userCat = 'family';
+let userSev = 4;
+let userSphereName = '';
+
+/* ── Demo contacts ── */
+const DEMO_CONTACTS = [
+  { id:1,  first:'Angela',  last:'Rivera',   cat:'family',       sev:0, phone:'+15558675309' },
+  { id:2,  first:'James',   last:'Chen',     cat:'family',       sev:3, phone:'+15551234567' },
+  { id:3,  first:'Marcus',  last:'Santos',   cat:'professional', sev:1, phone:'+15559876543' },
+  { id:4,  first:'Kim',     last:'Williams', cat:'friend',       sev:4, phone:'+15554567890' },
+  { id:5,  first:'Robert',  last:'Okafor',   cat:'friend',       sev:2, phone:'+15557654321' },
+  { id:6,  first:'Dina',    last:'Patel',    cat:'professional', sev:4, phone:'+15552345678' },
+  { id:7,  first:'Tomás', last:'Reyes', cat:'family',       sev:3, phone:'+15558765432' },
+  { id:8,  first:'Sarah',   last:'Kwon',     cat:'friend',       sev:2, phone:'+15553456789' },
+  { id:9,  first:'David',   last:'Okonkwo',  cat:'other',        sev:1, phone:'+15556543210' },
+  { id:10, first:'Lisa',    last:'Berg',     cat:'family',       sev:4, phone:'+15554321098' },
+  { id:11, first:'Carlos',  last:'Mendez',   cat:'professional', sev:3, phone:'+15551112233' },
+  { id:12, first:'Priya',   last:'Nair',     cat:'friend',       sev:4, phone:'+15554445566' },
+];
+
+/* ── 3D Galaxy Engine ── */
+let netYaw = 0.4, netPitch = -0.15;
+const NET_DIST = 220;
+const NET_FOV = 520;
+let netSpin = true;
+let netDragging = false;
+let NODES = [];
+let networkExpanded = false;
+
+function rebuildNodeTargets() {
+  const shellR = Math.min(CV.width, CV.height) * 0.34;
+  const N = DEMO_CONTACTS.length;
+  NODES.forEach((node, i) => {
+    const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
+    const fr = Math.sqrt(Math.max(0, 1 - fy * fy));
+    const th = i * 2.399963229728653 + Math.sin(i * 127.1) * 0.22;
+    let tx = Math.cos(th) * fr, ty = fy, tz = Math.sin(th) * fr;
+    const L = Math.hypot(tx, ty, tz) || 1;
+    node.tx = tx / L * shellR;
+    node.ty = ty / L * shellR;
+    node.tz = tz / L * shellR;
+  });
+}
+
+function buildNodes(fresh) {
+  const N = DEMO_CONTACTS.length;
+  const shellR = Math.min(CV.width, CV.height) * 0.34;
+
+  NODES = DEMO_CONTACTS.map((contact, i) => {
+    const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
+    const fr = Math.sqrt(Math.max(0, 1 - fy * fy));
+    const th = i * 2.399963229728653 + Math.sin(i * 127.1) * 0.22;
+    let tx = Math.cos(th) * fr, ty = fy, tz = Math.sin(th) * fr;
+    const L = Math.hypot(tx, ty, tz) || 1;
+    tx = tx / L * shellR;
+    ty = ty / L * shellR;
+    tz = tz / L * shellR;
+
+    return {
+      contact: contact,
+      tx: tx, ty: ty, tz: tz,
+      x: fresh ? 0 : tx, y: fresh ? 0 : ty, z: fresh ? 0 : tz,
+      vx: fresh ? tx * 0.055 : 0, vy: fresh ? ty * 0.055 : 0, vz: fresh ? tz * 0.055 : 0,
+      r: 20 * DPR,
+      initials: (contact.first[0] + contact.last[0]).toUpperCase()
+    };
+  });
+  networkExpanded = !fresh;
+}
+
+function projectNode(node) {
+  const cy = Math.cos(netYaw), sy = Math.sin(netYaw);
+  const cp = Math.cos(netPitch), sp = Math.sin(netPitch);
+  let x = node.x * cy + node.z * sy;
+  let z = -node.x * sy + node.z * cy;
+  let y = node.y;
+  let y2 = y * cp - z * sp;
+  let z2 = y * sp + z * cp;
+  const canvasCx = CV.width / 2;
+  const canvasCy = CV.height / 2;
+  const scale = NET_FOV / (NET_FOV + z2 + NET_DIST);
+  return { sx: canvasCx + x * scale, sy: canvasCy + y2 * scale, scale: scale, z: z2 };
+}
+
+function stepPhys() {
+  if (!networkExpanded) {
+    let allClose = true;
+    NODES.forEach(n => {
+      n.vx += (n.tx - n.x) * 0.035;
+      n.vy += (n.ty - n.y) * 0.035;
+      n.vz += (n.tz - n.z) * 0.035;
+      n.vx *= 0.88; n.vy *= 0.88; n.vz *= 0.88;
+      n.x += n.vx; n.y += n.vy; n.z += n.vz;
+      if (Math.hypot(n.x - n.tx, n.y - n.ty, n.z - n.tz) > 3) allClose = false;
+    });
+    if (allClose) networkExpanded = true;
+    return;
+  }
+  const N = NODES.length;
+  for (let i = 0; i < N; i++) {
+    const a = NODES[i];
+    for (let j = i + 1; j < N; j++) {
+      const b = NODES[j];
+      let dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+      let d2 = dx*dx + dy*dy + dz*dz + 0.01;
+      if (d2 > 90000) continue;
+      const f = Math.min(10, 2600 / d2);
+      const d = Math.sqrt(d2);
+      dx /= d; dy /= d; dz /= d;
+      a.vx += dx*f; a.vy += dy*f; a.vz += dz*f;
+      b.vx -= dx*f; b.vy -= dy*f; b.vz -= dz*f;
+    }
+  }
+  NODES.forEach(n => {
+    n.vx += (n.tx - n.x) * 0.012;
+    n.vy += (n.ty - n.y) * 0.012;
+    n.vz += (n.tz - n.z) * 0.012;
+    n.vx *= 0.86; n.vy *= 0.86; n.vz *= 0.86;
+    n.x += n.vx; n.y += n.vy; n.z += n.vz;
+  });
+}
+
+function hitTestNetwork(clientX, clientY) {
+  const rect = CV.getBoundingClientRect();
+  const mx = (clientX - rect.left) * DPR;
+  const my = (clientY - rect.top) * DPR;
+  const cx = CV.width / 2, cy = CV.height / 2;
+  // Center sphere (user)
+  const centerR = 26 * DPR;
+  if (Math.hypot(mx - cx, my - cy) < centerR * 1.4) return { isCenter: true };
+  // Contact nodes — find front-most hit
+  let closest = null;
+  let closestZ = -Infinity;
+  for (const node of NODES) {
+    const p = projectNode(node);
+    const d = Math.hypot(mx - p.sx, my - p.sy);
+    const hitR = node.r * p.scale * 1.6;
+    if (d < hitR && p.z > closestZ) { closest = node; closestZ = p.z; }
+  }
+  return closest ? { isCenter: false, node: closest } : null;
+}
+
+/* ── State transitions ── */
+function enterSelf() {
+  appState = 'self';
+  // Restore user settings
+  curCat = userCat;
+  curSev = userSev;
+  sphereName = userSphereName;
+  updateStatusLabel();
+  const c = CATS[curCat];
+  document.documentElement.style.setProperty('--accent', `rgb(${c.r},${c.g},${c.b})`);
+  // UI
+  stage.classList.remove('network-mode');
+  document.getElementById('backBtn').hidden = true;
+  document.getElementById('networkHint').hidden = true;
+  if (sphereLabelsEl) sphereLabelsEl.style.display = '';
+  document.getElementById('demoCycler').style.display = '';
+  // Re-init effects for new canvas size
+  setTimeout(() => { resize(); initFX(); }, 60);
+}
+
+function enterNetwork() {
+  // Save user settings
+  userCat = curCat;
+  userSev = curSev;
+  userSphereName = sphereName;
+  appState = 'network';
+  // UI
+  stage.classList.add('network-mode');
+  document.getElementById('backBtn').hidden = false;
+  document.getElementById('networkHint').hidden = false;
+  if (sphereLabelsEl) sphereLabelsEl.style.display = 'none';
+  document.getElementById('demoCycler').style.display = 'none';
+  // Hide self-state hold hint
+  const holdHint = document.getElementById('holdHint');
+  if (holdHint) holdHint.style.display = 'none';
+  // Build galaxy
+  setTimeout(() => {
+    resize();
+    buildNodes(true); // fresh = start from center for expand animation
+    initFX();
+  }, 60);
+}
+
+function enterDetail(contact) {
+  selectedContact = contact;
+  appState = 'detail';
+  // Set the sphere to this contact's colors
+  curCat = contact.cat;
+  curSev = contact.sev;
+  sphereName = contact.first + ' ' + contact.last;
+  updateStatusLabel();
+  const c = CATS[curCat];
+  document.documentElement.style.setProperty('--accent', `rgb(${c.r},${c.g},${c.b})`);
+  // UI
+  stage.classList.remove('network-mode');
+  document.getElementById('backBtn').hidden = true;
+  document.getElementById('networkHint').hidden = true;
+  if (sphereLabelsEl) {
+    sphereLabelsEl.style.display = '';
+    // Update status label text
+    document.getElementById('statusLabel').textContent = 'Status: ' + SEVS[curSev].label;
+  }
+  document.getElementById('demoCycler').style.display = 'none';
+  // Re-init effects for detail canvas size
+  setTimeout(() => {
+    resize();
+    initFX();
+    // Auto-open BLUF card
+    setTimeout(() => openBluf(), 350);
+  }, 60);
+}
+
+/* Back button handler */
+document.getElementById('backBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  enterSelf();
+});
+
 /* ── Status label update + name alternation ── */
 let pulseCount = 0;
-let lastPulseSign = 0;  // track sine zero-crossings to count pulses
+let lastPulseSign = 0;
 let showingName = false;
 let nameShowStart = 0;
-const NAME_SHOW_DURATION = 2200; // ms to show the name before reverting
+const NAME_SHOW_DURATION = 2200;
 
 function updateStatusLabel() {
   const sv = SEVS[curSev];
@@ -988,13 +1270,11 @@ function updateStatusLabel() {
 }
 
 function checkNameAlternation(t) {
-  // Count pulse cycles via zero-crossings of the pulse sine wave
+  if (appState === 'network') return; // no name alternation in network view
   const curSign = Math.sin(t * 0.003) >= 0 ? 1 : -1;
   if (lastPulseSign !== 0 && curSign === 1 && lastPulseSign === -1) {
-    // Rising zero-crossing = one full pulse completed
     pulseCount++;
     if (pulseCount >= 3 && sphereName && !showingName) {
-      // Every 3rd pulse, show the name
       showingName = true;
       nameShowStart = t;
       pulseCount = 0;
@@ -1003,8 +1283,6 @@ function checkNameAlternation(t) {
     }
   }
   lastPulseSign = curSign;
-
-  // Revert back to status after duration
   if (showingName && (t - nameShowStart) > NAME_SHOW_DURATION) {
     showingName = false;
     updateStatusLabel();
@@ -1014,6 +1292,7 @@ function checkNameAlternation(t) {
 /* ── Demo severity cycler (no user-selectable severity in production) ── */
 function cycleSev() {
   curSev = curSev <= 0 ? 4 : curSev - 1;
+  if (appState === 'self') userSev = curSev;
   updateStatusLabel();
 }
 
@@ -1021,9 +1300,9 @@ function setCat(btn) {
   document.querySelectorAll('.btn[data-color]').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   curCat = btn.dataset.color;
+  if (appState === 'self') userCat = curCat;
   const c = CATS[curCat];
   document.documentElement.style.setProperty('--accent', `rgb(${c.r},${c.g},${c.b})`);
-  // Show/hide custom name input for "Other"
   document.getElementById('otherNameRow').hidden = (curCat !== 'other');
 }
 
@@ -1140,9 +1419,6 @@ const BLUF_DATA = {
   }
 };
 
-const MOCK_PHONE = '(555) 867-5309';
-const MOCK_PHONE_TEL = '+15558675309';
-
 /* Mock cluster contacts for video connect */
 const MOCK_CLUSTER = [
   { name: 'A. Rivera', cat: 'family' },
@@ -1160,46 +1436,36 @@ function openBluf() {
   blufOpen = true;
   callRevealed = false;
   videoRevealed = false;
-  // Shrink main sphere stage
   stage.classList.add('bluf-shrink');
-  // Hide labels during BLUF
   if (sphereLabelsEl) sphereLabelsEl.style.display = 'none';
-  // Close any open reveals
   document.getElementById('blufCallReveal').classList.remove('open');
   document.getElementById('blufVideoReveal').classList.remove('open');
   document.getElementById('blufCallBtn').classList.remove('active');
   document.getElementById('blufVideoBtn').classList.remove('active');
-  // Reset broadcast panel
   closeBroadcast();
-  // Populate card content
   updateBlufContent();
-  // Open overlay
   document.getElementById('blufOverlay').classList.add('open');
 }
 
 function closeBluf() {
   blufOpen = false;
   stage.classList.remove('bluf-shrink');
-  if (sphereLabelsEl) sphereLabelsEl.style.display = '';
+  if (sphereLabelsEl && appState !== 'network') sphereLabelsEl.style.display = '';
   document.getElementById('blufOverlay').classList.remove('open');
-  // Stop any active broadcast recording/stream
   stopBcRecording();
   stopBcStream();
 }
 
 function handleBlufOverlayClick(e) {
-  // Tap on backdrop always closes
   if (e.target === document.getElementById('blufOverlay')) {
     closeBluf();
     return;
   }
-  // Don't intercept taps on interactive elements
   const tag = e.target.tagName.toLowerCase();
   if (tag === 'button' || tag === 'a' || tag === 'input' || tag === 'video' ||
       e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) {
     return;
   }
-  // Double-tap on non-interactive card area closes BLUF
   const now = performance.now();
   if ((now - blufLastTapTime) < DOUBLE_TAP_MS) {
     blufLastTapTime = 0;
@@ -1214,11 +1480,9 @@ function updateBlufContent() {
   const sv = SEVS[curSev];
   const c = CATS[curCat];
 
-  // Sphere ring glow color
   const ring = document.getElementById('blufSphereRing');
   if (ring) ring.style.setProperty('--status-color', `${sv.r},${sv.g},${sv.b}`);
 
-  // Hero identity — split name into first / family
   const fullName = (sphereName || 'Unknown').trim();
   const nameParts = fullName.split(/\s+/);
   const firstName = nameParts[0] || '';
@@ -1226,54 +1490,50 @@ function updateBlufContent() {
   document.getElementById('blufFirstName').textContent = firstName;
   document.getElementById('blufFamilyName').textContent = familyName;
 
-  // Headline + description
   document.getElementById('blufHeadline').textContent = d.headline;
   document.getElementById('blufDesc').textContent = d.desc;
 
-  // Card left-border accent — severity color (NOUS border-left pattern)
   const card = document.getElementById('blufCard');
   if (card) card.style.borderLeftColor = `rgb(${sv.r},${sv.g},${sv.b})`;
 
-  // Derivation badges — NOUS chip style (border only, no fill)
   const badgesEl = document.getElementById('blufBadges');
   badgesEl.innerHTML = d.badges
     .map(b => `<span class="bluf-badge" style="border-color:rgb(${b.color});color:rgb(${b.color})">${b.label}</span>`)
     .join('');
 
-  // Last contact
   document.getElementById('blufLastContact').textContent = d.lastContactDate;
 
-  // Open issues
   const issuesEl = document.getElementById('blufIssues');
   issuesEl.innerHTML = d.openIssues
     .map(i => `<div class="bluf-list-item">${i}</div>`)
     .join('');
 
-  // Next course of action
   const actionsEl = document.getElementById('blufNextActions');
   actionsEl.innerHTML = d.nextActions
     .map(a => `<div class="bluf-list-item">${a}</div>`)
     .join('');
 
-  // Phone link
-  document.getElementById('blufCallLink').textContent = MOCK_PHONE;
-  document.getElementById('blufCallLink').href = `tel:${MOCK_PHONE_TEL}`;
+  // Phone — use contact phone if available
+  const phone = selectedContact ? selectedContact.phone : '+15558675309';
+  const phoneDisplay = phone.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3');
+  document.getElementById('blufCallLink').textContent = phoneDisplay;
+  document.getElementById('blufCallLink').href = `tel:${phone}`;
 
-  // Video cluster list
+  // Video cluster list — show other contacts from the network
   const listEl = document.getElementById('blufClusterList');
-  listEl.innerHTML = MOCK_CLUSTER.map(m => {
+  const clusterContacts = DEMO_CONTACTS.filter(c => !selectedContact || c.id !== selectedContact.id).slice(0, 5);
+  listEl.innerHTML = clusterContacts.map(m => {
     const cc = CATS[m.cat] || CATS.other;
     const catLabel = m.cat.charAt(0).toUpperCase() + m.cat.slice(1);
-    return `<div class="bluf-cluster-item" onclick="initiateVideo('${m.name}')">
+    return `<div class="bluf-cluster-item" onclick="initiateVideo('${m.first} ${m.last}')">
       <span class="bluf-cluster-dot" style="background:rgb(${cc.r},${cc.g},${cc.b})"></span>
-      <span class="bluf-cluster-name">${m.name}</span>
+      <span class="bluf-cluster-name">${m.first} ${m.last.charAt(0)}.</span>
       <span class="bluf-cluster-label">${catLabel}</span>
     </div>`;
   }).join('');
 }
 
 function handleCall() {
-  // Toggle call reveal, close video if open
   if (videoRevealed) {
     videoRevealed = false;
     document.getElementById('blufVideoReveal').classList.remove('open');
@@ -1285,7 +1545,6 @@ function handleCall() {
 }
 
 function handleVideo() {
-  // Toggle video reveal, close call if open
   if (callRevealed) {
     callRevealed = false;
     document.getElementById('blufCallReveal').classList.remove('open');
@@ -1298,7 +1557,6 @@ function handleVideo() {
 
 function initiateVideo(name) {
   console.log(`[Remiel Signal] Initiating video with ${name}`);
-  // Placeholder — will connect to signaling server / WebRTC
 }
 
 /* ═══════════════════════════
@@ -1319,7 +1577,6 @@ function toggleBroadcast() {
   } else {
     body.classList.add('open');
     btn.textContent = 'Close';
-    // Start camera preview
     startBcStream();
   }
 }
@@ -1332,7 +1589,6 @@ function closeBroadcast() {
   btn.textContent = 'Open';
   stopBcRecording();
   stopBcStream();
-  // Reset playback
   const playback = document.getElementById('bcPlayback');
   const liveVideo = document.getElementById('bcLiveVideo');
   const placeholder = document.getElementById('bcPlaceholder');
@@ -1351,7 +1607,6 @@ async function startBcStream() {
     liveVideo.srcObject = bcStream;
     liveVideo.hidden = false;
     placeholder.hidden = true;
-    // Apply current mute state
     bcStream.getAudioTracks().forEach(t => { t.enabled = !bcMuted; });
     document.getElementById('bcStatus').textContent = 'Camera active';
   } catch (err) {
@@ -1372,11 +1627,7 @@ function stopBcStream() {
 }
 
 function toggleBcRecord() {
-  if (bcRecording) {
-    stopBcRecording();
-  } else {
-    startBcRecording();
-  }
+  if (bcRecording) { stopBcRecording(); } else { startBcRecording(); }
 }
 
 function startBcRecording() {
@@ -1389,12 +1640,9 @@ function startBcRecording() {
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
       ? 'video/webm;codecs=vp9,opus'
       : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-        ? 'video/webm;codecs=vp8,opus'
-        : 'video/webm';
+        ? 'video/webm;codecs=vp8,opus' : 'video/webm';
     bcRecorder = new MediaRecorder(bcStream, { mimeType });
-  } catch (e) {
-    bcRecorder = new MediaRecorder(bcStream);
-  }
+  } catch (e) { bcRecorder = new MediaRecorder(bcStream); }
 
   bcRecorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) bcChunks.push(e.data);
@@ -1410,8 +1658,7 @@ function startBcRecording() {
       document.getElementById('bcStatus').textContent = 'Recording saved — ready to broadcast';
     }
   };
-
-  bcRecorder.start(250); // collect data every 250ms
+  bcRecorder.start(250);
   bcRecording = true;
   const recordBtn = document.getElementById('bcRecordBtn');
   recordBtn.textContent = 'Stop';
@@ -1420,15 +1667,10 @@ function startBcRecording() {
 }
 
 function stopBcRecording() {
-  if (bcRecorder && bcRecorder.state !== 'inactive') {
-    bcRecorder.stop();
-  }
+  if (bcRecorder && bcRecorder.state !== 'inactive') bcRecorder.stop();
   bcRecording = false;
   const recordBtn = document.getElementById('bcRecordBtn');
-  if (recordBtn) {
-    recordBtn.textContent = 'Record';
-    recordBtn.classList.remove('recording');
-  }
+  if (recordBtn) { recordBtn.textContent = 'Record'; recordBtn.classList.remove('recording'); }
 }
 
 function handleBcUpload(event) {
@@ -1436,7 +1678,6 @@ function handleBcUpload(event) {
   if (!file) return;
   showBcPlayback(file);
   document.getElementById('bcStatus').textContent = `Uploaded: ${file.name}`;
-  // Reset file input so same file can be re-selected
   event.target.value = '';
 }
 
@@ -1444,7 +1685,6 @@ function showBcPlayback(blob) {
   const playback = document.getElementById('bcPlayback');
   const liveVideo = document.getElementById('bcLiveVideo');
   const placeholder = document.getElementById('bcPlaceholder');
-  // Switch from live to playback
   liveVideo.hidden = true;
   placeholder.hidden = true;
   playback.src = URL.createObjectURL(blob);
@@ -1457,15 +1697,9 @@ function showBcPlayback(blob) {
 
 function toggleBcMute() {
   bcMuted = !bcMuted;
-  const label = document.getElementById('bcMuteLabel');
-  label.textContent = bcMuted ? 'Audio Off' : 'Audio On';
-  const btn = document.getElementById('bcMuteBtn');
-  btn.classList.toggle('active', !bcMuted);
-  // Apply to live stream
-  if (bcStream) {
-    bcStream.getAudioTracks().forEach(t => { t.enabled = !bcMuted; });
-  }
-  // Apply to playback
+  document.getElementById('bcMuteLabel').textContent = bcMuted ? 'Audio Off' : 'Audio On';
+  document.getElementById('bcMuteBtn').classList.toggle('active', !bcMuted);
+  if (bcStream) bcStream.getAudioTracks().forEach(t => { t.enabled = !bcMuted; });
   const playback = document.getElementById('bcPlayback');
   if (playback) playback.muted = bcMuted;
 }
@@ -1474,7 +1708,6 @@ function setBcVolume(val) {
   const v = val / 100;
   const playback = document.getElementById('bcPlayback');
   if (playback) playback.volume = v;
-  // If volume > 0, make sure audio isn't muted
   if (v > 0 && bcMuted) {
     bcMuted = false;
     document.getElementById('bcMuteLabel').textContent = 'Audio On';
@@ -1484,20 +1717,22 @@ function setBcVolume(val) {
   }
 }
 
-/* ═══════════════════════════
-   LONG-PRESS & TAP DETECTION
-   ═══════════════════════════ */
+/* ═══════════════════════════════════════
+   STATE-AWARE INTERACTION HANDLERS
+   ═══════════════════════════════════════ */
 let overlayOpen = false;
 let pressTimer = null;
 let pressStarted = false;
 let pressStartX = 0, pressStartY = 0;
 const HOLD_MS = 500;
-const MOVE_THRESHOLD = 10; // px — if finger/mouse moves beyond this, cancel the hold
+const MOVE_THRESHOLD = 10;
+
+// Double-tap tracking for DETAIL state
+let detailLastTapTime = 0;
 
 function openOverlay() {
   overlayOpen = true;
   document.getElementById('overlay').classList.add('open');
-  // Hide the hold hint permanently after first open
   const hint = document.getElementById('holdHint');
   if (hint) hint.style.display = 'none';
 }
@@ -1509,16 +1744,11 @@ function closeOverlay() {
 }
 
 function handleOverlayClick(e) {
-  // Close overlay if clicking the backdrop (not the panel)
-  if (e.target === document.getElementById('overlay')) {
-    closeOverlay();
-  }
+  if (e.target === document.getElementById('overlay')) closeOverlay();
 }
 
-// Unified press handling for both mouse and touch
 function onPressStart(e) {
-  if (overlayOpen) return; // don't interfere with drag when overlay is open
-  if (blufOpen) return;    // don't interfere when BLUF card is showing
+  if (overlayOpen || blufOpen) return;
   if (dragging) return;
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -1526,19 +1756,32 @@ function onPressStart(e) {
   pressStartY = clientY;
   pressStarted = true;
 
-  // Start hold timer
-  pressTimer = setTimeout(() => {
-    if (pressStarted) {
-      stage.classList.remove('pressing');
-      openOverlay();
-      pressStarted = false;
-    }
-  }, HOLD_MS);
+  if (appState === 'self') {
+    // Long-press to open config
+    pressTimer = setTimeout(() => {
+      if (pressStarted) {
+        stage.classList.remove('pressing');
+        openOverlay();
+        pressStarted = false;
+      }
+    }, HOLD_MS);
+    setTimeout(() => { if (pressStarted) stage.classList.add('pressing'); }, 120);
 
-  // Visual feedback: brighten after a short delay so taps don't flash
-  setTimeout(() => {
-    if (pressStarted) stage.classList.add('pressing');
-  }, 120);
+  } else if (appState === 'network') {
+    // In network, press starts potential drag-to-rotate
+    netDragging = false;
+
+  } else if (appState === 'detail') {
+    // Long-press to open config for selected contact
+    pressTimer = setTimeout(() => {
+      if (pressStarted) {
+        stage.classList.remove('pressing');
+        openOverlay();
+        pressStarted = false;
+      }
+    }, HOLD_MS);
+    setTimeout(() => { if (pressStarted) stage.classList.add('pressing'); }, 120);
+  }
 }
 
 function onPressMove(e) {
@@ -1547,11 +1790,25 @@ function onPressMove(e) {
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
   const dx = clientX - pressStartX;
   const dy = clientY - pressStartY;
-  // If moved too far, this is a drag — cancel hold detection
+
+  if (appState === 'network') {
+    // Drag to rotate galaxy
+    if (Math.sqrt(dx*dx + dy*dy) > 5) {
+      netDragging = true;
+      netSpin = false; // stop auto-spin while dragging
+      netYaw += dx * 0.004;
+      netPitch += dy * 0.004;
+      netPitch = Math.max(-1.2, Math.min(1.2, netPitch));
+      pressStartX = clientX;
+      pressStartY = clientY;
+    }
+    return;
+  }
+
+  // Self/Detail: if moved too far, cancel hold
   if (Math.sqrt(dx*dx + dy*dy) > MOVE_THRESHOLD) {
     cancelPress();
-    // Start media drag if media loaded
-    if (media && !overlayOpen) {
+    if (media && !overlayOpen && appState !== 'network') {
       dragging = true;
       const rect = CV.getBoundingClientRect();
       dragStartX = (pressStartX - rect.left) * DPR;
@@ -1563,10 +1820,55 @@ function onPressMove(e) {
 }
 
 function onPressEnd(e) {
+  if (appState === 'network') {
+    if (pressStarted && !netDragging) {
+      // Tap in network mode — hit test
+      const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+      const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+      const hit = hitTestNetwork(clientX, clientY);
+      if (hit) {
+        if (hit.isCenter) {
+          enterSelf();
+        } else {
+          enterDetail(hit.node.contact);
+        }
+      }
+    } else if (netDragging) {
+      // Resume auto-spin after drag
+      setTimeout(() => { netSpin = true; }, 2000);
+    }
+    pressStarted = false;
+    netDragging = false;
+    stage.classList.remove('pressing');
+    return;
+  }
+
   if (pressStarted) {
-    // Single tap — open BLUF immediately
     cancelPress();
-    openBluf();
+    if (appState === 'self') {
+      // Single tap — open network
+      enterNetwork();
+    } else if (appState === 'detail') {
+      // Tap detection: single tap opens BLUF, double-tap returns to network
+      const now = performance.now();
+      if ((now - detailLastTapTime) < DOUBLE_TAP_MS) {
+        detailLastTapTime = 0;
+        // Double-tap — return to network
+        if (blufOpen) {
+          closeBluf();
+        } else {
+          enterNetwork();
+        }
+      } else {
+        detailLastTapTime = now;
+        // Single tap — open BLUF (with small delay to check for double-tap)
+        setTimeout(() => {
+          if (detailLastTapTime !== 0 && !blufOpen) {
+            openBluf();
+          }
+        }, DOUBLE_TAP_MS + 30);
+      }
+    }
   }
   stage.classList.remove('pressing');
 }
@@ -1577,65 +1879,43 @@ function cancelPress() {
   stage.classList.remove('pressing');
 }
 
-// Attach press handlers to stage (labels are inside stage, so clicks on them bubble up)
+// Attach press handlers
 stage.addEventListener('mousedown', e => {
-  if (overlayOpen) {
-    startDrag(e);
-  } else {
-    onPressStart(e);
-  }
+  if (overlayOpen) { startDrag(e); }
+  else { onPressStart(e); }
 });
 stage.addEventListener('touchstart', e => {
-  if (overlayOpen) {
-    startDrag(e);
-  } else {
-    e.preventDefault();
-    onPressStart(e);
-  }
+  if (overlayOpen) { startDrag(e); }
+  else { e.preventDefault(); onPressStart(e); }
 }, { passive: false });
 
 window.addEventListener('mousemove', e => {
-  if (overlayOpen) {
-    moveDrag(e);
-  } else {
-    onPressMove(e);
-  }
+  if (overlayOpen) { moveDrag(e); }
+  else { onPressMove(e); }
 });
 window.addEventListener('touchmove', e => {
-  if (overlayOpen) {
-    moveDrag(e);
-  } else {
-    onPressMove(e);
-  }
+  if (overlayOpen) { moveDrag(e); }
+  else { onPressMove(e); }
 }, { passive: false });
 
 window.addEventListener('mouseup', e => {
-  if (overlayOpen) {
-    dragging = false;
-  } else {
-    onPressEnd(e);
-    dragging = false;
-  }
+  if (overlayOpen) { dragging = false; }
+  else { onPressEnd(e); dragging = false; }
 });
 window.addEventListener('touchend', e => {
-  if (overlayOpen) {
-    dragging = false;
-  } else {
-    onPressEnd(e);
-    dragging = false;
-  }
+  if (overlayOpen) { dragging = false; }
+  else { onPressEnd(e); dragging = false; }
 });
 
 
 /* ── Media state (photo or video) ── */
-let media = null;       // Image or HTMLVideoElement
-let mediaType = null;   // 'image' | 'video'
+let media = null;
+let mediaType = null;
 let mediaOX = 0, mediaOY = 0;
 let mediaZoom = 1;
 let dragging = false;
 let dragStartX = 0, dragStartY = 0, dragOXStart = 0, dragOYStart = 0;
 
-// Hidden video element reused for all video uploads
 const videoEl = document.createElement('video');
 videoEl.muted = true;
 videoEl.loop = true;
@@ -1652,8 +1932,6 @@ function handleMedia(e) {
   const f = e.target.files[0];
   if (!f) return;
   const url = URL.createObjectURL(f);
-
-  // Reset position
   mediaOX = 0; mediaOY = 0; mediaZoom = 1;
   document.getElementById('zoomSlider').value = 1;
 
@@ -1668,7 +1946,6 @@ function handleMedia(e) {
       showPhotoControls();
       document.getElementById('mediaHint').textContent =
         'Drag to reposition · Pinch or scroll to zoom · Video loops';
-      // Snap back to sphere after media loads
       setTimeout(closeOverlay, 700);
     });
   } else {
@@ -1681,7 +1958,6 @@ function handleMedia(e) {
       showPhotoControls();
       document.getElementById('mediaHint').textContent =
         'Drag to reposition · Pinch or scroll to zoom';
-      // Snap back to sphere after media loads
       setTimeout(closeOverlay, 700);
     };
     img.src = url;
@@ -1702,10 +1978,7 @@ function toCanvasXY(e) {
   const rect = CV.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-  return {
-    x: (clientX - rect.left) * DPR,
-    y: (clientY - rect.top) * DPR
-  };
+  return { x: (clientX - rect.left) * DPR, y: (clientY - rect.top) * DPR };
 }
 
 function startDrag(e) {
@@ -1725,11 +1998,11 @@ function moveDrag(e) {
   mediaOY = dragOYStart + (p.y - dragStartY);
 }
 
-/* ── Pinch zoom (works both when overlay open and closed for convenience) ── */
+/* ── Pinch zoom ── */
 let lastPinchDist = 0;
 stage.addEventListener('touchstart', e => {
   if (e.touches.length === 2) {
-    cancelPress(); // cancel hold detection on pinch
+    cancelPress();
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     lastPinchDist = Math.sqrt(dx*dx + dy*dy);
@@ -1931,11 +2204,7 @@ initFX();
    ═════════════════ */
 let lastW = CV.width;
 
-function frame(ts) {
-  requestAnimationFrame(frame);
-  const t = ts||0;
-  if (CV.width !== lastW) { lastW=CV.width; initFX(); }
-
+function drawSphereView(t) {
   const w=CV.width, h=CV.height, cx=w/2, cy=h/2;
   const baseR = Math.min(w,h)/2*0.88;
   const pf = pulseOn ? 1+0.02*Math.sin(t*0.003) : 1;
@@ -1943,11 +2212,8 @@ function frame(ts) {
   const c = CATS[curCat];
 
   ctx.clearRect(0,0,w,h);
-
-  /* ── Name alternation on status label ── */
   checkNameAlternation(t);
 
-  /* ── Sync labels with sphere pulse (gravitational binding) ── */
   if (sphereLabelsEl && !blufOpen) {
     const breathe = Math.sin(t * 0.003);
     const labelScale = 1 + 0.008 * breathe;
@@ -1956,7 +2222,7 @@ function frame(ts) {
     sphereLabelsEl.style.opacity = labelAlpha;
   }
 
-  /* ── 1. Background ambient glow ── */
+  /* Background ambient glow */
   const bg = ctx.createRadialGradient(cx,cy,R*0.15,cx,cy,R*1.3);
   bg.addColorStop(0, `rgba(${c.r},${c.g},${c.b},0.05)`);
   bg.addColorStop(0.5, `rgba(${c.r},${c.g},${c.b},0.015)`);
@@ -1964,13 +2230,12 @@ function frame(ts) {
   ctx.fillStyle = bg;
   ctx.fillRect(0,0,w,h);
 
-  /* ── 2. Clip to sphere interior ── */
+  /* Clip to sphere interior */
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx,cy,R-2*DPR,0,Math.PI*2);
   ctx.clip();
 
-  // Dark interior base
   const ig = ctx.createRadialGradient(cx,cy,0,cx,cy,R);
   ig.addColorStop(0,'rgba(15,8,35,0.6)');
   ig.addColorStop(0.6,'rgba(8,4,20,0.85)');
@@ -1978,26 +2243,23 @@ function frame(ts) {
   ctx.fillStyle = ig;
   ctx.fillRect(cx-R,cy-R,R*2,R*2);
 
-  /* ── 3. Stars ── */
+  /* Stars */
   for (const s of stars) {
     const a = 0.3+0.4*Math.sin(t*s.speed+s.phase);
     ctx.fillStyle = `rgba(200,200,240,${a})`;
-    ctx.beginPath();
-    ctx.arc(s.x,s.y,s.s*DPR,0,Math.PI*2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.s*DPR,0,Math.PI*2); ctx.fill();
   }
 
-  /* ── 4. Neural mesh (background layer) ── */
-  mesh.step();
-  mesh.draw(ctx,t);
+  /* Neural mesh */
+  mesh.step(); mesh.draw(ctx,t);
 
-  /* ── 5. Filaments (background layer) ── */
+  /* Filaments */
   for (const f of fils) { f.step(); f.draw(ctx); }
 
-  /* ── 6. Discharge arcs (background layer) ── */
+  /* Discharge arcs */
   for (const a of darcs) { a.step(); a.draw(ctx); }
 
-  /* ── 7. Subtle bloom behind photo ── */
+  /* Subtle bloom */
   const bl = ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.5);
   bl.addColorStop(0,'rgba(255,255,255,0.12)');
   bl.addColorStop(0.3,'rgba(200,190,255,0.06)');
@@ -2005,45 +2267,35 @@ function frame(ts) {
   ctx.fillStyle = bl;
   ctx.beginPath(); ctx.arc(cx,cy,R*0.5,0,Math.PI*2); ctx.fill();
 
-  /* ── 8. MEDIA (photo or video) — rendered ON TOP, bright and clear ── */
+  /* MEDIA */
   if (media) {
-    const mW = mediaType === 'video' ? media.videoWidth  : media.width;
+    const mW = mediaType === 'video' ? media.videoWidth : media.width;
     const mH = mediaType === 'video' ? media.videoHeight : media.height;
-
     if (mW > 0 && mH > 0) {
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, R * 0.82, 0, Math.PI * 2);
-      ctx.clip();
-
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, 0, Math.PI * 2); ctx.clip();
       ctx.globalAlpha = 1.0;
-
       const aspect = mW / mH;
       const baseDim = R * 1.64;
       let dw, dh;
       if (aspect > 1) { dh = baseDim * mediaZoom; dw = dh * aspect; }
       else { dw = baseDim * mediaZoom; dh = dw / aspect; }
-
       const px = cx + mediaOX - dw / 2;
       const py = cy + mediaOY - dh / 2;
       ctx.drawImage(media, px, py, dw, dh);
-
-      // soft vignette so the media blends into the energy ring
       const vig = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R * 0.83);
       vig.addColorStop(0, 'rgba(0,0,0,0)');
       vig.addColorStop(0.85, 'rgba(4,2,10,0.3)');
       vig.addColorStop(1, 'rgba(4,2,10,0.85)');
       ctx.fillStyle = vig;
       ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-
       ctx.restore();
     }
   }
 
-  ctx.restore(); // un-clip from sphere interior
+  ctx.restore();
 
-  /* ── 9. Inner energy ring (category) ── */
-  // Wide soft glow
+  /* Inner energy ring (category) */
   ctx.lineWidth = 7*DPR;
   ctx.strokeStyle = `rgba(${c.r},${c.g},${c.b},${0.12+0.04*Math.sin(t*0.004)})`;
   ctx.shadowColor = `rgba(${c.r},${c.g},${c.b},0.45)`;
@@ -2051,7 +2303,6 @@ function frame(ts) {
   ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Mid glow
   ctx.lineWidth = 3.5*DPR;
   ctx.strokeStyle = `rgba(${c.r},${c.g},${c.b},${0.35+0.12*Math.sin(t*0.003)})`;
   ctx.shadowColor = `rgba(${c.r},${c.g},${c.b},0.6)`;
@@ -2059,7 +2310,6 @@ function frame(ts) {
   ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Core bright ring
   ctx.lineWidth = 1.4*DPR;
   ctx.strokeStyle = `rgba(${c.r},${c.g},${c.b},${0.75+0.15*Math.sin(t*0.005)})`;
   ctx.shadowColor = `rgb(${c.r},${c.g},${c.b})`;
@@ -2067,7 +2317,6 @@ function frame(ts) {
   ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Rim spark particles
   for (let i=0;i<10;i++) {
     const ang = (t*0.001+i*Math.PI/5)+Math.sin(t*0.002+i)*0.2;
     const sx = cx+Math.cos(ang)*R, sy = cy+Math.sin(ang)*R;
@@ -2079,15 +2328,12 @@ function frame(ts) {
     ctx.shadowBlur = 0;
   }
 
-  /* ── 10. NOUS STATUS RING (outer) ── */
+  /* NOUS STATUS RING (outer) */
   const sv = SEVS[curSev];
   const outerR = R * 1.07;
-  const sevPulse = pulseOn
-    ? 1 + sv.pulseAmp * Math.sin(t * sv.pulseSpd)
-    : 1;
+  const sevPulse = pulseOn ? 1 + sv.pulseAmp * Math.sin(t * sv.pulseSpd) : 1;
   const oR = outerR * sevPulse;
 
-  // Diffused wide glow
   ctx.lineWidth = 5 * DPR;
   ctx.strokeStyle = `rgba(${sv.r},${sv.g},${sv.b},${0.08 + 0.04 * Math.sin(t * sv.pulseSpd * 1.3)})`;
   ctx.shadowColor = `rgba(${sv.r},${sv.g},${sv.b},${0.35 * sv.glowMul})`;
@@ -2095,7 +2341,6 @@ function frame(ts) {
   ctx.beginPath(); ctx.arc(cx, cy, oR, 0, Math.PI * 2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Core thin ring
   ctx.lineWidth = 1.2 * DPR;
   ctx.strokeStyle = `rgba(${sv.r},${sv.g},${sv.b},${0.5 + 0.2 * Math.sin(t * sv.pulseSpd * 0.8)})`;
   ctx.shadowColor = `rgba(${sv.r},${sv.g},${sv.b},${0.5 * sv.glowMul})`;
@@ -2103,7 +2348,6 @@ function frame(ts) {
   ctx.beginPath(); ctx.arc(cx, cy, oR, 0, Math.PI * 2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Outer ring spark particles
   for (let i = 0; i < 6; i++) {
     const ang = (t * 0.0008 + i * Math.PI / 3) + Math.sin(t * 0.0015 + i * 2.1) * 0.3;
     const sx = cx + Math.cos(ang) * oR;
@@ -2116,7 +2360,7 @@ function frame(ts) {
     ctx.shadowBlur = 0;
   }
 
-  /* ── 11. SHIMMER ARC — rotating bright sweep on outer ring ── */
+  /* SHIMMER ARC */
   const shimmerBaseSpd = 0.0004 + sv.pulseSpd * 0.15;
   const shimmerAlpha   = 0.12 + 0.18 * sv.glowMul;
   const shimmerWidth   = 2.5 * DPR;
@@ -2147,34 +2391,169 @@ function frame(ts) {
     ctx.shadowBlur = 8 * DPR * sv.glowMul;
 
     ctx.beginPath();
-    if (dir > 0) {
-      ctx.arc(cx, cy, oR, shimAngle - arcSpan, shimAngle);
-    } else {
-      ctx.arc(cx, cy, oR, shimAngle, shimAngle + arcSpan);
-    }
+    if (dir > 0) { ctx.arc(cx, cy, oR, shimAngle - arcSpan, shimAngle); }
+    else { ctx.arc(cx, cy, oR, shimAngle, shimAngle + arcSpan); }
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Bright point at the leading edge
     ctx.fillStyle = `rgba(255,255,255,${shimmerAlpha * 0.9})`;
     ctx.shadowColor = `rgba(${sv.r},${sv.g},${sv.b},0.6)`;
     ctx.shadowBlur = 6 * DPR;
-    ctx.beginPath();
-    ctx.arc(headX, headY, 1.5 * DPR, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(headX, headY, 1.5 * DPR, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
   }
 
-  ctx.lineCap = 'butt'; // reset
+  ctx.lineCap = 'butt';
 
-  // Outer haze (blends both rings)
   const hz = ctx.createRadialGradient(cx, cy, oR * 0.97, cx, cy, oR * 1.1);
   hz.addColorStop(0, `rgba(${sv.r},${sv.g},${sv.b},${0.03 * sv.glowMul})`);
   hz.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = hz;
   ctx.beginPath(); ctx.arc(cx, cy, oR * 1.1, 0, Math.PI * 2); ctx.fill();
+}
 
-  /* ── Mini sphere copy for BLUF card ── */
+function drawNetworkView(t) {
+  const w = CV.width, h = CV.height, cx = w/2, cy = h/2;
+  ctx.clearRect(0, 0, w, h);
+
+  /* Deep space background */
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.6);
+  bg.addColorStop(0, 'rgba(8,6,18,1)');
+  bg.addColorStop(1, 'rgba(3,3,8,1)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  /* Dim stars */
+  for (const s of stars) {
+    const a = 0.12 + 0.18 * Math.sin(t * s.speed + s.phase);
+    ctx.fillStyle = `rgba(180,180,220,${a})`;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.s * DPR * 0.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  /* Physics */
+  stepPhys();
+
+  /* Auto-spin */
+  if (netSpin && !netDragging) netYaw += 0.0022;
+
+  /* Project and depth-sort (back to front) */
+  const projected = NODES.map(node => ({ node, p: projectNode(node) }));
+  projected.sort((a, b) => a.p.z - b.p.z);
+
+  /* Draw contact spheres */
+  for (const { node, p } of projected) {
+    const cat = CATS[node.contact.cat] || CATS.other;
+    const sev = SEVS[node.contact.sev];
+    const sr = node.r * p.scale;
+    const sx = p.sx, sy = p.sy;
+    const depthAlpha = 0.35 + 0.65 * Math.max(0, Math.min(1, (p.z + NET_DIST + 150) / (NET_DIST * 2 + 300)));
+
+    /* Severity outer glow (additive) */
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(sx, sy, sr * 0.4, sx, sy, sr * 2.8);
+    halo.addColorStop(0, `rgba(${sev.r},${sev.g},${sev.b},${0.1 * depthAlpha * sev.glowMul})`);
+    halo.addColorStop(0.5, `rgba(${sev.r},${sev.g},${sev.b},${0.03 * depthAlpha * sev.glowMul})`);
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(sx, sy, sr * 2.8, 0, Math.PI * 2); ctx.fill();
+
+    /* Category core */
+    const core = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+    core.addColorStop(0, `rgba(${cat.r},${cat.g},${cat.b},${0.75 * depthAlpha})`);
+    core.addColorStop(0.55, `rgba(${cat.r},${cat.g},${cat.b},${0.4 * depthAlpha})`);
+    core.addColorStop(1, `rgba(${cat.r},${cat.g},${cat.b},${0.06 * depthAlpha})`);
+    ctx.fillStyle = core;
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+
+    ctx.globalCompositeOperation = 'source-over';
+
+    /* Crisp rim */
+    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.5 * depthAlpha})`;
+    ctx.lineWidth = Math.max(1, 1.5 * DPR * p.scale);
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.stroke();
+
+    /* Initials */
+    if (sr > 8) {
+      ctx.fillStyle = `rgba(10,8,20,${0.9 * depthAlpha})`;
+      ctx.font = `bold ${Math.max(8, Math.round(sr * 0.55))}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(node.initials, sx, sy);
+    }
+
+    /* Name below */
+    if (sr > 10) {
+      ctx.fillStyle = `rgba(224,228,236,${0.5 * depthAlpha})`;
+      ctx.font = `${Math.max(7, Math.round(sr * 0.36))}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(node.contact.first, sx, sy + sr + Math.max(6, 8 * p.scale));
+
+      /* Urgency indicator for sev 0 or 1 */
+      if (node.contact.sev <= 1) {
+        ctx.fillStyle = `rgba(${sev.r},${sev.g},${sev.b},${0.45 * depthAlpha})`;
+        ctx.font = `${Math.max(6, Math.round(sr * 0.28))}px "Segoe UI", system-ui, sans-serif`;
+        ctx.fillText(sev.label.toLowerCase(), sx, sy + sr + Math.max(14, 18 * p.scale));
+      }
+    }
+  }
+
+  /* Center sphere (user) */
+  const centerR = 26 * DPR;
+  const breathe = 1 + 0.018 * Math.sin(t * 0.003);
+  const cr = centerR * breathe;
+
+  /* Gold halo */
+  ctx.globalCompositeOperation = 'lighter';
+  const centerHalo = ctx.createRadialGradient(cx, cy, cr * 0.3, cx, cy, cr * 3);
+  centerHalo.addColorStop(0, 'rgba(255,210,77,0.14)');
+  centerHalo.addColorStop(0.4, 'rgba(255,210,77,0.05)');
+  centerHalo.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = centerHalo;
+  ctx.beginPath(); ctx.arc(cx, cy, cr * 3, 0, Math.PI * 2); ctx.fill();
+
+  /* Gold core */
+  const centerCore = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+  centerCore.addColorStop(0, 'rgba(255,220,100,0.9)');
+  centerCore.addColorStop(0.55, 'rgba(255,200,60,0.55)');
+  centerCore.addColorStop(1, 'rgba(255,180,30,0.12)');
+  ctx.fillStyle = centerCore;
+  ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+
+  ctx.globalCompositeOperation = 'source-over';
+
+  /* Rim */
+  ctx.strokeStyle = 'rgba(255,210,77,0.55)';
+  ctx.lineWidth = 1.8 * DPR;
+  ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
+
+  /* User initials */
+  const userInit = (userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0,2) || 'ME';
+  ctx.fillStyle = 'rgba(15,10,5,0.88)';
+  ctx.font = `bold ${Math.round(cr * 0.55)}px "Segoe UI", system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(userInit, cx, cy);
+
+  /* User name below center */
+  ctx.fillStyle = 'rgba(255,210,77,0.55)';
+  ctx.font = `${Math.round(cr * 0.36)}px "Segoe UI", system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText(userSphereName || 'You', cx, cy + cr + 10);
+}
+
+function frame(ts) {
+  requestAnimationFrame(frame);
+  const t = ts || 0;
+  if (CV.width !== lastW) { lastW = CV.width; initFX(); }
+
+  if (appState === 'network') {
+    drawNetworkView(t);
+  } else {
+    // 'self' or 'detail' — both use the pulsating sphere view
+    drawSphereView(t);
+  }
+
+  /* Mini sphere copy for BLUF card */
   if (blufOpen && miniCtx) {
     miniCtx.clearRect(0, 0, miniCV.width, miniCV.height);
     miniCtx.drawImage(CV, 0, 0, miniCV.width, miniCV.height);
