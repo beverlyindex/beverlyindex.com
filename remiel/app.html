@@ -64,16 +64,23 @@
                 height 0.5s cubic-bezier(0.22,1,0.36,1);
   }
 
-  /* ── Network mode — expanded stage ── */
   /* ── Network mode — full viewport galaxy ── */
+  /* ── Network mode — CareCircle-style full viewport ── */
+  body.network-active { overflow: hidden; }
   .sphere-stage.network-mode {
-    width: 100vw;
-    height: 100vh;
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     z-index: 50;
     background: var(--bg);
+    transition: none;
+  }
+  .sphere-stage.network-mode canvas {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   canvas {
@@ -1042,24 +1049,21 @@ let appState = 'self'; // 'self' | 'network' | 'detail'
 let NODES = [];
 
 function resize() {
-  const box = stage.getBoundingClientRect();
-  const w = Math.floor(box.width);
-  const h = Math.floor(box.height);
-  /* Network mode: full viewport rectangle. Self/detail: square */
   if (appState === 'network') {
+    /* CareCircle approach: canvas = full window */
+    const w = innerWidth, h = innerHeight;
     CV.width  = w * DPR;
     CV.height = h * DPR;
     CV.style.width  = w + 'px';
     CV.style.height = h + 'px';
+    if (NODES.length > 0) rebuildNodeTargets();
   } else {
-    const s = Math.min(w, h);
+    const box = stage.getBoundingClientRect();
+    const s = Math.min(Math.floor(box.width), Math.floor(box.height));
     CV.width  = s * DPR;
     CV.height = s * DPR;
     CV.style.width  = s + 'px';
     CV.style.height = s + 'px';
-  }
-  if (appState === 'network' && NODES.length > 0) {
-    rebuildNodeTargets();
   }
 }
 resize();
@@ -1245,7 +1249,8 @@ function enterSelf() {
   updateStatusLabel();
   const c = CATS[curCat];
   document.documentElement.style.setProperty('--accent', `rgb(${c.r},${c.g},${c.b})`);
-  // UI
+  // UI — release viewport lock
+  document.body.classList.remove('network-active');
   stage.classList.remove('network-mode');
   document.getElementById('backBtn').hidden = true;
   document.getElementById('networkHint').hidden = true;
@@ -1261,7 +1266,8 @@ function enterNetwork() {
   userSev = curSev;
   userSphereName = sphereName;
   appState = 'network';
-  // UI
+  // UI — lock viewport like CareCircle
+  document.body.classList.add('network-active');
   stage.classList.add('network-mode');
   document.getElementById('backBtn').hidden = false;
   document.getElementById('networkHint').hidden = false;
@@ -1270,12 +1276,10 @@ function enterNetwork() {
   // Hide self-state hold hint
   const holdHint = document.getElementById('holdHint');
   if (holdHint) holdHint.style.display = 'none';
-  // Build galaxy
-  setTimeout(() => {
-    resize();
-    buildNodes(true); // fresh = start from center for expand animation
-    initFX();
-  }, 60);
+  // Build galaxy — no delay, immediate resize
+  resize();
+  buildNodes(true);
+  initFX();
 }
 
 function enterDetail(contact) {
@@ -1288,7 +1292,8 @@ function enterDetail(contact) {
   updateStatusLabel();
   const c = CATS[curCat];
   document.documentElement.style.setProperty('--accent', `rgb(${c.r},${c.g},${c.b})`);
-  // UI
+  // UI — release viewport lock
+  document.body.classList.remove('network-active');
   stage.classList.remove('network-mode');
   document.getElementById('backBtn').hidden = true;
   document.getElementById('networkHint').hidden = true;
