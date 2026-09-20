@@ -66,8 +66,8 @@
 
   /* ── Network mode — expanded stage ── */
   .sphere-stage.network-mode {
-    width: min(560px, 92vw);
-    height: min(560px, 92vw);
+    width: min(900px, 96vw);
+    height: min(900px, 90vh);
   }
 
   canvas {
@@ -1205,9 +1205,9 @@ function hitTestNetwork(clientX, clientY) {
   const mx = (clientX - rect.left) * DPR;
   const my = (clientY - rect.top) * DPR;
   const cx = CV.width / 2, cy = CV.height / 2;
-  // Center sphere (user)
-  const centerR = 34 * DPR;
-  if (Math.hypot(mx - cx, my - cy) < centerR * 1.4) return { isCenter: true };
+  // Center sphere (user) — matches render size
+  const centerR = 38 * DPR;
+  if (Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
   // Contact nodes — find front-most hit
   let closest = null;
   let closestZ = -Infinity;
@@ -2542,48 +2542,115 @@ function drawNetworkView(t) {
     }
   }
 
-  /* Center sphere (user) */
-  const centerR = 34 * DPR;
-  const breathe = 1 + 0.018 * Math.sin(t * 0.003);
+  /* ── Center sphere (user) — full sphere with media, rings, identity ── */
+  const uc = CATS[userCat] || CATS.family;
+  const usv = SEVS[userSev] || SEVS[4];
+  const centerR = 38 * DPR;
+  const breathe = 1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd);
   const cr = centerR * breathe;
 
-  /* Gold halo */
+  /* Outer glow (additive) — category color */
   ctx.globalCompositeOperation = 'lighter';
-  const centerHalo = ctx.createRadialGradient(cx, cy, cr * 0.3, cx, cy, cr * 3);
-  centerHalo.addColorStop(0, 'rgba(255,210,77,0.14)');
-  centerHalo.addColorStop(0.4, 'rgba(255,210,77,0.05)');
+  const centerHalo = ctx.createRadialGradient(cx, cy, cr * 0.3, cx, cy, cr * 3.2);
+  centerHalo.addColorStop(0, `rgba(${uc.r},${uc.g},${uc.b},0.18)`);
+  centerHalo.addColorStop(0.4, `rgba(${uc.r},${uc.g},${uc.b},0.06)`);
   centerHalo.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = centerHalo;
-  ctx.beginPath(); ctx.arc(cx, cy, cr * 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, cr * 3.2, 0, Math.PI * 2); ctx.fill();
 
-  /* Gold core */
+  /* Category core gradient */
   const centerCore = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
-  centerCore.addColorStop(0, 'rgba(255,220,100,0.9)');
-  centerCore.addColorStop(0.55, 'rgba(255,200,60,0.55)');
-  centerCore.addColorStop(1, 'rgba(255,180,30,0.12)');
+  centerCore.addColorStop(0, `rgba(${uc.r},${uc.g},${uc.b},0.85)`);
+  centerCore.addColorStop(0.5, `rgba(${uc.r},${uc.g},${uc.b},0.45)`);
+  centerCore.addColorStop(1, `rgba(${uc.r},${uc.g},${uc.b},0.08)`);
   ctx.fillStyle = centerCore;
   ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
 
   ctx.globalCompositeOperation = 'source-over';
 
-  /* Rim */
-  ctx.strokeStyle = 'rgba(255,210,77,0.55)';
-  ctx.lineWidth = 1.8 * DPR;
+  /* Media (photo/video) clipped inside the center sphere */
+  if (media) {
+    const mW = mediaType === 'video' ? media.videoWidth : media.width;
+    const mH = mediaType === 'video' ? media.videoHeight : media.height;
+    if (mW > 0 && mH > 0) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, cr * 0.82, 0, Math.PI * 2); ctx.clip();
+      ctx.globalAlpha = 1.0;
+      const aspect = mW / mH;
+      const baseDim = cr * 1.64;
+      let dw, dh;
+      if (aspect > 1) { dh = baseDim * mediaZoom; dw = dh * aspect; }
+      else { dw = baseDim * mediaZoom; dh = dw / aspect; }
+      const px = cx + mediaOX * (cr / (R || cr)) - dw / 2;
+      const py = cy + mediaOY * (cr / (R || cr)) - dh / 2;
+      ctx.drawImage(media, px, py, dw, dh);
+      /* Vignette inside media clip */
+      const vig = ctx.createRadialGradient(cx, cy, cr * 0.55, cx, cy, cr * 0.83);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(0.85, 'rgba(4,2,10,0.35)');
+      vig.addColorStop(1, 'rgba(4,2,10,0.9)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(cx - cr, cy - cr, cr * 2, cr * 2);
+      ctx.restore();
+    }
+  }
+
+  /* Inner energy ring (category) */
+  ctx.lineWidth = 4 * DPR;
+  ctx.strokeStyle = `rgba(${uc.r},${uc.g},${uc.b},${0.3 + 0.1 * Math.sin(t * 0.004)})`;
+  ctx.shadowColor = `rgba(${uc.r},${uc.g},${uc.b},0.5)`;
+  ctx.shadowBlur = 12 * DPR;
+  ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.lineWidth = 1.2 * DPR;
+  ctx.strokeStyle = `rgba(${uc.r},${uc.g},${uc.b},${0.7 + 0.15 * Math.sin(t * 0.005)})`;
   ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
 
-  /* User initials */
-  const userInit = (userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0,2) || 'ME';
-  ctx.fillStyle = 'rgba(15,10,5,0.88)';
-  ctx.font = `bold ${Math.round(cr * 0.55)}px "Segoe UI", system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(userInit, cx, cy);
+  /* NOUS status ring (outer — severity) */
+  const outerCR = cr * 1.1;
+  ctx.lineWidth = 3 * DPR;
+  ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${0.12 + 0.06 * Math.sin(t * usv.pulseSpd * 1.3)})`;
+  ctx.shadowColor = `rgba(${usv.r},${usv.g},${usv.b},${0.4 * usv.glowMul})`;
+  ctx.shadowBlur = 10 * DPR * usv.glowMul;
+  ctx.beginPath(); ctx.arc(cx, cy, outerCR, 0, Math.PI * 2); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.lineWidth = 0.8 * DPR;
+  ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${0.5 + 0.2 * Math.sin(t * usv.pulseSpd * 0.8)})`;
+  ctx.beginPath(); ctx.arc(cx, cy, outerCR, 0, Math.PI * 2); ctx.stroke();
+
+  /* Shimmer arcs on outer ring */
+  const cShimSpd = 0.0004 + usv.pulseSpd * 0.15;
+  const cShimAlpha = 0.12 + 0.15 * usv.glowMul;
+  for (let s = 0; s < 2; s++) {
+    const dir = s === 0 ? 1 : -1;
+    const phase = s * Math.PI;
+    const shimAngle = (t * cShimSpd * dir) + phase;
+    const arcSpan = 0.55;
+    ctx.lineWidth = 1.8 * DPR;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${cShimAlpha})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerCR, shimAngle - dir * arcSpan, shimAngle);
+    ctx.stroke();
+  }
+
+  /* User initials (only if no media) */
+  if (!media) {
+    const userInit = (userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0,2) || 'ME';
+    ctx.fillStyle = `rgba(10,8,20,0.88)`;
+    ctx.font = `bold ${Math.round(cr * 0.5)}px "Segoe UI", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(userInit, cx, cy);
+  }
 
   /* User name below center */
-  ctx.fillStyle = 'rgba(255,210,77,0.55)';
-  ctx.font = `${Math.round(cr * 0.36)}px "Segoe UI", system-ui, sans-serif`;
+  ctx.fillStyle = `rgba(${uc.r},${uc.g},${uc.b},0.6)`;
+  ctx.font = `${Math.max(8, Math.round(cr * 0.32))}px "Segoe UI", system-ui, sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillText(userSphereName || 'You', cx, cy + cr + 10);
+  ctx.fillText(userSphereName || 'You', cx, cy + outerCR + 10 * DPR);
 }
 
 function frame(ts) {
