@@ -1272,6 +1272,10 @@ function enterNetwork() {
   // Hide self-state hold hint
   const holdHint = document.getElementById('holdHint');
   if (holdHint) holdHint.style.display = 'none';
+  // Ensure video media keeps playing (Safari suspends display:none videos)
+  if (media && mediaType === 'video' && media.paused) {
+    media.play().catch(() => {});
+  }
   // Resize canvas and build galaxy IMMEDIATELY — no rAF needed
   // because network-mode resize() uses innerWidth/innerHeight (always correct)
   resize();
@@ -2601,16 +2605,9 @@ function drawNetworkView(t) {
   ctx.globalCompositeOperation = 'source-over';
 
   /* Media (photo/video) clipped inside the center sphere */
-  /* DIAGNOSTIC: bright fill to confirm code path + media state label */
-  ctx.save();
-  ctx.fillStyle = media ? '#ff00ff' : '#333';
-  ctx.beginPath(); ctx.arc(cx, cy, cr * 0.7, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(media ? ('IMG:' + (mediaType||'?') + ' ' + (media.width||0) + 'x' + (media.height||0)) : 'NO MEDIA', cx, cy - cr * 1.3 - 14);
   if (media) {
+    /* Re-kick video if Safari suspended it (display:none + tab switch) */
+    if (mediaType === 'video' && media.paused) media.play().catch(() => {});
     const mW = mediaType === 'video' ? media.videoWidth : media.width;
     const mH = mediaType === 'video' ? media.videoHeight : media.height;
     if (mW > 0 && mH > 0) {
