@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 </head>
 <body>
 <title>Remiel Sphere</title>
@@ -60,8 +63,7 @@
     flex-shrink: 0;
     cursor: default;
     touch-action: none;
-    transition: width 0.5s cubic-bezier(0.22,1,0.36,1),
-                height 0.5s cubic-bezier(0.22,1,0.36,1);
+    /* no transition — instant resize prevents sphere disappearing on state change */
   }
 
   /* ── Network mode — CareCircle-style full viewport ── */
@@ -78,8 +80,6 @@
   .sphere-stage.network-mode canvas {
     position: absolute;
     inset: 0;
-    width: 100% !important;
-    height: 100% !important;
   }
 
   canvas {
@@ -342,7 +342,7 @@
     transition: opacity 0.3s;
   }
 
-  /* ── Back button (network/detail state) ── */
+  /* ── Back button (network state) ── */
   .back-btn {
     position: absolute;
     top: 12px;
@@ -1118,15 +1118,16 @@ const DEMO_CONTACTS = [
 
 /* ── 3D Galaxy Engine ── */
 let netYaw = 0.4, netPitch = -0.15;
-const NET_DIST = 220;
-const NET_FOV = 520;
+const NET_DIST = 640;
+const NET_FOV = 980;
 let netSpin = true;
 let netDragging = false;
 // NODES declared above (before resize)
 let networkExpanded = false;
 
 function rebuildNodeTargets() {
-  const shellR = Math.min(CV.width, CV.height) * 0.42;
+  const smaller = Math.min(CV.width / DPR, CV.height / DPR);
+  const shellR = Math.max(200, Math.round(smaller * 0.6));
   const N = DEMO_CONTACTS.length;
   NODES.forEach((node, i) => {
     const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
@@ -1142,7 +1143,10 @@ function rebuildNodeTargets() {
 
 function buildNodes(fresh) {
   const N = DEMO_CONTACTS.length;
-  const shellR = Math.min(CV.width, CV.height) * 0.42;
+  const smaller = Math.min(CV.width / DPR, CV.height / DPR);
+  /* Orbit shell must clear the enlarged center sphere — use 0.72 instead of 0.6 */
+  const shellR = Math.max(240, Math.round(smaller * 0.72));
+  const nodeR = Math.max(16, Math.round(smaller * 0.032));
 
   NODES = DEMO_CONTACTS.map((contact, i) => {
     const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
@@ -1159,11 +1163,11 @@ function buildNodes(fresh) {
       tx: tx, ty: ty, tz: tz,
       x: fresh ? 0 : tx, y: fresh ? 0 : ty, z: fresh ? 0 : tz,
       vx: fresh ? tx * 0.055 : 0, vy: fresh ? ty * 0.055 : 0, vz: fresh ? tz * 0.055 : 0,
-      r: 16 * DPR,
+      r: nodeR,
       initials: (contact.first[0] + contact.last[0]).toUpperCase()
     };
   });
-  networkExpanded = !fresh;
+  networkExpanded = true;
 }
 
 function projectNode(node) {
@@ -1171,29 +1175,15 @@ function projectNode(node) {
   const cp = Math.cos(netPitch), sp = Math.sin(netPitch);
   let x = node.x * cy + node.z * sy;
   let z = -node.x * sy + node.z * cy;
-  let y = node.y;
-  let y2 = y * cp - z * sp;
-  let z2 = y * sp + z * cp;
-  const canvasCx = CV.width / 2;
-  const canvasCy = CV.height / 2;
-  const scale = NET_FOV / (NET_FOV + z2 + NET_DIST);
-  return { sx: canvasCx + x * scale, sy: canvasCy + y2 * scale, scale: scale, z: z2 };
+  let y2 = node.y * cp - z * sp;
+  let z2 = node.y * sp + z * cp;
+  z2 += NET_DIST;
+  const s = NET_FOV / Math.max(60, NET_FOV + z2);
+  const W = CV.width / DPR, H = CV.height / DPR;
+  return { sx: x * s + W / 2, sy: y2 * s + H / 2, scale: s, z: z2 };
 }
 
 function stepPhys() {
-  if (!networkExpanded) {
-    let allClose = true;
-    NODES.forEach(n => {
-      n.vx += (n.tx - n.x) * 0.035;
-      n.vy += (n.ty - n.y) * 0.035;
-      n.vz += (n.tz - n.z) * 0.035;
-      n.vx *= 0.88; n.vy *= 0.88; n.vz *= 0.88;
-      n.x += n.vx; n.y += n.vy; n.z += n.vz;
-      if (Math.hypot(n.x - n.tx, n.y - n.ty, n.z - n.tz) > 3) allClose = false;
-    });
-    if (allClose) networkExpanded = true;
-    return;
-  }
   const N = NODES.length;
   for (let i = 0; i < N; i++) {
     const a = NODES[i];
@@ -1220,11 +1210,14 @@ function stepPhys() {
 
 function hitTestNetwork(clientX, clientY) {
   const rect = CV.getBoundingClientRect();
-  const mx = (clientX - rect.left) * DPR;
-  const my = (clientY - rect.top) * DPR;
-  const cx = CV.width / 2, cy = CV.height / 2;
-  // Center sphere (user) — matches render size
-  const centerR = 38 * DPR;
+  /* projectNode returns CSS-pixel coords, so no DPR multiply */
+  const mx = clientX - rect.left;
+  const my = clientY - rect.top;
+  const cx = CV.width / DPR / 2, cy = CV.height / DPR / 2;
+  // Center sphere (user) — matches render size (CSS px)
+  const W = CV.width / DPR;
+  const selfStageW = Math.min(400, W * 0.88);
+  const centerR = Math.max(60, Math.round(selfStageW * 0.38));
   if (Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
   // Contact nodes — find front-most hit
   let closest = null;
@@ -1251,12 +1244,17 @@ function enterSelf() {
   // UI — release viewport lock
   document.body.classList.remove('network-active');
   stage.classList.remove('network-mode');
+  // Clear inline styles forced by enterNetwork
+  stage.style.position = '';
+  stage.style.inset = '';
+  stage.style.width = '';
+  stage.style.height = '';
   document.getElementById('backBtn').hidden = true;
   document.getElementById('networkHint').hidden = true;
   if (sphereLabelsEl) sphereLabelsEl.style.display = '';
   document.getElementById('demoCycler').style.display = '';
-  // Re-init effects for new canvas size
-  setTimeout(() => { resize(); initFX(); }, 60);
+  // Re-init effects for new canvas size — next frame so DOM class removal is applied
+  requestAnimationFrame(() => { resize(); initFX(); });
 }
 
 function enterNetwork() {
@@ -1268,6 +1266,11 @@ function enterNetwork() {
   // UI — lock viewport like CareCircle
   document.body.classList.add('network-active');
   stage.classList.add('network-mode');
+  // Force stage to full viewport via inline styles (belt + suspenders)
+  stage.style.position = 'fixed';
+  stage.style.inset = '0';
+  stage.style.width = '100%';
+  stage.style.height = '100%';
   document.getElementById('backBtn').hidden = false;
   document.getElementById('networkHint').hidden = false;
   if (sphereLabelsEl) sphereLabelsEl.style.display = 'none';
@@ -1275,10 +1278,17 @@ function enterNetwork() {
   // Hide self-state hold hint
   const holdHint = document.getElementById('holdHint');
   if (holdHint) holdHint.style.display = 'none';
-  // Build galaxy — no delay, immediate resize
+  // Ensure video media keeps playing (Safari suspends display:none videos)
+  if (media && mediaType === 'video' && media.paused) {
+    media.play().catch(() => {});
+  }
+  // Resize canvas and build galaxy IMMEDIATELY — no rAF needed
+  // because network-mode resize() uses innerWidth/innerHeight (always correct)
   resize();
   buildNodes(true);
   initFX();
+  // Safety net: re-verify dimensions after CSS fully settles
+  requestAnimationFrame(() => { resize(); });
 }
 
 function enterDetail(contact) {
@@ -1570,7 +1580,7 @@ function updateBlufContent() {
 
   // Video cluster list — show other contacts from the network
   const listEl = document.getElementById('blufClusterList');
-  const clusterContacts = DEMO_CONTACTS.filter(ct => !selectedContact || ct.id !== selectedContact.id).slice(0, 5);
+  const clusterContacts = DEMO_CONTACTS.filter(c => !selectedContact || c.id !== selectedContact.id).slice(0, 5);
   listEl.innerHTML = clusterContacts.map(m => {
     const cc = CATS[m.cat] || CATS.other;
     const catLabel = m.cat.charAt(0).toUpperCase() + m.cat.slice(1);
@@ -1776,7 +1786,6 @@ let pressStartX = 0, pressStartY = 0;
 const HOLD_MS = 500;
 const MOVE_THRESHOLD = 10;
 
-// Double-tap tracking for DETAIL state
 
 function openOverlay() {
   overlayOpen = true;
@@ -1931,6 +1940,8 @@ let media = null;
 let mediaType = null;
 let mediaOX = 0, mediaOY = 0;
 let mediaZoom = 1;
+let cachedMediaW = 0, cachedMediaH = 0;
+let mediaFrame = null; // off-screen canvas caching last good video frame
 let dragging = false;
 let dragStartX = 0, dragStartY = 0, dragOXStart = 0, dragOYStart = 0;
 
@@ -1939,7 +1950,13 @@ videoEl.muted = true;
 videoEl.loop = true;
 videoEl.playsInline = true;
 videoEl.setAttribute('playsinline', '');
-videoEl.style.display = 'none';
+/* Keep video off-screen but NOT display:none (Safari suspends display:none videos) */
+videoEl.style.position = 'fixed';
+videoEl.style.width = '1px';
+videoEl.style.height = '1px';
+videoEl.style.opacity = '0.01';
+videoEl.style.pointerEvents = 'none';
+videoEl.style.top = '-9999px';
 document.body.appendChild(videoEl);
 
 function showPhotoControls() {
@@ -1961,6 +1978,14 @@ function handleMedia(e) {
     videoEl.addEventListener('loadeddata', function onLoad() {
       videoEl.removeEventListener('loadeddata', onLoad);
       media = videoEl;
+      /* Immediately capture first frame to mediaFrame — survives Safari suspension */
+      const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+      if (vw > 0 && vh > 0) {
+        cachedMediaW = vw; cachedMediaH = vh;
+        if (!mediaFrame) mediaFrame = document.createElement('canvas');
+        mediaFrame.width = vw; mediaFrame.height = vh;
+        mediaFrame.getContext('2d').drawImage(videoEl, 0, 0, vw, vh);
+      }
       showPhotoControls();
       document.getElementById('mediaHint').textContent =
         'Drag to reposition · Pinch or scroll to zoom · Video loops';
@@ -1973,6 +1998,11 @@ function handleMedia(e) {
     const img = new Image();
     img.onload = () => {
       media = img;
+      /* Capture image to mediaFrame — guarantees network-mode always has a source */
+      cachedMediaW = img.width; cachedMediaH = img.height;
+      if (!mediaFrame) mediaFrame = document.createElement('canvas');
+      mediaFrame.width = img.width; mediaFrame.height = img.height;
+      mediaFrame.getContext('2d').drawImage(img, 0, 0, img.width, img.height);
       showPhotoControls();
       document.getElementById('mediaHint').textContent =
         'Drag to reposition · Pinch or scroll to zoom';
@@ -2207,10 +2237,27 @@ class DArc {
 /* ── Init effects ── */
 let fils=[], darcs=[], mesh=null;
 
+let netStars = [];
+function makeNetStars() {
+  const W = CV.width / DPR, H = CV.height / DPR;
+  netStars = [];
+  for (let i = 0; i < 120; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.max(W, H) * 0.78 * (0.15 + Math.random() * 0.8);
+    netStars.push({
+      x: W/2 + Math.cos(a) * d,
+      y: H/2 + Math.sin(a) * d,
+      s: 0.4 + Math.random() * 1.2,
+      phase: Math.random() * Math.PI * 2,
+      speed: 0.002 + Math.random() * 0.004
+    });
+  }
+}
 function initFX() {
   const w=CV.width, h=CV.height, cx=w/2, cy=h/2;
   const r = Math.min(w,h)/2*0.88;
   makeStars(cx,cy,r);
+  makeNetStars();
   fils=[]; for(let i=0;i<50;i++) fils.push(new Fil(cx,cy,r));
   darcs=[]; for(let i=0;i<6;i++) darcs.push(new DArc(cx,cy,r));
   mesh = new Mesh(cx,cy,r,35);
@@ -2289,6 +2336,7 @@ function drawSphereView(t) {
   if (media) {
     const mW = mediaType === 'video' ? media.videoWidth : media.width;
     const mH = mediaType === 'video' ? media.videoHeight : media.height;
+    if (mW > 0 && mH > 0) { cachedMediaW = mW; cachedMediaH = mH; }
     if (mW > 0 && mH > 0) {
       ctx.save();
       ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, 0, Math.PI * 2); ctx.clip();
@@ -2301,6 +2349,14 @@ function drawSphereView(t) {
       const px = cx + mediaOX - dw / 2;
       const py = cy + mediaOY - dh / 2;
       ctx.drawImage(media, px, py, dw, dh);
+      /* Capture video frame to off-screen canvas (survives Safari suspension) */
+      if (mediaType === 'video') {
+        if (!mediaFrame) mediaFrame = document.createElement('canvas');
+        if (mediaFrame.width !== mW || mediaFrame.height !== mH) {
+          mediaFrame.width = mW; mediaFrame.height = mH;
+        }
+        mediaFrame.getContext('2d').drawImage(media, 0, 0, mW, mH);
+      }
       const vig = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R * 0.83);
       vig.addColorStop(0, 'rgba(0,0,0,0)');
       vig.addColorStop(0.85, 'rgba(4,2,10,0.3)');
@@ -2359,7 +2415,7 @@ function drawSphereView(t) {
   ctx.beginPath(); ctx.arc(cx, cy, oR, 0, Math.PI * 2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  ctx.lineWidth = 1.2 * DPR;
+  ctx.lineWidth = 1.2;
   ctx.strokeStyle = `rgba(${sv.r},${sv.g},${sv.b},${0.5 + 0.2 * Math.sin(t * sv.pulseSpd * 0.8)})`;
   ctx.shadowColor = `rgba(${sv.r},${sv.g},${sv.b},${0.5 * sv.glowMul})`;
   ctx.shadowBlur = 4 * DPR;
@@ -2431,21 +2487,23 @@ function drawSphereView(t) {
 }
 
 function drawNetworkView(t) {
-  const w = CV.width, h = CV.height, cx = w/2, cy = h/2;
-  ctx.clearRect(0, 0, w, h);
+  /* Work in CSS pixels via DPR transform — matches CareCircle's proven approach */
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const W = CV.width / DPR, H = CV.height / DPR;
+  const cx = W / 2, cy = H / 2;
+  ctx.clearRect(0, 0, W, H);
 
   /* Deep space background */
-  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.6);
-  bg.addColorStop(0, 'rgba(8,6,18,1)');
-  bg.addColorStop(1, 'rgba(3,3,8,1)');
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.78);
+  bg.addColorStop(0, '#0a0f1a'); bg.addColorStop(0.55, '#05070c'); bg.addColorStop(1, '#000000');
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, W, H);
 
   /* Dim stars */
-  for (const s of stars) {
+  for (const s of netStars) {
     const a = 0.12 + 0.18 * Math.sin(t * s.speed + s.phase);
     ctx.fillStyle = `rgba(180,180,220,${a})`;
-    ctx.beginPath(); ctx.arc(s.x, s.y, s.s * DPR * 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.s * 0.5, 0, Math.PI * 2); ctx.fill();
   }
 
   /* Physics */
@@ -2458,67 +2516,110 @@ function drawNetworkView(t) {
   const projected = NODES.map(node => ({ node, p: projectNode(node) }));
   projected.sort((a, b) => a.p.z - b.p.z);
 
-  /* Draw contact spheres */
+  /* ── Connector lines — CareCircle curved links from center to each sphere ── */
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  for (const { node, p } of projected) {
+    const cat = CATS[node.contact.cat] || CATS.other;
+    const col = `rgb(${cat.r},${cat.g},${cat.b})`;
+    const a = Math.max(0.16, Math.min(0.7, p.scale * 0.7));
+    const isUrgent = node.contact.sev <= 1;
+    ctx.strokeStyle = isUrgent ? '#ffd24d' : col;
+    ctx.globalAlpha = a * (isUrgent ? 0.7 : 0.55);
+    ctx.lineWidth = (isUrgent ? 2.2 : 1.5) * p.scale;
+    ctx.beginPath();
+    const mx = (cx + p.sx) / 2, my = (cy + p.sy) / 2 - 18 * p.scale;
+    ctx.moveTo(cx, cy);
+    ctx.quadraticCurveTo(mx, my, p.sx, p.sy);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+
+  /* Draw contact spheres — CareCircle luminous star technique */
   for (const { node, p } of projected) {
     const cat = CATS[node.contact.cat] || CATS.other;
     const sev = SEVS[node.contact.sev];
-    const sr = node.r * p.scale;
+    const col = `rgb(${cat.r},${cat.g},${cat.b})`;
+    const colHex = '#' + [cat.r, cat.g, cat.b].map(v => v.toString(16).padStart(2,'0')).join('');
+    const s = p.scale;
+    const r = Math.max(2, node.r * s);
     const sx = p.sx, sy = p.sy;
-    const depthAlpha = 0.35 + 0.65 * Math.max(0, Math.min(1, (p.z + NET_DIST + 150) / (NET_DIST * 2 + 300)));
+    const isUrgent = node.contact.sev <= 1;
 
-    /* Severity outer glow (additive) */
+    /* Halo — luminous glow (additive) */
     ctx.globalCompositeOperation = 'lighter';
-    const halo = ctx.createRadialGradient(sx, sy, sr * 0.4, sx, sy, sr * 2.8);
-    halo.addColorStop(0, `rgba(${sev.r},${sev.g},${sev.b},${0.1 * depthAlpha * sev.glowMul})`);
-    halo.addColorStop(0.5, `rgba(${sev.r},${sev.g},${sev.b},${0.03 * depthAlpha * sev.glowMul})`);
-    halo.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = halo;
-    ctx.beginPath(); ctx.arc(sx, sy, sr * 2.8, 0, Math.PI * 2); ctx.fill();
+    let haloMul = 4.2;
+    let pulseA = 0;
+    if (isUrgent) {
+      pulseA = 0.5 + 0.5 * Math.sin(t * 7 + node.tx);
+      haloMul = 4.6 + pulseA * 1.8;
+    }
+    const halo = r * haloMul;
+    const gg = ctx.createRadialGradient(sx, sy, 0, sx, sy, halo);
+    gg.addColorStop(0, colHex + 'cc');
+    gg.addColorStop(0.16, colHex + '88');
+    gg.addColorStop(0.42, colHex + '2e');
+    gg.addColorStop(1, colHex + '00');
+    ctx.globalAlpha = 0.30 + 0.55 * s + (isUrgent ? 0.25 * pulseA : 0);
+    ctx.fillStyle = gg;
+    ctx.beginPath(); ctx.arc(sx, sy, halo, 0, Math.PI * 2); ctx.fill();
 
-    /* Category core */
-    const core = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
-    core.addColorStop(0, `rgba(${cat.r},${cat.g},${cat.b},${0.75 * depthAlpha})`);
-    core.addColorStop(0.55, `rgba(${cat.r},${cat.g},${cat.b},${0.4 * depthAlpha})`);
-    core.addColorStop(1, `rgba(${cat.r},${cat.g},${cat.b},${0.06 * depthAlpha})`);
+    /* Translucent shell */
+    ctx.globalAlpha = 0.30;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fill();
+
+    /* Colored heart */
+    const core = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 0.62);
+    core.addColorStop(0, col);
+    core.addColorStop(0.7, colHex + '55');
+    core.addColorStop(1, colHex + '00');
+    ctx.globalAlpha = 0.55;
     ctx.fillStyle = core;
-    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx, sy, r * 0.62, 0, Math.PI * 2); ctx.fill();
 
     ctx.globalCompositeOperation = 'source-over';
 
     /* Crisp rim */
-    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.5 * depthAlpha})`;
-    ctx.lineWidth = Math.max(1, 1.5 * DPR * p.scale);
-    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.92;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.6 * s;
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.stroke();
 
     /* Initials */
-    if (sr > 8) {
-      ctx.fillStyle = `rgba(10,8,20,${0.9 * depthAlpha})`;
-      ctx.font = `bold ${Math.max(8, Math.round(sr * 0.55))}px "Segoe UI", system-ui, sans-serif`;
+    ctx.globalAlpha = 1;
+    if (s > 0.32) {
+      ctx.fillStyle = '#0a0d14';
+      ctx.font = `700 ${Math.round(11 * s)}px "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(node.initials, sx, sy);
     }
 
     /* Name below */
-    if (sr > 10) {
-      ctx.fillStyle = `rgba(224,228,236,${0.5 * depthAlpha})`;
-      ctx.font = `${Math.max(7, Math.round(sr * 0.36))}px "Segoe UI", system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(node.contact.first, sx, sy + sr + Math.max(6, 8 * p.scale));
-
-      /* Urgency indicator for sev 0 or 1 */
-      if (node.contact.sev <= 1) {
-        ctx.fillStyle = `rgba(${sev.r},${sev.g},${sev.b},${0.45 * depthAlpha})`;
-        ctx.font = `${Math.max(6, Math.round(sr * 0.28))}px "Segoe UI", system-ui, sans-serif`;
-        ctx.fillText(sev.label.toLowerCase(), sx, sy + sr + Math.max(14, 18 * p.scale));
-      }
+    if (s > 0.38) {
+      ctx.fillStyle = col;
+      ctx.globalAlpha = 0.95;
+      ctx.font = `600 ${Math.round(10.5 * s)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.fillText(node.contact.first, sx, sy + r + 12 * s);
     }
+
+    /* Urgency label for sev 0 or 1 */
+    if (isUrgent && s > 0.38) {
+      ctx.globalAlpha = 0.55 + 0.35 * pulseA;
+      ctx.font = `600 ${Math.round(9 * s)}px "Segoe UI", system-ui, sans-serif`;
+      ctx.fillText(sev.label.toLowerCase(), sx, sy + r + 24 * s);
+    }
+    ctx.globalAlpha = 1;
   }
 
   /* ── Center sphere (user) — full sphere with media, rings, identity ── */
   const uc = CATS[userCat] || CATS.family;
   const usv = SEVS[userSev] || SEVS[4];
-  const centerR = 38 * DPR;
+  /* Match the self-mode sphere visual size — derived from stage width min(400, 88vw) * 0.44 */
+  const selfStageW = Math.min(400, W * 0.88);
+  const centerR = Math.max(60, Math.round(selfStageW * 0.38));
   const breathe = 1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd);
   const cr = centerR * breathe;
 
@@ -2541,55 +2642,56 @@ function drawNetworkView(t) {
 
   ctx.globalCompositeOperation = 'source-over';
 
-  /* Media (photo/video) clipped inside the center sphere */
-  if (media) {
-    const mW = mediaType === 'video' ? media.videoWidth : media.width;
-    const mH = mediaType === 'video' ? media.videoHeight : media.height;
-    if (mW > 0 && mH > 0) {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(cx, cy, cr * 0.82, 0, Math.PI * 2); ctx.clip();
-      ctx.globalAlpha = 1.0;
-      const aspect = mW / mH;
-      const baseDim = cr * 1.64;
-      let dw, dh;
-      if (aspect > 1) { dh = baseDim * mediaZoom; dw = dh * aspect; }
-      else { dw = baseDim * mediaZoom; dh = dw / aspect; }
-      const px = cx + mediaOX * (cr / (R || cr)) - dw / 2;
-      const py = cy + mediaOY * (cr / (R || cr)) - dh / 2;
-      ctx.drawImage(media, px, py, dw, dh);
-      /* Vignette inside media clip */
-      const vig = ctx.createRadialGradient(cx, cy, cr * 0.55, cx, cy, cr * 0.83);
-      vig.addColorStop(0, 'rgba(0,0,0,0)');
-      vig.addColorStop(0.85, 'rgba(4,2,10,0.35)');
-      vig.addColorStop(1, 'rgba(4,2,10,0.9)');
-      ctx.fillStyle = vig;
-      ctx.fillRect(cx - cr, cy - cr, cr * 2, cr * 2);
-      ctx.restore();
-    }
+  /* Media (photo/video) clipped inside the center sphere — always draw from mediaFrame */
+  if (mediaFrame && cachedMediaW > 0 && cachedMediaH > 0) {
+    /* Re-kick video playback so self-mode keeps capturing fresh frames */
+    if (media && mediaType === 'video' && media.paused) media.play().catch(() => {});
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, cr * 0.82, 0, Math.PI * 2); ctx.clip();
+    ctx.globalAlpha = 1.0;
+    const aspect = cachedMediaW / cachedMediaH;
+    const baseDim = cr * 1.64;
+    let dw, dh;
+    if (aspect > 1) { dh = baseDim * mediaZoom; dw = dh * aspect; }
+    else { dw = baseDim * mediaZoom; dh = dw / aspect; }
+    /* Scale user pan offsets from self-mode coords to center-sphere coords */
+    const selfR = Math.min(400, W * 0.88) * 0.44;
+    const offsetScale = cr / (selfR || cr);
+    const px = cx + mediaOX * offsetScale - dw / 2;
+    const py = cy + mediaOY * offsetScale - dh / 2;
+    ctx.drawImage(mediaFrame, px, py, dw, dh);
+    /* Vignette inside media clip */
+    const vig = ctx.createRadialGradient(cx, cy, cr * 0.55, cx, cy, cr * 0.83);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(0.85, 'rgba(4,2,10,0.35)');
+    vig.addColorStop(1, 'rgba(4,2,10,0.55)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(cx - cr, cy - cr, cr * 2, cr * 2);
+    ctx.restore();
   }
 
   /* Inner energy ring (category) */
-  ctx.lineWidth = 4 * DPR;
+  ctx.lineWidth = 4;
   ctx.strokeStyle = `rgba(${uc.r},${uc.g},${uc.b},${0.3 + 0.1 * Math.sin(t * 0.004)})`;
   ctx.shadowColor = `rgba(${uc.r},${uc.g},${uc.b},0.5)`;
-  ctx.shadowBlur = 12 * DPR;
+  ctx.shadowBlur = 12;
   ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  ctx.lineWidth = 1.2 * DPR;
+  ctx.lineWidth = 1.2;
   ctx.strokeStyle = `rgba(${uc.r},${uc.g},${uc.b},${0.7 + 0.15 * Math.sin(t * 0.005)})`;
   ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
 
   /* NOUS status ring (outer — severity) */
   const outerCR = cr * 1.1;
-  ctx.lineWidth = 3 * DPR;
+  ctx.lineWidth = 3;
   ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${0.12 + 0.06 * Math.sin(t * usv.pulseSpd * 1.3)})`;
   ctx.shadowColor = `rgba(${usv.r},${usv.g},${usv.b},${0.4 * usv.glowMul})`;
-  ctx.shadowBlur = 10 * DPR * usv.glowMul;
+  ctx.shadowBlur = 10 * usv.glowMul;
   ctx.beginPath(); ctx.arc(cx, cy, outerCR, 0, Math.PI * 2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  ctx.lineWidth = 0.8 * DPR;
+  ctx.lineWidth = 0.8;
   ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${0.5 + 0.2 * Math.sin(t * usv.pulseSpd * 0.8)})`;
   ctx.beginPath(); ctx.arc(cx, cy, outerCR, 0, Math.PI * 2); ctx.stroke();
 
@@ -2601,7 +2703,7 @@ function drawNetworkView(t) {
     const phase = s * Math.PI;
     const shimAngle = (t * cShimSpd * dir) + phase;
     const arcSpan = 0.55;
-    ctx.lineWidth = 1.8 * DPR;
+    ctx.lineWidth = 1.8;
     ctx.lineCap = 'round';
     ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${cShimAlpha})`;
     ctx.beginPath();
@@ -2609,8 +2711,8 @@ function drawNetworkView(t) {
     ctx.stroke();
   }
 
-  /* User initials (only if no media) */
-  if (!media) {
+  /* User initials (only if no media loaded) */
+  if (!mediaFrame) {
     const userInit = (userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0,2) || 'ME';
     ctx.fillStyle = `rgba(10,8,20,0.88)`;
     ctx.font = `bold ${Math.round(cr * 0.5)}px "Segoe UI", system-ui, sans-serif`;
@@ -2623,7 +2725,8 @@ function drawNetworkView(t) {
   ctx.fillStyle = `rgba(${uc.r},${uc.g},${uc.b},0.6)`;
   ctx.font = `${Math.max(8, Math.round(cr * 0.32))}px "Segoe UI", system-ui, sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillText(userSphereName || 'You', cx, cy + outerCR + 10 * DPR);
+  ctx.fillText(userSphereName || 'You', cx, cy + outerCR + 10);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 function frame(ts) {
@@ -2647,6 +2750,5 @@ function frame(ts) {
 
 requestAnimationFrame(frame);
 </script>
-
 </body>
 </html>
