@@ -1158,7 +1158,7 @@ function buildNodes(fresh) {
       tx: tx, ty: ty, tz: tz,
       x: fresh ? 0 : tx, y: fresh ? 0 : ty, z: fresh ? 0 : tz,
       vx: fresh ? tx * 0.055 : 0, vy: fresh ? ty * 0.055 : 0, vz: fresh ? tz * 0.055 : 0,
-      r: 16 * DPR,
+      r: 24 * DPR,
       initials: (contact.first[0] + contact.last[0]).toUpperCase()
     };
   });
@@ -2464,13 +2464,13 @@ function drawNetworkView(t) {
     const sev = SEVS[node.contact.sev];
 
     /* Soft glow line */
-    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.045 * depthAlpha})`;
-    ctx.lineWidth = Math.max(2, 5 * DPR * p.scale);
+    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.18 * depthAlpha})`;
+    ctx.lineWidth = Math.max(3, 7 * DPR * p.scale);
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.sx, p.sy); ctx.stroke();
 
     /* Core line */
-    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.12 * depthAlpha})`;
-    ctx.lineWidth = Math.max(0.5, 1.2 * DPR * p.scale);
+    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.35 * depthAlpha})`;
+    ctx.lineWidth = Math.max(1, 1.8 * DPR * p.scale);
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.sx, p.sy); ctx.stroke();
 
     /* Animated energy pulse along line for urgent/elevated contacts */
@@ -2480,7 +2480,7 @@ function drawNetworkView(t) {
       const py = cy + (p.sy - cy) * pulsePos;
       const pulseR = 3 * DPR * p.scale;
       const pulseGlow = ctx.createRadialGradient(px, py, 0, px, py, pulseR * 3);
-      pulseGlow.addColorStop(0, `rgba(${sev.r},${sev.g},${sev.b},${0.25 * depthAlpha})`);
+      pulseGlow.addColorStop(0, `rgba(${sev.r},${sev.g},${sev.b},${0.45 * depthAlpha})`);
       pulseGlow.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = pulseGlow;
       ctx.beginPath(); ctx.arc(px, py, pulseR * 3, 0, Math.PI * 2); ctx.fill();
@@ -2499,30 +2499,30 @@ function drawNetworkView(t) {
     /* Severity outer glow (additive) */
     ctx.globalCompositeOperation = 'lighter';
     const halo = ctx.createRadialGradient(sx, sy, sr * 0.4, sx, sy, sr * 2.8);
-    halo.addColorStop(0, `rgba(${sev.r},${sev.g},${sev.b},${0.1 * depthAlpha * sev.glowMul})`);
-    halo.addColorStop(0.5, `rgba(${sev.r},${sev.g},${sev.b},${0.03 * depthAlpha * sev.glowMul})`);
+    halo.addColorStop(0, `rgba(${sev.r},${sev.g},${sev.b},${0.2 * depthAlpha * sev.glowMul})`);
+    halo.addColorStop(0.5, `rgba(${sev.r},${sev.g},${sev.b},${0.08 * depthAlpha * sev.glowMul})`);
     halo.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = halo;
     ctx.beginPath(); ctx.arc(sx, sy, sr * 2.8, 0, Math.PI * 2); ctx.fill();
 
     /* Category core */
     const core = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
-    core.addColorStop(0, `rgba(${cat.r},${cat.g},${cat.b},${0.75 * depthAlpha})`);
-    core.addColorStop(0.55, `rgba(${cat.r},${cat.g},${cat.b},${0.4 * depthAlpha})`);
-    core.addColorStop(1, `rgba(${cat.r},${cat.g},${cat.b},${0.06 * depthAlpha})`);
+    core.addColorStop(0, `rgba(${cat.r},${cat.g},${cat.b},${0.9 * depthAlpha})`);
+    core.addColorStop(0.55, `rgba(${cat.r},${cat.g},${cat.b},${0.55 * depthAlpha})`);
+    core.addColorStop(1, `rgba(${cat.r},${cat.g},${cat.b},${0.15 * depthAlpha})`);
     ctx.fillStyle = core;
     ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
 
     ctx.globalCompositeOperation = 'source-over';
 
     /* Crisp rim */
-    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.5 * depthAlpha})`;
-    ctx.lineWidth = Math.max(1, 1.5 * DPR * p.scale);
+    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.7 * depthAlpha})`;
+    ctx.lineWidth = Math.max(1.5, 2 * DPR * p.scale);
     ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.stroke();
 
     /* Initials */
     if (sr > 8) {
-      ctx.fillStyle = `rgba(10,8,20,${0.9 * depthAlpha})`;
+      ctx.fillStyle = `rgba(240,240,255,${0.9 * depthAlpha})`;
       ctx.font = `bold ${Math.max(8, Math.round(sr * 0.55))}px "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -2531,7 +2531,7 @@ function drawNetworkView(t) {
 
     /* Name below */
     if (sr > 10) {
-      ctx.fillStyle = `rgba(224,228,236,${0.5 * depthAlpha})`;
+      ctx.fillStyle = `rgba(224,228,236,${0.75 * depthAlpha})`;
       ctx.font = `${Math.max(7, Math.round(sr * 0.36))}px "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(node.contact.first, sx, sy + sr + Math.max(6, 8 * p.scale));
