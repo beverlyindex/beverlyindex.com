@@ -1123,7 +1123,8 @@ let netDragging = false;
 let networkExpanded = false;
 
 function rebuildNodeTargets() {
-  const shellR = Math.min(CV.width / DPR, CV.height / DPR) < 700 ? 215 : 250;
+  const smaller = Math.min(CV.width / DPR, CV.height / DPR);
+  const shellR = Math.max(180, Math.round(smaller * 0.42));
   const N = DEMO_CONTACTS.length;
   NODES.forEach((node, i) => {
     const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
@@ -1139,7 +1140,9 @@ function rebuildNodeTargets() {
 
 function buildNodes(fresh) {
   const N = DEMO_CONTACTS.length;
-  const shellR = Math.min(CV.width / DPR, CV.height / DPR) < 700 ? 215 : 250;
+  const smaller = Math.min(CV.width / DPR, CV.height / DPR);
+  const shellR = Math.max(180, Math.round(smaller * 0.42));
+  const nodeR = Math.max(14, Math.round(smaller * 0.024));
 
   NODES = DEMO_CONTACTS.map((contact, i) => {
     const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
@@ -1156,7 +1159,7 @@ function buildNodes(fresh) {
       tx: tx, ty: ty, tz: tz,
       x: fresh ? 0 : tx, y: fresh ? 0 : ty, z: fresh ? 0 : tz,
       vx: fresh ? tx * 0.055 : 0, vy: fresh ? ty * 0.055 : 0, vz: fresh ? tz * 0.055 : 0,
-      r: 19,
+      r: nodeR,
       initials: (contact.first[0] + contact.last[0]).toUpperCase()
     };
   });
@@ -1208,7 +1211,7 @@ function hitTestNetwork(clientX, clientY) {
   const my = clientY - rect.top;
   const cx = CV.width / DPR / 2, cy = CV.height / DPR / 2;
   // Center sphere (user) — matches render size (CSS px)
-  const centerR = 30;
+  const centerR = Math.max(30, Math.round(Math.min(W, H) * 0.055));
   if (Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
   // Contact nodes — find front-most hit
   let closest = null;
@@ -2574,7 +2577,7 @@ function drawNetworkView(t) {
   /* ── Center sphere (user) — full sphere with media, rings, identity ── */
   const uc = CATS[userCat] || CATS.family;
   const usv = SEVS[userSev] || SEVS[4];
-  const centerR = 30;
+  const centerR = Math.max(30, Math.round(Math.min(W, H) * 0.055));
   const breathe = 1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd);
   const cr = centerR * breathe;
 
