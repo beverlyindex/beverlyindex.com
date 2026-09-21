@@ -13,7 +13,7 @@
 <body>
 <title>Remiel Sphere</title>
 <style>
-  /* Beverly Index font system — Fraunces (serif/headings) + Hanken Grotesk (sans/body) */
+  /* NOUS font system: Fraunces (serif headings) + Hanken Grotesk (body/UI) */
 
   :root {
     --bg: #05070c;
@@ -1224,7 +1224,6 @@ function hitTestNetwork(clientX, clientY) {
   // Center sphere (user) — matches render size (CSS px)
   const W = CV.width / DPR;
   const selfStageW = Math.min(400, W * 0.88);
-  /* Scale center sphere down on small screens so orbit spheres stay proportional */
   const centerFactor = W < 500 ? 0.17 : 0.24;
   const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
   if (Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
@@ -1508,23 +1507,16 @@ function openBluf(sphereScreenY) {
   updateBlufContent();
 
   const overlay = document.getElementById('blufOverlay');
-  const card = document.getElementById('blufCard');
 
   /* Position card beneath the tapped sphere when in network mode */
   if (appState === 'network' && typeof sphereScreenY === 'number') {
-    /* Stop galaxy auto-spin so user can focus on card */
     netSpin = false;
-    /* sphereScreenY is viewport Y of sphere bottom edge.
-       Place card 12px below that point. Use paddingTop on overlay
-       so the card starts just under the sphere, scrollable if needed. */
     const gap = 12;
-    /* Clamp so card never starts below 65% of viewport — it can scroll from there */
     const maxTop = Math.round(window.innerHeight * 0.65);
     const topPx = Math.min(maxTop, Math.max(8, Math.round(sphereScreenY + gap)));
     overlay.style.paddingTop = topPx + 'px';
     overlay.style.justifyContent = 'flex-start';
   } else {
-    /* Self-mode or fallback: center card */
     overlay.style.paddingTop = '';
     overlay.style.justifyContent = 'center';
   }
@@ -1539,10 +1531,8 @@ function closeBluf() {
   if (sphereLabelsEl && appState === 'self') sphereLabelsEl.style.display = '';
   const overlay = document.getElementById('blufOverlay');
   overlay.classList.remove('open');
-  /* Reset positioning */
   overlay.style.paddingTop = '';
   overlay.style.justifyContent = '';
-  /* Resume galaxy auto-spin */
   if (appState === 'network') {
     setTimeout(() => { netSpin = true; }, 400);
   }
@@ -1917,7 +1907,7 @@ function onPressEnd(e) {
         const rect = CV.getBoundingClientRect();
         if (hit.isCenter) {
           selectedContact = null;
-          /* Center sphere bottom in viewport coords */
+          /* Center sphere bottom in viewport coords (CSS pixels) */
           const W = CV.width / DPR;
           const selfStW = Math.min(400, W * 0.88);
           const cFactor = W < 500 ? 0.17 : 0.24;
@@ -2670,7 +2660,6 @@ function drawNetworkView(t) {
   const usv = SEVS[userSev] || SEVS[4];
   /* Match the self-mode sphere visual size — derived from stage width min(400, 88vw) * 0.44 */
   const selfStageW = Math.min(400, W * 0.88);
-  /* Scale center sphere down on small screens so orbit spheres stay proportional */
   const centerFactor = W < 500 ? 0.17 : 0.24;
   const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
   const breathe = 1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd);
