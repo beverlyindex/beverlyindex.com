@@ -60,8 +60,7 @@
     flex-shrink: 0;
     cursor: default;
     touch-action: none;
-    transition: width 0.5s cubic-bezier(0.22,1,0.36,1),
-                height 0.5s cubic-bezier(0.22,1,0.36,1);
+    /* no transition — instant resize prevents sphere disappearing on state change */
   }
 
   /* ── Network mode — CareCircle-style full viewport ── */
@@ -1255,8 +1254,8 @@ function enterSelf() {
   document.getElementById('networkHint').hidden = true;
   if (sphereLabelsEl) sphereLabelsEl.style.display = '';
   document.getElementById('demoCycler').style.display = '';
-  // Re-init effects for new canvas size
-  setTimeout(() => { resize(); initFX(); }, 60);
+  // Re-init effects for new canvas size — next frame so DOM class removal is applied
+  requestAnimationFrame(() => { resize(); initFX(); });
 }
 
 function enterNetwork() {
@@ -2456,6 +2455,38 @@ function drawNetworkView(t) {
   /* Project and depth-sort (back to front) */
   const projected = NODES.map(node => ({ node, p: projectNode(node) }));
   projected.sort((a, b) => a.p.z - b.p.z);
+
+  /* ── Connector lines — link each contact to center ── */
+  ctx.globalCompositeOperation = 'lighter';
+  for (const { node, p } of projected) {
+    const cat = CATS[node.contact.cat] || CATS.other;
+    const depthAlpha = 0.35 + 0.65 * Math.max(0, Math.min(1, (p.z + NET_DIST + 150) / (NET_DIST * 2 + 300)));
+    const sev = SEVS[node.contact.sev];
+
+    /* Soft glow line */
+    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.045 * depthAlpha})`;
+    ctx.lineWidth = Math.max(2, 5 * DPR * p.scale);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.sx, p.sy); ctx.stroke();
+
+    /* Core line */
+    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${0.12 * depthAlpha})`;
+    ctx.lineWidth = Math.max(0.5, 1.2 * DPR * p.scale);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.sx, p.sy); ctx.stroke();
+
+    /* Animated energy pulse along line for urgent/elevated contacts */
+    if (node.contact.sev <= 1) {
+      const pulsePos = (t * (0.0003 + sev.pulseSpd * 0.05)) % 1;
+      const px = cx + (p.sx - cx) * pulsePos;
+      const py = cy + (p.sy - cy) * pulsePos;
+      const pulseR = 3 * DPR * p.scale;
+      const pulseGlow = ctx.createRadialGradient(px, py, 0, px, py, pulseR * 3);
+      pulseGlow.addColorStop(0, `rgba(${sev.r},${sev.g},${sev.b},${0.25 * depthAlpha})`);
+      pulseGlow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = pulseGlow;
+      ctx.beginPath(); ctx.arc(px, py, pulseR * 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
 
   /* Draw contact spheres */
   for (const { node, p } of projected) {
