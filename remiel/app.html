@@ -1999,11 +1999,12 @@ function handleMedia(e) {
     img.onload = () => {
       media = img;
       /* Capture image to mediaFrame — guarantees network-mode always has a source */
-      cachedMediaW = img.width; cachedMediaH = img.height;
+      cachedMediaW = img.naturalWidth || img.width; cachedMediaH = img.naturalHeight || img.height;
       if (!mediaFrame) mediaFrame = document.createElement('canvas');
-      mediaFrame.width = img.width; mediaFrame.height = img.height;
-      mediaFrame.getContext('2d').drawImage(img, 0, 0, img.width, img.height);
+      mediaFrame.width = cachedMediaW; mediaFrame.height = cachedMediaH;
+      mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
       showPhotoControls();
+      console.log("[DIAG] img.onload: w=" + img.width + " h=" + img.height + " mediaFrame=" + (mediaFrame ? mediaFrame.width + "x" + mediaFrame.height : "null"));
       document.getElementById('mediaHint').textContent =
         'Drag to reposition · Pinch or scroll to zoom';
       setTimeout(closeOverlay, 700);
@@ -2643,6 +2644,19 @@ function drawNetworkView(t) {
   ctx.globalCompositeOperation = 'source-over';
 
   /* Media (photo/video) clipped inside the center sphere — always draw from mediaFrame */
+  if (!window._mfDiag) { window._mfDiag = true; console.log("[DIAG] drawNetworkView: mediaFrame=" + (mediaFrame ? "canvas(" + mediaFrame.width + "x" + mediaFrame.height + ")" : "null") + " cachedMediaW=" + cachedMediaW + " cachedMediaH=" + cachedMediaH + " media=" + (media ? mediaType : "null")); }
+  /* Fallback: if media loaded but mediaFrame was never captured, build it now */
+  if (!mediaFrame && media) {
+    const _fw = mediaType === "video" ? media.videoWidth : media.naturalWidth || media.width;
+    const _fh = mediaType === "video" ? media.videoHeight : media.naturalHeight || media.height;
+    if (_fw > 0 && _fh > 0) {
+      cachedMediaW = _fw; cachedMediaH = _fh;
+      mediaFrame = document.createElement("canvas");
+      mediaFrame.width = _fw; mediaFrame.height = _fh;
+      mediaFrame.getContext("2d").drawImage(media, 0, 0, _fw, _fh);
+      console.log("[DIAG] Fallback mediaFrame created: " + _fw + "x" + _fh);
+    }
+  }
   if (mediaFrame && cachedMediaW > 0 && cachedMediaH > 0) {
     /* Re-kick video playback so self-mode keeps capturing fresh frames */
     if (media && mediaType === 'video' && media.paused) media.play().catch(() => {});
@@ -2727,6 +2741,15 @@ function drawNetworkView(t) {
   ctx.textAlign = 'center';
   ctx.fillText(userSphereName || 'You', cx, cy + outerCR + 10);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  /* DIAGNOSTIC — remove after confirming fix */
+  const _dW = CV.width, _dH = CV.height;
+  const _mfOk = !!(mediaFrame && cachedMediaW > 0 && cachedMediaH > 0);
+  ctx.fillStyle = _mfOk ? "#0f0" : "#f00";
+  ctx.fillRect(_dW - 60, _dH - 30, 50, 20);
+  ctx.fillStyle = "#fff";
+  ctx.font = "11px monospace";
+  ctx.fillText(_mfOk ? "MF:OK" : "MF:NO", _dW - 56, _dH - 16);
+  ctx.fillText("v0921a", _dW - 56, _dH - 4);
 }
 
 function frame(ts) {
