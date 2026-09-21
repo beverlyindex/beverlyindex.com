@@ -64,7 +64,6 @@
                 height 0.5s cubic-bezier(0.22,1,0.36,1);
   }
 
-  /* ── Network mode — full viewport galaxy ── */
   /* ── Network mode — CareCircle-style full viewport ── */
   body.network-active { overflow: hidden; }
   .sphere-stage.network-mode {
@@ -343,7 +342,7 @@
     transition: opacity 0.3s;
   }
 
-  /* ── Back button (network/detail state) ── */
+  /* ── Back button (network state) ── */
   .back-btn {
     position: absolute;
     top: 12px;
@@ -1045,7 +1044,7 @@ const sphereLabelsEl = document.getElementById('sphereLabels');
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
 /* ── Forward declarations (needed by resize before full init) ── */
-let appState = 'self'; // 'self' | 'network' | 'detail'
+let appState = 'self'; // 'self' | 'network'
 let NODES = [];
 
 function resize() {
@@ -1284,32 +1283,8 @@ function enterNetwork() {
 
 function enterDetail(contact) {
   selectedContact = contact;
-  appState = 'detail';
-  // Set the sphere to this contact's colors
-  curCat = contact.cat;
-  curSev = contact.sev;
-  sphereName = contact.first + ' ' + contact.last;
-  updateStatusLabel();
-  const c = CATS[curCat];
-  document.documentElement.style.setProperty('--accent', `rgb(${c.r},${c.g},${c.b})`);
-  // UI — release viewport lock
-  document.body.classList.remove('network-active');
-  stage.classList.remove('network-mode');
-  document.getElementById('backBtn').hidden = true;
-  document.getElementById('networkHint').hidden = true;
-  if (sphereLabelsEl) {
-    sphereLabelsEl.style.display = '';
-    // Update status label text
-    document.getElementById('statusLabel').textContent = 'Status: ' + SEVS[curSev].label;
-  }
-  document.getElementById('demoCycler').style.display = 'none';
-  // Re-init effects for detail canvas size
-  setTimeout(() => {
-    resize();
-    initFX();
-    // Auto-open BLUF card
-    setTimeout(() => openBluf(), 350);
-  }, 60);
+  /* Stay in network mode — BLUF opens as overlay on galaxy */
+  openBluf();
 }
 
 /* Back button handler */
@@ -1501,8 +1476,11 @@ function openBluf() {
   blufOpen = true;
   callRevealed = false;
   videoRevealed = false;
-  stage.classList.add('bluf-shrink');
-  if (sphereLabelsEl) sphereLabelsEl.style.display = 'none';
+  /* Only shrink the sphere stage in self mode, not over the galaxy */
+  if (appState !== 'network') {
+    stage.classList.add('bluf-shrink');
+    if (sphereLabelsEl) sphereLabelsEl.style.display = 'none';
+  }
   document.getElementById('blufCallReveal').classList.remove('open');
   document.getElementById('blufVideoReveal').classList.remove('open');
   document.getElementById('blufCallBtn').classList.remove('active');
@@ -1514,8 +1492,9 @@ function openBluf() {
 
 function closeBluf() {
   blufOpen = false;
+  selectedContact = null;
   stage.classList.remove('bluf-shrink');
-  if (sphereLabelsEl && appState !== 'network') sphereLabelsEl.style.display = '';
+  if (sphereLabelsEl && appState === 'self') sphereLabelsEl.style.display = '';
   document.getElementById('blufOverlay').classList.remove('open');
   stopBcRecording();
   stopBcStream();
@@ -1541,14 +1520,19 @@ function handleBlufOverlayClick(e) {
 }
 
 function updateBlufContent() {
-  const d = BLUF_DATA[curSev];
-  const sv = SEVS[curSev];
-  const c = CATS[curCat];
+  /* Read from selectedContact when viewing a contact, else from user state */
+  const viewCat = selectedContact ? selectedContact.cat : curCat;
+  const viewSev = selectedContact ? selectedContact.sev : curSev;
+  const viewName = selectedContact ? (selectedContact.first + ' ' + selectedContact.last) : sphereName;
+
+  const d = BLUF_DATA[viewSev];
+  const sv = SEVS[viewSev];
+  const c = CATS[viewCat];
 
   const ring = document.getElementById('blufSphereRing');
   if (ring) ring.style.setProperty('--status-color', `${sv.r},${sv.g},${sv.b}`);
 
-  const fullName = (sphereName || 'Unknown').trim();
+  const fullName = (viewName || 'Unknown').trim();
   const nameParts = fullName.split(/\s+/);
   const firstName = nameParts[0] || '';
   const familyName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
@@ -1792,8 +1776,6 @@ let pressStartX = 0, pressStartY = 0;
 const HOLD_MS = 500;
 const MOVE_THRESHOLD = 10;
 
-// Double-tap tracking for DETAIL state
-let detailLastTapTime = 0;
 
 function openOverlay() {
   overlayOpen = true;
@@ -1836,16 +1818,6 @@ function onPressStart(e) {
     // In network, press starts potential drag-to-rotate
     netDragging = false;
 
-  } else if (appState === 'detail') {
-    // Long-press to open config for selected contact
-    pressTimer = setTimeout(() => {
-      if (pressStarted) {
-        stage.classList.remove('pressing');
-        openOverlay();
-        pressStarted = false;
-      }
-    }, HOLD_MS);
-    setTimeout(() => { if (pressStarted) stage.classList.add('pressing'); }, 120);
   }
 }
 
@@ -1870,7 +1842,7 @@ function onPressMove(e) {
     return;
   }
 
-  // Self/Detail: if moved too far, cancel hold
+  // Self mode: if moved too far, cancel hold
   if (Math.sqrt(dx*dx + dy*dy) > MOVE_THRESHOLD) {
     cancelPress();
     if (media && !overlayOpen && appState !== 'network') {
@@ -1913,26 +1885,6 @@ function onPressEnd(e) {
     if (appState === 'self') {
       // Single tap — open network
       enterNetwork();
-    } else if (appState === 'detail') {
-      // Tap detection: single tap opens BLUF, double-tap returns to network
-      const now = performance.now();
-      if ((now - detailLastTapTime) < DOUBLE_TAP_MS) {
-        detailLastTapTime = 0;
-        // Double-tap — return to network
-        if (blufOpen) {
-          closeBluf();
-        } else {
-          enterNetwork();
-        }
-      } else {
-        detailLastTapTime = now;
-        // Single tap — open BLUF (with small delay to check for double-tap)
-        setTimeout(() => {
-          if (detailLastTapTime !== 0 && !blufOpen) {
-            openBluf();
-          }
-        }, DOUBLE_TAP_MS + 30);
-      }
     }
   }
   stage.classList.remove('pressing');
@@ -2681,7 +2633,7 @@ function frame(ts) {
   if (appState === 'network') {
     drawNetworkView(t);
   } else {
-    // 'self' or 'detail' — both use the pulsating sphere view
+    // 'self' — pulsating sphere view
     drawSphereView(t);
   }
 
