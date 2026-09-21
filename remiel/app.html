@@ -1934,6 +1934,7 @@ let media = null;
 let mediaType = null;
 let mediaOX = 0, mediaOY = 0;
 let mediaZoom = 1;
+let cachedMediaW = 0, cachedMediaH = 0;
 let dragging = false;
 let dragStartX = 0, dragStartY = 0, dragOXStart = 0, dragOYStart = 0;
 
@@ -1942,7 +1943,13 @@ videoEl.muted = true;
 videoEl.loop = true;
 videoEl.playsInline = true;
 videoEl.setAttribute('playsinline', '');
-videoEl.style.display = 'none';
+/* Keep video off-screen but NOT display:none (Safari suspends display:none videos) */
+videoEl.style.position = 'fixed';
+videoEl.style.width = '1px';
+videoEl.style.height = '1px';
+videoEl.style.opacity = '0.01';
+videoEl.style.pointerEvents = 'none';
+videoEl.style.top = '-9999px';
 document.body.appendChild(videoEl);
 
 function showPhotoControls() {
@@ -2309,6 +2316,7 @@ function drawSphereView(t) {
   if (media) {
     const mW = mediaType === 'video' ? media.videoWidth : media.width;
     const mH = mediaType === 'video' ? media.videoHeight : media.height;
+    if (mW > 0 && mH > 0) { cachedMediaW = mW; cachedMediaH = mH; }
     if (mW > 0 && mH > 0) {
       ctx.save();
       ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, 0, Math.PI * 2); ctx.clip();
@@ -2606,10 +2614,13 @@ function drawNetworkView(t) {
 
   /* Media (photo/video) clipped inside the center sphere */
   if (media) {
-    /* Re-kick video if Safari suspended it (display:none + tab switch) */
+    /* Re-kick video if Safari suspended it */
     if (mediaType === 'video' && media.paused) media.play().catch(() => {});
-    const mW = mediaType === 'video' ? media.videoWidth : media.width;
-    const mH = mediaType === 'video' ? media.videoHeight : media.height;
+    let mW = mediaType === 'video' ? media.videoWidth : media.width;
+    let mH = mediaType === 'video' ? media.videoHeight : media.height;
+    /* Cache valid dimensions; fall back to cached if decoder reports 0 */
+    if (mW > 0 && mH > 0) { cachedMediaW = mW; cachedMediaH = mH; }
+    else { mW = cachedMediaW; mH = cachedMediaH; }
     if (mW > 0 && mH > 0) {
       ctx.save();
       ctx.beginPath(); ctx.arc(cx, cy, cr * 0.82, 0, Math.PI * 2); ctx.clip();
