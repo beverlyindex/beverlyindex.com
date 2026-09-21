@@ -1935,6 +1935,7 @@ let mediaType = null;
 let mediaOX = 0, mediaOY = 0;
 let mediaZoom = 1;
 let cachedMediaW = 0, cachedMediaH = 0;
+let mediaFrame = null; // off-screen canvas caching last good video frame
 let dragging = false;
 let dragStartX = 0, dragStartY = 0, dragOXStart = 0, dragOYStart = 0;
 
@@ -2329,6 +2330,14 @@ function drawSphereView(t) {
       const px = cx + mediaOX - dw / 2;
       const py = cy + mediaOY - dh / 2;
       ctx.drawImage(media, px, py, dw, dh);
+      /* Capture video frame to off-screen canvas (survives Safari suspension) */
+      if (mediaType === 'video') {
+        if (!mediaFrame) mediaFrame = document.createElement('canvas');
+        if (mediaFrame.width !== mW || mediaFrame.height !== mH) {
+          mediaFrame.width = mW; mediaFrame.height = mH;
+        }
+        mediaFrame.getContext('2d').drawImage(media, 0, 0, mW, mH);
+      }
       const vig = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R * 0.83);
       vig.addColorStop(0, 'rgba(0,0,0,0)');
       vig.addColorStop(0.85, 'rgba(4,2,10,0.3)');
@@ -2613,11 +2622,6 @@ function drawNetworkView(t) {
   ctx.globalCompositeOperation = 'source-over';
 
   /* Media (photo/video) clipped inside the center sphere */
-  /* DIAGNOSTIC — remove after debugging */
-  ctx.fillStyle = '#ff0';
-  ctx.font = 'bold 11px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('media=' + (media ? mediaType : 'NULL') + ' cached=' + cachedMediaW + 'x' + cachedMediaH, cx, cy - cr - 20);
   if (media) {
     /* Re-kick video if Safari suspended it */
     if (mediaType === 'video' && media.paused) media.play().catch(() => {});
@@ -2637,7 +2641,8 @@ function drawNetworkView(t) {
       else { dw = baseDim * mediaZoom; dh = dw / aspect; }
       const px = cx + mediaOX * (cr / (R || cr)) - dw / 2;
       const py = cy + mediaOY * (cr / (R || cr)) - dh / 2;
-      ctx.drawImage(media, px, py, dw, dh);
+      const drawSrc = (mediaType === 'video' && mediaFrame) ? mediaFrame : media;
+      ctx.drawImage(drawSrc, px, py, dw, dh);
       /* Vignette inside media clip */
       const vig = ctx.createRadialGradient(cx, cy, cr * 0.55, cx, cy, cr * 0.83);
       vig.addColorStop(0, 'rgba(0,0,0,0)');
