@@ -77,8 +77,6 @@
   .sphere-stage.network-mode canvas {
     position: absolute;
     inset: 0;
-    width: 100% !important;
-    height: 100% !important;
   }
 
   canvas {
@@ -1237,6 +1235,11 @@ function enterSelf() {
   // UI — release viewport lock
   document.body.classList.remove('network-active');
   stage.classList.remove('network-mode');
+  // Clear inline styles forced by enterNetwork
+  stage.style.position = '';
+  stage.style.inset = '';
+  stage.style.width = '';
+  stage.style.height = '';
   document.getElementById('backBtn').hidden = true;
   document.getElementById('networkHint').hidden = true;
   if (sphereLabelsEl) sphereLabelsEl.style.display = '';
@@ -1254,6 +1257,11 @@ function enterNetwork() {
   // UI — lock viewport like CareCircle
   document.body.classList.add('network-active');
   stage.classList.add('network-mode');
+  // Force stage to full viewport via inline styles (belt + suspenders)
+  stage.style.position = 'fixed';
+  stage.style.inset = '0';
+  stage.style.width = '100%';
+  stage.style.height = '100%';
   document.getElementById('backBtn').hidden = false;
   document.getElementById('networkHint').hidden = false;
   if (sphereLabelsEl) sphereLabelsEl.style.display = 'none';
@@ -1261,10 +1269,12 @@ function enterNetwork() {
   // Hide self-state hold hint
   const holdHint = document.getElementById('holdHint');
   if (holdHint) holdHint.style.display = 'none';
-  // Build galaxy — no delay, immediate resize
-  resize();
-  buildNodes(true);
-  initFX();
+  // Wait one frame for CSS to settle, then resize + build galaxy
+  requestAnimationFrame(() => {
+    resize();
+    buildNodes(true);
+    initFX();
+  });
 }
 
 function enterDetail(contact) {
