@@ -1269,12 +1269,13 @@ function enterNetwork() {
   // Hide self-state hold hint
   const holdHint = document.getElementById('holdHint');
   if (holdHint) holdHint.style.display = 'none';
-  // Wait one frame for CSS to settle, then resize + build galaxy
-  requestAnimationFrame(() => {
-    resize();
-    buildNodes(true);
-    initFX();
-  });
+  // Resize canvas and build galaxy IMMEDIATELY — no rAF needed
+  // because network-mode resize() uses innerWidth/innerHeight (always correct)
+  resize();
+  buildNodes(true);
+  initFX();
+  // Safety net: re-verify dimensions after CSS fully settles
+  requestAnimationFrame(() => { resize(); });
 }
 
 function enterDetail(contact) {
