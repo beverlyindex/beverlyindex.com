@@ -421,9 +421,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    padding-block: 0 max(16px, env(safe-area-inset-bottom, 0px));
+    padding-block: 12px max(24px, env(safe-area-inset-bottom, 0px));
     padding-inline: 16px;
-    background: rgba(3,4,8,0.25);
+    background: rgba(3,4,8,0.55);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
@@ -468,6 +468,7 @@
     border-radius: 16px;
     padding: 28px 32px;
     overflow: hidden;
+    margin-bottom: 24px;
     transform: translateY(18px);
     opacity: 0;
     transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease;
@@ -1315,6 +1316,10 @@
                 <div class="bc-placeholder" id="bcPlaceholder">Camera off</div>
               </div>
               <div class="bluf-bc-controls">
+                <button class="bluf-bc-btn" id="bcCameraBtn" onclick="toggleBcCamera()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                  <span id="bcCameraLabel">Camera On</span>
+                </button>
                 <button class="bluf-bc-btn" id="bcRecordBtn" onclick="toggleBcRecord()">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
                   Record
@@ -2140,13 +2145,27 @@ function togglePull(pullId) {
   const el = document.getElementById('pull_' + pullId);
   if (!el) return;
   const wasOpen = el.classList.contains('open');
-  // Close all pulls first
-  closeAllPulls();
-  // If this one was closed, open it
-  if (!wasOpen) {
+  // Close other pulls (not this one yet, so broadcast stream isn't killed prematurely)
+  PULL_IDS.forEach(id => {
+    if (id === pullId) return;
+    const other = document.getElementById('pull_' + id);
+    if (other) other.classList.remove('open');
+  });
+  // Kill broadcast stream only if a non-broadcast pull is being opened, or broadcast is closing
+  if (pullId !== 'broadcast' || wasOpen) {
+    closeBroadcastStream();
+  }
+  // Toggle this pull
+  if (wasOpen) {
+    el.classList.remove('open');
+  } else {
     el.classList.add('open');
     // Auto-start broadcast camera when opening broadcast pull
     if (pullId === 'broadcast') startBcStream();
+    // Scroll the pull header into view so content is visible near viewport edge
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 120);
   }
 }
 
@@ -2169,6 +2188,11 @@ function closeBroadcastStream() {
   if (placeholder) placeholder.hidden = false;
   const status = document.getElementById('bcStatus');
   if (status) status.textContent = '';
+  // Reset camera toggle button state
+  const camBtn = document.getElementById('bcCameraBtn');
+  if (camBtn) camBtn.classList.remove('active');
+  const camLabel = document.getElementById('bcCameraLabel');
+  if (camLabel) camLabel.textContent = 'Camera On';
 }
 
 /* ── Notes System ── */
@@ -2244,6 +2268,23 @@ function renderNotes() {
     </div>`;
   }).join('');
   thread.scrollTop = thread.scrollHeight;
+}
+
+function toggleBcCamera() {
+  if (bcStream) {
+    closeBroadcastStream();
+    const btn = document.getElementById('bcCameraBtn');
+    if (btn) btn.classList.remove('active');
+    const label = document.getElementById('bcCameraLabel');
+    if (label) label.textContent = 'Camera On';
+  } else {
+    startBcStream().then(() => {
+      const btn = document.getElementById('bcCameraBtn');
+      if (btn) btn.classList.add('active');
+      const label = document.getElementById('bcCameraLabel');
+      if (label) label.textContent = 'Camera Off';
+    });
+  }
 }
 
 async function startBcStream() {
@@ -2958,10 +2999,13 @@ function drawSphereView(t) {
         }
         mediaFrame.getContext('2d').drawImage(media, 0, 0, mW, mH);
       }
-      const vig = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R * 0.83);
+      /* Vignette — soft fade so photo blends into the sphere, no hard clip edge */
+      const vig = ctx.createRadialGradient(cx, cy, R * 0.35, cx, cy, R * 0.84);
       vig.addColorStop(0, 'rgba(0,0,0,0)');
-      vig.addColorStop(0.85, 'rgba(4,2,10,0.3)');
-      vig.addColorStop(1, 'rgba(4,2,10,0.85)');
+      vig.addColorStop(0.5, 'rgba(4,2,10,0.05)');
+      vig.addColorStop(0.72, 'rgba(4,2,10,0.25)');
+      vig.addColorStop(0.88, 'rgba(4,2,10,0.65)');
+      vig.addColorStop(1, 'rgba(4,2,10,0.95)');
       ctx.fillStyle = vig;
       ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
       ctx.restore();
@@ -3282,11 +3326,13 @@ function drawNetworkView(t) {
     const px = cx + mediaOX * offsetScale - dw / 2;
     const py = cy + mediaOY * offsetScale - dh / 2;
     ctx.drawImage(mediaFrame, px, py, dw, dh);
-    /* Vignette inside media clip */
-    const vig = ctx.createRadialGradient(cx, cy, cr * 0.55, cx, cy, cr * 0.83);
+    /* Vignette — soft fade so photo blends into the network center sphere */
+    const vig = ctx.createRadialGradient(cx, cy, cr * 0.35, cx, cy, cr * 0.84);
     vig.addColorStop(0, 'rgba(0,0,0,0)');
-    vig.addColorStop(0.85, 'rgba(4,2,10,0.35)');
-    vig.addColorStop(1, 'rgba(4,2,10,0.55)');
+    vig.addColorStop(0.5, 'rgba(4,2,10,0.05)');
+    vig.addColorStop(0.72, 'rgba(4,2,10,0.25)');
+    vig.addColorStop(0.88, 'rgba(4,2,10,0.65)');
+    vig.addColorStop(1, 'rgba(4,2,10,0.95)');
     ctx.fillStyle = vig;
     ctx.fillRect(cx - cr, cy - cr, cr * 2, cr * 2);
     ctx.restore();
