@@ -3633,7 +3633,253 @@ const DOUBLE_TAP_MS = 300;
 const miniCV = document.getElementById('miniSphere');
 const miniCtx = miniCV ? miniCV.getContext('2d') : null;
 
-/* NOUS BLUF data keyed by severity — behavioral pattern intelligence, no sentiment */
+/* ═══════════════════════════════════
+   SEVERITY ENGINE — Compute urgency from real data
+   ═══════════════════════════════════ */
+
+/**
+ * Compute a dynamic severity level (0–4) for a contact based on:
+ *  - Mood trend (declining moods = higher severity)
+ *  - Latest mood level (lower = higher severity)
+ *  - Interaction recency (longer gap since last entry = higher severity)
+ *  - Interaction frequency (fewer recent entries = higher severity)
+ *
+ * Returns { sevLevel:0-4, moods:[], interactions:[], moodTrend, daysSinceContact, avgMood }
+ */
+async function computeSeverity(contactId) {
+  const cid = contactId || 'self';
+  let moods = [], interactions = [];
+  try { moods = await RemielDB.getMoodsByContact(cid); } catch(e) {}
+  try { interactions = await RemielDB.getInteractionsByContact(cid); } catch(e) {}
+
+  const now = Date.now();
+  const DAY_MS = 86400000;
+
+  /* ── Mood analysis ── */
+  // Recent moods (last 14 days)
+  const recentMoods = moods.filter(m => (now - m.ts) < 14 * DAY_MS);
+  const last5 = recentMoods.slice(-5);
+  let avgMood = -1;       // -1 = no data
+  let moodTrend = 0;      // negative = declining, positive = improving
+
+  if (last5.length > 0) {
+    avgMood = last5.reduce((s, m) => s + m.level, 0) / last5.length;
+  }
+  if (last5.length >= 2) {
+    // Compare first half to second half
+    const mid = Math.floor(last5.length / 2);
+    const firstHalf = last5.slice(0, mid);
+    const secondHalf = last5.slice(mid);
+    const avgFirst = firstHalf.reduce((s, m) => s + m.level, 0) / firstHalf.length;
+    const avgSecond = secondHalf.reduce((s, m) => s + m.level, 0) / secondHalf.length;
+    moodTrend = avgSecond - avgFirst; // positive = improving, negative = declining
+  }
+
+  /* ── Interaction recency ── */
+  let daysSinceContact = 999; // no data
+  if (interactions.length > 0) {
+    const lastEntry = interactions[interactions.length - 1];
+    daysSinceContact = Math.max(0, (now - lastEntry.timestamp) / DAY_MS);
+  }
+
+  // Count interactions in last 7 days
+  const recentInteractions = interactions.filter(e => (now - e.timestamp) < 7 * DAY_MS);
+
+  /* ── Score calculation ── */
+  // Start at QUIET (4) and reduce based on signals
+  let score = 4.0;
+
+  // Factor 1: Average mood (strongest signal)
+  // Mood levels: 1=Struggling, 2=Tough, 3=Okay, 4=Good, 5=Thriving
+  if (avgMood >= 0) {
+    if (avgMood <= 1.5) score -= 3.5;       // Struggling → near CRITICAL
+    else if (avgMood <= 2.5) score -= 2.5;   // Tough → ELEVATED
+    else if (avgMood <= 3.2) score -= 1.0;   // Okay → WATCH
+    else if (avgMood <= 4.0) score -= 0.3;   // Good → stays near STABLE
+    // Thriving (>4) — no reduction
+  }
+
+  // Factor 2: Mood trend
+  if (moodTrend < -1.0) score -= 1.5;       // Sharp decline
+  else if (moodTrend < -0.3) score -= 0.8;  // Moderate decline
+  else if (moodTrend > 0.5) score += 0.3;   // Improving — slight relief
+
+  // Factor 3: Interaction gap
+  if (daysSinceContact > 14) score -= 1.0;     // Two weeks silent
+  else if (daysSinceContact > 7) score -= 0.5;  // One week
+  else if (daysSinceContact > 3) score -= 0.2;  // Few days
+
+  // Factor 4: No data at all — default to QUIET, not alarming
+  if (moods.length === 0 && interactions.length === 0) {
+    score = 4.0; // No data means QUIET
+  }
+
+  // Clamp to 0–4 range and round to integer
+  const sevLevel = Math.round(Math.max(0, Math.min(4, score)));
+
+  return {
+    sevLevel,
+    moods: recentMoods,
+    interactions,
+    recentInteractions,
+    moodTrend,
+    daysSinceContact,
+    avgMood,
+    last5
+  };
+}
+
+/**
+ * Generate dynamic BLUF data from real mood + interaction data.
+ * Produces same shape as BLUF_DATA entries: { headline, desc, badges, location, lastContact, openIssues, nextActions }
+ */
+function generateBlufData(sevLevel, compData) {
+  const { moods, interactions, recentInteractions, moodTrend, daysSinceContact, avgMood, last5 } = compData;
+  const SEV_LABELS = ['CRITICAL','ELEVATED','WATCH','STABLE','QUIET'];
+  const sevName = SEV_LABELS[sevLevel] || 'QUIET';
+
+  /* ── Headline — dynamic from real conditions ── */
+  let headline = '', desc = '';
+  const hasMoods = moods.length > 0;
+  const hasInteractions = interactions.length > 0;
+
+  if (sevLevel === 0) {
+    headline = 'CRITICAL — Immediate attention required.';
+    if (hasMoods && avgMood <= 1.5) {
+      desc = 'Mood pattern indicates sustained distress. Recent entries show a critical emotional state requiring direct engagement.';
+    } else if (moodTrend < -1.0) {
+      desc = 'Rapid decline in mood trajectory detected across recent entries. Intervention window is narrowing.';
+    } else {
+      desc = 'Multiple risk indicators converging. Contact frequency and emotional state both warrant immediate response.';
+    }
+  } else if (sevLevel === 1) {
+    headline = 'ELEVATED — Sustained signals above baseline.';
+    if (moodTrend < -0.3) {
+      desc = 'Mood trajectory is declining over recent entries. Pattern has not yet reached critical threshold but warrants proactive outreach.';
+    } else if (avgMood >= 0 && avgMood <= 2.5) {
+      desc = 'Recent mood levels consistently below midpoint. Sustained attention recommended to prevent further decline.';
+    } else {
+      desc = 'Engagement patterns deviate from established baseline. Monitoring recommended with check-in within 24 hours.';
+    }
+  } else if (sevLevel === 2) {
+    headline = 'WATCH — Engagement fluctuation outside normal range.';
+    if (daysSinceContact > 7) {
+      desc = 'No ledger activity recorded in over a week. Communication gap growing beyond typical rhythm.';
+    } else if (moodTrend < 0) {
+      desc = 'Slight downward trend in recent mood entries. No immediate concern but worth noting at next contact.';
+    } else {
+      desc = 'Minor variance in communication and mood patterns. No action required beyond continued observation.';
+    }
+  } else if (sevLevel === 3) {
+    headline = 'STABLE — Communication rhythm within established parameters.';
+    if (hasMoods && avgMood > 3.5) {
+      desc = 'Mood data reflects a consistently positive state. Engagement is reciprocal and on schedule.';
+    } else {
+      desc = 'All indicators within expected range. Current cadence appears healthy and balanced.';
+    }
+  } else {
+    headline = 'QUIET — Baseline low frequency. No flagged indicators.';
+    if (!hasMoods && !hasInteractions) {
+      desc = 'No mood or interaction data logged yet. Begin tracking to enable pattern analysis.';
+    } else {
+      desc = 'Contact rhythm at established low-frequency baseline. Relationship in a restful phase with no anomalous flags.';
+    }
+  }
+
+  /* ── Badges — data-driven tags ── */
+  const badges = [];
+  const SEV_BADGE_COLORS = {
+    critical: '239,68,68', high: '249,115,22', moderate: '234,179,8',
+    stable: '20,184,166', quiet: '96,165,250'
+  };
+
+  if (hasMoods) {
+    if (avgMood <= 1.5)       badges.push({ label: 'DISTRESS', color: SEV_BADGE_COLORS.critical });
+    else if (avgMood <= 2.5)  badges.push({ label: 'LOW MOOD', color: SEV_BADGE_COLORS.high });
+    else if (avgMood <= 3.5)  badges.push({ label: 'MID RANGE', color: SEV_BADGE_COLORS.moderate });
+    else if (avgMood <= 4.2)  badges.push({ label: 'POSITIVE', color: SEV_BADGE_COLORS.stable });
+    else                      badges.push({ label: 'THRIVING', color: SEV_BADGE_COLORS.quiet });
+  }
+
+  if (moodTrend < -1.0)       badges.push({ label: 'DECLINING', color: SEV_BADGE_COLORS.critical });
+  else if (moodTrend < -0.3)  badges.push({ label: 'DIP', color: SEV_BADGE_COLORS.high });
+  else if (moodTrend > 0.5)   badges.push({ label: 'IMPROVING', color: SEV_BADGE_COLORS.stable });
+
+  if (daysSinceContact > 14)       badges.push({ label: 'SILENT 14D+', color: SEV_BADGE_COLORS.critical });
+  else if (daysSinceContact > 7)   badges.push({ label: 'GAP 7D+', color: SEV_BADGE_COLORS.high });
+  else if (daysSinceContact <= 1)  badges.push({ label: 'RECENT', color: SEV_BADGE_COLORS.stable });
+
+  if (recentInteractions.length >= 5)      badges.push({ label: 'ACTIVE', color: SEV_BADGE_COLORS.stable });
+  else if (recentInteractions.length === 0 && hasInteractions) badges.push({ label: 'QUIET WK', color: SEV_BADGE_COLORS.moderate });
+
+  if (!hasMoods && !hasInteractions)  badges.push({ label: 'NO DATA', color: SEV_BADGE_COLORS.quiet });
+
+  // Limit to 4 badges max
+  while (badges.length > 4) badges.pop();
+  // Ensure at least one badge
+  if (badges.length === 0) badges.push({ label: sevName, color: SEV_BADGE_COLORS.quiet });
+
+  /* ── Last Contact — from ledger data ── */
+  let lastContact = null;
+  if (interactions.length > 0) {
+    const last = interactions[interactions.length - 1];
+    const d = new Date(last.timestamp);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    lastContact = {
+      date: months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(),
+      time: d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      location: '—',
+      health: hasMoods ? (['Distress','Low','Nominal','Positive','Thriving'][Math.round(avgMood) - 1] || 'Nominal') + ' — via mood log' : 'No mood data',
+      nextSteps: sevLevel <= 1 ? 'Proactive outreach recommended.' : sevLevel === 2 ? 'Monitor and note changes.' : 'Maintain current rhythm.'
+    };
+  } else {
+    lastContact = {
+      date: '—', time: '—', location: '—',
+      health: 'No data recorded',
+      nextSteps: 'Log an interaction to begin tracking.'
+    };
+  }
+
+  /* ── Open Issues — generated from data conditions ── */
+  const openIssues = [];
+  if (hasMoods && avgMood <= 2.0) openIssues.push('Mood levels indicate sustained difficulty — ' + (avgMood <= 1.5 ? 'critical range' : 'below midpoint'));
+  if (moodTrend < -0.3) openIssues.push('Mood trajectory declining over recent entries');
+  if (daysSinceContact > 7) openIssues.push('No ledger activity in ' + Math.round(daysSinceContact) + ' days');
+  if (recentInteractions.length === 0 && hasInteractions) openIssues.push('Zero interactions logged this week');
+  if (!hasMoods) openIssues.push('No mood data recorded — tracking not yet started');
+  if (!hasInteractions) openIssues.push('No interaction history — begin logging to establish baseline');
+  if (openIssues.length === 0) openIssues.push('No open issues at this time');
+
+  /* ── Next Actions — contextual recommendations ── */
+  const nextActions = [];
+  if (sevLevel === 0) {
+    nextActions.push('Initiate direct contact immediately');
+    nextActions.push('Confirm current state and offer support');
+  } else if (sevLevel === 1) {
+    nextActions.push('Schedule check-in within 24 hours');
+    if (moodTrend < -0.3) nextActions.push('Review recent entries for context');
+  } else if (sevLevel === 2) {
+    nextActions.push('Send low-pressure outreach within 48 hours');
+    nextActions.push('Note any context that may explain changes');
+  } else if (sevLevel === 3) {
+    nextActions.push('Maintain current contact cadence');
+    nextActions.push('Continue regular mood + ledger tracking');
+  } else {
+    if (!hasMoods || !hasInteractions) {
+      nextActions.push('Log a mood or interaction to establish baseline');
+    } else {
+      nextActions.push('Continue passive monitoring');
+    }
+    nextActions.push('Initiate contact at your discretion');
+  }
+
+  /* ── Location — placeholder (no GPS in Remiel consumer fork) ── */
+  const location = { micro: '—', macro: '—', updated: '—' };
+
+  return { headline, desc, badges, location, lastContact, openIssues, nextActions };
+}
+
+/* NOUS BLUF data keyed by severity — FALLBACK when engine produces nothing (no data, no DB) */
 const BLUF_DATA = {
   0: {
     headline: 'URGENT — Escalating contact attempts. Immediate response required.',
@@ -3761,7 +4007,7 @@ function openBluf(sphereScreenY) {
   document.getElementById('blufCallBtn').classList.remove('active');
   document.getElementById('blufVideoBtn').classList.remove('active');
   closeAllPulls();
-  updateBlufContent();
+  updateBlufContent().catch(() => {});
 
   const overlay = document.getElementById('blufOverlay');
 
@@ -3826,13 +4072,33 @@ function handleBlufOverlayClick(e) {
   }
 }
 
-function updateBlufContent() {
+async function updateBlufContent() {
   /* Read from selectedContact when viewing a contact, else from user state */
   const viewCat = selectedContact ? selectedContact.cat : curCat;
-  const viewSev = selectedContact ? selectedContact.sev : curSev;
   const viewName = selectedContact ? (selectedContact.first + ' ' + selectedContact.last) : sphereName;
+  const contactId = selectedContact ? selectedContact.id : 'self';
 
-  const d = BLUF_DATA[viewSev];
+  /* ── Compute severity from real data ── */
+  let viewSev, d;
+  try {
+    const comp = await computeSeverity(contactId);
+    viewSev = comp.sevLevel;
+    d = generateBlufData(viewSev, comp);
+
+    /* Update the contact's live severity so the galaxy sphere reflects it */
+    if (selectedContact && selectedContact.sev !== viewSev) {
+      selectedContact.sev = viewSev;
+      /* Also update in DEMO_CONTACTS array for galaxy render */
+      const dc = DEMO_CONTACTS.find(c => c.id === selectedContact.id);
+      if (dc) dc.sev = viewSev;
+    }
+    if (!selectedContact) curSev = viewSev;
+  } catch(e) {
+    /* Fallback to static data if engine fails */
+    viewSev = selectedContact ? selectedContact.sev : curSev;
+    d = BLUF_DATA[viewSev];
+  }
+
   const sv = SEVS[viewSev];
   const c = CATS[viewCat];
 
