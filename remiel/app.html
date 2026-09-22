@@ -1973,6 +1973,328 @@
     color: var(--text-muted, #5a6a8a);
     padding: 8px 0;
   }
+
+  /* ═══════════════════════════════════════════════════
+     Alert Engine — Notification Center
+     ═══════════════════════════════════════════════════ */
+
+  /* ── Bell button (fixed, top-right, beside exit) ── */
+  .alert-bell {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: calc(max(12px, env(safe-area-inset-right, 0px)) + 72px);
+    z-index: 200;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    padding: 0;
+    font-family: inherit;
+  }
+  .alert-bell:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.16);
+  }
+  .alert-bell:active {
+    transform: scale(0.92);
+  }
+  .alert-bell svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: var(--text-dim, #6b7280);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke 0.2s;
+  }
+  .alert-bell:hover svg {
+    stroke: var(--text, #e0e4ec);
+  }
+
+  /* ── Badge count ── */
+  .alert-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: #FF4444;
+    color: #fff;
+    font-family: var(--nous-mono, 'JetBrains Mono', monospace);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.4);
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .alert-badge.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* ── Bell ring animation ── */
+  @keyframes alertBellRing {
+    0%   { transform: rotate(0deg); }
+    10%  { transform: rotate(14deg); }
+    20%  { transform: rotate(-12deg); }
+    30%  { transform: rotate(10deg); }
+    40%  { transform: rotate(-8deg); }
+    50%  { transform: rotate(5deg); }
+    60%  { transform: rotate(-3deg); }
+    70%  { transform: rotate(1deg); }
+    100% { transform: rotate(0deg); }
+  }
+  .alert-bell.ringing svg {
+    animation: alertBellRing 0.7s ease-in-out;
+  }
+
+  /* ── Overlay (click-outside catcher) ── */
+  .alert-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 298;
+    display: none;
+  }
+  .alert-overlay.active {
+    display: block;
+  }
+
+  /* ── Notification Panel ── */
+  .alert-panel {
+    position: fixed;
+    top: calc(max(12px, env(safe-area-inset-top, 0px)) + 44px);
+    right: max(12px, env(safe-area-inset-right, 0px));
+    width: 320px;
+    max-height: min(440px, 70vh);
+    background: var(--surface, #0e1219);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+    z-index: 299;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .alert-panel.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  /* Panel header */
+  .alert-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .alert-panel-title {
+    font-family: var(--nous-serif, 'Instrument Serif', serif);
+    font-size: 17px;
+    color: var(--text, #e0e4ec);
+    margin: 0;
+    font-weight: 400;
+  }
+  .alert-clear-btn {
+    font-family: var(--nous-mono, 'JetBrains Mono', monospace);
+    font-size: 10px;
+    color: var(--text-dim, #6b7280);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s ease, color 0.15s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .alert-clear-btn:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--text, #e0e4ec);
+  }
+
+  /* Scrollable list */
+  .alert-list {
+    overflow-y: auto;
+    max-height: min(370px, calc(70vh - 70px));
+    padding: 6px 0 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .alert-list::-webkit-scrollbar { width: 3px; }
+  .alert-list::-webkit-scrollbar-track { background: transparent; }
+  .alert-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+  }
+
+  /* Empty state */
+  .alert-empty {
+    padding: 36px 20px;
+    text-align: center;
+    font-family: var(--nous-font, 'Hanken Grotesk', sans-serif);
+    font-size: 13px;
+    color: var(--text-dim, #6b7280);
+    line-height: 1.6;
+  }
+  .alert-empty-icon {
+    font-size: 24px;
+    margin-bottom: 6px;
+    opacity: 0.4;
+  }
+
+  /* ── Individual alert card ── */
+  .alert-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px 10px 14px;
+    margin: 2px 8px;
+    border-radius: 10px;
+    border-left: 3px solid transparent;
+    background: rgba(255,255,255,0.015);
+    transition: background 0.15s ease;
+    cursor: pointer;
+    position: relative;
+  }
+  .alert-card:hover {
+    background: rgba(255,255,255,0.04);
+  }
+
+  /* Severity-colored left borders */
+  .alert-card[data-sev="0"] { border-left-color: #FF4444; }
+  .alert-card[data-sev="1"] { border-left-color: #FF8C00; }
+  .alert-card[data-sev="2"] { border-left-color: #E8A44A; }
+  .alert-card[data-sev="3"] { border-left-color: #00E676; }
+  .alert-card[data-sev="4"] { border-left-color: #4AE8C4; }
+
+  .alert-card-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .alert-card-type {
+    font-family: var(--nous-mono, 'JetBrains Mono', monospace);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 2px;
+    color: var(--text-dim, #6b7280);
+  }
+  .alert-card[data-sev="0"] .alert-card-type { color: #FF4444; }
+  .alert-card[data-sev="1"] .alert-card-type { color: #FF8C00; }
+
+  .alert-card-msg {
+    font-family: var(--nous-font, 'Hanken Grotesk', sans-serif);
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text, #e0e4ec);
+    word-wrap: break-word;
+  }
+  .alert-card-time {
+    font-family: var(--nous-mono, 'JetBrains Mono', monospace);
+    font-size: 9px;
+    color: var(--text-dim, #6b7280);
+    margin-top: 3px;
+    opacity: 0.6;
+  }
+
+  /* Dismiss X button */
+  .alert-dismiss {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.15s ease, background 0.15s ease;
+    padding: 0;
+    margin-top: 1px;
+  }
+  .alert-card:hover .alert-dismiss {
+    opacity: 0.5;
+  }
+  .alert-dismiss:hover {
+    opacity: 1 !important;
+    background: rgba(255,255,255,0.08);
+  }
+  .alert-dismiss svg {
+    width: 12px;
+    height: 12px;
+    stroke: var(--text-dim, #6b7280);
+    stroke-width: 2;
+    fill: none;
+  }
+
+  /* ── BLUF alert indicator ── */
+  .bluf-alert-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(255, 68, 68, 0.12);
+    font-family: var(--nous-mono, 'JetBrains Mono', monospace);
+    font-size: 9px;
+    color: #FF4444;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    margin-left: 6px;
+    animation: moodConfirm 0.3s ease;
+  }
+  .bluf-alert-indicator svg {
+    width: 9px;
+    height: 9px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .bluf-alert-indicator.sev-1 {
+    background: rgba(255, 140, 0, 0.12);
+    color: #FF8C00;
+  }
+  .bluf-alert-indicator.sev-2 {
+    background: rgba(232, 164, 74, 0.12);
+    color: #E8A44A;
+  }
+  .bluf-alert-indicator.sev-3 {
+    background: rgba(0, 230, 118, 0.10);
+    color: #00E676;
+  }
+
+  /* ── Mobile responsive ── */
+  @media (max-width: 480px) {
+    .alert-panel {
+      right: 8px;
+      left: 8px;
+      width: auto;
+    }
+    .alert-bell {
+      right: calc(max(8px, env(safe-area-inset-right, 0px)) + 64px);
+    }
+  }
 </style>
 
 <!-- ═══ Gate Screen ═══ -->
@@ -2094,6 +2416,25 @@
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
   Exit
 </button>
+
+<!-- ═══ Alert Notification Bell ═══ -->
+<button class="alert-bell" id="alertBell" aria-label="Notifications" title="Notifications">
+  <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span class="alert-badge" id="alertBadge">0</span>
+</button>
+<div class="alert-overlay" id="alertOverlay"></div>
+<div class="alert-panel" id="alertPanel" role="dialog" aria-label="Notifications">
+  <div class="alert-panel-header">
+    <h3 class="alert-panel-title">Notifications</h3>
+    <button class="alert-clear-btn" id="alertClearAll">Clear All</button>
+  </div>
+  <div class="alert-list" id="alertList">
+    <div class="alert-empty">
+      <div class="alert-empty-icon">&#9825;</div>
+      Everyone's accounted for. Nice work.
+    </div>
+  </div>
+</div>
 
 <div class="sphere-stage" id="stage">
   <canvas id="sphere"></canvas>
@@ -4114,6 +4455,10 @@ async function updateBlufContent() {
   const viewName = selectedContact ? (selectedContact.first + ' ' + selectedContact.last) : sphereName;
   const contactId = selectedContact ? selectedContact.id : 'self';
 
+  /* Clear previous alert indicator if present */
+  const _oldAlertInd = document.querySelector('.bluf-alert-indicator');
+  if (_oldAlertInd) _oldAlertInd.remove();
+
   /* ── Compute severity from real data ── */
   let viewSev, d;
   try {
@@ -4162,6 +4507,15 @@ async function updateBlufContent() {
 
   document.getElementById('blufHeadline').textContent = d.headline;
   document.getElementById('blufDesc').textContent = d.desc;
+
+  /* Alert indicator on BLUF card */
+  if (typeof AlertEngine !== 'undefined') {
+    const _alertHtml = AlertEngine.getBlufIndicator(contactId);
+    const _headlineEl = document.getElementById('blufHeadline');
+    if (_headlineEl && _alertHtml) {
+      _headlineEl.insertAdjacentHTML('afterend', _alertHtml);
+    }
+  }
 
   const card = document.getElementById('blufCard');
   if (card) card.style.borderLeftColor = `rgb(${sv.r},${sv.g},${sv.b})`;
@@ -5858,6 +6212,463 @@ function frame(ts) {
 }
 
 /* Animation starts only after gate + video intro via revealApp() */
+
+/* ═══════════════════════════════════════════════════════════
+   Alert Engine — Notification Center
+   Monitors severity across all contacts and surfaces
+   gentle nudges when someone may need your attention.
+   ═══════════════════════════════════════════════════════════ */
+const AlertEngine = (() => {
+  'use strict';
+
+  const ALERT_TYPES = {
+    OVERDUE:         'overdue',
+    DECLINING_MOOD:  'declining_mood',
+    CRITICAL:        'critical',
+    NO_DATA:         'no_data'
+  };
+
+  const TYPE_LABELS = {
+    overdue:         'Overdue',
+    declining_mood:  'Needs Attention',
+    critical:        'Critical',
+    no_data:         'Off Radar'
+  };
+
+  const STORAGE_KEY        = 'remiel_alerts';
+  const DISMISSED_KEY      = 'remiel_dismissed';
+  const CHECK_INTERVAL_MS  = 30 * 60 * 1000;
+  const DISMISS_EXPIRY_MS  = 24 * 60 * 60 * 1000;
+
+  let alerts       = [];
+  let dismissedMap = {};
+  let intervalId   = null;
+  let ready        = false;
+
+  /* ── Helpers ── */
+  function makeId(contactId, type) {
+    return contactId + '::' + type;
+  }
+
+  function relativeTime(ts) {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    const days = Math.floor(hrs / 24);
+    return days + 'd ago';
+  }
+
+  function esc(str) {
+    const d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+  }
+
+  function latestTs(entries) {
+    if (!entries || entries.length === 0) return null;
+    let max = 0;
+    for (let i = 0; i < entries.length; i++) {
+      const raw = entries[i].ts || entries[i].timestamp || entries[i].date || entries[i].created || 0;
+      const t = typeof raw === 'string' ? new Date(raw).getTime() : raw;
+      if (t > max) max = t;
+    }
+    return max || null;
+  }
+
+  /* ── Persistence ── */
+  async function loadState() {
+    try {
+      const s = await RemielDB.getSetting(STORAGE_KEY);
+      alerts = s ? JSON.parse(s) : [];
+    } catch (e) { alerts = []; }
+    try {
+      const d = await RemielDB.getSetting(DISMISSED_KEY);
+      dismissedMap = d ? JSON.parse(d) : {};
+    } catch (e) { dismissedMap = {}; }
+
+    const now = Date.now();
+    let pruned = false;
+    for (const id in dismissedMap) {
+      if (now - dismissedMap[id] > DISMISS_EXPIRY_MS) {
+        delete dismissedMap[id];
+        pruned = true;
+      }
+    }
+    if (pruned) await saveDismissed();
+  }
+
+  async function saveAlerts() {
+    try { await RemielDB.putSetting(STORAGE_KEY, JSON.stringify(alerts)); } catch (e) {}
+  }
+
+  async function saveDismissed() {
+    try { await RemielDB.putSetting(DISMISSED_KEY, JSON.stringify(dismissedMap)); } catch (e) {}
+  }
+
+  function isDismissed(id) {
+    const ts = dismissedMap[id];
+    if (!ts) return false;
+    if (Date.now() - ts > DISMISS_EXPIRY_MS) {
+      delete dismissedMap[id];
+      return false;
+    }
+    return true;
+  }
+
+  /* ── Core: scan all contacts and generate alerts ── */
+  async function checkAlerts() {
+    await loadState();
+
+    let contacts;
+    try { contacts = await RemielDB.getAllContacts(); } catch (e) { return; }
+    if (!contacts || contacts.length === 0) {
+      alerts = [];
+      await saveAlerts();
+      updateUI();
+      return;
+    }
+
+    const previousIds = new Set(alerts.map(a => a.id));
+    const existingById = {};
+    for (const a of alerts) existingById[a.id] = a;
+
+    const generated = [];
+    const DAY_MS = 86400000;
+    const now = Date.now();
+    const sevenDays = 7 * DAY_MS;
+
+    for (const contact of contacts) {
+      let sev;
+      try { sev = await computeSeverity(contact.id); } catch (e) { continue; }
+      if (!sev) continue;
+
+      const name = contact.name
+        || ((contact.first || '') + ' ' + (contact.last || '')).trim()
+        || 'Someone';
+
+      /* 1) Critical severity */
+      if (sev.sevLevel === 0) {
+        const aid = makeId(contact.id, ALERT_TYPES.CRITICAL);
+        if (!isDismissed(aid)) {
+          generated.push({
+            id: aid, contactId: contact.id, contactName: name,
+            type: ALERT_TYPES.CRITICAL, sevLevel: 0,
+            message: name + ' is at critical level. Please reach out when you can.',
+            timestamp: existingById[aid] ? existingById[aid].timestamp : now
+          });
+        }
+      }
+
+      /* 2) Overdue interactions */
+      if (typeof sev.daysSinceContact === 'number') {
+        const overdue =
+          (sev.sevLevel <= 1 && sev.daysSinceContact > 3) ||
+          (sev.sevLevel >= 2 && sev.sevLevel <= 3 && sev.daysSinceContact > 7);
+        if (overdue) {
+          const aid = makeId(contact.id, ALERT_TYPES.OVERDUE);
+          if (!isDismissed(aid)) {
+            const days = Math.floor(sev.daysSinceContact);
+            generated.push({
+              id: aid, contactId: contact.id, contactName: name,
+              type: ALERT_TYPES.OVERDUE, sevLevel: sev.sevLevel,
+              message: 'It’s been ' + days + ' day' + (days !== 1 ? 's' : '') + ' since you connected with ' + name + '.',
+              timestamp: existingById[aid] ? existingById[aid].timestamp : now
+            });
+          }
+        }
+      }
+
+      /* 3) Declining mood trend */
+      if (typeof sev.moodTrend === 'number' && sev.moodTrend < -0.3) {
+        const aid = makeId(contact.id, ALERT_TYPES.DECLINING_MOOD);
+        if (!isDismissed(aid)) {
+          generated.push({
+            id: aid, contactId: contact.id, contactName: name,
+            type: ALERT_TYPES.DECLINING_MOOD, sevLevel: Math.min(sev.sevLevel, 2),
+            message: name + '’s mood has been trending down. They might need your attention.',
+            timestamp: existingById[aid] ? existingById[aid].timestamp : now
+          });
+        }
+      }
+
+      /* 4) No data logged in 7+ days */
+      const lastMood = latestTs(sev.moods);
+      const lastIx = latestTs(sev.interactions);
+      const moodStale = !lastMood || (now - lastMood > sevenDays);
+      const ixStale = !lastIx || (now - lastIx > sevenDays);
+      const hasHistory = !!(lastMood || lastIx);
+
+      if (moodStale && ixStale && hasHistory) {
+        const aid = makeId(contact.id, ALERT_TYPES.NO_DATA);
+        if (!isDismissed(aid)) {
+          generated.push({
+            id: aid, contactId: contact.id, contactName: name,
+            type: ALERT_TYPES.NO_DATA, sevLevel: Math.min(sev.sevLevel, 3),
+            message: name + ' has been off your radar for a while. Everything okay?',
+            timestamp: existingById[aid] ? existingById[aid].timestamp : now
+          });
+        }
+      }
+    }
+
+    /* Sort: most urgent first, then newest */
+    generated.sort((a, b) => {
+      if (a.sevLevel !== b.sevLevel) return a.sevLevel - b.sevLevel;
+      return b.timestamp - a.timestamp;
+    });
+
+    const newAlerts = generated.filter(g => !previousIds.has(g.id));
+    alerts = generated;
+    await saveAlerts();
+    updateUI();
+
+    /* System notifications for new critical/elevated */
+    for (const al of newAlerts) {
+      if (al.sevLevel <= 1) {
+        showNotification(
+          TYPE_LABELS[al.type] + ': ' + al.contactName,
+          al.message,
+          al.id
+        );
+      }
+    }
+    return newAlerts;
+  }
+
+  /* ── Dismiss / Clear ── */
+  async function dismissAlert(id) {
+    alerts = alerts.filter(a => a.id !== id);
+    dismissedMap[id] = Date.now();
+    await saveAlerts();
+    await saveDismissed();
+    updateUI();
+  }
+
+  async function clearAll() {
+    const now = Date.now();
+    for (const a of alerts) dismissedMap[a.id] = now;
+    alerts = [];
+    await saveAlerts();
+    await saveDismissed();
+    updateUI();
+  }
+
+  /* ── Getters ── */
+  function getAlerts() { return alerts.slice(); }
+
+  function getAlertsForContact(contactId) {
+    return alerts.filter(a => a.contactId === contactId);
+  }
+
+  /* ── Notification API ── */
+  async function requestPermission() {
+    if (!('Notification' in window)) return 'unsupported';
+    if (Notification.permission === 'granted') return 'granted';
+    if (Notification.permission === 'denied') return 'denied';
+    return await Notification.requestPermission();
+  }
+
+  function showNotification(title, body, tag) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'SHOW_NOTIFICATION',
+        title: title, body: body,
+        tag: tag || 'remiel-alert',
+        url: './'
+      });
+      return;
+    }
+    try {
+      new Notification(title, {
+        body: body, tag: tag || 'remiel-alert',
+        icon: 'remiel-logo.png', requireInteraction: false
+      });
+    } catch (e) {}
+  }
+
+  /* ═══ UI ═══ */
+  function updateUI() {
+    updateBadge();
+    renderList();
+  }
+
+  function updateBadge() {
+    const badge = document.getElementById('alertBadge');
+    if (!badge) return;
+    const count = alerts.length;
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.classList.toggle('visible', count > 0);
+  }
+
+  function renderList() {
+    const list = document.getElementById('alertList');
+    if (!list) return;
+
+    if (alerts.length === 0) {
+      list.innerHTML =
+        '<div class="alert-empty">' +
+          '<div class="alert-empty-icon">♡</div>' +
+          'Everyone’s accounted for. Nice work.' +
+        '</div>';
+      return;
+    }
+
+    let html = '';
+    for (const a of alerts) {
+      html +=
+        '<div class="alert-card" data-sev="' + a.sevLevel + '" data-id="' + esc(a.id) + '" data-contact="' + esc(String(a.contactId)) + '">' +
+          '<div class="alert-card-body">' +
+            '<div class="alert-card-type">' + esc(TYPE_LABELS[a.type] || a.type) + '</div>' +
+            '<div class="alert-card-msg">' + esc(a.message) + '</div>' +
+            '<div class="alert-card-time">' + relativeTime(a.timestamp) + '</div>' +
+          '</div>' +
+          '<button class="alert-dismiss" data-dismiss="' + esc(a.id) + '" aria-label="Dismiss" title="Dismiss">' +
+            '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+          '</button>' +
+        '</div>';
+    }
+    list.innerHTML = html;
+  }
+
+  function togglePanel() {
+    const panel = document.getElementById('alertPanel');
+    const overlay = document.getElementById('alertOverlay');
+    if (!panel) return;
+    if (panel.classList.contains('open')) {
+      closePanel();
+    } else {
+      renderList();
+      panel.classList.add('open');
+      if (overlay) overlay.classList.add('active');
+    }
+  }
+
+  function closePanel() {
+    const panel = document.getElementById('alertPanel');
+    const overlay = document.getElementById('alertOverlay');
+    if (panel) panel.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
+  }
+
+  function ringBell() {
+    const bell = document.getElementById('alertBell');
+    if (!bell) return;
+    bell.classList.remove('ringing');
+    void bell.offsetWidth;
+    bell.classList.add('ringing');
+    setTimeout(() => bell.classList.remove('ringing'), 800);
+  }
+
+  /* ── BLUF alert indicator ── */
+  function getBlufIndicator(contactId) {
+    const ca = getAlertsForContact(contactId);
+    if (ca.length === 0) return '';
+    const highestSev = Math.min(...ca.map(a => a.sevLevel));
+    let cls = '';
+    if (highestSev === 1) cls = ' sev-1';
+    else if (highestSev === 2) cls = ' sev-2';
+    else if (highestSev >= 3) cls = ' sev-3';
+    const label = ca.length === 1 ? '1 alert' : ca.length + ' alerts';
+    return '<span class="bluf-alert-indicator' + cls + '">' +
+      '<svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>' +
+      label + '</span>';
+  }
+
+  /* ── Event binding ── */
+  function bindEvents() {
+    const bell = document.getElementById('alertBell');
+    const overlay = document.getElementById('alertOverlay');
+    const clearBtn = document.getElementById('alertClearAll');
+    const list = document.getElementById('alertList');
+
+    if (bell) bell.addEventListener('click', (e) => { e.stopPropagation(); togglePanel(); });
+    if (overlay) overlay.addEventListener('click', () => closePanel());
+    if (clearBtn) clearBtn.addEventListener('click', (e) => { e.stopPropagation(); clearAll(); });
+
+    if (list) {
+      list.addEventListener('click', (e) => {
+        const dismissBtn = e.target.closest('.alert-dismiss');
+        if (dismissBtn) {
+          e.stopPropagation();
+          const id = dismissBtn.getAttribute('data-dismiss');
+          if (id) dismissAlert(id);
+          return;
+        }
+        const cardEl = e.target.closest('.alert-card');
+        if (cardEl) {
+          const cid = cardEl.getAttribute('data-contact');
+          if (cid) {
+            closePanel();
+            if (typeof DEMO_CONTACTS !== 'undefined') {
+              const match = DEMO_CONTACTS.find(c => String(c.id) === cid);
+              if (match) {
+                selectedContact = match;
+                if (typeof openBluf === 'function') openBluf();
+                return;
+              }
+            }
+            if (cid === 'self' && typeof openBluf === 'function') openBluf();
+          }
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
+  }
+
+  /* ── Service worker registration ── */
+  function registerSW() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (nw) nw.addEventListener('statechange', () => {});
+      });
+    }).catch(() => {});
+  }
+
+  /* ── Init ── */
+  async function init() {
+    if (ready) return;
+    ready = true;
+    registerSW();
+    await loadState();
+    updateUI();
+    bindEvents();
+
+    setTimeout(async () => {
+      const newOnes = await checkAlerts();
+      if (newOnes && newOnes.length > 0) ringBell();
+    }, 2500);
+
+    intervalId = setInterval(() => {
+      checkAlerts().then((n) => { if (n && n.length > 0) ringBell(); });
+    }, CHECK_INTERVAL_MS);
+
+    requestPermission();
+  }
+
+  return {
+    init, checkAlerts, getAlerts, getAlertsForContact,
+    dismissAlert, clearAll, requestPermission, showNotification,
+    getBlufIndicator, updateUI, ringBell, closePanel
+  };
+})();
+
+/* Start alert engine after RemielDB is ready */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => AlertEngine.init());
+} else {
+  setTimeout(() => AlertEngine.init(), 500);
+}
+
 </script>
 </body>
 </html>
