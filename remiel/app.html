@@ -438,10 +438,10 @@
   .bluf-card {
     --nous-font: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
     --nous-serif: 'Fraunces', Georgia, serif;
-    --nous-bg: #05070c;
-    --nous-panel: rgba(14,18,30,0.88);
-    --nous-panel2: rgba(22,30,46,0.85);
-    --nous-line: rgba(42,51,72,0.7);
+    --nous-bg: rgba(5,7,12,0.55);
+    --nous-panel: rgba(14,18,30,0.55);
+    --nous-panel2: rgba(22,30,46,0.45);
+    --nous-line: rgba(42,51,72,0.5);
     --nous-ink: #e8ecf4;
     --nous-dim: #8b94a8;
     --nous-accent: #ffd24d;
@@ -452,9 +452,9 @@
     max-width: 380px;
     display: flex;
     flex-direction: column;
-    background: var(--nous-panel);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    background: var(--nous-bg);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
     border: 1px solid var(--nous-line);
     border-left: 3px solid var(--nous-accent);
     border-radius: 14px;
@@ -558,20 +558,83 @@
     border: 1px solid;
   }
 
-  .bluf-section {
+  /* ── Unified pull (accordion) system — NOUS panel style ── */
+  .bluf-pull {
     border-top: 1px solid var(--nous-line);
-    margin-top: 16px;
-    padding-top: 14px;
+    margin-top: 0;
+    padding: 0;
   }
-
+  .bluf-pull:first-of-type {
+    margin-top: 14px;
+  }
+  .bluf-pull-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    padding: 10px 2px;
+    transition: background 0.15s;
+  }
+  .bluf-pull-header:active {
+    background: rgba(255,255,255,0.02);
+  }
   .bluf-section-label {
     font-family: var(--nous-font);
-    font-size: 11.5px;
-    font-weight: 400;
-    letter-spacing: 1px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.1px;
     text-transform: uppercase;
     color: var(--nous-dim);
-    margin-bottom: 9px;
+    margin-bottom: 0;
+    pointer-events: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .bluf-pull.open .bluf-section-label {
+    color: var(--nous-accent);
+  }
+  .bluf-pull-preview {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--nous-font);
+    font-size: 10.5px;
+    color: rgba(139,148,168,0.65);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    letter-spacing: 0.2px;
+  }
+  .bluf-pull.open .bluf-pull-preview {
+    opacity: 0;
+  }
+  .bluf-pull-chevron {
+    width: 14px;
+    height: 14px;
+    color: var(--nous-dim);
+    transition: transform 0.3s ease, color 0.2s;
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+  .bluf-pull.open .bluf-pull-chevron {
+    transform: rotate(180deg);
+    color: var(--nous-accent);
+    opacity: 1;
+  }
+  .bluf-pull-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.22,1,0.36,1);
+  }
+  .bluf-pull.open .bluf-pull-body {
+    max-height: 800px;
+  }
+  .bluf-pull-content {
+    padding: 0 0 10px 0;
   }
 
   /* ── BLUF list items — NOUS .item sub-card pattern ── */
@@ -598,44 +661,157 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ── Video Broadcast section ── */
-  .bluf-broadcast {
-    border-top: 1px solid var(--nous-line);
-    margin-top: 16px;
-    padding-top: 14px;
+  /* ── Location pull ── */
+  .bluf-location-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
-  .bluf-broadcast-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
+  .bluf-loc-card {
+    background: var(--nous-panel2);
+    border: 1px solid var(--nous-line);
+    border-radius: 10px;
+    padding: 10px 12px;
   }
-  .bluf-broadcast-header .bluf-section-label {
-    margin-bottom: 0;
-  }
-  .bluf-broadcast-toggle {
+  .bluf-loc-label {
     font-family: var(--nous-font);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--nous-dim);
+    margin-bottom: 4px;
+  }
+  .bluf-loc-value {
+    font-family: var(--nous-font);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--nous-ink);
+  }
+  .bluf-loc-full {
+    grid-column: 1 / -1;
+  }
+
+  /* ── Last Contact detail rows ── */
+  .bluf-lc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+  }
+  .bluf-lc-row + .bluf-lc-row {
+    border-top: 1px solid rgba(42,51,72,0.3);
+  }
+  .bluf-lc-key {
+    font-family: var(--nous-font);
+    font-size: 11px;
+    color: var(--nous-dim);
+    letter-spacing: 0.3px;
+  }
+  .bluf-lc-val {
+    font-family: var(--nous-font);
+    font-size: 13px;
+    color: var(--nous-ink);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Notes pull ── */
+  .bluf-notes-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+  }
+  .bluf-note-item {
+    background: var(--nous-panel2);
+    border: 1px solid var(--nous-line);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-family: var(--nous-font);
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--nous-ink);
+  }
+  .bluf-note-meta {
     font-size: 10px;
     color: var(--nous-dim);
+    margin-top: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .bluf-notes-compose {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .bluf-notes-input {
+    flex: 1;
+    background: var(--nous-panel2);
+    border: 1px solid var(--nous-line);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-family: var(--nous-font);
+    font-size: 13px;
+    color: var(--nous-ink);
+    resize: none;
+    min-height: 38px;
+    max-height: 80px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .bluf-notes-input:focus {
+    border-color: var(--nous-accent);
+  }
+  .bluf-notes-input::placeholder {
+    color: var(--nous-dim);
+  }
+  .bluf-notes-send {
     background: none;
     border: 1px solid var(--nous-line);
-    border-radius: 7px;
-    padding: 3px 9px;
+    border-radius: 9px;
+    color: var(--nous-accent);
+    padding: 8px 12px;
     cursor: pointer;
-    transition: border-color 0.2s, color 0.2s;
+    font-family: var(--nous-font);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    transition: background 0.2s, border-color 0.2s;
+    white-space: nowrap;
   }
-  .bluf-broadcast-toggle:hover {
+  .bluf-notes-send:active {
+    background: rgba(255,210,77,0.08);
+    border-color: var(--nous-accent);
+  }
+  .bluf-notes-assign {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .bluf-assign-chip {
+    font-family: var(--nous-font);
+    font-size: 10px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--nous-line);
+    color: var(--nous-dim);
+    background: none;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .bluf-assign-chip.selected {
     border-color: var(--nous-accent);
     color: var(--nous-accent);
+    background: rgba(255,210,77,0.08);
   }
-  .bluf-broadcast-body {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.35s cubic-bezier(0.22,1,0.36,1);
-  }
-  .bluf-broadcast-body.open {
-    max-height: 500px;
-  }
+
+  /* ── Broadcast inner (inside pull body) ── */
   .bluf-broadcast-inner {
     padding-top: 12px;
     display: flex;
@@ -957,61 +1133,151 @@
       <!-- Derivation badges -->
       <div class="bluf-badges" id="blufBadges"></div>
 
-      <!-- Video Broadcast -->
-      <div class="bluf-broadcast">
-        <div class="bluf-broadcast-header" onclick="toggleBroadcast()">
-          <div class="bluf-section-label">Broadcast</div>
-          <button class="bluf-broadcast-toggle" id="bcToggleBtn">Open</button>
+      <!-- ═══ 6 PULLS (accordion) ═══ -->
+
+      <!-- Pull 1: Location -->
+      <div class="bluf-pull" id="pull_location">
+        <div class="bluf-pull-header" onclick="togglePull('location')">
+          <div class="bluf-section-label">Location</div>
+          <span class="bluf-pull-preview" id="pullPrev_location">—</span>
+          <svg class="bluf-pull-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-        <div class="bluf-broadcast-body" id="bcBody">
-          <div class="bluf-broadcast-inner">
-            <div class="bluf-video-preview" id="bcPreview">
-              <video id="bcLiveVideo" autoplay muted playsinline></video>
-              <video id="bcPlayback" playsinline hidden></video>
-              <div class="bc-placeholder" id="bcPlaceholder">Camera off</div>
-            </div>
-            <div class="bluf-bc-controls">
-              <button class="bluf-bc-btn" id="bcRecordBtn" onclick="toggleBcRecord()">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
-                Record
-              </button>
-              <button class="bluf-bc-btn" id="bcUploadBtn" onclick="document.getElementById('bcFileInput').click()">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-                Upload
-              </button>
-              <input type="file" id="bcFileInput" accept="video/*" hidden onchange="handleBcUpload(event)">
-            </div>
-            <div class="bluf-bc-controls">
-              <button class="bluf-bc-btn" id="bcMuteBtn" onclick="toggleBcMute()">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
-                <span id="bcMuteLabel">Audio On</span>
-              </button>
-              <div class="bluf-audio-row">
-                <label>Vol</label>
-                <input type="range" id="bcVolume" min="0" max="100" value="80" oninput="setBcVolume(this.value)">
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content">
+            <div class="bluf-location-grid" id="blufLocation">
+              <div class="bluf-loc-card">
+                <div class="bluf-loc-label">Micro</div>
+                <div class="bluf-loc-value" id="blufLocMicro">—</div>
+              </div>
+              <div class="bluf-loc-card">
+                <div class="bluf-loc-label">Macro</div>
+                <div class="bluf-loc-value" id="blufLocMacro">—</div>
+              </div>
+              <div class="bluf-loc-card bluf-loc-full">
+                <div class="bluf-loc-label">Last Updated</div>
+                <div class="bluf-loc-value" id="blufLocTime">—</div>
               </div>
             </div>
-            <div class="bluf-bc-status" id="bcStatus"></div>
           </div>
         </div>
       </div>
 
-      <!-- Last Contact -->
-      <div class="bluf-section">
-        <div class="bluf-section-label">Last Contact</div>
-        <div class="bluf-contact-time" id="blufLastContact">—</div>
+      <!-- Pull 2: Broadcast -->
+      <div class="bluf-pull" id="pull_broadcast">
+        <div class="bluf-pull-header" onclick="togglePull('broadcast')">
+          <div class="bluf-section-label">Broadcast</div>
+          <span class="bluf-pull-preview">Record · Upload · Send to cluster</span>
+          <svg class="bluf-pull-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content">
+            <div class="bluf-broadcast-inner">
+              <div class="bluf-video-preview" id="bcPreview">
+                <video id="bcLiveVideo" autoplay muted playsinline></video>
+                <video id="bcPlayback" playsinline hidden></video>
+                <div class="bc-placeholder" id="bcPlaceholder">Camera off</div>
+              </div>
+              <div class="bluf-bc-controls">
+                <button class="bluf-bc-btn" id="bcRecordBtn" onclick="toggleBcRecord()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                  Record
+                </button>
+                <button class="bluf-bc-btn" id="bcUploadBtn" onclick="document.getElementById('bcFileInput').click()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+                  Upload
+                </button>
+                <input type="file" id="bcFileInput" accept="video/*" hidden onchange="handleBcUpload(event)">
+              </div>
+              <div class="bluf-bc-controls">
+                <button class="bluf-bc-btn" id="bcMuteBtn" onclick="toggleBcMute()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                  <span id="bcMuteLabel">Audio On</span>
+                </button>
+                <div class="bluf-audio-row">
+                  <label>Vol</label>
+                  <input type="range" id="bcVolume" min="0" max="100" value="80" oninput="setBcVolume(this.value)">
+                </div>
+              </div>
+              <div class="bluf-bc-status" id="bcStatus"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Open Issues -->
-      <div class="bluf-section">
-        <div class="bluf-section-label">Open Issues</div>
-        <div id="blufIssues"></div>
+      <!-- Pull 3: Last Contact -->
+      <div class="bluf-pull" id="pull_lastcontact">
+        <div class="bluf-pull-header" onclick="togglePull('lastcontact')">
+          <div class="bluf-section-label">Last Contact</div>
+          <span class="bluf-pull-preview" id="pullPrev_lastcontact">—</span>
+          <svg class="bluf-pull-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content" id="blufLastContactBody">
+            <div class="bluf-lc-row">
+              <span class="bluf-lc-key">Date</span>
+              <span class="bluf-lc-val" id="blufLcDate">—</span>
+            </div>
+            <div class="bluf-lc-row">
+              <span class="bluf-lc-key">Time</span>
+              <span class="bluf-lc-val" id="blufLcTime">—</span>
+            </div>
+            <div class="bluf-lc-row">
+              <span class="bluf-lc-key">Location</span>
+              <span class="bluf-lc-val" id="blufLcLocation">—</span>
+            </div>
+            <div class="bluf-lc-row">
+              <span class="bluf-lc-key">State of Health</span>
+              <span class="bluf-lc-val" id="blufLcHealth">—</span>
+            </div>
+            <div style="margin-top:8px;">
+              <div class="bluf-loc-label">Next Steps</div>
+              <div id="blufLcNextSteps" style="font-size:13px;color:var(--nous-ink);line-height:1.45;margin-top:4px;">—</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Next Course of Action -->
-      <div class="bluf-section">
-        <div class="bluf-section-label">Next Course of Action</div>
-        <div id="blufNextActions"></div>
+      <!-- Pull 4: Open Issues -->
+      <div class="bluf-pull" id="pull_issues">
+        <div class="bluf-pull-header" onclick="togglePull('issues')">
+          <div class="bluf-section-label">Open Issues</div>
+          <span class="bluf-pull-preview" id="pullPrev_issues">—</span>
+          <svg class="bluf-pull-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content" id="blufIssues"></div>
+        </div>
+      </div>
+
+      <!-- Pull 5: Next Action -->
+      <div class="bluf-pull" id="pull_nextaction">
+        <div class="bluf-pull-header" onclick="togglePull('nextaction')">
+          <div class="bluf-section-label">Next Action</div>
+          <span class="bluf-pull-preview" id="pullPrev_nextaction">—</span>
+          <svg class="bluf-pull-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content" id="blufNextActions"></div>
+        </div>
+      </div>
+
+      <!-- Pull 6: Notes -->
+      <div class="bluf-pull" id="pull_notes">
+        <div class="bluf-pull-header" onclick="togglePull('notes')">
+          <div class="bluf-section-label">Notes</div>
+          <span class="bluf-pull-preview" id="pullPrev_notes">No notes</span>
+          <svg class="bluf-pull-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content">
+            <div class="bluf-notes-assign" id="blufNoteAssign"></div>
+            <div class="bluf-notes-thread" id="blufNoteThread"></div>
+            <div class="bluf-notes-compose">
+              <textarea class="bluf-notes-input" id="blufNoteInput" placeholder="Type a note…" rows="1" onclick="event.stopPropagation()"></textarea>
+              <button class="bluf-notes-send" onclick="sendNote(); event.stopPropagation();">Send</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Signaling Actions -->
@@ -1389,7 +1655,8 @@ const BLUF_DATA = {
       { label: 'BIO SPIKE', color: '249,115,22' },
       { label: 'MULTI-CH', color: '234,179,8' }
     ],
-    lastContactDate: 'Sep 20, 2026 — 2:47 PM',
+    location: { micro: 'Moving — hallway to exit', macro: 'Chicago, IL — W. Loop', updated: 'Sep 20, 2026 — 2:44 PM' },
+    lastContact: { date: 'Sep 20, 2026', time: '2:47 PM', location: 'W. Loop, Chicago, IL', health: 'Elevated — distress markers', nextSteps: 'Awaiting confirmation of safety. Voice contact initiated.' },
     openIssues: [
       'Contact frequency 4× above baseline in last hour',
       'Geolocation departed from established pattern',
@@ -1397,8 +1664,7 @@ const BLUF_DATA = {
     ],
     nextActions: [
       'Initiate direct voice contact immediately',
-      'Confirm physical safety and location',
-      'Reassess severity after contact established'
+      'Confirm physical safety and location'
     ]
   },
   1: {
@@ -1409,14 +1675,14 @@ const BLUF_DATA = {
       { label: 'CADENCE', color: '249,115,22' },
       { label: 'ASYNC→RT', color: '234,179,8' }
     ],
-    lastContactDate: 'Sep 20, 2026 — 12:15 PM',
+    location: { micro: 'Office — desk area', macro: 'Austin, TX — Downtown', updated: 'Sep 20, 2026 — 12:10 PM' },
+    lastContact: { date: 'Sep 20, 2026', time: '12:15 PM', location: 'Downtown, Austin, TX', health: 'Nominal — elevated activity', nextSteps: 'Monitor for further escalation over next 24 hours.' },
     openIssues: [
       'Response latency dropped below 1 minute sustained',
       'Communication cadence shifted from async to real-time',
       'Pattern deviation sustained for 48+ hours'
     ],
     nextActions: [
-      'Monitor for further escalation over next 24 hours',
       'Schedule direct check-in within the day',
       'Review historical context for pattern triggers'
     ]
@@ -1429,7 +1695,8 @@ const BLUF_DATA = {
       { label: 'MISSED CI', color: '234,179,8' },
       { label: 'RATIO', color: '200,120,220' }
     ],
-    lastContactDate: 'Sep 19, 2026 — 9:30 AM',
+    location: { micro: 'Home — living area', macro: 'Denver, CO — Capitol Hill', updated: 'Sep 19, 2026 — 9:25 AM' },
+    lastContact: { date: 'Sep 19, 2026', time: '9:30 AM', location: 'Capitol Hill, Denver, CO', health: 'Nominal — no flags', nextSteps: 'Send low-pressure outreach within 48 hours.' },
     openIssues: [
       'Skipped last 2 scheduled check-in windows',
       'Communication initiative ratio shifted toward one-sided',
@@ -1437,8 +1704,7 @@ const BLUF_DATA = {
     ],
     nextActions: [
       'Send low-pressure outreach within 48 hours',
-      'Note any external context that may explain shift',
-      'Reassess if pattern continues beyond 5 days'
+      'Note any external context that may explain shift'
     ]
   },
   3: {
@@ -1449,7 +1715,8 @@ const BLUF_DATA = {
       { label: 'RECIPROCAL', color: '20,184,166' },
       { label: 'ON SCHED', color: '96,165,250' }
     ],
-    lastContactDate: 'Sep 17, 2026 — 6:45 PM',
+    location: { micro: 'Home — kitchen', macro: 'Seattle, WA — Ballard', updated: 'Sep 17, 2026 — 6:40 PM' },
+    lastContact: { date: 'Sep 17, 2026', time: '6:45 PM', location: 'Ballard, Seattle, WA', health: 'Nominal — stable', nextSteps: 'No action required. Maintain current rhythm.' },
     openIssues: [
       'No open issues at this time'
     ],
@@ -1466,12 +1733,13 @@ const BLUF_DATA = {
       { label: 'MUTUAL', color: '96,165,250' },
       { label: 'RESTFUL', color: '20,184,166' }
     ],
-    lastContactDate: 'Sep 15, 2026 — 3:12 PM',
+    location: { micro: 'Unknown — last ping expired', macro: 'Portland, OR — Pearl District', updated: 'Sep 15, 2026 — 3:08 PM' },
+    lastContact: { date: 'Sep 15, 2026', time: '3:12 PM', location: 'Pearl District, Portland, OR', health: 'Nominal — restful', nextSteps: 'No action required — continue passive monitoring.' },
     openIssues: [
       'No open issues at this time'
     ],
     nextActions: [
-      'No action required — continue passive monitoring',
+      'Continue passive monitoring',
       'Initiate contact at your discretion'
     ]
   }
@@ -1503,7 +1771,7 @@ function openBluf(sphereScreenY) {
   document.getElementById('blufVideoReveal').classList.remove('open');
   document.getElementById('blufCallBtn').classList.remove('active');
   document.getElementById('blufVideoBtn').classList.remove('active');
-  closeBroadcast();
+  closeAllPulls();
   updateBlufContent();
 
   const overlay = document.getElementById('blufOverlay');
@@ -1536,8 +1804,7 @@ function closeBluf() {
   if (appState === 'network') {
     setTimeout(() => { netSpin = true; }, 400);
   }
-  stopBcRecording();
-  stopBcStream();
+  closeAllPulls();
 }
 
 function handleBlufOverlayClick(e) {
@@ -1546,8 +1813,8 @@ function handleBlufOverlayClick(e) {
     return;
   }
   const tag = e.target.tagName.toLowerCase();
-  if (tag === 'button' || tag === 'a' || tag === 'input' || tag === 'video' ||
-      e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) {
+  if (tag === 'button' || tag === 'a' || tag === 'input' || tag === 'video' || tag === 'textarea' ||
+      e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('textarea') || e.target.closest('.bluf-pull-header')) {
     return;
   }
   const now = performance.now();
@@ -1590,17 +1857,62 @@ function updateBlufContent() {
     .map(b => `<span class="bluf-badge" style="border-color:rgb(${b.color});color:rgb(${b.color})">${b.label}</span>`)
     .join('');
 
-  document.getElementById('blufLastContact').textContent = d.lastContactDate;
+  /* ── Location pull ── */
+  const loc = d.location || {};
+  const locMicro = document.getElementById('blufLocMicro');
+  const locMacro = document.getElementById('blufLocMacro');
+  const locTime = document.getElementById('blufLocTime');
+  if (locMicro) locMicro.textContent = loc.micro || '—';
+  if (locMacro) locMacro.textContent = loc.macro || '—';
+  if (locTime) locTime.textContent = loc.updated || '—';
+  const locPrev = document.getElementById('pullPrev_location');
+  if (locPrev) locPrev.textContent = loc.macro || '—';
 
+  /* ── Last Contact pull ── */
+  const lc = d.lastContact || {};
+  const lcDate = document.getElementById('blufLcDate');
+  const lcTime = document.getElementById('blufLcTime');
+  const lcLoc = document.getElementById('blufLcLocation');
+  const lcHealth = document.getElementById('blufLcHealth');
+  const lcNext = document.getElementById('blufLcNextSteps');
+  if (lcDate) lcDate.textContent = lc.date || '—';
+  if (lcTime) lcTime.textContent = lc.time || '—';
+  if (lcLoc) lcLoc.textContent = lc.location || '—';
+  if (lcHealth) lcHealth.textContent = lc.health || '—';
+  if (lcNext) lcNext.textContent = lc.nextSteps || '—';
+  const lcPrev = document.getElementById('pullPrev_lastcontact');
+  if (lcPrev) lcPrev.textContent = lc.date ? (lc.date + ' — ' + lc.time) : '—';
+
+  /* ── Open Issues pull ── */
   const issuesEl = document.getElementById('blufIssues');
   issuesEl.innerHTML = d.openIssues
     .map(i => `<div class="bluf-list-item">${i}</div>`)
     .join('');
+  const issuesPrev = document.getElementById('pullPrev_issues');
+  if (issuesPrev) issuesPrev.textContent = d.openIssues.length + (d.openIssues.length === 1 ? ' issue' : ' issues');
 
+  /* ── Next Action pull ── */
   const actionsEl = document.getElementById('blufNextActions');
   actionsEl.innerHTML = d.nextActions
     .map(a => `<div class="bluf-list-item">${a}</div>`)
     .join('');
+  const actionPrev = document.getElementById('pullPrev_nextaction');
+  if (actionPrev) actionPrev.textContent = d.nextActions[0] ? d.nextActions[0].substring(0, 36) + (d.nextActions[0].length > 36 ? '…' : '') : '—';
+
+  /* ── Notes pull — assign chips ── */
+  const assignRow = document.getElementById('blufNoteAssign');
+  if (assignRow) {
+    const contacts = DEMO_CONTACTS.filter(c => !selectedContact || c.id !== selectedContact.id).slice(0, 6);
+    const selfLabel = viewName ? viewName.split(' ')[0] : 'Self';
+    assignRow.innerHTML = `<button class="bluf-assign-chip selected" onclick="toggleNoteAssign('all',this)">All</button>` +
+      `<button class="bluf-assign-chip" onclick="toggleNoteAssign('${selfLabel}',this)">${selfLabel}</button>` +
+      contacts.map(c => `<button class="bluf-assign-chip" onclick="toggleNoteAssign('${c.first}',this)">${c.first}</button>`).join('');
+  }
+  renderNotes();
+  const notesPrev = document.getElementById('pullPrev_notes');
+  const noteKey = selectedContact ? selectedContact.id : 'self';
+  const noteCount = (notesStore[noteKey] || []).length;
+  if (notesPrev) notesPrev.textContent = noteCount > 0 ? noteCount + (noteCount === 1 ? ' note' : ' notes') : 'No notes';
 
   // Phone — use contact phone if available
   const phone = selectedContact ? selectedContact.phone : '+15558675309';
@@ -1657,25 +1969,32 @@ let bcChunks = [];
 let bcRecording = false;
 let bcMuted = false;
 
-function toggleBroadcast() {
-  const body = document.getElementById('bcBody');
-  const btn = document.getElementById('bcToggleBtn');
-  const isOpen = body.classList.contains('open');
-  if (isOpen) {
-    closeBroadcast();
-  } else {
-    body.classList.add('open');
-    btn.textContent = 'Close';
-    startBcStream();
+/* ── Unified Pull Accordion ── */
+const PULL_IDS = ['location', 'broadcast', 'lastcontact', 'issues', 'nextaction', 'notes'];
+
+function togglePull(pullId) {
+  const el = document.getElementById('pull_' + pullId);
+  if (!el) return;
+  const wasOpen = el.classList.contains('open');
+  // Close all pulls first
+  closeAllPulls();
+  // If this one was closed, open it
+  if (!wasOpen) {
+    el.classList.add('open');
+    // Auto-start broadcast camera when opening broadcast pull
+    if (pullId === 'broadcast') startBcStream();
   }
 }
 
-function closeBroadcast() {
-  const body = document.getElementById('bcBody');
-  const btn = document.getElementById('bcToggleBtn');
-  if (!body || !btn) return;
-  body.classList.remove('open');
-  btn.textContent = 'Open';
+function closeAllPulls() {
+  PULL_IDS.forEach(id => {
+    const el = document.getElementById('pull_' + id);
+    if (el) el.classList.remove('open');
+  });
+  closeBroadcastStream();
+}
+
+function closeBroadcastStream() {
   stopBcRecording();
   stopBcStream();
   const playback = document.getElementById('bcPlayback');
@@ -1686,6 +2005,81 @@ function closeBroadcast() {
   if (placeholder) placeholder.hidden = false;
   const status = document.getElementById('bcStatus');
   if (status) status.textContent = '';
+}
+
+/* ── Notes System ── */
+const notesStore = {};
+let noteAssignees = new Set(['all']);
+
+function toggleNoteAssign(name, btn) {
+  if (!btn) return;
+  if (name === 'all') {
+    // Toggle "All" — if selecting All, deselect others
+    noteAssignees.clear();
+    noteAssignees.add('all');
+    const chips = btn.parentElement.querySelectorAll('.bluf-assign-chip');
+    chips.forEach(c => c.classList.remove('selected'));
+    btn.classList.add('selected');
+  } else {
+    // Deselect "All" chip, toggle this one
+    const allChip = btn.parentElement.querySelector('.bluf-assign-chip');
+    if (allChip) allChip.classList.remove('selected');
+    noteAssignees.delete('all');
+    if (noteAssignees.has(name)) {
+      noteAssignees.delete(name);
+      btn.classList.remove('selected');
+      // If none selected, default back to All
+      if (noteAssignees.size === 0) {
+        noteAssignees.add('all');
+        if (allChip) allChip.classList.add('selected');
+      }
+    } else {
+      noteAssignees.add(name);
+      btn.classList.add('selected');
+    }
+  }
+}
+
+function sendNote() {
+  const input = document.getElementById('blufNoteInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  const noteKey = selectedContact ? selectedContact.id : 'self';
+  if (!notesStore[noteKey]) notesStore[noteKey] = [];
+  notesStore[noteKey].push({
+    text: text,
+    to: Array.from(noteAssignees),
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  });
+  input.value = '';
+  renderNotes();
+  // Update preview
+  const notesPrev = document.getElementById('pullPrev_notes');
+  const count = notesStore[noteKey].length;
+  if (notesPrev) notesPrev.textContent = count + (count === 1 ? ' note' : ' notes');
+}
+
+function renderNotes() {
+  const thread = document.getElementById('blufNoteThread');
+  if (!thread) return;
+  const noteKey = selectedContact ? selectedContact.id : 'self';
+  const notes = notesStore[noteKey] || [];
+  if (notes.length === 0) {
+    thread.innerHTML = '<div style="font-size:11.5px;color:var(--nous-dim);padding:8px 0;">No notes yet</div>';
+    return;
+  }
+  thread.innerHTML = notes.map(n => {
+    const toLabel = n.to.includes('all') ? 'All' : n.to.join(', ');
+    return `<div class="bluf-note-item" style="margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span style="font-size:10px;color:var(--nous-accent);">→ ${toLabel}</span>
+        <span style="font-size:10px;color:var(--nous-dim);">${n.time}</span>
+      </div>
+      <div style="color:var(--nous-ink);line-height:1.45;">${n.text}</div>
+    </div>`;
+  }).join('');
+  thread.scrollTop = thread.scrollHeight;
 }
 
 async function startBcStream() {
