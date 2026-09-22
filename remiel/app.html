@@ -1996,15 +1996,23 @@
 <!-- ═══ Onboarding Wizard (first launch only) ═══ -->
 <div class="onboarding" id="onboarding" hidden>
 
-  <!-- Step 1: Welcome -->
+  <!-- Step 1: Your Name -->
   <div class="ob-step" id="obStep1">
-    <h1 class="ob-heading">Who matters most?</h1>
-    <p class="ob-subtitle">Remiel Sentinel keeps a gentle watch on the people you care about. Let's start with the ones closest to you.</p>
-    <button class="ob-btn ob-primary" onclick="obNext(2)">Let's Begin</button>
+    <h1 class="ob-heading">What should we call you?</h1>
+    <p class="ob-subtitle">This is the name that appears on your sphere.</p>
+    <input class="ob-input" id="obUserName" type="text" placeholder="Your first name" autocomplete="off" maxlength="30" style="text-align:center; font-size:16px; margin-bottom:24px;">
+    <button class="ob-btn ob-primary" id="obNameBtn" onclick="obNext(2)" disabled>Continue</button>
   </div>
 
-  <!-- Step 2: Add People -->
+  <!-- Step 2: Welcome -->
   <div class="ob-step" id="obStep2" hidden>
+    <h1 class="ob-heading">Who matters most?</h1>
+    <p class="ob-subtitle">Remiel Sentinel keeps a gentle watch on the people you care about. Let's start with the ones closest to you.</p>
+    <button class="ob-btn ob-primary" onclick="obNext(3)">Let's Begin</button>
+  </div>
+
+  <!-- Step 3: Add People -->
+  <div class="ob-step" id="obStep3" hidden>
     <h2 class="ob-heading-sm">Add Your People</h2>
     <p class="ob-hint">Add at least one person to continue.</p>
 
@@ -2032,12 +2040,12 @@
 
     <div class="ob-nav">
       <span class="ob-count" id="obCount">0 people added</span>
-      <button class="ob-btn ob-primary" id="obNextBtn" onclick="obNext(3)" disabled>Continue</button>
+      <button class="ob-btn ob-primary" id="obNextBtn" onclick="obNext(4)" disabled>Continue</button>
     </div>
   </div>
 
-  <!-- Step 3: Add to Home Screen -->
-  <div class="ob-step" id="obStep3" hidden>
+  <!-- Step 4: Add to Home Screen -->
+  <div class="ob-step" id="obStep4" hidden>
     <h2 class="ob-heading-sm">Add to Home Screen</h2>
 
     <div class="ob-warning">
@@ -2068,6 +2076,7 @@
     <span class="ob-dot-ind active" id="obDot1"></span>
     <span class="ob-dot-ind" id="obDot2"></span>
     <span class="ob-dot-ind" id="obDot3"></span>
+    <span class="ob-dot-ind" id="obDot4"></span>
   </div>
 
 </div>
@@ -2959,14 +2968,19 @@ function obNext(step) {
   document.getElementById('obStep1').hidden = (step !== 1);
   document.getElementById('obStep2').hidden = (step !== 2);
   document.getElementById('obStep3').hidden = (step !== 3);
+  document.getElementById('obStep4').hidden = (step !== 4);
 
   /* Update progress dots */
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= 4; i++) {
     document.getElementById('obDot' + i).classList.toggle('active', i === step);
   }
 
-  /* If arriving at step 2, focus the first-name input */
-  if (step === 2) {
+  /* If arriving at step 1 (name), focus the name input */
+  if (step === 1) {
+    setTimeout(() => document.getElementById('obUserName').focus(), 300);
+  }
+  /* If arriving at step 3 (add people), focus the first-name input */
+  if (step === 3) {
     setTimeout(() => document.getElementById('obFirst').focus(), 300);
   }
 }
@@ -3125,6 +3139,16 @@ async function obSkipA2hs() {
 }
 
 async function _obSaveAndLaunch() {
+  /* Seed the user's own name from onboarding Step 1 */
+  const obName = (document.getElementById('obUserName') || {}).value;
+  if (obName && obName.trim()) {
+    userSphereName = obName.trim();
+    sphereName = userSphereName;
+    await RemielDB.putSetting('userSphereName', userSphereName);
+    const nameInput = document.getElementById('nameInput');
+    if (nameInput) nameInput.value = userSphereName;
+  }
+
   /* Persist each person the user added as a contact */
   const catMap = { family: 'family', friend: 'friend', professional: 'professional', other: 'other' };
   for (let i = 0; i < _obPeople.length; i++) {
@@ -3153,8 +3177,21 @@ async function _obSaveAndLaunch() {
   await launchGalaxy(saved);
 }
 
-/* Allow Enter key in the add-person form */
+/* Allow Enter key in the add-person form + name input validation */
 document.addEventListener('DOMContentLoaded', () => {
+  /* Step 1: user name — enable Continue only when non-empty */
+  const obUserName = document.getElementById('obUserName');
+  const obNameBtn = document.getElementById('obNameBtn');
+  if (obUserName && obNameBtn) {
+    obUserName.addEventListener('input', () => {
+      obNameBtn.disabled = !obUserName.value.trim();
+    });
+    obUserName.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && obUserName.value.trim()) { e.preventDefault(); obNext(2); }
+    });
+  }
+
+  /* Step 3: add-person form */
   const obFirst = document.getElementById('obFirst');
   const obLast = document.getElementById('obLast');
   if (obFirst) {
