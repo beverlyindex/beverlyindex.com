@@ -1752,6 +1752,100 @@
     font-weight: 600;
     cursor: pointer;
   }
+
+  /* ═══ Mood Logger ═══ */
+  .mood-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 8px 0 4px;
+  }
+  .mood-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 4px 8px;
+    border: 1px solid rgba(155,106,232,0.12);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mood-btn:active { transform: scale(0.93); }
+  .mood-btn .mood-face {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+  .mood-btn .mood-label {
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    color: var(--text-muted, #6060a0);
+    text-transform: uppercase;
+  }
+  .mood-btn.mood-active {
+    border-color: rgba(155,106,232,0.5);
+    background: rgba(155,106,232,0.12);
+  }
+  .mood-btn.mood-active .mood-label {
+    color: #9B6AE8;
+  }
+  .mood-logged {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(74,232,196,0.08);
+    border: 1px solid rgba(74,232,196,0.2);
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    font-size: 13px;
+    color: #4AE8C4;
+    animation: moodConfirm 0.4s ease;
+  }
+  @keyframes moodConfirm {
+    0% { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  .mood-history {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(155,106,232,0.08);
+  }
+  .mood-history-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted, #6060a0);
+    margin-bottom: 8px;
+  }
+  .mood-history-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    font-size: 12px;
+    color: var(--text-secondary, #b0b0d0);
+  }
+  .mood-history-face {
+    font-size: 1rem;
+    width: 22px;
+    text-align: center;
+  }
+  .mood-history-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted, #6060a0);
+    margin-left: auto;
+    white-space: nowrap;
+  }
 </style>
 
 <!-- ═══ Gate Screen ═══ -->
@@ -1988,6 +2082,43 @@
       <div class="bluf-tags" id="blufTags"></div>
       <!-- Bev-tile data grid -->
       <div class="bev-strip" id="bevStrip"></div>
+
+      <!-- ═══ Mood Logger ═══ -->
+      <div class="bluf-pull" id="pull_mood">
+        <div class="bluf-pull-header" onclick="togglePull('mood')">
+          <div class="bluf-section-label">Mood</div>
+          <span class="bluf-pull-preview" id="pullPrev_mood">Log how they're doing</span>
+          <span class="bluf-pull-chevron">&#9660;</span>
+        </div>
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content">
+            <div class="mood-row" id="moodRow">
+              <button class="mood-btn" data-level="1" onclick="logMood(1, this)">
+                <span class="mood-face">😣</span>
+                <span class="mood-label">Struggling</span>
+              </button>
+              <button class="mood-btn" data-level="2" onclick="logMood(2, this)">
+                <span class="mood-face">😟</span>
+                <span class="mood-label">Low</span>
+              </button>
+              <button class="mood-btn" data-level="3" onclick="logMood(3, this)">
+                <span class="mood-face">😐</span>
+                <span class="mood-label">Okay</span>
+              </button>
+              <button class="mood-btn" data-level="4" onclick="logMood(4, this)">
+                <span class="mood-face">🙂</span>
+                <span class="mood-label">Good</span>
+              </button>
+              <button class="mood-btn" data-level="5" onclick="logMood(5, this)">
+                <span class="mood-face">😊</span>
+                <span class="mood-label">Thriving</span>
+              </button>
+            </div>
+            <div id="moodConfirm"></div>
+            <div class="mood-history" id="moodHistory"></div>
+          </div>
+        </div>
+      </div>
 
       <!-- ═══ 6 PULLS (accordion) ═══ -->
 
@@ -2907,6 +3038,127 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════
+   Mood Logger
+   ═══════════════════════════════════════════════════════════ */
+
+const MOOD_FACES = { 1: '😣', 2: '😟', 3: '😐', 4: '🙂', 5: '😊' };
+const MOOD_LABELS = { 1: 'Struggling', 2: 'Low', 3: 'Okay', 4: 'Good', 5: 'Thriving' };
+
+async function logMood(level, btnEl) {
+  const contactId = (typeof selectedContact !== 'undefined' && selectedContact)
+    ? selectedContact.id : 'self';
+
+  /* Highlight the tapped button */
+  document.querySelectorAll('#moodRow .mood-btn').forEach(b => b.classList.remove('mood-active'));
+  if (btnEl) btnEl.classList.add('mood-active');
+
+  /* Write to IndexedDB */
+  try {
+    await RemielDB.addMood({
+      contactId: contactId,
+      level: level,
+      ts: Date.now()
+    });
+  } catch(e) {
+    console.warn('Mood log failed:', e);
+  }
+
+  /* Show confirmation */
+  const confirm = document.getElementById('moodConfirm');
+  if (confirm) {
+    confirm.innerHTML =
+      '<div class="mood-logged">' +
+        '<span>' + MOOD_FACES[level] + '</span>' +
+        '<span>Logged: ' + MOOD_LABELS[level] + '</span>' +
+      '</div>';
+    setTimeout(() => { confirm.innerHTML = ''; }, 3000);
+  }
+
+  /* Update the pull preview text */
+  const prev = document.getElementById('pullPrev_mood');
+  if (prev) prev.textContent = MOOD_FACES[level] + ' ' + MOOD_LABELS[level];
+
+  /* Refresh the history below */
+  await renderMoodHistory(contactId);
+}
+
+async function renderMoodHistory(contactId) {
+  const box = document.getElementById('moodHistory');
+  if (!box) return;
+
+  let entries = [];
+  try {
+    entries = await RemielDB.getMoodsByContact(contactId);
+  } catch(e) {
+    box.innerHTML = '';
+    return;
+  }
+
+  /* Show last 7 entries, newest first */
+  const recent = entries.slice(-7).reverse();
+  if (recent.length === 0) {
+    box.innerHTML = '';
+    return;
+  }
+
+  box.innerHTML =
+    '<div class="mood-history-title">Recent</div>' +
+    recent.map(m => {
+      const face = MOOD_FACES[m.level] || '?';
+      const label = MOOD_LABELS[m.level] || '?';
+      const when = formatMoodTime(m.ts);
+      return '<div class="mood-history-row">' +
+        '<span class="mood-history-face">' + face + '</span>' +
+        '<span>' + label + '</span>' +
+        '<span class="mood-history-time">' + when + '</span>' +
+      '</div>';
+    }).join('');
+}
+
+function formatMoodTime(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = now - d;
+
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+
+  const days = Math.floor(diff / 86400000);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return days + 'd ago';
+
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/* Load mood state when BLUF opens (called from updateBlufContent) */
+async function loadMoodForBluf() {
+  const contactId = (typeof selectedContact !== 'undefined' && selectedContact)
+    ? selectedContact.id : 'self';
+
+  /* Update pull preview with most recent mood */
+  const prev = document.getElementById('pullPrev_mood');
+  try {
+    const entries = await RemielDB.getMoodsByContact(contactId);
+    if (entries.length > 0) {
+      const last = entries[entries.length - 1];
+      if (prev) prev.textContent = MOOD_FACES[last.level] + ' ' + MOOD_LABELS[last.level] + ' (' + formatMoodTime(last.ts) + ')';
+    } else {
+      if (prev) prev.textContent = selectedContact ? 'Log how they\'re doing' : 'Log how you\'re feeling';
+    }
+  } catch(e) {
+    if (prev) prev.textContent = 'Log mood';
+  }
+
+  /* Clear any active state from previous view */
+  document.querySelectorAll('#moodRow .mood-btn').forEach(b => b.classList.remove('mood-active'));
+  document.getElementById('moodConfirm').innerHTML = '';
+
+  /* Load history */
+  await renderMoodHistory(contactId);
+}
+
+/* ═══════════════════════════════════════════════════════════
    Core App
    ═══════════════════════════════════════════════════════════ */
 
@@ -3582,6 +3834,9 @@ function updateBlufContent() {
       <span class="bluf-cluster-label">${catLabel}</span>
     </div>`;
   }).join('');
+
+  /* ── Mood pull — load async (non-blocking) ── */
+  loadMoodForBluf().catch(() => {});
 }
 
 function handleCall() {
@@ -3620,7 +3875,7 @@ let bcRecording = false;
 let bcMuted = false;
 
 /* ── Unified Pull Accordion ── */
-const PULL_IDS = ['location', 'broadcast', 'lastcontact', 'issues', 'nextaction', 'notes'];
+const PULL_IDS = ['mood', 'location', 'broadcast', 'lastcontact', 'issues', 'nextaction', 'notes'];
 
 function togglePull(pullId) {
   const el = document.getElementById('pull_' + pullId);
