@@ -3272,6 +3272,94 @@
     position: fixed; top: -9999px; left: -9999px;
     width: 1px; height: 1px; overflow: hidden;
   }
+
+  /* ═══ Daily Summary Digest Card ═══ */
+  .daily-digest {
+    width: min(420px, 90vw); margin: 0 auto;
+    background: var(--nous-panel, rgba(16,18,28,0.55));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px; padding: 18px 20px;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    margin-top: -8px; margin-bottom: 16px;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  body.network-active .daily-digest { display: none; }
+  .daily-digest.hidden { opacity: 0; transform: translateY(-8px); pointer-events: none; display: none; }
+
+  .dd-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+  }
+  .dd-greeting {
+    font-family: 'Instrument Serif', serif; font-size: 20px;
+    color: var(--text); font-weight: 400;
+  }
+  .dd-date {
+    font-size: 11px; color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .dd-dismiss {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; padding: 4px; font-size: 16px; opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+  .dd-dismiss:hover { opacity: 1; }
+
+  /* Digest sections */
+  .dd-section { margin-bottom: 12px; }
+  .dd-section:last-child { margin-bottom: 0; }
+  .dd-section-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--rim-cyan, #38bdf8); margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  /* Alert items in digest */
+  .dd-alert-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; font-size: 12px; color: var(--text);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .dd-alert-item:last-child { border-bottom: none; }
+  .dd-alert-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dd-alert-dot.critical { background: #FF4444; }
+  .dd-alert-dot.elevated { background: #FF8C00; }
+  .dd-alert-dot.watch { background: #E8A44A; }
+  .dd-alert-dot.stable { background: #00E676; }
+
+  /* Streak counter */
+  .dd-streak {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; background: rgba(255,255,255,0.03);
+    border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  .dd-streak-flame { font-size: 20px; }
+  .dd-streak-info { flex: 1; }
+  .dd-streak-count {
+    font-size: 16px; font-weight: 700; color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .dd-streak-label { font-size: 11px; color: var(--text-dim); }
+
+  /* Medication schedule in digest */
+  .dd-med-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 0; font-size: 12px; color: var(--text);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .dd-med-item:last-child { border-bottom: none; }
+  .dd-med-name { font-weight: 500; }
+  .dd-med-time {
+    font-size: 11px; color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Empty digest */
+  .dd-empty {
+    text-align: center; padding: 12px 0; color: var(--text-dim); font-size: 13px;
+  }
 </style>
 
 <!-- ═══ Gate Screen ═══ -->
@@ -3602,6 +3690,41 @@
 
 <!-- Hidden file input for contact photo uploads -->
 <input type="file" id="contactPhotoInput" accept="image/*" hidden onchange="handleContactPhoto(event)">
+
+<!-- Daily Summary Digest — morning card, SELF mode only -->
+<div class="daily-digest hidden" id="dailyDigest" role="region" aria-label="Daily summary">
+  <div class="dd-header">
+    <div>
+      <div class="dd-greeting" id="ddGreeting" data-i18n="dd.greeting">Good morning</div>
+      <div class="dd-date" id="ddDate"></div>
+    </div>
+    <button class="dd-dismiss" id="ddDismiss" aria-label="Dismiss daily summary">&times;</button>
+  </div>
+
+  <!-- Alerts needing attention -->
+  <div class="dd-section" id="ddAlertSection">
+    <div class="dd-section-title" data-i18n="dd.needsAttention">NEEDS ATTENTION</div>
+    <div id="ddAlertList"></div>
+  </div>
+
+  <!-- Medication schedule -->
+  <div class="dd-section" id="ddMedSection">
+    <div class="dd-section-title" data-i18n="dd.upcomingMeds">TODAY'S MEDICATIONS</div>
+    <div id="ddMedList"></div>
+  </div>
+
+  <!-- Mood logging streak -->
+  <div class="dd-section" id="ddStreakSection">
+    <div class="dd-streak">
+      <span class="dd-streak-flame">&#128293;</span>
+      <span class="dd-streak-count" id="ddStreakCount">0</span>
+      <span class="dd-streak-label" data-i18n="dd.dayStreak">day streak</span>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="dd-empty hidden" id="ddEmpty" data-i18n="dd.empty">All clear — nothing needs your attention right now.</div>
+</div>
 
 <!-- BLUF Card — appears on tap, double-tap to close -->
 <div class="bluf-overlay" id="blufOverlay" onclick="handleBlufOverlayClick(event)" role="dialog" aria-modal="true" aria-label="Contact details">
@@ -4747,6 +4870,24 @@ const I18n = (function () {
       'med.nextDose':             'Next',
       'med.overdue':              'Overdue',
 
+      'dd.greeting':              'Good morning',
+      'dd.greetingAfternoon':     'Good afternoon',
+      'dd.greetingEvening':       'Good evening',
+      'dd.needsAttention':        'NEEDS ATTENTION',
+      'dd.upcomingMeds':          'TODAY\'S MEDICATIONS',
+      'dd.dayStreak':             'day streak',
+      'dd.dayStreakOne':          'day streak',
+      'dd.empty':                 'All clear — nothing needs your attention right now.',
+      'dd.noMeds':                'No medications scheduled today',
+      'dd.daysNoContact':         '{count} days without contact',
+      'dd.moodDecline':           'Mood declining',
+      'dd.nextDose':              'Next: {time}',
+      'dd.pillsLeft':             '{count} pills left',
+      'dd.dismissed':             'Daily summary dismissed',
+      'dd.sevCritical':           'Critical',
+      'dd.sevElevated':           'Elevated',
+      'dd.sevWatch':              'Watch',
+
       'settings.title':           'Settings',
       'settings.language':        'Language',
       'settings.yourData':        'Your Data',
@@ -4915,6 +5056,24 @@ const I18n = (function () {
       'med.freqAsNeeded':         'Al bisogno',
       'med.nextDose':             'Prossima',
       'med.overdue':              'In ritardo',
+
+      'dd.greeting':              'Buongiorno',
+      'dd.greetingAfternoon':     'Buon pomeriggio',
+      'dd.greetingEvening':       'Buonasera',
+      'dd.needsAttention':        'RICHIEDE ATTENZIONE',
+      'dd.upcomingMeds':          'FARMACI DI OGGI',
+      'dd.dayStreak':             'giorni consecutivi',
+      'dd.dayStreakOne':          'giorno consecutivo',
+      'dd.empty':                 'Tutto a posto — nulla richiede la tua attenzione.',
+      'dd.noMeds':                'Nessun farmaco programmato per oggi',
+      'dd.daysNoContact':         '{count} giorni senza contatto',
+      'dd.moodDecline':           'Umore in calo',
+      'dd.nextDose':              'Prossima: {time}',
+      'dd.pillsLeft':             '{count} pillole rimaste',
+      'dd.dismissed':             'Riepilogo giornaliero chiuso',
+      'dd.sevCritical':           'Critico',
+      'dd.sevElevated':           'Elevato',
+      'dd.sevWatch':              'Attenzione',
 
       'settings.title':           'Impostazioni',
       'settings.language':        'Lingua',
@@ -9516,6 +9675,270 @@ if (document.readyState === 'loading') {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   Daily Summary — morning digest card shown once per session
+   in SELF mode. Surfaces severity changes, upcoming meds,
+   contacts needing attention, and mood logging streaks.
+   ═══════════════════════════════════════════════════════════ */
+const DailySummary = (() => {
+  'use strict';
+
+  const SEV_CLASSES = ['critical', 'elevated', 'watch', 'stable', 'quiet'];
+  const SEV_KEYS   = ['dd.sevCritical', 'dd.sevElevated', 'dd.sevWatch', '', ''];
+  let dismissed = false;
+
+  /* ── Greeting based on time of day ── */
+  function getGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return I18n.t('dd.greeting');           // Good morning
+    if (h < 17) return I18n.t('dd.greetingAfternoon');  // Good afternoon
+    return I18n.t('dd.greetingEvening');                 // Good evening
+  }
+
+  /* ── Format today's date ── */
+  function formatDate() {
+    const d = new Date();
+    const opts = { weekday: 'long', month: 'long', day: 'numeric' };
+    try { return d.toLocaleDateString(I18n.lang === 'it' ? 'it-IT' : 'en-US', opts); }
+    catch(e) { return d.toDateString(); }
+  }
+
+  /* ── Calculate mood logging streak (consecutive days) ── */
+  async function calcStreak() {
+    let allMoods = [];
+    try { allMoods = await RemielDB.getMoodsByContact('self'); } catch(e) {}
+    if (allMoods.length === 0) return 0;
+
+    const DAY_MS = 86400000;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    // Build a set of day offsets that have a mood entry
+    const daySet = new Set();
+    allMoods.forEach(m => {
+      const dayOffset = Math.floor((todayStart - new Date(new Date(m.ts).getFullYear(), new Date(m.ts).getMonth(), new Date(m.ts).getDate()).getTime()) / DAY_MS);
+      daySet.add(dayOffset);
+    });
+
+    // Count consecutive days starting from today (0) or yesterday (1)
+    let streak = 0;
+    let start = daySet.has(0) ? 0 : 1; // allow starting from yesterday if not yet logged today
+    if (!daySet.has(0) && !daySet.has(1)) return 0;
+    for (let d = start; d < 365; d++) {
+      if (daySet.has(d)) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  /* ── Find contacts with severity <= 2 (CRITICAL, ELEVATED, WATCH) ── */
+  async function getAlertContacts() {
+    let contacts = [];
+    try { contacts = await RemielDB.getAllContacts(); } catch(e) {}
+    const results = [];
+
+    for (const c of contacts) {
+      try {
+        const sev = await computeSeverity(c.id);
+        if (sev.sevLevel <= 2) {
+          results.push({
+            name: c.first || c.last || c.id,
+            sevLevel: sev.sevLevel,
+            daysSinceContact: Math.round(sev.daysSinceContact),
+            moodTrend: sev.moodTrend
+          });
+        }
+      } catch(e) {}
+    }
+
+    // Sort by severity (lowest = most critical first)
+    results.sort((a, b) => a.sevLevel - b.sevLevel);
+    return results;
+  }
+
+  /* ── Get today's medication schedule ── */
+  async function getTodayMeds() {
+    let meds = [];
+    try { meds = await RemielDB.getAllMedications(); } catch(e) {}
+    return meds.filter(m => m.active !== false);
+  }
+
+  /* ── Render the alert contacts section ── */
+  function renderAlerts(alertContacts) {
+    const section = document.getElementById('ddAlertSection');
+    const list = document.getElementById('ddAlertList');
+    if (!section || !list) return;
+
+    if (alertContacts.length === 0) {
+      section.classList.add('hidden');
+      return;
+    }
+    section.classList.remove('hidden');
+    list.innerHTML = '';
+
+    alertContacts.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'dd-alert-item';
+
+      const dot = document.createElement('span');
+      dot.className = 'dd-alert-dot ' + SEV_CLASSES[c.sevLevel];
+
+      const name = document.createElement('span');
+      name.className = 'dd-alert-name';
+      name.textContent = c.name;
+
+      const detail = document.createElement('span');
+      detail.className = 'dd-alert-detail';
+      // Show severity label + reason
+      const sevLabel = SEV_KEYS[c.sevLevel] ? I18n.t(SEV_KEYS[c.sevLevel]) : '';
+      let reason = '';
+      if (c.daysSinceContact > 3 && c.daysSinceContact < 900) {
+        reason = I18n.t('dd.daysNoContact', { count: c.daysSinceContact });
+      } else if (c.moodTrend < -0.3) {
+        reason = I18n.t('dd.moodDecline');
+      }
+      detail.textContent = sevLabel + (reason ? ' · ' + reason : '');
+
+      item.appendChild(dot);
+      item.appendChild(name);
+      item.appendChild(detail);
+      list.appendChild(item);
+    });
+  }
+
+  /* ── Render medication schedule section ── */
+  function renderMeds(meds) {
+    const section = document.getElementById('ddMedSection');
+    const list = document.getElementById('ddMedList');
+    if (!section || !list) return;
+
+    if (meds.length === 0) {
+      section.classList.add('hidden');
+      return;
+    }
+    section.classList.remove('hidden');
+    list.innerHTML = '';
+
+    const FREQ_LABELS = {
+      daily: '1×', bid: '2×', tid: '3×', qid: '4×', weekly: 'wk', prn: 'prn'
+    };
+
+    meds.slice(0, 5).forEach(m => {
+      const item = document.createElement('div');
+      item.className = 'dd-med-item';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'dd-med-name';
+      nameSpan.textContent = m.name + (m.dose ? ' ' + m.dose : '');
+
+      const meta = document.createElement('span');
+      meta.className = 'dd-med-time';
+      const parts = [];
+      if (m.frequency && FREQ_LABELS[m.frequency]) parts.push(FREQ_LABELS[m.frequency]);
+      if (typeof m.pillsLeft === 'number' && m.pillsLeft <= 14) {
+        parts.push(I18n.t('dd.pillsLeft', { count: m.pillsLeft }));
+      }
+      meta.textContent = parts.join(' · ');
+
+      item.appendChild(nameSpan);
+      item.appendChild(meta);
+      list.appendChild(item);
+    });
+  }
+
+  /* ── Render streak counter ── */
+  function renderStreak(streak) {
+    const section = document.getElementById('ddStreakSection');
+    const count = document.getElementById('ddStreakCount');
+    if (!section || !count) return;
+
+    if (streak <= 0) {
+      section.classList.add('hidden');
+      return;
+    }
+    section.classList.remove('hidden');
+    count.textContent = streak;
+
+    // Update label for singular
+    const label = section.querySelector('.dd-streak-label');
+    if (label) {
+      label.textContent = streak === 1
+        ? I18n.t('dd.dayStreakOne')
+        : I18n.t('dd.dayStreak');
+    }
+  }
+
+  /* ── Show/hide the digest card ── */
+  function show() {
+    const el = document.getElementById('dailyDigest');
+    if (!el || dismissed) return;
+    el.classList.remove('hidden');
+    if (typeof A11y !== 'undefined') A11y.announce(getGreeting());
+  }
+
+  function hide() {
+    const el = document.getElementById('dailyDigest');
+    if (!el) return;
+    el.classList.add('hidden');
+    dismissed = true;
+    if (typeof A11y !== 'undefined') A11y.announce(I18n.t('dd.dismissed'));
+  }
+
+  /* ── Check if there's anything worth showing ── */
+  function hasContent(alertContacts, meds, streak) {
+    return alertContacts.length > 0 || meds.length > 0 || streak > 0;
+  }
+
+  /* ── Main build + display ── */
+  async function build() {
+    if (dismissed) return;
+
+    // Set greeting and date
+    const greetEl = document.getElementById('ddGreeting');
+    const dateEl = document.getElementById('ddDate');
+    if (greetEl) greetEl.textContent = getGreeting();
+    if (dateEl) dateEl.textContent = formatDate();
+
+    // Gather data
+    const [alertContacts, meds, streak] = await Promise.all([
+      getAlertContacts(),
+      getTodayMeds(),
+      calcStreak()
+    ]);
+
+    const emptyEl = document.getElementById('ddEmpty');
+
+    if (!hasContent(alertContacts, meds, streak)) {
+      // Show empty state
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      const ddAlertSection = document.getElementById('ddAlertSection');
+      const ddMedSection = document.getElementById('ddMedSection');
+      const ddStreakSection = document.getElementById('ddStreakSection');
+      if (ddAlertSection) ddAlertSection.classList.add('hidden');
+      if (ddMedSection) ddMedSection.classList.add('hidden');
+      if (ddStreakSection) ddStreakSection.classList.add('hidden');
+    } else {
+      if (emptyEl) emptyEl.classList.add('hidden');
+      renderAlerts(alertContacts);
+      renderMeds(meds);
+      renderStreak(streak);
+    }
+
+    show();
+  }
+
+  /* ── Init ── */
+  function init() {
+    const dismissBtn = document.getElementById('ddDismiss');
+    if (dismissBtn) dismissBtn.addEventListener('click', hide);
+
+    // Auto-build after a short delay to let DB initialize
+    setTimeout(() => build(), 1200);
+  }
+
+  return { init, build, hide };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    Medication Tracker — formulary, scheduling, taken/skip,
    refill tracking, wired into AlertEngine.
    ═══════════════════════════════════════════════════════════ */
@@ -10071,15 +10494,17 @@ const MedicationTracker = (() => {
   return { init, loadMeds, updatePreview };
 })();
 
-/* Start alert engine and medication tracker after RemielDB is ready */
+/* Start alert engine, daily summary, and medication tracker after RemielDB is ready */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     AlertEngine.init();
+    DailySummary.init();
     MedicationTracker.init();
   });
 } else {
   setTimeout(() => {
     AlertEngine.init();
+    DailySummary.init();
     MedicationTracker.init();
   }, 500);
 }
