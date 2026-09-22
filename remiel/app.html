@@ -1846,6 +1846,133 @@
     margin-left: auto;
     white-space: nowrap;
   }
+
+  /* ═══ Care Ledger ═══ */
+  .ledger-compose {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+  }
+  .ledger-input {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(155,106,232,0.12);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-family: 'Hanken Grotesk', sans-serif;
+    font-size: 13px;
+    color: #e0e0f0;
+    resize: none;
+    min-height: 38px;
+    max-height: 80px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .ledger-input:focus {
+    border-color: rgba(155,106,232,0.4);
+  }
+  .ledger-input::placeholder {
+    color: var(--text-muted, #6060a0);
+  }
+  .ledger-send {
+    background: none;
+    border: 1px solid rgba(155,106,232,0.12);
+    border-radius: 9px;
+    color: var(--accent-purple, #9B6AE8);
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: 'Hanken Grotesk', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    transition: background 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .ledger-send:active {
+    background: rgba(155,106,232,0.08);
+    border-color: rgba(155,106,232,0.3);
+  }
+  .ledger-mic {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid rgba(155,106,232,0.12);
+    background: rgba(255,255,255,0.02);
+    color: var(--text-muted, #6060a0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    flex-shrink: 0;
+  }
+  .ledger-mic:active {
+    transform: scale(0.93);
+  }
+  .ledger-mic.recording {
+    border-color: #FF4444;
+    background: rgba(255,68,68,0.12);
+    color: #FF4444;
+    animation: micPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes micPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(255,68,68,0); }
+  }
+  .ledger-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+  }
+  .ledger-entry {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(155,106,232,0.08);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-family: 'Hanken Grotesk', sans-serif;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: #e0e0f0;
+  }
+  .ledger-entry-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .ledger-entry-type {
+    font-size: 11px;
+    opacity: 0.7;
+  }
+  .ledger-entry-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted, #6060a0);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .ledger-entry-text {
+    color: var(--text-secondary, #b0b0d0);
+    word-break: break-word;
+  }
+  .ledger-voice-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: #FF4444;
+    text-align: center;
+    padding: 4px 0;
+    animation: moodConfirm 0.3s ease;
+  }
+  .ledger-empty {
+    font-size: 11.5px;
+    color: var(--text-muted, #6060a0);
+    padding: 8px 0;
+  }
 </style>
 
 <!-- ═══ Gate Screen ═══ -->
@@ -2120,7 +2247,29 @@
         </div>
       </div>
 
-      <!-- ═══ 6 PULLS (accordion) ═══ -->
+      <!-- ═══ Care Ledger ═══ -->
+      <div class="bluf-pull" id="pull_ledger">
+        <div class="bluf-pull-header" onclick="togglePull('ledger')">
+          <div class="bluf-section-label">Ledger</div>
+          <span class="bluf-pull-preview" id="pullPrev_ledger">Record an interaction</span>
+          <span class="bluf-pull-chevron">&#9660;</span>
+        </div>
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content">
+            <div class="ledger-thread" id="ledgerThread"></div>
+            <div id="ledgerVoiceStatus"></div>
+            <div class="ledger-compose">
+              <textarea class="ledger-input" id="ledgerInput" placeholder="What happened?" rows="1" onclick="event.stopPropagation()"></textarea>
+              <button class="ledger-mic" id="ledgerMicBtn" onclick="toggleVoiceDictation(); event.stopPropagation();" title="Voice dictation">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </button>
+              <button class="ledger-send" onclick="sendLedgerEntry(); event.stopPropagation();">Log</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 5 PULLS (accordion) ═══ -->
 
       <!-- Pull 1: Location -->
       <div class="bluf-pull" id="pull_location">
@@ -2252,24 +2401,7 @@
         </div>
       </div>
 
-      <!-- Pull 6: Notes -->
-      <div class="bluf-pull" id="pull_notes">
-        <div class="bluf-pull-header" onclick="togglePull('notes')">
-          <div class="bluf-section-label">Notes</div>
-          <span class="bluf-pull-preview" id="pullPrev_notes">No notes</span>
-          <span class="bluf-pull-chevron">&#9660;</span>
-        </div>
-        <div class="bluf-pull-body">
-          <div class="bluf-pull-content">
-            <div class="bluf-notes-assign" id="blufNoteAssign"></div>
-            <div class="bluf-notes-thread" id="blufNoteThread"></div>
-            <div class="bluf-notes-compose">
-              <textarea class="bluf-notes-input" id="blufNoteInput" placeholder="Type a note…" rows="1" onclick="event.stopPropagation()"></textarea>
-              <button class="bluf-notes-send" onclick="sendNote(); event.stopPropagation();">Send</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- (Notes pull replaced by Care Ledger above) -->
 
       <!-- Signaling Actions -->
       <div class="bluf-actions">
@@ -3801,20 +3933,8 @@ function updateBlufContent() {
   const actionPrev = document.getElementById('pullPrev_nextaction');
   if (actionPrev) actionPrev.textContent = d.nextActions[0] ? d.nextActions[0].substring(0, 36) + (d.nextActions[0].length > 36 ? '…' : '') : '—';
 
-  /* ── Notes pull — assign chips ── */
-  const assignRow = document.getElementById('blufNoteAssign');
-  if (assignRow) {
-    const contacts = DEMO_CONTACTS.filter(c => !selectedContact || c.id !== selectedContact.id).slice(0, 6);
-    const selfLabel = viewName ? viewName.split(' ')[0] : 'Self';
-    assignRow.innerHTML = `<button class="bluf-assign-chip selected" onclick="toggleNoteAssign('all',this)">All</button>` +
-      `<button class="bluf-assign-chip" onclick="toggleNoteAssign('${selfLabel}',this)">${selfLabel}</button>` +
-      contacts.map(c => `<button class="bluf-assign-chip" onclick="toggleNoteAssign('${c.first}',this)">${c.first}</button>`).join('');
-  }
-  renderNotes();
-  const notesPrev = document.getElementById('pullPrev_notes');
-  const noteKey = selectedContact ? selectedContact.id : 'self';
-  const noteCount = (notesStore[noteKey] || []).length;
-  if (notesPrev) notesPrev.textContent = noteCount > 0 ? noteCount + (noteCount === 1 ? ' note' : ' notes') : 'No notes';
+  /* ── Care Ledger pull — load async (non-blocking) ── */
+  loadLedgerForBluf().catch(() => {});
 
   // Phone — use contact phone if available
   const phone = selectedContact ? selectedContact.phone : '+15558675309';
@@ -3875,7 +3995,7 @@ let bcRecording = false;
 let bcMuted = false;
 
 /* ── Unified Pull Accordion ── */
-const PULL_IDS = ['mood', 'location', 'broadcast', 'lastcontact', 'issues', 'nextaction', 'notes'];
+const PULL_IDS = ['mood', 'ledger', 'location', 'broadcast', 'lastcontact', 'issues', 'nextaction'];
 
 function togglePull(pullId) {
   const el = document.getElementById('pull_' + pullId);
@@ -3931,79 +4051,200 @@ function closeBroadcastStream() {
   if (camLabel) camLabel.textContent = 'Camera On';
 }
 
-/* ── Notes System ── */
-const notesStore = {};
-let noteAssignees = new Set(['all']);
+/* ═══════════════════════════════════════════════════════════
+   Care Ledger — persistent interaction log with voice dictation
+   Stores to IndexedDB via RemielDB.addInteraction()
+   ═══════════════════════════════════════════════════════════ */
 
-function toggleNoteAssign(name, btn) {
-  if (!btn) return;
-  if (name === 'all') {
-    // Toggle "All" — if selecting All, deselect others
-    noteAssignees.clear();
-    noteAssignees.add('all');
-    const chips = btn.parentElement.querySelectorAll('.bluf-assign-chip');
-    chips.forEach(c => c.classList.remove('selected'));
-    btn.classList.add('selected');
-  } else {
-    // Deselect "All" chip, toggle this one
-    const allChip = btn.parentElement.querySelector('.bluf-assign-chip');
-    if (allChip) allChip.classList.remove('selected');
-    noteAssignees.delete('all');
-    if (noteAssignees.has(name)) {
-      noteAssignees.delete(name);
-      btn.classList.remove('selected');
-      // If none selected, default back to All
-      if (noteAssignees.size === 0) {
-        noteAssignees.add('all');
-        if (allChip) allChip.classList.add('selected');
-      }
-    } else {
-      noteAssignees.add(name);
-      btn.classList.add('selected');
-    }
-  }
-}
+let _voiceRecognition = null;
+let _voiceActive = false;
 
-function sendNote() {
-  const input = document.getElementById('blufNoteInput');
+async function sendLedgerEntry(type) {
+  const input = document.getElementById('ledgerInput');
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-  const noteKey = selectedContact ? selectedContact.id : 'self';
-  if (!notesStore[noteKey]) notesStore[noteKey] = [];
-  notesStore[noteKey].push({
+
+  const contactId = (typeof selectedContact !== 'undefined' && selectedContact)
+    ? selectedContact.id : 'self';
+
+  const entry = {
+    contactId: contactId,
+    type: type || 'note',
     text: text,
-    to: Array.from(noteAssignees),
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  });
+    timestamp: Date.now()
+  };
+
+  try {
+    await RemielDB.addInteraction(entry);
+  } catch (e) {
+    console.warn('[Ledger] IndexedDB write failed:', e);
+  }
+
   input.value = '';
-  renderNotes();
-  // Update preview
-  const notesPrev = document.getElementById('pullPrev_notes');
-  const count = notesStore[noteKey].length;
-  if (notesPrev) notesPrev.textContent = count + (count === 1 ? ' note' : ' notes');
+
+  /* Update preview */
+  const prev = document.getElementById('pullPrev_ledger');
+  if (prev) {
+    const snippet = text.length > 32 ? text.substring(0, 32) + '…' : text;
+    prev.textContent = snippet;
+  }
+
+  /* Re-render thread */
+  await renderLedger(contactId);
 }
 
-function renderNotes() {
-  const thread = document.getElementById('blufNoteThread');
+async function renderLedger(contactId) {
+  const thread = document.getElementById('ledgerThread');
   if (!thread) return;
-  const noteKey = selectedContact ? selectedContact.id : 'self';
-  const notes = notesStore[noteKey] || [];
-  if (notes.length === 0) {
-    thread.innerHTML = '<div style="font-size:11.5px;color:var(--nous-dim);padding:8px 0;">No notes yet</div>';
+
+  const cid = contactId || ((typeof selectedContact !== 'undefined' && selectedContact)
+    ? selectedContact.id : 'self');
+
+  let entries = [];
+  try {
+    entries = await RemielDB.getInteractionsByContact(cid);
+  } catch (e) {
+    console.warn('[Ledger] IndexedDB read failed:', e);
+  }
+
+  if (entries.length === 0) {
+    thread.innerHTML = '<div class="ledger-empty">No entries yet</div>';
     return;
   }
-  thread.innerHTML = notes.map(n => {
-    const toLabel = n.to.includes('all') ? 'All' : n.to.join(', ');
-    return `<div class="bluf-note-item" style="margin-bottom:6px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-        <span style="font-size:10px;color:var(--nous-accent);">→ ${toLabel}</span>
-        <span style="font-size:10px;color:var(--nous-dim);">${n.time}</span>
+
+  /* Sort newest first, limit to 20 */
+  entries.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  const display = entries.slice(0, 20);
+
+  thread.innerHTML = display.map(e => {
+    const icon = e.type === 'voice' ? '🎙️' : '📝';
+    const label = e.type === 'voice' ? 'Voice' : 'Note';
+    const time = formatMoodTime(e.timestamp);
+    const safeText = (e.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<div class="ledger-entry">
+      <div class="ledger-entry-header">
+        <span class="ledger-entry-type" title="${label}">${icon}</span>
+        <span class="ledger-entry-time">${time}</span>
       </div>
-      <div style="color:var(--nous-ink);line-height:1.45;">${n.text}</div>
+      <div class="ledger-entry-text">${safeText}</div>
     </div>`;
   }).join('');
-  thread.scrollTop = thread.scrollHeight;
+}
+
+function toggleVoiceDictation() {
+  if (_voiceActive) {
+    stopVoiceDictation();
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    const status = document.getElementById('ledgerVoiceStatus');
+    if (status) {
+      status.innerHTML = '<div class="ledger-voice-status">Voice not supported in this browser</div>';
+      setTimeout(() => { status.innerHTML = ''; }, 3000);
+    }
+    return;
+  }
+
+  _voiceRecognition = new SpeechRecognition();
+  _voiceRecognition.continuous = false;
+  _voiceRecognition.interimResults = true;
+  _voiceRecognition.lang = 'en-US';
+
+  const micBtn = document.getElementById('ledgerMicBtn');
+  const input = document.getElementById('ledgerInput');
+  const status = document.getElementById('ledgerVoiceStatus');
+
+  _voiceRecognition.onstart = () => {
+    _voiceActive = true;
+    if (micBtn) micBtn.classList.add('recording');
+    if (status) status.innerHTML = '<div class="ledger-voice-status">Listening…</div>';
+  };
+
+  _voiceRecognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = 0; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    if (input) input.value = transcript;
+  };
+
+  _voiceRecognition.onend = () => {
+    _voiceActive = false;
+    if (micBtn) micBtn.classList.remove('recording');
+    if (status) status.innerHTML = '';
+
+    /* Auto-submit if we got text */
+    if (input && input.value.trim()) {
+      sendLedgerEntry('voice');
+    }
+  };
+
+  _voiceRecognition.onerror = (event) => {
+    _voiceActive = false;
+    if (micBtn) micBtn.classList.remove('recording');
+    const msg = event.error === 'not-allowed' ? 'Microphone access denied'
+      : event.error === 'no-speech' ? 'No speech detected'
+      : 'Voice error: ' + event.error;
+    if (status) {
+      status.innerHTML = `<div class="ledger-voice-status">${msg}</div>`;
+      setTimeout(() => { status.innerHTML = ''; }, 3000);
+    }
+  };
+
+  try {
+    _voiceRecognition.start();
+  } catch (e) {
+    console.warn('[Ledger] SpeechRecognition start failed:', e);
+  }
+}
+
+function stopVoiceDictation() {
+  if (_voiceRecognition) {
+    try { _voiceRecognition.stop(); } catch (e) { /* ignore */ }
+  }
+  _voiceActive = false;
+  const micBtn = document.getElementById('ledgerMicBtn');
+  if (micBtn) micBtn.classList.remove('recording');
+  const status = document.getElementById('ledgerVoiceStatus');
+  if (status) status.innerHTML = '';
+}
+
+async function loadLedgerForBluf() {
+  const contactId = (typeof selectedContact !== 'undefined' && selectedContact)
+    ? selectedContact.id : 'self';
+
+  /* Stop any active dictation when switching contacts */
+  if (_voiceActive) stopVoiceDictation();
+
+  /* Clear input */
+  const input = document.getElementById('ledgerInput');
+  if (input) input.value = '';
+
+  /* Load entries and update preview */
+  let entries = [];
+  try {
+    entries = await RemielDB.getInteractionsByContact(contactId);
+  } catch (e) { /* silent */ }
+
+  const prev = document.getElementById('pullPrev_ledger');
+  if (prev) {
+    if (entries.length > 0) {
+      entries.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      const latest = entries[0];
+      const snippet = (latest.text || '').length > 32
+        ? (latest.text || '').substring(0, 32) + '…'
+        : (latest.text || '');
+      prev.textContent = snippet || (entries.length + ' entries');
+    } else {
+      prev.textContent = 'Record an interaction';
+    }
+  }
+
+  /* Render timeline */
+  await renderLedger(contactId);
 }
 
 function toggleBcCamera() {
