@@ -5208,6 +5208,7 @@ async function launchGalaxy(savedContacts) {
 
     /* Restore contact photos from blob storage */
     const photos = await RemielDB.getAllPhotos();
+    console.log('RemielDB: loaded', photos.length, 'photo(s) from storage');
     for (const p of photos) {
       if (p.blob instanceof Blob) {
         const url = URL.createObjectURL(p.blob);
@@ -6559,7 +6560,20 @@ async function _obSaveAndLaunch() {
       email: ''
     });
     if (p.photoBlob) {
-      try { await RemielDB.putPhoto(cid, p.photoBlob); } catch (err) { console.warn('obContactPhoto save error', err); }
+      try {
+        await RemielDB.putPhoto(cid, p.photoBlob);
+        /* Also load into contactPhotos Map immediately */
+        const _obUrl = URL.createObjectURL(p.photoBlob);
+        const _obImg = new Image();
+        await new Promise((_res) => {
+          _obImg.onload = _res;
+          _obImg.onerror = () => { console.warn('obPhoto: failed to load for', cid); _res(); };
+          _obImg.src = _obUrl;
+        });
+        if (_obImg.naturalWidth > 0) {
+          contactPhotos.set(cid, { img: _obImg, w: _obImg.naturalWidth, h: _obImg.naturalHeight });
+        }
+      } catch (err) { console.warn('obContactPhoto save error', err); }
     }
   }
 
@@ -9643,7 +9657,7 @@ function onPressMove(e) {
 
   if (appState === 'network') {
     // Drag to rotate galaxy
-    if (Math.sqrt(dx*dx + dy*dy) > 5) {
+    if (Math.sqrt(dx*dx + dy*dy) > 12) {
       netDragging = true;
       netSpin = false; // stop auto-spin while dragging
       netYaw += dx * 0.004;
@@ -9671,12 +9685,14 @@ function onPressMove(e) {
 
 function onPressEnd(e) {
   if (appState === 'network') {
-    if (pressStarted && !netDragging) {
-      // Tap in network mode — single/double tap detection
-      const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-      const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const _totalDx = clientX - (pressStartX || clientX);
+    const _totalDy = clientY - (pressStartY || clientY);
+    const _totalDist = Math.sqrt(_totalDx*_totalDx + _totalDy*_totalDy);
 
-      /* ── Quick-action icon tap detection on focused sphere ── */
+    /* ── Quick-action icon tap — check FIRST, even if slight drag ── */
+    if (pressStarted && focusedContactId && _totalDist < 30) {
       if (focusedContactId) {
         const _qaNode = NODES.find(n => n.contact.id === focusedContactId);
         if (_qaNode) {
@@ -9720,7 +9736,10 @@ function onPressEnd(e) {
           }
         }
       }
+    } /* end quick-action check */
 
+    /* ── Regular tap detection (only if not dragging) ── */
+    if (pressStarted && !netDragging) {
       const hit = hitTestNetwork(clientX, clientY);
       if (hit) {
         const rect = CV.getBoundingClientRect();
@@ -9729,7 +9748,7 @@ function onPressEnd(e) {
         if (hit.isCenter) {
           const W = CV.width / DPR;
           const selfStW = Math.min(400, W * 0.88);
-          const cFactor = W < 500 ? 0.17 : 0.24;
+          const cFactor = W < 500 ? 0.22 : 0.26;
           const cR = Math.max(38, Math.round(selfStW * cFactor));
           sphereBottomY = rect.top + (CV.height / DPR / 2) + cR;
         } else {
