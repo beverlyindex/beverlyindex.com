@@ -1229,6 +1229,28 @@
     opacity: 0;
     pointer-events: none;
   }
+  /* ── Beverly Index splash (post-gate, pre-video) ── */
+  .bi-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 9500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #060a14;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.8s ease;
+  }
+  .bi-splash.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .bi-splash img {
+    width: min(640px, 88vw);
+    height: auto;
+    filter: drop-shadow(0 0 60px rgba(40,100,200,0.15));
+  }
   .gate-logo {
     width: min(220px, 50vw);
     height: auto;
@@ -3878,6 +3900,11 @@
   </div>
 </div>
 
+<!-- ═══ Beverly Index Splash ═══ -->
+<div class="bi-splash" id="biSplash" aria-label="Beverly Index">
+  <img src="beverly-index-logo.png" alt="Beverly Index" draggable="false">
+</div>
+
 <!-- ═══ Video Intro ═══ -->
 <div class="video-intro" id="videoIntro">
   <video id="introVideo" playsinline muted></video>
@@ -4783,30 +4810,33 @@ function beginVideoIntro() {
   const gateEl = document.getElementById('gateScreen');
   const introEl = document.getElementById('videoIntro');
   const videoEl = document.getElementById('introVideo');
+  const biSplash = document.getElementById('biSplash');
 
-  /* Phase 1: Hold the logo splash for 3 seconds so users see the brand */
-  /* Hide the input/form elements but keep logo and title visible */
-  const gateInput = gateEl.querySelector('.gate-input-wrap');
-  const gateLang = gateEl.querySelector('.gate-lang-switcher');
-  if (gateInput) gateInput.style.cssText = 'opacity:0;pointer-events:none;transition:opacity 0.5s;';
-  if (gateLang) gateLang.style.cssText = 'opacity:0;pointer-events:none;transition:opacity 0.5s;';
+  /* Phase 1: Fade out gate screen immediately */
+  gateEl.classList.add('hidden');
 
-  /* After 3 seconds, fade out gate and start video */
+  /* Phase 2: Beverly Index company splash — full screen, 4 second hold */
+  biSplash.classList.add('active');
+
   setTimeout(() => {
-    gateEl.classList.add('hidden');
+    /* Phase 3: Fade out BI splash, start video intro */
+    biSplash.classList.remove('active');
 
-    const vidSrc = pickNextVideo();
-    videoEl.src = vidSrc;
-    videoEl.muted = true;
-    videoEl.currentTime = 0;
+    setTimeout(() => {
+      /* After fade-out transition completes, start video */
+      const vidSrc = pickNextVideo();
+      videoEl.src = vidSrc;
+      videoEl.muted = true;
+      videoEl.currentTime = 0;
 
-    introEl.classList.add('active');
-    videoEl.play().catch(() => {
-      revealApp();
-    });
+      introEl.classList.add('active');
+      videoEl.play().catch(() => {
+        revealApp();
+      });
 
-    videoEl.addEventListener('ended', () => revealApp(), { once: true });
-  }, 3000);
+      videoEl.addEventListener('ended', () => revealApp(), { once: true });
+    }, 800); /* match the 0.8s CSS fade-out */
+  }, 4000);
 }
 
 function skipIntro() {
