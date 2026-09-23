@@ -4358,6 +4358,26 @@ async function launchGalaxy(savedContacts) {
       }
     }
 
+    /* Restore broadcast videos on startup — show in sphere until replaced */
+    try {
+      const allContacts = DEMO_CONTACTS.slice();
+      /* Include self */
+      allContacts.push({ id: 'self' });
+      for (const c of allContacts) {
+        const cid = c.id;
+        /* Skip if a static photo is already loaded for this contact */
+        if (cid === 'self') {
+          if (media && mediaType) continue;
+        } else {
+          if (contactPhotos.has(cid)) continue;
+        }
+        const latest = await RemielDB.getLatestBroadcast(cid);
+        if (latest && latest.blob) {
+          loadBroadcastIntoSphere(cid, latest.blob);
+        }
+      }
+    } catch(e) { /* broadcasts store may not exist yet */ }
+
     /* Restore user settings */
     const savedCat = await RemielDB.getSetting('userCat');
     if (savedCat) { userCat = savedCat; curCat = savedCat; }
