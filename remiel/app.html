@@ -4429,9 +4429,18 @@ document.getElementById('gateInput').addEventListener('keydown', (e) => {
 document.getElementById('exitBtn').style.display = 'none';
 document.getElementById('stage').style.display = 'none';
 
-/* Early i18n: try loading saved locale for the gate screen before RemielDB is formally opened */
+/* Early i18n: try loading saved locale for the gate screen before RemielDB is formally opened.
+   IMPORTANT: must NOT call indexedDB.open() without a version number — a versionless open
+   on a fresh browser creates the DB at v1 with zero stores, preventing onupgradeneeded
+   from ever firing in RemielDB.open(). Use indexedDB.databases() to check existence first. */
 (async function earlyI18n() {
   try {
+    if (typeof indexedDB.databases === 'function') {
+      const dbs = await indexedDB.databases();
+      if (!dbs.some(function(d) { return d.name === 'remiel-sentinel'; })) return;
+    } else {
+      return;
+    }
     const req = indexedDB.open('remiel-sentinel');
     req.onsuccess = function () {
       const db = req.result;
@@ -4446,6 +4455,7 @@ document.getElementById('stage').style.display = 'none';
       };
       get.onerror = function () { db.close(); };
     };
+    req.onerror = function () { /* silent */ };
   } catch (e) { /* silent — gate stays English by default */ }
 })();
 
@@ -4457,7 +4467,7 @@ document.getElementById('stage').style.display = 'none';
 
 const RemielDB = (() => {
   const DB_NAME = 'remiel-sentinel';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   let _db = null;
 
   function open() {
