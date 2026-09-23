@@ -4818,24 +4818,51 @@ function beginVideoIntro() {
   /* Phase 2: Beverly Index company splash — full screen, 4 second hold */
   biSplash.classList.add('active');
 
-  setTimeout(() => {
-    /* Phase 3: Fade out BI splash, start video intro */
-    biSplash.classList.remove('active');
+  /* Preload the video WHILE the splash is showing so it is ready to play */
+  const vidSrc = pickNextVideo();
+  videoEl.src = vidSrc;
+  videoEl.muted = true;
+  videoEl.currentTime = 0;
+  videoEl.load();
 
-    setTimeout(() => {
-      /* After fade-out transition completes, start video */
-      const vidSrc = pickNextVideo();
-      videoEl.src = vidSrc;
-      videoEl.muted = true;
-      videoEl.currentTime = 0;
+  var _videoReady = false;
+  var _splashDone = false;
 
-      introEl.classList.add('active');
-      videoEl.play().catch(() => {
-        revealApp();
+  function _tryCrossfade() {
+    if (!_videoReady || !_splashDone) return;
+    /* Video is loaded AND splash timer elapsed — crossfade now.
+       Activate video intro FIRST (underneath), then fade out splash on top. */
+    introEl.classList.add('active');
+    videoEl.play().catch(function() { revealApp(); });
+    videoEl.addEventListener('ended', function() { revealApp(); }, { once: true });
+
+    /* Brief delay so video frame renders before splash fades */
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        biSplash.classList.remove('active');
       });
+    });
+  }
 
-      videoEl.addEventListener('ended', () => revealApp(), { once: true });
-    }, 800); /* match the 0.8s CSS fade-out */
+  videoEl.addEventListener('canplay', function _onReady() {
+    videoEl.removeEventListener('canplay', _onReady);
+    _videoReady = true;
+    _tryCrossfade();
+  }, { once: true });
+
+  /* Safety: if video fails to load within 6s, skip straight to app */
+  var _loadTimeout = setTimeout(function() {
+    if (!_videoReady) {
+      _videoReady = true;
+      _splashDone = true;
+      biSplash.classList.remove('active');
+      setTimeout(function() { revealApp(); }, 800);
+    }
+  }, 6000);
+
+  setTimeout(function() {
+    _splashDone = true;
+    _tryCrossfade();
   }, 4000);
 }
 
