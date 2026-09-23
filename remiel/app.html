@@ -5189,6 +5189,23 @@
 </main>
 
 <script>
+/* ── Global Toast Notification ── */
+function showToast(msg) {
+  if (typeof A11y !== 'undefined') A11y.announce(msg);
+  var existing = document.querySelector('.sentinel-toast');
+  if (existing) existing.remove();
+  var toast = document.createElement('div');
+  toast.className = 'sentinel-toast';
+  toast.textContent = msg;
+  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+    'background:rgba(56,189,248,0.2);color:#38bdf8;padding:8px 20px;border-radius:20px;' +
+    'font-size:12px;font-weight:600;z-index:9999;backdrop-filter:blur(12px);' +
+    'border:1px solid rgba(56,189,248,0.3);pointer-events:none;';
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
+  setTimeout(function() { toast.remove(); }, 2500);
+}
+
 /* ═══════════════════════════════════════════════════════════
    Gate Screen / Video Intro / App Reveal
    ═══════════════════════════════════════════════════════════ */
@@ -5715,6 +5732,10 @@ const RemielDB = (() => {
 
   async function putPhoto(contactId, blob) {
     await open();
+    /* Safari IDB rejects File objects — convert to plain Blob */
+    if (blob instanceof File || (blob && blob.constructor && blob.constructor.name === 'File')) {
+      blob = new Blob([await blob.arrayBuffer()], { type: blob.type || 'image/png' });
+    }
     return promisify(tx('photos', 'readwrite').put({ contactId, blob, updatedAt: Date.now() }));
   }
 
@@ -13700,23 +13721,7 @@ const MedicationTracker = (() => {
     return map[freq] || freq;
   }
 
-  function showToast(msg) {
-    /* Screen reader announcement */
-    if (typeof A11y !== 'undefined') A11y.announce(msg);
-    /* Reuse existing toast system if available, else simple one */
-    const existing = document.querySelector('.med-toast');
-    if (existing) existing.remove();
-    const toast = document.createElement('div');
-    toast.className = 'med-toast';
-    toast.textContent = msg;
-    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
-      'background:rgba(56,189,248,0.2);color:#38bdf8;padding:8px 20px;border-radius:20px;' +
-      'font-size:12px;font-weight:600;z-index:9999;backdrop-filter:blur(12px);' +
-      'border:1px solid rgba(56,189,248,0.3);animation:fadeInUp 0.3s ease;';
-    document.body.appendChild(toast);
-    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
-    setTimeout(() => toast.remove(), 2500);
-  }
+  /* showToast is now global — removed local copy */
 
   /* ── Pull preview ── */
   function updatePreview() {
@@ -14615,6 +14620,9 @@ const SentinelCall = (function() {
     _guestTargetId = callTarget.toUpperCase();
     /* Show guest overlay instead of gate */
     document.getElementById('scGuestOverlay').classList.remove('hidden');
+    /* Hide the gate so only the guest overlay is visible */
+    var _gateEl = document.getElementById('gateScreen');
+    if (_gateEl) _gateEl.style.display = 'none';
     /* Enable join button when name is entered */
     const nameInput = document.getElementById('scGuestName');
     const joinBtn = document.getElementById('scGuestJoinBtn');
