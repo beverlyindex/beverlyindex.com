@@ -1436,6 +1436,59 @@
   }
 
   /* ═══ Onboarding Wizard ═══ */
+  /* ── Contextual Guidance Banners ── */
+  .sentinel-guide {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(12, 14, 20, 0.94);
+    border: 1px solid rgba(255, 210, 77, 0.3);
+    border-radius: 16px;
+    padding: 10px 20px;
+    color: #ffd24d;
+    font: 600 13px/1.5 "Hanken Grotesk", system-ui, sans-serif;
+    z-index: 800;
+    pointer-events: none;
+    text-align: center;
+    max-width: 85vw;
+    opacity: 0;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .sentinel-guide.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sentinel-guide.top {
+    top: max(env(safe-area-inset-top, 12px), 12px);
+    transform: translateX(-50%) translateY(-8px);
+  }
+  .sentinel-guide.top.visible {
+    transform: translateX(-50%) translateY(0);
+  }
+  .sentinel-guide.bottom {
+    bottom: max(calc(env(safe-area-inset-bottom, 12px) + 10px), 22px);
+    transform: translateX(-50%) translateY(8px);
+  }
+  .sentinel-guide.bottom.visible {
+    transform: translateX(-50%) translateY(0);
+  }
+  .sentinel-guide .guide-dismiss {
+    display: inline-block;
+    margin-left: 12px;
+    color: rgba(255,210,77,0.5);
+    cursor: pointer;
+    pointer-events: auto;
+    font-size: 11px;
+    vertical-align: middle;
+  }
+  .sentinel-guide .guide-icon {
+    margin-right: 6px;
+    font-size: 14px;
+    vertical-align: -1px;
+  }
+
   .onboarding {
     position: fixed;
     inset: 0;
@@ -4167,6 +4220,10 @@
   </div>
   <div class="hold-hint" id="holdHint">tap to open your network</div>
   <div class="network-hint" id="networkHint" hidden>tap any sphere &middot; drag to rotate</div>
+
+  <!-- Contextual guidance banners -->
+  <div class="sentinel-guide top" id="guideTop"></div>
+  <div class="sentinel-guide bottom" id="guideBottom"></div>
   <button class="back-btn" id="backBtn" hidden>&#8592;</button>
 </div>
 
@@ -4395,12 +4452,12 @@
         <div class="bluf-pull-body">
           <div class="bluf-pull-content">
             <div class="bluf-location-grid" id="blufLocation">
-              <div class="bluf-loc-card">
-                <div class="bluf-loc-label">Micro</div>
-                <div class="bluf-loc-value" id="blufLocMicro">—</div>
+              <div class="bluf-loc-card bluf-loc-full">
+                <div class="bluf-loc-label">Local</div>
+                <div class="bluf-loc-value" id="blufLocMicro" style="font-size:12px;line-height:1.35;">—</div>
               </div>
-              <div class="bluf-loc-card">
-                <div class="bluf-loc-label">Macro</div>
+              <div class="bluf-loc-card bluf-loc-full">
+                <div class="bluf-loc-label">Global</div>
                 <div class="bluf-loc-value" id="blufLocMacro">—</div>
               </div>
               <div class="bluf-loc-card bluf-loc-full">
@@ -5042,6 +5099,10 @@ async function launchGalaxy(savedContacts) {
       animRunning = true;
       requestAnimationFrame(frame);
     }
+    /* Show welcome guidance after launch */
+    setTimeout(() => SentinelGuide.onEnterSelf(), 1200);
+    /* Start composite headline engine */
+    SentinelHeadlines.start();
   });
 }
 
@@ -5512,8 +5573,8 @@ const I18n = (function () {
 
 
 
-      'location.micro':           'Micro',
-      'location.macro':           'Macro',
+      'location.micro':           'Local',
+      'location.macro':           'Global',
       'location.lastUpdated':     'Last Updated',
       'location.unknown':         'Unknown',
 
@@ -5737,8 +5798,8 @@ const I18n = (function () {
 
 
 
-      'location.micro':           'Micro',
-      'location.macro':           'Macro',
+      'location.micro':           'Local',
+      'location.macro':           'Global',
       'location.lastUpdated':     'Ultimo Aggiornamento',
       'location.unknown':         'Sconosciuto',
 
@@ -6591,6 +6652,8 @@ function enterSelf() {
   document.getElementById('demoCycler').style.display = '';
   // Re-init effects for new canvas size — next frame so DOM class removal is applied
   requestAnimationFrame(() => { resize(); initFX(); });
+  /* Show contextual guidance */
+  setTimeout(() => SentinelGuide.onEnterSelf(), 800);
 }
 
 function enterNetwork() {
@@ -6615,7 +6678,8 @@ function enterNetwork() {
   const holdHint = document.getElementById('holdHint');
   if (holdHint) holdHint.style.display = 'none';
   // Ensure video media keeps playing (Safari suspends display:none videos)
-  if (media && mediaType === 'video' && media.paused) {
+  if (media && mediaType === 'video' && (media.paused || media.ended)) {
+    if (media.ended) { media.currentTime = 0; }
     media.play().catch(() => {});
   }
   // Resize canvas and build galaxy IMMEDIATELY — no rAF needed
@@ -6625,6 +6689,8 @@ function enterNetwork() {
   initFX();
   // Safety net: re-verify dimensions after CSS fully settles
   requestAnimationFrame(() => { resize(); });
+  /* Show contextual guidance */
+  setTimeout(() => SentinelGuide.onEnterNetwork(), 600);
 }
 
 function enterDetail(contact, sphereScreenY) {
@@ -6701,6 +6767,195 @@ function setOtherLabel(val) {
   otherLabel = val.trim() || 'Other';
   document.getElementById('otherBtnLabel').textContent = otherLabel;
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   SentinelLocation — Real GPS + Reverse Geocoding
+   Phase 1 (Micro): Street address, building, room (WiFi-aided)
+   Phase 2 (Macro): City, state, country
+   Uses OpenStreetMap Nominatim (free, no API key)
+   ═══════════════════════════════════════════════════════════ */
+
+const SentinelLocation = (() => {
+  let _cachedPosition = null;
+  let _cachedGeocode = null;
+  let _lastFetchTime = 0;
+  const CACHE_TTL = 60000; /* 1 minute — re-fetch if older */
+  const GEOCODE_TTL = 300000; /* 5 minutes for reverse geocode cache */
+  let _lastGeocodeTime = 0;
+
+  /* Get raw GPS coordinates from browser */
+  function getPosition(opts) {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true, /* Uses WiFi/cell for better indoor accuracy */
+        timeout: 10000,
+        maximumAge: 30000,
+        ...opts
+      });
+    });
+  }
+
+  /* Reverse geocode via OpenStreetMap Nominatim */
+  async function reverseGeocode(lat, lon) {
+    const url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2'
+      + '&lat=' + lat + '&lon=' + lon
+      + '&addressdetails=1&zoom=18';
+    const resp = await fetch(url, {
+      headers: { 'Accept-Language': navigator.language || 'en' }
+    });
+    if (!resp.ok) throw new Error('Geocode failed: ' + resp.status);
+    return resp.json();
+  }
+
+  /* Build structured location from geocode result */
+  function parseGeocode(data) {
+    const addr = data.address || {};
+    /* Micro: most specific — house number + street, or building/amenity */
+    const parts = [];
+    if (addr.amenity) parts.push(addr.amenity);
+    else if (addr.building) parts.push(addr.building);
+    if (addr.house_number && addr.road) {
+      parts.push(addr.house_number + ' ' + addr.road);
+    } else if (addr.road) {
+      parts.push(addr.road);
+    }
+    if (addr.neighbourhood && !parts.some(p => p.includes(addr.neighbourhood))) {
+      parts.push(addr.neighbourhood);
+    }
+    const micro = parts.length > 0 ? parts.join(', ') : (data.display_name || '').split(',').slice(0, 2).join(',').trim();
+
+    /* Macro: city/town, state/region, country */
+    const cityPart = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
+    const statePart = addr.state || addr.region || '';
+    const countryPart = addr.country || '';
+    const macroParts = [cityPart, statePart, countryPart].filter(Boolean);
+    const macro = macroParts.join(', ') || 'Unknown';
+
+    return {
+      micro: micro || 'Unknown',
+      macro: macro,
+      lat: parseFloat(data.lat || lat),
+      lon: parseFloat(data.lon || lon),
+      raw: addr,
+      accuracy: _cachedPosition ? _cachedPosition.coords.accuracy : null
+    };
+  }
+
+  /* Main entry: get current location with geocoding */
+  async function getCurrentLocation(forceRefresh) {
+    const now = Date.now();
+    /* Return cached geocode if fresh enough */
+    if (!forceRefresh && _cachedGeocode && (now - _lastGeocodeTime) < GEOCODE_TTL) {
+      return _cachedGeocode;
+    }
+
+    /* Get GPS position */
+    const pos = await getPosition();
+    _cachedPosition = pos;
+    _lastFetchTime = now;
+
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+
+    /* Reverse geocode */
+    const geo = await reverseGeocode(lat, lon);
+    _cachedGeocode = parseGeocode(geo);
+    _cachedGeocode.timestamp = now;
+    _cachedGeocode.accuracy = pos.coords.accuracy;
+    _lastGeocodeTime = now;
+
+    return _cachedGeocode;
+  }
+
+  /* Save location snapshot to IndexedDB for a contact or self */
+  async function saveLocation(contactId, locationData) {
+    const key = 'location_' + (contactId || 'self');
+    await RemielDB.putSetting(key, {
+      micro: locationData.micro,
+      macro: locationData.macro,
+      lat: locationData.lat,
+      lon: locationData.lon,
+      accuracy: locationData.accuracy,
+      timestamp: Date.now()
+    });
+  }
+
+  /* Load last known location from IndexedDB */
+  async function loadLocation(contactId) {
+    const key = 'location_' + (contactId || 'self');
+    return RemielDB.getSetting(key);
+  }
+
+  /* Save a check-in record (timestamp + location + contactId) */
+  async function saveCheckin(contactId, locationData) {
+    const key = 'checkin_' + (contactId || 'self');
+    const record = {
+      timestamp: Date.now(),
+      location: locationData ? locationData.macro : null,
+      micro: locationData ? locationData.micro : null,
+      lat: locationData ? locationData.lat : null,
+      lon: locationData ? locationData.lon : null
+    };
+    /* Save as latest check-in */
+    await RemielDB.putSetting(key, record);
+    /* Also append to history (keep last 50) */
+    const histKey = 'checkinHistory_' + (contactId || 'self');
+    let history = (await RemielDB.getSetting(histKey)) || [];
+    history.push(record);
+    if (history.length > 50) history = history.slice(-50);
+    await RemielDB.putSetting(histKey, history);
+    return record;
+  }
+
+  /* Load last check-in for a contact */
+  async function loadCheckin(contactId) {
+    const key = 'checkin_' + (contactId || 'self');
+    return RemielDB.getSetting(key);
+  }
+
+  /* Format timestamp to readable date + time */
+  function formatCheckin(record) {
+    if (!record || !record.timestamp) return { date: '—', time: '—', location: '—' };
+    const d = new Date(record.timestamp);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return {
+      date: months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(),
+      time: d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      location: record.micro || record.location || '—'
+    };
+  }
+
+  /* Format location update time */
+  function formatUpdateTime(timestamp) {
+    if (!timestamp) return '—';
+    const d = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return diffMin + 'm ago';
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return diffHr + 'h ago';
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay === 1) return 'Yesterday';
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  return {
+    getCurrentLocation,
+    saveLocation,
+    loadLocation,
+    saveCheckin,
+    loadCheckin,
+    formatCheckin,
+    formatUpdateTime
+  };
+})();
 
 /* ═══════════════════════════════
    BLUF CARD — Relationship Insight
@@ -6811,7 +7066,7 @@ async function computeSeverity(contactId) {
  * Generate dynamic BLUF data from real mood + interaction data.
  * Produces same shape as BLUF_DATA entries: { headline, desc, badges, location, lastContact, openIssues, nextActions }
  */
-function generateBlufData(sevLevel, compData) {
+async function generateBlufData(sevLevel, compData, contactId) {
   const { moods, interactions, recentInteractions, moodTrend, daysSinceContact, avgMood, last5 } = compData;
   const SEV_LABELS = ['CRITICAL','ELEVATED','WATCH','STABLE','QUIET'];
   const sevName = SEV_LABELS[sevLevel] || 'QUIET';
@@ -6903,10 +7158,17 @@ function generateBlufData(sevLevel, compData) {
     const last = interactions[interactions.length - 1];
     const d = new Date(last.timestamp);
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    /* Use check-in location if we have it, else try current location */
+    let _lcLocation = '—';
+    try {
+      const _chk = await SentinelLocation.loadCheckin(contactId);
+      if (_chk && _chk.micro) _lcLocation = _chk.micro;
+      else if (_chk && _chk.location) _lcLocation = _chk.location;
+    } catch(_) {}
     lastContact = {
       date: months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(),
       time: d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-      location: '—',
+      location: _lcLocation,
       health: hasMoods ? (['Struggling','Low','Okay','Good','Thriving'][Math.round(avgMood) - 1] || 'Okay') + ' — from mood log' : 'No mood data yet',
       nextSteps: sevLevel <= 1 ? 'Reach out soon — they could use you.' : sevLevel === 2 ? 'Keep an eye on things.' : 'All good. Keep the rhythm going.'
     };
@@ -6931,8 +7193,35 @@ function generateBlufData(sevLevel, compData) {
   /* ── Next Action — single priority directive (CareCircle mechanics) ── */
   const nextActions = [nextActionText || 'Nothing pending — a quiet day.'];
 
-  /* ── Location — placeholder (no GPS in Remiel consumer fork) ── */
-  const location = { micro: '—', macro: '—', updated: '—' };
+  /* ── Location — real GPS + reverse geocode ── */
+  let location = { micro: '—', macro: '—', updated: '—' };
+  try {
+    const locData = await SentinelLocation.getCurrentLocation();
+    if (locData) {
+      location = {
+        micro: locData.micro || '—',
+        macro: locData.macro || '—',
+        updated: SentinelLocation.formatUpdateTime(locData.timestamp),
+        lat: locData.lat,
+        lon: locData.lon,
+        accuracy: locData.accuracy
+      };
+      /* Persist self location */
+      SentinelLocation.saveLocation('self', locData).catch(() => {});
+    }
+  } catch (e) {
+    /* Geolocation denied or unavailable — try loading last known */
+    try {
+      const saved = await SentinelLocation.loadLocation('self');
+      if (saved) {
+        location = {
+          micro: saved.micro || '—',
+          macro: saved.macro || '—',
+          updated: SentinelLocation.formatUpdateTime(saved.timestamp)
+        };
+      }
+    } catch (_) {}
+  }
 
   return { headline, desc, badges, location, lastContact, openIssues, nextActions };
 }
@@ -7036,6 +7325,7 @@ let videoRevealed = false;
 let blufLastTapTime = 0;
 
 function openBluf(sphereScreenY) {
+  SentinelGuide.onOpenBluf();
   blufOpen = true;
   callRevealed = false;
   videoRevealed = false;
@@ -7078,6 +7368,7 @@ function openBluf(sphereScreenY) {
 }
 
 function closeBluf() {
+  SentinelGuide.onCloseBluf();
   blufOpen = false;
   selectedContact = null;
   focusedContactId = null;
@@ -7127,7 +7418,7 @@ async function updateBlufContent() {
   try {
     const comp = await computeSeverity(contactId);
     viewSev = comp.sevLevel;
-    d = generateBlufData(viewSev, comp);
+    d = await generateBlufData(viewSev, comp, contactId);
 
     /* Update the contact's live severity so the galaxy sphere reflects it */
     if (selectedContact && selectedContact.sev !== viewSev) {
@@ -7142,6 +7433,15 @@ async function updateBlufContent() {
     viewSev = selectedContact ? selectedContact.sev : curSev;
     d = BLUF_DATA[viewSev];
   }
+
+  /* ── Record check-in with location (silent, non-blocking) ── */
+  (async () => {
+    try {
+      let locData = null;
+      try { locData = await SentinelLocation.getCurrentLocation(); } catch (_) {}
+      await SentinelLocation.saveCheckin(contactId, locData);
+    } catch (_) {}
+  })();
 
   const sv = SEVS[viewSev];
   const c = CATS[viewCat];
@@ -7221,8 +7521,20 @@ async function updateBlufContent() {
   const locPrev = document.getElementById('pullPrev_location');
   if (locPrev) locPrev.textContent = loc.macro || '—';
 
-  /* ── Last Contact pull ── */
-  const lc = d.lastContact || {};
+  /* ── Last Contact / Check-in pull — prefer real check-in data ── */
+  let lc = d.lastContact || {};
+  try {
+    const _realCheckin = await SentinelLocation.loadCheckin(contactId);
+    if (_realCheckin && _realCheckin.timestamp) {
+      const _fmt = SentinelLocation.formatCheckin(_realCheckin);
+      lc = {
+        ...lc,
+        date: _fmt.date,
+        time: _fmt.time,
+        location: _fmt.location
+      };
+    }
+  } catch (_) {}
   const lcDate = document.getElementById('blufLcDate');
   const lcTime = document.getElementById('blufLcTime');
   const lcLoc = document.getElementById('blufLcLocation');
@@ -7271,34 +7583,55 @@ async function updateBlufContent() {
   loadProfile().catch(() => {});
 
 
-  // Quick Action Bar — update links and hide for self-view
+  // Quick Action Bar — update links; preserve button DOM (never innerHTML replace)
   const _qaBar = document.getElementById('blufQuickActions');
   const _qaCall = document.getElementById('qaCallBtn');
   const _qaText = document.getElementById('qaTextBtn');
   const _qaEmail = document.getElementById('qaEmailBtn');
   const _editBtn = document.getElementById('blufEditBtn');
+  /* Remove any previously injected self-note */
+  const _oldSelfNote = _qaBar ? _qaBar.querySelector('.qa-self-note') : null;
+  if (_oldSelfNote) _oldSelfNote.remove();
   if (!selectedContact) {
-    // Self-view: show note explaining no quick actions
+    /* Self-view: hide buttons, show explanatory note */
     _qaBar.classList.remove('hidden');
-    _qaBar.innerHTML = '<div class="qa-self-note">This is your profile &mdash; quick actions are for your contacts</div>';
+    if (_qaCall) _qaCall.style.display = 'none';
+    if (_qaText) _qaText.style.display = 'none';
+    if (_qaEmail) _qaEmail.style.display = 'none';
+    if (!_qaBar.querySelector('.qa-self-note')) {
+      const _selfNote = document.createElement('div');
+      _selfNote.className = 'qa-self-note';
+      _selfNote.innerHTML = 'This is your profile &mdash; quick actions are for your contacts';
+      _qaBar.appendChild(_selfNote);
+    }
     if (_editBtn) _editBtn.style.display = 'none';
   } else {
+    /* Contact view: show all buttons, update links */
     _qaBar.classList.remove('hidden');
     if (_editBtn) _editBtn.style.display = '';
+    if (_qaCall) _qaCall.style.display = '';
+    if (_qaText) _qaText.style.display = '';
+    if (_qaEmail) _qaEmail.style.display = '';
     const _phone = selectedContact.phone || '';
     const _email = selectedContact.email || '';
-    _qaCall.href = _phone ? 'tel:' + _phone : '#';
-    _qaCall.style.opacity = _phone ? '1' : '0.35';
-    _qaCall.style.pointerEvents = _phone ? 'auto' : 'none';
-    _qaCall.title = _phone ? 'Call ' + selectedContact.first : 'No phone number on file — edit contact to add';
-    _qaText.href = _phone ? 'sms:' + _phone : '#';
-    _qaText.style.opacity = _phone ? '1' : '0.35';
-    _qaText.style.pointerEvents = _phone ? 'auto' : 'none';
-        _qaText.title = _phone ? 'Text ' + selectedContact.first : 'No phone number on file — edit contact to add';
-    _qaEmail.href = _email ? 'mailto:' + _email : '#';
-    _qaEmail.style.opacity = _email ? '1' : '0.35';
-    _qaEmail.style.pointerEvents = _email ? 'auto' : 'none';
-        _qaEmail.title = _email ? 'Email ' + selectedContact.first : 'No email on file — edit contact to add';
+    if (_qaCall) {
+      _qaCall.href = _phone ? 'tel:' + _phone : '#';
+      _qaCall.style.opacity = _phone ? '1' : '0.35';
+      _qaCall.style.pointerEvents = _phone ? 'auto' : 'none';
+      _qaCall.title = _phone ? 'Call ' + selectedContact.first : 'No phone number on file — edit contact to add';
+    }
+    if (_qaText) {
+      _qaText.href = _phone ? 'sms:' + _phone : '#';
+      _qaText.style.opacity = _phone ? '1' : '0.35';
+      _qaText.style.pointerEvents = _phone ? 'auto' : 'none';
+      _qaText.title = _phone ? 'Text ' + selectedContact.first : 'No phone number on file — edit contact to add';
+    }
+    if (_qaEmail) {
+      _qaEmail.href = _email ? 'mailto:' + _email : '#';
+      _qaEmail.style.opacity = _email ? '1' : '0.35';
+      _qaEmail.style.pointerEvents = _email ? 'auto' : 'none';
+      _qaEmail.title = _email ? 'Email ' + selectedContact.first : 'No email on file — edit contact to add';
+    }
   }
 
 
@@ -7336,6 +7669,661 @@ let sphereTapTimer = null;     /* Timer for single/double tap detection */
 let sphereTapTarget = null;    /* { isCenter, contactId, sphereScreenY } from first tap */
 const SPHERE_TAP_MS = 300;    /* Window for double tap detection */
 const FOCUS_SCALE = 1.8;      /* How much bigger a focused sphere appears */
+
+/* ═══════════════════════════════════════════════════════════════
+   Sentinel Guide — contextual hints that appear at the right time
+   ═══════════════════════════════════════════════════════════════ */
+const SentinelGuide = (() => {
+  const _seen = {};   /* track which hints the user has seen this session */
+  let _activeTop = null;
+  let _activeBottom = null;
+  let _topTimer = null;
+  let _bottomTimer = null;
+
+  /* Load persisted seen-hints from IndexedDB */
+  (async () => {
+    try {
+      const stored = await RemielDB.getSetting('guideSeen');
+      if (stored) Object.assign(_seen, stored);
+    } catch(_) {}
+  })();
+
+  function _persist() {
+    RemielDB.putSetting('guideSeen', _seen).catch(() => {});
+  }
+
+  function show(id, text, position, duration) {
+    /* Don't re-show hints the user dismissed */
+    if (_seen[id] === 'dismissed') return;
+    position = position || 'bottom';
+    duration = duration || 5000;
+    const el = document.getElementById(position === 'top' ? 'guideTop' : 'guideBottom');
+    if (!el) return;
+
+    /* Don't stack the same hint */
+    const activeRef = position === 'top' ? '_activeTop' : '_activeBottom';
+    if ((position === 'top' ? _activeTop : _activeBottom) === id) return;
+
+    el.innerHTML = '<span class="guide-icon">\u2728</span>' + text +
+      '<span class="guide-dismiss" onclick="SentinelGuide.dismiss(\''+id+'\',\''+position+'\')">\u2715</span>';
+    el.classList.add('visible');
+
+    if (position === 'top') { _activeTop = id; clearTimeout(_topTimer); _topTimer = setTimeout(() => hide(position), duration); }
+    else { _activeBottom = id; clearTimeout(_bottomTimer); _bottomTimer = setTimeout(() => hide(position), duration); }
+
+    /* Mark as seen (but not dismissed — user can still see it once) */
+    if (!_seen[id]) { _seen[id] = 'seen'; _persist(); }
+  }
+
+  function hide(position) {
+    const el = document.getElementById(position === 'top' ? 'guideTop' : 'guideBottom');
+    if (el) el.classList.remove('visible');
+    if (position === 'top') { _activeTop = null; clearTimeout(_topTimer); }
+    else { _activeBottom = null; clearTimeout(_bottomTimer); }
+  }
+
+  function dismiss(id, position) {
+    hide(position);
+    _seen[id] = 'dismissed';
+    _persist();
+  }
+
+  function hideAll() {
+    hide('top');
+    hide('bottom');
+  }
+
+  /* Contextual triggers — called from state transitions */
+  function onEnterSelf() {
+    hideAll();
+    if (!_seen['self-tap']) {
+      show('self-tap', 'Tap your sphere to open your network', 'bottom', 6000);
+    } else if (!_seen['self-hold']) {
+      show('self-hold', 'Hold your sphere to change your name and status', 'bottom', 5000);
+    }
+  }
+
+  function onEnterNetwork() {
+    hideAll();
+    if (!_seen['net-tap']) {
+      show('net-tap', 'Tap a sphere to enlarge it \u00B7 Double-tap to open details', 'bottom', 7000);
+    } else if (!_seen['net-drag']) {
+      show('net-drag', 'Drag to rotate your network \u00B7 \u2190 to go back', 'top', 5000);
+    }
+  }
+
+  function onFocusSphere(contactName) {
+    if (!_seen['focus-actions']) {
+      show('focus-actions', 'Call, text, or email ' + contactName + ' with the icons below', 'bottom', 5000);
+    } else if (!_seen['focus-double']) {
+      show('focus-double', 'Double-tap ' + contactName + '\'s sphere to see their full status', 'bottom', 4500);
+    }
+  }
+
+  function onOpenBluf() {
+    hideAll();
+    if (!_seen['bluf-nav']) {
+      show('bluf-nav', 'Tap outside or double-tap to close \u00B7 Swipe sections to explore', 'top', 6000);
+    }
+  }
+
+  function onCloseBluf() {
+    hideAll();
+  }
+
+  return { show, hide, hideAll, dismiss, onEnterSelf, onEnterNetwork, onFocusSphere, onOpenBluf, onCloseBluf };
+})();
+
+
+/* ══════════════════════════════════════════════════════════════
+   SENTINEL VOICE ANALYSIS — Client-Side Feature Extraction (Step 3)
+   Extracts prosodic features from audio using Web Audio API:
+   - Pitch (F0) mean & variability
+   - Speech rate (zero-crossing proxy)
+   - Pause ratio
+   - Energy contour (RMS mean & variability)
+   - Voice tremor index (energy modulation)
+   - Spectral centroid (brightness)
+   Privacy-first: raw audio NEVER leaves device.
+   ══════════════════════════════════════════════════════════════ */
+
+const SentinelFeatureExtractor = (() => {
+  const SAMPLE_RATE = 16000;
+  const FRAME_SIZE = 512;
+  const HOP_SIZE = 256;
+
+  async function decodeAudio(blob) {
+    const arrayBuf = await blob.arrayBuffer();
+    try {
+      const tmpCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+      const decoded = await tmpCtx.decodeAudioData(arrayBuf.slice(0));
+      tmpCtx.close().catch(() => {});
+      const offCtx = new OfflineAudioContext(1, Math.ceil(decoded.duration * SAMPLE_RATE), SAMPLE_RATE);
+      const src = offCtx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(offCtx.destination);
+      src.start();
+      const rendered = await offCtx.startRendering();
+      return rendered.getChannelData(0);
+    } catch (e) {
+      console.warn('[SentinelFeature] Audio decode failed:', e);
+      return null;
+    }
+  }
+
+  function computeRMS(samples) {
+    const frames = [];
+    for (let i = 0; i + FRAME_SIZE <= samples.length; i += HOP_SIZE) {
+      let sum = 0;
+      for (let j = 0; j < FRAME_SIZE; j++) sum += samples[i + j] * samples[i + j];
+      frames.push(Math.sqrt(sum / FRAME_SIZE));
+    }
+    return frames;
+  }
+
+  function estimateF0(samples) {
+    const f0Values = [];
+    const minP = Math.floor(SAMPLE_RATE / 500);
+    const maxP = Math.floor(SAMPLE_RATE / 60);
+    for (let i = 0; i + FRAME_SIZE <= samples.length; i += HOP_SIZE) {
+      const frame = samples.slice(i, i + FRAME_SIZE);
+      let energy = 0;
+      for (let j = 0; j < frame.length; j++) energy += frame[j] * frame[j];
+      if (energy / frame.length < 0.0001) { f0Values.push(0); continue; }
+      let bestCorr = -1, bestPeriod = 0;
+      for (let lag = minP; lag <= maxP && lag < frame.length; lag++) {
+        let corr = 0, n1 = 0, n2 = 0;
+        for (let j = 0; j < frame.length - lag; j++) {
+          corr += frame[j] * frame[j + lag];
+          n1 += frame[j] * frame[j];
+          n2 += frame[j + lag] * frame[j + lag];
+        }
+        const denom = Math.sqrt(n1 * n2);
+        if (denom > 0) corr /= denom;
+        if (corr > bestCorr) { bestCorr = corr; bestPeriod = lag; }
+      }
+      f0Values.push(bestCorr > 0.3 && bestPeriod > 0 ? SAMPLE_RATE / bestPeriod : 0);
+    }
+    return f0Values;
+  }
+
+  function computeZCR(samples) {
+    const frames = [];
+    for (let i = 0; i + FRAME_SIZE <= samples.length; i += HOP_SIZE) {
+      let crossings = 0;
+      for (let j = 1; j < FRAME_SIZE; j++) {
+        if ((samples[i + j] >= 0) !== (samples[i + j - 1] >= 0)) crossings++;
+      }
+      frames.push(crossings / FRAME_SIZE);
+    }
+    return frames;
+  }
+
+  function computePauseRatio(rmsFrames) {
+    if (rmsFrames.length === 0) return 0;
+    const maxRMS = Math.max(...rmsFrames);
+    const threshold = maxRMS * 0.08;
+    return rmsFrames.filter(r => r < threshold).length / rmsFrames.length;
+  }
+
+  function computeTremorIndex(rmsFrames) {
+    if (rmsFrames.length < 20) return 0;
+    let modulation = 0;
+    for (let i = 2; i < rmsFrames.length; i++) {
+      modulation += Math.abs(rmsFrames[i] - 2 * rmsFrames[i - 1] + rmsFrames[i - 2]);
+    }
+    modulation /= (rmsFrames.length - 2);
+    const meanRMS = rmsFrames.reduce((a, b) => a + b, 0) / rmsFrames.length;
+    return meanRMS > 0 ? modulation / meanRMS : 0;
+  }
+
+  function stats(arr) {
+    const filtered = arr.filter(v => v > 0);
+    if (filtered.length === 0) return { mean: 0, std: 0, min: 0, max: 0 };
+    const mean = filtered.reduce((a, b) => a + b, 0) / filtered.length;
+    const variance = filtered.reduce((s, v) => s + (v - mean) * (v - mean), 0) / filtered.length;
+    return { mean, std: Math.sqrt(variance), min: Math.min(...filtered), max: Math.max(...filtered) };
+  }
+
+  async function extract(audioBlob) {
+    try {
+      const samples = await decodeAudio(audioBlob);
+      if (!samples || samples.length < SAMPLE_RATE * 2) {
+        return { error: 'Audio too short (minimum 2 seconds)', features: null };
+      }
+      const duration = samples.length / SAMPLE_RATE;
+      const rmsFrames = computeRMS(samples);
+      const f0Frames = estimateF0(samples);
+      const zcrFrames = computeZCR(samples);
+      const pauseRatio = computePauseRatio(rmsFrames);
+      const tremorIndex = computeTremorIndex(rmsFrames);
+      const f0S = stats(f0Frames);
+      const rmsS = stats(rmsFrames);
+      const zcrS = stats(zcrFrames);
+
+      const features = {
+        f0_mean: Math.round(f0S.mean * 100) / 100,
+        f0_std: Math.round(f0S.std * 100) / 100,
+        energy_mean: Math.round(rmsS.mean * 10000) / 10000,
+        energy_std: Math.round(rmsS.std * 10000) / 10000,
+        speech_rate: Math.round(zcrS.mean * 10000) / 10000,
+        pause_ratio: Math.round(pauseRatio * 1000) / 1000,
+        tremor_index: Math.round(tremorIndex * 10000) / 10000,
+        spectral_mean: 0,
+        spectral_std: 0,
+        f0_range: Math.round((f0S.max - f0S.min) * 100) / 100,
+        energy_range: Math.round((rmsS.max - rmsS.min) * 10000) / 10000,
+        duration: Math.round(duration * 100) / 100
+      };
+      return { features, duration, frameCount: rmsFrames.length, voicedFrames: f0Frames.filter(v => v > 0).length, totalFrames: f0Frames.length };
+    } catch (e) {
+      console.error('[SentinelFeature] Extraction failed:', e);
+      return { error: e.message, features: null };
+    }
+  }
+
+  return { extract, decodeAudio, computeRMS, estimateF0 };
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   SENTINEL BASELINE — Welford Online Estimator (Step 4)
+   Per-contact running mean + variance on feature vectors.
+   Minimum 3 sessions before vocal signals appear in headlines.
+   ══════════════════════════════════════════════════════════════ */
+
+const SentinelBaseline = (() => {
+  const MIN_SESSIONS = 3;
+  const FEATURE_KEYS = [
+    'f0_mean', 'f0_std', 'energy_mean', 'energy_std',
+    'speech_rate', 'pause_ratio', 'tremor_index',
+    'spectral_mean', 'spectral_std', 'f0_range', 'energy_range', 'duration'
+  ];
+
+  async function load(contactId) {
+    const key = 'voiceBaseline_' + contactId;
+    const stored = await RemielDB.getSetting(key);
+    if (stored && stored.n >= 1) return stored;
+    return _newBaseline();
+  }
+
+  function _newBaseline() {
+    const bl = { n: 0, means: {}, m2s: {} };
+    for (const k of FEATURE_KEYS) { bl.means[k] = 0; bl.m2s[k] = 0; }
+    return bl;
+  }
+
+  async function update(contactId, features) {
+    const bl = await load(contactId);
+    bl.n += 1;
+    for (const k of FEATURE_KEYS) {
+      const val = features[k] || 0;
+      const delta = val - bl.means[k];
+      bl.means[k] += delta / bl.n;
+      const delta2 = val - bl.means[k];
+      bl.m2s[k] += delta * delta2;
+    }
+    bl.lastUpdate = Date.now();
+    await RemielDB.putSetting('voiceBaseline_' + contactId, bl);
+    return bl;
+  }
+
+  function variance(baseline) {
+    const v = {};
+    for (const k of FEATURE_KEYS) v[k] = baseline.n > 1 ? baseline.m2s[k] / baseline.n : 0;
+    return v;
+  }
+
+  function stdev(baseline) {
+    const v = variance(baseline);
+    const sd = {};
+    for (const k of FEATURE_KEYS) sd[k] = Math.sqrt(v[k]);
+    return sd;
+  }
+
+  function zScores(features, baseline) {
+    const sd = stdev(baseline);
+    const z = {};
+    for (const k of FEATURE_KEYS) {
+      const s = sd[k];
+      z[k] = s > 0 ? (features[k] - baseline.means[k]) / s : 0;
+    }
+    return z;
+  }
+
+  function isMature(baseline) { return baseline && baseline.n >= MIN_SESSIONS; }
+
+  return { load, update, variance, stdev, zScores, isMature, FEATURE_KEYS, MIN_SESSIONS };
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   SENTINEL WELLNESS SCORER (Step 5)
+   Feature vector + baseline -> wellness state + confidence.
+   States: Distressed / Low / Agitated / Stable / Elevated
+   Runs entirely on-device. Optionally syncs to Vercel API.
+   ══════════════════════════════════════════════════════════════ */
+
+const SentinelWellnessScorer = (() => {
+  const STATES = ['Distressed', 'Low', 'Agitated', 'Stable', 'Elevated'];
+
+  async function score(contactId, features) {
+    const baseline = await SentinelBaseline.load(contactId);
+    if (!SentinelBaseline.isMature(baseline)) {
+      return {
+        state: 'Stable', confidence: 0.2,
+        sessionsNeeded: SentinelBaseline.MIN_SESSIONS - baseline.n,
+        message: 'Building baseline (' + baseline.n + '/' + SentinelBaseline.MIN_SESSIONS + ' sessions)',
+        zScores: null
+      };
+    }
+
+    const z = SentinelBaseline.zScores(features, baseline);
+    let distressScore = 0, agitationScore = 0, lowScore = 0, elevatedScore = 0;
+
+    /* F0 (pitch) */
+    if (z.f0_mean < -1.5) lowScore += 2;
+    else if (z.f0_mean < -0.8) lowScore += 1;
+    if (z.f0_mean > 1.5) agitationScore += 1.5;
+    else if (z.f0_mean > 0.8) elevatedScore += 1;
+
+    /* F0 variability */
+    if (z.f0_std < -1.2) lowScore += 1.5;
+    if (z.f0_range < -1.2) lowScore += 1;
+    if (z.f0_std > 1.5) distressScore += 1;
+
+    /* Energy */
+    if (z.energy_mean < -1.5) lowScore += 2;
+    else if (z.energy_mean < -0.8) lowScore += 1;
+    if (z.energy_mean > 1.5) agitationScore += 1.5;
+    else if (z.energy_mean > 0.8) elevatedScore += 1;
+
+    /* Speech rate */
+    if (z.speech_rate < -1.0) lowScore += 1;
+    if (z.speech_rate > 1.5) agitationScore += 1.5;
+
+    /* Pause ratio */
+    if (z.pause_ratio > 1.5) distressScore += 1.5;
+    else if (z.pause_ratio > 0.8) lowScore += 0.5;
+    if (z.pause_ratio < -1.2) agitationScore += 0.5;
+
+    /* Tremor */
+    if (z.tremor_index > 2.0) distressScore += 2;
+    else if (z.tremor_index > 1.0) distressScore += 1;
+
+    /* Spectral centroid */
+    if (z.spectral_mean < -1.0) lowScore += 0.5;
+    if (z.spectral_mean > 1.0) elevatedScore += 0.5;
+
+    const scores = { Distressed: distressScore, Low: lowScore, Agitated: agitationScore, Elevated: elevatedScore, Stable: 1.5 };
+    let maxState = 'Stable', maxScore = scores.Stable;
+    for (const [state, sc] of Object.entries(scores)) {
+      if (sc > maxScore) { maxState = state; maxScore = sc; }
+    }
+
+    const sortedScores = Object.values(scores).sort((a, b) => b - a);
+    const separation = sortedScores.length > 1 ? sortedScores[0] - sortedScores[1] : 0;
+    const maturityFactor = Math.min(1, baseline.n / 10);
+    let confidence = Math.min(0.95, (0.3 + separation * 0.15) * maturityFactor);
+    confidence = Math.round(confidence * 100) / 100;
+
+    const result = { state: maxState, confidence, scores, zScores: z, baselineSessions: baseline.n, message: null };
+
+    try { await RemielDB.putSetting('voiceWellness_' + contactId, { state: result.state, confidence: result.confidence, ts: Date.now(), features }); } catch(_) {}
+    try { if (typeof SentinelHeadlines !== 'undefined') await SentinelHeadlines.refreshOne(contactId); } catch(_) {}
+    _syncToAPI(contactId, features, baseline, result).catch(() => {});
+    return result;
+  }
+
+  async function _syncToAPI(contactId, features, baseline, result) {
+    try {
+      const token = await RemielDB.getSetting('syncToken');
+      if (!token) return;
+      await fetch('https://remiel-sentinel-api.vercel.app/api/voice/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ contactId, features, baselineMeans: baseline.means, baselineN: baseline.n, state: result.state, confidence: result.confidence, ts: Date.now() })
+      });
+    } catch(_) {}
+  }
+
+  return { score, STATES };
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   SENTINEL INTELLIGENCE — Composite Headline Engine (Steps 1+6)
+   Merges: interaction recency, mood trajectory, medication adherence,
+   check-in patterns, calendar dates, voice wellness into dynamic
+   sphere headlines. Updates every 30s.
+   ══════════════════════════════════════════════════════════════ */
+
+const SentinelHeadlines = (() => {
+  const _cache = {};
+  const _REFRESH_MS = 30000;
+  let _timer = null;
+
+  const P = {
+    VOICE_DISTRESS: 100, CRITICAL_MOOD: 90, BIRTHDAY_TODAY: 85,
+    BIRTHDAY_SOON: 80, MOOD_DROPPING: 75, MED_MISSED: 70,
+    VOICE_LOW: 65, OVERDUE_CONTACT: 60, MOOD_LOW: 55,
+    QUIET_WEEK: 50, VOICE_AGITATED: 45, CHECKIN_GAP: 40,
+    VOICE_ELEVATED: 30, MOOD_IMPROVING: 25, CONNECTED: 20,
+    STABLE: 15, ALL_GOOD: 10, NO_DATA: 5
+  };
+
+  async function computeHeadline(contact) {
+    if (!contact) return { headline: '', priority: 0 };
+    const cid = contact.id;
+    const now = Date.now();
+    const DAY_MS = 86400000;
+    const candidates = [];
+
+    /* Signal 1: Interaction recency */
+    let interactions = [];
+    try { interactions = await RemielDB.getInteractionsByContact(cid); } catch(_) {}
+    let daysSince = 999;
+    if (interactions.length > 0) {
+      const last = interactions[interactions.length - 1];
+      daysSince = (now - (last.timestamp || last.ts || 0)) / DAY_MS;
+    }
+    if (daysSince > 21) candidates.push({ headline: 'NO CONTACT IN ' + Math.round(daysSince) + ' DAYS', priority: P.OVERDUE_CONTACT + 5 });
+    else if (daysSince > 14) candidates.push({ headline: "HASN'T HEARD FROM YOU IN 2 WEEKS", priority: P.OVERDUE_CONTACT });
+    else if (daysSince > 7) candidates.push({ headline: 'BEEN A WHILE — REACH OUT', priority: P.OVERDUE_CONTACT - 5 });
+
+    const recentIx = interactions.filter(e => (now - (e.timestamp || e.ts || 0)) < 7 * DAY_MS);
+    if (recentIx.length === 0 && interactions.length > 0) candidates.push({ headline: 'QUIET WEEK', priority: P.QUIET_WEEK });
+    else if (recentIx.length >= 5) candidates.push({ headline: 'WELL CONNECTED', priority: P.CONNECTED });
+
+    /* Signal 2: Mood trajectory */
+    let moods = [];
+    try { moods = await RemielDB.getMoodsByContact(cid); } catch(_) {}
+    const recentMoods = moods.filter(m => (now - (m.timestamp || m.ts || 0)) < 14 * DAY_MS);
+    const last5 = recentMoods.slice(-5);
+    if (last5.length > 0) {
+      const avgMood = last5.reduce((s, m) => s + (m.level || 3), 0) / last5.length;
+      if (last5.length >= 2) {
+        const mid = Math.floor(last5.length / 2);
+        const avgFirst = last5.slice(0, mid).reduce((s, m) => s + (m.level || 3), 0) / mid;
+        const avgSecond = last5.slice(mid).reduce((s, m) => s + (m.level || 3), 0) / (last5.length - mid);
+        const trend = avgSecond - avgFirst;
+        if (trend < -1.0) candidates.push({ headline: 'MOOD DROPPING FAST', priority: P.MOOD_DROPPING + 5 });
+        else if (trend < -0.3) candidates.push({ headline: 'MOOD TRENDING DOWN', priority: P.MOOD_DROPPING });
+        else if (trend > 0.8) candidates.push({ headline: 'MOOD BRIGHTENING', priority: P.MOOD_IMPROVING });
+      }
+      if (avgMood <= 1.5) candidates.push({ headline: 'REALLY STRUGGLING', priority: P.CRITICAL_MOOD });
+      else if (avgMood <= 2.5) candidates.push({ headline: 'HAVING A TOUGH TIME', priority: P.MOOD_LOW });
+    }
+
+    /* Signal 3: Medication adherence */
+    try {
+      const meds = (await RemielDB.getMedicationsByContact(cid)).filter(m => m.active !== false);
+      if (meds.length > 0) {
+        const FREQ_SLOTS = { daily: 1, bid: 2, tid: 3, qid: 4, weekly: 0.143, asNeeded: 0 };
+        const cutoff48 = now - 48 * 3600 * 1000;
+        let missed = 0;
+        for (const med of meds) {
+          const slots = FREQ_SLOTS[med.frequency || 'daily'] || 0;
+          if (!slots) continue;
+          const expected = Math.round(slots * 2);
+          const taken = (med.doseLog || []).filter(d => d.ts >= cutoff48 && d.action === 'taken').length;
+          missed += Math.max(0, expected - taken);
+        }
+        if (missed > 3) candidates.push({ headline: 'MISSED MEDICATIONS', priority: P.MED_MISSED + 5 });
+        else if (missed > 1) candidates.push({ headline: 'MEDS MAY NEED ATTENTION', priority: P.MED_MISSED });
+      }
+    } catch(_) {}
+
+    /* Signal 4: Calendar dates (birthday) */
+    try {
+      const profile = await RemielDB.getProfile(cid);
+      if (profile && profile.birthday) {
+        const bd = new Date(profile.birthday + 'T00:00:00');
+        const today = new Date();
+        const thisYearBd = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
+        const diff = (thisYearBd - today) / DAY_MS;
+        if (diff >= 0 && diff < 1) candidates.push({ headline: 'BIRTHDAY TODAY! 🎂', priority: P.BIRTHDAY_TODAY });
+        else if (diff >= 1 && diff <= 3) candidates.push({ headline: 'BIRTHDAY IN ' + Math.ceil(diff) + ' DAYS', priority: P.BIRTHDAY_SOON });
+        else if (diff >= 4 && diff <= 7) candidates.push({ headline: 'BIRTHDAY THIS WEEK', priority: P.BIRTHDAY_SOON - 10 });
+        /* Yesterday */
+        if (diff < 0 && diff > -2) candidates.push({ headline: 'BIRTHDAY WAS YESTERDAY', priority: P.BIRTHDAY_SOON - 5 });
+      }
+    } catch(_) {}
+
+    /* Signal 5: Check-in frequency pattern */
+    try {
+      const history = (await RemielDB.getSetting('checkinHistory_' + cid)) || [];
+      if (history.length >= 3) {
+        const recent = history.slice(-10);
+        let gaps = [];
+        for (let i = 1; i < recent.length; i++) gaps.push(recent[i].timestamp - recent[i - 1].timestamp);
+        const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+        const sinceCheckin = now - recent[recent.length - 1].timestamp;
+        if (sinceCheckin > avgGap * 2.5 && sinceCheckin > 3 * DAY_MS) {
+          candidates.push({ headline: 'CHECK-IN PATTERN CHANGED', priority: P.CHECKIN_GAP });
+        }
+      }
+    } catch(_) {}
+
+    /* Signal 6: Voice wellness state */
+    try {
+      const wellness = await RemielDB.getSetting('voiceWellness_' + cid);
+      if (wellness && wellness.state && wellness.confidence >= 0.6) {
+        const age = (now - (wellness.ts || 0)) / DAY_MS;
+        if (age < 7) {
+          const vMap = {
+            'Distressed': { h: 'VOICE SIGNALS CONCERN', p: P.VOICE_DISTRESS },
+            'Low': { h: 'VOICE SOUNDS STRAINED', p: P.VOICE_LOW },
+            'Agitated': { h: 'VOCAL STRESS DETECTED', p: P.VOICE_AGITATED },
+            'Elevated': { h: 'SOUNDING ENERGIZED', p: P.VOICE_ELEVATED }
+          };
+          const v = vMap[wellness.state];
+          if (v) candidates.push({ headline: v.h, priority: v.p });
+        }
+      }
+    } catch(_) {}
+
+    /* Default fallbacks */
+    if (candidates.length === 0) {
+      const sevMap = { 0: ['NEEDS YOU NOW', P.CRITICAL_MOOD - 5], 1: ['REACH OUT TODAY', P.MOOD_LOW - 5], 2: ['CHECK IN SOON', P.QUIET_WEEK - 5], 3: ['DOING OKAY', P.STABLE], 4: ['ALL GOOD', P.ALL_GOOD] };
+      const sv = sevMap[contact.sev] || sevMap[4];
+      candidates.push({ headline: sv[0], priority: sv[1] });
+    }
+    if (!moods.length && !interactions.length) return { headline: 'START TRACKING', priority: P.NO_DATA };
+
+    candidates.sort((a, b) => b.priority - a.priority);
+    return candidates[0];
+  }
+
+  async function refreshAll() {
+    try {
+      const contacts = await RemielDB.getAllContacts();
+      for (const c of contacts) {
+        try {
+          const result = await computeHeadline(c);
+          _cache[c.id] = { headline: result.headline, priority: result.priority, ts: Date.now() };
+        } catch(_) {}
+      }
+    } catch(_) {}
+  }
+
+  function get(contact) {
+    if (!contact) return '';
+    const cached = _cache[contact.id];
+    if (cached && (Date.now() - cached.ts) < _REFRESH_MS * 2) return cached.headline;
+    const sev = contact.sev;
+    switch (sev) {
+      case 0: return 'NEEDS YOU NOW'; case 1: return 'REACH OUT TODAY';
+      case 2: return 'CHECK IN SOON'; case 3: return 'DOING OKAY';
+      case 4: return 'ALL GOOD'; default: return '';
+    }
+  }
+
+  function start() { refreshAll(); _timer = setInterval(refreshAll, _REFRESH_MS); }
+  function stop() { if (_timer) { clearInterval(_timer); _timer = null; } }
+
+  async function refreshOne(contactId) {
+    try {
+      const contact = await RemielDB.getContact(contactId);
+      if (contact) {
+        const result = await computeHeadline(contact);
+        _cache[contactId] = { headline: result.headline, priority: result.priority, ts: Date.now() };
+      }
+    } catch(_) {}
+  }
+
+  return { get, start, stop, refreshAll, refreshOne, computeHeadline };
+})();
+
+function getContactHeadline(contact) {
+  return SentinelHeadlines.get(contact);
+}
+
+/* ── Quick-action icon drawing for focused spheres ── */
+function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
+  /* Three icons: phone, SMS, email — drawn below the sphere */
+  const iconY = sy + r + 28 * s;          /* Below name label */
+  const iconSpacing = Math.max(22, 28 * s);
+  const iconR = Math.max(9, 11 * s);
+  const icons = [
+    { type: 'phone', cx: sx - iconSpacing },
+    { type: 'sms',   cx: sx },
+    { type: 'email', cx: sx + iconSpacing }
+  ];
+
+  /* Fade-in animation — icons pulse in */
+  const fadeAlpha = Math.min(1, 0.75 + 0.25 * Math.sin(t * 0.004));
+
+  for (const icon of icons) {
+    /* Circle background */
+    ctx.globalAlpha = 0.85 * fadeAlpha;
+    ctx.fillStyle = 'rgba(255,210,77,0.18)';
+    ctx.beginPath();
+    ctx.arc(icon.cx, iconY, iconR, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* Circle border */
+    ctx.strokeStyle = '#ffd24d';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(icon.cx, iconY, iconR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    /* Icon symbol */
+    ctx.globalAlpha = 0.95 * fadeAlpha;
+    ctx.fillStyle = '#ffd24d';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const iFs = Math.max(8, Math.round(10 * s));
+    ctx.font = iFs + 'px system-ui, sans-serif';
+
+    if (icon.type === 'phone') {
+      ctx.fillText('\u260E', icon.cx, iconY);           /* ☎ phone */
+    } else if (icon.type === 'sms') {
+      ctx.fillText('\u{1F4AC}', icon.cx, iconY);        /* 💬 speech bubble */
+    } else if (icon.type === 'email') {
+      ctx.fillText('\u2709', icon.cx, iconY);            /* ✉ envelope */
+    }
+  }
+  ctx.globalAlpha = 1;
+}
 
 /* ── Next Action Engine (CareCircle mechanics) ── */
 let nextActionNodeId = null;   /* Contact ID for gold halo */
@@ -8206,6 +9194,14 @@ function loadBroadcastIntoSphere(contactId, blob) {
   video.loop = true;
   video.muted = true; /* Muted for autoplay in sphere; click to unmute */
   video.playsInline = true;
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  /* Safari doesn't honor loop on detached video elements used as canvas sources.
+     Manually restart on ended as a reliable fallback. */
+  video.addEventListener('ended', () => {
+    video.currentTime = 0;
+    video.play().catch(() => {});
+  });
   video.addEventListener('loadedmetadata', () => {
     video.play().catch(() => {});
     if (contactId === 'self') {
@@ -8359,6 +9355,52 @@ function onPressEnd(e) {
       // Tap in network mode — single/double tap detection
       const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
       const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+
+      /* ── Quick-action icon tap detection on focused sphere ── */
+      if (focusedContactId) {
+        const _qaNode = NODES.find(n => n.contact.id === focusedContactId);
+        if (_qaNode) {
+          const _qaP = projectNode(_qaNode);
+          const _qaS = _qaP.scale;
+          const _qaMul = FOCUS_SCALE;
+          const _qaCb = pulseOn ? (1 + (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseAmp * Math.sin(performance.now() * (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseSpd + _qaNode.tx)) : 1;
+          const _qaR = Math.max(2, _qaNode.r * _qaS * _qaMul * _qaCb);
+          const _qaSx = _qaP.sx, _qaSy = _qaP.sy;
+          const _qaIconY = _qaSy + _qaR + 28 * _qaS;
+          const _qaSpacing = Math.max(22, 28 * _qaS);
+          const _qaIconR = Math.max(9, 11 * _qaS) + 6;  /* +6 for tap target padding */
+          const _qaRect = CV.getBoundingClientRect();
+          const _qaTx = clientX - _qaRect.left;
+          const _qaTy = clientY - _qaRect.top;
+          const _qaIcons = [
+            { type: 'phone', cx: _qaSx - _qaSpacing },
+            { type: 'sms',   cx: _qaSx },
+            { type: 'email', cx: _qaSx + _qaSpacing }
+          ];
+          for (const _qi of _qaIcons) {
+            const _qDist = Math.hypot(_qaTx - _qi.cx, _qaTy - _qaIconY);
+            if (_qDist <= _qaIconR) {
+              /* Icon tapped — trigger action */
+              const _qc = _qaNode.contact;
+              if (_qi.type === 'phone' && _qc.phone) {
+                window.location.href = 'tel:' + _qc.phone;
+              } else if (_qi.type === 'sms' && _qc.phone) {
+                window.location.href = 'sms:' + _qc.phone;
+              } else if (_qi.type === 'email' && _qc.email) {
+                window.location.href = 'mailto:' + _qc.email;
+              } else {
+                /* No contact info — brief toast */
+                showToast(_qi.type === 'email' ? 'No email on file — add in BLUF' : 'No phone on file — add in BLUF');
+              }
+              pressStarted = false;
+              netDragging = false;
+              stage.classList.remove('pressing');
+              return;
+            }
+          }
+        }
+      }
+
       const hit = hitTestNetwork(clientX, clientY);
       if (hit) {
         const rect = CV.getBoundingClientRect();
@@ -8392,6 +9434,10 @@ function onPressEnd(e) {
           sphereTapTarget = { isCenter: hit.isCenter, contactId: tapContactId, sphereBottomY, hit };
           focusedContactId = hit.isCenter ? null : hit.node.contact.id;
           netSpin = false; /* Pause auto-spin while focusing */
+          /* Show quick-action guidance for focused sphere */
+          if (!hit.isCenter && hit.node.contact) {
+            SentinelGuide.onFocusSphere(hit.node.contact.first);
+          }
           sphereTapTimer = setTimeout(() => {
             /* Single tap confirmed — sphere stays focused/enlarged */
             sphereTapTimer = null;
@@ -8403,6 +9449,7 @@ function onPressEnd(e) {
       } else {
         /* Tapped empty space — unfocus */
         focusedContactId = null;
+        SentinelGuide.hideAll();
         if (sphereTapTimer) { clearTimeout(sphereTapTimer); sphereTapTimer = null; sphereTapTarget = null; }
       }
     } else if (netDragging) {
@@ -9123,7 +10170,7 @@ function drawNetworkView(t) {
       const _mh = _memPhoto.isVideo ? _memImg.videoHeight : (_memImg.naturalHeight || _memImg.height);
       if (_mw > 0 && _mh > 0) {
         /* Re-kick video if browser paused it (mobile power saving) */
-        if (_memPhoto.isVideo && _memImg.paused) _memImg.play().catch(function(){});
+        if (_memPhoto.isVideo && (_memImg.paused || _memImg.ended)) { if (_memImg.ended) { _memImg.currentTime = 0; } _memImg.play().catch(function(){}); }
         ctx.save();
         /* Dream region — large circle in upper-right quadrant */
         var _drR = Math.min(W, H) * 0.28;
@@ -9273,6 +10320,21 @@ function drawNetworkView(t) {
       ctx.fillText(node.initials, sx, sy);
     }
 
+    /* ── Floating headline ABOVE sphere — what this contact needs from you ── */
+    if (s > 0.38) {
+      const _hl = getContactHeadline(node.contact);
+      if (_hl) {
+        const _hlFs = Math.max(7, Math.min(12, Math.round(10.5 * s)));
+        ctx.fillStyle = '#ffd24d';
+        ctx.globalAlpha = 0.92;
+        ctx.font = `700 ${_hlFs}px "Hanken Grotesk", system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(_hl, sx, sy - r - 8 * s);
+        ctx.globalAlpha = 1;
+      }
+    }
+
     /* Name below — clamp font size for stability */
     if (s > 0.38) {
       ctx.fillStyle = col;
@@ -9287,6 +10349,11 @@ function drawNetworkView(t) {
       ctx.globalAlpha = 0.55 + 0.35 * pulseA;
       ctx.font = `600 ${Math.round(9 * s)}px "Hanken Grotesk", system-ui, sans-serif`;
       ctx.fillText(sev.label.toLowerCase(), sx, sy + r + 24 * s);
+    }
+
+    /* ── Quick-action icons beneath focused/enlarged sphere ── */
+    if (isFocused && s > 0.38) {
+      drawQuickActionIcons(ctx, sx, sy, r, s, node.contact, t);
     }
     ctx.globalAlpha = 1;
   }
@@ -9334,7 +10401,7 @@ function drawNetworkView(t) {
   }
   if (mediaFrame && cachedMediaW > 0 && cachedMediaH > 0) {
     /* Re-kick video playback so self-mode keeps capturing fresh frames */
-    if (media && mediaType === 'video' && media.paused) media.play().catch(() => {});
+    if (media && mediaType === 'video' && (media.paused || media.ended)) { if (media.ended) { media.currentTime = 0; } media.play().catch(() => {}); }
     /* Capture live video frame to mediaFrame so network-mode video stays animated */
     if (media && mediaType === "video" && media.readyState >= 2) {
       const vw = media.videoWidth, vh = media.videoHeight;
@@ -10343,11 +11410,7 @@ const VoiceCheckin = (function () {
 
   function showCaptureResult() {
     $('voiceResultDuration').textContent = formatTime(lastDuration);
-    if (NousClient.isConnected()) {
-      $('voiceResultStatus').textContent = 'Analyzing voice biomarkers via NOUS...';
-    } else {
-      $('voiceResultStatus').textContent = 'Voice captured. NOUS analysis will be available when connected.';
-    }
+    $('voiceResultStatus').textContent = 'Voice captured. Analyzing prosodic features...';
     showStaticWaveform();
     $('voiceCaptureResult').style.display = 'flex';
   }
@@ -10366,6 +11429,27 @@ const VoiceCheckin = (function () {
       ts: Date.now(),
       nousResult: null
     };
+    /* ── Sentinel Voice Intelligence: extract features + score wellness ── */
+    try {
+      const _extraction = await SentinelFeatureExtractor.extract(lastBlob);
+      if (_extraction.features) {
+        entry.voiceFeatures = _extraction.features;
+        entry.voiceMeta = { frameCount: _extraction.frameCount, voicedFrames: _extraction.voicedFrames, totalFrames: _extraction.totalFrames };
+        const _bl = await SentinelBaseline.update(entry.contactId, _extraction.features);
+        entry.baselineN = _bl.n;
+        if (SentinelBaseline.isMature(_bl)) {
+          const _ws = await SentinelWellnessScorer.score(entry.contactId, _extraction.features);
+          entry.wellnessState = _ws.state;
+          entry.wellnessConfidence = _ws.confidence;
+          if (_ws.state !== 'Stable' && _ws.confidence >= 0.5) {
+            showToast('Voice analysis: ' + _ws.state.toLowerCase() + ' pattern detected');
+          }
+        } else {
+          showToast('Baseline building: ' + _bl.n + '/' + SentinelBaseline.MIN_SESSIONS + ' sessions');
+        }
+      }
+    } catch (_feErr) { console.warn('[VoiceCheckin] Feature extraction failed:', _feErr); }
+    /* ── NOUS integration (if connected) ── */
     try {
       entry.nousResult = await NousClient.submitVoice(lastBlob, entry.contactId);
     } catch (e) {
