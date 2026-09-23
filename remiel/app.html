@@ -4066,6 +4066,115 @@
     line-height: 1;
   }
 
+
+  /* ═══════════════════════════════════
+     SENTINEL CALL — Video Call UI
+     ═══════════════════════════════════ */
+  .sentinel-call-overlay {
+    position: fixed; inset: 0; z-index: 100000;
+    background: #05070c;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .sentinel-call-overlay.active {
+    opacity: 1; pointer-events: auto;
+  }
+  .sc-remote-video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; background: #000;
+  }
+  .sc-local-video {
+    position: absolute; top: env(safe-area-inset-top, 12px); right: 12px;
+    width: 120px; height: 160px; border-radius: 12px;
+    object-fit: cover; background: #111; border: 2px solid rgba(255,210,77,0.4);
+    z-index: 100002; margin-top: 12px;
+  }
+  .sc-status {
+    position: relative; z-index: 100001;
+    text-align: center; color: #fff; padding: 20px;
+  }
+  .sc-caller-name {
+    font-size: 28px; font-weight: 700; margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .sc-call-label {
+    font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 32px;
+  }
+  .sc-pulse-ring {
+    width: 120px; height: 120px; border-radius: 50%;
+    border: 3px solid rgba(255,210,77,0.3);
+    margin: 0 auto 24px; display: flex; align-items: center; justify-content: center;
+    animation: scPulse 2s ease-in-out infinite;
+  }
+  .sc-pulse-ring .sc-avatar {
+    width: 100px; height: 100px; border-radius: 50%;
+    background: linear-gradient(135deg, #1a1a3e, #2a1a4e);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; font-weight: 700; color: #ffd24d;
+  }
+  @keyframes scPulse {
+    0%, 100% { transform: scale(1); border-color: rgba(255,210,77,0.3); }
+    50% { transform: scale(1.08); border-color: rgba(255,210,77,0.6); }
+  }
+  .sc-controls {
+    position: absolute; bottom: 40px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 24px;
+    z-index: 100003;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .sc-btn {
+    width: 64px; height: 64px; border-radius: 50%; border: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; cursor: pointer; transition: transform 0.15s;
+  }
+  .sc-btn:active { transform: scale(0.92); }
+  .sc-btn-accept { background: #22c55e; color: #fff; }
+  .sc-btn-reject { background: #ef4444; color: #fff; }
+  .sc-btn-hangup { background: #ef4444; color: #fff; }
+  .sc-btn-mute   { background: rgba(255,255,255,0.15); color: #fff; }
+  .sc-btn-mute.active { background: rgba(239,68,68,0.5); }
+  .sc-btn-flip   { background: rgba(255,255,255,0.15); color: #fff; }
+  .sc-call-timer {
+    position: absolute; top: env(safe-area-inset-top, 12px); left: 0; right: 0;
+    text-align: center; color: rgba(255,255,255,0.7); font-size: 14px;
+    font-variant-numeric: tabular-nums; z-index: 100002;
+    padding-top: 16px;
+  }
+  .sc-connecting-dots::after {
+    content: ''; animation: scDots 1.5s infinite;
+  }
+  @keyframes scDots {
+    0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; }
+  }
+  /* Incoming call ring animation */
+  .sc-incoming-ring {
+    animation: scIncomingPulse 1s ease-in-out infinite alternate;
+  }
+  @keyframes scIncomingPulse {
+    from { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+    to   { box-shadow: 0 0 0 30px rgba(34,197,94,0); }
+  }
+  /* Video call QA button */
+  .bluf-qa-btn.sc-video-btn {
+    background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4);
+  }
+  .bluf-qa-btn.sc-video-btn:hover {
+    background: rgba(34,197,94,0.25);
+  }
+  /* Sentinel ID display in settings */
+  .sc-id-display {
+    background: rgba(255,210,77,0.08); border: 1px solid rgba(255,210,77,0.2);
+    border-radius: 8px; padding: 10px 14px; margin: 8px 0;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 15px;
+    color: #ffd24d; letter-spacing: 1px; text-align: center;
+    user-select: all; cursor: pointer;
+  }
+  .sc-id-label {
+    font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 4px; text-align: center;
+  }
+
 </style>
 
 
@@ -4562,10 +4671,10 @@
 
       <!-- ═══ PULLS (accordion) ═══ -->
 
-      <!-- Pull 1: Broadcast -->
+      <!-- Pull 1: Video Note -->
       <div class="bluf-pull" id="pull_broadcast">
-        <div class="bluf-pull-header" onclick="togglePull('broadcast')">
-          <div class="bluf-section-label">Broadcast</div>
+        <div class="bluf-pull-header" onclick="togglePull('videonote')">
+          <div class="bluf-section-label">Video Note</div>
           <span class="bluf-pull-preview">Describe how you are feeling right now</span>
           <span class="bluf-pull-chevron">&#9660;</span>
         </div>
@@ -4606,7 +4715,7 @@
               <div class="bluf-bc-controls" id="bcShareRow" hidden>
                 <button class="bluf-bc-btn primary" id="bcShareBtn" onclick="shareBroadcast()">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                  Share Broadcast
+                  Share Video Note
                 </button>
                 <button class="bluf-bc-btn" id="bcSaveBtn" onclick="saveBroadcastToSphere()">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -4928,6 +5037,10 @@
 
       <!-- Quick Action Bar -->
       <div class="bluf-quick-actions" id="blufQuickActions">
+        <button class="bluf-qa-btn sc-video-btn" id="qaVideoBtn" onclick="event.stopPropagation(); SentinelCall.callFocused();">
+          <span class="bluf-qa-icon">📹</span>
+          Video
+        </button>
         <a class="bluf-qa-btn" id="qaCallBtn" href="tel:" onclick="event.stopPropagation()">
           <span class="bluf-qa-icon">📞</span>
           Call
@@ -4945,6 +5058,41 @@
   </div>
 </div>
 
+
+<!-- ═══ Sentinel Call — Video Call Overlays ═══ -->
+<div class="sentinel-call-overlay" id="scOverlay">
+  <video class="sc-remote-video" id="scRemoteVideo" autoplay playsinline></video>
+  <video class="sc-local-video" id="scLocalVideo" autoplay playsinline muted></video>
+  <div class="sc-call-timer" id="scCallTimer" hidden>00:00</div>
+  <div class="sc-status" id="scStatus">
+    <div class="sc-pulse-ring" id="scPulseRing">
+      <div class="sc-avatar" id="scAvatar">?</div>
+    </div>
+    <div class="sc-caller-name" id="scCallerName"></div>
+    <div class="sc-call-label" id="scCallLabel"><span class="sc-connecting-dots">Connecting</span></div>
+  </div>
+  <div class="sc-controls" id="scControls">
+    <button class="sc-btn sc-btn-mute" id="scMuteBtn" onclick="SentinelCall.toggleMute()" title="Mute">🎤</button>
+    <button class="sc-btn sc-btn-hangup" id="scHangupBtn" onclick="SentinelCall.hangUp()" title="End Call">📵</button>
+    <button class="sc-btn sc-btn-flip" id="scFlipBtn" onclick="SentinelCall.flipCamera()" title="Switch Camera">🔄</button>
+  </div>
+</div>
+
+<!-- Incoming Call Overlay (separate so it can ring while main is hidden) -->
+<div class="sentinel-call-overlay" id="scIncomingOverlay">
+  <div class="sc-status">
+    <div class="sc-pulse-ring sc-incoming-ring" id="scInPulseRing">
+      <div class="sc-avatar" id="scInAvatar">?</div>
+    </div>
+    <div class="sc-caller-name" id="scInCallerName">Incoming Call</div>
+    <div class="sc-call-label">Sentinel Call</div>
+  </div>
+  <div class="sc-controls">
+    <button class="sc-btn sc-btn-reject" onclick="SentinelCall.rejectIncoming()" title="Decline">✕</button>
+    <button class="sc-btn sc-btn-accept" onclick="SentinelCall.acceptIncoming()" title="Answer">📹</button>
+  </div>
+</div>
+
 <!-- ═══ Add Person FAB (network constellation view) ═══ -->
 <button class="add-person-fab hidden" id="addPersonFab" onclick="toggleAddModal()" aria-label="Add person">+</button>
 
@@ -4956,6 +5104,7 @@
     <input class="contact-modal-input" id="cmLastName" type="text" placeholder="Last name" maxlength="30" autocomplete="off">
     <input class="contact-modal-input" id="cmPhone" type="tel" placeholder="Phone number" maxlength="20" autocomplete="off">
     <input class="contact-modal-input" id="cmEmail" type="email" placeholder="Email address" maxlength="60" autocomplete="off">
+    <input class="contact-modal-input" id="cmSentinelId" type="text" placeholder="Sentinel ID (for video calls)" maxlength="8" autocomplete="off" style="text-transform:uppercase; letter-spacing:2px; font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace,monospace; font-size:15px;">
     <div class="contact-modal-cat-row" id="cmCatRow">
       <button class="contact-modal-cat active" data-cat="family" onclick="cmSetCat(this)">
         <span class="contact-modal-cat-dot" style="background:rgb(56,189,248)"></span>Family
@@ -5019,10 +5168,46 @@ async function sha256(str) {
    Note: index.html uppercases input before hashing; we do the same.
    To add a code: sha256('carecircle:' + CODE_UPPERCASED) and add the hex here. */
 const VALID_HASHES = new Set([
-  'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6',  /* primary */
+  'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6',  /* BEVR — primary */
   '2dfff49a919dda77992069e38094e3e2e8a699a3ac8e080d45664465d1700ffb',  /* tester  */
-  '02c9549ac193f3287f532293c5df0264965ccba60e79bd712919e7bd12bba5f9'   /* architect */
+  '02c9549ac193f3287f532293c5df0264965ccba60e79bd712919e7bd12bba5f9',  /* architect */
+  '696d20537f0205b818a6c83938ae3421dde94e626f5a286a6288ea37ad1644d5',  /* RSTX — tester-2 */
+  '1d86a55e665006e5ebf3e19a208b77fcc11478075acb3190f993ff2c06f077e2',  /* NXLP — tester-3 */
+  '7104ff5be2a110f3d94588986fb06741ca958a732324444c399449c58e319afa'   /* WQKZ — tester-4 */
 ]);
+
+/* ── Code usage tracking ── */
+const CODE_LABELS = {
+  'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6': 'BEVR',
+  '2dfff49a919dda77992069e38094e3e2e8a699a3ac8e080d45664465d1700ffb': 'tester',
+  '02c9549ac193f3287f532293c5df0264965ccba60e79bd712919e7bd12bba5f9': 'architect',
+  '696d20537f0205b818a6c83938ae3421dde94e626f5a286a6288ea37ad1644d5': 'RSTX',
+  '1d86a55e665006e5ebf3e19a208b77fcc11478075acb3190f993ff2c06f077e2': 'NXLP',
+  '7104ff5be2a110f3d94588986fb06741ca958a732324444c399449c58e319afa': 'WQKZ'
+};
+
+function trackCodeUsage(codeHash) {
+  try {
+    const label = CODE_LABELS[codeHash] || 'unknown';
+    const entry = {
+      code: label,
+      hash: codeHash.substring(0, 12),
+      usedAt: new Date().toISOString(),
+      userAgent: navigator.userAgent.substring(0, 80)
+    };
+    const tx = _db.transaction('settings', 'readwrite');
+    const store = tx.objectStore('settings');
+    store.get('codeUsageLog').onsuccess = function(e) {
+      const log = (e.target.result && e.target.result.value) || [];
+      log.push(entry);
+      while (log.length > 200) log.shift();
+      store.put({ key: 'codeUsageLog', value: log });
+    };
+    console.log('Gate code used:', label, 'at', entry.usedAt);
+  } catch(err) {
+    console.warn('Code tracking error:', err);
+  }
+}
 
 let appRevealed = false;
 let animRunning = false;
@@ -5061,7 +5246,8 @@ async function submitGateCode() {
   if (VALID_HASHES.has(hash)) {
     errEl.innerHTML = '&nbsp;';
     /* Store for session continuity */
-    try { sessionStorage.setItem('rm:access', code); } catch(e) {}
+    try { sessionStorage.setItem('rm:access', code);
+          trackCodeUsage(hash); } catch(e) {}
     beginVideoIntro();
   } else {
     flashGateError(I18n.t('gate.error.invalid'), input);
@@ -5713,7 +5899,7 @@ const I18n = (function () {
       'pull.mood':                'Mood',
       'pull.ledger':              'Ledger',
       'pull.location':            'Location',
-      'pull.broadcast':           'Broadcast',
+      'pull.broadcast':           'Video Note',
       'pull.lastCheckin':         'Last Check-in',
       'pull.thingsToNote':        'Things to Note',
       'pull.nextSteps':           'Next Steps',
@@ -7919,6 +8105,7 @@ async function updateBlufContent() {
 
   // Quick Action Bar — update links; preserve button DOM (never innerHTML replace)
   const _qaBar = document.getElementById('blufQuickActions');
+  const _qaVideo = document.getElementById('qaVideoBtn');
   const _qaCall = document.getElementById('qaCallBtn');
   const _qaText = document.getElementById('qaTextBtn');
   const _qaEmail = document.getElementById('qaEmailBtn');
@@ -7929,6 +8116,7 @@ async function updateBlufContent() {
   if (!selectedContact) {
     /* Self-view: hide buttons, show explanatory note */
     _qaBar.classList.remove('hidden');
+    if (_qaVideo) _qaVideo.style.display = 'none';
     if (_qaCall) _qaCall.style.display = 'none';
     if (_qaText) _qaText.style.display = 'none';
     if (_qaEmail) _qaEmail.style.display = 'none';
@@ -7943,6 +8131,7 @@ async function updateBlufContent() {
     /* Contact view: show all buttons, update links */
     _qaBar.classList.remove('hidden');
     if (_editBtn) _editBtn.style.display = '';
+    if (_qaVideo) _qaVideo.style.display = '';
     if (_qaCall) _qaCall.style.display = '';
     if (_qaText) _qaText.style.display = '';
     if (_qaEmail) _qaEmail.style.display = '';
@@ -8612,14 +8801,15 @@ function getContactHeadline(contact) {
 
 /* ── Quick-action icon drawing for focused spheres ── */
 function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
-  /* Three icons: phone, SMS, email — drawn below the sphere */
+  /* Four icons: video, phone, SMS, email — drawn below the sphere */
   const iconY = sy + r + 28 * s;          /* Below name label */
   const iconSpacing = Math.max(22, 28 * s);
   const iconR = Math.max(9, 11 * s);
   const icons = [
-    { type: 'phone', cx: sx - iconSpacing },
-    { type: 'sms',   cx: sx },
-    { type: 'email', cx: sx + iconSpacing }
+    { type: 'video', cx: sx - iconSpacing * 1.5 },
+    { type: 'phone', cx: sx - iconSpacing * 0.5 },
+    { type: 'sms',   cx: sx + iconSpacing * 0.5 },
+    { type: 'email', cx: sx + iconSpacing * 1.5 }
   ];
 
   /* Fade-in animation — icons pulse in */
@@ -8648,7 +8838,9 @@ function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
     const iFs = Math.max(8, Math.round(10 * s));
     ctx.font = iFs + 'px system-ui, sans-serif';
 
-    if (icon.type === 'phone') {
+    if (icon.type === 'video') {
+      ctx.fillText('\u{1F4F9}', icon.cx, iconY);        /* 📹 video camera */
+    } else if (icon.type === 'phone') {
       ctx.fillText('\u260E', icon.cx, iconY);           /* ☎ phone */
     } else if (icon.type === 'sms') {
       ctx.fillText('\u{1F4AC}', icon.cx, iconY);        /* 💬 speech bubble */
@@ -8981,7 +9173,7 @@ function startSeverityTimer() {
 }
 
 /* ── Unified Pull Accordion ── */
-const PULL_IDS = ['broadcast', 'location', 'lastcontact', 'profile', 'nextaction', 'issues', 'medication', 'ledger', 'intelligence'];
+const PULL_IDS = ['videonote', 'location', 'lastcontact', 'profile', 'nextaction', 'issues', 'medication', 'ledger', 'intelligence'];
 
 function togglePull(pullId) {
   const el = document.getElementById('pull_' + pullId);
@@ -8994,7 +9186,7 @@ function togglePull(pullId) {
     if (other) other.classList.remove('open');
   });
   // Kill broadcast stream only if a non-broadcast pull is being opened, or broadcast is closing
-  if (pullId !== 'broadcast' || wasOpen) {
+  if (pullId !== 'videonote' || wasOpen) {
     closeBroadcastStream();
   }
   // Toggle this pull
@@ -9003,7 +9195,7 @@ function togglePull(pullId) {
   } else {
     el.classList.add('open');
     // Auto-start broadcast camera when opening broadcast pull
-    if (pullId === 'broadcast') startBcStream();
+    if (pullId === 'videonote') startBcStream();
     // Scroll the pull header into view so content is visible near viewport edge
     setTimeout(() => {
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -9428,7 +9620,7 @@ function startBcRecording() {
     if (bcChunks.length > 0) {
       const blob = new Blob(bcChunks, { type: bcRecorder.mimeType || 'video/webm' });
       showBcPlayback(blob);
-      document.getElementById('bcStatus').textContent = 'Recording saved — ready to broadcast';
+      document.getElementById('bcStatus').textContent = 'Recording saved';
     }
   };
   bcRecorder.start(250);
@@ -9482,8 +9674,8 @@ async function shareBroadcast() {
   const file = new File([bcLastBlob], 'broadcast.' + ext, { type: bcLastBlob.type || 'video/webm' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'Broadcast', text: 'Shared from Remiel Sentinel' });
-      document.getElementById('bcStatus').textContent = 'Broadcast shared';
+      await navigator.share({ files: [file], title: 'Video Note', text: 'Shared from Remiel Sentinel' });
+      document.getElementById('bcStatus').textContent = 'Video note shared';
     } catch (err) {
       if (err.name !== 'AbortError') {
         document.getElementById('bcStatus').textContent = 'Share cancelled or not supported';
@@ -9517,7 +9709,7 @@ async function saveBroadcastToSphere() {
 
   /* Load broadcast video into the sphere */
   loadBroadcastIntoSphere(contactId, bcLastBlob);
-  document.getElementById('bcStatus').textContent = 'Broadcast saved to sphere';
+  document.getElementById('bcStatus').textContent = 'Video note saved to sphere';
 }
 
 /* Load a broadcast video blob into a contact's sphere for playback */
@@ -9709,16 +9901,19 @@ function onPressEnd(e) {
           const _qaTx = clientX - _qaRect.left;
           const _qaTy = clientY - _qaRect.top;
           const _qaIcons = [
-            { type: 'phone', cx: _qaSx - _qaSpacing },
-            { type: 'sms',   cx: _qaSx },
-            { type: 'email', cx: _qaSx + _qaSpacing }
+            { type: 'video', cx: _qaSx - _qaSpacing * 1.5 },
+            { type: 'phone', cx: _qaSx - _qaSpacing * 0.5 },
+            { type: 'sms',   cx: _qaSx + _qaSpacing * 0.5 },
+            { type: 'email', cx: _qaSx + _qaSpacing * 1.5 }
           ];
           for (const _qi of _qaIcons) {
             const _qDist = Math.hypot(_qaTx - _qi.cx, _qaTy - _qaIconY);
             if (_qDist <= _qaIconR) {
               /* Icon tapped — trigger action */
               const _qc = _qaNode.contact;
-              if (_qi.type === 'phone' && _qc.phone) {
+              if (_qi.type === 'video') {
+                SentinelCall.callContact(_qc.id);
+              } else if (_qi.type === 'phone' && _qc.phone) {
                 window.location.href = 'tel:' + _qc.phone;
               } else if (_qi.type === 'sms' && _qc.phone) {
                 window.location.href = 'sms:' + _qc.phone;
@@ -13935,6 +14130,7 @@ if (document.readyState === 'loading') {
     DailySummary.init();
     MedicationTracker.init();
     SyncEngine.init();
+    SentinelCall.init();
     startNextActionTimer();
     startSeverityTimer();
   });
@@ -13943,9 +14139,411 @@ if (document.readyState === 'loading') {
     AlertEngine.init();
     DailySummary.init();
     MedicationTracker.init();
+    SyncEngine.init();
+    SentinelCall.init();
+    startNextActionTimer();
+    startSeverityTimer();
+  }, 0);
+}
 
 /* ── Disabled quick-action tap feedback ── */
-document.querySelectorAll('#qaCallBtn, #qaTextBtn, #qaEmailBtn').forEach(btn => {
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SENTINEL CALL — WebRTC Video Calling via PeerJS
+   Real-time peer-to-peer video/audio communication.
+   Each user gets a Sentinel ID; call by Sentinel ID.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Load PeerJS dynamically */
+(function loadPeerJS() {
+  if (window.Peer) return;
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
+  s.crossOrigin = 'anonymous';
+  s.onload = () => console.log('PeerJS loaded');
+  s.onerror = () => console.warn('PeerJS failed to load — video calling unavailable');
+  document.head.appendChild(s);
+})();
+
+const SentinelCall = (function() {
+  'use strict';
+
+  let _peer = null;
+  let _myId = null;
+  let _localStream = null;
+  let _currentCall = null;
+  let _incomingCall = null;
+  let _callStartTime = null;
+  let _timerInterval = null;
+  let _audioMuted = false;
+  let _facingMode = 'user';
+  let _ringtoneCtx = null;
+  let _ringtoneOsc = null;
+
+  /* ── Generate short Sentinel ID ── */
+  function _generateId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let id = '';
+    for (let i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+    return id;
+  }
+
+  /* ── Initialize ── */
+  async function init() {
+    /* Get or create Sentinel ID */
+    _myId = await RemielDB.getSetting('sentinelCallId');
+    if (!_myId) {
+      _myId = _generateId();
+      await RemielDB.putSetting('sentinelCallId', _myId);
+    }
+
+    /* Wait for PeerJS to load */
+    let retries = 0;
+    while (!window.Peer && retries < 50) {
+      await new Promise(r => setTimeout(r, 200));
+      retries++;
+    }
+    if (!window.Peer) {
+      console.warn('SentinelCall: PeerJS not available');
+      return;
+    }
+
+    /* Connect to PeerJS signaling server */
+    const peerId = 'sentinel-' + _myId.toLowerCase();
+    _peer = new Peer(peerId, { debug: 0 });
+
+    _peer.on('open', (id) => {
+      console.log('SentinelCall: online, peerId=' + id + ', sentinelId=' + _myId);
+    });
+
+    _peer.on('call', (call) => {
+      console.log('SentinelCall: incoming call from', call.peer);
+      _incomingCall = call;
+      _showIncoming(call);
+    });
+
+    _peer.on('disconnected', () => {
+      console.log('SentinelCall: disconnected, reconnecting...');
+      if (_peer && !_peer.destroyed) _peer.reconnect();
+    });
+
+    _peer.on('error', (err) => {
+      console.warn('SentinelCall: error', err.type, err.message);
+      if (err.type === 'peer-unavailable') {
+        _hideAllOverlays();
+        _stopLocalStream();
+        showToast('Could not reach that person — they may not be online');
+      }
+    });
+
+    /* Show Sentinel ID in settings if element exists */
+    const idEl = document.getElementById('scMyId');
+    if (idEl) idEl.textContent = _myId;
+  }
+
+  /* ── Get camera stream ── */
+  async function _getStream() {
+    return navigator.mediaDevices.getUserMedia({
+      video: { facingMode: _facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: true
+    });
+  }
+
+  /* ── Call a contact by ID ── */
+  async function callContact(contactId) {
+    if (!_peer || _peer.destroyed) {
+      showToast('Video calling not ready — try again in a moment');
+      return;
+    }
+
+    let contact;
+    try { contact = await RemielDB.getContact(contactId); } catch(e) {}
+    if (!contact) { showToast('Contact not found'); return; }
+
+    const targetId = contact.sentinelId;
+    if (!targetId) {
+      showToast('No Sentinel ID for ' + (contact.first || 'this contact') + ' — add it in their profile');
+      return;
+    }
+
+    try {
+      _localStream = await _getStream();
+    } catch (err) {
+      showToast('Camera/mic access denied');
+      return;
+    }
+
+    /* Show outgoing UI */
+    const name = ((contact.first || '') + ' ' + (contact.last || '')).trim() || 'Contact';
+    const initials = (contact.first || '?')[0] + (contact.last || '')[0];
+    _showOutgoing(name, initials);
+
+    /* Place the call */
+    const remotePeerId = 'sentinel-' + targetId.toLowerCase();
+    _currentCall = _peer.call(remotePeerId, _localStream, {
+      metadata: { callerName: (await _getMyName()), callerId: _myId }
+    });
+
+    /* Show local video */
+    const localVid = document.getElementById('scLocalVideo');
+    if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
+
+    _currentCall.on('stream', (remoteStream) => {
+      _showActive(remoteStream);
+    });
+
+    _currentCall.on('close', () => {
+      endCall();
+    });
+
+    _currentCall.on('error', (err) => {
+      console.warn('SentinelCall: call error', err);
+      endCall();
+      showToast('Call failed — ' + (err.message || 'connection lost'));
+    });
+  }
+
+  /* ── Call from focused sphere (quick action) ── */
+  function callFocused() {
+    if (typeof focusedContactId !== 'undefined' && focusedContactId) {
+      callContact(focusedContactId);
+    } else if (typeof selectedContact !== 'undefined' && selectedContact) {
+      callContact(selectedContact.id);
+    } else {
+      showToast('Select a contact first');
+    }
+  }
+
+  /* ── Accept incoming call ── */
+  async function acceptIncoming() {
+    if (!_incomingCall) return;
+    _stopRingtone();
+
+    try {
+      _localStream = await _getStream();
+    } catch(err) {
+      showToast('Camera/mic access denied');
+      rejectIncoming();
+      return;
+    }
+
+    _incomingCall.answer(_localStream);
+    _currentCall = _incomingCall;
+    _incomingCall = null;
+
+    /* Show local video */
+    const localVid = document.getElementById('scLocalVideo');
+    if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
+
+    _currentCall.on('stream', (remoteStream) => {
+      /* Hide incoming overlay, show active */
+      document.getElementById('scIncomingOverlay').classList.remove('active');
+      _showActive(remoteStream);
+    });
+
+    _currentCall.on('close', () => { endCall(); });
+  }
+
+  /* ── Reject incoming ── */
+  function rejectIncoming() {
+    _stopRingtone();
+    if (_incomingCall) { _incomingCall.close(); _incomingCall = null; }
+    document.getElementById('scIncomingOverlay').classList.remove('active');
+  }
+
+  /* ── Hang up ── */
+  function hangUp() {
+    if (_currentCall) _currentCall.close();
+    endCall();
+  }
+
+  /* ── End call cleanup ── */
+  function endCall() {
+    _stopRingtone();
+    _stopLocalStream();
+    _currentCall = null;
+    _incomingCall = null;
+    _callStartTime = null;
+    _audioMuted = false;
+    if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+    _hideAllOverlays();
+  }
+
+  /* ── Mute toggle ── */
+  function toggleMute() {
+    if (!_localStream) return;
+    _audioMuted = !_audioMuted;
+    _localStream.getAudioTracks().forEach(t => { t.enabled = !_audioMuted; });
+    const btn = document.getElementById('scMuteBtn');
+    if (btn) {
+      btn.classList.toggle('active', _audioMuted);
+      btn.textContent = _audioMuted ? '🔇' : '🎤';
+    }
+  }
+
+  /* ── Flip camera ── */
+  async function flipCamera() {
+    if (!_localStream || !_currentCall) return;
+    _facingMode = _facingMode === 'user' ? 'environment' : 'user';
+    try {
+      _localStream.getVideoTracks().forEach(t => t.stop());
+      const newStream = await _getStream();
+      const newVideoTrack = newStream.getVideoTracks()[0];
+
+      /* Replace track in peer connection */
+      const sender = _currentCall.peerConnection
+        .getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender) await sender.replaceTrack(newVideoTrack);
+
+      /* Keep audio tracks */
+      const audioTrack = _localStream.getAudioTracks()[0];
+      _localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
+
+      const localVid = document.getElementById('scLocalVideo');
+      if (localVid) localVid.srcObject = _localStream;
+    } catch(err) {
+      console.warn('SentinelCall: flip failed', err);
+    }
+  }
+
+  /* ── UI helpers ── */
+  function _showOutgoing(name, initials) {
+    const overlay = document.getElementById('scOverlay');
+    const status = document.getElementById('scStatus');
+    const callerName = document.getElementById('scCallerName');
+    const avatar = document.getElementById('scAvatar');
+    const label = document.getElementById('scCallLabel');
+    const timer = document.getElementById('scCallTimer');
+    const remoteVid = document.getElementById('scRemoteVideo');
+
+    if (remoteVid) remoteVid.srcObject = null;
+    if (status) status.style.display = '';
+    if (callerName) callerName.textContent = name;
+    if (avatar) avatar.textContent = initials || '?';
+    if (label) label.innerHTML = '<span class="sc-connecting-dots">Calling</span>';
+    if (timer) timer.hidden = true;
+    if (overlay) overlay.classList.add('active');
+  }
+
+  function _showIncoming(call) {
+    const meta = call.metadata || {};
+    const name = meta.callerName || call.peer.replace('sentinel-', '').toUpperCase();
+    const initials = name.substring(0, 2).toUpperCase();
+
+    const overlay = document.getElementById('scIncomingOverlay');
+    const callerName = document.getElementById('scInCallerName');
+    const avatar = document.getElementById('scInAvatar');
+
+    if (callerName) callerName.textContent = name;
+    if (avatar) avatar.textContent = initials;
+    if (overlay) overlay.classList.add('active');
+
+    _playRingtone();
+
+    /* Auto-timeout after 30s */
+    setTimeout(() => {
+      if (_incomingCall === call) rejectIncoming();
+    }, 30000);
+  }
+
+  function _showActive(remoteStream) {
+    const remoteVid = document.getElementById('scRemoteVideo');
+    const status = document.getElementById('scStatus');
+    const timer = document.getElementById('scCallTimer');
+    const overlay = document.getElementById('scOverlay');
+
+    if (remoteVid) {
+      remoteVid.srcObject = remoteStream;
+      remoteVid.play().catch(() => {});
+    }
+    if (status) status.style.display = 'none';
+    if (timer) timer.hidden = false;
+    if (overlay) overlay.classList.add('active');
+
+    /* Start call timer */
+    _callStartTime = Date.now();
+    _timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - _callStartTime) / 1000);
+      const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const ss = String(elapsed % 60).padStart(2, '0');
+      if (timer) timer.textContent = mm + ':' + ss;
+    }, 1000);
+  }
+
+  function _hideAllOverlays() {
+    const overlay = document.getElementById('scOverlay');
+    const incoming = document.getElementById('scIncomingOverlay');
+    const localVid = document.getElementById('scLocalVideo');
+    const remoteVid = document.getElementById('scRemoteVideo');
+    const timer = document.getElementById('scCallTimer');
+
+    if (overlay) overlay.classList.remove('active');
+    if (incoming) incoming.classList.remove('active');
+    if (localVid) localVid.srcObject = null;
+    if (remoteVid) remoteVid.srcObject = null;
+    if (timer) timer.hidden = true;
+  }
+
+  function _stopLocalStream() {
+    if (_localStream) {
+      _localStream.getTracks().forEach(t => t.stop());
+      _localStream = null;
+    }
+  }
+
+  /* ── Ringtone (Web Audio) ── */
+  function _playRingtone() {
+    try {
+      _ringtoneCtx = new (window.AudioContext || window.webkitAudioContext)();
+      _ringtoneOsc = _ringtoneCtx.createOscillator();
+      const gain = _ringtoneCtx.createGain();
+      _ringtoneOsc.type = 'sine';
+      _ringtoneOsc.frequency.value = 440;
+      gain.gain.value = 0.15;
+      _ringtoneOsc.connect(gain);
+      gain.connect(_ringtoneCtx.destination);
+      /* Pulsing ring pattern */
+      const now = _ringtoneCtx.currentTime;
+      for (let i = 0; i < 20; i++) {
+        gain.gain.setValueAtTime(0.15, now + i * 1.5);
+        gain.gain.setValueAtTime(0, now + i * 1.5 + 0.5);
+        gain.gain.setValueAtTime(0.15, now + i * 1.5 + 0.7);
+        gain.gain.setValueAtTime(0, now + i * 1.5 + 1.2);
+      }
+      _ringtoneOsc.start();
+    } catch(e) {}
+  }
+
+  function _stopRingtone() {
+    try { if (_ringtoneOsc) _ringtoneOsc.stop(); } catch(e) {}
+    try { if (_ringtoneCtx) _ringtoneCtx.close(); } catch(e) {}
+    _ringtoneOsc = null; _ringtoneCtx = null;
+  }
+
+  /* ── Get user's display name ── */
+  async function _getMyName() {
+    try {
+      const n = await RemielDB.getSetting('userSphereName');
+      if (n) return n;
+    } catch(e) {}
+    return 'Someone';
+  }
+
+  /* ── Public getters ── */
+  function getMyId() { return _myId; }
+  function isInCall() { return !!_currentCall; }
+
+  return {
+    init, callContact, callFocused,
+    acceptIncoming, rejectIncoming, hangUp, endCall,
+    toggleMute, flipCamera,
+    getMyId, isInCall
+  };
+})();
+
+
+document.querySelectorAll('#qaVideoBtn, #qaCallBtn, #qaTextBtn, #qaEmailBtn').forEach(btn => {
   btn.addEventListener('click', function(e) {
     if (this.style.pointerEvents === 'none' || parseFloat(this.style.opacity) < 0.5) {
       e.preventDefault();
@@ -14012,6 +14610,7 @@ function openContactModal(mode, contact) {
     lastInput.value = selectedContact.last || '';
     phoneInput.value = selectedContact.phone || '';
     emailInput.value = selectedContact.email || '';
+    document.getElementById('cmSentinelId').value = selectedContact.sentinelId || '';
     _cmCat = selectedContact.cat || 'family';
     document.querySelectorAll('#cmCatRow .contact-modal-cat').forEach(b => {
       b.classList.toggle('active', b.dataset.cat === _cmCat);
@@ -14024,6 +14623,7 @@ function openContactModal(mode, contact) {
     lastInput.value = '';
     phoneInput.value = '';
     emailInput.value = '';
+    document.getElementById('cmSentinelId').value = '';
     deleteBtn.classList.add('hidden');
   }
 
@@ -14069,6 +14669,7 @@ async function saveContactModal() {
       DEMO_CONTACTS[idx].cat = _cmCat;
       DEMO_CONTACTS[idx].phone = phone;
       DEMO_CONTACTS[idx].email = email;
+      DEMO_CONTACTS[idx].sentinelId = (document.getElementById('cmSentinelId').value.trim() || '').toUpperCase();
 
       // Persist to IndexedDB
       try {
@@ -14082,6 +14683,7 @@ async function saveContactModal() {
         selectedContact.cat = _cmCat;
         selectedContact.phone = phone;
         selectedContact.email = email;
+        selectedContact.sentinelId = DEMO_CONTACTS[idx].sentinelId;
       }
 
       // Rebuild constellation nodes and refresh BLUF
@@ -14100,7 +14702,8 @@ async function saveContactModal() {
       cat: _cmCat,
       sev: 2,
       phone: phone,
-      email: email
+      email: email,
+      sentinelId: (document.getElementById('cmSentinelId').value.trim() || '').toUpperCase()
     };
 
     DEMO_CONTACTS.push(newContact);
