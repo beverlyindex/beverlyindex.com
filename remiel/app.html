@@ -4041,6 +4041,44 @@
     </div>
   </div>
 
+
+  <!-- Account & Sync -->
+  <div class="settings-section" id="syncSection">
+    <div class="settings-section-title" data-i18n="sync.account">Account</div>
+    <div class="settings-card">
+      <!-- Not authenticated: show auth form -->
+      <div id="syncAuthForm">
+        <div id="syncAuthToggle" style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="settings-action-btn" id="syncLoginTab" onclick="SettingsPanel.syncTab('login')" style="flex:1;opacity:1;">Sign In</button>
+          <button class="settings-action-btn secondary" id="syncSignupTab" onclick="SettingsPanel.syncTab('signup')" style="flex:1;opacity:0.6;">Create Account</button>
+        </div>
+        <input class="settings-input" type="email" id="syncEmail" placeholder="Email" autocomplete="email" style="margin-bottom:8px;">
+        <input class="settings-input" type="password" id="syncPassword" placeholder="Password" autocomplete="current-password" style="margin-bottom:8px;">
+        <div id="syncSignupFields" style="display:none;">
+          <input class="settings-input" type="text" id="syncDisplayName" placeholder="Display Name" autocomplete="name" style="margin-bottom:8px;">
+          <input class="settings-input" type="text" id="syncInviteCode" placeholder="Invite Code" autocomplete="off" style="margin-bottom:8px;">
+        </div>
+        <button class="settings-action-btn" id="syncAuthBtn" onclick="SettingsPanel.doSyncAuth()" style="width:100%;">Sign In</button>
+        <div class="settings-status" id="syncAuthStatus"></div>
+      </div>
+      <!-- Authenticated: show sync status -->
+      <div id="syncStatusPanel" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div>
+            <div style="font-weight:600;font-size:13px;" id="syncDisplayLabel"></div>
+            <div style="font-size:11px;color:var(--text-dim);" id="syncStatusLabel"></div>
+          </div>
+          <div id="syncIndicator" style="width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0;"></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="settings-action-btn" id="syncNowBtn" onclick="SettingsPanel.doSyncNow()" style="flex:1;">Sync Now</button>
+          <button class="settings-action-btn secondary" id="syncLogoutBtn" onclick="SettingsPanel.doSyncLogout()">Sign Out</button>
+        </div>
+        <div class="settings-status" id="syncStatus"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Data Summary -->
   <div class="settings-section">
     <div class="settings-section-title" data-i18n="settings.yourData">Your Data</div>
@@ -9733,6 +9771,7 @@ const SettingsPanel = (function () {
   /* ── Panel Open / Close ── */
   function openPanel() {
     $('settingsPanel').classList.add('open');
+    updateSyncUI();
     refreshSummary();
   }
 
@@ -9776,8 +9815,129 @@ const SettingsPanel = (function () {
     setTimeout(init, 300);
   }
 
+
+  // ── Sync UI ──
+  var _syncMode = 'login';
+
+  function syncTab(mode) {
+    _syncMode = mode;
+    var loginTab = $('syncLoginTab');
+    var signupTab = $('syncSignupTab');
+    var signupFields = $('syncSignupFields');
+    var authBtn = $('syncAuthBtn');
+    if (mode === 'signup') {
+      loginTab.style.opacity = '0.6';
+      signupTab.style.opacity = '1';
+      signupFields.style.display = 'block';
+      authBtn.textContent = I18n.t('sync.signUp');
+    } else {
+      loginTab.style.opacity = '1';
+      signupTab.style.opacity = '0.6';
+      signupFields.style.display = 'none';
+      authBtn.textContent = I18n.t('sync.signIn');
+    }
+  }
+
+  async function doSyncAuth() {
+    var email = $('syncEmail').value.trim();
+    var password = $('syncPassword').value;
+    var statusEl = $('syncAuthStatus');
+
+    if (!email || !password) {
+      statusEl.textContent = 'Email and password required';
+      statusEl.style.color = '#f87171';
+      return;
+    }
+
+    statusEl.textContent = '...';
+    statusEl.style.color = 'var(--text-dim)';
+
+    try {
+      // Configure API base if not set
+      if (!SyncEngine.getStatus().apiBase) {
+        await SyncEngine.configure('https://remiel-sentinel-api.onrender.com');
+      }
+
+      if (_syncMode === 'signup') {
+        var displayName = $('syncDisplayName').value.trim() || email.split('@')[0];
+        var inviteCode = $('syncInviteCode').value.trim();
+        await SyncEngine.signup(email, password, displayName, inviteCode);
+      } else {
+        await SyncEngine.login(email, password);
+      }
+
+      statusEl.textContent = '';
+      updateSyncUI();
+      SyncEngine.startAutoSync();
+      // Trigger initial sync
+      setTimeout(function() { SyncEngine.sync(); }, 500);
+    } catch (err) {
+      statusEl.textContent = err.message || 'Authentication failed';
+      statusEl.style.color = '#f87171';
+    }
+  }
+
+  async function doSyncNow() {
+    var btn = $('syncNowBtn');
+    var statusEl = $('syncStatus');
+    btn.disabled = true;
+    btn.textContent = I18n.t('sync.syncing');
+    statusEl.textContent = '';
+
+    try {
+      var result = await SyncEngine.sync();
+      if (result.push && result.push.success) {
+        statusEl.textContent = 'Synced (v' + (result.pull ? result.pull.version : result.push.version) + ')';
+        statusEl.style.color = '#4ade80';
+      } else if (result.error) {
+        statusEl.textContent = result.error;
+        statusEl.style.color = '#f87171';
+      } else {
+        statusEl.textContent = 'Sync complete';
+        statusEl.style.color = '#4ade80';
+      }
+    } catch (err) {
+      statusEl.textContent = err.message || 'Sync failed';
+      statusEl.style.color = '#f87171';
+    }
+
+    btn.disabled = false;
+    btn.textContent = I18n.t('sync.syncNow');
+    updateSyncUI();
+  }
+
+  async function doSyncLogout() {
+    if (!confirm('Sign out? Your local data stays on this device.')) return;
+    await SyncEngine.logout();
+    updateSyncUI();
+  }
+
+  function updateSyncUI() {
+    var status = SyncEngine.getStatus();
+    var authForm = $('syncAuthForm');
+    var statusPanel = $('syncStatusPanel');
+
+    if (status.authenticated) {
+      authForm.style.display = 'none';
+      statusPanel.style.display = 'block';
+      $('syncDisplayLabel').textContent = status.displayName || status.userId;
+      var indicator = $('syncIndicator');
+      if (status.online) {
+        $('syncStatusLabel').textContent = I18n.t('sync.connected') + ' · v' + status.lastSyncVersion;
+        indicator.style.background = '#4ade80';
+      } else {
+        $('syncStatusLabel').textContent = I18n.t('sync.offline');
+        indicator.style.background = '#fbbf24';
+      }
+    } else {
+      authForm.style.display = 'block';
+      statusPanel.style.display = 'none';
+    }
+  }
+
   return {
-    open: openPanel, close: closePanel,
+    open: openPanel,
+    syncTab: syncTab, doSyncAuth: doSyncAuth, doSyncNow: doSyncNow, doSyncLogout: doSyncLogout, updateSyncUI: updateSyncUI, close: closePanel,
     doExport, onFileSelected, doDecrypt, doImport,
     confirmClearAll, refreshSummary
   };
