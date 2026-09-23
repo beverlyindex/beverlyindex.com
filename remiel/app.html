@@ -1352,7 +1352,7 @@
   .video-intro {
     position: fixed;
     inset: 0;
-    z-index: 8500;
+    z-index: 9200;
     background: #000;
     display: flex;
     align-items: center;
@@ -1366,8 +1366,9 @@
     pointer-events: auto;
   }
   .video-intro video {
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
     object-fit: cover;
   }
   .video-intro .skip-btn {
@@ -4132,7 +4133,7 @@
     <input type="file" id="obSelfCameraInput" accept="image/*,video/*" capture="user" hidden>
     <div class="ob-media-options">
       <button class="ob-media-opt" onclick="document.getElementById('obSelfFileInput').click()">Upload</button>
-      <button class="ob-media-opt" onclick="document.getElementById('obSelfCameraInput').click()">Take Photo/Video</button>
+      <button class="ob-media-opt" onclick="_obOpenCamera('self')">Take Photo/Video</button>
     </div>
     <p class="ob-media-hint" id="obSelfMediaHint">Photo or short video required</p>
     <input class="ob-input" id="obUserName" type="text" placeholder="Your first name" autocomplete="off" maxlength="30" style="text-align:center; font-size:16px; margin-bottom:24px;">
@@ -4158,7 +4159,7 @@
         </div>
         <div class="ob-contact-media-opts">
           <button class="ob-contact-media-opt" onclick="document.getElementById('obContactFileInput').click()">Upload photo</button>
-          <button class="ob-contact-media-opt" onclick="document.getElementById('obContactCameraInput').click()">Take photo</button>
+          <button class="ob-contact-media-opt" onclick="_obOpenCamera('contact')">Take photo</button>
         </div>
       </div>
       <input type="file" id="obContactFileInput" accept="image/*" hidden>
@@ -5082,8 +5083,9 @@ function beginVideoIntro() {
   const videoEl = document.getElementById('introVideo');
   const biSplash = document.getElementById('biSplash');
 
-  /* Phase 1: Hide gate screen INSTANTLY — no fade, no Remiel logo visible */
-  gateEl.style.display = 'none';
+  /* Phase 1: Hide gate screen BELOW video layers — no flash of app UI */
+  gateEl.style.zIndex = '0';
+  gateEl.style.opacity = '0';
 
   /* Phase 2: Beverly Index company splash — full screen, 4 second hold */
   biSplash.classList.add('active');
@@ -6268,6 +6270,18 @@ function _obValidateStep1() {
   if (btn) btn.disabled = !(nameOk && mediaOk);
 }
 
+
+/* Camera capture — tries native input[capture] first; getUserMedia fallback */
+function _obOpenCamera(mode) {
+  var inputId = mode === 'self' ? 'obSelfCameraInput' : 'obContactCameraInput';
+  var inp = document.getElementById(inputId);
+  if (inp) {
+    /* Ensure capture attribute is set for this click */
+    inp.setAttribute('capture', mode === 'self' ? 'user' : 'environment');
+    inp.click();
+  }
+}
+
 (function _initObMedia() {
   document.addEventListener('DOMContentLoaded', function() {
     var sf = document.getElementById('obSelfFileInput');
@@ -6847,8 +6861,8 @@ function buildNodes(fresh) {
   const N = DEMO_CONTACTS.length;
   const smaller = Math.min(CV.width / DPR, CV.height / DPR);
   /* Orbit shell must clear the enlarged center sphere — use 0.72 instead of 0.6 */
-  const shellR = Math.max(240, Math.round(smaller * 0.72));
-  const nodeR = Math.max(16, Math.round(smaller * 0.032));
+  const shellR = Math.max(260, Math.round(smaller * 0.78));
+  const nodeR = Math.max(20, Math.round(smaller * 0.042));
 
   NODES = DEMO_CONTACTS.map((contact, i) => {
     const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
@@ -6919,7 +6933,7 @@ function hitTestNetwork(clientX, clientY) {
   // Center sphere (user) — matches render size (CSS px)
   const W = CV.width / DPR;
   const selfStageW = Math.min(400, W * 0.88);
-  const centerFactor = W < 500 ? 0.17 : 0.24;
+  const centerFactor = W < 500 ? 0.22 : 0.26;
   const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
   if (Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
   // Contact nodes — find front-most hit
@@ -10483,7 +10497,7 @@ function drawNetworkView(t) {
     ctx.arc(_drCx, _drCy, _drR, 0, Math.PI * 2);
     ctx.clip();
     /* Dreamy breathing opacity — very faded, gently pulsing */
-    var _dreamAlpha = 0.16 + 0.05 * Math.sin(t * 0.0008);
+    var _dreamAlpha = 0.22 + 0.08 * Math.sin(t * 0.0008);
     if (_memPhoto && _memPhoto.img) {
       const _memImg = _memPhoto.img;
       const _mw = _memPhoto.isVideo ? _memImg.videoWidth : (_memImg.naturalWidth || _memImg.width);
@@ -10505,11 +10519,11 @@ function drawNetworkView(t) {
       _drGlow.addColorStop(0, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.22)');
       _drGlow.addColorStop(0.5, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.10)');
       _drGlow.addColorStop(1, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0)');
-      ctx.globalAlpha = _dreamAlpha * 1.5;
+      ctx.globalAlpha = _dreamAlpha * 2.5;
       ctx.fillStyle = _drGlow;
       ctx.fillRect(_drCx - _drR, _drCy - _drR, _drR * 2, _drR * 2);
       /* Initials in dream circle */
-      ctx.globalAlpha = _dreamAlpha * 2.2;
+      ctx.globalAlpha = _dreamAlpha * 3.5;
       ctx.fillStyle = 'rgb(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ')';
       ctx.font = '700 ' + Math.round(_drR * 0.5) + 'px "Hanken Grotesk", system-ui, sans-serif';
       ctx.textAlign = 'center';
@@ -10542,7 +10556,7 @@ function drawNetworkView(t) {
   /* ── Connector lines — CareCircle curved links from center edge to each sphere ── */
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
-  const _cR = Math.max(38, Math.round((Math.min(400, W * 0.88)) * (W < 500 ? 0.17 : 0.24)));
+  const _cR = Math.max(38, Math.round((Math.min(400, W * 0.88)) * (W < 500 ? 0.22 : 0.26)));
   const _cEdge = _cR * 1.15; /* start just outside the center sphere rim */
   for (const { node, p } of projected) {
     const cat = CATS[node.contact.cat] || CATS.other;
@@ -10666,7 +10680,7 @@ function drawNetworkView(t) {
     if (s > 0.38) {
       const _hl = getContactHeadline(node.contact);
       if (_hl) {
-        const _hlFs = Math.max(7, Math.min(12, Math.round(10.5 * s)));
+        const _hlFs = Math.max(8, Math.min(12, Math.round(10 * s)));
         ctx.fillStyle = '#ffd24d';
         ctx.globalAlpha = 0.92 * (alphaOverride || 1);
         ctx.font = `700 ${_hlFs}px "Hanken Grotesk", system-ui, sans-serif`;
@@ -10681,7 +10695,7 @@ function drawNetworkView(t) {
     if (s > 0.38) {
       ctx.fillStyle = col;
       ctx.globalAlpha = 0.95 * (alphaOverride || 1);
-      const _nfs = Math.max(7, Math.min(12, Math.round(10.5 * s)));
+      const _nfs = Math.max(9, Math.min(14, Math.round(12 * s)));
       ctx.font = `600 ${_nfs}px "Hanken Grotesk", system-ui, sans-serif`;
       ctx.fillText(node.contact.first, sx, sy + r + 12 * s);
     }
@@ -10710,7 +10724,7 @@ function drawNetworkView(t) {
   const usv = SEVS[userSev] || SEVS[4];
   /* Match the self-mode sphere visual size — derived from stage width min(400, 88vw) * 0.44 */
   const selfStageW = Math.min(400, W * 0.88);
-  const centerFactor = W < 500 ? 0.17 : 0.24;
+  const centerFactor = W < 500 ? 0.22 : 0.26;
   const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
   const breathe = pulseOn ? (1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd)) : 1;
   const cr = centerR * breathe;
