@@ -4888,6 +4888,25 @@ const I18n = (function () {
       'dd.sevElevated':           'Elevated',
       'dd.sevWatch':              'Watch',
 
+      'sync.account':             'Account',
+      'sync.signIn':              'Sign In',
+      'sync.signUp':              'Create Account',
+      'sync.signOut':             'Sign Out',
+      'sync.email':               'Email',
+      'sync.password':            'Password',
+      'sync.displayName':         'Display Name',
+      'sync.inviteCode':          'Invite Code',
+      'sync.syncing':             'Syncing...',
+      'sync.lastSync':            'Last sync',
+      'sync.offline':             'Offline',
+      'sync.connected':           'Connected',
+      'sync.syncNow':             'Sync Now',
+      'sync.circles':             'Circles',
+      'sync.createCircle':        'Create Circle',
+      'sync.joinCircle':          'Join Circle',
+      'sync.inviteMember':        'Invite Member',
+      'sync.noCircles':           'No circles yet',
+
       'settings.title':           'Settings',
       'settings.language':        'Language',
       'settings.yourData':        'Your Data',
@@ -5074,6 +5093,25 @@ const I18n = (function () {
       'dd.sevCritical':           'Critico',
       'dd.sevElevated':           'Elevato',
       'dd.sevWatch':              'Attenzione',
+
+      'sync.account':             'Account',
+      'sync.signIn':              'Accedi',
+      'sync.signUp':              'Crea Account',
+      'sync.signOut':             'Esci',
+      'sync.email':               'Email',
+      'sync.password':            'Password',
+      'sync.displayName':         'Nome visualizzato',
+      'sync.inviteCode':          'Codice Invito',
+      'sync.syncing':             'Sincronizzazione...',
+      'sync.lastSync':            'Ultima sincronizzazione',
+      'sync.offline':             'Non in linea',
+      'sync.connected':           'Connesso',
+      'sync.syncNow':             'Sincronizza ora',
+      'sync.circles':             'Cerchi',
+      'sync.createCircle':        'Crea Cerchio',
+      'sync.joinCircle':          'Unisciti al Cerchio',
+      'sync.inviteMember':        'Invita Membro',
+      'sync.noCircles':           'Nessun cerchio ancora',
 
       'settings.title':           'Impostazioni',
       'settings.language':        'Lingua',
@@ -10494,18 +10532,437 @@ const MedicationTracker = (() => {
   return { init, loadMeds, updatePreview };
 })();
 
-/* Start alert engine, daily summary, and medication tracker after RemielDB is ready */
+/* ══════════════════════════════════════════════════════════════
+   SyncEngine — Local-first sync with Remiel Sentinel API
+   Pushes IndexedDB changes to the server, pulls remote changes back.
+   Works offline; queues changes and syncs when connectivity returns.
+   ══════════════════════════════════════════════════════════════ */
+
+const SyncEngine = (() => {
+  'use strict';
+
+  const API_BASE_KEY = '_sync_api_base';
+  const TOKEN_KEY = '_sync_access_token';
+  const REFRESH_KEY = '_sync_refresh_token';
+  const USER_ID_KEY = '_sync_user_id';
+  const DISPLAY_NAME_KEY = '_sync_display_name';
+  const LAST_VERSION_KEY = '_sync_last_version';
+
+  let _apiBase = null;
+  let _accessToken = null;
+  let _refreshToken = null;
+  let _userId = null;
+  let _displayName = null;
+  let _lastSyncVersion = 0;
+  let _syncInProgress = false;
+  let _syncInterval = null;
+  let _serverIdMap = {};
+
+  // ── Config persistence ──
+
+  async function _loadConfig() {
+    try {
+      _apiBase = await RemielDB.getSetting(API_BASE_KEY) || null;
+      _accessToken = await RemielDB.getSetting(TOKEN_KEY) || null;
+      _refreshToken = await RemielDB.getSetting(REFRESH_KEY) || null;
+      _userId = await RemielDB.getSetting(USER_ID_KEY) || null;
+      _displayName = await RemielDB.getSetting(DISPLAY_NAME_KEY) || null;
+      _lastSyncVersion = parseInt(await RemielDB.getSetting(LAST_VERSION_KEY) || '0', 10);
+      var mapStr = await RemielDB.getSetting('_sync_id_map');
+      if (mapStr) {
+        try { _serverIdMap = JSON.parse(mapStr); } catch(e) { _serverIdMap = {}; }
+      }
+    } catch (e) {
+      console.warn('SyncEngine: config load failed', e);
+    }
+  }
+
+  async function _saveConfig() {
+    try {
+      if (_apiBase) await RemielDB.putSetting(API_BASE_KEY, _apiBase);
+      if (_accessToken) await RemielDB.putSetting(TOKEN_KEY, _accessToken);
+      if (_refreshToken) await RemielDB.putSetting(REFRESH_KEY, _refreshToken);
+      if (_userId) await RemielDB.putSetting(USER_ID_KEY, _userId);
+      if (_displayName) await RemielDB.putSetting(DISPLAY_NAME_KEY, _displayName);
+      await RemielDB.putSetting(LAST_VERSION_KEY, String(_lastSyncVersion));
+      await RemielDB.putSetting('_sync_id_map', JSON.stringify(_serverIdMap));
+    } catch (e) {
+      console.warn('SyncEngine: config save failed', e);
+    }
+  }
+
+  // ── HTTP helpers ──
+
+  async function _fetch(path, options) {
+    if (!_apiBase) throw new Error('Not configured');
+    var url = _apiBase + path;
+    var headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    if (_accessToken) headers['Authorization'] = 'Bearer ' + _accessToken;
+
+    var response = await fetch(url, { ...options, headers: headers });
+
+    if (response.status === 401 && _refreshToken) {
+      var refreshed = await _tryRefresh();
+      if (refreshed) {
+        headers['Authorization'] = 'Bearer ' + _accessToken;
+        response = await fetch(url, { ...options, headers: headers });
+      }
+    }
+    return response;
+  }
+
+  async function _tryRefresh() {
+    if (!_apiBase || !_refreshToken) return false;
+    try {
+      var res = await fetch(_apiBase + '/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: _refreshToken }),
+      });
+      if (!res.ok) return false;
+      var data = await res.json();
+      _accessToken = data.access_token;
+      _refreshToken = data.refresh_token;
+      _userId = data.user_id;
+      await _saveConfig();
+      return true;
+    } catch (e) {
+      console.warn('SyncEngine: token refresh failed', e);
+      return false;
+    }
+  }
+
+  // ── Auth ──
+
+  function isAuthenticated() { return !!(_apiBase && _accessToken && _userId); }
+  function getUserId() { return _userId; }
+  function getDisplayName() { return _displayName; }
+
+  async function configure(apiBase) {
+    _apiBase = apiBase.replace(/\/$/, '');
+    await RemielDB.putSetting(API_BASE_KEY, _apiBase);
+  }
+
+  async function signup(email, password, displayName, inviteCode) {
+    if (!_apiBase) throw new Error('API not configured');
+    var res = await fetch(_apiBase + '/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email, password: password,
+        display_name: displayName, invite_code: inviteCode || null,
+      }),
+    });
+    if (!res.ok) {
+      var err = await res.json().catch(function() { return { detail: 'Signup failed' }; });
+      throw new Error(err.detail || 'Signup failed');
+    }
+    var data = await res.json();
+    _accessToken = data.access_token;
+    _refreshToken = data.refresh_token;
+    _userId = data.user_id;
+    _displayName = data.display_name;
+    await _saveConfig();
+    return data;
+  }
+
+  async function login(email, password) {
+    if (!_apiBase) throw new Error('API not configured');
+    var res = await fetch(_apiBase + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password }),
+    });
+    if (!res.ok) {
+      var err = await res.json().catch(function() { return { detail: 'Login failed' }; });
+      throw new Error(err.detail || 'Login failed');
+    }
+    var data = await res.json();
+    _accessToken = data.access_token;
+    _refreshToken = data.refresh_token;
+    _userId = data.user_id;
+    _displayName = data.display_name;
+    await _saveConfig();
+    return data;
+  }
+
+  async function logout() {
+    _accessToken = null; _refreshToken = null;
+    _userId = null; _displayName = null;
+    _lastSyncVersion = 0; _serverIdMap = {};
+    await _saveConfig();
+    stopAutoSync();
+  }
+
+  // ── Push: send local changes to server ──
+
+  async function push() {
+    if (!isAuthenticated()) return { skipped: true, reason: 'not authenticated' };
+    if (_syncInProgress) return { skipped: true, reason: 'sync in progress' };
+    _syncInProgress = true;
+
+    try {
+      var contacts = await RemielDB.getAllContacts();
+      var allMoods = [], allInteractions = [];
+      var allMedications = await RemielDB.getAllMedications();
+
+      var contactIds = contacts.map(function(c) { return c.id; });
+      contactIds.push('self');
+
+      for (var i = 0; i < contactIds.length; i++) {
+        try {
+          var moods = await RemielDB.getMoodsByContact(contactIds[i]);
+          moods.forEach(function(m) { m._contactRef = contactIds[i]; allMoods.push(m); });
+        } catch(e) {}
+        try {
+          var ixs = await RemielDB.getInteractionsByContact(contactIds[i]);
+          ixs.forEach(function(ix) { ix._contactRef = contactIds[i]; allInteractions.push(ix); });
+        } catch(e) {}
+      }
+
+      var payload = {
+        last_sync_version: _lastSyncVersion,
+        contacts: contacts.map(function(c) {
+          return {
+            client_id: c.id,
+            server_id: _serverIdMap['contact_' + c.id] || null,
+            first: c.first || '', last: c.last || '',
+            cat: c.cat || null, sev: typeof c.sev === 'number' ? c.sev : null,
+            phone: c.phone || '', notes: c.notes || '',
+            created_at: c.createdAt || null, updated_at: c.updatedAt || null,
+          };
+        }),
+        moods: allMoods.map(function(m) {
+          var cRef = m._contactRef || m.contactId;
+          return {
+            client_id: m.id,
+            server_id: _serverIdMap['mood_' + m.id] || null,
+            contact_id: _serverIdMap['contact_' + cRef] || (cRef === 'self' ? 'self' : cRef),
+            contact_client_id: typeof cRef === 'number' ? cRef : null,
+            value: m.value, label: m.label || null, note: m.note || null,
+            timestamp: m.timestamp || Date.now(),
+          };
+        }),
+        interactions: allInteractions.map(function(ix) {
+          var cRef = ix._contactRef || ix.contactId;
+          return {
+            client_id: ix.id,
+            server_id: _serverIdMap['interaction_' + ix.id] || null,
+            contact_id: _serverIdMap['contact_' + cRef] || cRef,
+            contact_client_id: typeof cRef === 'number' ? cRef : null,
+            type: ix.type || null, direction: ix.direction || null,
+            note: ix.note || null, duration: ix.duration || null,
+            timestamp: ix.timestamp || Date.now(),
+          };
+        }),
+        medications: allMedications.map(function(med) {
+          var cRef = med.contactId;
+          return {
+            client_id: med.id,
+            server_id: _serverIdMap['med_' + med.id] || null,
+            contact_id: _serverIdMap['contact_' + cRef] || cRef,
+            contact_client_id: typeof cRef === 'number' ? cRef : null,
+            name: med.name || '', dosage: med.dosage || null,
+            frequency: med.frequency || null, time_of_day: med.timeOfDay || null,
+            pills_remaining: med.pillsRemaining != null ? med.pillsRemaining : null,
+            refill_threshold: med.refillThreshold != null ? med.refillThreshold : null,
+            active: med.active !== false, prescriber: med.prescriber || null,
+            pharmacy: med.pharmacy || null, notes: med.notes || null,
+          };
+        }),
+        settings: [],
+        voice_entries: [],
+      };
+
+      // Sync user settings
+      var settingsKeys = ['userCat', 'userSev', 'userSphereName', 'otherLabel', 'locale', 'onboardingComplete'];
+      for (var s = 0; s < settingsKeys.length; s++) {
+        var val = await RemielDB.getSetting(settingsKeys[s]);
+        if (val !== undefined && val !== null) {
+          payload.settings.push({ key: settingsKeys[s], value: JSON.stringify(val) });
+        }
+      }
+
+      // Voice entries
+      if (typeof RemielDB.getVoiceEntries === 'function') {
+        try {
+          var ve = await RemielDB.getVoiceEntries();
+          payload.voice_entries = ve.map(function(v) {
+            return {
+              id: v.id,
+              contact_id: _serverIdMap['contact_' + v.contactId] || v.contactId || null,
+              contact_client_id: typeof v.contactId === 'number' ? v.contactId : null,
+              transcript: v.transcript || null, duration_sec: v.durationSec || null,
+              ts: v.ts || Date.now(), analysis: v.analysis || null,
+            };
+          });
+        } catch(e) {}
+      }
+
+      var res = await _fetch('/sync/push', { method: 'POST', body: JSON.stringify(payload) });
+      if (!res.ok) {
+        var err = await res.json().catch(function() { return {}; });
+        throw new Error(err.detail || 'Push failed: ' + res.status);
+      }
+
+      var result = await res.json();
+
+      // Store server ID mappings
+      ['contact', 'mood', 'interaction', 'medication'].forEach(function(type) {
+        var mapKey = type + '_map';
+        if (type === 'medication') mapKey = 'medication_map';
+        var prefix = type === 'medication' ? 'med_' : type + '_';
+        if (result[mapKey]) {
+          Object.keys(result[mapKey]).forEach(function(clientId) {
+            _serverIdMap[prefix + clientId] = result[mapKey][clientId];
+          });
+        }
+      });
+
+      _lastSyncVersion = result.current_version;
+      await _saveConfig();
+      console.log('SyncEngine: push OK v=' + _lastSyncVersion);
+      return { success: true, version: _lastSyncVersion, errors: result.errors || [] };
+
+    } catch (e) {
+      console.warn('SyncEngine: push failed', e);
+      return { success: false, error: e.message };
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  // ── Pull: fetch remote changes ──
+
+  async function pull() {
+    if (!isAuthenticated()) return { skipped: true, reason: 'not authenticated' };
+    if (_syncInProgress) return { skipped: true, reason: 'sync in progress' };
+    _syncInProgress = true;
+
+    try {
+      var res = await _fetch('/sync/pull?since_version=' + _lastSyncVersion, { method: 'GET' });
+      if (!res.ok) throw new Error('Pull failed: ' + res.status);
+
+      var data = await res.json();
+
+      // Apply remote contacts
+      if (data.contacts) {
+        for (var i = 0; i < data.contacts.length; i++) {
+          var c = data.contacts[i];
+          if (c.deleted) continue;
+          var existingId = null;
+          Object.keys(_serverIdMap).forEach(function(k) {
+            if (k.startsWith('contact_') && _serverIdMap[k] === c.server_id) {
+              existingId = parseInt(k.replace('contact_', ''), 10);
+            }
+          });
+          if (existingId) {
+            var existing = await RemielDB.getContact(existingId);
+            if (existing) {
+              var d = c.data;
+              if (d.first) existing.first = d.first;
+              if (d.last !== undefined) existing.last = d.last;
+              if (d.cat !== undefined) existing.cat = d.cat;
+              if (d.sev !== undefined) existing.sev = d.sev;
+              if (d.phone !== undefined) existing.phone = d.phone;
+              if (d.notes !== undefined) existing.notes = d.notes;
+              existing.updatedAt = Date.now();
+              await RemielDB.putContact(existing);
+            }
+          } else if (c.client_id) {
+            _serverIdMap['contact_' + c.client_id] = c.server_id;
+          }
+        }
+      }
+
+      _lastSyncVersion = data.current_version;
+      await _saveConfig();
+      console.log('SyncEngine: pull OK v=' + _lastSyncVersion);
+      return { success: true, version: _lastSyncVersion };
+
+    } catch (e) {
+      console.warn('SyncEngine: pull failed', e);
+      return { success: false, error: e.message };
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  // ── Full sync ──
+
+  async function sync() {
+    if (!isAuthenticated()) return { skipped: true, reason: 'not authenticated' };
+    var pushResult = await push();
+    if (!pushResult.success && !pushResult.skipped) return pushResult;
+    var pullResult = await pull();
+    return { push: pushResult, pull: pullResult };
+  }
+
+  // ── Auto-sync ──
+
+  function startAutoSync(intervalMs) {
+    stopAutoSync();
+    var interval = intervalMs || 300000;
+    if (navigator.onLine && isAuthenticated()) {
+      setTimeout(function() { sync(); }, 2000);
+    }
+    _syncInterval = setInterval(function() {
+      if (navigator.onLine && isAuthenticated()) sync();
+    }, interval);
+    window.addEventListener('online', _onOnline);
+    console.log('SyncEngine: auto-sync ON, interval=' + interval + 'ms');
+  }
+
+  function stopAutoSync() {
+    if (_syncInterval) { clearInterval(_syncInterval); _syncInterval = null; }
+    window.removeEventListener('online', _onOnline);
+  }
+
+  function _onOnline() {
+    if (isAuthenticated()) setTimeout(function() { sync(); }, 1000);
+  }
+
+  function getStatus() {
+    return {
+      authenticated: isAuthenticated(),
+      userId: _userId,
+      displayName: _displayName,
+      apiBase: _apiBase,
+      lastSyncVersion: _lastSyncVersion,
+      syncInProgress: _syncInProgress,
+      online: navigator.onLine,
+    };
+  }
+
+  async function init() {
+    await _loadConfig();
+    if (isAuthenticated()) startAutoSync();
+    console.log('SyncEngine: init, auth=' + isAuthenticated());
+  }
+
+  return {
+    init: init, configure: configure,
+    signup: signup, login: login, logout: logout,
+    isAuthenticated: isAuthenticated, getUserId: getUserId, getDisplayName: getDisplayName,
+    push: push, pull: pull, sync: sync,
+    startAutoSync: startAutoSync, stopAutoSync: stopAutoSync, getStatus: getStatus,
+  };
+})();
+
+/* Start alert engine, daily summary, medication tracker, and sync engine after RemielDB is ready */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     AlertEngine.init();
     DailySummary.init();
     MedicationTracker.init();
+    SyncEngine.init();
   });
 } else {
   setTimeout(() => {
     AlertEngine.init();
     DailySummary.init();
     MedicationTracker.init();
+    SyncEngine.init();
   }, 500);
 }
 
