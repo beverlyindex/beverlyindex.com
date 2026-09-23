@@ -9008,6 +9008,48 @@ function drawNetworkView(t) {
     ctx.beginPath(); ctx.arc(s.x, s.y, s.s * 0.5, 0, Math.PI * 2); ctx.fill();
   }
 
+  /* ── Interaction Memory — dreamy faded image of focused contact ── */
+  if (focusedContactId) {
+    const _memPhoto = contactPhotos.get(focusedContactId);
+    if (_memPhoto && _memPhoto.img) {
+      const _memImg = _memPhoto.img;
+      const _mw = _memPhoto.isVideo ? _memImg.videoWidth : (_memImg.naturalWidth || _memImg.width);
+      const _mh = _memPhoto.isVideo ? _memImg.videoHeight : (_memImg.naturalHeight || _memImg.height);
+      if (_mw > 0 && _mh > 0) {
+        /* Re-kick video if browser paused it (mobile power saving) */
+        if (_memPhoto.isVideo && _memImg.paused) _memImg.play().catch(function(){});
+        ctx.save();
+        /* Dream region — large circle in upper-right quadrant */
+        var _drR = Math.min(W, H) * 0.28;
+        var _drCx = W - _drR - W * 0.05;
+        var _drCy = _drR + H * 0.06;
+        ctx.beginPath();
+        ctx.arc(_drCx, _drCy, _drR, 0, Math.PI * 2);
+        ctx.clip();
+        /* Cover-fit image into dream circle */
+        var _drAspect = _mw / _mh;
+        var _drW, _drH;
+        if (_drAspect > 1) { _drH = _drR * 2; _drW = _drH * _drAspect; }
+        else { _drW = _drR * 2; _drH = _drW / _drAspect; }
+        /* Dreamy breathing opacity — very faded, gently pulsing */
+        var _dreamAlpha = 0.16 + 0.05 * Math.sin(t * 0.0008);
+        ctx.globalAlpha = _dreamAlpha;
+        ctx.drawImage(_memImg, _drCx - _drW / 2, _drCy - _drH / 2, _drW, _drH);
+        /* Vignette — soft radial fade to match dark space background */
+        ctx.globalAlpha = 1;
+        var _drVig = ctx.createRadialGradient(_drCx, _drCy, _drR * 0.2, _drCx, _drCy, _drR);
+        _drVig.addColorStop(0, 'rgba(8,10,16,0)');
+        _drVig.addColorStop(0.4, 'rgba(8,10,16,0.25)');
+        _drVig.addColorStop(0.65, 'rgba(8,10,16,0.58)');
+        _drVig.addColorStop(0.85, 'rgba(8,10,16,0.85)');
+        _drVig.addColorStop(1, 'rgba(8,10,16,0.97)');
+        ctx.fillStyle = _drVig;
+        ctx.fillRect(_drCx - _drR, _drCy - _drR, _drR * 2, _drR * 2);
+        ctx.restore();
+      }
+    }
+  }
+
   /* Physics */
   stepPhys();
 
