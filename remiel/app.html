@@ -763,6 +763,31 @@
   .bluf-list-item:last-child {
     margin-bottom: 0;
   }
+
+  /* ── Next Action card — CareCircle priority directive style ── */
+  .bluf-next-action-card {
+    background: rgba(255,210,77,0.06);
+    border: 1px solid rgba(255,210,77,0.18);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .bluf-na-label {
+    font-family: var(--nous-font);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #ffd24d;
+    text-shadow: 0 0 10px rgba(255,210,77,0.3);
+    margin-bottom: 6px;
+  }
+  .bluf-na-text {
+    font-family: var(--nous-font);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--nous-ink);
+  }
   .bluf-contact-time {
     font-family: var(--nous-font);
     font-size: 13px;
@@ -1996,7 +2021,7 @@
   .alert-bell {
     position: fixed;
     top: max(12px, env(safe-area-inset-top, 0px));
-    right: calc(max(12px, env(safe-area-inset-right, 0px)) + 72px);
+    right: calc(max(12px, env(safe-area-inset-right, 0px)) + 122px);
     z-index: 200;
     width: 36px;
     height: 36px;
@@ -2306,7 +2331,7 @@
       width: auto;
     }
     .alert-bell {
-      right: calc(max(8px, env(safe-area-inset-right, 0px)) + 64px);
+      right: calc(max(8px, env(safe-area-inset-right, 0px)) + 116px);
     }
   }
 
@@ -2756,7 +2781,7 @@
   .settings-btn {
     position: fixed;
     top: max(12px, env(safe-area-inset-top, 0px));
-    right: calc(max(12px, env(safe-area-inset-right, 0px)) + 36px);
+    right: calc(max(12px, env(safe-area-inset-right, 0px)) + 82px);
     z-index: 200;
     width: 36px;
     height: 36px;
@@ -2983,7 +3008,7 @@
 
   @media (max-width: 480px) {
     .settings-btn {
-      right: calc(max(8px, env(safe-area-inset-right, 0px)) + 32px);
+      right: calc(max(8px, env(safe-area-inset-right, 0px)) + 76px);
     }
     .settings-data-grid {
       grid-template-columns: repeat(2, 1fr);
@@ -6177,28 +6202,8 @@ function generateBlufData(sevLevel, compData) {
   if (!hasInteractions) openIssues.push('No interactions logged yet — start tracking to build a picture');
   if (openIssues.length === 0) openIssues.push('Nothing to note right now');
 
-  /* ── Next Actions — contextual recommendations ── */
-  const nextActions = [];
-  if (sevLevel === 0) {
-    nextActions.push('Call or text them today');
-    nextActions.push('Let them know you\'re thinking of them');
-  } else if (sevLevel === 1) {
-    nextActions.push('Check in within the next day or two');
-    if (moodTrend < -0.3) nextActions.push('Look back at recent entries for context');
-  } else if (sevLevel === 2) {
-    nextActions.push('Send a message when you get a chance');
-    nextActions.push('Think about what might be going on in their life');
-  } else if (sevLevel === 3) {
-    nextActions.push('Keep doing what you\'re doing');
-    nextActions.push('Keep logging moods and interactions');
-  } else {
-    if (!hasMoods || !hasInteractions) {
-      nextActions.push('Log a mood or interaction to get started');
-    } else {
-      nextActions.push('No rush — you\'ll know when to reach out');
-    }
-    nextActions.push('Reach out whenever it feels right');
-  }
+  /* ── Next Action — single priority directive (CareCircle mechanics) ── */
+  const nextActions = [nextActionText || 'Nothing pending — a quiet day.'];
 
   /* ── Location — placeholder (no GPS in Remiel consumer fork) ── */
   const location = { micro: '—', macro: '—', updated: '—' };
@@ -6223,10 +6228,7 @@ const BLUF_DATA = {
       'Recent mood entries show they\'re struggling',
       'Now is the time to show up for them'
     ],
-    nextActions: [
-      'Call or text them today',
-      'Let them know you\'re thinking of them'
-    ]
+    nextActions: ['Call or text them today']
   },
   1: {
     headline: 'ELEVATED — Something may be shifting.',
@@ -6243,10 +6245,7 @@ const BLUF_DATA = {
       'Things feel a little different from their usual pattern',
       'Worth a check-in soon'
     ],
-    nextActions: [
-      'Check in within the next day or two',
-      'Think about what might be going on'
-    ]
+    nextActions: ['Check in within the next day or two']
   },
   2: {
     headline: 'WATCH — A few things to keep in mind.',
@@ -6263,10 +6262,7 @@ const BLUF_DATA = {
       'Communication has been a bit one-sided',
       'They\'ve been quieter than usual'
     ],
-    nextActions: [
-      'Send a message when you get a chance',
-      'Think about what might be going on in their life'
-    ]
+    nextActions: ['Send a message when you get a chance']
   },
   3: {
     headline: 'STABLE — Things are going well.',
@@ -6281,10 +6277,7 @@ const BLUF_DATA = {
     openIssues: [
       'Nothing to note right now'
     ],
-    nextActions: [
-      'Keep doing what you\'re doing',
-      'Keep logging moods and interactions'
-    ]
+    nextActions: ['Keep doing what you\'re doing']
   },
   4: {
     headline: 'QUIET — All is calm.',
@@ -6299,10 +6292,7 @@ const BLUF_DATA = {
     openIssues: [
       'Nothing to note right now'
     ],
-    nextActions: [
-      'No rush — you\'ll know when to reach out',
-      'Reach out whenever it feels right'
-    ]
+    nextActions: ['No rush — reach out whenever it feels right']
   }
 };
 
@@ -6532,12 +6522,24 @@ async function updateBlufContent() {
   if (issuesPrev) issuesPrev.textContent = d.openIssues.length + (d.openIssues.length === 1 ? ' issue' : ' issues');
 
   /* ── Next Action pull ── */
+  /* Per-contact priority directive (CareCircle mechanics) */
   const actionsEl = document.getElementById('blufNextActions');
-  actionsEl.innerHTML = d.nextActions
-    .map(a => `<div class="bluf-list-item">${a}</div>`)
-    .join('');
+  let _naText = nextActionText;
+  try {
+    if (selectedContact) {
+      _naText = await contactNextAction(selectedContact);
+    }
+  } catch(e) {}
+  const _naLabel = selectedContact
+    ? 'Next · ' + selectedContact.first
+    : 'Next action';
+  actionsEl.innerHTML =
+    '<div class="bluf-next-action-card">' +
+      '<div class="bluf-na-label">' + _naLabel + '</div>' +
+      '<div class="bluf-na-text">' + _naText + '</div>' +
+    '</div>';
   const actionPrev = document.getElementById('pullPrev_nextaction');
-  if (actionPrev) actionPrev.textContent = d.nextActions[0] ? d.nextActions[0].substring(0, 36) + (d.nextActions[0].length > 36 ? '…' : '') : '—';
+  if (actionPrev) actionPrev.textContent = _naText ? _naText.substring(0, 36) + (_naText.length > 36 ? '…' : '') : '—';
 
   /* ── Care Ledger pull — load async (non-blocking) ── */
   loadLedgerForBluf().catch(() => {});
@@ -6614,6 +6616,161 @@ let sphereTapTimer = null;     /* Timer for single/double tap detection */
 let sphereTapTarget = null;    /* { isCenter, contactId, sphereScreenY } from first tap */
 const SPHERE_TAP_MS = 300;    /* Window for double tap detection */
 const FOCUS_SCALE = 1.8;      /* How much bigger a focused sphere appears */
+
+/* ── Next Action Engine (CareCircle mechanics) ── */
+let nextActionNodeId = null;   /* Contact ID for gold halo */
+let nextActionText = 'Nothing pending — a quiet day.';
+let _nextActionTimer = null;
+
+async function computeNextAction() {
+  try {
+    const now = new Date();
+    const hhmm = now.toTimeString().slice(0, 5);
+    const todayK = now.toISOString().slice(0, 10);
+    const _FS = { daily: ['08:00'], bid: ['08:00','20:00'], tid: ['08:00','14:00','20:00'], qid: ['08:00','12:00','16:00','20:00'], weekly: ['08:00'], asNeeded: [] };
+
+    let allMeds = [];
+    try { allMeds = (await RemielDB.getAllMedications()).filter(m => m.active !== false); } catch(e) {}
+
+    const lastInterMap = new Map();
+    for (const c of DEMO_CONTACTS) {
+      try {
+        const ints = await RemielDB.getInteractionsByContact(c.id);
+        if (ints.length > 0) {
+          const sorted = ints.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          lastInterMap.set(c.id, sorted[0].timestamp || 0);
+        }
+      } catch(e) {}
+    }
+
+    const cands = [];
+
+    for (const m of allMeds) {
+      const slots = _FS[m.frequency] || [];
+      const todayLog = (m.doseLog || []).filter(d => {
+        return new Date(d.ts).toISOString().slice(0, 10) === todayK && d.action === 'taken';
+      });
+      const takenCount = todayLog.length;
+      const cName = m.contactName || 'someone';
+
+      if (typeof m.pillsLeft === 'number' && m.pillsLeft === 0) {
+        cands.push({ k: '0a', text: 'Refill needed — ' + m.name + ' for ' + cName, node: m.contactId || null });
+      } else if (typeof m.pillsLeft === 'number' && m.pillsLeft > 0 && m.pillsLeft <= 3) {
+        cands.push({ k: '1a', text: m.pillsLeft + ' pills left — refill ' + m.name + ' soon', node: m.contactId || null });
+      }
+
+      for (let i = takenCount; i < slots.length; i++) {
+        const st = slots[i];
+        if (!st || st.includes(' ')) continue;
+        if (st < hhmm) {
+          const sm = parseInt(st) * 60 + parseInt(st.slice(3));
+          const nm = parseInt(hhmm) * 60 + parseInt(hhmm.slice(3));
+          if (nm - sm > 60) {
+            cands.push({ k: '0b', text: 'Overdue — give ' + m.name + ' to ' + cName, node: m.contactId || null });
+          }
+        }
+      }
+
+      for (let i = takenCount; i < slots.length; i++) {
+        const st = slots[i];
+        if (!st || st.includes(' ')) continue;
+        if (st >= hhmm) {
+          cands.push({ k: '1b' + st, text: st + ' · give ' + m.name + ' to ' + cName, node: m.contactId || null });
+          break;
+        }
+      }
+    }
+
+    for (const c of DEMO_CONTACTS) {
+      const lastTs = lastInterMap.get(c.id) || 0;
+      const daysSince = lastTs > 0 ? (now.getTime() - lastTs) / 86400000 : 999;
+      const sev = c.sev;
+
+      if (sev === 0 && daysSince > 1) {
+        cands.push({ k: '1c', text: 'Reach out to ' + c.first + ' — critical, ' + Math.round(daysSince) + 'd since contact', node: c.id });
+      } else if (sev === 1 && daysSince > 3) {
+        cands.push({ k: '2a', text: 'Check in with ' + c.first + ' — elevated, ' + Math.round(daysSince) + 'd since contact', node: c.id });
+      } else if (sev === 2 && daysSince > 7) {
+        cands.push({ k: '2b', text: 'Touch base with ' + c.first + ' — ' + Math.round(daysSince) + ' days since last contact', node: c.id });
+      } else if (daysSince > 14) {
+        cands.push({ k: '3a', text: 'It\'s been ' + Math.round(daysSince) + ' days — reach out to ' + c.first, node: c.id });
+      }
+    }
+
+    cands.sort((a, b) => a.k.localeCompare(b.k));
+    const top = cands[0];
+    nextActionText = top ? top.text : 'Nothing pending — a quiet day.';
+    nextActionNodeId = top ? top.node : null;
+  } catch(e) {
+    console.warn('computeNextAction error:', e);
+    nextActionText = 'Nothing pending — a quiet day.';
+    nextActionNodeId = null;
+  }
+}
+
+async function contactNextAction(contact) {
+  if (!contact) return 'No pending action — all quiet';
+  try {
+    const now = new Date();
+    const hhmm = now.toTimeString().slice(0, 5);
+    const todayK = now.toISOString().slice(0, 10);
+    const _FS = { daily: ['08:00'], bid: ['08:00','20:00'], tid: ['08:00','14:00','20:00'], qid: ['08:00','12:00','16:00','20:00'], weekly: ['08:00'], asNeeded: [] };
+    const sev = contact.sev;
+
+    if (sev === 0) return 'Critical — reach out now, then log the interaction';
+
+    let meds = [];
+    try { meds = (await RemielDB.getMedicationsByContact(contact.id)).filter(m => m.active !== false); } catch(e) {}
+
+    for (const m of meds) {
+      if (typeof m.pillsLeft === 'number' && m.pillsLeft >= 0 && m.pillsLeft <= 3) {
+        return 'Refill ' + m.name + ' — ' + (m.pillsLeft === 0 ? 'needs refill now' : m.pillsLeft + ' pills left');
+      }
+    }
+
+    for (const m of meds) {
+      const slots = _FS[m.frequency] || [];
+      const todayLog = (m.doseLog || []).filter(d => new Date(d.ts).toISOString().slice(0, 10) === todayK && d.action === 'taken');
+      for (let i = todayLog.length; i < slots.length; i++) {
+        const st = slots[i];
+        if (!st || st.includes(' ')) continue;
+        if (st >= hhmm) return st + ' · give ' + m.name;
+        const sm = parseInt(st) * 60 + parseInt(st.slice(3));
+        const nm = parseInt(hhmm) * 60 + parseInt(hhmm.slice(3));
+        if (nm - sm > 60) return 'Overdue — give ' + m.name + ' now';
+      }
+    }
+
+    let daysSince = 999;
+    try {
+      const ints = await RemielDB.getInteractionsByContact(contact.id);
+      if (ints.length > 0) {
+        const latest = ints.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+        daysSince = (now.getTime() - (latest.timestamp || 0)) / 86400000;
+      }
+    } catch(e) {}
+
+    if (sev === 1) {
+      if (daysSince > 3) return 'Check in — it\'s been ' + Math.round(daysSince) + ' days';
+      return 'Elevated — keep an eye on things';
+    }
+    if (sev === 2) {
+      if (daysSince > 7) return 'Reach out — ' + Math.round(daysSince) + ' days since last contact';
+      return 'Watch — check in when you can';
+    }
+    if (daysSince > 14) return 'It\'s been ' + Math.round(daysSince) + ' days — touch base soon';
+    if (daysSince > 7) return 'Last contact ' + Math.round(daysSince) + ' days ago';
+    return 'No pending action — all quiet';
+  } catch(e) {
+    return 'No pending action — all quiet';
+  }
+}
+
+function startNextActionTimer() {
+  if (_nextActionTimer) clearInterval(_nextActionTimer);
+  computeNextAction();
+  _nextActionTimer = setInterval(() => computeNextAction(), 60000);
+}
 
 /* ── Unified Pull Accordion ── */
 const PULL_IDS = ['broadcast', 'location', 'lastcontact', 'nextaction', 'issues', 'medication', 'ledger', 'intelligence'];
@@ -8030,6 +8187,15 @@ function drawNetworkView(t) {
     ctx.lineWidth = 1.6 * s * focusMul;
     ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.stroke();
 
+    /* Gold halo — marks the contact whose action is next (CareCircle mechanic) */
+    if (nextActionNodeId && node.contact.id === nextActionNodeId && s > 0.25) {
+      const ph = 0.5 + 0.5 * Math.sin(t * 0.0024);
+      ctx.globalAlpha = 0.45 + 0.4 * ph;
+      ctx.strokeStyle = '#ffd24d';
+      ctx.lineWidth = 2.2 * s;
+      ctx.beginPath(); ctx.arc(sx, sy, r + 9 * s + ph * 4 * s, 0, Math.PI * 2); ctx.stroke();
+    }
+
     /* Initials — only when no contact photo */
     ctx.globalAlpha = 1;
     if (!cPhoto && s > 0.32) {
@@ -8191,7 +8357,9 @@ function drawNetworkView(t) {
   ctx.fillStyle = `rgba(${uc.r},${uc.g},${uc.b},0.6)`;
   ctx.font = `${Math.max(8, Math.round(cr * 0.32))}px "Hanken Grotesk", system-ui, sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillText(userSphereName || 'You', cx, cy + outerCR + 10);
+  ctx.textBaseline = 'top';
+  ctx.fillText(userSphereName || 'You', cx, cy + outerCR + 6);
+  ctx.textBaseline = 'alphabetic';
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
@@ -10562,6 +10730,7 @@ const MedicationTracker = (() => {
       ? (t ? t.t('med.doseLogged') : 'Dose logged')
       : (t ? t.t('med.doseSkipped') : 'Dose skipped');
     showToast(msg);
+    computeNextAction();
   }
 
   /* ── Delete ── */
@@ -11092,6 +11261,7 @@ if (document.readyState === 'loading') {
     DailySummary.init();
     MedicationTracker.init();
     SyncEngine.init();
+    startNextActionTimer();
   });
 } else {
   setTimeout(() => {
@@ -11099,6 +11269,7 @@ if (document.readyState === 'loading') {
     DailySummary.init();
     MedicationTracker.init();
     SyncEngine.init();
+    startNextActionTimer();
   }, 500);
 }
 
