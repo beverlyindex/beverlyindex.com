@@ -3518,6 +3518,69 @@
     font-family: 'JetBrains Mono', monospace;
   }
 
+
+  /* ── Self-view quick actions note ── */
+  .qa-self-note {
+    text-align: center; font-size: 11px; color: rgba(255,255,255,0.35);
+    padding: 8px 12px; font-style: italic; width: 100%;
+  }
+
+  /* ── Medication camera / scan button ── */
+  .med-cam-btn {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.25);
+    color: #38bdf8; border-radius: 8px; padding: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .med-cam-btn:hover { background: rgba(56,189,248,0.25); }
+  .med-input-wrap { position: relative; }
+  .med-name-input { padding-right: 42px !important; }
+
+  /* ── New medication fields ── */
+  .med-reason-input {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 8px 12px; color: #e0e0e0; font-size: 13px;
+    font-family: inherit; width: 100%; box-sizing: border-box;
+    transition: border-color 0.2s;
+  }
+  .med-reason-input:focus { border-color: rgba(56,189,248,0.4); outline: none; }
+  .med-for-select {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 8px 12px; color: #e0e0e0; font-size: 13px;
+    font-family: inherit; width: 100%; box-sizing: border-box;
+  }
+
+  /* ── Med Image Reader overlay ── */
+  .med-img-overlay {
+    position: fixed; inset: 0; z-index: 9500;
+    background: rgba(0,0,0,0.88); backdrop-filter: blur(16px);
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 24px; opacity: 0;
+    pointer-events: none; transition: opacity 0.3s;
+  }
+  .med-img-overlay.active { opacity: 1; pointer-events: auto; }
+  .med-img-overlay video {
+    width: min(100%, 400px); border-radius: 16px; border: 2px solid rgba(56,189,248,0.3);
+  }
+  .med-img-overlay canvas { display: none; }
+  .med-img-actions {
+    display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; justify-content: center;
+  }
+  .med-img-actions button {
+    padding: 10px 24px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.08); color: #e0e0e0; font-size: 14px;
+    font-family: inherit; cursor: pointer; transition: background 0.2s;
+  }
+  .med-img-actions button:hover { background: rgba(255,255,255,0.15); }
+  .med-img-actions .primary { background: rgba(56,189,248,0.2); border-color: rgba(56,189,248,0.4); color: #38bdf8; }
+  .med-img-result {
+    margin-top: 12px; padding: 12px 18px; background: rgba(56,189,248,0.08);
+    border: 1px solid rgba(56,189,248,0.2); border-radius: 12px;
+    color: #a8d8f0; font-size: 13px; text-align: center; max-width: 360px;
+    word-break: break-word; min-height: 20px;
+  }
+  .med-img-preview { max-width: min(100%, 320px); border-radius: 12px; margin-top: 12px; }
   /* ═══ Contact Management — Add Person FAB ═══ */
   .add-person-fab {
     position: fixed;
@@ -3550,6 +3613,25 @@
   .add-person-fab:active { transform: scale(0.92); }
   .add-person-fab.hidden { display: none !important; }
 
+
+  /* ── Modal close X ── */
+  .contact-modal-hdr {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+  }
+  .contact-modal-x {
+    background: none; border: none; color: rgba(255,255,255,0.45);
+    font-size: 26px; line-height: 1; cursor: pointer; padding: 4px 8px;
+    transition: color 0.2s;
+  }
+  .contact-modal-x:hover { color: rgba(255,255,255,0.85); }
+
+  /* ── FAB rotates to X when modal opens ── */
+  .add-person-fab.fab-open {
+    transform: rotate(45deg);
+    background: rgba(239,68,68,0.18);
+    border-color: rgba(239,68,68,0.4);
+    color: #ef4444;
+  }
   /* ═══ Contact Modal (Add / Edit) ═══ */
   .contact-modal-overlay {
     position: fixed;
@@ -3758,6 +3840,24 @@
   }
 
 </style>
+
+
+<!-- ═══ Med Image Reader ═══ -->
+<div class="med-img-overlay" id="medImgOverlay">
+  <div style="font-size:15px;color:#a8d8f0;margin-bottom:12px;font-weight:600;">Scan Medication Label</div>
+  <video id="medImgVideo" playsinline autoplay muted></video>
+  <canvas id="medImgCanvas"></canvas>
+  <img id="medImgPreview" class="med-img-preview" style="display:none" alt="Captured">
+  <div class="med-img-result" id="medImgResult">Point camera at the medication label or upload a photo</div>
+  <div class="med-img-actions">
+    <button onclick="MedImageReader.capture()" class="primary" id="medImgCaptureBtn">📷 Capture</button>
+    <label style="padding:10px 24px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:#e0e0e0;font-size:14px;cursor:pointer;text-align:center;">
+      📁 Upload
+      <input type="file" accept="image/*" id="medImgFileInput" onchange="MedImageReader.handleFile(this)" style="display:none">
+    </label>
+    <button onclick="MedImageReader.close()">Cancel</button>
+  </div>
+</div>
 
 <!-- ═══ Gate Screen ═══ -->
 <div class="gate-screen" id="gateScreen" role="region" aria-label="Authentication">
@@ -4384,6 +4484,9 @@
                     data-i18n-placeholder="med.searchPlaceholder"
                     placeholder="Search or enter medication name…"
                     autocomplete="off" autocorrect="off" spellcheck="false">
+                  <button class="med-cam-btn" id="medCamBtn" onclick="MedImageReader.open()" aria-label="Scan medication label" title="Scan label with camera">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  </button>
                   <div class="med-autocomplete" id="medAutocomplete"></div>
                 </div>
               </div>
@@ -4400,6 +4503,11 @@
                 </select>
                 <input type="number" class="med-refill-input" id="medRefillInput"
                   data-i18n-placeholder="med.pillsLeft" placeholder="Pills left" min="0">
+                <input type="text" class="med-reason-input" id="medReasonInput"
+                  placeholder="Reason (e.g. blood pressure)" autocomplete="off">
+                <select class="med-for-select" id="medForSelect">
+                  <option value="self">For myself</option>
+                </select>
                 <button class="med-add-btn" id="medAddBtn" data-i18n="med.add">+ Add</button>
               </div>
 
@@ -4540,12 +4648,12 @@
 </div>
 
 <!-- ═══ Add Person FAB (network constellation view) ═══ -->
-<button class="add-person-fab hidden" id="addPersonFab" onclick="openContactModal('add')" aria-label="Add person">+</button>
+<button class="add-person-fab hidden" id="addPersonFab" onclick="toggleAddModal()" aria-label="Add person">+</button>
 
 <!-- ═══ Contact Add/Edit Modal ═══ -->
 <div class="contact-modal-overlay" id="contactModalOverlay" onclick="if(event.target===this)closeContactModal()">
   <div class="contact-modal" id="contactModal">
-    <h3 class="contact-modal-title" id="contactModalTitle">Add Person</h3>
+    <div class="contact-modal-hdr"><h3 class="contact-modal-title" id="contactModalTitle">Add Person</h3><button class="contact-modal-x" onclick="closeContactModal()" aria-label="Close">&times;</button></div>
     <input class="contact-modal-input" id="cmFirstName" type="text" placeholder="First name (required)" maxlength="30" autocomplete="off">
     <input class="contact-modal-input" id="cmLastName" type="text" placeholder="Last name" maxlength="30" autocomplete="off">
     <input class="contact-modal-input" id="cmPhone" type="tel" placeholder="Phone number" maxlength="20" autocomplete="off">
@@ -4676,22 +4784,29 @@ function beginVideoIntro() {
   const introEl = document.getElementById('videoIntro');
   const videoEl = document.getElementById('introVideo');
 
-  /* Fade out the gate screen */
-  gateEl.classList.add('hidden');
+  /* Phase 1: Hold the logo splash for 3 seconds so users see the brand */
+  /* Hide the input/form elements but keep logo and title visible */
+  const gateInput = gateEl.querySelector('.gate-input-wrap');
+  const gateLang = gateEl.querySelector('.gate-lang-switcher');
+  if (gateInput) gateInput.style.cssText = 'opacity:0;pointer-events:none;transition:opacity 0.5s;';
+  if (gateLang) gateLang.style.cssText = 'opacity:0;pointer-events:none;transition:opacity 0.5s;';
 
-  const src = pickNextVideo();
-  videoEl.src = src;
-  videoEl.muted = true;     /* ensure autoplay works */
-  videoEl.currentTime = 0;
+  /* After 3 seconds, fade out gate and start video */
+  setTimeout(() => {
+    gateEl.classList.add('hidden');
 
-  /* Show and play */
-  introEl.classList.add('active');
-  videoEl.play().catch(() => {
-    /* Autoplay blocked — skip straight to app */
-    revealApp();
-  });
+    const vidSrc = pickNextVideo();
+    videoEl.src = vidSrc;
+    videoEl.muted = true;
+    videoEl.currentTime = 0;
 
-  videoEl.addEventListener('ended', () => revealApp(), { once: true });
+    introEl.classList.add('active');
+    videoEl.play().catch(() => {
+      revealApp();
+    });
+
+    videoEl.addEventListener('ended', () => revealApp(), { once: true });
+  }, 3000);
 }
 
 function skipIntro() {
@@ -7068,8 +7183,9 @@ async function updateBlufContent() {
   const _qaEmail = document.getElementById('qaEmailBtn');
   const _editBtn = document.getElementById('blufEditBtn');
   if (!selectedContact) {
-    // Self-view: hide action bar and edit button
-    _qaBar.classList.add('hidden');
+    // Self-view: show note explaining no quick actions
+    _qaBar.classList.remove('hidden');
+    _qaBar.innerHTML = '<div class="qa-self-note">This is your profile &mdash; quick actions are for your contacts</div>';
     if (_editBtn) _editBtn.style.display = 'none';
   } else {
     _qaBar.classList.remove('hidden');
@@ -7079,12 +7195,15 @@ async function updateBlufContent() {
     _qaCall.href = _phone ? 'tel:' + _phone : '#';
     _qaCall.style.opacity = _phone ? '1' : '0.35';
     _qaCall.style.pointerEvents = _phone ? 'auto' : 'none';
+    _qaCall.title = _phone ? 'Call ' + selectedContact.first : 'No phone number on file — edit contact to add';
     _qaText.href = _phone ? 'sms:' + _phone : '#';
     _qaText.style.opacity = _phone ? '1' : '0.35';
     _qaText.style.pointerEvents = _phone ? 'auto' : 'none';
+        _qaText.title = _phone ? 'Text ' + selectedContact.first : 'No phone number on file — edit contact to add';
     _qaEmail.href = _email ? 'mailto:' + _email : '#';
     _qaEmail.style.opacity = _email ? '1' : '0.35';
     _qaEmail.style.pointerEvents = _email ? 'auto' : 'none';
+        _qaEmail.title = _email ? 'Email ' + selectedContact.first : 'No email on file — edit contact to add';
   }
 
 
@@ -8899,9 +9018,11 @@ function drawNetworkView(t) {
   const projected = NODES.map(node => ({ node, p: projectNode(node) }));
   projected.sort((a, b) => a.p.z - b.p.z);
 
-  /* ── Connector lines — CareCircle curved links from center to each sphere ── */
+  /* ── Connector lines — CareCircle curved links from center edge to each sphere ── */
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
+  const _cR = Math.max(38, Math.round((Math.min(400, W * 0.88)) * (W < 500 ? 0.17 : 0.24)));
+  const _cEdge = _cR * 1.15; /* start just outside the center sphere rim */
   for (const { node, p } of projected) {
     const cat = CATS[node.contact.cat] || CATS.other;
     const col = `rgb(${cat.r},${cat.g},${cat.b})`;
@@ -8910,9 +9031,14 @@ function drawNetworkView(t) {
     ctx.strokeStyle = isUrgent ? '#ffd24d' : col;
     ctx.globalAlpha = a * (isUrgent ? 0.7 : 0.55);
     ctx.lineWidth = (isUrgent ? 2.2 : 1.5) * p.scale;
+    /* Compute start point on the edge of center sphere toward the contact */
+    const dx = p.sx - cx, dy = p.sy - cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const startX = cx + (dx / dist) * _cEdge;
+    const startY = cy + (dy / dist) * _cEdge;
     ctx.beginPath();
-    const mx = (cx + p.sx) / 2, my = (cy + p.sy) / 2 - 18 * p.scale;
-    ctx.moveTo(cx, cy);
+    const mx = (startX + p.sx) / 2, my = (startY + p.sy) / 2 - 18 * p.scale;
+    ctx.moveTo(startX, startY);
     ctx.quadraticCurveTo(mx, my, p.sx, p.sy);
     ctx.stroke();
   }
@@ -8928,7 +9054,9 @@ function drawNetworkView(t) {
     const s = p.scale;
     const isFocused = focusedContactId === node.contact.id;
     const focusMul = isFocused ? FOCUS_SCALE : 1;
-    const r = Math.max(2, node.r * s * focusMul);
+    /* Breathing — gentle scale pulse per-sphere, gated by pulseOn */
+    const _cb = pulseOn ? (1 + (SEVS[node.contact.sev] || SEVS[4]).pulseAmp * Math.sin(t * (SEVS[node.contact.sev] || SEVS[4]).pulseSpd + node.tx)) : 1;
+    const r = Math.max(2, node.r * s * focusMul * _cb);
     const sx = p.sx, sy = p.sy;
     const isUrgent = node.contact.sev <= 1;
 
@@ -8997,11 +9125,12 @@ function drawNetworkView(t) {
       ctx.fillText(node.initials, sx, sy);
     }
 
-    /* Name below */
+    /* Name below — clamp font size for stability */
     if (s > 0.38) {
       ctx.fillStyle = col;
       ctx.globalAlpha = 0.95;
-      ctx.font = `600 ${Math.round(10.5 * s)}px "Hanken Grotesk", system-ui, sans-serif`;
+      const _nfs = Math.max(7, Math.min(12, Math.round(10.5 * s)));
+      ctx.font = `600 ${_nfs}px "Hanken Grotesk", system-ui, sans-serif`;
       ctx.fillText(node.contact.first, sx, sy + r + 12 * s);
     }
 
@@ -9021,7 +9150,7 @@ function drawNetworkView(t) {
   const selfStageW = Math.min(400, W * 0.88);
   const centerFactor = W < 500 ? 0.17 : 0.24;
   const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
-  const breathe = 1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd);
+  const breathe = pulseOn ? (1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd)) : 1;
   const cr = centerR * breathe;
 
   /* Outer glow (additive) — category color */
@@ -9144,12 +9273,14 @@ function drawNetworkView(t) {
     ctx.fillText(userInit, cx, cy);
   }
 
-  /* User name below center */
+  /* User name below center — use base centerR for stable sizing */
+  const _nameFs = Math.max(8, Math.round(centerR * 0.32));
   ctx.fillStyle = `rgba(${uc.r},${uc.g},${uc.b},0.6)`;
-  ctx.font = `${Math.max(8, Math.round(cr * 0.32))}px "Hanken Grotesk", system-ui, sans-serif`;
+  ctx.font = `${_nameFs}px "Hanken Grotesk", system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(userSphereName || 'You', cx, cy + outerCR + 6);
+  const _nameY = cy + centerR * 1.1 + 6; /* fixed position based on unbreathed centerR */
+  ctx.fillText(userSphereName || 'You', cx, _nameY);
   ctx.textBaseline = 'alphabetic';
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
@@ -11317,6 +11448,8 @@ const MedicationTracker = (() => {
     const freq = ($('medFreqSelect') || {}).value || 'daily';
     const pillsRaw = ($('medRefillInput') || {}).value;
     const pillsLeft = pillsRaw !== '' ? parseInt(pillsRaw) : -1;
+    const reason = ($('medReasonInput') || {}).value || '';
+    const forWhom = ($('medForSelect') || {}).value || 'self';
 
     const contact = await RemielDB.getContact(contactId);
     const contactName = contact
@@ -11331,6 +11464,8 @@ const MedicationTracker = (() => {
       dose,
       frequency: freq,
       pillsLeft: isNaN(pillsLeft) ? -1 : pillsLeft,
+      reason: reason,
+      forWhom: forWhom,
       active: true,
       doseLog: [],
       createdAt: Date.now()
@@ -11344,6 +11479,8 @@ const MedicationTracker = (() => {
     if ($('medDoseInput')) $('medDoseInput').value = '';
     if ($('medFreqSelect')) $('medFreqSelect').value = 'daily';
     if ($('medRefillInput')) $('medRefillInput').value = '';
+    if ($('medReasonInput')) $('medReasonInput').value = '';
+    if ($('medForSelect')) $('medForSelect').value = 'self';
     showDetailRow(false);
     $('medAutocomplete').classList.remove('show');
 
@@ -11463,6 +11600,7 @@ const MedicationTracker = (() => {
             '<div class="med-card-detail">' +
               (med.dose ? '<span>' + escHtml(med.dose) + '</span>' : '') +
               '<span>' + escHtml(freqLabel) + '</span>' +
+              (med.reason ? '<span style="color:rgba(56,189,248,0.6)">for ' + escHtml(med.reason) + '</span>' : '') +
             '</div>' +
             (med.drugClass ? '<div class="med-card-class">' + escHtml(med.drugClass) + '</div>' : '') +
           '</div>' +
@@ -12066,6 +12204,26 @@ if (document.readyState === 'loading') {
     AlertEngine.init();
     DailySummary.init();
     MedicationTracker.init();
+
+/* ── Disabled quick-action tap feedback ── */
+document.querySelectorAll('#qaCallBtn, #qaTextBtn, #qaEmailBtn').forEach(btn => {
+  btn.addEventListener('click', function(e) {
+    if (this.style.pointerEvents === 'none' || parseFloat(this.style.opacity) < 0.5) {
+      e.preventDefault();
+      e.stopPropagation();
+      const isEmail = this.id === 'qaEmailBtn';
+      const msg = isEmail
+        ? 'No email on file — tap Edit to add'
+        : 'No phone number on file — tap Edit to add';
+      const t = document.createElement('div');
+      t.textContent = msg;
+      t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.15);color:#f87171;padding:8px 18px;border-radius:20px;font-size:11px;font-weight:600;z-index:9999;backdrop-filter:blur(12px);border:1px solid rgba(239,68,68,0.25);pointer-events:none;';
+      document.body.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; }, 2200);
+      setTimeout(() => t.remove(), 2600);
+    }
+  }, true);
+});
     SyncEngine.init();
     startNextActionTimer();
     startSeverityTimer();
@@ -12131,12 +12289,26 @@ function openContactModal(mode, contact) {
   }
 
   overlay.classList.add('open');
+  var _fab = document.getElementById('addPersonFab');
+  if (_fab) _fab.classList.add('fab-open');
   setTimeout(() => firstInput.focus(), 200);
 }
 
 function closeContactModal() {
   document.getElementById('contactModalOverlay').classList.remove('open');
+  const fab = document.getElementById('addPersonFab');
+  if (fab) fab.classList.remove('fab-open');
 }
+function toggleAddModal() {
+  const overlay = document.getElementById('contactModalOverlay');
+  const fab = document.getElementById('addPersonFab');
+  if (overlay.classList.contains('open')) {
+    closeContactModal();
+  } else {
+    openContactModal('add');
+  }
+}
+
 
 async function saveContactModal() {
   const first = document.getElementById('cmFirstName').value.trim();
@@ -12268,6 +12440,256 @@ function updateFabVisibility() {
     _origCloseBluf.apply(this, arguments);
     updateFabVisibility();
   };
+})();
+
+
+/* ── Breathing toggle in settings ── */
+(function addBreathingToggle() {
+  function inject() {
+    /* Find a good settings container — look for setting-row elements */
+    const rows = document.querySelectorAll('.setting-row');
+    if (rows.length === 0) { setTimeout(inject, 1000); return; }
+    const lastRow = rows[rows.length - 1];
+    const bRow = document.createElement('div');
+    bRow.className = 'setting-row';
+    bRow.innerHTML =
+      '<span class="setting-label">Breathing effects</span>' +
+      '<label class="setting-toggle"><input type="checkbox" id="breatheToggle" ' +
+      (pulseOn ? 'checked' : '') + '><span class="toggle-track"><span class="toggle-thumb"></span></span></label>';
+    lastRow.parentNode.insertBefore(bRow, lastRow.nextSibling);
+    document.getElementById('breatheToggle').addEventListener('change', function() {
+      pulseOn = this.checked;
+      RemielDB.putSetting('pulseOn', pulseOn);
+    });
+    /* Load saved preference */
+    RemielDB.getSetting('pulseOn').then(v => {
+      if (v === false) {
+        pulseOn = false;
+        var cb = document.getElementById('breatheToggle');
+        if (cb) cb.checked = false;
+      }
+    }).catch(() => {});
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject);
+  else setTimeout(inject, 500);
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MedImageReader — Camera/upload → OCR-like text extraction
+   Uses canvas analysis + FORMULARY matching to identify medication names.
+   ═══════════════════════════════════════════════════════════════ */
+const MedImageReader = (() => {
+  'use strict';
+  let stream = null;
+
+  function open() {
+    const overlay = document.getElementById('medImgOverlay');
+    const video = document.getElementById('medImgVideo');
+    const preview = document.getElementById('medImgPreview');
+    const result = document.getElementById('medImgResult');
+    const captureBtn = document.getElementById('medImgCaptureBtn');
+
+    preview.style.display = 'none';
+    video.style.display = '';
+    captureBtn.style.display = '';
+    result.textContent = 'Point camera at the medication label or upload a photo';
+    overlay.classList.add('active');
+
+    /* Try to access camera */
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      }).then(s => {
+        stream = s;
+        video.srcObject = s;
+      }).catch(() => {
+        video.style.display = 'none';
+        captureBtn.style.display = 'none';
+        result.textContent = 'Camera unavailable — use Upload instead';
+      });
+    } else {
+      video.style.display = 'none';
+      captureBtn.style.display = 'none';
+      result.textContent = 'Camera unavailable — use Upload instead';
+    }
+  }
+
+  function close() {
+    const overlay = document.getElementById('medImgOverlay');
+    overlay.classList.remove('active');
+    stopCamera();
+  }
+
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    const video = document.getElementById('medImgVideo');
+    if (video) video.srcObject = null;
+  }
+
+  function capture() {
+    const video = document.getElementById('medImgVideo');
+    const canvas = document.getElementById('medImgCanvas');
+    if (!video || video.videoWidth === 0) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    /* Show preview */
+    const preview = document.getElementById('medImgPreview');
+    preview.src = canvas.toDataURL('image/jpeg', 0.85);
+    preview.style.display = '';
+    video.style.display = 'none';
+    stopCamera();
+
+    processImage(canvas);
+  }
+
+  function handleFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById('medImgCanvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+
+        const preview = document.getElementById('medImgPreview');
+        preview.src = e.target.result;
+        preview.style.display = '';
+        const video = document.getElementById('medImgVideo');
+        video.style.display = 'none';
+        stopCamera();
+
+        processImage(canvas);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  }
+
+  function processImage(canvas) {
+    const result = document.getElementById('medImgResult');
+    result.textContent = 'Analyzing image…';
+
+    /* Use built-in text detection API if available, otherwise fall back to formulary matching */
+    if ('TextDetector' in window) {
+      const detector = new TextDetector();
+      detector.detect(canvas).then(texts => {
+        const allText = texts.map(t => t.rawValue).join(' ');
+        const matches = matchFormulary(allText);
+        showMatches(matches, allText);
+      }).catch(() => {
+        /* Fallback: prompt user to type or use formulary search */
+        fallbackAnalysis();
+      });
+    } else if (typeof Tesseract !== 'undefined') {
+      /* If Tesseract.js were loaded */
+      fallbackAnalysis();
+    } else {
+      fallbackAnalysis();
+    }
+  }
+
+  function fallbackAnalysis() {
+    const result = document.getElementById('medImgResult');
+    result.innerHTML = 'Image captured! Text recognition requires a supported browser.<br>' +
+      '<strong>Tap a medication below or type the name manually:</strong>';
+
+    /* Show common medications as quick-pick buttons */
+    const quickPick = document.createElement('div');
+    quickPick.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;justify-content:center;';
+    const common = ['Metformin','Lisinopril','Atorvastatin','Amlodipine','Metoprolol',
+      'Omeprazole','Levothyroxine','Albuterol','Sertraline','Gabapentin','Hydrochlorothiazide','Losartan'];
+    common.forEach(name => {
+      const btn = document.createElement('button');
+      btn.textContent = name;
+      btn.style.cssText = 'padding:4px 10px;border-radius:12px;border:1px solid rgba(56,189,248,0.25);background:rgba(56,189,248,0.08);color:#38bdf8;font-size:11px;cursor:pointer;';
+      btn.onclick = () => selectMed(name);
+      quickPick.appendChild(btn);
+    });
+    result.appendChild(quickPick);
+  }
+
+  function matchFormulary(text) {
+    if (!text) return [];
+    const upper = text.toUpperCase();
+    const FORMULARY = typeof MedicationTracker !== 'undefined' ? [] : [];
+    /* Access the internal formulary via duck typing */
+    const allMeds = [
+      'Acetaminophen','Ibuprofen','Aspirin','Naproxen','Amoxicillin','Azithromycin',
+      'Ciprofloxacin','Doxycycline','Lisinopril','Losartan','Amlodipine','Metoprolol',
+      'Atenolol','Metformin','Atorvastatin','Rosuvastatin','Simvastatin','Omeprazole',
+      'Pantoprazole','Sertraline','Fluoxetine','Escitalopram','Venlafaxine','Duloxetine',
+      'Bupropion','Trazodone','Gabapentin','Pregabalin','Levothyroxine','Prednisone',
+      'Albuterol','Montelukast','Cetirizine','Loratadine','Hydrochlorothiazide',
+      'Furosemide','Warfarin','Apixaban','Clopidogrel','Insulin Glargine','Insulin Lispro',
+      'Alprazolam','Lorazepam','Diazepam','Clonazepam','Lamotrigine','Topiramate',
+      'Carbamazepine','Tamsulosin','Finasteride','Cyclobenzaprine','Tramadol','Sumatriptan',
+      'Zolpidem','Melatonin','Vitamin D','Multivitamin'
+    ];
+    return allMeds.filter(m => upper.includes(m.toUpperCase()));
+  }
+
+  function showMatches(matches, rawText) {
+    const result = document.getElementById('medImgResult');
+    if (matches.length > 0) {
+      result.innerHTML = '<strong>Detected:</strong> ';
+      matches.forEach((m, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = m;
+        btn.style.cssText = 'margin:2px 4px;padding:4px 12px;border-radius:12px;border:1px solid rgba(56,189,248,0.4);background:rgba(56,189,248,0.15);color:#38bdf8;font-size:12px;cursor:pointer;font-weight:600;';
+        btn.onclick = () => selectMed(m);
+        result.appendChild(btn);
+      });
+    } else {
+      fallbackAnalysis();
+    }
+  }
+
+  function selectMed(name) {
+    const nameInput = document.getElementById('medNameInput');
+    if (nameInput) {
+      nameInput.value = name;
+      nameInput.dispatchEvent(new Event('input'));
+    }
+    /* Show detail row */
+    const detailRow = document.getElementById('medDetailRow');
+    if (detailRow) detailRow.style.display = 'flex';
+    close();
+  }
+
+  return { open, close, capture, handleFile };
+})();
+
+
+/* ── Populate medication "for whom" dropdown ── */
+(function populateMedFor() {
+  async function fill() {
+    const sel = document.getElementById('medForSelect');
+    if (!sel) { setTimeout(fill, 1000); return; }
+    try {
+      const contacts = await RemielDB.getAllContacts();
+      contacts.forEach(c => {
+        const name = (c.first || '') + (c.last ? ' ' + c.last : '');
+        if (name.trim()) {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = 'For ' + name.trim();
+          sel.appendChild(opt);
+        }
+      });
+    } catch(e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else setTimeout(fill, 800);
 })();
 
 </script>
