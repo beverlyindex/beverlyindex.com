@@ -2931,6 +2931,93 @@
   .settings-status.success { color: #5fbf7a; }
   .settings-status.error { color: #e05252; }
 
+  /* ── Account & Sync UI ── */
+  .sync-status-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    margin-bottom: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-dim, #6b7280);
+  }
+  .sync-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #e05252; flex-shrink: 0;
+  }
+  .sync-dot.online { background: #5fbf7a; }
+  .sync-dot.syncing { background: #f0c040; animation: syncPulse 1s infinite; }
+  @keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .sync-status-text { flex: 1; }
+  .sync-status-action {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 5px 12px; border-radius: 6px;
+    cursor: pointer; border: 1px solid var(--rim-cyan, #38bdf8);
+    background: transparent; color: var(--rim-cyan, #38bdf8);
+    transition: background 0.15s;
+  }
+  .sync-status-action:hover { background: rgba(56,189,248,0.1); }
+  .sync-status-action:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .sync-auth-tabs {
+    display: flex; gap: 0; margin-bottom: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .sync-auth-tab {
+    flex: 1; padding: 10px 0; text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-dim, #6b7280);
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .sync-auth-tab.active {
+    color: var(--rim-cyan, #38bdf8);
+    border-bottom-color: var(--rim-cyan, #38bdf8);
+  }
+  .sync-auth-form { display: none; }
+  .sync-auth-form.active { display: block; }
+
+  .sync-field { margin-bottom: 10px; }
+  .sync-field label {
+    display: block; margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim, #6b7280);
+  }
+
+  .sync-account-info {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; margin-bottom: 12px;
+  }
+  .sync-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(56,189,248,0.2), rgba(126,87,194,0.2));
+    border: 1px solid rgba(56,189,248,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Instrument Serif', serif;
+    font-size: 18px; color: var(--rim-cyan, #38bdf8);
+    flex-shrink: 0;
+  }
+  .sync-account-detail {
+    flex: 1; min-width: 0;
+  }
+  .sync-account-name {
+    font-family: 'Hanken Grotesk', sans-serif;
+    font-size: 14px; font-weight: 600;
+    color: var(--text, #e0e4ec);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sync-account-email {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-dim, #6b7280);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
   .settings-data-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -3561,6 +3648,78 @@
         <button class="settings-action-btn" id="importConfirmBtn" onclick="SettingsPanel.doImport()" style="display:none;">Replace All Data</button>
       </div>
       <div class="settings-status" id="importStatus"></div>
+    </div>
+  </div>
+
+  <!-- Account & Sync -->
+  <div class="settings-section" id="syncSection">
+    <div class="settings-section-title" data-i18n="sync.account">Account</div>
+
+    <!-- Sync status bar (visible when logged in) -->
+    <div class="sync-status-bar" id="syncStatusBar" style="display:none;">
+      <span class="sync-dot" id="syncDot"></span>
+      <span class="sync-status-text" id="syncStatusText">Offline</span>
+      <button class="sync-status-action" id="syncNowBtn" onclick="AccountUI.syncNow()" data-i18n="sync.syncNow">Sync Now</button>
+    </div>
+
+    <!-- When NOT logged in: auth card -->
+    <div class="settings-card" id="syncAuthCard">
+      <div class="sync-auth-tabs">
+        <button class="sync-auth-tab active" id="tabSignIn" onclick="AccountUI.switchTab('signin')" data-i18n="sync.signIn">Sign In</button>
+        <button class="sync-auth-tab" id="tabSignUp" onclick="AccountUI.switchTab('signup')" data-i18n="sync.signUp">Create Account</button>
+      </div>
+
+      <!-- Sign In form -->
+      <div class="sync-auth-form active" id="formSignIn">
+        <div class="sync-field">
+          <label for="syncLoginEmail" data-i18n="sync.email">Email</label>
+          <input class="settings-input" type="email" id="syncLoginEmail" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="sync-field">
+          <label for="syncLoginPassword" data-i18n="sync.password">Password</label>
+          <input class="settings-input" type="password" id="syncLoginPassword" placeholder="Password" autocomplete="current-password">
+        </div>
+        <button class="settings-action-btn" id="signInBtn" onclick="AccountUI.doSignIn()" data-i18n="sync.signIn">Sign In</button>
+        <div class="settings-status" id="signInStatus"></div>
+      </div>
+
+      <!-- Sign Up form -->
+      <div class="sync-auth-form" id="formSignUp">
+        <div class="sync-field">
+          <label for="syncSignupName" data-i18n="sync.displayName">Display Name</label>
+          <input class="settings-input" type="text" id="syncSignupName" placeholder="Your name" autocomplete="name">
+        </div>
+        <div class="sync-field">
+          <label for="syncSignupEmail" data-i18n="sync.email">Email</label>
+          <input class="settings-input" type="email" id="syncSignupEmail" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="sync-field">
+          <label for="syncSignupPassword" data-i18n="sync.password">Password</label>
+          <input class="settings-input" type="password" id="syncSignupPassword" placeholder="Min 8 characters" autocomplete="new-password">
+        </div>
+        <div class="sync-field">
+          <label for="syncInviteCode" data-i18n="sync.inviteCode">Invite Code</label>
+          <input class="settings-input" type="text" id="syncInviteCode" placeholder="Required for beta" autocomplete="off">
+        </div>
+        <button class="settings-action-btn" id="signUpBtn" onclick="AccountUI.doSignUp()" data-i18n="sync.signUp">Create Account</button>
+        <div class="settings-status" id="signUpStatus"></div>
+      </div>
+    </div>
+
+    <!-- When logged in: account info card -->
+    <div class="settings-card" id="syncAccountCard" style="display:none;">
+      <div class="sync-account-info">
+        <div class="sync-avatar" id="syncAvatar">R</div>
+        <div class="sync-account-detail">
+          <div class="sync-account-name" id="syncAccountName">—</div>
+          <div class="sync-account-email" id="syncAccountEmail">—</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="settings-action-btn" onclick="AccountUI.syncNow()" data-i18n="sync.syncNow">Sync Now</button>
+        <button class="settings-action-btn secondary" onclick="AccountUI.doSignOut()" data-i18n="sync.signOut">Sign Out</button>
+      </div>
+      <div class="settings-status" id="syncAccountStatus"></div>
     </div>
   </div>
 
@@ -10949,20 +11108,225 @@ const SyncEngine = (() => {
   };
 })();
 
-/* Start alert engine, daily summary, medication tracker, and sync engine after RemielDB is ready */
+/* ══════════════════════════════════════════════════════════════
+   AccountUI — Settings-panel controller for Account & Sync section.
+   Wires HTML forms to SyncEngine and keeps the UI in sync.
+   ══════════════════════════════════════════════════════════════ */
+
+const AccountUI = (() => {
+  'use strict';
+
+  const API_BASE = 'https://remiel.beverly-index.com';
+
+  const $ = id => document.getElementById(id);
+
+  // ── Tab switching ──
+
+  function switchTab(tab) {
+    const isSignIn = (tab === 'signin');
+    $('tabSignIn').classList.toggle('active', isSignIn);
+    $('tabSignUp').classList.toggle('active', !isSignIn);
+    $('formSignIn').classList.toggle('active', isSignIn);
+    $('formSignUp').classList.toggle('active', !isSignIn);
+    // Clear statuses on switch
+    $('signInStatus').textContent = '';
+    $('signUpStatus').textContent = '';
+  }
+
+  // ── Sign In ──
+
+  async function doSignIn() {
+    const email = $('syncLoginEmail').value.trim();
+    const password = $('syncLoginPassword').value;
+    const statusEl = $('signInStatus');
+
+    if (!email || !password) {
+      statusEl.textContent = 'Email and password required.';
+      statusEl.className = 'settings-status error';
+      return;
+    }
+
+    statusEl.textContent = 'Signing in...';
+    statusEl.className = 'settings-status';
+    $('signInBtn').disabled = true;
+
+    try {
+      await SyncEngine.configure(API_BASE);
+      await SyncEngine.login(email, password);
+      statusEl.textContent = '';
+      refreshUI();
+      // Trigger first sync
+      SyncEngine.startAutoSync();
+      SyncEngine.sync();
+    } catch (e) {
+      statusEl.textContent = e.message || 'Sign in failed';
+      statusEl.className = 'settings-status error';
+    } finally {
+      $('signInBtn').disabled = false;
+    }
+  }
+
+  // ── Sign Up ──
+
+  async function doSignUp() {
+    const name = $('syncSignupName').value.trim();
+    const email = $('syncSignupEmail').value.trim();
+    const password = $('syncSignupPassword').value;
+    const invite = $('syncInviteCode').value.trim();
+    const statusEl = $('signUpStatus');
+
+    if (!name || !email || !password) {
+      statusEl.textContent = 'All fields except invite code are required.';
+      statusEl.className = 'settings-status error';
+      return;
+    }
+    if (password.length < 8) {
+      statusEl.textContent = 'Password must be at least 8 characters.';
+      statusEl.className = 'settings-status error';
+      return;
+    }
+
+    statusEl.textContent = 'Creating account...';
+    statusEl.className = 'settings-status';
+    $('signUpBtn').disabled = true;
+
+    try {
+      await SyncEngine.configure(API_BASE);
+      await SyncEngine.signup(email, password, name, invite);
+      statusEl.textContent = '';
+      refreshUI();
+      SyncEngine.startAutoSync();
+      SyncEngine.sync();
+    } catch (e) {
+      statusEl.textContent = e.message || 'Signup failed';
+      statusEl.className = 'settings-status error';
+    } finally {
+      $('signUpBtn').disabled = false;
+    }
+  }
+
+  // ── Sign Out ──
+
+  async function doSignOut() {
+    const statusEl = $('syncAccountStatus');
+    statusEl.textContent = 'Signing out...';
+    statusEl.className = 'settings-status';
+
+    try {
+      await SyncEngine.logout();
+      statusEl.textContent = '';
+      refreshUI();
+    } catch (e) {
+      statusEl.textContent = e.message || 'Sign out failed';
+      statusEl.className = 'settings-status error';
+    }
+  }
+
+  // ── Sync Now ──
+
+  async function syncNow() {
+    const dotEl = $('syncDot');
+    const textEl = $('syncStatusText');
+    const btnEl = $('syncNowBtn');
+
+    if (!SyncEngine.isAuthenticated()) return;
+
+    dotEl.className = 'sync-dot syncing';
+    textEl.textContent = I18n ? I18n.t('sync.syncing') : 'Syncing...';
+    btnEl.disabled = true;
+
+    try {
+      var result = await SyncEngine.sync();
+      if (result && result.pull && result.pull.success) {
+        dotEl.className = 'sync-dot online';
+        textEl.textContent = (I18n ? I18n.t('sync.lastSync') : 'Last sync') + ': ' + new Date().toLocaleTimeString();
+      } else {
+        dotEl.className = 'sync-dot';
+        textEl.textContent = (result && result.pull && result.pull.error) || 'Sync failed';
+      }
+    } catch (e) {
+      dotEl.className = 'sync-dot';
+      textEl.textContent = e.message || 'Sync error';
+    } finally {
+      btnEl.disabled = false;
+    }
+  }
+
+  // ── Refresh UI state ──
+
+  function refreshUI() {
+    const authed = SyncEngine.isAuthenticated();
+
+    // Toggle cards
+    $('syncAuthCard').style.display = authed ? 'none' : '';
+    $('syncAccountCard').style.display = authed ? '' : 'none';
+    $('syncStatusBar').style.display = authed ? '' : 'none';
+
+    if (authed) {
+      const status = SyncEngine.getStatus();
+      // Account info
+      $('syncAccountName').textContent = status.displayName || '—';
+      $('syncAccountEmail').textContent = status.apiBase ? status.apiBase.replace(/^https?:\/\//, '') : '—';
+      $('syncAvatar').textContent = (status.displayName || '?').charAt(0).toUpperCase();
+
+      // Sync status bar
+      const dotEl = $('syncDot');
+      const textEl = $('syncStatusText');
+      if (status.syncInProgress) {
+        dotEl.className = 'sync-dot syncing';
+        textEl.textContent = I18n ? I18n.t('sync.syncing') : 'Syncing...';
+      } else if (navigator.onLine) {
+        dotEl.className = 'sync-dot online';
+        textEl.textContent = I18n ? I18n.t('sync.connected') : 'Connected';
+      } else {
+        dotEl.className = 'sync-dot';
+        textEl.textContent = I18n ? I18n.t('sync.offline') : 'Offline';
+      }
+    }
+
+    // Clear form fields
+    $('syncLoginEmail').value = '';
+    $('syncLoginPassword').value = '';
+    $('syncSignupName').value = '';
+    $('syncSignupEmail').value = '';
+    $('syncSignupPassword').value = '';
+    $('syncInviteCode').value = '';
+  }
+
+  // ── Init (called after SyncEngine.init) ──
+
+  function init() {
+    refreshUI();
+    // Listen for online/offline to update status bar
+    window.addEventListener('online', refreshUI);
+    window.addEventListener('offline', refreshUI);
+  }
+
+  return {
+    init: init,
+    switchTab: switchTab,
+    doSignIn: doSignIn,
+    doSignUp: doSignUp,
+    doSignOut: doSignOut,
+    syncNow: syncNow,
+    refreshUI: refreshUI,
+  };
+})();
+
+/* Start alert engine, daily summary, medication tracker, sync engine, and account UI after RemielDB is ready */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     AlertEngine.init();
     DailySummary.init();
     MedicationTracker.init();
-    SyncEngine.init();
+    SyncEngine.init().then(() => AccountUI.init());
   });
 } else {
   setTimeout(() => {
     AlertEngine.init();
     DailySummary.init();
     MedicationTracker.init();
-    SyncEngine.init();
+    SyncEngine.init().then(() => AccountUI.init());
   }, 500);
 }
 
