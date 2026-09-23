@@ -4175,6 +4175,35 @@
     letter-spacing: 1px; margin-bottom: 4px; text-align: center;
   }
 
+
+/* ── Guest Call (open invite) ── */
+.sc-guest-overlay {
+  position: fixed; inset: 0; z-index: 99999;
+  background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0a0a1a 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: opacity 0.3s;
+}
+.sc-guest-overlay.hidden { display: none; }
+.sc-guest-title { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; opacity: 0.5; margin-bottom: 8px; }
+.sc-guest-name-input {
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px; padding: 14px 20px; font-size: 18px; color: #fff;
+  text-align: center; width: 280px; max-width: 80vw; outline: none;
+  font-family: inherit;
+}
+.sc-guest-name-input::placeholder { color: rgba(255,255,255,0.3); }
+.sc-guest-name-input:focus { border-color: rgb(56,189,248); box-shadow: 0 0 0 3px rgba(56,189,248,0.15); }
+.sc-guest-join-btn {
+  margin-top: 20px; background: rgb(56,189,248); color: #000; border: none;
+  border-radius: 14px; padding: 14px 40px; font-size: 16px; font-weight: 700;
+  cursor: pointer; letter-spacing: 0.5px;
+  transition: transform 0.15s, background 0.15s;
+}
+.sc-guest-join-btn:active { transform: scale(0.96); }
+.sc-guest-join-btn:disabled { opacity: 0.4; cursor: default; }
+.sc-guest-status { margin-top: 16px; font-size: 13px; opacity: 0.6; }
+.sc-guest-logo { font-size: 28px; margin-bottom: 24px; letter-spacing: 1px; font-weight: 300; }
 </style>
 
 
@@ -4352,7 +4381,7 @@
 </button>
 
 <!-- ═══ Settings Gear ═══ -->
-<button class="settings-btn" id="settingsBtn" aria-label="Settings" title="Settings" onclick="SettingsPanel.open()">
+<button class="settings-btn" id="settingsBtn" aria-label="Settings" title="Settings" onclick="SettingsPanel.open(); if(typeof SentinelCall!=='undefined') SentinelCall.updateSettingsDisplay();">
   <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
 </button>
 
@@ -4430,6 +4459,23 @@
     </div>
   </div>
 
+  <!-- Sentinel Call ID -->
+  <div class="settings-section">
+    <div class="settings-section-title">Sentinel Call</div>
+    <div class="settings-card">
+      <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">Your Sentinel ID is how others reach you by video call. Share your call link with anyone.</p>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div id="settingsSentinelId" style="font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;font-size:20px;letter-spacing:3px;font-weight:700;color:var(--text-primary,#fff);text-transform:uppercase;">--------</div>
+        <button class="settings-action-btn secondary" onclick="SentinelCall.copyMyId()" style="font-size:11px;padding:6px 12px;white-space:nowrap;">Copy ID</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="settings-action-btn" onclick="SentinelCall.shareCallLink()" style="flex:1;min-width:120px;">Share Call Link</button>
+        <button class="settings-action-btn secondary" onclick="SentinelCall.regenerateId()" style="font-size:11px;padding:6px 12px;white-space:nowrap;">New ID</button>
+      </div>
+      <div class="settings-status" id="sentinelIdStatus"></div>
+    </div>
+  </div>
+
   <!-- Export -->
   <div class="settings-section">
     <div class="settings-section-title" data-i18n="settings.export">Export Encrypted Backup</div>
@@ -4475,6 +4521,19 @@
   </div>
 
   <div style="height:40px;flex-shrink:0;"></div>
+
+<!-- ═══ Guest Call Overlay (open invite) ═══ -->
+<div class="sc-guest-overlay hidden" id="scGuestOverlay">
+  <div class="sc-guest-logo">REMIEL SENTINEL</div>
+  <div class="sc-guest-title">Video Call</div>
+  <p style="font-size:15px;opacity:0.7;margin:0 0 24px;max-width:300px;text-align:center;line-height:1.5;">
+    Enter your name to join the call
+  </p>
+  <input class="sc-guest-name-input" id="scGuestName" type="text" placeholder="Your name" maxlength="30" autocomplete="name">
+  <button class="sc-guest-join-btn" id="scGuestJoinBtn" onclick="SentinelCall.guestJoinCall()" disabled>Join Call</button>
+  <div class="sc-guest-status" id="scGuestStatus"></div>
+</div>
+
 </div>
 
 <!-- ═══ Alert Notification Bell ═══ -->
@@ -8123,7 +8182,12 @@ async function updateBlufContent() {
     if (!_qaBar.querySelector('.qa-self-note')) {
       const _selfNote = document.createElement('div');
       _selfNote.className = 'qa-self-note';
-      _selfNote.innerHTML = 'This is your profile &mdash; quick actions are for your contacts';
+      const _myScId = SentinelCall.getMyId ? SentinelCall.getMyId() : '...';
+      _selfNote.innerHTML = '<div style="text-align:center;padding:4px 0;">'
+        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.5;margin-bottom:4px;">Your Sentinel ID</div>'
+        + '<div style="font-family:monospace;font-size:18px;letter-spacing:3px;font-weight:700;">' + (_myScId || '...') + '</div>'
+        + '<button onclick="SentinelCall.shareCallLink()" style="margin-top:8px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:rgb(56,189,248);border-radius:8px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;">Share Call Link</button>'
+        + '</div>';
       _qaBar.appendChild(_selfNote);
     }
     if (_editBtn) _editBtn.style.display = 'none';
@@ -14131,6 +14195,11 @@ if (document.readyState === 'loading') {
     MedicationTracker.init();
     SyncEngine.init();
     SentinelCall.init();
+    /* Check for ?call= invite link — if present, show guest overlay and skip gate */
+    if (typeof SentinelCall !== 'undefined' && SentinelCall.checkCallInvite()) {
+      /* Guest call mode — gate is bypassed, only call UI shown */
+      return;
+    }
     startNextActionTimer();
     startSeverityTimer();
   });
@@ -14141,6 +14210,7 @@ if (document.readyState === 'loading') {
     MedicationTracker.init();
     SyncEngine.init();
     SentinelCall.init();
+    if (typeof SentinelCall !== 'undefined' && SentinelCall.checkCallInvite()) return;
     startNextActionTimer();
     startSeverityTimer();
   }, 0);
@@ -14534,11 +14604,196 @@ const SentinelCall = (function() {
   function getMyId() { return _myId; }
   function isInCall() { return !!_currentCall; }
 
+
+  /* ── Guest / Open Invite call logic ── */
+  let _guestTargetId = null;
+
+  function checkCallInvite() {
+    const params = new URLSearchParams(window.location.search);
+    const callTarget = params.get('call');
+    if (!callTarget) return false;
+    _guestTargetId = callTarget.toUpperCase();
+    /* Show guest overlay instead of gate */
+    document.getElementById('scGuestOverlay').classList.remove('hidden');
+    /* Enable join button when name is entered */
+    const nameInput = document.getElementById('scGuestName');
+    const joinBtn = document.getElementById('scGuestJoinBtn');
+    nameInput.addEventListener('input', () => {
+      joinBtn.disabled = nameInput.value.trim().length < 1;
+    });
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && nameInput.value.trim()) guestJoinCall();
+    });
+    setTimeout(() => nameInput.focus(), 300);
+    /* Clean URL without reloading */
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+    return true;
+  }
+
+  async function guestJoinCall() {
+    const name = document.getElementById('scGuestName').value.trim();
+    if (!name || !_guestTargetId) return;
+    const statusEl = document.getElementById('scGuestStatus');
+    statusEl.textContent = 'Connecting...';
+
+    /* Generate a temp guest Sentinel ID */
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let guestId = 'G';
+    const arr = new Uint8Array(7);
+    crypto.getRandomValues(arr);
+    for (let i = 0; i < 7; i++) guestId += chars[arr[i] % chars.length];
+
+    /* Connect PeerJS as guest */
+    try {
+      await _loadPeerJS();
+    } catch(e) {
+      statusEl.textContent = 'Could not load video calling library';
+      return;
+    }
+
+    const guestPeerId = 'sentinel-' + guestId.toLowerCase();
+    const guestPeer = new Peer(guestPeerId, { debug: 0 });
+
+    guestPeer.on('open', async (id) => {
+      statusEl.textContent = 'Calling...';
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+        /* Hide guest overlay, show outgoing UI */
+        document.getElementById('scGuestOverlay').classList.add('hidden');
+        _localStream = stream;
+
+        const localVid = document.getElementById('scLocalVideo');
+        if (localVid) { localVid.srcObject = stream; localVid.play().catch(() => {}); }
+
+        /* Show outgoing call overlay */
+        _showOutgoing(_guestTargetId, '?');
+
+        /* Place the call */
+        const remotePeerId = 'sentinel-' + _guestTargetId.toLowerCase();
+        const call = guestPeer.call(remotePeerId, stream, {
+          metadata: { callerName: name, callerId: guestId, isGuest: true }
+        });
+
+        if (!call) {
+          showToast('Could not place call');
+          _endCall();
+          return;
+        }
+
+        _currentCall = call;
+        _peer = guestPeer;
+
+        call.on('stream', (remoteStream) => {
+          _showActive(name);
+          const remoteVid = document.getElementById('scRemoteVideo');
+          if (remoteVid) { remoteVid.srcObject = remoteStream; remoteVid.play().catch(() => {}); }
+        });
+
+        call.on('close', () => { _endCall(); guestPeer.destroy(); });
+        call.on('error', (err) => {
+          console.warn('Guest call error:', err);
+          showToast('Call failed');
+          _endCall();
+          guestPeer.destroy();
+        });
+
+        /* Timeout if no answer in 30s */
+        setTimeout(() => {
+          if (_currentCall === call && !document.getElementById('scCallOverlay').classList.contains('active-state')) {
+            showToast('No answer');
+            call.close();
+            _endCall();
+            guestPeer.destroy();
+          }
+        }, 30000);
+
+      } catch(err) {
+        statusEl.textContent = 'Camera/mic access denied';
+        guestPeer.destroy();
+      }
+    });
+
+    guestPeer.on('error', (err) => {
+      statusEl.textContent = 'Connection failed: ' + err.message;
+    });
+  }
+
+  /* Helper to load PeerJS if not loaded */
+  function _loadPeerJS() {
+    return new Promise((resolve, reject) => {
+      if (window.Peer) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
+      s.crossOrigin = 'anonymous';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('PeerJS load failed'));
+      document.head.appendChild(s);
+    });
+  }
+
+  /* ── Share & utility functions ── */
+  function copyMyId() {
+    if (!_myId) { showToast('Sentinel ID not ready yet'); return; }
+    navigator.clipboard.writeText(_myId).then(
+      () => showToast('Sentinel ID copied: ' + _myId),
+      () => { /* Fallback */ showToast('Your ID: ' + _myId); }
+    );
+  }
+
+  function shareCallLink() {
+    if (!_myId) { showToast('Sentinel ID not ready yet'); return; }
+    const url = window.location.origin + window.location.pathname + '?call=' + _myId;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Video Call Me on Sentinel',
+        text: 'Tap this link to start a video call with me on Remiel Sentinel',
+        url: url
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(
+        () => showToast('Call link copied!'),
+        () => showToast(url)
+      );
+    }
+  }
+
+  async function regenerateId() {
+    if (!confirm('Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.')) return;
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let id = '';
+    const arr = new Uint8Array(8);
+    crypto.getRandomValues(arr);
+    for (let i = 0; i < 8; i++) id += chars[arr[i] % chars.length];
+    _myId = id;
+    /* Save to IndexedDB */
+    try {
+      const tx = _db.transaction('settings', 'readwrite');
+      tx.objectStore('settings').put({ key: 'sentinelId', value: id });
+    } catch(e) {}
+    /* Reconnect PeerJS with new ID */
+    if (_peer) { try { _peer.destroy(); } catch(e) {} }
+    _initPeer();
+    /* Update settings display */
+    const el = document.getElementById('settingsSentinelId');
+    if (el) el.textContent = id;
+    showToast('New Sentinel ID: ' + id);
+  }
+
+  /* Update settings panel when it opens */
+  function updateSettingsDisplay() {
+    const el = document.getElementById('settingsSentinelId');
+    if (el && _myId) el.textContent = _myId;
+  }
+
   return {
     init, callContact, callFocused,
     acceptIncoming, rejectIncoming, hangUp, endCall,
     toggleMute, flipCamera,
-    getMyId, isInCall
+    getMyId, isInCall,
+    copyMyId, shareCallLink, regenerateId, updateSettingsDisplay,
+    checkCallInvite, guestJoinCall
   };
 })();
 
