@@ -4354,6 +4354,19 @@
 .social-import-result { font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-top: 10px; }
 .social-import-result.success { background: rgba(46,213,115,0.15); color: #2ed573; }
 .social-import-result.error { background: rgba(248,113,113,0.15); color: #f87171; }
+
+/* ── Location Sharing ── */
+.loc-share-section { margin-top: 10px; }
+.loc-share-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); cursor: pointer; transition: background 0.2s; color: var(--text-primary, #fff); font-size: 13px; font-weight: 500; }
+.loc-share-btn:hover { background: rgba(255,255,255,0.08); }
+.loc-share-btn .loc-icon { font-size: 16px; flex-shrink: 0; }
+.loc-share-status { font-size: 11px; color: var(--text-dim, #999); margin-top: 6px; }
+.loc-shared-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.loc-shared-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+.loc-shared-item .loc-peer-name { font-size: 12px; font-weight: 500; color: var(--text-primary, #fff); }
+.loc-shared-item .loc-peer-time { font-size: 11px; color: var(--text-dim, #999); }
+.loc-shared-item .loc-peer-coords { font-size: 10px; color: var(--accent, #00d4ff); font-family: monospace; }
+
 </style>
 
 
@@ -4597,7 +4610,36 @@
   </div>
 
   <!-- Data Summary -->
-  <div class="settings-section">
+  
+    <div class="settings-section" id="locationShareSection" style="display:none;">
+      <div class="settings-section-title">Location Sharing</div>
+      <div class="settings-card">
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;">Share your current location with your Circle on demand. Not continuous — only when you choose.</p>
+        <div class="loc-share-section">
+          <button class="loc-share-btn" onclick="LocationShare.shareNow()">
+            <span class="loc-icon">📍</span>
+            <span>Share My Location Now</span>
+          </button>
+          <div class="loc-share-status" id="locShareStatus"></div>
+          <button class="loc-share-btn" onclick="LocationShare.stopSharing()" id="locStopBtn" style="display:none;margin-top:6px;border-color:rgba(255,80,80,0.3);">
+            <span class="loc-icon">🚫</span>
+            <span>Stop Sharing Location</span>
+          </button>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Circle Locations</div>
+          <button class="loc-share-btn" onclick="LocationShare.loadShared()" style="margin-bottom:6px;">
+            <span class="loc-icon">🔄</span>
+            <span>Refresh Shared Locations</span>
+          </button>
+          <div class="loc-shared-list" id="locSharedList">
+            <div style="font-size:11px;color:var(--text-dim);">No shared locations yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
     <div class="settings-section-title" data-i18n="settings.yourData">Your Data</div>
     <div class="settings-card">
       <div class="settings-data-grid" id="settingsDataGrid">
@@ -13180,6 +13222,10 @@ const A11y = (() => {
           CircleManager.updateVisibility();
           CircleManager.loadConnections();
         }
+        if (typeof LocationShare !== 'undefined') {
+          LocationShare.updateVisibility();
+          LocationShare.loadShared();
+        }
       };
     }
     if (typeof _origClose === 'function') {
@@ -15247,6 +15293,144 @@ const SocialImport = (() => {
   };
 })();
 
+  /* ── LocationShare ── */
+  const LocationShare = (() => {
+    'use strict';
+
+    function _$(id) { return document.getElementById(id); }
+
+    async function _apiFetch(path, opts) {
+      if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
+        throw new Error('Not authenticated');
+      }
+      return SyncEngine.apiFetch(path, opts || {});
+    }
+
+    function _timeAgo(ts) {
+      var diff = Date.now() - ts;
+      if (diff < 60000) return 'just now';
+      if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+      return Math.floor(diff / 86400000) + 'd ago';
+    }
+
+    async function shareNow() {
+      var status = _$('locShareStatus');
+      if (!status) return;
+      if (!navigator.geolocation) {
+        status.textContent = 'Geolocation is not supported by your browser.';
+        return;
+      }
+      status.textContent = 'Getting your location...';
+
+      navigator.geolocation.getCurrentPosition(
+        async function(pos) {
+          try {
+            var resp = await _apiFetch('/location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                accuracy: pos.coords.accuracy || null,
+              }),
+            });
+            if (!resp.ok) {
+              var err = await resp.json().catch(function() { return {}; });
+              status.textContent = 'Error: ' + (err.detail || 'Failed to share');
+              return;
+            }
+            status.textContent = 'Location shared at ' + new Date().toLocaleTimeString() +
+              ' (' + pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4) + ')';
+            var stopBtn = _$('locStopBtn');
+            if (stopBtn) stopBtn.style.display = '';
+          } catch (e) {
+            status.textContent = 'Error: ' + e.message;
+          }
+        },
+        function(err) {
+          var msg = 'Location error: ';
+          if (err.code === 1) msg += 'Permission denied';
+          else if (err.code === 2) msg += 'Position unavailable';
+          else if (err.code === 3) msg += 'Timeout';
+          else msg += err.message;
+          status.textContent = msg;
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
+
+    async function stopSharing() {
+      var status = _$('locShareStatus');
+      try {
+        var resp = await _apiFetch('/location', { method: 'DELETE' });
+        if (resp.ok) {
+          if (status) status.textContent = 'Location sharing stopped.';
+          var stopBtn = _$('locStopBtn');
+          if (stopBtn) stopBtn.style.display = 'none';
+        } else {
+          if (status) status.textContent = 'Failed to stop sharing.';
+        }
+      } catch (e) {
+        if (status) status.textContent = 'Error: ' + e.message;
+      }
+    }
+
+    async function loadShared() {
+      var list = _$('locSharedList');
+      if (!list) return;
+      try {
+        var resp = await _apiFetch('/location/shared', {});
+        if (!resp.ok) {
+          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Could not load shared locations</div>';
+          return;
+        }
+        var data = await resp.json();
+        var locs = data.locations || [];
+        if (locs.length === 0) {
+          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">No one in your Circle is sharing their location right now</div>';
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < locs.length; i++) {
+          var l = locs[i];
+          html += '<div class="loc-shared-item">' +
+            '<div>' +
+              '<div class="loc-peer-name">' + (l.display_name || l.handle || 'Unknown') + '</div>' +
+              '<div class="loc-peer-coords">' + Number(l.latitude).toFixed(4) + ', ' + Number(l.longitude).toFixed(4) + '</div>' +
+              '<div class="loc-peer-time">' + _timeAgo(l.timestamp) + '</div>' +
+            '</div>' +
+          '</div>';
+        }
+        list.innerHTML = html;
+      } catch (e) {
+        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Error: ' + e.message + '</div>';
+      }
+    }
+
+    function updateVisibility() {
+      var section = _$('locationShareSection');
+      if (!section) return;
+      var authed = typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated();
+      section.style.display = authed ? '' : 'none';
+    }
+
+    function init() {
+      updateVisibility();
+      if (typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated()) {
+        loadShared();
+      }
+    }
+
+    return {
+      shareNow: shareNow,
+      stopSharing: stopSharing,
+      loadShared: loadShared,
+      updateVisibility: updateVisibility,
+      init: init,
+    };
+  })();
+
 /* Start alert engine, daily summary, medication tracker, and sync engine after RemielDB is ready */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
@@ -15255,6 +15439,7 @@ if (document.readyState === 'loading') {
     MedicationTracker.init();
     SyncEngine.init();
     CircleManager.init();
+    if (typeof LocationShare !== 'undefined') LocationShare.init();
     /* P1.1: Show account creation prompt for new users */
     if (typeof SyncPrompt !== 'undefined' && window._pendingGateCode) {
       SyncPrompt.show(window._pendingGateCode);
@@ -15276,6 +15461,7 @@ if (document.readyState === 'loading') {
     MedicationTracker.init();
     SyncEngine.init();
     CircleManager.init();
+    if (typeof LocationShare !== 'undefined') LocationShare.init();
     SentinelCall.init();
     if (typeof SentinelCall !== 'undefined' && SentinelCall.checkCallInvite()) return;
     startNextActionTimer();
