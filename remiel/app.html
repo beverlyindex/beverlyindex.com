@@ -5690,12 +5690,16 @@ const RemielDB = (() => {
     await open();
     if (!contact.createdAt) contact.createdAt = Date.now();
     contact.updatedAt = Date.now();
-    return promisify(tx('contacts', 'readwrite').put(contact));
+    var result = await promisify(tx('contacts', 'readwrite').put(contact));
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    return result;
   }
 
   async function deleteContact(id) {
     await open();
-    return promisify(tx('contacts', 'readwrite').delete(id));
+    var result = await promisify(tx('contacts', 'readwrite').delete(id));
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    return result;
   }
 
   async function seedContacts(demoList) {
@@ -5769,7 +5773,9 @@ const RemielDB = (() => {
   async function addInteraction(entry) {
     await open();
     if (!entry.timestamp) entry.timestamp = Date.now();
-    return promisify(tx('interactions', 'readwrite').add(entry));
+    var result = await promisify(tx('interactions', 'readwrite').add(entry));
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    return result;
   }
 
   async function getInteractionsByContact(contactId) {
@@ -5782,7 +5788,9 @@ const RemielDB = (() => {
   async function addMood(entry) {
     await open();
     if (!entry.timestamp) entry.timestamp = Date.now();
-    return promisify(tx('moods', 'readwrite').add(entry));
+    var result = await promisify(tx('moods', 'readwrite').add(entry));
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    return result;
   }
 
   async function getMoodsByContact(contactId) {
@@ -5796,7 +5804,9 @@ const RemielDB = (() => {
     await open();
     if (!med.createdAt) med.createdAt = Date.now();
     med.updatedAt = Date.now();
-    return promisify(tx('medications', 'readwrite').add(med));
+    var result = await promisify(tx('medications', 'readwrite').add(med));
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    return result;
   }
 
   async function getMedicationsByContact(contactId) {
@@ -5808,12 +5818,16 @@ const RemielDB = (() => {
   async function updateMedication(med) {
     await open();
     med.updatedAt = Date.now();
-    return promisify(tx('medications', 'readwrite').put(med));
+    var result = await promisify(tx('medications', 'readwrite').put(med));
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    return result;
   }
 
   async function deleteMedication(id) {
     await open();
-    return promisify(tx('medications', 'readwrite').delete(id));
+    var result = await promisify(tx('medications', 'readwrite').delete(id));
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    return result;
   }
 
   async function getAllMedications() {
@@ -11654,8 +11668,20 @@ const SettingsPanel = (function () {
       statusPanel.style.display = 'block';
       $('syncDisplayLabel').textContent = status.displayName || status.userId;
       var indicator = $('syncIndicator');
-      if (status.online) {
-        $('syncStatusLabel').textContent = I18n.t('sync.connected') + ' · v' + status.lastSyncVersion;
+      if (status.syncInProgress) {
+        $('syncStatusLabel').textContent = I18n.t('sync.syncing');
+        indicator.style.background = '#60a5fa';
+      } else if (status.lastSyncError) {
+        $('syncStatusLabel').textContent = 'Sync failed';
+        indicator.style.background = '#f87171';
+      } else if (!status.online) {
+        $('syncStatusLabel').textContent = I18n.t('sync.offline') + (status.pendingChanges > 0 ? ' \u00b7 ' + status.pendingChanges + ' pending' : '');
+        indicator.style.background = '#fbbf24';
+      } else if (status.pendingChanges > 0) {
+        $('syncStatusLabel').textContent = status.pendingChanges + ' changes pending';
+        indicator.style.background = '#fbbf24';
+      } else if (status.online) {
+        $('syncStatusLabel').textContent = I18n.t('sync.connected') + ' \u00b7 v' + status.lastSyncVersion;
         indicator.style.background = '#4ade80';
       } else {
         $('syncStatusLabel').textContent = I18n.t('sync.offline');
@@ -13800,6 +13826,11 @@ const SyncEngine = (() => {
   let _syncInProgress = false;
   let _syncInterval = null;
   let _serverIdMap = {};
+  let _pendingChanges = 0;
+  let _lastSyncError = null;
+  let _retryCount = 0;
+  let _retryTimer = null;
+  const MAX_RETRY_DELAY = 60000;
 
   // ── Config persistence ──
 
@@ -13815,6 +13846,8 @@ const SyncEngine = (() => {
       if (mapStr) {
         try { _serverIdMap = JSON.parse(mapStr); } catch(e) { _serverIdMap = {}; }
       }
+      var pendingVal = await RemielDB.getSetting('_sync_pending_changes');
+      if (pendingVal) _pendingChanges = parseInt(pendingVal, 10) || 0;
     } catch (e) {
       console.warn('SyncEngine: config load failed', e);
     }
@@ -13833,6 +13866,75 @@ const SyncEngine = (() => {
       console.warn('SyncEngine: config save failed', e);
     }
   }
+
+  // ── Offline sync queue: dirty tracking + retry ──
+
+  function markDirty() {
+    _pendingChanges++;
+    try { RemielDB.putSetting('_sync_pending_changes', _pendingChanges); } catch(e) {}
+    _updateSyncIndicator();
+    // If online and authenticated, trigger a debounced sync
+    if (navigator.onLine && isAuthenticated() && !_syncInProgress) {
+      if (_retryTimer) clearTimeout(_retryTimer);
+      _retryTimer = setTimeout(function() {
+        _retryTimer = null;
+        sync();
+      }, 3000); // 3s debounce for rapid writes
+    }
+  }
+
+  function _clearPending() {
+    _pendingChanges = 0;
+    _lastSyncError = null;
+    _retryCount = 0;
+    if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
+    try { RemielDB.putSetting('_sync_pending_changes', 0); } catch(e) {}
+    _updateSyncIndicator();
+  }
+
+  function _updateSyncIndicator() {
+    var indicator = document.getElementById('syncIndicator');
+    var label = document.getElementById('syncStatusLabel');
+    if (!indicator || !label) return;
+    if (!isAuthenticated()) return;
+
+    if (_syncInProgress) {
+      indicator.style.background = '#60a5fa';
+      label.textContent = 'Syncing...';
+    } else if (_lastSyncError) {
+      indicator.style.background = '#f87171';
+      label.textContent = 'Sync failed';
+    } else if (!navigator.onLine) {
+      indicator.style.background = '#fbbf24';
+      label.textContent = 'Offline' + (_pendingChanges > 0 ? ' \u00b7 ' + _pendingChanges + ' pending' : '');
+    } else if (_pendingChanges > 0) {
+      indicator.style.background = '#fbbf24';
+      label.textContent = _pendingChanges + ' changes pending';
+    } else {
+      indicator.style.background = '#4ade80';
+      label.textContent = 'Connected \u00b7 v' + _lastSyncVersion;
+    }
+  }
+
+  function _scheduleRetry() {
+    if (_retryTimer) clearTimeout(_retryTimer);
+    if (!isAuthenticated()) return;
+    var delay = Math.min(1000 * Math.pow(2, _retryCount), MAX_RETRY_DELAY);
+    _retryCount++;
+    console.log('SyncEngine: retry #' + _retryCount + ' in ' + delay + 'ms');
+    _retryTimer = setTimeout(function() {
+      _retryTimer = null;
+      if (navigator.onLine && isAuthenticated()) {
+        sync().then(function(result) {
+          if (result.push && result.push.success) {
+            _retryCount = 0;
+          }
+        });
+      }
+    }, delay);
+  }
+
+  function getPendingCount() { return _pendingChanges; }
 
   // ── HTTP helpers ──
 
@@ -14064,11 +14166,15 @@ const SyncEngine = (() => {
 
       _lastSyncVersion = result.current_version;
       await _saveConfig();
+      _clearPending();
       console.log('SyncEngine: push OK v=' + _lastSyncVersion);
       return { success: true, version: _lastSyncVersion, errors: result.errors || [] };
 
     } catch (e) {
       console.warn('SyncEngine: push failed', e);
+      _lastSyncError = e.message;
+      _scheduleRetry();
+      _updateSyncIndicator();
       return { success: false, error: e.message };
     } finally {
       _syncInProgress = false;
@@ -14125,6 +14231,9 @@ const SyncEngine = (() => {
 
     } catch (e) {
       console.warn('SyncEngine: pull failed', e);
+      _lastSyncError = e.message;
+      _scheduleRetry();
+      _updateSyncIndicator();
       return { success: false, error: e.message };
     } finally {
       _syncInProgress = false;
@@ -14135,9 +14244,11 @@ const SyncEngine = (() => {
 
   async function sync() {
     if (!isAuthenticated()) return { skipped: true, reason: 'not authenticated' };
+    _updateSyncIndicator();
     var pushResult = await push();
     if (!pushResult.success && !pushResult.skipped) return pushResult;
     var pullResult = await pull();
+    _updateSyncIndicator();
     return { push: pushResult, pull: pullResult };
   }
 
@@ -14153,16 +14264,29 @@ const SyncEngine = (() => {
       if (navigator.onLine && isAuthenticated()) sync();
     }, interval);
     window.addEventListener('online', _onOnline);
+    window.addEventListener('offline', _onOffline);
     console.log('SyncEngine: auto-sync ON, interval=' + interval + 'ms');
   }
 
   function stopAutoSync() {
     if (_syncInterval) { clearInterval(_syncInterval); _syncInterval = null; }
+    if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
     window.removeEventListener('online', _onOnline);
+    window.removeEventListener('offline', _onOffline);
   }
 
   function _onOnline() {
-    if (isAuthenticated()) setTimeout(function() { sync(); }, 1000);
+    _lastSyncError = null;
+    _retryCount = 0;
+    _updateSyncIndicator();
+    if (isAuthenticated()) {
+      console.log('SyncEngine: back online, syncing with backoff reset');
+      setTimeout(function() { sync(); }, 1000);
+    }
+  }
+
+  function _onOffline() {
+    _updateSyncIndicator();
   }
 
   function getStatus() {
@@ -14174,13 +14298,16 @@ const SyncEngine = (() => {
       lastSyncVersion: _lastSyncVersion,
       syncInProgress: _syncInProgress,
       online: navigator.onLine,
+      pendingChanges: _pendingChanges,
+      lastSyncError: _lastSyncError,
     };
   }
 
   async function init() {
     await _loadConfig();
     if (isAuthenticated()) startAutoSync();
-    console.log('SyncEngine: init, auth=' + isAuthenticated());
+    setTimeout(_updateSyncIndicator, 500);
+    console.log('SyncEngine: init, auth=' + isAuthenticated() + ', pending=' + _pendingChanges);
   }
 
   return {
@@ -14189,6 +14316,7 @@ const SyncEngine = (() => {
     isAuthenticated: isAuthenticated, getUserId: getUserId, getDisplayName: getDisplayName,
     push: push, pull: pull, sync: sync,
     startAutoSync: startAutoSync, stopAutoSync: stopAutoSync, getStatus: getStatus,
+    markDirty: markDirty, getPendingCount: getPendingCount,
   };
 })();
 
