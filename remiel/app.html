@@ -4367,6 +4367,16 @@
 .loc-shared-item .loc-peer-time { font-size: 11px; color: var(--text-dim, #999); }
 .loc-shared-item .loc-peer-coords { font-size: 10px; color: var(--accent, #00d4ff); font-family: monospace; }
 
+
+/* ── Shared Video Notes ── */
+.shared-videonotes { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.shared-vn-item { padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+.shared-vn-item .vn-peer { font-size: 12px; font-weight: 500; color: var(--text-primary, #fff); margin-bottom: 4px; }
+.shared-vn-item .vn-time { font-size: 10px; color: var(--text-dim, #999); margin-bottom: 6px; }
+.shared-vn-item video { width: 100%; border-radius: 6px; max-height: 200px; background: #000; }
+.circle-share-btn { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(0,212,255,0.3); background: rgba(0,212,255,0.1); cursor: pointer; color: var(--accent, #00d4ff); font-size: 11px; font-weight: 500; transition: background 0.2s; }
+.circle-share-btn:hover { background: rgba(0,212,255,0.2); }
+
 </style>
 
 
@@ -4638,6 +4648,20 @@
         </div>
       </div>
     </div>
+    <div class="settings-section" id="sharedVideoNotesSection" style="display:none;">
+      <div class="settings-section-title">Shared Video Notes</div>
+      <div class="settings-card">
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;">Video notes shared by your Circle (last 7 days)</p>
+        <button class="loc-share-btn" onclick="VideoNoteShare.loadShared()" style="margin-bottom:8px;">
+          <span class="loc-icon">🔄</span>
+          <span>Refresh Shared Notes</span>
+        </button>
+        <div class="shared-videonotes" id="sharedVideoNotesList">
+          <div style="font-size:11px;color:var(--text-dim);">No shared video notes yet</div>
+        </div>
+      </div>
+    </div>
+
 
     <div class="settings-section">
     <div class="settings-section-title" data-i18n="settings.yourData">Your Data</div>
@@ -5048,6 +5072,10 @@
                 <button class="bluf-bc-btn" id="bcSaveBtn" onclick="saveBroadcastToSphere()">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                   Save to Sphere
+                </button>
+                <button class="bluf-bc-btn circle-share-btn" id="bcCircleShareBtn" onclick="VideoNoteShare.uploadToCircle()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                  Share with Circle
                 </button>
               </div>
             </div>
@@ -13226,6 +13254,10 @@ const A11y = (() => {
           LocationShare.updateVisibility();
           LocationShare.loadShared();
         }
+        if (typeof VideoNoteShare !== 'undefined') {
+          VideoNoteShare.updateVisibility();
+          VideoNoteShare.loadShared();
+        }
       };
     }
     if (typeof _origClose === 'function') {
@@ -15431,6 +15463,120 @@ const SocialImport = (() => {
     };
   })();
 
+  /* ── VideoNoteShare — upload & view shared video notes ── */
+  const VideoNoteShare = (() => {
+    'use strict';
+
+    function _$(id) { return document.getElementById(id); }
+
+    function _timeAgo(ts) {
+      var diff = Date.now() - ts;
+      if (diff < 60000) return 'just now';
+      if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+      return Math.floor(diff / 86400000) + 'd ago';
+    }
+
+    async function uploadToCircle() {
+      if (typeof bcLastBlob === 'undefined' || !bcLastBlob) {
+        var st = _$('bcStatus');
+        if (st) st.textContent = 'No video to share — record or upload first.';
+        return;
+      }
+      if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
+        var st2 = _$('bcStatus');
+        if (st2) st2.textContent = 'Sign in to share with your Circle.';
+        return;
+      }
+
+      var btn = _$('bcCircleShareBtn');
+      if (btn) btn.textContent = 'Uploading...';
+
+      try {
+        var mimeType = bcLastBlob.type || 'video/webm';
+        var resp = await SyncEngine.apiFetch('/storage/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': mimeType,
+            'x-blob-type': 'videonote',
+            'x-mime-type': mimeType,
+            'content-length': String(bcLastBlob.size),
+          },
+          body: bcLastBlob,
+        });
+
+        if (!resp.ok) {
+          var err = await resp.json().catch(function() { return {}; });
+          throw new Error(err.detail || 'Upload failed');
+        }
+
+        var data = await resp.json();
+        var st3 = _$('bcStatus');
+        if (st3) st3.textContent = 'Shared with Circle!';
+        if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Shared!';
+        setTimeout(function() {
+          if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 014-10z"/></svg> Share with Circle';
+        }, 3000);
+      } catch (e) {
+        var st4 = _$('bcStatus');
+        if (st4) st4.textContent = 'Circle share error: ' + e.message;
+        if (btn) btn.textContent = 'Share with Circle';
+      }
+    }
+
+    async function loadShared() {
+      var list = _$('sharedVideoNotesList');
+      if (!list) return;
+      if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
+        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Sign in to see shared notes</div>';
+        return;
+      }
+      try {
+        var resp = await SyncEngine.apiFetch('/storage/shared-media', {});
+        if (!resp.ok) {
+          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Could not load shared notes</div>';
+          return;
+        }
+        var data = await resp.json();
+        var media = data.media || [];
+        if (media.length === 0) {
+          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">No one in your Circle has shared a video note recently</div>';
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < media.length; i++) {
+          var m = media[i];
+          html += '<div class="shared-vn-item">' +
+            '<div class="vn-peer">' + (m.display_name || m.handle || 'Unknown') + '</div>' +
+            '<div class="vn-time">' + _timeAgo(m.created_at) + '</div>' +
+            '<video src="' + m.url + '" controls playsinline preload="metadata" style="width:100%;border-radius:6px;max-height:200px;background:#000;"></video>' +
+          '</div>';
+        }
+        list.innerHTML = html;
+      } catch (e) {
+        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Error: ' + e.message + '</div>';
+      }
+    }
+
+    function updateVisibility() {
+      var section = _$('sharedVideoNotesSection');
+      if (!section) return;
+      var authed = typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated();
+      section.style.display = authed ? '' : 'none';
+    }
+
+    function init() {
+      updateVisibility();
+    }
+
+    return {
+      uploadToCircle: uploadToCircle,
+      loadShared: loadShared,
+      updateVisibility: updateVisibility,
+      init: init,
+    };
+  })();
+
 /* Start alert engine, daily summary, medication tracker, and sync engine after RemielDB is ready */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
@@ -15440,6 +15586,7 @@ if (document.readyState === 'loading') {
     SyncEngine.init();
     CircleManager.init();
     if (typeof LocationShare !== 'undefined') LocationShare.init();
+    if (typeof VideoNoteShare !== 'undefined') VideoNoteShare.init();
     /* P1.1: Show account creation prompt for new users */
     if (typeof SyncPrompt !== 'undefined' && window._pendingGateCode) {
       SyncPrompt.show(window._pendingGateCode);
@@ -15462,6 +15609,7 @@ if (document.readyState === 'loading') {
     SyncEngine.init();
     CircleManager.init();
     if (typeof LocationShare !== 'undefined') LocationShare.init();
+    if (typeof VideoNoteShare !== 'undefined') VideoNoteShare.init();
     SentinelCall.init();
     if (typeof SentinelCall !== 'undefined' && SentinelCall.checkCallInvite()) return;
     startNextActionTimer();
