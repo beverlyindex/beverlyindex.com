@@ -4403,6 +4403,46 @@
 .pulse-btn:hover { transform: scale(1.1); }
 .pulse-btn:active { transform: scale(0.95); }
 
+
+  /* ── Push Notifications ── */
+  .push-section { margin-top: 0; }
+  .push-toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0;
+  }
+  .push-toggle-label {
+    font-size: 13px; color: var(--text-primary);
+  }
+  .push-toggle-sub {
+    font-size: 11px; color: var(--text-dim); margin-top: 2px;
+  }
+  .push-toggle {
+    position: relative; width: 44px; height: 24px;
+    flex-shrink: 0;
+  }
+  .push-toggle input {
+    opacity: 0; width: 0; height: 0;
+  }
+  .push-toggle-slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: var(--surface-dim, #555); border-radius: 24px;
+    transition: background 0.25s;
+  }
+  .push-toggle-slider::before {
+    content: ''; position: absolute; width: 18px; height: 18px;
+    left: 3px; bottom: 3px; background: #fff; border-radius: 50%;
+    transition: transform 0.25s;
+  }
+  .push-toggle input:checked + .push-toggle-slider {
+    background: var(--accent, #6366f1);
+  }
+  .push-toggle input:checked + .push-toggle-slider::before {
+    transform: translateX(20px);
+  }
+  .push-status-text {
+    font-size: 11px; color: var(--text-dim); margin-top: 4px;
+  }
+
 </style>
 
 
@@ -4687,6 +4727,25 @@
         </div>
       </div>
     </div>
+
+    <div class="settings-section push-section" id="pushNotifySection" style="display:none;">
+      <div class="settings-section-title">Push Notifications</div>
+      <div class="settings-card">
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;">Get notified when a contact's severity changes or a check-in is overdue, even when the app is closed.</p>
+        <div class="push-toggle-row">
+          <div>
+            <div class="push-toggle-label">Enable Push Notifications</div>
+            <div class="push-toggle-sub">Severity alerts, missed check-ins, medication reminders</div>
+          </div>
+          <label class="push-toggle">
+            <input type="checkbox" id="pushToggle" onchange="PushNotify.toggle(this.checked)">
+            <span class="push-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="push-status-text" id="pushStatusText">Checking status...</div>
+      </div>
+    </div>
+
 
 
     <div class="settings-section">
@@ -13298,7 +13357,11 @@ const A11y = (() => {
           VideoNoteShare.updateVisibility();
           VideoNoteShare.loadShared();
         }
-      };
+      }
+    if (typeof PushNotify !== 'undefined') {
+      PushNotify.updateVisibility();
+      PushNotify.checkStatus();
+    };
     }
     if (typeof _origClose === 'function') {
       SettingsPanel.close = function () {
@@ -15785,6 +15848,200 @@ const SocialImport = (() => {
     };
   })();
 
+  /* ═══════════════════════════════════════════════════
+     PushNotify — Web Push subscription manager
+     ═══════════════════════════════════════════════════ */
+  const PushNotify = (() => {
+    'use strict';
+
+    const API_BASE = (typeof SyncEngine !== 'undefined' && SyncEngine._apiBase)
+      ? SyncEngine._apiBase
+      : 'https://remiel-sentinel-api.vercel.app';
+    let _subscribed = false;
+
+    function _getToken() {
+      if (typeof SyncEngine !== 'undefined' && SyncEngine._token) return SyncEngine._token;
+      try { return localStorage.getItem('remiel_access_token'); } catch (e) { return null; }
+    }
+
+    async function _apiFetch(path, opts) {
+      if (typeof SyncEngine !== 'undefined' && typeof SyncEngine._fetch === 'function') {
+        return SyncEngine._fetch(path, opts);
+      }
+      var token = _getToken();
+      var headers = Object.assign({}, opts && opts.headers, {
+        'Content-Type': 'application/json',
+      });
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      var resp = await fetch(API_BASE + path, Object.assign({}, opts, { headers: headers }));
+      return resp;
+    }
+
+    function _urlBase64ToUint8Array(base64String) {
+      var padding = '='.repeat((4 - base64String.length % 4) % 4);
+      var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      var rawData = atob(base64);
+      var outputArray = new Uint8Array(rawData.length);
+      for (var i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    async function subscribe() {
+      try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          _setStatus('Push notifications not supported in this browser.');
+          return false;
+        }
+
+        var permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          _setStatus('Notification permission denied. Enable in browser settings.');
+          _updateToggle(false);
+          return false;
+        }
+
+        var keyResp = await _apiFetch('/push/vapid-key', { method: 'GET' });
+        if (!keyResp.ok) {
+          _setStatus('Push service unavailable.');
+          _updateToggle(false);
+          return false;
+        }
+        var keyData = await keyResp.json();
+
+        var reg = await navigator.serviceWorker.ready;
+        var subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: _urlBase64ToUint8Array(keyData.publicKey),
+        });
+
+        var subJson = subscription.toJSON();
+        var resp = await _apiFetch('/push/subscribe', {
+          method: 'POST',
+          body: JSON.stringify({
+            endpoint: subJson.endpoint,
+            keys: subJson.keys,
+          }),
+        });
+
+        if (resp.ok) {
+          _subscribed = true;
+          _setStatus('Push notifications enabled.');
+          _updateToggle(true);
+          return true;
+        } else {
+          _setStatus('Failed to register subscription.');
+          _updateToggle(false);
+          return false;
+        }
+      } catch (err) {
+        console.error('PushNotify subscribe error:', err);
+        _setStatus('Error enabling push notifications.');
+        _updateToggle(false);
+        return false;
+      }
+    }
+
+    async function unsubscribe() {
+      try {
+        var reg = await navigator.serviceWorker.ready;
+        var subscription = await reg.pushManager.getSubscription();
+
+        if (subscription) {
+          var subJson = subscription.toJSON();
+          await _apiFetch('/push/subscribe', {
+            method: 'DELETE',
+            body: JSON.stringify({ endpoint: subJson.endpoint }),
+          });
+          await subscription.unsubscribe();
+        }
+
+        _subscribed = false;
+        _setStatus('Push notifications disabled.');
+        _updateToggle(false);
+      } catch (err) {
+        console.error('PushNotify unsubscribe error:', err);
+        _setStatus('Error disabling push notifications.');
+      }
+    }
+
+    async function toggle(enabled) {
+      if (enabled) {
+        await subscribe();
+      } else {
+        await unsubscribe();
+      }
+    }
+
+    async function checkStatus() {
+      try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          _setStatus('Push not supported.');
+          _updateToggle(false);
+          return;
+        }
+
+        var reg = await navigator.serviceWorker.ready;
+        var subscription = await reg.pushManager.getSubscription();
+
+        if (subscription) {
+          var resp = await _apiFetch('/push/status', { method: 'GET' });
+          if (resp.ok) {
+            var data = await resp.json();
+            _subscribed = data.subscribed;
+            _updateToggle(_subscribed);
+            _setStatus(_subscribed ? 'Push notifications active.' : 'Push notifications inactive.');
+          } else {
+            _subscribed = false;
+            _updateToggle(false);
+            _setStatus('Could not verify push status.');
+          }
+        } else {
+          _subscribed = false;
+          _updateToggle(false);
+          _setStatus('Push notifications inactive.');
+        }
+      } catch (err) {
+        _subscribed = false;
+        _updateToggle(false);
+        _setStatus('Push notifications inactive.');
+      }
+    }
+
+    function _setStatus(text) {
+      var el = document.getElementById('pushStatusText');
+      if (el) el.textContent = text;
+    }
+
+    function _updateToggle(on) {
+      var el = document.getElementById('pushToggle');
+      if (el) el.checked = on;
+    }
+
+    function updateVisibility() {
+      var section = document.getElementById('pushNotifySection');
+      if (!section) return;
+      var token = _getToken();
+      section.style.display = token ? '' : 'none';
+    }
+
+    function init() {
+      updateVisibility();
+      var token = _getToken();
+      if (token) checkStatus();
+    }
+
+    return {
+      subscribe: subscribe,
+      unsubscribe: unsubscribe,
+      toggle: toggle,
+      checkStatus: checkStatus,
+      updateVisibility: updateVisibility,
+      init: init,
+    };
+  })();
+
 /* Start alert engine, daily summary, medication tracker, and sync engine after RemielDB is ready */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
@@ -15795,6 +16052,7 @@ if (document.readyState === 'loading') {
     CircleManager.init();
     if (typeof LocationShare !== 'undefined') LocationShare.init();
     if (typeof VideoNoteShare !== 'undefined') VideoNoteShare.init();
+    if (typeof PushNotify !== 'undefined') PushNotify.init();
     /* P1.1: Show account creation prompt for new users */
     if (typeof SyncPrompt !== 'undefined' && window._pendingGateCode) {
       SyncPrompt.show(window._pendingGateCode);
@@ -15818,6 +16076,7 @@ if (document.readyState === 'loading') {
     CircleManager.init();
     if (typeof LocationShare !== 'undefined') LocationShare.init();
     if (typeof VideoNoteShare !== 'undefined') VideoNoteShare.init();
+    if (typeof PushNotify !== 'undefined') PushNotify.init();
     SentinelCall.init();
     if (typeof SentinelCall !== 'undefined' && SentinelCall.checkCallInvite()) return;
     startNextActionTimer();
