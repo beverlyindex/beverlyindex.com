@@ -7725,10 +7725,16 @@ const DEMO_CONTACTS = [
 
 /* ── 3D Galaxy Engine ── */
 let netYaw = 0.4, netPitch = -0.15;
-const NET_DIST = 640;
+let NET_DIST = 640;
 const NET_FOV = 980;
 let netSpin = true;
 let netDragging = false;
+let netVelYaw = 0, netVelPitch = 0; /* momentum velocity */
+let netLastDragX = 0, netLastDragY = 0, netLastDragT = 0; /* last drag sample */
+let netMomentumRAF = 0; /* momentum animation frame ID */
+let netZoom = 1.0; /* galaxy zoom factor: 1.0 = default */
+const NET_ZOOM_MIN = 0.4, NET_ZOOM_MAX = 2.5;
+const NET_DIST_BASE = 640; /* original NET_DIST — zoom scales this */
 // NODES declared above (before resize)
 let networkExpanded = false;
 
@@ -10521,6 +10527,9 @@ function onPressStart(e) {
   } else if (appState === 'network') {
     // In network, press starts potential drag-to-rotate
     netDragging = false;
+    if (netMomentumRAF) { cancelAnimationFrame(netMomentumRAF); netMomentumRAF = 0; }
+    netVelYaw = 0; netVelPitch = 0;
+    netLastDragT = performance.now();
     /* Long-press on center sphere → reopen sphere setup overlay */
     pressTimer = setTimeout(() => {
       if (pressStarted && !netDragging) {
@@ -10544,13 +10553,25 @@ function onPressMove(e) {
   const dy = clientY - pressStartY;
 
   if (appState === 'network') {
-    // Drag to rotate galaxy
+    // Drag to rotate galaxy (with momentum tracking)
     if (Math.sqrt(dx*dx + dy*dy) > 12) {
       netDragging = true;
-      netSpin = false; // stop auto-spin while dragging
+      netSpin = false;
+      if (netMomentumRAF) { cancelAnimationFrame(netMomentumRAF); netMomentumRAF = 0; }
+      const now = performance.now();
+      const dt = now - netLastDragT;
       netYaw += dx * 0.004;
       netPitch += dy * 0.004;
       netPitch = Math.max(-1.2, Math.min(1.2, netPitch));
+      /* Track velocity from last few pixels of movement */
+      if (dt > 0 && dt < 100) {
+        const alpha = 0.4; /* smoothing factor */
+        netVelYaw = alpha * (dx * 0.004 / (dt / 16.67)) + (1 - alpha) * netVelYaw;
+        netVelPitch = alpha * (dy * 0.004 / (dt / 16.67)) + (1 - alpha) * netVelPitch;
+      }
+      netLastDragX = clientX;
+      netLastDragY = clientY;
+      netLastDragT = now;
       pressStartX = clientX;
       pressStartY = clientY;
     }
@@ -10683,8 +10704,27 @@ function onPressEnd(e) {
         if (sphereTapTimer) { clearTimeout(sphereTapTimer); sphereTapTimer = null; sphereTapTarget = null; }
       }
     } else if (netDragging) {
-      // Resume auto-spin after drag
-      setTimeout(() => { netSpin = true; }, 2000);
+      // Apply momentum with deceleration on drag release
+      const speed = Math.sqrt(netVelYaw * netVelYaw + netVelPitch * netVelPitch);
+      if (speed > 0.0005) {
+        const friction = 0.94; /* deceleration factor per frame */
+        let vy = netVelYaw, vp = netVelPitch;
+        (function momentumStep() {
+          vy *= friction;
+          vp *= friction;
+          netYaw += vy;
+          netPitch += vp;
+          netPitch = Math.max(-1.2, Math.min(1.2, netPitch));
+          if (Math.abs(vy) > 0.00008 || Math.abs(vp) > 0.00008) {
+            netMomentumRAF = requestAnimationFrame(momentumStep);
+          } else {
+            netMomentumRAF = 0;
+            if (!blufOpen) netSpin = true;
+          }
+        })();
+      } else {
+        setTimeout(() => { if (!blufOpen) netSpin = true; }, 1500);
+      }
     }
     pressStarted = false;
     netDragging = false;
@@ -10930,6 +10970,35 @@ function moveDrag(e) {
   mediaOY = dragOYStart + (p.y - dragStartY);
 }
 
+/* ── Galaxy pinch zoom (network mode) ── */
+let netPinchDist = 0;
+stage.addEventListener('touchstart', e => {
+  if (e.touches.length === 2 && appState === 'network') {
+    cancelPress();
+    netDragging = false;
+    if (netMomentumRAF) { cancelAnimationFrame(netMomentumRAF); netMomentumRAF = 0; }
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    netPinchDist = Math.sqrt(dx*dx + dy*dy);
+  }
+}, { passive: false });
+stage.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && appState === 'network' && netPinchDist > 0) {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const ratio = dist / netPinchDist;
+    netZoom *= ratio;
+    netZoom = Math.max(NET_ZOOM_MIN, Math.min(NET_ZOOM_MAX, netZoom));
+    NET_DIST = NET_DIST_BASE / netZoom;
+    netPinchDist = dist;
+  }
+}, { passive: false });
+stage.addEventListener('touchend', e => {
+  if (e.touches.length < 2) netPinchDist = 0;
+});
+
 /* ── Pinch zoom ── */
 let lastPinchDist = 0;
 stage.addEventListener('touchstart', e => {
@@ -10960,6 +11029,14 @@ stage.addEventListener('touchend', e => {
 
 /* ── Scroll zoom ── */
 stage.addEventListener('wheel', e => {
+  if (appState === 'network' && !overlayOpen) {
+    /* Galaxy scroll-to-zoom */
+    e.preventDefault();
+    netZoom += e.deltaY * -0.001;
+    netZoom = Math.max(NET_ZOOM_MIN, Math.min(NET_ZOOM_MAX, netZoom));
+    NET_DIST = NET_DIST_BASE / netZoom;
+    return;
+  }
   if (!media) return;
   e.preventDefault();
   mediaZoom += e.deltaY * -0.002;
