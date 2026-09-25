@@ -4301,6 +4301,34 @@
     border-bottom-color: #38bdf8;
   }
 
+
+/* ── The Circle (connections) ── */
+.circle-list { list-style: none; padding: 0; margin: 0; }
+.circle-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.circle-item:last-child { border-bottom: none; }
+.circle-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent, #6c5ce7), #a29bfe); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.circle-info { flex: 1; min-width: 0; }
+.circle-name { font-size: 14px; font-weight: 500; color: var(--text-primary, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.circle-handle { font-size: 11px; color: var(--text-dim, #999); }
+.circle-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.circle-status.pending { background: rgba(255,165,0,0.15); color: #ffa500; }
+.circle-status.accepted { background: rgba(46,213,115,0.15); color: #2ed573; }
+.circle-actions { display: flex; gap: 6px; }
+.circle-btn { padding: 5px 12px; border-radius: 6px; border: none; font-size: 12px; font-weight: 500; cursor: pointer; }
+.circle-btn.accept { background: var(--accent, #6c5ce7); color: #fff; }
+.circle-btn.decline { background: rgba(255,255,255,0.08); color: var(--text-dim, #999); }
+.circle-invite-form { display: flex; gap: 8px; margin-top: 10px; }
+.circle-invite-input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text-primary, #fff); font-size: 13px; outline: none; }
+.circle-invite-input:focus { border-color: var(--accent, #6c5ce7); }
+.circle-invite-btn { padding: 8px 16px; border-radius: 8px; border: none; background: var(--accent, #6c5ce7); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
+.circle-empty { font-size: 13px; color: var(--text-dim, #999); text-align: center; padding: 20px 0; }
+.circle-invite-status { font-size: 12px; margin-top: 6px; min-height: 18px; }
+.circle-invite-status.success { color: #2ed573; }
+.circle-invite-status.error { color: #ff4757; }
+.circle-sharing-toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.circle-sharing-toggle { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-dim, #999); }
+.circle-sharing-toggle input { accent-color: var(--accent, #6c5ce7); }
+
 </style>
 
 
@@ -4557,6 +4585,35 @@
   </div>
 
   <!-- Sentinel Call ID -->
+
+  <!-- The Circle (Connections) -->
+  <div class="settings-section" id="circleSection" style="display:none;">
+    <div class="settings-section-title">The Circle</div>
+    <div class="settings-card">
+      <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">Connect with people you care about. Share moods, check-ins, and stay in touch across devices.</p>
+
+      <!-- Invite form -->
+      <div class="circle-invite-form">
+        <input class="circle-invite-input" id="circleInviteInput" type="text" placeholder="Handle or email" autocomplete="off">
+        <button class="circle-invite-btn" onclick="CircleManager.sendInvite()">Invite</button>
+      </div>
+      <div class="circle-invite-status" id="circleInviteStatus"></div>
+
+      <!-- Pending invitations -->
+      <div id="circlePendingSection" style="display:none;margin-top:16px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Pending Invitations</div>
+        <ul class="circle-list" id="circlePendingList"></ul>
+      </div>
+
+      <!-- Connected -->
+      <div id="circleConnectedSection" style="margin-top:16px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Connected</div>
+        <ul class="circle-list" id="circleConnectedList"></ul>
+        <div class="circle-empty" id="circleEmpty">No connections yet. Invite someone above!</div>
+      </div>
+    </div>
+  </div>
+
   <div class="settings-section">
     <div class="settings-section-title">Sentinel Call</div>
     <div class="settings-card">
@@ -13046,6 +13103,10 @@ const A11y = (() => {
         _origOpen.apply(this, arguments);
         const panel = document.getElementById('settingsPanel');
         if (panel) trapFocus(panel);
+        if (typeof CircleManager !== 'undefined') {
+          CircleManager.updateVisibility();
+          CircleManager.loadConnections();
+        }
       };
     }
     if (typeof _origClose === 'function') {
@@ -14575,6 +14636,275 @@ const SyncEngine = (() => {
     pushPhotos: pushPhotos, pullPhotos: pullPhotos, syncPhotos: syncPhotos,
     startAutoSync: startAutoSync, stopAutoSync: stopAutoSync, getStatus: getStatus,
     markDirty: markDirty, getPendingCount: getPendingCount,
+    apiFetch: _fetch, getApiBase: function() { return _apiBase; },
+  };
+})();
+
+
+
+/* ══════════════════════════════════════════════════════════════
+   CircleManager — The Circle connection management
+   Handles invitations, connection listing, and sharing preferences.
+   ══════════════════════════════════════════════════════════════ */
+const CircleManager = (() => {
+  'use strict';
+
+  let _loaded = false;
+
+  function _$(id) { return document.getElementById(id); }
+
+  async function _apiFetch(path, opts) {
+    if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
+      throw new Error('Not authenticated');
+    }
+    return SyncEngine.apiFetch(path, opts || {});
+  }
+
+  function _initials(name) {
+    if (!name) return '?';
+    var parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0].substring(0, 2).toUpperCase();
+  }
+
+  function _setStatus(msg, isError) {
+    var el = _$('circleInviteStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = isError ? '#f87171' : '#4ade80';
+    el.style.display = msg ? 'block' : 'none';
+    if (msg && !isError) {
+      setTimeout(function() { el.style.display = 'none'; }, 4000);
+    }
+  }
+
+  /* ── Send Invitation ── */
+  async function sendInvite() {
+    var input = _$('circleInviteInput');
+    if (!input) return;
+    var value = input.value.trim();
+    if (!value) { _setStatus('Enter a handle or email', true); return; }
+
+    _setStatus('Sending invitation...', false);
+    try {
+      var body = {};
+      if (value.indexOf('@') !== -1) { body.email = value; }
+      else { body.handle = value.replace(/^@/, ''); }
+
+      var res = await _apiFetch('/connections/invite', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        var data = await res.json();
+        input.value = '';
+        _setStatus('Invitation sent to ' + (data.connection.to_user ? data.connection.to_user.display_name : value), false);
+        await loadConnections();
+      } else {
+        var err = await res.json().catch(function() { return { detail: 'Failed to send' }; });
+        _setStatus(err.detail || 'Failed to send invitation', true);
+      }
+    } catch (e) {
+      _setStatus(e.message || 'Network error', true);
+    }
+  }
+
+  /* ── Accept / Decline ── */
+  async function acceptInvite(id) {
+    try {
+      var res = await _apiFetch('/connections/' + id + '/accept', { method: 'PUT' });
+      if (res.ok) {
+        _setStatus('Connection accepted', false);
+        await loadConnections();
+      } else {
+        var err = await res.json().catch(function() { return {}; });
+        _setStatus(err.detail || 'Failed to accept', true);
+      }
+    } catch (e) { _setStatus(e.message, true); }
+  }
+
+  async function declineInvite(id) {
+    try {
+      var res = await _apiFetch('/connections/' + id + '/decline', { method: 'PUT' });
+      if (res.ok) {
+        _setStatus('Invitation declined', false);
+        await loadConnections();
+      } else {
+        var err = await res.json().catch(function() { return {}; });
+        _setStatus(err.detail || 'Failed to decline', true);
+      }
+    } catch (e) { _setStatus(e.message, true); }
+  }
+
+  async function removeConnection(id) {
+    try {
+      var res = await _apiFetch('/connections/' + id, { method: 'DELETE' });
+      if (res.ok) {
+        _setStatus('Connection removed', false);
+        await loadConnections();
+      } else {
+        _setStatus('Failed to remove', true);
+      }
+    } catch (e) { _setStatus(e.message, true); }
+  }
+
+  /* ── Sharing toggles ── */
+  async function updateSharing(id, key, value) {
+    try {
+      var body = {};
+      body[key] = value ? 1 : 0;
+      var res = await _apiFetch('/connections/' + id + '/sharing', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        _setStatus('Failed to update sharing', true);
+      }
+    } catch (e) { console.warn('CircleManager: sharing update failed', e); }
+  }
+
+  /* ── Render helpers ── */
+  function _renderPendingItem(inv) {
+    var li = document.createElement('li');
+    li.className = 'circle-item';
+    li.innerHTML =
+      '<div class="circle-avatar">' + _initials(inv.from.display_name) + '</div>' +
+      '<div class="circle-info">' +
+        '<div class="circle-name">' + _esc(inv.from.display_name || 'Unknown') + '</div>' +
+        '<div class="circle-handle">' + (inv.from.handle ? '@' + _esc(inv.from.handle) : '') + '</div>' +
+        (inv.message ? '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + _esc(inv.message) + '</div>' : '') +
+      '</div>' +
+      '<div class="circle-actions">' +
+        '<button class="circle-btn accept" data-id="' + inv.id + '">Accept</button>' +
+        '<button class="circle-btn decline" data-id="' + inv.id + '">Decline</button>' +
+      '</div>';
+    li.querySelector('.circle-btn.accept').addEventListener('click', function() { acceptInvite(inv.id); });
+    li.querySelector('.circle-btn.decline').addEventListener('click', function() { declineInvite(inv.id); });
+    return li;
+  }
+
+  function _renderConnectionItem(conn) {
+    var li = document.createElement('li');
+    li.className = 'circle-item';
+    var statusClass = conn.status === 'accepted' ? 'accepted' : 'pending';
+    var statusLabel = conn.status === 'accepted' ? 'Connected' :
+                      (conn.direction === 'sent' ? 'Sent' : 'Pending');
+
+    var sharingHtml = '';
+    if (conn.status === 'accepted') {
+      sharingHtml =
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
+          _sharingToggle(conn.id, 'share_contacts', 'Contacts', conn.sharing.contacts) +
+          _sharingToggle(conn.id, 'share_moods', 'Moods', conn.sharing.moods) +
+          _sharingToggle(conn.id, 'share_location', 'Location', conn.sharing.location) +
+          _sharingToggle(conn.id, 'share_media', 'Media', conn.sharing.media) +
+        '</div>';
+    }
+
+    li.innerHTML =
+      '<div class="circle-avatar">' + _initials(conn.peer.display_name) + '</div>' +
+      '<div class="circle-info">' +
+        '<div class="circle-name">' + _esc(conn.peer.display_name || 'Unknown') + '</div>' +
+        '<div class="circle-handle">' + (conn.peer.handle ? '@' + _esc(conn.peer.handle) : '') + '</div>' +
+        sharingHtml +
+      '</div>' +
+      '<span class="circle-status ' + statusClass + '">' + statusLabel + '</span>';
+    return li;
+  }
+
+  function _sharingToggle(connId, key, label, isOn) {
+    var id = 'share_' + connId + '_' + key;
+    return '<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);cursor:pointer;">' +
+      '<input type="checkbox" id="' + id + '" ' + (isOn ? 'checked' : '') +
+      ' onchange="CircleManager.updateSharing(\'' + connId + '\',\'' + key + '\',this.checked)"' +
+      ' style="accent-color:var(--accent,#6c5ce7);width:14px;height:14px;">' +
+      label + '</label>';
+  }
+
+  function _esc(str) {
+    var el = document.createElement('span');
+    el.textContent = str;
+    return el.innerHTML;
+  }
+
+  /* ── Load all connections ── */
+  async function loadConnections() {
+    if (!SyncEngine.isAuthenticated()) return;
+
+    try {
+      /* Load pending invitations */
+      var pendingRes = await _apiFetch('/connections/pending', { method: 'GET' });
+      var pendingSection = _$('circlePendingSection');
+      var pendingList = _$('circlePendingList');
+
+      if (pendingRes.ok) {
+        var pendingData = await pendingRes.json();
+        var invitations = pendingData.invitations || [];
+        if (pendingList) pendingList.innerHTML = '';
+        if (invitations.length > 0) {
+          if (pendingSection) pendingSection.style.display = 'block';
+          invitations.forEach(function(inv) {
+            pendingList.appendChild(_renderPendingItem(inv));
+          });
+        } else {
+          if (pendingSection) pendingSection.style.display = 'none';
+        }
+      }
+
+      /* Load all connections */
+      var connRes = await _apiFetch('/connections', { method: 'GET' });
+      var connectedList = _$('circleConnectedList');
+      var emptyEl = _$('circleEmpty');
+
+      if (connRes.ok) {
+        var connData = await connRes.json();
+        var connections = (connData.connections || []).filter(function(c) {
+          return c.status === 'accepted' || (c.status === 'pending' && c.direction === 'sent');
+        });
+        if (connectedList) connectedList.innerHTML = '';
+        if (connections.length > 0) {
+          if (emptyEl) emptyEl.style.display = 'none';
+          connections.forEach(function(conn) {
+            connectedList.appendChild(_renderConnectionItem(conn));
+          });
+        } else {
+          if (emptyEl) emptyEl.style.display = 'block';
+        }
+      }
+    } catch (e) {
+      console.warn('CircleManager: load failed', e);
+    }
+  }
+
+  /* ── Show/hide section based on auth ── */
+  function updateVisibility() {
+    var section = _$('circleSection');
+    if (!section) return;
+    var isAuth = typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated();
+    section.style.display = isAuth ? 'block' : 'none';
+  }
+
+  /* ── Init ── */
+  function init() {
+    if (_loaded) return;
+    _loaded = true;
+    updateVisibility();
+    /* If authenticated, load connections */
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated()) {
+      loadConnections();
+    }
+  }
+
+  return {
+    init: init,
+    sendInvite: sendInvite,
+    acceptInvite: acceptInvite,
+    declineInvite: declineInvite,
+    removeConnection: removeConnection,
+    updateSharing: updateSharing,
+    loadConnections: loadConnections,
+    updateVisibility: updateVisibility,
   };
 })();
 
@@ -14585,6 +14915,7 @@ if (document.readyState === 'loading') {
     DailySummary.init();
     MedicationTracker.init();
     SyncEngine.init();
+    CircleManager.init();
     /* P1.1: Show account creation prompt for new users */
     if (typeof SyncPrompt !== 'undefined' && window._pendingGateCode) {
       SyncPrompt.show(window._pendingGateCode);
@@ -14605,6 +14936,7 @@ if (document.readyState === 'loading') {
     DailySummary.init();
     MedicationTracker.init();
     SyncEngine.init();
+    CircleManager.init();
     SentinelCall.init();
     if (typeof SentinelCall !== 'undefined' && SentinelCall.checkCallInvite()) return;
     startNextActionTimer();
