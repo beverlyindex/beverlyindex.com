@@ -4204,6 +4204,103 @@
 .sc-guest-join-btn:disabled { opacity: 0.4; cursor: default; }
 .sc-guest-status { margin-top: 16px; font-size: 13px; opacity: 0.6; }
 .sc-guest-logo { font-size: 28px; margin-bottom: 24px; letter-spacing: 1px; font-weight: 300; }
+
+  /* ── Sync Account Prompt ── */
+  .sync-prompt-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: fadeIn 0.3s ease;
+  }
+  .sync-prompt-overlay.active { display: flex; }
+  .sync-prompt-card {
+    background: var(--surface, #1a1a2e);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 32px 28px;
+    max-width: 380px;
+    width: 90%;
+    text-align: center;
+  }
+  .sync-prompt-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: var(--text-bright, #f0f0f0);
+  }
+  .sync-prompt-card p {
+    font-size: 13px;
+    color: var(--text-dim, #999);
+    margin: 0 0 20px;
+    line-height: 1.5;
+  }
+  .sync-prompt-field {
+    width: 100%;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--text-bright, #f0f0f0);
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    outline: none;
+  }
+  .sync-prompt-field:focus { border-color: rgba(56,189,248,0.5); }
+  .sync-prompt-field::placeholder { color: rgba(255,255,255,0.3); }
+  .sync-prompt-btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+  .sync-prompt-btn.primary {
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    color: #fff;
+  }
+  .sync-prompt-btn.secondary {
+    background: transparent;
+    color: var(--text-dim, #999);
+    font-size: 12px;
+  }
+  .sync-prompt-status {
+    font-size: 12px;
+    min-height: 18px;
+    margin-top: 4px;
+  }
+  .sync-prompt-tabs {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .sync-prompt-tab {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim, #999);
+    cursor: pointer;
+    padding-bottom: 4px;
+    border-bottom: 2px solid transparent;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+  .sync-prompt-tab.active {
+    color: var(--text-bright, #f0f0f0);
+    border-bottom-color: #38bdf8;
+  }
+
 </style>
 
 
@@ -5119,6 +5216,27 @@
 
 
 <!-- ═══ Sentinel Call — Video Call Overlays ═══ -->
+
+<!-- ── Sync Account Prompt (shown after gate entry for unauthenticated users) ── -->
+<div class="sync-prompt-overlay" id="syncPromptOverlay">
+  <div class="sync-prompt-card">
+    <h3 id="syncPromptTitle">Create Your Account</h3>
+    <p>Sync your contacts and data across devices. Your gate code is your invite.</p>
+    <div class="sync-prompt-tabs">
+      <button class="sync-prompt-tab active" id="spSignupTab" onclick="SyncPrompt.tab('signup')">Sign Up</button>
+      <button class="sync-prompt-tab" id="spLoginTab" onclick="SyncPrompt.tab('login')">Sign In</button>
+    </div>
+    <input class="sync-prompt-field" id="spEmail" type="email" placeholder="Email" autocomplete="email">
+    <input class="sync-prompt-field" id="spPassword" type="password" placeholder="Password" autocomplete="new-password">
+    <div id="spSignupFields">
+      <input class="sync-prompt-field" id="spDisplayName" type="text" placeholder="Display Name (optional)">
+    </div>
+    <div class="sync-prompt-status" id="spStatus"></div>
+    <button class="sync-prompt-btn primary" id="spAuthBtn" onclick="SyncPrompt.submit()">Create Account</button>
+    <button class="sync-prompt-btn secondary" onclick="SyncPrompt.dismiss()">Skip for now</button>
+  </div>
+</div>
+
 <div class="sentinel-call-overlay" id="scOverlay">
   <video class="sc-remote-video" id="scRemoteVideo" autoplay playsinline></video>
   <video class="sc-local-video" id="scLocalVideo" autoplay playsinline muted></video>
@@ -5324,6 +5442,12 @@ async function submitGateCode() {
     /* Store for session continuity */
     try { sessionStorage.setItem('rm:access', code);
           trackCodeUsage(hash); } catch(e) {}
+    /* Trigger account creation prompt after app loads (P1.1) */
+    try {
+      if (!sessionStorage.getItem('rm:syncPromptDismissed')) {
+        window._pendingGateCode = code;
+      }
+    } catch(e) {}
     beginVideoIntro();
   } else {
     flashGateError(I18n.t('gate.error.invalid'), input);
@@ -14327,6 +14451,11 @@ if (document.readyState === 'loading') {
     DailySummary.init();
     MedicationTracker.init();
     SyncEngine.init();
+    /* P1.1: Show account creation prompt for new users */
+    if (typeof SyncPrompt !== 'undefined' && window._pendingGateCode) {
+      SyncPrompt.show(window._pendingGateCode);
+      delete window._pendingGateCode;
+    }
     SentinelCall.init();
     /* Check for ?call= invite link — if present, show guest overlay and skip gate */
     if (typeof SentinelCall !== 'undefined' && SentinelCall.checkCallInvite()) {
@@ -14357,6 +14486,115 @@ if (document.readyState === 'loading') {
    Real-time peer-to-peer video/audio communication.
    Each user gets a Sentinel ID; call by Sentinel ID.
    ═══════════════════════════════════════════════════════════════ */
+
+
+/* ══════════════════════════════════════════════════════════════
+   SyncPrompt — Post-gate account creation prompt
+   Shows after galaxy loads for unauthenticated first-time users.
+   Gate code auto-populates as invite code.
+   ══════════════════════════════════════════════════════════════ */
+const SyncPrompt = (function() {
+  'use strict';
+
+  let _mode = 'signup';
+  let _gateCode = null;
+  let _shown = false;
+
+  function show(gateCode) {
+    if (_shown) return;
+    /* Check if already authenticated */
+    if (typeof SyncEngine !== 'undefined') {
+      try {
+        var status = SyncEngine.getStatus();
+        if (status.authenticated) return; /* Already has account */
+      } catch(e) {}
+    }
+    _gateCode = gateCode || null;
+    _shown = true;
+
+    /* Delay so user sees the galaxy first */
+    setTimeout(function() {
+      var overlay = document.getElementById('syncPromptOverlay');
+      if (overlay) overlay.classList.add('active');
+    }, 2500);
+  }
+
+  function tab(mode) {
+    _mode = mode;
+    var signupTab = document.getElementById('spSignupTab');
+    var loginTab = document.getElementById('spLoginTab');
+    var signupFields = document.getElementById('spSignupFields');
+    var authBtn = document.getElementById('spAuthBtn');
+    var title = document.getElementById('syncPromptTitle');
+
+    if (mode === 'signup') {
+      signupTab.classList.add('active');
+      loginTab.classList.remove('active');
+      signupFields.style.display = 'block';
+      authBtn.textContent = 'Create Account';
+      title.textContent = 'Create Your Account';
+    } else {
+      loginTab.classList.add('active');
+      signupTab.classList.remove('active');
+      signupFields.style.display = 'none';
+      authBtn.textContent = 'Sign In';
+      title.textContent = 'Welcome Back';
+    }
+    document.getElementById('spStatus').textContent = '';
+  }
+
+  async function submit() {
+    var email = document.getElementById('spEmail').value.trim();
+    var password = document.getElementById('spPassword').value;
+    var statusEl = document.getElementById('spStatus');
+
+    if (!email || !password) {
+      statusEl.textContent = 'Email and password required';
+      statusEl.style.color = '#f87171';
+      return;
+    }
+
+    statusEl.textContent = '...';
+    statusEl.style.color = 'var(--text-dim)';
+
+    try {
+      if (!SyncEngine.getStatus().apiBase) {
+        await SyncEngine.configure('https://remiel-sentinel-api.vercel.app');
+      }
+
+      if (_mode === 'signup') {
+        var displayName = document.getElementById('spDisplayName').value.trim() || email.split('@')[0];
+        await SyncEngine.signup(email, password, displayName, _gateCode);
+      } else {
+        await SyncEngine.login(email, password);
+      }
+
+      /* Success — close prompt and start sync */
+      statusEl.textContent = '';
+      dismiss();
+      showToast('Account ready — syncing your data');
+      SyncEngine.startAutoSync();
+      setTimeout(function() { SyncEngine.sync(); }, 500);
+
+      /* Update settings panel if open */
+      if (typeof SettingsPanel !== 'undefined' && SettingsPanel.updateSyncUI) {
+        SettingsPanel.updateSyncUI();
+      }
+    } catch (err) {
+      statusEl.textContent = err.message || 'Authentication failed';
+      statusEl.style.color = '#f87171';
+    }
+  }
+
+  function dismiss() {
+    var overlay = document.getElementById('syncPromptOverlay');
+    if (overlay) overlay.classList.remove('active');
+    /* Remember dismissal so we don't re-prompt this session */
+    try { sessionStorage.setItem('rm:syncPromptDismissed', '1'); } catch(e) {}
+  }
+
+  return { show: show, tab: tab, submit: submit, dismiss: dismiss };
+})();
 
 /* Load PeerJS dynamically */
 (function loadPeerJS() {
