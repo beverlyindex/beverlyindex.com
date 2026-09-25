@@ -5864,7 +5864,11 @@ const RemielDB = (() => {
     if (blob instanceof File || (blob && blob.constructor && blob.constructor.name === 'File')) {
       blob = new Blob([await blob.arrayBuffer()], { type: blob.type || 'image/png' });
     }
-    return promisify(tx('photos', 'readwrite').put({ contactId, blob, updatedAt: Date.now() }));
+    var result = await promisify(tx('photos', 'readwrite').put({ contactId, blob, updatedAt: Date.now() }));
+    /* Clear synced flag so next sync pushes this photo */
+    try { await putSetting('_photoSynced_' + contactId, null); } catch(e) {}
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    return result;
   }
 
   async function deletePhoto(contactId) {
@@ -14372,8 +14376,11 @@ const SyncEngine = (() => {
     var pushResult = await push();
     if (!pushResult.success && !pushResult.skipped) return pushResult;
     var pullResult = await pull();
+    /* Sync photos after data sync */
+    var photoResult = null;
+    try { photoResult = await syncPhotos(); } catch(e) { console.warn('SyncEngine: photo sync error', e); }
     _updateSyncIndicator();
-    return { push: pushResult, pull: pullResult };
+    return { push: pushResult, pull: pullResult, photos: photoResult };
   }
 
   // ── Auto-sync ──
@@ -14434,11 +14441,138 @@ const SyncEngine = (() => {
     console.log('SyncEngine: init, auth=' + isAuthenticated() + ', pending=' + _pendingChanges);
   }
 
+
+  /* ── Photo / Blob Sync ── */
+  var _blobSyncVersion = 0;
+
+  async function _fetchRaw(path, options) {
+    if (!_apiBase) throw new Error('Not configured');
+    var url = _apiBase + path;
+    var headers = options.headers || {};
+    if (_accessToken) headers['Authorization'] = 'Bearer ' + _accessToken;
+
+    var response = await fetch(url, Object.assign({}, options, { headers: headers }));
+
+    if (response.status === 401 && _refreshToken) {
+      var refreshed = await _tryRefresh();
+      if (refreshed) {
+        headers['Authorization'] = 'Bearer ' + _accessToken;
+        response = await fetch(url, Object.assign({}, options, { headers: headers }));
+      }
+    }
+    return response;
+  }
+
+  async function pushPhotos() {
+    if (!isAuthenticated()) return { skipped: true, reason: 'not authenticated' };
+    try {
+      var allPhotos = await RemielDB.getAllPhotos();
+      if (!allPhotos || allPhotos.length === 0) return { pushed: 0 };
+
+      var pushed = 0;
+      for (var i = 0; i < allPhotos.length; i++) {
+        var photo = allPhotos[i];
+        if (!photo.blob || !photo.contactId) continue;
+
+        /* Check if already synced (stored in IDB settings) */
+        var syncKey = '_photoSynced_' + photo.contactId;
+        var already = await RemielDB.getSetting(syncKey);
+        if (already) continue;
+
+        /* Upload as raw binary */
+        var blob = photo.blob;
+        var mimeType = blob.type || 'image/png';
+        var res = await _fetchRaw('/storage/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': mimeType,
+            'x-mime-type': mimeType,
+            'x-blob-type': 'photo',
+            'x-contact-id': String(photo.contactId),
+            'Content-Length': String(blob.size),
+          },
+          body: blob,
+        });
+
+        if (res.ok) {
+          var result = await res.json();
+          /* Mark as synced with the blob URL */
+          await RemielDB.putSetting(syncKey, result.url);
+          pushed++;
+          console.log('SyncEngine: pushed photo for contact', photo.contactId, '->', result.id);
+        } else {
+          console.warn('SyncEngine: photo upload failed for contact', photo.contactId, res.status);
+        }
+      }
+      return { pushed: pushed };
+    } catch (e) {
+      console.error('SyncEngine: pushPhotos error', e);
+      return { error: e.message };
+    }
+  }
+
+  async function pullPhotos() {
+    if (!isAuthenticated()) return { skipped: true, reason: 'not authenticated' };
+    try {
+      var res = await _fetch('/storage/list?since_version=' + _blobSyncVersion, { method: 'GET' });
+      if (!res.ok) throw new Error('Photo list failed: ' + res.status);
+
+      var data = await res.json();
+      if (!data.blobs || data.blobs.length === 0) return { pulled: 0 };
+
+      var pulled = 0;
+      for (var i = 0; i < data.blobs.length; i++) {
+        var entry = data.blobs[i];
+        if (entry.blob_type !== 'photo' || !entry.contact_id) continue;
+
+        /* Check if we already have this photo locally */
+        var existing = await RemielDB.getPhoto(entry.contact_id);
+        if (existing && existing.blob) {
+          /* Conflict resolution: latest wins — server is always newer for pulled items */
+          var syncKey = '_photoSynced_' + entry.contact_id;
+          var localUrl = await RemielDB.getSetting(syncKey);
+          if (localUrl === entry.url) continue; /* Same photo, skip */
+        }
+
+        /* Download the photo blob */
+        try {
+          var photoRes = await fetch(entry.url);
+          if (!photoRes.ok) continue;
+          var photoBlob = await photoRes.blob();
+
+          /* Store in IDB */
+          await RemielDB.putPhoto(entry.contact_id, photoBlob);
+          await RemielDB.putSetting('_photoSynced_' + entry.contact_id, entry.url);
+          pulled++;
+          console.log('SyncEngine: pulled photo for contact', entry.contact_id);
+        } catch (dlErr) {
+          console.warn('SyncEngine: photo download failed for', entry.contact_id, dlErr.message);
+        }
+
+        /* Track highest sync version */
+        if (entry.sync_version > _blobSyncVersion) {
+          _blobSyncVersion = entry.sync_version;
+        }
+      }
+      return { pulled: pulled };
+    } catch (e) {
+      console.error('SyncEngine: pullPhotos error', e);
+      return { error: e.message };
+    }
+  }
+
+  async function syncPhotos() {
+    var pushResult = await pushPhotos();
+    var pullResult = await pullPhotos();
+    return { push: pushResult, pull: pullResult };
+  }
+
   return {
     init: init, configure: configure,
     signup: signup, login: login, logout: logout,
     isAuthenticated: isAuthenticated, getUserId: getUserId, getDisplayName: getDisplayName,
     push: push, pull: pull, sync: sync,
+    pushPhotos: pushPhotos, pullPhotos: pullPhotos, syncPhotos: syncPhotos,
     startAutoSync: startAutoSync, stopAutoSync: stopAutoSync, getStatus: getStatus,
     markDirty: markDirty, getPendingCount: getPendingCount,
   };
