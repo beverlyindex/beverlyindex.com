@@ -4377,6 +4377,32 @@
 .circle-share-btn { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(0,212,255,0.3); background: rgba(0,212,255,0.1); cursor: pointer; color: var(--accent, #00d4ff); font-size: 11px; font-weight: 500; transition: background 0.2s; }
 .circle-share-btn:hover { background: rgba(0,212,255,0.2); }
 
+
+/* ── The Pulse — Care Feed ── */
+.pulse-overlay { position: fixed; inset: 0; z-index: 9000; background: var(--card-bg, #0d0d1a); transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.pulse-overlay.open { transform: translateY(0); }
+.pulse-header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 16px; background: var(--card-bg, #0d0d1a); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.pulse-title { font-size: 18px; font-weight: 700; color: var(--text-primary, #fff); letter-spacing: -0.3px; }
+.pulse-close { background: none; border: none; color: var(--text-dim, #999); font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.pulse-close:hover { background: rgba(255,255,255,0.06); }
+.pulse-summary { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.pulse-sev-chip { flex-shrink: 0; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #fff; cursor: pointer; border: none; opacity: 0.6; transition: opacity 0.2s; }
+.pulse-sev-chip.active { opacity: 1; }
+.pulse-cards { padding: 8px 16px 80px; display: flex; flex-direction: column; gap: 8px; }
+.pulse-card { padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); cursor: pointer; transition: background 0.2s; }
+.pulse-card:hover { background: rgba(255,255,255,0.06); }
+.pulse-card-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.pulse-card-sev { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pulse-card-name { font-size: 14px; font-weight: 600; color: var(--text-primary, #fff); }
+.pulse-card-cat { font-size: 10px; color: var(--text-dim, #999); margin-left: auto; text-transform: uppercase; letter-spacing: 0.5px; }
+.pulse-card-body { font-size: 12px; color: var(--text-dim, #999); line-height: 1.5; }
+.pulse-card-body strong { color: var(--text-primary, #fff); font-weight: 500; }
+.pulse-card-action { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; background: rgba(0,212,255,0.1); color: var(--accent, #00d4ff); font-size: 11px; font-weight: 500; border: none; cursor: pointer; }
+.pulse-empty { text-align: center; padding: 40px 16px; color: var(--text-dim, #999); font-size: 13px; }
+.pulse-btn { position: fixed; bottom: 20px; right: 20px; z-index: 8000; width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #00d4ff, #7b61ff); border: none; color: #fff; font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+.pulse-btn:hover { transform: scale(1.1); }
+.pulse-btn:active { transform: scale(0.95); }
+
 </style>
 
 
@@ -5502,6 +5528,20 @@
     </div>
     <button class="contact-modal-delete hidden" id="cmDeleteBtn" onclick="deleteContactFromModal()">Remove This Person</button>
   </div>
+</div>
+
+
+<!-- ═══ The Pulse — Care Feed ═══ -->
+<button class="pulse-btn" id="pulseBtn" onclick="ThePulse.open()" aria-label="Open The Pulse" title="The Pulse">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+</button>
+<div class="pulse-overlay" id="pulseOverlay">
+  <div class="pulse-header">
+    <div class="pulse-title">The Pulse</div>
+    <button class="pulse-close" onclick="ThePulse.close()" aria-label="Close">&times;</button>
+  </div>
+  <div class="pulse-summary" id="pulseSevChips"></div>
+  <div class="pulse-cards" id="pulseCards"></div>
 </div>
 
 </main>
@@ -15574,6 +15614,174 @@ const SocialImport = (() => {
       loadShared: loadShared,
       updateVisibility: updateVisibility,
       init: init,
+    };
+  })();
+
+  /* ── ThePulse — Care Feed ── */
+  const ThePulse = (() => {
+    'use strict';
+    const SEV_COLORS = {
+      0: '#ef4444', 1: '#f97316', 2: '#eab308',
+      3: '#14b8a6', 4: '#60a5fa',
+    };
+    const SEV_LABELS = {
+      0: 'Urgent', 1: 'Elevated', 2: 'Moderate',
+      3: 'Stable', 4: 'Quiet',
+    };
+    let _filter = null; // null = all severities
+
+    function open() {
+      var overlay = document.getElementById('pulseOverlay');
+      if (overlay) {
+        overlay.classList.add('open');
+        _loadFeed();
+      }
+    }
+
+    function close() {
+      var overlay = document.getElementById('pulseOverlay');
+      if (overlay) overlay.classList.remove('open');
+    }
+
+    function _setFilter(sev) {
+      _filter = (_filter === sev) ? null : sev;
+      _loadFeed();
+    }
+
+    function _timeAgo(ts) {
+      if (!ts) return 'never';
+      var diff = Date.now() - ts;
+      if (diff < 60000) return 'just now';
+      if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+      return Math.floor(diff / 86400000) + 'd ago';
+    }
+
+    function _suggestAction(contact, lastInt, lastMood) {
+      var sev = contact.sev != null ? contact.sev : 3;
+      var daysSinceInt = lastInt ? Math.floor((Date.now() - (lastInt.timestamp || lastInt.updatedAt || 0)) / 86400000) : 999;
+
+      if (sev <= 1 && daysSinceInt > 1) return 'Reach out today';
+      if (sev <= 1) return 'Follow up soon';
+      if (daysSinceInt > 14) return 'Reconnect — it has been ' + daysSinceInt + ' days';
+      if (daysSinceInt > 7) return 'Check in this week';
+      if (sev === 2) return 'Monitor';
+      return null;
+    }
+
+    async function _loadFeed() {
+      var cardsEl = document.getElementById('pulseCards');
+      var chipsEl = document.getElementById('pulseSevChips');
+      if (!cardsEl || !chipsEl) return;
+
+      if (typeof RemielDB === 'undefined') {
+        cardsEl.innerHTML = '<div class="pulse-empty">Database not ready</div>';
+        return;
+      }
+
+      try {
+        var contacts = await RemielDB.getAllContacts();
+        if (!contacts || contacts.length === 0) {
+          cardsEl.innerHTML = '<div class="pulse-empty">No contacts yet. Add people to your galaxy to see The Pulse.</div>';
+          chipsEl.innerHTML = '';
+          return;
+        }
+
+        // Build severity counts
+        var sevCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+        for (var i = 0; i < contacts.length; i++) {
+          var s = contacts[i].sev != null ? contacts[i].sev : 3;
+          if (s < 0) s = 0;
+          if (s > 4) s = 4;
+          sevCounts[s]++;
+        }
+
+        // Render severity chips
+        var chipHtml = '<button class="pulse-sev-chip' + (_filter === null ? ' active' : '') + '" style="background:rgba(255,255,255,0.15);" onclick="ThePulse._setFilter(null)">All (' + contacts.length + ')</button>';
+        for (var sv = 0; sv <= 4; sv++) {
+          if (sevCounts[sv] > 0) {
+            chipHtml += '<button class="pulse-sev-chip' + (_filter === sv ? ' active' : '') + '" style="background:' + SEV_COLORS[sv] + ';" onclick="ThePulse._setFilter(' + sv + ')">' + SEV_LABELS[sv] + ' (' + sevCounts[sv] + ')</button>';
+          }
+        }
+        chipsEl.innerHTML = chipHtml;
+
+        // Sort by severity (ascending = most urgent first), then by name
+        contacts.sort(function(a, b) {
+          var sa = a.sev != null ? a.sev : 3;
+          var sb = b.sev != null ? b.sev : 3;
+          if (sa !== sb) return sa - sb;
+          var na = ((a.first || '') + ' ' + (a.last || '')).trim().toLowerCase();
+          var nb = ((b.first || '') + ' ' + (b.last || '')).trim().toLowerCase();
+          return na < nb ? -1 : na > nb ? 1 : 0;
+        });
+
+        // Filter by severity if set
+        if (_filter !== null) {
+          contacts = contacts.filter(function(c) {
+            var sv2 = c.sev != null ? c.sev : 3;
+            return sv2 === _filter;
+          });
+        }
+
+        if (contacts.length === 0) {
+          cardsEl.innerHTML = '<div class="pulse-empty">No contacts at this severity level</div>';
+          return;
+        }
+
+        // Build cards with async data
+        var html = '';
+        for (var j = 0; j < contacts.length; j++) {
+          var c = contacts[j];
+          var name = ((c.first || '') + ' ' + (c.last || '')).trim() || 'Unknown';
+          var sev = c.sev != null ? c.sev : 3;
+          if (sev < 0) sev = 0;
+          if (sev > 4) sev = 4;
+          var cat = c.cat || '';
+
+          var lastInt = null;
+          var lastMood = null;
+          try {
+            var ints = await RemielDB.getInteractionsByContact(c.id);
+            if (ints && ints.length > 0) lastInt = ints[ints.length - 1];
+          } catch(e) {}
+          try {
+            var moods = await RemielDB.getMoodsByContact(c.id);
+            if (moods && moods.length > 0) lastMood = moods[moods.length - 1];
+          } catch(e) {}
+
+          var bodyLines = [];
+          if (lastInt) {
+            bodyLines.push('<strong>Last contact:</strong> ' + (lastInt.type || 'interaction') + ' ' + _timeAgo(lastInt.timestamp || lastInt.updatedAt));
+          } else {
+            bodyLines.push('<strong>Last contact:</strong> none recorded');
+          }
+          if (lastMood) {
+            bodyLines.push('<strong>Last mood:</strong> ' + (lastMood.label || (lastMood.value != null ? lastMood.value + '/10' : '')) + ' ' + _timeAgo(lastMood.timestamp || lastMood.updatedAt));
+          }
+
+          var action = _suggestAction(c, lastInt, lastMood);
+          var actionHtml = action ? '<div class="pulse-card-action">' + action + '</div>' : '';
+
+          html += '<div class="pulse-card" onclick="ThePulse.close(); if(typeof focusContact===\'function\') focusContact(\'' + (c.id || '').replace(/'/g, '') + '\')">' +
+            '<div class="pulse-card-top">' +
+              '<div class="pulse-card-sev" style="background:' + SEV_COLORS[sev] + ';"></div>' +
+              '<div class="pulse-card-name">' + name + '</div>' +
+              '<div class="pulse-card-cat">' + cat + '</div>' +
+            '</div>' +
+            '<div class="pulse-card-body">' + bodyLines.join('<br>') + actionHtml + '</div>' +
+          '</div>';
+        }
+        cardsEl.innerHTML = html;
+
+      } catch (e) {
+        cardsEl.innerHTML = '<div class="pulse-empty">Error loading feed: ' + e.message + '</div>';
+      }
+    }
+
+    return {
+      open: open,
+      close: close,
+      _setFilter: _setFilter,
     };
   })();
 
