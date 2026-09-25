@@ -14412,9 +14412,61 @@ const SentinelCall = (function() {
       return;
     }
 
-    /* Connect to PeerJS signaling server */
+    /* ── Fetch TURN/STUN ICE servers for NAT traversal ── */
+    async function _fetchIceServers() {
+      /* Try Vercel API first (returns Metered.ca TURN credentials) */
+      try {
+        var apiBase = SyncEngine.getStatus ? SyncEngine.getStatus().apiBase : null;
+        if (apiBase) {
+          var resp = await fetch(apiBase + '/api/turn/credentials');
+          if (resp.ok) {
+            var servers = await resp.json();
+            if (Array.isArray(servers) && servers.length > 0) {
+              console.log('SentinelCall: using', servers.length, 'ICE servers from API');
+              return servers;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('SentinelCall: TURN credential fetch failed, using fallback', e.message);
+      }
+
+      /* Fallback: public STUN + Metered Open Relay static TURN */
+      return [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        {
+          urls: 'turn:standard.relay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:standard.relay.metered.ca:80?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:standard.relay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turns:standard.relay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ];
+    }
+
+    /* Connect to PeerJS signaling server with ICE/TURN config */
+    const iceServers = await _fetchIceServers();
     const peerId = 'sentinel-' + _myId.toLowerCase();
-    _peer = new Peer(peerId, { debug: 0 });
+    _peer = new Peer(peerId, {
+      debug: 0,
+      config: {
+        iceServers: iceServers
+      }
+    });
 
     _peer.on('open', (id) => {
       console.log('SentinelCall: online, peerId=' + id + ', sentinelId=' + _myId);
