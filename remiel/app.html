@@ -4329,6 +4329,31 @@
 .circle-sharing-toggle { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-dim, #999); }
 .circle-sharing-toggle input { accent-color: var(--accent, #6c5ce7); }
 
+
+/* ── Social Import ── */
+.social-import-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.social-import-btn { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); cursor: pointer; transition: background 0.2s; }
+.social-import-btn:hover { background: rgba(255,255,255,0.08); }
+.social-import-btn .si-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.social-import-btn .si-label { font-size: 12px; font-weight: 500; color: var(--text-primary, #fff); }
+.social-import-modal { position: fixed; inset: 0; z-index: 10001; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); padding: 16px; }
+.social-import-modal.active { display: flex; }
+.social-import-panel { background: var(--card-bg, #1a1a2e); border-radius: 12px; padding: 20px; max-width: 400px; width: 100%; max-height: 80vh; overflow-y: auto; }
+.social-import-panel h3 { margin: 0 0 6px; font-size: 16px; color: var(--text-primary, #fff); }
+.social-import-panel .si-sub { font-size: 12px; color: var(--text-dim, #999); margin: 0 0 14px; }
+.social-import-panel textarea { width: 100%; min-height: 120px; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text-primary, #fff); font-size: 13px; font-family: inherit; resize: vertical; box-sizing: border-box; }
+.social-import-panel .si-hint { font-size: 11px; color: var(--text-dim, #999); margin: 6px 0 14px; }
+.social-import-panel .si-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.social-import-panel .si-btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
+.social-import-panel .si-btn.primary { background: var(--accent, #6c5ce7); color: #fff; }
+.social-import-panel .si-btn.secondary { background: rgba(255,255,255,0.08); color: var(--text-dim, #999); }
+.social-import-preview { margin: 10px 0; max-height: 200px; overflow-y: auto; }
+.social-import-preview-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; color: var(--text-primary, #fff); }
+.social-import-preview-item:last-child { border-bottom: none; }
+.social-import-preview-item .si-check { width: 16px; height: 16px; accent-color: var(--accent, #6c5ce7); }
+.social-import-result { font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-top: 10px; }
+.social-import-result.success { background: rgba(46,213,115,0.15); color: #2ed573; }
+.social-import-result.error { background: rgba(248,113,113,0.15); color: #f87171; }
 </style>
 
 
@@ -4610,6 +4635,54 @@
         <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Connected</div>
         <ul class="circle-list" id="circleConnectedList"></ul>
         <div class="circle-empty" id="circleEmpty">No connections yet. Invite someone above!</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" id="socialImportSection">
+    <div class="settings-section-title">Import Contacts</div>
+    <div class="settings-card">
+      <p style="font-size:12px;color:var(--text-dim);margin:0 0 6px;">Bring people in from your social networks. Paste a list or enter contacts manually.</p>
+      <div class="social-import-grid">
+        <button class="social-import-btn" onclick="SocialImport.open('instagram')">
+          <span class="si-icon" style="background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);">&#x1F4F7;</span>
+          <span class="si-label">Instagram</span>
+        </button>
+        <button class="social-import-btn" onclick="SocialImport.open('facebook')">
+          <span class="si-icon" style="background:#1877F2;">f</span>
+          <span class="si-label">Facebook</span>
+        </button>
+        <button class="social-import-btn" onclick="SocialImport.open('whatsapp')">
+          <span class="si-icon" style="background:#25D366;">&#x260E;</span>
+          <span class="si-label">WhatsApp</span>
+        </button>
+        <button class="social-import-btn" onclick="SocialImport.open('snapchat')">
+          <span class="si-icon" style="background:#FFFC00;color:#000;">&#x1F47B;</span>
+          <span class="si-label">Snapchat</span>
+        </button>
+      </div>
+      <div style="margin-top:10px;">
+        <button class="social-import-btn" onclick="SocialImport.open('manual')" style="width:100%;justify-content:center;">
+          <span class="si-icon" style="background:rgba(255,255,255,0.1);">+</span>
+          <span class="si-label">Paste or Type Contacts</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Social Import Modal -->
+  <div class="social-import-modal" id="socialImportModal" onclick="if(event.target===this)SocialImport.close()">
+    <div class="social-import-panel">
+      <h3 id="siTitle">Import Contacts</h3>
+      <p class="si-sub" id="siSubtitle">Paste contact info below</p>
+      <textarea id="siTextarea" placeholder="Paste contacts here..."></textarea>
+      <p class="si-hint" id="siHint">One contact per line. Format: Name, Phone or Handle</p>
+      <div class="social-import-preview" id="siPreview" style="display:none;"></div>
+      <div class="social-import-result" id="siResult" style="display:none;"></div>
+      <div class="si-actions">
+        <button class="si-btn secondary" onclick="SocialImport.close()">Cancel</button>
+        <button class="si-btn primary" id="siParseBtn" onclick="SocialImport.parse()">Preview</button>
+        <button class="si-btn primary" id="siImportBtn" onclick="SocialImport.doImport()" style="display:none;">Import Selected</button>
       </div>
     </div>
   </div>
@@ -14905,6 +14978,272 @@ const CircleManager = (() => {
     updateSharing: updateSharing,
     loadConnections: loadConnections,
     updateVisibility: updateVisibility,
+  };
+})();
+
+
+/* ══════════════════════════════════════════════════════════════
+   SocialImport — Social media contact import flows
+   Manual entry with platform-specific formatting hints.
+   Framework ready for OAuth when developer apps are registered.
+   ══════════════════════════════════════════════════════════════ */
+const SocialImport = (() => {
+  'use strict';
+
+  let _currentPlatform = null;
+  let _parsedContacts = [];
+
+  function _$(id) { return document.getElementById(id); }
+
+  const PLATFORMS = {
+    instagram: {
+      title: 'Import from Instagram',
+      subtitle: 'Paste usernames or the list from your Following page.',
+      hint: 'One per line. Examples:\n@janedoe\njohn_smith\nJane Doe, @janedoe',
+      placeholder: '@username or Name, @username — one per line',
+      parseHandle: true,
+      source: 'instagram',
+    },
+    facebook: {
+      title: 'Import from Facebook',
+      subtitle: 'Paste names from your Friends list or exported contacts.',
+      hint: 'One per line. Examples:\nJane Doe\nJohn Smith, john@email.com',
+      placeholder: 'Name or Name, email — one per line',
+      parseHandle: false,
+      source: 'facebook',
+    },
+    whatsapp: {
+      title: 'Import from WhatsApp',
+      subtitle: 'Paste contacts from your WhatsApp chat list or exported contacts.',
+      hint: 'One per line. Examples:\nJane Doe, +1-555-0123\n+15550123',
+      placeholder: 'Name, phone number — one per line',
+      parseHandle: false,
+      source: 'whatsapp',
+    },
+    snapchat: {
+      title: 'Import from Snapchat',
+      subtitle: 'Paste usernames from your Snapchat friends list.',
+      hint: 'One per line. Examples:\n@janedoe\njohn_smith',
+      placeholder: '@username — one per line',
+      parseHandle: true,
+      source: 'snapchat',
+    },
+    manual: {
+      title: 'Import Contacts',
+      subtitle: 'Type or paste a list of contacts.',
+      hint: 'One per line. Format: First Last, phone or email\nExamples:\nJane Doe, 555-0123\nJohn Smith, john@email.com',
+      placeholder: 'Name, phone or email — one per line',
+      parseHandle: false,
+      source: 'manual',
+    },
+  };
+
+  function open(platform) {
+    _currentPlatform = platform;
+    _parsedContacts = [];
+    var cfg = PLATFORMS[platform] || PLATFORMS.manual;
+
+    _$('siTitle').textContent = cfg.title;
+    _$('siSubtitle').textContent = cfg.subtitle;
+    _$('siTextarea').placeholder = cfg.placeholder;
+    _$('siHint').textContent = cfg.hint;
+    _$('siTextarea').value = '';
+    _$('siPreview').style.display = 'none';
+    _$('siPreview').innerHTML = '';
+    _$('siResult').style.display = 'none';
+    _$('siParseBtn').style.display = '';
+    _$('siImportBtn').style.display = 'none';
+
+    _$('socialImportModal').classList.add('active');
+    setTimeout(function() { _$('siTextarea').focus(); }, 100);
+  }
+
+  function close() {
+    _$('socialImportModal').classList.remove('active');
+    _currentPlatform = null;
+    _parsedContacts = [];
+  }
+
+  function _parseLine(line, cfg) {
+    line = line.trim();
+    if (!line) return null;
+
+    /* Strip leading bullet, dash, number */
+    line = line.replace(/^[\-\*\d\.\)]+\s*/, '');
+
+    var parts = line.split(/[,\t]+/).map(function(s) { return s.trim(); }).filter(Boolean);
+    var contact = { first: '', last: '', phone: '', email: '', handle: '', source: cfg.source };
+
+    if (parts.length === 1) {
+      var val = parts[0];
+      /* Check if it is a handle (@something) */
+      if (val.startsWith('@') || (cfg.parseHandle && /^[a-zA-Z0-9._]+$/.test(val))) {
+        contact.handle = val.replace(/^@/, '');
+        contact.first = contact.handle;
+      } else if (/^\+?[\d\s\-\(\)]{7,}$/.test(val)) {
+        /* Phone number */
+        contact.phone = val;
+        contact.first = val;
+      } else if (val.indexOf('@') !== -1 && val.indexOf('.') !== -1) {
+        /* Email */
+        contact.email = val;
+        contact.first = val.split('@')[0];
+      } else {
+        /* Treat as a name */
+        var nameParts = val.split(/\s+/);
+        contact.first = nameParts[0] || '';
+        contact.last = nameParts.slice(1).join(' ') || '';
+      }
+    } else {
+      /* First part is usually the name */
+      var namePart = parts[0];
+      var nameParts2 = namePart.split(/\s+/);
+      contact.first = nameParts2[0] || '';
+      contact.last = nameParts2.slice(1).join(' ') || '';
+
+      /* Second part is handle, phone, or email */
+      var val2 = parts[1] || '';
+      if (val2.startsWith('@') || (cfg.parseHandle && /^[a-zA-Z0-9._]+$/.test(val2))) {
+        contact.handle = val2.replace(/^@/, '');
+      } else if (/^\+?[\d\s\-\(\)]{7,}$/.test(val2)) {
+        contact.phone = val2;
+      } else if (val2.indexOf('@') !== -1 && val2.indexOf('.') !== -1) {
+        contact.email = val2;
+      } else {
+        contact.last = (contact.last ? contact.last + ' ' : '') + val2;
+      }
+
+      /* Third part if present */
+      if (parts[2]) {
+        var val3 = parts[2];
+        if (/^\+?[\d\s\-\(\)]{7,}$/.test(val3)) {
+          contact.phone = val3;
+        } else if (val3.indexOf('@') !== -1 && val3.indexOf('.') !== -1) {
+          contact.email = val3;
+        }
+      }
+    }
+
+    if (!contact.first && !contact.handle && !contact.phone) return null;
+    return contact;
+  }
+
+  function parse() {
+    var text = _$('siTextarea').value;
+    var cfg = PLATFORMS[_currentPlatform] || PLATFORMS.manual;
+    var lines = text.split('\n');
+    _parsedContacts = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var c = _parseLine(lines[i], cfg);
+      if (c) {
+        c._idx = _parsedContacts.length;
+        c._selected = true;
+        _parsedContacts.push(c);
+      }
+    }
+
+    if (_parsedContacts.length === 0) {
+      _showResult('No contacts found. Check the format and try again.', true);
+      return;
+    }
+
+    /* Show preview */
+    var preview = _$('siPreview');
+    preview.innerHTML = '';
+    _parsedContacts.forEach(function(c) {
+      var div = document.createElement('div');
+      div.className = 'social-import-preview-item';
+      var displayName = _esc(c.first + (c.last ? ' ' + c.last : ''));
+      var detail = c.handle ? '@' + _esc(c.handle) : (c.phone || c.email || '');
+      div.innerHTML =
+        '<input type="checkbox" class="si-check" checked data-idx="' + c._idx + '" onchange="SocialImport.toggleItem(' + c._idx + ',this.checked)">' +
+        '<span>' + displayName + (detail ? ' <span style="color:var(--text-dim);font-size:11px;">' + _esc(detail) + '</span>' : '') + '</span>';
+      preview.appendChild(div);
+    });
+    preview.style.display = 'block';
+    _$('siResult').style.display = 'none';
+    _$('siParseBtn').style.display = 'none';
+    _$('siImportBtn').style.display = '';
+  }
+
+  function toggleItem(idx, checked) {
+    if (_parsedContacts[idx]) _parsedContacts[idx]._selected = checked;
+  }
+
+  async function doImport() {
+    var selected = _parsedContacts.filter(function(c) { return c._selected; });
+    if (selected.length === 0) {
+      _showResult('No contacts selected.', true);
+      return;
+    }
+
+    var imported = 0;
+    var skipped = 0;
+
+    for (var i = 0; i < selected.length; i++) {
+      var c = selected[i];
+      try {
+        /* Check for duplicate by name */
+        var allContacts = await RemielDB.getAllContacts();
+        var duplicate = allContacts.some(function(existing) {
+          return existing.first && existing.first.toLowerCase() === c.first.toLowerCase() &&
+                 (existing.last || '').toLowerCase() === (c.last || '').toLowerCase();
+        });
+        if (duplicate) { skipped++; continue; }
+
+        await RemielDB.putContact({
+          first: c.first,
+          last: c.last || '',
+          cat: 'friend',
+          sev: 3,
+          phone: c.phone || '',
+          email: c.email || '',
+          notes: (c.handle ? c.source + ': @' + c.handle : 'Imported from ' + c.source),
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        imported++;
+
+        /* Mark dirty for sync */
+        if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) {
+          SyncEngine.markDirty();
+        }
+      } catch (e) {
+        console.warn('SocialImport: failed to import', c.first, e);
+        skipped++;
+      }
+    }
+
+    _showResult('Imported ' + imported + ' contact' + (imported !== 1 ? 's' : '') +
+      (skipped > 0 ? ' (' + skipped + ' skipped as duplicates)' : '') + '.', false);
+    _$('siImportBtn').style.display = 'none';
+
+    /* Refresh the galaxy if possible */
+    if (typeof loadAndRender === 'function') {
+      setTimeout(function() { loadAndRender(); }, 500);
+    }
+  }
+
+  function _showResult(msg, isError) {
+    var el = _$('siResult');
+    el.textContent = msg;
+    el.className = 'social-import-result ' + (isError ? 'error' : 'success');
+    el.style.display = 'block';
+  }
+
+  function _esc(str) {
+    var el = document.createElement('span');
+    el.textContent = str || '';
+    return el.innerHTML;
+  }
+
+  return {
+    open: open,
+    close: close,
+    parse: parse,
+    toggleItem: toggleItem,
+    doImport: doImport,
   };
 })();
 
