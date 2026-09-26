@@ -3887,6 +3887,32 @@
     box-shadow: 0 6px 28px rgba(0,0,0,0.4), 0 0 18px rgba(56,189,248,0.25);
   }
   .add-person-fab:active { transform: scale(0.92); }
+
+  /* ── Add Person modal: photo upload area ── */
+  .cm-photo-area {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 0 6px;
+  }
+  .cm-photo-circle {
+    width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(255,255,255,0.06); border: 2px dashed rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; overflow: hidden; position: relative;
+    transition: border-color 0.2s, background 0.15s;
+  }
+  .cm-photo-circle:hover { border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.10); }
+  .cm-photo-circle.has-media { border-style: solid; border-color: #4CAF50; }
+  .cm-photo-circle img, .cm-photo-circle video {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+  }
+  .cm-photo-circle .cm-photo-icon {
+    color: rgba(255,255,255,0.35); font-size: 20px; line-height: 1;
+  }
+  .cm-photo-label {
+    font-size: 12px; color: var(--text-dim, rgba(255,255,255,0.5));
+    cursor: pointer;
+  }
+  .cm-photo-label:hover { color: var(--text-primary, #fff); }
   .add-person-fab.hidden { display: none !important; }
 
 
@@ -5268,7 +5294,7 @@
 </div>
 
 <!-- Hidden file input for contact photo uploads -->
-<input type="file" id="contactPhotoInput" accept="image/*" hidden onchange="handleContactPhoto(event)">
+<input type="file" id="contactPhotoInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" hidden onchange="handleContactPhoto(event)">
 
 <!-- Daily Summary Digest — morning card, SELF mode only -->
 <div class="daily-digest hidden" id="dailyDigest" role="region" aria-label="Daily summary">
@@ -5811,6 +5837,13 @@
 <div class="contact-modal-overlay" id="contactModalOverlay" onclick="if(event.target===this)closeContactModal()">
   <div class="contact-modal" id="contactModal">
     <div class="contact-modal-hdr"><h3 class="contact-modal-title" id="contactModalTitle">Add Person</h3><button class="contact-modal-x" onclick="closeContactModal()" aria-label="Close">&times;</button></div>
+    <div class="cm-photo-area">
+      <div class="cm-photo-circle" id="cmPhotoCircle" onclick="document.getElementById('cmPhotoFileInput').click()" title="Add photo, GIF, or video">
+        <span class="cm-photo-icon" id="cmPhotoIcon">&#128247;</span>
+      </div>
+      <span class="cm-photo-label" onclick="document.getElementById('cmPhotoFileInput').click()">Add photo or video</span>
+      <input type="file" id="cmPhotoFileInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" hidden onchange="handleCmPhoto(event)">
+    </div>
     <input class="contact-modal-input" id="cmFirstName" type="text" placeholder="First name (required)" maxlength="30" autocomplete="off">
     <input class="contact-modal-input" id="cmLastName" type="text" placeholder="Last name" maxlength="30" autocomplete="off">
     <input class="contact-modal-input" id="cmPhone" type="tel" placeholder="Phone number" maxlength="20" autocomplete="off">
@@ -6192,25 +6225,36 @@ async function launchGalaxy(savedContacts) {
     console.log('RemielDB: loaded', photos.length, 'photo(s) from storage');
     for (const p of photos) {
       if (p.blob instanceof Blob) {
-        const url = URL.createObjectURL(p.blob);
-        const img = new Image();
-        await new Promise((res) => {
-          img.onload = res;
-          img.onerror = res;
-          img.src = url;
-        });
-        if (img.naturalWidth > 0) {
+        const blobType = p.blob.type || '';
+        if (blobType.startsWith('video/')) {
+          /* Video blob — load as looping video element */
           if (p.contactId === 'self') {
-            media = img;
-            mediaType = 'image';
-            cachedMediaW = img.naturalWidth;
-            cachedMediaH = img.naturalHeight;
-            if (!mediaFrame) mediaFrame = document.createElement('canvas');
-            mediaFrame.width = cachedMediaW;
-            mediaFrame.height = cachedMediaH;
-            mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
+            loadBroadcastIntoSphere('self', p.blob);
           } else {
-            contactPhotos.set(p.contactId, { img, w: img.naturalWidth, h: img.naturalHeight });
+            loadBroadcastIntoSphere(p.contactId, p.blob);
+          }
+        } else {
+          /* Image/GIF blob — load as Image */
+          const url = URL.createObjectURL(p.blob);
+          const img = new Image();
+          await new Promise((res) => {
+            img.onload = res;
+            img.onerror = res;
+            img.src = url;
+          });
+          if (img.naturalWidth > 0) {
+            if (p.contactId === 'self') {
+              media = img;
+              mediaType = 'image';
+              cachedMediaW = img.naturalWidth;
+              cachedMediaH = img.naturalHeight;
+              if (!mediaFrame) mediaFrame = document.createElement('canvas');
+              mediaFrame.width = cachedMediaW;
+              mediaFrame.height = cachedMediaH;
+              mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
+            } else {
+              contactPhotos.set(p.contactId, { img, w: img.naturalWidth, h: img.naturalHeight });
+            }
           }
         }
       }
@@ -11382,6 +11426,55 @@ function showPhotoControls() {
   document.getElementById('photoControls').hidden = false;
 }
 
+/* ── Add Person Modal: photo staging ── */
+var _cmPhotoBlob = null;   /* Staged file blob for the new contact */
+var _cmPhotoIsVideo = false;
+
+function handleCmPhoto(e) {
+  var f = e.target.files[0];
+  if (!f) return;
+  _cmPhotoBlob = f;
+  _cmPhotoIsVideo = f.type.startsWith('video/');
+  var circle = document.getElementById('cmPhotoCircle');
+  var icon = document.getElementById('cmPhotoIcon');
+
+  /* Clear previous preview */
+  circle.querySelectorAll('img, video').forEach(function(el) { el.remove(); });
+  icon.style.display = 'none';
+  circle.classList.add('has-media');
+
+  if (_cmPhotoIsVideo) {
+    var vid = document.createElement('video');
+    vid.src = URL.createObjectURL(f);
+    vid.muted = true; vid.loop = true; vid.playsInline = true;
+    vid.setAttribute('playsinline', '');
+    vid.autoplay = true;
+    vid.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+    circle.appendChild(vid);
+  } else {
+    var img = document.createElement('img');
+    img.src = URL.createObjectURL(f);
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+    circle.appendChild(img);
+  }
+  e.target.value = '';
+}
+
+function _resetCmPhoto() {
+  _cmPhotoBlob = null;
+  _cmPhotoIsVideo = false;
+  var circle = document.getElementById('cmPhotoCircle');
+  if (circle) {
+    circle.querySelectorAll('img, video').forEach(function(el) {
+      if (el.src && el.src.startsWith('blob:')) URL.revokeObjectURL(el.src);
+      el.remove();
+    });
+    circle.classList.remove('has-media');
+    var icon = document.getElementById('cmPhotoIcon');
+    if (icon) icon.style.display = '';
+  }
+}
+
 /* ── Contact Photo System — images/video for orbit spheres ── */
 const contactPhotos = new Map(); // contactId → { img, w, h }
 
@@ -11390,23 +11483,41 @@ function handleContactPhoto(e) {
   if (!f || !selectedContact) return;
   const contactId = selectedContact.id;
   const url = URL.createObjectURL(f);
-  const img = new Image();
-  img.onload = () => {
-    contactPhotos.set(contactId, {
-      img: img,
-      w: img.naturalWidth,
-      h: img.naturalHeight
+
+  if (f.type.startsWith('video/')) {
+    /* Video file — load as looping video element for sphere playback */
+    const video = document.createElement('video');
+    video.src = url;
+    video.loop = true; video.muted = true; video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    video.addEventListener('ended', () => { video.currentTime = 0; video.play().catch(() => {}); });
+    video.addEventListener('loadedmetadata', () => {
+      video.play().catch(() => {});
+      contactPhotos.set(contactId, { img: video, w: video.videoWidth, h: video.videoHeight, isVideo: true });
+      const lbl = document.getElementById('contactPhotoBtnLabel');
+      if (lbl) lbl.textContent = 'Change Photo';
+      RemielDB.putPhoto(contactId, f).catch(err =>
+        console.warn('RemielDB: photo save failed', err)
+      );
     });
-    /* Update the button label */
-    const lbl = document.getElementById('contactPhotoBtnLabel');
-    if (lbl) lbl.textContent = 'Change Photo';
-    /* Persist to IndexedDB */
-    RemielDB.putPhoto(contactId, f).catch(err =>
-      console.warn('RemielDB: photo save failed', err)
-    );
-  };
-  img.onerror = () => { console.warn('Failed to load contact photo'); };
-  img.src = url;
+  } else {
+    /* Image or GIF — load as Image element */
+    const img = new Image();
+    img.onload = () => {
+      contactPhotos.set(contactId, {
+        img: img,
+        w: img.naturalWidth,
+        h: img.naturalHeight
+      });
+      const lbl = document.getElementById('contactPhotoBtnLabel');
+      if (lbl) lbl.textContent = 'Change Photo';
+      RemielDB.putPhoto(contactId, f).catch(err =>
+        console.warn('RemielDB: photo save failed', err)
+      );
+    };
+    img.onerror = () => { console.warn('Failed to load contact photo'); };
+    img.src = url;
+  }
   e.target.value = '';
 }
 
@@ -18321,6 +18432,31 @@ function openContactModal(mode, contact) {
       b.classList.toggle('active', b.dataset.cat === _cmCat);
     });
     deleteBtn.classList.remove('hidden');
+    /* Show existing photo in the modal circle if contact has one */
+    _resetCmPhoto();
+    if (contactPhotos.has(selectedContact.id)) {
+      var _existingPhoto = contactPhotos.get(selectedContact.id);
+      var circle = document.getElementById('cmPhotoCircle');
+      var icon = document.getElementById('cmPhotoIcon');
+      if (circle && icon) {
+        icon.style.display = 'none';
+        circle.classList.add('has-media');
+        if (_existingPhoto.isVideo && _existingPhoto.img && _existingPhoto.img.src) {
+          var _evid = document.createElement('video');
+          _evid.src = _existingPhoto.img.src;
+          _evid.muted = true; _evid.loop = true; _evid.playsInline = true;
+          _evid.setAttribute('playsinline', '');
+          _evid.autoplay = true;
+          _evid.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+          circle.appendChild(_evid);
+        } else if (_existingPhoto.img && _existingPhoto.img.src) {
+          var _eimg = document.createElement('img');
+          _eimg.src = _existingPhoto.img.src;
+          _eimg.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+          circle.appendChild(_eimg);
+        }
+      }
+    }
   } else {
     title.textContent = 'Add Person';
     saveBtn.textContent = 'Add';
@@ -18330,6 +18466,7 @@ function openContactModal(mode, contact) {
     emailInput.value = '';
     document.getElementById('cmSentinelId').value = '';
     deleteBtn.classList.add('hidden');
+    _resetCmPhoto();
   }
 
   overlay.classList.add('open');
@@ -18397,6 +18534,7 @@ function closeContactModal() {
   document.getElementById('contactModalOverlay').classList.remove('open');
   const fab = document.getElementById('addPersonFab');
   if (fab) fab.classList.remove('fab-open');
+  _resetCmPhoto();
 }
 function toggleAddModal() {
   const overlay = document.getElementById('contactModalOverlay');
@@ -18470,6 +18608,25 @@ async function saveContactModal() {
     try {
       await RemielDB.putContact(newContact);
     } catch (e) { console.warn('Contact add failed', e); }
+
+    // Save staged photo/video from the modal
+    if (_cmPhotoBlob) {
+      try {
+        await RemielDB.putPhoto(newId, _cmPhotoBlob);
+        if (_cmPhotoIsVideo) {
+          loadBroadcastIntoSphere(newId, _cmPhotoBlob);
+        } else {
+          (function(cId, blob) {
+            var _url = URL.createObjectURL(blob);
+            var _img = new Image();
+            _img.onload = function() {
+              contactPhotos.set(cId, { img: _img, w: _img.naturalWidth, h: _img.naturalHeight });
+            };
+            _img.src = _url;
+          })(newId, _cmPhotoBlob);
+        }
+      } catch(e) { console.warn('Modal photo save failed', e); }
+    }
 
     // Rebuild constellation nodes
     buildNodes(true);
