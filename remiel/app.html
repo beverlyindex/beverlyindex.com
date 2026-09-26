@@ -3195,6 +3195,44 @@
   }
   .settings-btn:hover svg { stroke: var(--text, #e0e4ec); }
 
+  /* ── BioMotion Settings ── */
+  .bio-motion-card { padding: 14px 16px; }
+  .bio-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .bio-row-label { font-size:13px; font-weight:600; color:var(--text-primary); }
+  .bio-toggle-btn {
+    background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12);
+    color: var(--text-primary); font-family:inherit; font-size:12px; font-weight:700;
+    padding: 5px 16px; border-radius:16px; cursor:pointer; transition: all 0.2s;
+    min-width: 52px; text-align:center; letter-spacing:0.04em;
+  }
+  .bio-toggle-btn:active { transform:scale(0.95); }
+  .bio-bar-track {
+    width:100%; height:6px; background:rgba(255,255,255,0.06);
+    border-radius:3px; overflow:hidden; margin-bottom:4px;
+  }
+  .bio-bar-fill {
+    height:100%; width:0%; border-radius:3px;
+    transition: width 0.3s ease, background 0.3s ease;
+  }
+  .bio-status-text { font-size:11px; color:var(--text-dim); margin-bottom:12px; }
+  .bio-hr-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .bio-hr-value { font-size:18px; font-weight:700; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+  .bio-hr-btn {
+    background: rgba(255,68,68,0.15); border:1px solid rgba(255,68,68,0.25);
+    color: #FF6B6B; font-family:inherit; font-size:11px; font-weight:600;
+    padding: 5px 14px; border-radius:14px; cursor:pointer; transition:all 0.2s;
+  }
+  .bio-hr-btn:disabled { opacity:0.5; cursor:default; }
+  .bio-hr-btn:active:not(:disabled) { transform:scale(0.95); }
+  .bio-hint { font-size:10px; color:var(--text-dim); margin-top:10px; line-height:1.4; }
+  .bio-status-banner {
+    display:none; font-size:11px; padding:6px 10px; border-radius:8px;
+    margin-top:8px; text-align:center; font-weight:500;
+  }
+  .bio-banner-info { background:rgba(96,165,250,0.12); color:#60A5FA; }
+  .bio-banner-success { background:rgba(0,230,118,0.12); color:#00E676; }
+  .bio-banner-warn { background:rgba(255,140,0,0.12); color:#FF8C00; }
+
   .settings-panel {
     position: fixed;
     inset: 0;
@@ -4837,6 +4875,383 @@
     transform: translateX(16px);
   }
 
+
+
+/* ═══ RSM — Remiel Sentinel Messaging ═══ */
+
+/* ═══ SentinelViews — Circle Views Panel ═══ */
+.sv-overlay {
+  position: fixed; inset: 0; z-index: 6200;
+  background: rgba(4,6,12,0.85);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.sv-overlay.open {
+  opacity: 1; pointer-events: auto;
+}
+.sv-panel {
+  width: min(420px, 94vw);
+  max-height: 80vh;
+  background: rgba(12,14,22,0.97);
+  border-radius: 20px 20px 0 0;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.22,1,0.36,1);
+  display: flex; flex-direction: column;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-bottom: none;
+}
+.sv-overlay.open .sv-panel {
+  transform: translateY(0);
+}
+.sv-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 18px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sv-title {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 20px; color: #e2e8f0; margin: 0;
+}
+.sv-close {
+  background: none; border: none; color: #94a3b8; font-size: 24px;
+  cursor: pointer; padding: 4px 8px; line-height: 1;
+}
+.sv-close:hover { color: #e2e8f0; }
+.sv-body {
+  flex: 1; overflow-y: auto; padding: 12px 16px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+.sv-section-label {
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.5px; color: #64748b; margin: 14px 0 8px;
+}
+.sv-section-label:first-child { margin-top: 4px; }
+.sv-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 8px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.sv-card:hover { background: rgba(255,255,255,0.06); }
+.sv-card.active {
+  border-color: rgba(56,189,248,0.4);
+  background: rgba(56,189,248,0.08);
+}
+.sv-card-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.sv-card-icon.one-on-one { background: rgba(168,85,247,0.15); color: #a855f7; }
+.sv-card-icon.unit { background: rgba(56,189,248,0.15); color: #38bdf8; }
+.sv-card-icon.team { background: rgba(74,222,128,0.15); color: #4ade80; }
+.sv-card-icon.all { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.sv-card-info { flex: 1; min-width: 0; }
+.sv-card-name {
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 14px; font-weight: 600; color: #e2e8f0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sv-card-meta {
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 11px; color: #64748b; margin-top: 2px;
+}
+.sv-card-actions {
+  display: flex; gap: 4px; flex-shrink: 0;
+}
+.sv-card-btn {
+  background: none; border: none; color: #64748b;
+  cursor: pointer; padding: 4px; border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.sv-card-btn:hover { color: #e2e8f0; background: rgba(255,255,255,0.08); }
+.sv-card-btn.delete:hover { color: #f87171; }
+.sv-create-row {
+  display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
+}
+.sv-create-btn {
+  flex: 1; min-width: 100px;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.02);
+  color: #94a3b8; font-size: 12px; font-weight: 600;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  cursor: pointer; text-align: center;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.sv-create-btn:hover {
+  border-color: rgba(56,189,248,0.3);
+  color: #e2e8f0;
+  background: rgba(56,189,248,0.05);
+}
+
+/* ── View Editor sub-panel ── */
+.sv-editor {
+  position: fixed; inset: 0; z-index: 6300;
+  background: rgba(4,6,12,0.9);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.sv-editor.open { opacity: 1; pointer-events: auto; }
+.sv-editor-card {
+  width: min(400px, 92vw);
+  max-height: 82vh;
+  background: rgba(15,17,25,0.98);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex; flex-direction: column;
+  transform: scale(0.95);
+  transition: transform 0.25s cubic-bezier(0.22,1,0.36,1);
+}
+.sv-editor.open .sv-editor-card {
+  transform: scale(1);
+}
+.sv-editor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sv-editor-title {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 18px; color: #e2e8f0; margin: 0;
+}
+.sv-editor-body {
+  flex: 1; overflow-y: auto; padding: 14px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.sv-field-label {
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.2px; color: #64748b; margin: 0 0 6px;
+}
+.sv-field-label:not(:first-child) { margin-top: 14px; }
+.sv-name-input {
+  width: 100%; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #e2e8f0; font-size: 14px;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  outline: none; transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.sv-name-input:focus { border-color: rgba(56,189,248,0.4); }
+.sv-name-input::placeholder { color: #475569; }
+.sv-roster {
+  max-height: 240px; overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px; background: rgba(255,255,255,0.02);
+}
+.sv-roster-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.sv-roster-item:last-child { border-bottom: none; }
+.sv-roster-item:hover { background: rgba(255,255,255,0.04); }
+.sv-roster-item.selected { background: rgba(56,189,248,0.08); }
+.sv-roster-check {
+  width: 20px; height: 20px; border-radius: 6px;
+  border: 2px solid rgba(255,255,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: border-color 0.15s, background 0.15s;
+}
+.sv-roster-item.selected .sv-roster-check {
+  border-color: #38bdf8; background: #38bdf8;
+}
+.sv-roster-check-mark {
+  display: none; color: #0f1119; font-size: 12px; font-weight: 900; line-height: 1;
+}
+.sv-roster-item.selected .sv-roster-check-mark { display: block; }
+.sv-roster-name {
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 13px; color: #e2e8f0; flex: 1;
+}
+.sv-roster-cat {
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 10px; color: #64748b; text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.sv-editor-footer {
+  display: flex; gap: 10px; padding: 14px 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.sv-editor-btn {
+  flex: 1; padding: 11px 16px; border-radius: 10px;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: background 0.15s, border-color 0.15s;
+}
+.sv-editor-btn.cancel {
+  background: transparent; color: #94a3b8;
+}
+.sv-editor-btn.cancel:hover { background: rgba(255,255,255,0.04); }
+.sv-editor-btn.save {
+  background: rgba(56,189,248,0.15); color: #38bdf8;
+  border-color: rgba(56,189,248,0.3);
+}
+.sv-editor-btn.save:hover { background: rgba(56,189,248,0.25); }
+.sv-editor-btn:disabled {
+  opacity: 0.4; cursor: not-allowed;
+}
+
+/* ── View indicator floating badge (galaxy view) ── */
+.sv-badge {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  z-index: 500; display: none;
+  padding: 8px 18px; border-radius: 20px;
+  background: rgba(12,14,22,0.92);
+  border: 1px solid rgba(56,189,248,0.25);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 12px; font-weight: 600; color: #38bdf8;
+  cursor: pointer; white-space: nowrap;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.sv-badge.visible { display: flex; align-items: center; gap: 8px; }
+.sv-badge:hover { background: rgba(56,189,248,0.12); }
+.sv-badge-x {
+  background: none; border: none; color: #64748b; cursor: pointer;
+  font-size: 14px; padding: 0 2px; line-height: 1;
+}
+.sv-badge-x:hover { color: #e2e8f0; }
+/* ═══ /SentinelViews CSS ═══ */
+
+.sentinel-msg-overlay {
+  position: fixed; inset: 0; z-index: 6100;
+  background: rgba(4,6,12,0.82);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  display: flex; align-items: stretch; justify-content: flex-start;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+.sentinel-msg-overlay.open {
+  opacity: 1; pointer-events: auto;
+}
+.sentinel-msg-panel {
+  width: min(380px, 88vw); height: 100%;
+  background: rgba(12,14,22,0.96);
+  border-right: 1px solid rgba(56,189,248,0.15);
+  display: flex; flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+}
+.sentinel-msg-overlay.open .sentinel-msg-panel {
+  transform: translateX(0);
+}
+.sentinel-msg-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.sentinel-msg-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 14px; color: #0c0e14;
+  flex-shrink: 0;
+}
+.sentinel-msg-name {
+  font-size: 15px; font-weight: 600; color: #f0f0f5;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.sentinel-msg-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.06); border: none;
+  color: #aaa; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.sentinel-msg-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.sentinel-msg-thread {
+  flex: 1; overflow-y: auto; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.sentinel-msg-bubble {
+  max-width: 85%; padding: 10px 14px;
+  border-radius: 16px; font-size: 14px; line-height: 1.45;
+  word-break: break-word; position: relative;
+}
+.sentinel-msg-bubble.sent {
+  align-self: flex-end;
+  background: rgba(56,189,248,0.18);
+  color: #e0f2fe;
+  border-bottom-right-radius: 4px;
+}
+.sentinel-msg-bubble.received {
+  align-self: flex-start;
+  background: rgba(74,222,128,0.15);
+  color: #dcfce7;
+  border-bottom-left-radius: 4px;
+}
+.sentinel-msg-time {
+  font-size: 10px; opacity: 0.45; margin-top: 4px;
+}
+.sentinel-msg-compose {
+  display: flex; align-items: flex-end; gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.sentinel-msg-input {
+  flex: 1; min-height: 40px; max-height: 120px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 10px 16px;
+  color: #f0f0f5; font-size: 14px; font-family: inherit;
+  resize: none; outline: none;
+  transition: border-color 0.2s;
+}
+.sentinel-msg-input:focus {
+  border-color: rgba(56,189,248,0.4);
+}
+.sentinel-msg-input::placeholder { color: rgba(255,255,255,0.25); }
+.sentinel-msg-send {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(56,189,248,0.25);
+  border: 1px solid rgba(56,189,248,0.35);
+  color: #38bdf8; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s, transform 0.15s;
+}
+.sentinel-msg-send:hover { background: rgba(56,189,248,0.35); }
+.sentinel-msg-send:active { transform: scale(0.92); }
+.sentinel-msg-empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.2); font-size: 13px; text-align: center;
+  padding: 20px;
+}
+/* BLUF latest message section */
+.bluf-msg-latest {
+  padding: 10px 14px;
+  background: rgba(56,189,248,0.06);
+  border-radius: 8px;
+  border-left: 3px solid rgba(56,189,248,0.35);
+  margin-bottom: 4px;
+}
+.bluf-msg-latest-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px;
+  color: rgba(56,189,248,0.6); margin-bottom: 4px;
+}
+.bluf-msg-latest-text {
+  font-size: 13px; color: #e0f2fe; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bluf-msg-latest-time {
+  font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 4px;
+}
+
 </style>
 
 
@@ -5166,6 +5581,62 @@
     </div>
 
 
+
+    <!-- Motion Sensing -->
+    <div class="settings-section" id="bioMotionSection">
+      <div class="settings-section-title">Motion Sensing</div>
+      <div class="settings-card bio-motion-card">
+        <div class="bio-row">
+          <span class="bio-row-label">Device Motion</span>
+          <button class="bio-toggle-btn" id="bioMotionToggle" onclick="toggleBioMotion()">OFF</button>
+        </div>
+        <div class="bio-bar-track">
+          <div class="bio-bar-fill" id="bioMotionBar"></div>
+        </div>
+        <div class="bio-status-text" id="bioMotionStatus">Tap to enable</div>
+
+        <div class="bio-row" style="margin-bottom:6px;">
+          <span class="bio-row-label">Heart Rate (BLE)</span>
+          <span class="bio-hr-value" id="bioHRValue">-- BPM</span>
+        </div>
+        <div class="bio-hr-row">
+          <button class="bio-hr-btn" id="bioHRBtn" onclick="connectBioHeartRate()">Connect</button>
+          <span style="font-size:10px;color:var(--text-dim);">Chrome only</span>
+        </div>
+
+        <div class="bio-hint">
+          Motion data from your phone enhances your sphere&#8217;s ring &#8212;
+          activity level affects glow intensity, shimmer speed, and pulse rhythm.
+          Heart rate syncs the ring&#8217;s pulse to your heartbeat.
+        </div>
+        <div class="bio-status-banner" id="bioStatusBanner"></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+    <div class="settings-section-title">Circle Bio Monitor</div>
+    <div class="settings-card">
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 12px;">Connect BLE heart rate monitors and map each to a contact. Their rings will pulse in real-time with live heart rate data.</p>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="font-size:12px;color:var(--text-dim);">Connected monitors: <span id="bioGroupCount" style="font-weight:600;">None</span></span>
+          <button onclick="bioGroupAddDevice()" id="bioGroupAddBtn"
+            style="background:linear-gradient(135deg,rgba(108,92,231,0.25),rgba(108,92,231,0.15));color:#a78bfa;border:1px solid rgba(108,92,231,0.35);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;">
+            + Add Monitor
+          </button>
+        </div>
+
+        <div id="bioGroupDeviceList">
+          <div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No monitors connected. Tap "Add Monitor" to scan for BLE heart rate devices.</div>
+        </div>
+
+        <div style="margin-top:10px;padding:8px 10px;background:rgba(20,184,166,0.08);border:1px solid rgba(20,184,166,0.15);border-radius:8px;">
+          <p style="font-size:11px;color:var(--text-dim);margin:0;line-height:1.5;">
+            <strong style="color:#14b8a6;">How it works:</strong> Each BLE heart rate monitor is paired via Bluetooth, then mapped to a contact. The contact&#8217;s outer ring and shimmer arcs will pulse with their live BPM. Requires Chrome with Web Bluetooth.
+          </p>
+        </div>
+      </div>
+    </div>
 
     <div class="settings-section">
     <div class="settings-section-title" data-i18n="settings.yourData">Your Data</div>
@@ -5502,6 +5973,70 @@
 </div>
 
 <!-- BLUF Card — appears on tap, double-tap to close -->
+
+
+<!-- ═══ SentinelViews — Circle Views Panel ═══ -->
+<div class="sv-overlay" id="svOverlay" onclick="if(event.target===this)SentinelViews.closePanel()">
+  <div class="sv-panel">
+    <div class="sv-header">
+      <h3 class="sv-title">Circle Views</h3>
+      <button class="sv-close" onclick="SentinelViews.closePanel()" aria-label="Close">&times;</button>
+    </div>
+    <div class="sv-body" id="svBody">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SentinelViews — Editor sub-panel ═══ -->
+<div class="sv-editor" id="svEditor" onclick="if(event.target===this)SentinelViews.closeEditor()">
+  <div class="sv-editor-card">
+    <div class="sv-editor-header">
+      <h3 class="sv-editor-title" id="svEditorTitle">New View</h3>
+      <button class="sv-close" onclick="SentinelViews.closeEditor()" aria-label="Close">&times;</button>
+    </div>
+    <div class="sv-editor-body" id="svEditorBody">
+      <div class="sv-field-label">View Name</div>
+      <input class="sv-name-input" id="svNameInput" type="text" placeholder="e.g. Morning Check-in" maxlength="50" autocomplete="off" />
+      <div class="sv-field-label">Select Contacts</div>
+      <div class="sv-roster" id="svRoster">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+    <div class="sv-editor-footer">
+      <button class="sv-editor-btn cancel" onclick="SentinelViews.closeEditor()">Cancel</button>
+      <button class="sv-editor-btn save" id="svSaveBtn" onclick="SentinelViews.saveView()">Save View</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SentinelViews — Active view badge ═══ -->
+<div class="sv-badge" id="svBadge" onclick="SentinelViews.openPanel()">
+  <span id="svBadgeLabel">—</span>
+  <button class="sv-badge-x" onclick="event.stopPropagation();SentinelViews.clearView()" aria-label="Clear view">&times;</button>
+</div>
+<!-- ═══ /SentinelViews HTML ═══ -->
+
+<!-- ═══ RSM — Remiel Sentinel Messaging ═══ -->
+<div class="sentinel-msg-overlay" id="sentinelMsgOverlay" onclick="if(event.target===this)SentinelMessaging.close()">
+  <div class="sentinel-msg-panel">
+    <div class="sentinel-msg-header">
+      <div class="sentinel-msg-avatar" id="sentinelMsgAvatar">?</div>
+      <div class="sentinel-msg-name" id="sentinelMsgName">—</div>
+      <button class="sentinel-msg-close" onclick="SentinelMessaging.close()" aria-label="Close messages">&times;</button>
+    </div>
+    <div class="sentinel-msg-thread" id="sentinelMsgThread">
+      <div class="sentinel-msg-empty">Send a message to check in</div>
+    </div>
+    <div class="sentinel-msg-compose">
+      <textarea class="sentinel-msg-input" id="sentinelMsgInput" placeholder="Type a message..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();SentinelMessaging.send();}"></textarea>
+      <button class="sentinel-msg-send" onclick="SentinelMessaging.send()" aria-label="Send message">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="bluf-overlay" id="blufOverlay" onclick="handleBlufOverlayClick(event)" role="dialog" aria-modal="true" aria-label="Contact details">
   <div class="bluf-card" id="blufCard">
 
@@ -5537,6 +6072,9 @@
       <div class="bluf-tags" id="blufTags"></div>
       <!-- Bev-tile data grid -->
       <div class="bev-strip" id="bevStrip"></div>
+      <!-- Latest Message -->
+      <div class="bluf-msg-latest" id="blufMsgLatest" hidden></div>
+
 
       <!-- ═══ PULLS (accordion) ═══ -->
 
@@ -6556,8 +7094,12 @@ async function launchGalaxy(savedContacts) {
     }
     /* Show welcome guidance after launch */
     setTimeout(() => SentinelGuide.onEnterSelf(), 1200);
+    /* Initialize BioMotion sensing (DeviceMotion API) */
+    setTimeout(() => initBioMotion(), 1500);
     /* Start composite headline engine */
     SentinelHeadlines.start();
+    /* Init SentinelViews */
+    if (typeof SentinelViews !== 'undefined') SentinelViews.init();
   });
 }
 
@@ -8525,6 +9067,249 @@ const SEVS = {
 };
 let curSev = 4;
 
+/* ═══════════════════════════════════════════
+   BIOMETRIC MOTION SENSING (DeviceMotion API)
+   Enhances existing ring system with real-time
+   phone motion data — activity level, orientation,
+   and optional BLE heart rate.
+   ═══════════════════════════════════════════ */
+const _bio = {
+  enabled: false,          /* user toggle */
+  supported: false,        /* DeviceMotion available */
+  permGranted: false,      /* iOS permission granted */
+  /* Smoothed motion values (0-1 scale) */
+  motionIntensity: 0,      /* overall activity: 0=still, 1=vigorous */
+  rawAccel: 0,             /* instantaneous accel magnitude */
+  gyroIntensity: 0,        /* rotational activity */
+  tilt: { beta: 0, gamma: 0 },  /* phone tilt angles */
+  /* Heart rate (BLE, optional) */
+  heartRate: 0,            /* BPM, 0 = no data */
+  hrConnected: false,
+  hrDevice: null,
+  /* Internal */
+  _samples: [],            /* rolling window for smoothing */
+  _sampleMax: 30,          /* ~0.5s at 60fps DeviceMotion rate */
+  _lastUpdate: 0,
+  _smoothAlpha: 0.08,      /* EMA smoothing factor */
+  _stillThreshold: 0.12,   /* below this = "still" */
+  _activeThreshold: 0.55,  /* above this = "active" */
+};
+
+/* ── Compute smoothed motion intensity from raw acceleration ── */
+function _bioUpdateMotion(ax, ay, az, rAlpha, rBeta, rGamma) {
+  /* Acceleration magnitude (excluding gravity if available) */
+  const accelMag = Math.sqrt(ax * ax + ay * ay + az * az);
+  /* Normalize: typical walking ~2-4 m/s², running ~8-12 */
+  const normAccel = Math.min(1, accelMag / 12);
+
+  /* Gyro magnitude */
+  const gyroMag = Math.sqrt(
+    (rAlpha || 0) * (rAlpha || 0) +
+    (rBeta || 0) * (rBeta || 0) +
+    (rGamma || 0) * (rGamma || 0)
+  );
+  const normGyro = Math.min(1, gyroMag / 300);
+
+  /* EMA smoothing */
+  const a = _bio._smoothAlpha;
+  _bio.rawAccel = normAccel;
+  _bio.motionIntensity = _bio.motionIntensity * (1 - a) + normAccel * a;
+  _bio.gyroIntensity = _bio.gyroIntensity * (1 - a) + normGyro * a;
+  _bio._lastUpdate = performance.now();
+}
+
+/* ── Initialize DeviceMotion listener ── */
+function initBioMotion() {
+  if (!('DeviceMotionEvent' in window)) {
+    console.log('BioMotion: DeviceMotion API not supported');
+    _bio.supported = false;
+    return;
+  }
+  _bio.supported = true;
+
+  /* Check if saved preference exists */
+  RemielDB.getSetting('bioMotionEnabled').then(function(saved) {
+    if (saved === true) {
+      _requestMotionPermission();
+    }
+  }).catch(function() {});
+}
+
+/* ── Request permission (iOS 13+ requires explicit permission) ── */
+function _requestMotionPermission() {
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    /* iOS — must be called from user gesture context */
+    DeviceMotionEvent.requestPermission().then(function(state) {
+      if (state === 'granted') {
+        _bio.permGranted = true;
+        _startMotionListening();
+      } else {
+        console.log('BioMotion: permission denied');
+        _bio.permGranted = false;
+        _bio.enabled = false;
+        _updateBioUI();
+      }
+    }).catch(function(err) {
+      console.warn('BioMotion: permission error', err);
+      _bio.enabled = false;
+      _updateBioUI();
+    });
+  } else {
+    /* Android / desktop — no permission needed */
+    _bio.permGranted = true;
+    _startMotionListening();
+  }
+}
+
+/* ── Start listening to DeviceMotion events ── */
+function _startMotionListening() {
+  _bio.enabled = true;
+  RemielDB.putSetting('bioMotionEnabled', true).catch(function() {});
+
+  window.addEventListener('devicemotion', function(e) {
+    if (!_bio.enabled) return;
+    /* Prefer accelerationIncludingGravity minus gravity,
+       fall back to acceleration (which excludes gravity) */
+    const a = e.accelerationIncludingGravity || {};
+    const aNoG = e.acceleration || {};
+    /* Use acceleration without gravity if available (more accurate) */
+    const ax = aNoG.x != null ? aNoG.x : (a.x || 0);
+    const ay = aNoG.y != null ? aNoG.y : (a.y || 0);
+    const az = aNoG.z != null ? aNoG.z : ((a.z || 0) - 9.81);
+    const r = e.rotationRate || {};
+    _bioUpdateMotion(ax, ay, az, r.alpha, r.beta, r.gamma);
+  }, { passive: true });
+
+  /* Also listen for orientation (tilt data) */
+  window.addEventListener('deviceorientation', function(e) {
+    if (!_bio.enabled) return;
+    _bio.tilt.beta = e.beta || 0;   /* front-back tilt (-180 to 180) */
+    _bio.tilt.gamma = e.gamma || 0; /* left-right tilt (-90 to 90) */
+  }, { passive: true });
+
+  _updateBioUI();
+  console.log('BioMotion: motion sensing active');
+}
+
+/* ── Stop motion sensing ── */
+function _stopMotionListening() {
+  _bio.enabled = false;
+  _bio.motionIntensity = 0;
+  _bio.gyroIntensity = 0;
+  _bio.rawAccel = 0;
+  RemielDB.putSetting('bioMotionEnabled', false).catch(function() {});
+  _updateBioUI();
+  console.log('BioMotion: motion sensing stopped');
+}
+
+/* ── Toggle motion sensing (called from settings UI) ── */
+function toggleBioMotion() {
+  if (_bio.enabled) {
+    _stopMotionListening();
+  } else {
+    _requestMotionPermission();
+  }
+}
+
+/* ── BLE Heart Rate (Chrome only) ── */
+async function connectBioHeartRate() {
+  if (!navigator.bluetooth) {
+    _showBioBanner('Heart rate requires Chrome with Web Bluetooth support.', 'warn');
+    return;
+  }
+  try {
+    _showBioBanner('Scanning for heart rate monitors...', 'info');
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: ['heart_rate'] }]
+    });
+    _bio.hrDevice = device;
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService('heart_rate');
+    const char = await service.getCharacteristic('heart_rate_measurement');
+
+    await char.startNotifications();
+    char.addEventListener('characteristicvaluechanged', function(e) {
+      const val = e.target.value;
+      /* Parse HR value per Bluetooth spec */
+      const flags = val.getUint8(0);
+      const is16bit = flags & 0x01;
+      _bio.heartRate = is16bit ? val.getUint16(1, true) : val.getUint8(1);
+      _bio.hrConnected = true;
+      _updateBioUI();
+    });
+
+    _bio.hrConnected = true;
+    _showBioBanner('Heart rate monitor connected!', 'success');
+    _updateBioUI();
+
+    device.addEventListener('gattserverdisconnected', function() {
+      _bio.hrConnected = false;
+      _bio.heartRate = 0;
+      _updateBioUI();
+      _showBioBanner('Heart rate monitor disconnected.', 'warn');
+    });
+  } catch(err) {
+    if (err.name !== 'NotFoundError') {
+      console.warn('BioMotion: BLE HR error', err);
+      _showBioBanner('Could not connect to heart rate monitor.', 'warn');
+    }
+    _bio.hrConnected = false;
+    _updateBioUI();
+  }
+}
+
+/* ── Show a small banner in the bio settings card ── */
+function _showBioBanner(msg, type) {
+  var el = document.getElementById('bioStatusBanner');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'bio-status-banner bio-banner-' + (type || 'info');
+  el.style.display = 'block';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(function() { el.style.display = 'none'; }, 4000);
+}
+
+/* ── Update the settings UI to reflect current state ── */
+function _updateBioUI() {
+  var toggle = document.getElementById('bioMotionToggle');
+  if (toggle) toggle.textContent = _bio.enabled ? 'ON' : 'OFF';
+
+  var status = document.getElementById('bioMotionStatus');
+  if (status) {
+    if (!_bio.supported) {
+      status.textContent = 'Not supported on this device';
+    } else if (_bio.enabled) {
+      var level = _bio.motionIntensity < _bio._stillThreshold ? 'Still' :
+                  _bio.motionIntensity < _bio._activeThreshold ? 'Moderate' : 'Active';
+      status.textContent = level + ' \u2022 ' + _bio.motionIntensity.toFixed(2);
+    } else {
+      status.textContent = 'Tap to enable';
+    }
+  }
+
+  var bar = document.getElementById('bioMotionBar');
+  if (bar) {
+    bar.style.width = Math.round(_bio.motionIntensity * 100) + '%';
+    bar.style.background = _bio.motionIntensity < _bio._stillThreshold ? '#4AE8C4' :
+                           _bio.motionIntensity < _bio._activeThreshold ? '#E8A44A' : '#FF4444';
+  }
+
+  var hrLabel = document.getElementById('bioHRValue');
+  if (hrLabel) {
+    hrLabel.textContent = _bio.hrConnected ? (_bio.heartRate + ' BPM') : '-- BPM';
+  }
+  var hrBtn = document.getElementById('bioHRBtn');
+  if (hrBtn) {
+    hrBtn.textContent = _bio.hrConnected ? 'Connected' : 'Connect';
+    hrBtn.disabled = _bio.hrConnected;
+  }
+}
+
+/* ── Periodic UI refresh for live motion readout ── */
+setInterval(function() {
+  if (_bio.enabled) _updateBioUI();
+}, 500);
+
 /* ═══════════════════════════════════
    REMIEL SENTINEL — Three-State System
    ═══════════════════════════════════ */
@@ -8532,6 +9317,206 @@ let curSev = 4;
 // appState declared above (before resize)
 let selectedContact = null;
 let userCat = 'family';
+/* ═══════════════════════════════════════════
+   BLE GROUP MONITOR — Multi-device HR tracking
+   Connect multiple BLE heart rate monitors and
+   map each to a specific contact in the galaxy.
+   Coach/Commander/Clinician use case.
+   ═══════════════════════════════════════════ */
+const _bioGroupMonitor = {
+  devices: new Map(),       /* deviceId -> { device, char, contactId, heartRate, name, connected } */
+  scanning: false,
+  maxDevices: 12,           /* max simultaneous BLE connections */
+};
+
+/* ── Connect a new BLE HR device ── */
+async function bioGroupAddDevice() {
+  if (!navigator.bluetooth) {
+    _showBioBanner('BLE heart rate requires Chrome with Web Bluetooth.', 'warn');
+    return;
+  }
+  if (_bioGroupMonitor.devices.size >= _bioGroupMonitor.maxDevices) {
+    _showBioBanner('Maximum ' + _bioGroupMonitor.maxDevices + ' monitors reached.', 'warn');
+    return;
+  }
+  try {
+    _bioGroupMonitor.scanning = true;
+    _updateGroupMonitorUI();
+    _showBioBanner('Scanning for heart rate monitors...', 'info');
+
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: ['heart_rate'] }]
+    });
+
+    /* Check if already connected */
+    if (_bioGroupMonitor.devices.has(device.id)) {
+      _showBioBanner('This device is already connected.', 'warn');
+      _bioGroupMonitor.scanning = false;
+      _updateGroupMonitorUI();
+      return;
+    }
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService('heart_rate');
+    const char = await service.getCharacteristic('heart_rate_measurement');
+
+    const devEntry = {
+      device: device,
+      char: char,
+      contactId: null,        /* will be mapped by user */
+      heartRate: 0,
+      name: device.name || 'HR Monitor',
+      connected: true,
+    };
+
+    await char.startNotifications();
+    char.addEventListener('characteristicvaluechanged', function(e) {
+      const val = e.target.value;
+      const flags = val.getUint8(0);
+      const is16bit = flags & 0x01;
+      devEntry.heartRate = is16bit ? val.getUint16(1, true) : val.getUint8(1);
+      /* Push HR to mapped contact's bio */
+      if (devEntry.contactId) {
+        var dc = (typeof DEMO_CONTACTS !== 'undefined')
+          ? DEMO_CONTACTS.find(function(c) { return c.id === devEntry.contactId; })
+          : null;
+        if (dc) {
+          if (!dc.bio) dc.bio = { motionIntensity: 0, heartRate: 0, lastUpdate: 0 };
+          _updateContactBioTrend(dc.bio, null, devEntry.heartRate);
+          dc.bio.source = 'ble';
+        }
+      }
+      _updateGroupMonitorUI();
+    });
+
+    device.addEventListener('gattserverdisconnected', function() {
+      devEntry.connected = false;
+      devEntry.heartRate = 0;
+      /* Clear the contact's bio HR */
+      if (devEntry.contactId && typeof DEMO_CONTACTS !== 'undefined') {
+        var dc = DEMO_CONTACTS.find(function(c) { return c.id === devEntry.contactId; });
+        if (dc && dc.bio && dc.bio.source === 'ble') {
+          dc.bio.heartRate = 0;
+        }
+      }
+      _showBioBanner(devEntry.name + ' disconnected.', 'warn');
+      _updateGroupMonitorUI();
+    });
+
+    _bioGroupMonitor.devices.set(device.id, devEntry);
+    _bioGroupMonitor.scanning = false;
+    _showBioBanner(devEntry.name + ' connected! Map it to a contact below.', 'success');
+    _updateGroupMonitorUI();
+
+  } catch(e) {
+    _bioGroupMonitor.scanning = false;
+    if (e.name !== 'NotFoundError') {  /* user cancelled picker */
+      _showBioBanner('Connection failed: ' + e.message, 'warn');
+    }
+    _updateGroupMonitorUI();
+  }
+}
+
+/* ── Map a BLE device to a contact ── */
+function bioGroupMapDevice(deviceId, contactId) {
+  var dev = _bioGroupMonitor.devices.get(deviceId);
+  if (!dev) return;
+
+  /* Clear old mapping if this contact was mapped to another device */
+  _bioGroupMonitor.devices.forEach(function(d) {
+    if (d.contactId === contactId && d !== dev) {
+      d.contactId = null;
+    }
+  });
+
+  dev.contactId = contactId;
+
+  /* Push current HR to contact immediately */
+  if (contactId && dev.heartRate > 0 && typeof DEMO_CONTACTS !== 'undefined') {
+    var dc = DEMO_CONTACTS.find(function(c) { return c.id === contactId; });
+    if (dc) {
+      if (!dc.bio) dc.bio = { motionIntensity: 0, heartRate: 0, lastUpdate: 0 };
+      _updateContactBioTrend(dc.bio, null, dev.heartRate);
+      dc.bio.source = 'ble';
+    }
+  }
+
+  _showBioBanner('Monitor mapped to contact.', 'success');
+  _updateGroupMonitorUI();
+}
+
+/* ── Disconnect a specific BLE device ── */
+function bioGroupDisconnect(deviceId) {
+  var dev = _bioGroupMonitor.devices.get(deviceId);
+  if (!dev) return;
+  try {
+    if (dev.device && dev.device.gatt && dev.device.gatt.connected) {
+      dev.device.gatt.disconnect();
+    }
+  } catch(e) {}
+  /* Clear contact bio */
+  if (dev.contactId && typeof DEMO_CONTACTS !== 'undefined') {
+    var dc = DEMO_CONTACTS.find(function(c) { return c.id === dev.contactId; });
+    if (dc && dc.bio && dc.bio.source === 'ble') {
+      dc.bio.heartRate = 0;
+    }
+  }
+  _bioGroupMonitor.devices.delete(deviceId);
+  _updateGroupMonitorUI();
+}
+
+/* ── Update the Group Monitor UI panel ── */
+function _updateGroupMonitorUI() {
+  var list = document.getElementById('bioGroupDeviceList');
+  if (!list) return;
+
+  var html = '';
+  if (_bioGroupMonitor.devices.size === 0) {
+    html = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No monitors connected. Tap "Add Monitor" to scan for BLE heart rate devices.</div>';
+  } else {
+    _bioGroupMonitor.devices.forEach(function(dev, devId) {
+      var hrDisplay = dev.connected
+        ? (dev.heartRate > 0 ? '<span style="color:#ef4444;font-weight:700;font-size:16px;">' + dev.heartRate + ' BPM</span>' : '<span style="color:var(--text-dim);font-size:12px;">Waiting...</span>')
+        : '<span style="color:var(--text-dim);font-size:12px;">Disconnected</span>';
+
+      /* Contact selector dropdown */
+      var contactOpts = '<option value="">— Assign to contact —</option>';
+      if (typeof DEMO_CONTACTS !== 'undefined') {
+        DEMO_CONTACTS.forEach(function(c) {
+          var sel = (dev.contactId === c.id) ? ' selected' : '';
+          contactOpts += '<option value="' + c.id + '"' + sel + '>' + (c.first || '') + ' ' + (c.last || '') + '</option>';
+        });
+      }
+
+      html += '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+          '<span style="font-weight:600;font-size:13px;color:var(--text-bright);">' + dev.name + '</span>' +
+          hrDisplay +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<select onchange="bioGroupMapDevice('' + devId + '', this.value ? parseInt(this.value) : null)" ' +
+            'style="flex:1;background:rgba(0,0,0,0.3);color:var(--text-bright);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:5px 8px;font-size:11px;appearance:auto;-webkit-appearance:auto;">' +
+            contactOpts +
+          '</select>' +
+          '<button onclick="bioGroupDisconnect('' + devId + '')" ' +
+            'style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">Disconnect</button>' +
+        '</div>' +
+      '</div>';
+    });
+  }
+
+  list.innerHTML = html;
+
+  /* Update count badge */
+  var badge = document.getElementById('bioGroupCount');
+  if (badge) {
+    var activeCount = 0;
+    _bioGroupMonitor.devices.forEach(function(d) { if (d.connected) activeCount++; });
+    badge.textContent = activeCount > 0 ? activeCount + ' active' : 'None';
+    badge.style.color = activeCount > 0 ? '#14b8a6' : 'var(--text-dim)';
+  }
+}
+
 let userSev = 4;
 let userSphereName = '';
 
@@ -8550,6 +9535,134 @@ const DEMO_CONTACTS = [
   { id:11, first:'Carlos',  last:'Mendez',   cat:'professional', sev:3, phone:'+15551112233', email:'' },
   { id:12, first:'Priya',   last:'Nair',     cat:'friend',       sev:4, phone:'+15554445566', email:'' },
 ];
+
+
+/* ── Ensure every contact has a bio field for biometric data ── */
+function _ensureContactBio(contact) {
+  if (!contact.bio) {
+    contact.bio = {
+      motionIntensity: 0, heartRate: 0, lastUpdate: 0, source: null,
+      /* Trend tracking */
+      prevMotionIntensity: 0, prevHeartRate: 0,
+      deltaMotion: 0, deltaHR: 0,
+      trendMotion: 'steady',  /* 'up', 'down', 'steady' */
+      trendHR: 'steady',
+      isLive: false,           /* true when data updated within last 30s */
+      liveFlicker: 0           /* animation counter for liveness pulse */
+    };
+  } else {
+    /* Backfill trend fields on existing bio objects */
+    if (contact.bio.prevMotionIntensity == null) contact.bio.prevMotionIntensity = 0;
+    if (contact.bio.prevHeartRate == null) contact.bio.prevHeartRate = 0;
+    if (contact.bio.deltaMotion == null) contact.bio.deltaMotion = 0;
+    if (contact.bio.deltaHR == null) contact.bio.deltaHR = 0;
+    if (contact.bio.trendMotion == null) contact.bio.trendMotion = 'steady';
+    if (contact.bio.trendHR == null) contact.bio.trendHR = 'steady';
+    if (contact.bio.isLive == null) contact.bio.isLive = false;
+    if (contact.bio.liveFlicker == null) contact.bio.liveFlicker = 0;
+  }
+  return contact;
+}
+DEMO_CONTACTS.forEach(_ensureContactBio);
+
+/* ── Bio trend computation ── */
+const BIO_LIVE_THRESHOLD_MS = 30000; /* 30 seconds — readings older than this are "stale" */
+const BIO_TREND_DEADZONE = 0.02;     /* ignore changes smaller than 2% for motion */
+const BIO_TREND_HR_DEADZONE = 2;     /* ignore HR changes < 2 BPM */
+
+function _updateContactBioTrend(bio, newMotion, newHR) {
+  /* Save previous values */
+  bio.prevMotionIntensity = bio.motionIntensity || 0;
+  bio.prevHeartRate = bio.heartRate || 0;
+
+  /* Update current values */
+  if (newMotion != null) bio.motionIntensity = newMotion;
+  if (newHR != null) bio.heartRate = newHR;
+
+  /* Compute deltas */
+  bio.deltaMotion = bio.motionIntensity - bio.prevMotionIntensity;
+  bio.deltaHR = bio.heartRate - bio.prevHeartRate;
+
+  /* Compute trend direction */
+  if (Math.abs(bio.deltaMotion) < BIO_TREND_DEADZONE) {
+    bio.trendMotion = 'steady';
+  } else {
+    bio.trendMotion = bio.deltaMotion > 0 ? 'up' : 'down';
+  }
+
+  if (Math.abs(bio.deltaHR) < BIO_TREND_HR_DEADZONE) {
+    bio.trendHR = 'steady';
+  } else {
+    bio.trendHR = bio.deltaHR > 0 ? 'up' : 'down';
+  }
+
+  /* Mark as live */
+  bio.lastUpdate = Date.now();
+  bio.isLive = true;
+  bio.liveFlicker = 1.0; /* reset flicker to bright */
+}
+
+/* Decay liveness over time — called each frame for visible contacts */
+function _decayContactLiveness(bio) {
+  if (!bio || !bio.lastUpdate) return;
+  const age = Date.now() - bio.lastUpdate;
+  bio.isLive = age < BIO_LIVE_THRESHOLD_MS;
+  /* Flicker fades from 1.0 → 0 over the threshold period */
+  bio.liveFlicker = bio.isLive ? Math.max(0, 1 - (age / BIO_LIVE_THRESHOLD_MS)) : 0;
+}
+
+/* ── Circle aggregate for center sphere HUD ── */
+let _circleAggregate = {
+  activeCount: 0, totalCount: 0,
+  avgMotion: 0, avgHR: 0,
+  maxMotion: 0, maxHR: 0,
+  trendingUp: 0, trendingDown: 0, steady: 0,
+  lastComputed: 0
+};
+
+function _computeCircleAggregate() {
+  if (typeof DEMO_CONTACTS === 'undefined' || !DEMO_CONTACTS.length) return;
+  const now = Date.now();
+  /* Throttle to once per second */
+  if (now - _circleAggregate.lastComputed < 1000) return;
+
+  /* Use view-filtered contacts if active */
+  var _aggFilter = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
+  var _aggSource = _aggFilter ? DEMO_CONTACTS.filter(function(c) { return _aggFilter.has(c.id); }) : DEMO_CONTACTS;
+
+  let active = 0, totalMI = 0, totalHR = 0, maxMI = 0, maxHR = 0;
+  let up = 0, down = 0, steady = 0;
+  const total = _aggSource.length;
+
+  for (let i = 0; i < total; i++) {
+    const c = _aggSource[i];
+    if (!c.bio) continue;
+    _decayContactLiveness(c.bio);
+
+    if (c.bio.isLive) {
+      active++;
+      totalMI += (c.bio.motionIntensity || 0);
+      totalHR += (c.bio.heartRate || 0);
+      if ((c.bio.motionIntensity || 0) > maxMI) maxMI = c.bio.motionIntensity;
+      if ((c.bio.heartRate || 0) > maxHR) maxHR = c.bio.heartRate;
+    }
+
+    if (c.bio.trendMotion === 'up' || c.bio.trendHR === 'up') up++;
+    else if (c.bio.trendMotion === 'down' || c.bio.trendHR === 'down') down++;
+    else steady++;
+  }
+
+  _circleAggregate.activeCount = active;
+  _circleAggregate.totalCount = total;
+  _circleAggregate.avgMotion = active > 0 ? totalMI / active : 0;
+  _circleAggregate.avgHR = active > 0 ? totalHR / active : 0;
+  _circleAggregate.maxMotion = maxMI;
+  _circleAggregate.maxHR = maxHR;
+  _circleAggregate.trendingUp = up;
+  _circleAggregate.trendingDown = down;
+  _circleAggregate.steady = steady;
+  _circleAggregate.lastComputed = now;
+}
 
 /* ── 3D Galaxy Engine ── */
 let netYaw = 0.4, netPitch = -0.15;
@@ -8583,13 +9696,19 @@ function rebuildNodeTargets() {
 }
 
 function buildNodes(fresh) {
-  const N = DEMO_CONTACTS.length;
+  /* ── SentinelViews filter: only show contacts in active view ── */
+  var _viewFilter = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
+  var _source = _viewFilter ? DEMO_CONTACTS.filter(function(c) { return _viewFilter.has(c.id); }) : DEMO_CONTACTS;
+
+  const N = _source.length;
   const smaller = Math.min(CV.width / DPR, CV.height / DPR);
   /* Orbit shell must clear the enlarged center sphere — use 0.72 instead of 0.6 */
   const shellR = Math.max(260, Math.round(smaller * 0.78));
   const nodeR = Math.max(20, Math.round(smaller * 0.042));
 
-  NODES = DEMO_CONTACTS.map((contact, i) => {
+  /* Ensure every contact has bio field before building nodes */
+  _source.forEach(_ensureContactBio);
+  NODES = _source.map((contact, i) => {
     const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
     const fr = Math.sqrt(Math.max(0, 1 - fy * fy));
     const th = i * 2.399963229728653 + Math.sin(i * 127.1) * 0.22;
@@ -9687,10 +10806,12 @@ async function updateBlufContent() {
       _qaCall.title = _phone ? 'Call ' + selectedContact.first : 'No phone on file — go to Profile to add';
     }
     if (_qaText) {
-      _qaText.href = _phone ? 'sms:' + normalizePhone(_phone) : '#';
-      _qaText.style.opacity = _phone ? '1' : '0.35';
-      _qaText.style.pointerEvents = _phone ? 'auto' : 'none';
-      _qaText.title = _phone ? 'Text ' + selectedContact.first : 'No phone on file — go to Profile to add';
+      /* Wire "Text" to in-app messaging panel instead of SMS */
+      _qaText.href = '#';
+      _qaText.style.opacity = '1';
+      _qaText.style.pointerEvents = 'auto';
+      _qaText.title = 'Message ' + selectedContact.first;
+      _qaText.onclick = function(e) { e.preventDefault(); SentinelMessaging.openFor(selectedContact.id); };
     }
     if (_qaEmail) {
       _qaEmail.href = _email ? 'mailto:' + _email : '#';
@@ -9706,6 +10827,11 @@ async function updateBlufContent() {
     }
   }
 
+
+  /* ── Latest Message — load async ── */
+  if (typeof SentinelMessaging !== 'undefined' && selectedContact) {
+    SentinelMessaging.loadBlufSection(selectedContact.id).catch(() => {});
+  }
 
   /* ── Mood pull — load async (non-blocking) ── */
   loadMoodForBluf().catch(() => {});
@@ -10391,6 +11517,656 @@ const SentinelHeadlines = (() => {
   }
 
   return { get, start, stop, refreshAll, refreshOne, computeHeadline };
+})();
+
+/* ═══════════════════════════════════════════════════════════
+   RSM — Remiel Sentinel Messaging
+   Sphere-to-sphere instant messages. Center sphere can
+   message individual contacts; responses flow into the
+   ticker-tape headline and BLUF.
+   ═══════════════════════════════════════════════════════════ */
+const SentinelMessaging = (() => {
+  'use strict';
+
+  const _DB_PREFIX = 'sentinelMsg_';
+  let _activeContactId = null;
+  let _tickerCache = {};  /* contactId → { text, scrollX, color, ts } */
+  const TICKER_COLOR_SENT = '#38bdf8';     /* cyan for sent */
+  const TICKER_COLOR_RECEIVED = '#4ade80'; /* green for received */
+  const TICKER_SPEED = 0.6;               /* pixels per frame */
+
+  /* ── Persistence via RemielDB settings store ── */
+  async function _loadThread(contactId) {
+    try {
+      const data = await RemielDB.getSetting(_DB_PREFIX + contactId);
+      return (data && data.value) ? data.value : [];
+    } catch (_) { return []; }
+  }
+
+  async function _saveThread(contactId, messages) {
+    try {
+      await RemielDB.putSetting(_DB_PREFIX + contactId, messages);
+    } catch (_) {}
+  }
+
+  /* ── Open messaging panel for a contact ── */
+  async function openFor(contactId) {
+    const contact = DEMO_CONTACTS.find(c => c.id === contactId);
+    if (!contact) return;
+    _activeContactId = contactId;
+
+    /* Update header */
+    const nameEl = document.getElementById('sentinelMsgName');
+    const avatarEl = document.getElementById('sentinelMsgAvatar');
+    if (nameEl) nameEl.textContent = contact.first + ' ' + contact.last;
+    if (avatarEl) {
+      const cat = CATS[contact.cat] || CATS.other;
+      avatarEl.style.background = 'rgb(' + cat.r + ',' + cat.g + ',' + cat.b + ')';
+      avatarEl.textContent = (contact.first[0] || '') + (contact.last[0] || '');
+    }
+
+    /* Render thread */
+    await _renderThread(contactId);
+
+    /* Open overlay */
+    const overlay = document.getElementById('sentinelMsgOverlay');
+    if (overlay) {
+      overlay.classList.add('open');
+      /* Focus input after animation */
+      setTimeout(() => {
+        const inp = document.getElementById('sentinelMsgInput');
+        if (inp) inp.focus();
+      }, 350);
+    }
+  }
+
+  /* ── Close panel ── */
+  function close() {
+    _activeContactId = null;
+    const overlay = document.getElementById('sentinelMsgOverlay');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  /* ── Send message from center sphere ── */
+  async function send() {
+    if (!_activeContactId) return;
+    const inp = document.getElementById('sentinelMsgInput');
+    if (!inp) return;
+    const text = (inp.value || '').trim();
+    if (!text) return;
+    inp.value = '';
+    inp.style.height = 'auto';
+
+    const msg = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      from: 'center',
+      text: text,
+      ts: Date.now()
+    };
+
+    const thread = await _loadThread(_activeContactId);
+    thread.push(msg);
+    await _saveThread(_activeContactId, thread);
+
+    /* Update ticker for this contact — sent messages show in cyan */
+    _tickerCache[_activeContactId] = {
+      text: text,
+      scrollX: 0,
+      color: TICKER_COLOR_SENT,
+      ts: Date.now(),
+      from: 'center'
+    };
+
+    await _renderThread(_activeContactId);
+
+    /* Also broadcast via sync if available */
+    _broadcastMessage(_activeContactId, msg);
+  }
+
+  /* ── Receive / simulate response from contact ── */
+  async function receiveResponse(contactId, text) {
+    if (!contactId || !text) return;
+
+    const msg = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      from: contactId,
+      text: text,
+      ts: Date.now()
+    };
+
+    const thread = await _loadThread(contactId);
+    thread.push(msg);
+    await _saveThread(contactId, thread);
+
+    /* Update ticker — received messages show in green */
+    _tickerCache[contactId] = {
+      text: text,
+      scrollX: 0,
+      color: TICKER_COLOR_RECEIVED,
+      ts: Date.now(),
+      from: contactId
+    };
+
+    /* If panel is open for this contact, refresh */
+    if (_activeContactId === contactId) {
+      await _renderThread(contactId);
+    }
+
+    /* Update BLUF if this contact is currently selected */
+    if (selectedContact && selectedContact.id === contactId) {
+      _updateBlufLatestMessage(contactId);
+    }
+  }
+
+  /* ── Render thread in panel ── */
+  async function _renderThread(contactId) {
+    const threadEl = document.getElementById('sentinelMsgThread');
+    if (!threadEl) return;
+
+    const messages = await _loadThread(contactId);
+    const contact = DEMO_CONTACTS.find(c => c.id === contactId);
+    const contactName = contact ? contact.first : 'Contact';
+
+    if (messages.length === 0) {
+      threadEl.innerHTML = '<div class="sentinel-msg-empty">Send a message to check in with ' + contactName + '</div>';
+      return;
+    }
+
+    /* Render last 50 messages */
+    const recent = messages.slice(-50);
+    let html = '';
+    for (const m of recent) {
+      const isSent = m.from === 'center';
+      const cls = isSent ? 'sent' : 'received';
+      const timeStr = _formatTime(m.ts);
+      html += '<div class="sentinel-msg-bubble ' + cls + '">'
+            + _escHtml(m.text)
+            + '<div class="sentinel-msg-time">' + (isSent ? 'You' : contactName) + ' · ' + timeStr + '</div>'
+            + '</div>';
+    }
+    threadEl.innerHTML = html;
+
+    /* Scroll to bottom */
+    requestAnimationFrame(() => { threadEl.scrollTop = threadEl.scrollHeight; });
+  }
+
+  /* ── Update BLUF latest message section ── */
+  async function _updateBlufLatestMessage(contactId) {
+    const el = document.getElementById('blufMsgLatest');
+    if (!el) return;
+    const messages = await _loadThread(contactId);
+    if (messages.length === 0) {
+      el.hidden = true;
+      return;
+    }
+    const last = messages[messages.length - 1];
+    const isSent = last.from === 'center';
+    const contact = DEMO_CONTACTS.find(c => c.id === contactId);
+    const who = isSent ? 'You' : (contact ? contact.first : 'Contact');
+
+    el.hidden = false;
+    el.innerHTML = '<div class="bluf-msg-latest-label">Latest Message</div>'
+      + '<div class="bluf-msg-latest-text">' + who + ': ' + _escHtml(last.text) + '</div>'
+      + '<div class="bluf-msg-latest-time">' + _formatTime(last.ts) + '</div>';
+  }
+
+  /* ── Load BLUF section (called from updateBlufContent) ── */
+  async function loadBlufSection(contactId) {
+    await _updateBlufLatestMessage(contactId);
+  }
+
+  /* ── Get latest message text for headline ticker ── */
+  function getTickerData(contactId) {
+    return _tickerCache[contactId] || null;
+  }
+
+  /* ── Get latest message for BLUF headline override ── */
+  async function getLatestMessageText(contactId) {
+    const messages = await _loadThread(contactId);
+    if (messages.length === 0) return null;
+    const last = messages[messages.length - 1];
+    /* Only show messages less than 1 hour old in headline */
+    if (Date.now() - last.ts > 3600000) return null;
+    return {
+      text: last.text,
+      from: last.from,
+      ts: last.ts
+    };
+  }
+
+  /* ── Broadcast via SyncEngine if available ── */
+  function _broadcastMessage(contactId, msg) {
+    try {
+      if (typeof SyncEngine !== 'undefined' && SyncEngine.isActive && SyncEngine.isActive()) {
+        SyncEngine.broadcast({ type: 'sentinel-message', contactId, msg });
+      }
+    } catch (_) {}
+  }
+
+  /* ── Helpers ── */
+  function _formatTime(ts) {
+    const d = new Date(ts);
+    const now = new Date();
+    const diffMs = now - d;
+    if (diffMs < 60000) return 'Just now';
+    if (diffMs < 3600000) return Math.floor(diffMs / 60000) + 'm ago';
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
+           d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function _escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* ── Auto-textarea resize ── */
+  function _initAutoResize() {
+    const inp = document.getElementById('sentinelMsgInput');
+    if (inp) {
+      inp.addEventListener('input', () => {
+        inp.style.height = 'auto';
+        inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+      });
+    }
+  }
+
+  /* Init on DOM ready */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initAutoResize);
+  } else {
+    setTimeout(_initAutoResize, 100);
+  }
+
+  return {
+    openFor, close, send, receiveResponse,
+    getTickerData, getLatestMessageText,
+    loadBlufSection,
+    get activeContactId() { return _activeContactId; },
+    TICKER_COLOR_SENT, TICKER_COLOR_RECEIVED, TICKER_SPEED
+  };
+})();
+
+
+
+
+/* ═══════════════════════════════════════════════════════════
+   SentinelViews — Savable Circle Views
+   One-on-One, Unit, Team views with CRUD, persistence,
+   and galaxy filter integration.
+   ═══════════════════════════════════════════════════════════ */
+const SentinelViews = (() => {
+  'use strict';
+
+  const _DB_KEY = 'sentinelViews';
+  const VIEW_TYPES = ['one-on-one', 'unit', 'team'];
+  const TYPE_LABELS = { 'one-on-one': 'One-on-One', 'unit': 'Unit', 'team': 'Team' };
+  const TYPE_ICONS = { 'one-on-one': '\u25C9', 'unit': '\u25CE', 'team': '\u2B22' };
+  const TYPE_LIMITS = { 'one-on-one': 1, 'unit': Infinity, 'team': Infinity };
+
+  let _views = [];       /* Array of view objects */
+  let _activeViewId = null;
+  let _editingViewId = null;
+  let _editorType = 'unit';
+  let _selectedIds = new Set();
+
+  /* ── Persistence via RemielDB settings store ── */
+  async function _load() {
+    try {
+      if (typeof RemielDB !== 'undefined') {
+        const stored = await RemielDB.getSetting(_DB_KEY);
+        if (Array.isArray(stored)) {
+          _views = stored;
+        }
+      }
+    } catch (e) {
+      console.warn('[SentinelViews] load error:', e);
+    }
+  }
+
+  async function _save() {
+    try {
+      if (typeof RemielDB !== 'undefined') {
+        await RemielDB.putSetting(_DB_KEY, _views);
+      }
+    } catch (e) {
+      console.warn('[SentinelViews] save error:', e);
+    }
+  }
+
+  /* ── Active view filter ── */
+  function getActiveView() {
+    if (!_activeViewId) return null;
+    return _views.find(v => v.id === _activeViewId) || null;
+  }
+
+  function getFilteredContacts() {
+    const view = getActiveView();
+    if (!view) return null; /* null = show all */
+    return new Set(view.contactIds);
+  }
+
+  /* ── CRUD ── */
+  function _genId() {
+    return 'sv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+  }
+
+  function createView(name, type, contactIds) {
+    const view = {
+      id: _genId(),
+      name: name.trim(),
+      type: type,
+      contactIds: contactIds.slice(),
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    _views.push(view);
+    _save();
+    return view;
+  }
+
+  function updateView(id, updates) {
+    const view = _views.find(v => v.id === id);
+    if (!view) return null;
+    if (updates.name !== undefined) view.name = updates.name.trim();
+    if (updates.contactIds !== undefined) view.contactIds = updates.contactIds.slice();
+    view.updatedAt = Date.now();
+    _save();
+    return view;
+  }
+
+  function deleteView(id) {
+    _views = _views.filter(v => v.id !== id);
+    if (_activeViewId === id) {
+      _activeViewId = null;
+      _applyFilter();
+      _updateBadge();
+    }
+    _save();
+  }
+
+  /* ── Apply filter to galaxy ── */
+  function _applyFilter() {
+    if (typeof buildNodes === 'function') {
+      buildNodes(false);
+    }
+    /* Force circle aggregate recompute */
+    if (typeof _circleAggregate !== 'undefined') {
+      _circleAggregate.lastComputed = 0;
+    }
+  }
+
+  /* ── Badge ── */
+  function _updateBadge() {
+    const badge = document.getElementById('svBadge');
+    const label = document.getElementById('svBadgeLabel');
+    if (!badge || !label) return;
+    const view = getActiveView();
+    if (view) {
+      label.textContent = TYPE_LABELS[view.type] + ': ' + view.name;
+      badge.classList.add('visible');
+    } else {
+      badge.classList.remove('visible');
+    }
+  }
+
+  /* ── Panel: views picker ── */
+  function openPanel() {
+    const overlay = document.getElementById('svOverlay');
+    if (!overlay) return;
+    _renderPanel();
+    overlay.classList.add('open');
+  }
+
+  function closePanel() {
+    const overlay = document.getElementById('svOverlay');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  function _renderPanel() {
+    const body = document.getElementById('svBody');
+    if (!body) return;
+
+    let h = '';
+
+    /* "All Contacts" option */
+    h += '<div class="sv-card' + (_activeViewId === null ? ' active' : '') + '" onclick="SentinelViews.activateView(null)">';
+    h += '<div class="sv-card-icon all">\u2B50</div>';
+    h += '<div class="sv-card-info"><div class="sv-card-name">All Contacts</div>';
+    h += '<div class="sv-card-meta">' + (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS.length : 0) + ' contacts</div></div>';
+    h += '</div>';
+
+    /* Group by type */
+    VIEW_TYPES.forEach(type => {
+      const ofType = _views.filter(v => v.type === type);
+      if (ofType.length > 0) {
+        h += '<div class="sv-section-label">' + TYPE_LABELS[type] + ' Views</div>';
+        ofType.forEach(v => {
+          const isActive = _activeViewId === v.id;
+          h += '<div class="sv-card' + (isActive ? ' active' : '') + '" onclick="SentinelViews.activateView(\'' + v.id + '\')">';
+          h += '<div class="sv-card-icon ' + type + '">' + TYPE_ICONS[type] + '</div>';
+          h += '<div class="sv-card-info"><div class="sv-card-name">' + _esc(v.name) + '</div>';
+          h += '<div class="sv-card-meta">' + v.contactIds.length + ' contact' + (v.contactIds.length !== 1 ? 's' : '') + '</div></div>';
+          h += '<div class="sv-card-actions">';
+          h += '<button class="sv-card-btn" onclick="event.stopPropagation();SentinelViews.editView(\'' + v.id + '\')" title="Edit view">';
+          h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+          h += '</button>';
+          h += '<button class="sv-card-btn delete" onclick="event.stopPropagation();SentinelViews.confirmDelete(\'' + v.id + '\')" title="Delete view">';
+          h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+          h += '</button>';
+          h += '</div></div>';
+        });
+      }
+    });
+
+    /* Create buttons */
+    h += '<div class="sv-create-row">';
+    h += '<button class="sv-create-btn" onclick="SentinelViews.newView(\'one-on-one\')">+ One-on-One</button>';
+    h += '<button class="sv-create-btn" onclick="SentinelViews.newView(\'unit\')">+ Unit</button>';
+    h += '<button class="sv-create-btn" onclick="SentinelViews.newView(\'team\')">+ Team</button>';
+    h += '</div>';
+
+    /* Add Person shortcut — since center sphere tap now opens views */
+    h += '<div style="text-align:center;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)">';
+    h += '<button style="background:none;border:none;color:#94a3b8;font-family:Hanken Grotesk,system-ui,sans-serif;font-size:13px;cursor:pointer;padding:8px 16px" ';
+    h += 'onclick="SentinelViews.closePanel();openContactModal(\'add\')" ';
+    h += 'onmouseover="this.style.color=\'#e2e8f0\'" onmouseout="this.style.color=\'#94a3b8\'">';
+    h += '+ Add New Contact</button></div>';
+
+    body.innerHTML = h;
+  }
+
+  function _esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  /* ── Activate a view ── */
+  function activateView(viewId) {
+    _activeViewId = viewId;
+    _applyFilter();
+    _updateBadge();
+    closePanel();
+    /* Guide user */
+    if (typeof SentinelGuide !== 'undefined') {
+      const view = getActiveView();
+      if (view) {
+        SentinelGuide.showBanner(TYPE_LABELS[view.type] + ' view "' + view.name + '" active — tap badge to change', 3000);
+      } else {
+        SentinelGuide.showBanner('Showing all contacts', 2000);
+      }
+    }
+  }
+
+  function clearView() {
+    _activeViewId = null;
+    _applyFilter();
+    _updateBadge();
+    if (typeof SentinelGuide !== 'undefined') {
+      SentinelGuide.showBanner('Showing all contacts', 2000);
+    }
+  }
+
+  /* ── Editor ── */
+  function newView(type) {
+    _editingViewId = null;
+    _editorType = type;
+    _selectedIds = new Set();
+    _openEditor('New ' + TYPE_LABELS[type] + ' View');
+  }
+
+  function editView(id) {
+    const view = _views.find(v => v.id === id);
+    if (!view) return;
+    _editingViewId = id;
+    _editorType = view.type;
+    _selectedIds = new Set(view.contactIds);
+    _openEditor('Edit ' + TYPE_LABELS[view.type] + ' View');
+    /* Pre-fill name */
+    setTimeout(() => {
+      const nameInput = document.getElementById('svNameInput');
+      if (nameInput) nameInput.value = view.name;
+    }, 50);
+  }
+
+  function _openEditor(title) {
+    const editor = document.getElementById('svEditor');
+    const titleEl = document.getElementById('svEditorTitle');
+    if (!editor) return;
+    if (titleEl) titleEl.textContent = title;
+    _renderRoster();
+    _updateSaveBtn();
+    editor.classList.add('open');
+    /* Focus name input */
+    setTimeout(() => {
+      const nameInput = document.getElementById('svNameInput');
+      if (nameInput && !_editingViewId) {
+        nameInput.value = '';
+        nameInput.focus();
+      }
+    }, 100);
+  }
+
+  function closeEditor() {
+    const editor = document.getElementById('svEditor');
+    if (editor) editor.classList.remove('open');
+  }
+
+  function _renderRoster() {
+    const roster = document.getElementById('svRoster');
+    if (!roster || typeof DEMO_CONTACTS === 'undefined') return;
+
+    let h = '';
+    /* Sort alphabetically */
+    const sorted = DEMO_CONTACTS.slice().sort((a, b) =>
+      (a.first + ' ' + a.last).localeCompare(b.first + ' ' + b.last)
+    );
+
+    sorted.forEach(c => {
+      const sel = _selectedIds.has(c.id);
+      h += '<div class="sv-roster-item' + (sel ? ' selected' : '') + '" onclick="SentinelViews.toggleContact(' + c.id + ')">';
+      h += '<div class="sv-roster-check"><span class="sv-roster-check-mark">\u2713</span></div>';
+      h += '<div class="sv-roster-name">' + _esc(c.first + ' ' + c.last) + '</div>';
+      h += '<div class="sv-roster-cat">' + (c.cat || '') + '</div>';
+      h += '</div>';
+    });
+
+    roster.innerHTML = h;
+  }
+
+  function toggleContact(contactId) {
+    const limit = TYPE_LIMITS[_editorType];
+    if (_selectedIds.has(contactId)) {
+      _selectedIds.delete(contactId);
+    } else {
+      if (limit === 1) {
+        /* One-on-One: only one contact allowed */
+        _selectedIds.clear();
+      }
+      _selectedIds.add(contactId);
+    }
+    _renderRoster();
+    _updateSaveBtn();
+  }
+
+  function _updateSaveBtn() {
+    const btn = document.getElementById('svSaveBtn');
+    const nameInput = document.getElementById('svNameInput');
+    if (!btn) return;
+    /* Enable save only if name and at least one contact selected */
+    const hasName = nameInput && nameInput.value.trim().length > 0;
+    const hasContacts = _selectedIds.size > 0;
+    btn.disabled = !(hasName && hasContacts);
+    /* Also listen for name input changes */
+    if (nameInput && !nameInput._svBound) {
+      nameInput._svBound = true;
+      nameInput.addEventListener('input', _updateSaveBtn);
+    }
+  }
+
+  function saveView() {
+    const nameInput = document.getElementById('svNameInput');
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!name || _selectedIds.size === 0) return;
+
+    const contactIds = Array.from(_selectedIds);
+
+    if (_editingViewId) {
+      /* Update existing */
+      updateView(_editingViewId, { name, contactIds });
+      if (typeof SentinelGuide !== 'undefined') {
+        SentinelGuide.showBanner('View "' + name + '" updated', 2500);
+      }
+    } else {
+      /* Create new */
+      const view = createView(name, _editorType, contactIds);
+      /* Auto-activate the new view */
+      _activeViewId = view.id;
+      _applyFilter();
+      _updateBadge();
+      if (typeof SentinelGuide !== 'undefined') {
+        SentinelGuide.showBanner('View "' + name + '" created — now active', 3000);
+      }
+    }
+
+    closeEditor();
+    _renderPanel();
+  }
+
+  /* ── Delete confirmation ── */
+  function confirmDelete(id) {
+    const view = _views.find(v => v.id === id);
+    if (!view) return;
+    /* Simple confirm — inline */
+    if (confirm('Delete view "' + view.name + '"? This cannot be undone.')) {
+      deleteView(id);
+      _renderPanel();
+      if (typeof SentinelGuide !== 'undefined') {
+        SentinelGuide.showBanner('View deleted', 2000);
+      }
+    }
+  }
+
+  /* ── Init ── */
+  async function init() {
+    await _load();
+    _updateBadge();
+  }
+
+  return {
+    init,
+    openPanel, closePanel,
+    newView, editView, closeEditor,
+    toggleContact, saveView,
+    activateView, clearView,
+    confirmDelete,
+    getActiveView,
+    getFilteredContacts,
+    get views() { return _views; },
+    get activeViewId() { return _activeViewId; }
+  };
 })();
 
 /* ── RosterImport Module ── */
@@ -11268,7 +13044,7 @@ function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
   /* Modern action labels — vertically stacked beside the focused sphere */
   var labelFs = Math.max(10, Math.round(12 * s));
   var lineH = Math.max(22, Math.round(26 * s));
-  var labels = ['Video', 'Phone', 'Text', 'Email'];
+  var labels = ['Video', 'Phone', 'Message', 'Email'];
   var gap = Math.max(14, 18 * s);
   var totalH = labels.length * lineH;
   var startY = sy - totalH / 2 + lineH / 2;
@@ -12449,16 +14225,17 @@ function onPressEnd(e) {
                 openQuickDial('video', _qc.first, _qc.id);
               } else if (_qi.type === 'phone' && _qc.phone) {
                 window.location.href = 'tel:' + normalizePhone(_qc.phone);
-              } else if (_qi.type === 'sms' && _qc.phone) {
-                window.location.href = 'sms:' + normalizePhone(_qc.phone);
+              } else if (_qi.type === 'sms') {
+                /* RSM — open in-app messaging instead of native SMS */
+                SentinelMessaging.openFor(_qc.id);
               } else if (_qi.type === 'email' && _qc.email) {
                 window.location.href = 'mailto:' + _qc.email;
               } else {
                 /* No contact info — open quick-dial overlay */
                 if (_qi.type === 'email' && _qc) {
                   openQuickDial('email', _qc.first, _qc.id);
-                } else if ((_qi.type === 'phone' || _qi.type === 'sms') && _qc) {
-                  openQuickDial(_qi.type === 'sms' ? 'sms' : 'call', _qc.first, _qc.id);
+                } else if (_qi.type === 'phone' && _qc) {
+                  openQuickDial('call', _qc.first, _qc.id);
                 } else if (_qi.type === 'video' && _qc) {
                   openQuickDial('video', _qc.first, _qc.id);
                 } else {
@@ -12520,8 +14297,8 @@ function onPressEnd(e) {
             var _tapWasCenter = sphereTapTarget && sphereTapTarget.isCenter;
             sphereTapTarget = null;
             if (_tapWasCenter) {
-              /* Center sphere tap → open Add Person modal for quick add */
-              openContactModal('add');
+              /* Center sphere tap → open Circle Views panel */
+              SentinelViews.openPanel();
             } else {
               /* Contact sphere stays focused/enlarged */
               /* Resume gentle spin after focus */
@@ -13563,11 +15340,171 @@ function drawNetworkView(t) {
       drawContactPhotoInSphere(ctx, cPhoto, sx, sy, r);
     }
 
-    /* Crisp rim */
-    ctx.globalAlpha = 0.92 * (alphaOverride || 1);
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 1.6 * s * focusMul;
+    /* ── Inner energy ring (category-colored) ── */
+    const _cBio = node.contact.bio || { motionIntensity: 0, heartRate: 0 };
+    const _cMI = Math.min(1, _cBio.motionIntensity || 0);
+    const _cHR = _cBio.heartRate || 0;
+    const _cHRConn = _cHR > 0;
+    const _cInnerLW = (2.5 + _cMI * 2) * s * focusMul;
+    const _cInnerGlow = (6 + _cMI * 8) * s;
+    const _cInnerAlpha = (0.35 + _cMI * 0.2) + 0.08 * Math.sin(t * 0.004 + node.tx);
+    ctx.lineWidth = Math.max(0.8, _cInnerLW);
+    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${Math.min(1, _cInnerAlpha * (alphaOverride || 1))})`;
+    ctx.shadowColor = `rgba(${cat.r},${cat.g},${cat.b},${(0.4 + _cMI * 0.25) * (alphaOverride || 1)})`;
+    ctx.shadowBlur = Math.max(0, _cInnerGlow);
     ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    /* Crisp inner edge */
+    const _cEdgeA = (0.65 + 0.12 * Math.sin(t * 0.005 + node.tx)) * (alphaOverride || 1);
+    ctx.lineWidth = Math.max(0.5, (0.9 + _cMI * 0.4) * s * focusMul);
+    ctx.strokeStyle = `rgba(${cat.r},${cat.g},${cat.b},${Math.min(1, _cEdgeA)})`;
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.stroke();
+
+    /* ── Outer severity ring ── */
+    const _cOuterR = r * 1.12;
+    const _cPulseSpd = (_cHRConn)
+      ? (_cHR / 60) * 0.0063
+      : sev.pulseSpd;
+    const _cOuterLW = (1.8 + _cMI * 1.2) * s * focusMul;
+    const _cOuterA = ((0.15 + _cMI * 0.1) + 0.05 * Math.sin(t * _cPulseSpd * 1.3 + node.tx)) * (alphaOverride || 1);
+    ctx.lineWidth = Math.max(0.4, _cOuterLW);
+    ctx.strokeStyle = `rgba(${sev.r},${sev.g},${sev.b},${Math.min(0.7, _cOuterA)})`;
+    ctx.shadowColor = `rgba(${sev.r},${sev.g},${sev.b},${(0.3 + _cMI * 0.2) * sev.glowMul * (alphaOverride || 1)})`;
+    ctx.shadowBlur = Math.max(0, (6 + _cMI * 5) * s * sev.glowMul);
+    ctx.beginPath(); ctx.arc(sx, sy, _cOuterR, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    /* Crisp outer edge */
+    ctx.lineWidth = Math.max(0.3, (0.5 + _cMI * 0.3) * s);
+    ctx.strokeStyle = `rgba(${sev.r},${sev.g},${sev.b},${Math.min(0.6, (0.4 + 0.15 * Math.sin(t * _cPulseSpd * 0.8 + node.tx) + _cMI * 0.1) * (alphaOverride || 1))})`;
+    ctx.beginPath(); ctx.arc(sx, sy, _cOuterR, 0, Math.PI * 2); ctx.stroke();
+
+    /* ── Shimmer arcs on outer ring ── */
+    if (s > 0.2) {
+      const _cShimSpd = 0.0003 + _cPulseSpd * 0.12 + _cMI * 0.0015;
+      const _cShimAlpha = (0.1 + 0.12 * sev.glowMul + _cMI * 0.14) * (alphaOverride || 1);
+      const _cShimSpan = 0.45 + _cMI * 0.3;
+      const _cShimN = _cMI > 0.55 ? 3 : 2;
+      for (let _si = 0; _si < _cShimN; _si++) {
+        const _sDir = _si === 0 ? 1 : (_si === 1 ? -1 : 1);
+        const _sPhase = _si * (Math.PI * 2 / _cShimN);
+        const _sAngle = (t * _cShimSpd * _sDir) + _sPhase + node.tx;
+        ctx.lineWidth = Math.max(0.4, (1.2 + _cMI * 0.5) * s);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = `rgba(${sev.r},${sev.g},${sev.b},${Math.min(0.55, _cShimAlpha)})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, _cOuterR, _sAngle - _sDir * _cShimSpan, _sAngle);
+        ctx.stroke();
+      }
+    }
+
+    /* ── Change indicators: liveness, trend, delta ── */
+    if (s > 0.30) {
+      const _cbio = node.contact.bio;
+      if (_cbio) {
+        _decayContactLiveness(_cbio);
+
+        /* (A) Liveness pulse — small glowing dot at 2 o'clock when data is fresh */
+        if (_cbio.isLive && _cbio.liveFlicker > 0) {
+          const _liveDotR = Math.max(2.5, 4.5 * s);
+          const _liveDotAngle = -Math.PI * 0.3; /* 2 o'clock position */
+          const _liveDotX = sx + Math.cos(_liveDotAngle) * (_cOuterR + _liveDotR + 2 * s);
+          const _liveDotY = sy + Math.sin(_liveDotAngle) * (_cOuterR + _liveDotR + 2 * s);
+          const _liveAlpha = (0.5 + 0.5 * Math.sin(t * 0.008 + node.tx * 2)) * _cbio.liveFlicker;
+          ctx.globalAlpha = _liveAlpha * (alphaOverride || 1);
+          ctx.fillStyle = '#4ade80'; /* green pulse for live data */
+          ctx.shadowColor = '#4ade80';
+          ctx.shadowBlur = 6 * s;
+          ctx.beginPath();
+          ctx.arc(_liveDotX, _liveDotY, _liveDotR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        /* (B) Trend direction arrows — at 10 o'clock for motion, 4 o'clock for HR */
+        ctx.globalAlpha = 0.85 * (alphaOverride || 1);
+        const _arrowSize = Math.max(4, 7 * s);
+
+        /* Motion trend arrow (10 o'clock) */
+        if (_cbio.trendMotion !== 'steady' && (_cbio.motionIntensity > 0 || _cbio.deltaMotion !== 0)) {
+          const _mtAngle = Math.PI * 1.15; /* 10 o'clock */
+          const _mtX = sx + Math.cos(_mtAngle) * (_cOuterR + _arrowSize + 3 * s);
+          const _mtY = sy + Math.sin(_mtAngle) * (_cOuterR + _arrowSize + 3 * s);
+          const _mtColor = _cbio.trendMotion === 'up' ? '#fb923c' : '#60a5fa'; /* orange up, blue down */
+          ctx.fillStyle = _mtColor;
+          ctx.beginPath();
+          if (_cbio.trendMotion === 'up') {
+            /* Up triangle */
+            ctx.moveTo(_mtX, _mtY - _arrowSize * 0.7);
+            ctx.lineTo(_mtX - _arrowSize * 0.5, _mtY + _arrowSize * 0.4);
+            ctx.lineTo(_mtX + _arrowSize * 0.5, _mtY + _arrowSize * 0.4);
+          } else {
+            /* Down triangle */
+            ctx.moveTo(_mtX, _mtY + _arrowSize * 0.7);
+            ctx.lineTo(_mtX - _arrowSize * 0.5, _mtY - _arrowSize * 0.4);
+            ctx.lineTo(_mtX + _arrowSize * 0.5, _mtY - _arrowSize * 0.4);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        /* HR trend arrow (4 o'clock) */
+        if (_cbio.trendHR !== 'steady' && (_cbio.heartRate > 0 || _cbio.deltaHR !== 0)) {
+          const _htAngle = -Math.PI * 0.15; /* 4 o'clock */
+          const _htX = sx + Math.cos(_htAngle) * (_cOuterR + _arrowSize + 3 * s);
+          const _htY = sy + Math.sin(_htAngle) * (_cOuterR + _arrowSize + 3 * s);
+          const _htColor = _cbio.trendHR === 'up' ? '#f87171' : '#60a5fa'; /* red up, blue down */
+          ctx.fillStyle = _htColor;
+          ctx.beginPath();
+          if (_cbio.trendHR === 'up') {
+            ctx.moveTo(_htX, _htY - _arrowSize * 0.7);
+            ctx.lineTo(_htX - _arrowSize * 0.5, _htY + _arrowSize * 0.4);
+            ctx.lineTo(_htX + _arrowSize * 0.5, _htY + _arrowSize * 0.4);
+          } else {
+            ctx.moveTo(_htX, _htY + _arrowSize * 0.7);
+            ctx.lineTo(_htX - _arrowSize * 0.5, _htY - _arrowSize * 0.4);
+            ctx.lineTo(_htX + _arrowSize * 0.5, _htY - _arrowSize * 0.4);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        /* (C) Delta readout — small text below name showing change amounts */
+        if (s > 0.45) {
+          const _hasDelta = (Math.abs(_cbio.deltaMotion) >= BIO_TREND_DEADZONE) ||
+                            (Math.abs(_cbio.deltaHR) >= BIO_TREND_HR_DEADZONE);
+          if (_hasDelta && (_cbio.isLive || (Date.now() - (_cbio.lastUpdate || 0)) < 60000)) {
+            const _deltaFs = Math.max(7, Math.min(10, Math.round(8 * s)));
+            ctx.font = `500 ${_deltaFs}px "Hanken Grotesk", system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            let _deltaParts = [];
+            if (Math.abs(_cbio.deltaMotion) >= BIO_TREND_DEADZONE) {
+              const _dmSign = _cbio.deltaMotion > 0 ? '+' : '';
+              _deltaParts.push(_dmSign + (_cbio.deltaMotion * 100).toFixed(0) + '% act');
+            }
+            if (Math.abs(_cbio.deltaHR) >= BIO_TREND_HR_DEADZONE) {
+              const _dhSign = _cbio.deltaHR > 0 ? '+' : '';
+              _deltaParts.push(_dhSign + Math.round(_cbio.deltaHR) + ' bpm');
+            }
+            if (_deltaParts.length > 0) {
+              const _deltaText = _deltaParts.join('  ');
+              /* Position below the name label (name is at sy + r + 12*s) */
+              const _deltaY = sy + r + 24 * s + (node.contact.sev <= 1 ? 12 * s : 0);
+              const _deltaColor = (_cbio.trendMotion === 'up' || _cbio.trendHR === 'up')
+                ? 'rgba(251,146,60,0.75)' : 'rgba(96,165,250,0.75)';
+              ctx.fillStyle = _deltaColor;
+              ctx.globalAlpha = 0.8 * (alphaOverride || 1);
+              ctx.fillText(_deltaText, sx, _deltaY);
+            }
+          }
+        }
+
+        ctx.globalAlpha = 1 * (alphaOverride || 1);
+      }
+    }
 
     /* Gold halo — marks the contact whose action is next (CareCircle mechanic) */
     if (nextActionNodeId && node.contact.id === nextActionNodeId && s > 0.25) {
@@ -13588,18 +15525,46 @@ function drawNetworkView(t) {
       ctx.fillText(node.initials, sx, sy);
     }
 
-    /* ── Floating headline ABOVE sphere — what this contact needs from you ── */
+    /* ── Floating headline ABOVE sphere — ticker-tape for messages, static for status ── */
     if (s > 0.38) {
-      const _hl = getContactHeadline(node.contact);
-      if (_hl) {
-        const _hlFs = Math.max(8, Math.min(12, Math.round(10 * s)));
-        ctx.fillStyle = '#ffd24d';
-        ctx.globalAlpha = 0.92 * (alphaOverride || 1);
-        ctx.font = `700 ${_hlFs}px "Hanken Grotesk", system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText(_hl, sx, sy - r - 8 * s);
+      const _tickerData = SentinelMessaging.getTickerData(node.contact.id);
+      const _hlFs = Math.max(8, Math.min(12, Math.round(10 * s)));
+      ctx.font = '700 ' + _hlFs + 'px "Hanken Grotesk", system-ui, sans-serif';
+      ctx.textBaseline = 'alphabetic';
+      const _hlY = sy - r - 8 * s;
+
+      if (_tickerData && _tickerData.text && (Date.now() - _tickerData.ts) < 3600000) {
+        /* ── Ticker-tape: auto-scrolling latest message ── */
+        const _tickText = _tickerData.text.toUpperCase();
+        const _tickW = ctx.measureText(_tickText).width;
+        const _clipW = Math.min(r * 3, 160 * s);
+
+        /* Advance scroll — wraps around after full text passes */
+        if (!_tickerData._scrollX) _tickerData._scrollX = _clipW;
+        _tickerData._scrollX -= SentinelMessaging.TICKER_SPEED;
+        if (_tickerData._scrollX < -_tickW) _tickerData._scrollX = _clipW;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(sx - _clipW / 2, _hlY - _hlFs - 2, _clipW, _hlFs + 6);
+        ctx.clip();
+
+        ctx.fillStyle = _tickerData.color;
+        ctx.globalAlpha = 0.95 * (alphaOverride || 1);
+        ctx.textAlign = 'left';
+        ctx.fillText(_tickText, sx - _clipW / 2 + _tickerData._scrollX, _hlY);
+        ctx.restore();
         ctx.globalAlpha = 1;
+      } else {
+        /* ── Static headline — original behavior ── */
+        const _hl = getContactHeadline(node.contact);
+        if (_hl) {
+          ctx.fillStyle = '#ffd24d';
+          ctx.globalAlpha = 0.92 * (alphaOverride || 1);
+          ctx.textAlign = 'center';
+          ctx.fillText(_hl, sx, _hlY);
+          ctx.globalAlpha = 1;
+        }
       }
     }
 
@@ -13625,6 +15590,9 @@ function drawNetworkView(t) {
     }
     ctx.globalAlpha = 1;
   }
+
+  /* ── Compute circle aggregate for center HUD ── */
+  _computeCircleAggregate();
 
   /* ── PASS 1: Draw contact spheres BEHIND center (back to front) ── */
   for (const item of _behindNodes) {
@@ -13714,44 +15682,65 @@ function drawNetworkView(t) {
     ctx.restore();
   }
 
-  /* Inner energy ring (category) */
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = `rgba(${uc.r},${uc.g},${uc.b},${0.3 + 0.1 * Math.sin(t * 0.004)})`;
-  ctx.shadowColor = `rgba(${uc.r},${uc.g},${uc.b},0.5)`;
-  ctx.shadowBlur = 12;
+  /* Inner energy ring (category) — enhanced by BioMotion */
+  const _bMI = _bio.enabled ? _bio.motionIntensity : 0;
+  const _bGI = _bio.enabled ? _bio.gyroIntensity : 0;
+  /* Motion boosts ring thickness: 4 base → up to 7 when very active */
+  const _innerLW = 4 + _bMI * 3;
+  /* Motion boosts glow: 12 base → up to 24 */
+  const _innerGlow = 12 + _bMI * 12;
+  /* Motion boosts base alpha: 0.3 → up to 0.55 */
+  const _innerAlpha = (0.3 + _bMI * 0.25) + 0.1 * Math.sin(t * 0.004);
+  ctx.lineWidth = _innerLW;
+  ctx.strokeStyle = `rgba(${uc.r},${uc.g},${uc.b},${_innerAlpha})`;
+  ctx.shadowColor = `rgba(${uc.r},${uc.g},${uc.b},${0.5 + _bMI * 0.3})`;
+  ctx.shadowBlur = _innerGlow;
   ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  ctx.lineWidth = 1.2;
-  ctx.strokeStyle = `rgba(${uc.r},${uc.g},${uc.b},${0.7 + 0.15 * Math.sin(t * 0.005)})`;
+  /* Crisp inner edge — gyro adds subtle flicker */
+  const _innerEdgeA = (0.7 + 0.15 * Math.sin(t * 0.005)) + _bGI * 0.15;
+  ctx.lineWidth = 1.2 + _bGI * 0.6;
+  ctx.strokeStyle = `rgba(${uc.r},${uc.g},${uc.b},${Math.min(1, _innerEdgeA)})`;
   ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
 
-  /* NOUS status ring (outer — severity) */
+  /* NOUS status ring (outer — severity) — enhanced by BioMotion */
   const outerCR = cr * 1.1;
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${0.12 + 0.06 * Math.sin(t * usv.pulseSpd * 1.3)})`;
-  ctx.shadowColor = `rgba(${usv.r},${usv.g},${usv.b},${0.4 * usv.glowMul})`;
-  ctx.shadowBlur = 10 * usv.glowMul;
+  /* Heart rate sync: if BLE HR connected, override pulse speed to match BPM */
+  const _hrPulseSpd = (_bio.enabled && _bio.hrConnected && _bio.heartRate > 0)
+    ? (_bio.heartRate / 60) * 0.0063  /* convert BPM to radians-per-ms matching original scale */
+    : usv.pulseSpd;
+  /* Motion boosts outer ring thickness: 3 → up to 5 */
+  const _outerLW = 3 + _bMI * 2;
+  /* Motion boosts outer ring alpha */
+  const _outerBaseA = (0.12 + _bMI * 0.12) + 0.06 * Math.sin(t * _hrPulseSpd * 1.3);
+  ctx.lineWidth = _outerLW;
+  ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${_outerBaseA})`;
+  ctx.shadowColor = `rgba(${usv.r},${usv.g},${usv.b},${(0.4 + _bMI * 0.3) * usv.glowMul})`;
+  ctx.shadowBlur = (10 + _bMI * 8) * usv.glowMul;
   ctx.beginPath(); ctx.arc(cx, cy, outerCR, 0, Math.PI * 2); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  ctx.lineWidth = 0.8;
-  ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${0.5 + 0.2 * Math.sin(t * usv.pulseSpd * 0.8)})`;
+  /* Crisp outer edge — motion-responsive */
+  ctx.lineWidth = 0.8 + _bMI * 0.5;
+  ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${0.5 + 0.2 * Math.sin(t * _hrPulseSpd * 0.8) + _bMI * 0.15})`;
   ctx.beginPath(); ctx.arc(cx, cy, outerCR, 0, Math.PI * 2); ctx.stroke();
 
-  /* Shimmer arcs on outer ring */
-  const cShimSpd = 0.0004 + usv.pulseSpd * 0.15;
-  const cShimAlpha = 0.12 + 0.15 * usv.glowMul;
-  for (let s = 0; s < 2; s++) {
-    const dir = s === 0 ? 1 : -1;
-    const phase = s * Math.PI;
+  /* Shimmer arcs on outer ring — motion accelerates, widens, and brightens */
+  const _shimMotionBoost = _bMI * 0.002;  /* motion adds speed */
+  const cShimSpd = 0.0004 + _hrPulseSpd * 0.15 + _shimMotionBoost;
+  const cShimAlpha = (0.12 + 0.15 * usv.glowMul) + _bMI * 0.18;
+  const _shimArcSpan = 0.55 + _bMI * 0.35;  /* wider arcs when active */
+  const _shimCount = _bMI > _bio._activeThreshold ? 3 : 2;  /* 3rd arc when very active */
+  for (let s = 0; s < _shimCount; s++) {
+    const dir = s === 0 ? 1 : (s === 1 ? -1 : 1);
+    const phase = s * (Math.PI * 2 / _shimCount);
     const shimAngle = (t * cShimSpd * dir) + phase;
-    const arcSpan = 0.55;
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = 1.8 + _bMI * 0.8;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${cShimAlpha})`;
+    ctx.strokeStyle = `rgba(${usv.r},${usv.g},${usv.b},${Math.min(0.7, cShimAlpha)})`;
     ctx.beginPath();
-    ctx.arc(cx, cy, outerCR, shimAngle - dir * arcSpan, shimAngle);
+    ctx.arc(cx, cy, outerCR, shimAngle - dir * _shimArcSpan, shimAngle);
     ctx.stroke();
   }
 
@@ -13774,6 +15763,74 @@ function drawNetworkView(t) {
   const _nameY = cy + centerR * 1.1 + 6; /* fixed position based on unbreathed centerR */
   ctx.fillText(userSphereName || 'You', cx, _nameY);
   ctx.textBaseline = 'alphabetic';
+
+  /* ── Circle Aggregate HUD — only on center sphere (command center) ── */
+  _computeCircleAggregate();
+  if (_circleAggregate.totalCount > 0) {
+    const _hudFs = Math.max(7, Math.round(centerR * 0.16));
+    const _hudSmFs = Math.max(6, Math.round(centerR * 0.13));
+    const _hudX = cx;
+    const _hudBaseY = cy - centerR * 1.1 - 10;
+
+    /* "CIRCLE COMMAND" label — makes it clear this is the aggregate view */
+    ctx.font = `600 ${_hudSmFs}px "Hanken Grotesk", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = `rgba(${uc.r},${uc.g},${uc.b},0.45)`;
+    /* Manual letter-spacing for cross-browser compat */
+    /* Show active view name or default CIRCLE COMMAND */
+    var _activeViewObj = (typeof SentinelViews !== 'undefined') ? SentinelViews.getActiveView() : null;
+    const _ccLabel = _activeViewObj ? _activeViewObj.name.toUpperCase() : 'CIRCLE COMMAND';
+    let _ccX = _hudX - ctx.measureText(_ccLabel).width * 0.6;
+    for (let _ci = 0; _ci < _ccLabel.length; _ci++) {
+      ctx.fillText(_ccLabel[_ci], _ccX, _hudBaseY - 2);
+      _ccX += ctx.measureText(_ccLabel[_ci]).width + 1.5;
+    }
+
+    /* Active count / total */
+    const _activeLabel = _circleAggregate.activeCount + '/' + _circleAggregate.totalCount + ' active';
+    ctx.font = `500 ${_hudFs}px "Hanken Grotesk", system-ui, sans-serif`;
+    const _activePct = _circleAggregate.totalCount > 0
+      ? _circleAggregate.activeCount / _circleAggregate.totalCount : 0;
+    const _activeColor = _activePct > 0.5 ? 'rgba(74,222,128,0.8)' /* green */
+      : _activePct > 0 ? 'rgba(251,191,36,0.8)' /* amber */
+      : 'rgba(148,163,184,0.5)'; /* gray */
+    ctx.fillStyle = _activeColor;
+    ctx.fillText(_activeLabel, _hudX, _hudBaseY - _hudSmFs - 4);
+
+    /* Trend summary arrows: ↑N ↓N —N */
+    if (_circleAggregate.trendingUp > 0 || _circleAggregate.trendingDown > 0) {
+      const _trendY = _hudBaseY - _hudSmFs - _hudFs - 6;
+      ctx.font = `600 ${_hudSmFs}px "Hanken Grotesk", system-ui, sans-serif`;
+      let _trendParts = [];
+      if (_circleAggregate.trendingUp > 0)
+        _trendParts.push('▲' + _circleAggregate.trendingUp);
+      if (_circleAggregate.trendingDown > 0)
+        _trendParts.push('▼' + _circleAggregate.trendingDown);
+      if (_circleAggregate.steady > 0)
+        _trendParts.push('—' + _circleAggregate.steady);
+      const _trendText = _trendParts.join('  ');
+      ctx.fillStyle = 'rgba(203,213,225,0.6)';
+      ctx.fillText(_trendText, _hudX, _trendY);
+    }
+
+    /* Aggregate HR readout if any contacts have HR */
+    if (_circleAggregate.avgHR > 0) {
+      const _hrY = cy + centerR * 1.1 + 6 + _hudFs + 6;
+      ctx.font = `500 ${_hudSmFs}px "Hanken Grotesk", system-ui, sans-serif`;
+      ctx.textBaseline = 'top';
+      const _avgHRText = 'avg ' + Math.round(_circleAggregate.avgHR) + ' bpm';
+      ctx.fillStyle = 'rgba(248,113,113,0.65)';
+      ctx.fillText(_avgHRText, _hudX, _hrY);
+
+      if (_circleAggregate.maxHR > 0 && _circleAggregate.activeCount > 1) {
+        ctx.fillStyle = 'rgba(248,113,113,0.45)';
+        ctx.fillText('peak ' + Math.round(_circleAggregate.maxHR), _hudX, _hrY + _hudSmFs + 2);
+      }
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+
   /* ── PASS 2: Draw contact spheres IN FRONT of center (with transparency) ── */
   for (const item of _frontNodes) {
     _drawOneContactSphere(item, 0.72);
@@ -16767,6 +18824,33 @@ const SyncEngine = (() => {
         } catch(e) {}
       }
 
+      /* ── Broadcast local bio state to circle members ── */
+      if (typeof _bio !== 'undefined' && _bio.enabled) {
+        payload.bio_snapshot = {
+          motionIntensity: Math.round(_bio.motionIntensity * 1000) / 1000,
+          gyroIntensity: Math.round(_bio.gyroIntensity * 1000) / 1000,
+          heartRate: _bio.heartRate || 0,
+          hrConnected: _bio.hrConnected || false,
+          timestamp: Date.now()
+        };
+      }
+
+      /* ── Include per-contact bio updates from BLE group monitor ── */
+      if (typeof _bioGroupMonitor !== 'undefined' && _bioGroupMonitor.devices.size > 0) {
+        payload.contact_bio_updates = [];
+        _bioGroupMonitor.devices.forEach(function(dev) {
+          if (dev.contactId && dev.heartRate > 0) {
+            var cServerId = _serverIdMap['contact_' + dev.contactId] || null;
+            payload.contact_bio_updates.push({
+              contact_id: cServerId,
+              contact_client_id: typeof dev.contactId === 'number' ? dev.contactId : null,
+              heartRate: dev.heartRate,
+              timestamp: Date.now()
+            });
+          }
+        });
+      }
+
       var res = await _fetch('/sync/push', { method: 'POST', body: JSON.stringify(payload) });
       if (!res.ok) {
         var err = await res.json().catch(function() { return {}; });
@@ -16843,6 +18927,38 @@ const SyncEngine = (() => {
             }
           } else if (c.client_id) {
             _serverIdMap['contact_' + c.client_id] = c.server_id;
+          }
+        }
+      }
+
+      /* ── Apply circle members' bio snapshots to contacts ── */
+      if (data.circle_bio && Array.isArray(data.circle_bio)) {
+        for (var b = 0; b < data.circle_bio.length; b++) {
+          var bioSnap = data.circle_bio[b];
+          if (!bioSnap.contact_id && !bioSnap.contact_client_id) continue;
+          /* Find local contact by server ID mapping or client ID */
+          var localCid = null;
+          if (bioSnap.contact_client_id) {
+            localCid = bioSnap.contact_client_id;
+          } else {
+            Object.keys(_serverIdMap).forEach(function(k) {
+              if (k.startsWith('contact_') && _serverIdMap[k] === bioSnap.contact_id) {
+                localCid = parseInt(k.replace('contact_', ''), 10);
+              }
+            });
+          }
+          if (localCid && typeof DEMO_CONTACTS !== 'undefined') {
+            var dc = DEMO_CONTACTS.find(function(c) { return c.id === localCid; });
+            if (dc) {
+              _ensureContactBio(dc);
+              _updateContactBioTrend(
+                dc.bio,
+                bioSnap.motionIntensity != null ? bioSnap.motionIntensity : null,
+                bioSnap.heartRate != null ? bioSnap.heartRate : null
+              );
+              dc.bio.source = 'sync';
+              console.log('SyncEngine: bio update for contact ' + localCid + ' — MI=' + dc.bio.motionIntensity + ' HR=' + dc.bio.heartRate);
+            }
           }
         }
       }
@@ -17233,6 +19349,7 @@ const CircleManager = (() => {
           _sharingToggle(conn.id, 'share_moods', 'Moods', conn.sharing.moods) +
           _sharingToggle(conn.id, 'share_location', 'Location', conn.sharing.location) +
           _sharingToggle(conn.id, 'share_media', 'Media', conn.sharing.media) +
+          _sharingToggle(conn.id, 'share_bio', 'Biometrics', conn.sharing && conn.sharing.bio) +
         '</div>';
     }
 
