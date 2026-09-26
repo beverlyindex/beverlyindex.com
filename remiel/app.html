@@ -4558,6 +4558,19 @@
 /* ── Roster Import ── */
 
   /* ── Group Photo face detection ── */
+  .gp-banner { padding:14px 16px; border-radius:12px; margin:10px 0; font:600 14px/1.4 'Hanken Grotesk',system-ui,sans-serif; display:flex; align-items:flex-start; gap:10px; }
+  .gp-banner svg { flex-shrink:0; margin-top:1px; }
+  .gp-banner-error { background:rgba(244,67,54,0.12); border:1px solid rgba(244,67,54,0.3); color:#F44336; }
+  .gp-banner-success { background:rgba(76,175,80,0.12); border:1px solid rgba(76,175,80,0.3); color:#4CAF50; }
+  .gp-banner-info { background:rgba(197,165,90,0.12); border:1px solid rgba(197,165,90,0.3); color:#C5A55A; }
+  .gp-banner-body { flex:1; }
+  .gp-banner-body p { margin:0 0 8px; }
+  .gp-banner-body p:last-child { margin:0; }
+  .gp-banner .gp-retry-btn { display:inline-block; margin-top:8px; padding:6px 16px; border-radius:8px; border:1px solid currentColor; background:transparent; color:inherit; font:600 13px 'Hanken Grotesk',system-ui,sans-serif; cursor:pointer; }
+  .gp-banner .gp-alt-btn { display:inline-block; margin-top:4px; padding:6px 16px; border-radius:8px; border:none; background:rgba(197,165,90,0.15); color:#C5A55A; font:600 13px 'Hanken Grotesk',system-ui,sans-serif; cursor:pointer; }
+  .gp-next-step { background:linear-gradient(135deg,#C5A55A,#8B7332); color:#000; border:none; padding:14px 28px; border-radius:12px; font:700 15px 'Hanken Grotesk',system-ui,sans-serif; cursor:pointer; width:100%; margin-top:12px; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .gp-next-step:active { transform:scale(0.98); }
+  .gp-next-step svg { flex-shrink:0; }
   .gp-overlay { position:absolute; top:0; left:0; pointer-events:none; }
   .gp-face-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:8px; padding:8px 0; }
   .gp-face-card { position:relative; background:rgba(255,255,255,0.05); border:1px solid rgba(197,165,90,0.2); border-radius:8px; padding:6px; text-align:center; cursor:pointer; transition:all .2s; }
@@ -6196,7 +6209,7 @@ function _loadFaceApi() {
       if (!_faceApiModelsLoaded) {
         _faceApiModelsLoaded = true;
         faceapi.nets.tinyFaceDetector.loadFromUri(
-          'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
+          'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights'
         ).then(function() { resolve(window.faceapi); })
          .catch(reject);
       } else { resolve(window.faceapi); }
@@ -6207,7 +6220,7 @@ function _loadFaceApi() {
     s.onload = function() {
       _faceApiModelsLoaded = true;
       faceapi.nets.tinyFaceDetector.loadFromUri(
-        'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
+        'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights'
       ).then(function() { resolve(window.faceapi); })
        .catch(reject);
     };
@@ -10430,6 +10443,12 @@ var RosterImport = (function() {
     document.querySelectorAll('.roster-tab').forEach(function(btn) {
       btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
     });
+    // Reset group photo drop zone visibility when switching to group tab
+    if (tab === 'group') {
+      var gpDz = document.getElementById('gpDropZone');
+      var gpPrev = document.getElementById('gpFacePreview');
+      if (gpDz && gpPrev && !gpPrev.innerHTML.trim()) gpDz.style.display = '';
+    }
   }
 
   function handleImageFile(input) {
@@ -10798,24 +10817,32 @@ var RosterImport = (function() {
     var status = document.getElementById('gpStatus');
     var preview = document.getElementById('gpFacePreview');
     var importBtn = document.getElementById('gpImportBtn');
+    var dropZone = document.getElementById('gpDropZone');
+
+    // Hide drop zone, show progress
+    if (dropZone) dropZone.style.display = 'none';
     prog.style.display = '';
-    fill.style.width = '0%';
-    status.textContent = 'Loading face detection...';
+    fill.style.width = '5%';
+    status.textContent = 'Loading face detection engine...';
     preview.innerHTML = '';
     importBtn.style.display = 'none';
     _gpFaces = [];
 
-    // Load face-api.js and process image in parallel with OCR
+    // Keep file reference for retry
+    var _gpCurrentFile = file;
+
     var imgUrl = URL.createObjectURL(file);
     var img = new Image();
     img.onload = function() {
       _gpOrigImg = img;
+      fill.style.width = '15%';
+      status.textContent = 'Face detection engine loading...';
 
       // Run face detection and OCR in parallel
       Promise.all([
         _loadFaceApi().then(function(faceapi) {
-          status.textContent = 'Detecting faces...';
           fill.style.width = '30%';
+          status.textContent = 'Scanning image for faces...';
           var opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.35 });
           return faceapi.detectAllFaces(img, opts);
         }),
@@ -10825,6 +10852,7 @@ var RosterImport = (function() {
               if (m.status === 'recognizing text') {
                 var pct = Math.round(50 + m.progress * 30);
                 fill.style.width = pct + '%';
+                status.textContent = 'Reading text from image... ' + Math.round(m.progress * 100) + '%';
               }
             }
           });
@@ -10835,13 +10863,23 @@ var RosterImport = (function() {
         var ocrText = (ocrResult && ocrResult.data && ocrResult.data.text) || '';
 
         if (!detections || detections.length === 0) {
-          status.textContent = 'No faces detected. Try a clearer photo with visible faces.';
           fill.style.width = '100%';
+          prog.style.display = 'none';
+          preview.innerHTML =
+            '<div class="gp-banner gp-banner-info">' +
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+              '<div class="gp-banner-body">' +
+                '<p>No faces detected in this image.</p>' +
+                '<p style="font-weight:400;font-size:13px;opacity:0.8">Try a clearer photo where faces are visible and well-lit. Close-up group shots work best.</p>' +
+                '<button class="gp-retry-btn" onclick="document.getElementById('gpDropZone').style.display='';document.getElementById('gpFacePreview').innerHTML='';document.getElementById('gpFileInput').click()">Try Another Photo</button>' +
+                '<button class="gp-alt-btn" onclick="RosterImport.switchTab('image')" style="margin-left:8px">Use Image OCR Instead</button>' +
+              '</div>' +
+            '</div>';
           return;
         }
 
-        status.textContent = 'Cropping ' + detections.length + ' faces...';
         fill.style.width = '85%';
+        status.textContent = 'Cropping ' + detections.length + ' faces...';
 
         // Sort faces: top-to-bottom rows, then left-to-right within rows
         var sorted = detections.slice().sort(function(a, b) {
@@ -10857,7 +10895,6 @@ var RosterImport = (function() {
         // Crop each face
         _gpFaces = sorted.map(function(det, idx) {
           var box = det.box;
-          // Expand crop area slightly for better headshots
           var pad = Math.round(Math.max(box.width, box.height) * 0.35);
           var cx = Math.max(0, Math.round(box.x - pad));
           var cy = Math.max(0, Math.round(box.y - pad));
@@ -10872,26 +10909,42 @@ var RosterImport = (function() {
 
           return {
             canvas: canvas,
-            x: box.x,
-            y: box.y,
-            w: box.width,
-            h: box.height,
+            x: box.x, y: box.y, w: box.width, h: box.height,
             name: nameLines[idx] || '',
             selected: true
           };
         });
 
         fill.style.width = '100%';
-        status.textContent = detections.length + ' faces detected' + (nameLines.length > 0 ? ', ' + nameLines.length + ' names found' : '') + '.';
+        prog.style.display = 'none';
         _showGroupPhotoPreview();
       }).catch(function(err) {
-        status.textContent = 'Face detection failed: ' + err.message;
         fill.style.width = '0%';
+        prog.style.display = 'none';
         console.error('Group photo error:', err);
+        preview.innerHTML =
+          '<div class="gp-banner gp-banner-error">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+            '<div class="gp-banner-body">' +
+              '<p>Face detection failed</p>' +
+              '<p style="font-weight:400;font-size:13px;opacity:0.8">' + (err.message || 'Could not load the face detection engine. Check your internet connection and try again.') + '</p>' +
+              '<button class="gp-retry-btn" onclick="document.getElementById('gpDropZone').style.display='';document.getElementById('gpFacePreview').innerHTML='';document.getElementById('gpFileInput').click()">Try Again</button>' +
+              '<button class="gp-alt-btn" onclick="RosterImport.switchTab('image')" style="margin-left:8px">Use Image OCR Instead</button>' +
+            '</div>' +
+          '</div>';
       });
     };
     img.onerror = function() {
-      status.textContent = 'Failed to load image.';
+      prog.style.display = 'none';
+      preview.innerHTML =
+        '<div class="gp-banner gp-banner-error">' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+          '<div class="gp-banner-body">' +
+            '<p>Could not load this image</p>' +
+            '<p style="font-weight:400;font-size:13px;opacity:0.8">The file may be corrupted or in an unsupported format.</p>' +
+            '<button class="gp-retry-btn" onclick="document.getElementById('gpDropZone').style.display='';document.getElementById('gpFacePreview').innerHTML='';document.getElementById('gpFileInput').click()">Try Another Photo</button>' +
+          '</div>' +
+        '</div>';
     };
     img.src = imgUrl;
     input.value = '';
@@ -10936,10 +10989,27 @@ var RosterImport = (function() {
     var importBtn = document.getElementById('gpImportBtn');
     if (!_gpFaces.length) { preview.innerHTML = ''; importBtn.style.display = 'none'; return; }
 
-    var html = '<div class="gp-stats">' + _gpFaces.length + ' faces found &mdash; name each person and select who to import</div>';
-    html += '<div style="margin-bottom:8px"><label style="display:flex;align-items:center;gap:6px;color:#C5A55A;font-size:13px;cursor:pointer"><input type="checkbox" id="gpSelectAll" checked onchange="RosterImport.toggleAllFaces(this.checked)"> Select All</label></div>';
-    html += '<div class="gp-face-grid">';
+    var selCount = _gpFaces.filter(function(f) { return f.selected; }).length;
 
+    // Success banner
+    var html = '<div class="gp-banner gp-banner-success">' +
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.5 2.5L16 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '<div class="gp-banner-body">' +
+        '<p>' + _gpFaces.length + ' face' + (_gpFaces.length !== 1 ? 's' : '') + ' detected!</p>' +
+        '<p style="font-weight:400;font-size:13px;opacity:0.8">Name each person below, then tap <strong>Import Selected</strong> to add them to your constellation.</p>' +
+      '</div>' +
+    '</div>';
+
+    // Select all toggle
+    html += '<div style="margin:8px 0;display:flex;align-items:center;justify-content:space-between">' +
+      '<label style="display:flex;align-items:center;gap:6px;color:#C5A55A;font-size:13px;cursor:pointer">' +
+        '<input type="checkbox" id="gpSelectAll" checked onchange="RosterImport.toggleAllFaces(this.checked)"> Select All' +
+      '</label>' +
+      '<span style="font-size:12px;color:rgba(255,255,255,0.4)" id="gpSelCount">' + selCount + ' of ' + _gpFaces.length + ' selected</span>' +
+    '</div>';
+
+    // Face grid
+    html += '<div class="gp-face-grid">';
     for (var i = 0; i < _gpFaces.length; i++) {
       var face = _gpFaces[i];
       var dataUrl = face.canvas.toDataURL('image/png');
@@ -10952,9 +11022,21 @@ var RosterImport = (function() {
       html += '</div>';
     }
     html += '</div>';
+
     preview.innerHTML = html;
+
+    // Show prominent import button
     importBtn.style.display = '';
-    importBtn.textContent = 'Import ' + _gpFaces.filter(function(f) { return f.selected; }).length + ' Selected';
+    importBtn.className = 'gp-next-step';
+    importBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg> Import ' + selCount + ' Contact' + (selCount !== 1 ? 's' : '') + ' to Constellation';
+  }
+
+  function _updateGpSelCount() {
+    var c = _gpFaces.filter(function(f) { return f.selected; }).length;
+    var el = document.getElementById('gpSelCount');
+    if (el) el.textContent = c + ' of ' + _gpFaces.length + ' selected';
+    var btn = document.getElementById('gpImportBtn');
+    if (btn) btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg> Import ' + c + ' Contact' + (c !== 1 ? 's' : '') + ' to Constellation';
   }
 
   function toggleFace(idx) {
@@ -10962,8 +11044,7 @@ var RosterImport = (function() {
     _gpFaces[idx].selected = !_gpFaces[idx].selected;
     var card = document.querySelector('.gp-face-card[data-idx="' + idx + '"]');
     if (card) card.classList.toggle('selected', _gpFaces[idx].selected);
-    var btn = document.getElementById('gpImportBtn');
-    if (btn) btn.textContent = 'Import ' + _gpFaces.filter(function(f) { return f.selected; }).length + ' Selected';
+    _updateGpSelCount();
   }
 
   function toggleAllFaces(checked) {
@@ -10972,8 +11053,7 @@ var RosterImport = (function() {
       var card = document.querySelector('.gp-face-card[data-idx="' + i + '"]');
       if (card) card.classList.toggle('selected', checked);
     });
-    var btn = document.getElementById('gpImportBtn');
-    if (btn) btn.textContent = 'Import ' + _gpFaces.filter(function(f) { return f.selected; }).length + ' Selected';
+    _updateGpSelCount();
   }
 
   function setFaceName(idx, name) {
@@ -10982,7 +11062,20 @@ var RosterImport = (function() {
 
   async function doGroupImport() {
     var selected = _gpFaces.filter(function(f) { return f.selected; });
-    if (!selected.length) { alert('No faces selected to import.'); return; }
+    if (!selected.length) {
+      var preview = document.getElementById('gpFacePreview');
+      if (preview) {
+        var existing = preview.querySelector('.gp-banner-error');
+        if (existing) existing.remove();
+        preview.insertAdjacentHTML('afterbegin',
+          '<div class="gp-banner gp-banner-error">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+            '<div class="gp-banner-body"><p>No faces selected. Tap on faces to select them first.</p></div>' +
+          '</div>'
+        );
+      }
+      return;
+    }
 
     var cat = (document.getElementById('rosterCatSelect') || {}).value || 'other';
     var imported = 0;
@@ -10999,51 +11092,58 @@ var RosterImport = (function() {
         first: first,
         last: last,
         cat: cat,
-        sev: 'green',
+        sev: 2,
         phone: '',
-        email: ''
+        email: '',
+        sentinelId: 'sentinel_' + id + '_' + Math.random().toString(36).substr(2, 6)
       };
       DEMO_CONTACTS.push(contact);
+      try { await RemielDB.putContact(contact); } catch (e) {}
 
       // Store face crop as contact photo
       try {
-        var blob = await new Promise(function(resolve) {
-          face.canvas.toBlob(resolve, 'image/png');
-        });
         var photoImg = new Image();
         photoImg.src = face.canvas.toDataURL('image/png');
         contactPhotos.set(id, { img: photoImg, w: 128, h: 128, isVideo: false, isGif: false });
-      } catch(e) { /* photo storage failed, continue */ }
+      } catch(e) {}
 
       imported++;
     }
 
     // Rebuild constellation
-    if (typeof buildNodes === 'function') buildNodes(true);
-    if (typeof renderObContacts === 'function') renderObContacts();
+    buildNodes(false);
+    try { updateBlufContent(); } catch(e) {}
 
-    // Update onboarding count
-    var obCount = document.getElementById('obContactCount');
-    if (obCount) obCount.textContent = DEMO_CONTACTS.length;
-    var obNext = document.getElementById('obNextBtn');
-    if (obNext && DEMO_CONTACTS.length > 0) obNext.style.display = '';
+    // Update onboarding
+    try {
+      var obContacts = document.getElementById('obContacts');
+      if (obContacts) { typeof renderObContacts === 'function' && renderObContacts(); }
+      var obCount = document.getElementById('obCount');
+      if (obCount) obCount.textContent = DEMO_CONTACTS.length + ' people added';
+      var obNextBtn = document.getElementById('obNextBtn');
+      if (obNextBtn && DEMO_CONTACTS.length > 0) obNextBtn.disabled = false;
+    } catch(e) {}
 
-    // Show success in modal
+    // Show success screen (matches existing doImport pattern)
+    var catLabel = cat === 'personal' ? 'Personal' : cat === 'professional' ? 'Professional' : cat === 'team' ? 'Team' : cat === 'family' ? 'Family' : 'circle';
     var modalBody = document.querySelector('.roster-modal .roster-body');
     var modalHeader = document.querySelector('.roster-modal .roster-header');
     if (modalBody) {
-      modalBody.innerHTML = '<div style="text-align:center;padding:40px 20px">' +
-        '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" style="margin-bottom:16px">' +
-        '<circle cx="12" cy="12" r="10" stroke="#4CAF50" stroke-width="2"/>' +
-        '<path d="M8 12l2.5 2.5L16 9" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-        '</svg>' +
-        '<p style="font-size:22px;font-weight:700;color:#C5A55A;margin:0 0 8px">' +
-        imported + ' Contacts Imported!</p>' +
-        '<p style="font-size:13px;color:rgba(255,255,255,0.5);margin:0 0 24px">from group photo face detection</p>' +
-        '<button onclick="RosterImport.close()" style="background:linear-gradient(135deg,#C5A55A,#8B7332);color:#000;border:none;' +
-        'padding:12px 32px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer">Done</button></div>';
+      modalBody.innerHTML =
+        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px">' +
+          '<div style="width:64px;height:64px;border-radius:50%;background:rgba(76,175,80,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:16px">' +
+            '<svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</div>' +
+          '<p style="color:#4CAF50;font:700 22px \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 8px">' + imported + ' Contact' + (imported !== 1 ? 's' : '') + ' Imported!</p>' +
+          '<p style="color:rgba(255,255,255,0.5);font:400 14px/1.4 \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 8px">Added to your ' + catLabel + ' circle from group photo</p>' +
+          '<p style="color:rgba(255,255,255,0.3);font:400 12px/1.4 \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 24px">Each face has been saved as a contact photo</p>' +
+          '<button onclick="RosterImport.close()" style="background:#C5A55A;color:#000;border:none;padding:12px 32px;border-radius:10px;font:600 15px \'Hanken Grotesk\',system-ui,sans-serif;cursor:pointer">Done</button>' +
+        '</div>';
     }
-    if (modalHeader) modalHeader.style.display = 'none';
+    if (modalHeader) {
+      var closeBtn = modalHeader.querySelector('button');
+      if (closeBtn) closeBtn.style.display = 'none';
+    }
   }
 
   async function doImport() {
@@ -11125,6 +11225,28 @@ var RosterImport = (function() {
           var inp = document.getElementById('rosterFileImg');
           inp.files = dt.files;
           handleImageFile(inp);
+        }
+      });
+    }
+  }, 500);
+
+  // Drag-and-drop support for group photo tab
+  setTimeout(function() {
+    var gpDz = document.getElementById('gpDropZone');
+    if (gpDz) {
+      gpDz.addEventListener('dragover', function(e) { e.preventDefault(); gpDz.classList.add('dragover'); });
+      gpDz.addEventListener('dragleave', function() { gpDz.classList.remove('dragover'); });
+      gpDz.addEventListener('drop', function(e) {
+        e.preventDefault();
+        gpDz.classList.remove('dragover');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+          var inp = document.getElementById('gpFileInput');
+          if (inp) {
+            var dt = new DataTransfer();
+            dt.items.add(e.dataTransfer.files[0]);
+            inp.files = dt.files;
+            handleGroupPhoto(inp);
+          }
         }
       });
     }
