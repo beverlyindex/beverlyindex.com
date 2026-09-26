@@ -4792,8 +4792,8 @@
           <button class="ob-contact-media-opt" onclick="_obOpenCamera('contact')">Take photo</button>
         </div>
       </div>
-      <input type="file" id="obContactFileInput" accept="image/*" hidden>
-      <input type="file" id="obContactCameraInput" accept="image/*" capture="environment" hidden>
+      <input type="file" id="obContactFileInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" hidden>
+      <input type="file" id="obContactCameraInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" capture="environment" hidden>
       <input class="ob-input" id="obFirst" type="text" placeholder="First name" data-i18n-placeholder="onboard.people.firstName" autocomplete="off" maxlength="30">
       <input class="ob-input" id="obLast" type="text" placeholder="Last name" data-i18n-placeholder="onboard.people.lastName" autocomplete="off" maxlength="30">
       <div class="ob-cat-row" id="obCatRow">
@@ -5738,7 +5738,7 @@
 
       <!-- Quick Action Bar -->
       <div class="bluf-quick-actions" id="blufQuickActions">
-        <button class="bluf-qa-btn sc-video-btn" id="qaVideoBtn" onclick="event.stopPropagation(); SentinelCall.callFocused();">Video</button>
+        <a class="bluf-qa-btn sc-video-btn" id="qaVideoBtn" href="facetime:" onclick="event.stopPropagation()">Video</a>
         <a class="bluf-qa-btn" id="qaCallBtn" href="tel:" onclick="event.stopPropagation()">Phone</a>
         <a class="bluf-qa-btn" id="qaTextBtn" href="sms:" onclick="event.stopPropagation()">Text</a>
         <a class="bluf-qa-btn" id="qaEmailBtn" href="mailto:" onclick="event.stopPropagation()">Email</a>
@@ -9455,6 +9455,12 @@ async function updateBlufContent() {
       _qaEmail.style.pointerEvents = _email ? 'auto' : 'none';
       _qaEmail.title = _email ? 'Email ' + selectedContact.first : 'No email on file — go to Profile to add';
     }
+    if (_qaVideo) {
+      _qaVideo.href = _phone ? 'facetime:' + _phone : '#';
+      _qaVideo.style.opacity = _phone ? '1' : '0.35';
+      _qaVideo.style.pointerEvents = _phone ? 'auto' : 'none';
+      _qaVideo.title = _phone ? 'Video call ' + selectedContact.first : 'No phone on file — go to Profile to add';
+    }
   }
 
 
@@ -11300,8 +11306,10 @@ function onPressEnd(e) {
               /* Fresh lookup from DEMO_CONTACTS to pick up edits */
               const _qcBase = _qaNode.contact;
               const _qc = DEMO_CONTACTS.find(c => c.id === _qcBase.id) || _qcBase;
-              if (_qi.type === 'video') {
-                SentinelCall.callContact(_qc.id);
+              if (_qi.type === 'video' && _qc.phone) {
+                window.location.href = 'facetime:' + _qc.phone;
+              } else if (_qi.type === 'video' && !_qc.phone) {
+                openQuickDial('video', _qc.first, _qc.id);
               } else if (_qi.type === 'phone' && _qc.phone) {
                 window.location.href = 'tel:' + _qc.phone;
               } else if (_qi.type === 'sms' && _qc.phone) {
@@ -18437,9 +18445,10 @@ document.querySelectorAll('#qaVideoBtn, #qaCallBtn, #qaTextBtn, #qaEmailBtn').fo
       var isEmail = this.id === 'qaEmailBtn';
       var isCall = this.id === 'qaCallBtn';
       var isText = this.id === 'qaTextBtn';
-      if ((isCall || isText) && selectedContact) {
+      var isVideo = this.id === 'qaVideoBtn';
+      if ((isCall || isText || isVideo) && selectedContact) {
         /* Open quick-dial so user can enter a number */
-        openQuickDial(isText ? 'sms' : 'call', selectedContact.first, selectedContact.id);
+        openQuickDial(isVideo ? 'video' : (isText ? 'sms' : 'call'), selectedContact.first, selectedContact.id);
       } else if (isEmail) {
         showToast('No email on file — go to Profile to add');
       } else {
@@ -18556,6 +18565,9 @@ function openQuickDial(mode, contactName, contactId) {
   if (mode === 'sms') {
     actionBtn.textContent = 'Text';
     actionBtn.className = 'quick-dial-text';
+  } else if (mode === 'video') {
+    actionBtn.textContent = 'Video Call';
+    actionBtn.className = 'quick-dial-call';
   } else {
     actionBtn.textContent = 'Call';
     actionBtn.className = 'quick-dial-call';
@@ -18591,6 +18603,8 @@ function execQuickDial() {
   closeQuickDial();
   if (_qdMode === 'sms') {
     window.location.href = 'sms:' + num;
+  } else if (_qdMode === 'video') {
+    window.location.href = 'facetime:' + num;
   } else {
     window.location.href = 'tel:' + num;
   }
