@@ -3437,6 +3437,65 @@
     color: var(--rim-cyan, #38bdf8);
     box-shadow: 0 1px 4px rgba(0,0,0,0.2);
   }
+
+
+  /* ── Contacts list popup (settings) ── */
+  .contacts-popup-overlay {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0,0,0,0.55); justify-content: center; align-items: center;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  .contacts-popup-overlay.open { display: flex; }
+  .contacts-popup {
+    background: #151928; border-radius: 16px; padding: 20px; width: 90%; max-width: 340px;
+    max-height: 70vh; overflow-y: auto; box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .contacts-popup h3 {
+    margin: 0 0 14px 0; font-size: 16px; color: #e0e4f0; font-weight: 600;
+  }
+  .contacts-popup-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer;
+    border-radius: 8px; transition: background 0.15s;
+  }
+  .contacts-popup-item:last-child { border-bottom: none; }
+  .contacts-popup-item:hover, .contacts-popup-item:active { background: rgba(56,189,248,0.08); }
+  .contacts-popup-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(56,189,248,0.25), rgba(168,85,247,0.25));
+    display: flex; align-items: center; justify-content: center;
+    font: 600 13px/1 "DM Sans", system-ui, sans-serif; color: #c0c8e0;
+    flex-shrink: 0; overflow: hidden;
+  }
+  .contacts-popup-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .contacts-popup-name { font-size: 14px; color: #d0d4e8; }
+  .contacts-popup-cat { font-size: 11px; color: rgba(160,170,210,0.5); text-transform: capitalize; }
+  .contacts-popup-close {
+    display: block; margin: 14px auto 0; background: none; border: 1px solid rgba(255,255,255,0.12);
+    color: #a0a8c8; font: 500 13px/1 "DM Sans", system-ui, sans-serif;
+    padding: 8px 24px; border-radius: 8px; cursor: pointer;
+  }
+  .contacts-popup-close:hover { background: rgba(255,255,255,0.06); }
+  /* ── Language switcher overlay (intro/onboarding) ── */
+  .lang-overlay-switcher {
+    position: absolute; top: env(safe-area-inset-top, 12px); right: 16px;
+    z-index: 9999; display: flex; align-items: center; gap: 0;
+    background: rgba(10,12,24,0.65); border-radius: 20px;
+    padding: 4px 2px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .lang-overlay-switcher button {
+    background: none; border: none; color: rgba(200,210,240,0.55);
+    font: 600 13px/1 "DM Sans", system-ui, sans-serif;
+    padding: 6px 12px; cursor: pointer; border-radius: 16px; transition: all 0.2s;
+  }
+  .lang-overlay-switcher button.active {
+    color: #fff; background: rgba(56,189,248,0.25);
+  }
+  .lang-overlay-switcher .lang-div {
+    width: 1px; height: 14px; background: rgba(255,255,255,0.18);
+  }
   .lang-switcher__divider {
     width: 1px;
     height: 14px;
@@ -4743,6 +4802,11 @@
 <!-- ═══ Video Intro ═══ -->
 <div class="video-intro" id="videoIntro">
   <video id="introVideo" playsinline muted></video>
+  <div class="lang-overlay-switcher" id="introLangSwitcher">
+    <button class="active" data-lang="en" onclick="_setLangOverlay(this,'en')">EN</button>
+    <span class="lang-div"></span>
+    <button data-lang="it" onclick="_setLangOverlay(this,'it')">IT</button>
+  </div>
   <button class="skip-btn" onclick="skipIntro()" aria-label="Skip intro video">Skip</button>
 </div>
 
@@ -4750,7 +4814,12 @@
 <div class="onboarding" id="onboarding" hidden role="region" aria-label="Setup wizard">
 
   <!-- Step 1: Your Name + Photo/Video -->
-  <div class="ob-step" id="obStep1">
+  <div class="ob-step" id="obStep1" style="position:relative;">
+    <div class="lang-overlay-switcher" id="obLangSwitcher" style="position:absolute;top:0;right:0;">
+      <button class="active" data-lang="en" onclick="_setLangOverlay(this,'en')">EN</button>
+      <span class="lang-div"></span>
+      <button data-lang="it" onclick="_setLangOverlay(this,'it')">IT</button>
+    </div>
     <h1 class="ob-heading">Set up your sphere</h1>
     <p class="ob-subtitle">Your name and image appear at the center of your galaxy.</p>
     <div class="ob-media-upload" id="obSelfMediaCircle" onclick="document.getElementById('obSelfFileInput').click()" role="button" tabindex="0" aria-label="Upload your photo or video">
@@ -5004,7 +5073,7 @@
     <div class="settings-section-title" data-i18n="settings.yourData">Your Data</div>
     <div class="settings-card">
       <div class="settings-data-grid" id="settingsDataGrid">
-        <div class="settings-data-stat"><span class="sds-num" id="statContacts">—</span><span class="sds-label">Contacts</span></div>
+        <div class="settings-data-stat" onclick="openContactsPopup()" style="cursor:pointer;" title="Click to see your contacts"><span class="sds-num" id="statContacts">—</span><span class="sds-label">Contacts</span></div>
         <div class="settings-data-stat"><span class="sds-num" id="statMoods">—</span><span class="sds-label">Moods</span></div>
         <div class="settings-data-stat"><span class="sds-num" id="statLedger">—</span><span class="sds-label">Interactions</span></div>
       </div>
@@ -5499,6 +5568,20 @@
           <div class="bluf-pull-content">
             <div class="profile-form" id="profileForm">
               <div class="profile-field-group">
+                <label class="profile-field-label">Phone</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="tel" class="profile-field-input" id="profilePhone" placeholder="Phone number" onclick="event.stopPropagation()" style="flex:1;">
+                  <button onclick="document.getElementById('profilePhone').value='';event.stopPropagation();" style="background:none;border:none;color:rgba(248,113,113,0.7);font-size:18px;cursor:pointer;padding:4px 8px;" title="Clear phone">&times;</button>
+                </div>
+              </div>
+              <div class="profile-field-group">
+                <label class="profile-field-label">Email</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="email" class="profile-field-input" id="profileEmail" placeholder="Email address" onclick="event.stopPropagation()" style="flex:1;">
+                  <button onclick="document.getElementById('profileEmail').value='';event.stopPropagation();" style="background:none;border:none;color:rgba(248,113,113,0.7);font-size:18px;cursor:pointer;padding:4px 8px;" title="Clear email">&times;</button>
+                </div>
+              </div>
+              <div class="profile-field-group">
                 <label class="profile-field-label" data-i18n="profile.birthday">Birthday</label>
                 <input type="date" class="profile-field-input" id="profileBirthday" onclick="event.stopPropagation()">
               </div>
@@ -5805,6 +5888,16 @@
 
 <!-- ═══ Add Person FAB (network constellation view) ═══ -->
 <!-- Quick-Dial Popup -->
+
+<!-- ═══ Contacts List Popup (settings) ═══ -->
+<div class="contacts-popup-overlay" id="contactsPopupOverlay" onclick="if(event.target===this)closeContactsPopup()">
+  <div class="contacts-popup">
+    <h3 id="contactsPopupTitle">Your Contacts</h3>
+    <div id="contactsPopupList"></div>
+    <button class="contacts-popup-close" onclick="closeContactsPopup()">Close</button>
+  </div>
+</div>
+
 <div class="quick-dial-overlay" id="quickDialOverlay" onclick="if(event.target===this)closeQuickDial()">
   <div class="quick-dial-box">
     <div class="quick-dial-title" id="quickDialTitle">Add Number</div>
@@ -6249,6 +6342,7 @@ async function launchGalaxy(savedContacts) {
             if (p.contactId === 'self') {
               media = img;
               mediaType = 'image';
+              mediaIsGif = (p.mimeType === 'image/gif');
               cachedMediaW = img.naturalWidth;
               cachedMediaH = img.naturalHeight;
               if (!mediaFrame) mediaFrame = document.createElement('canvas');
@@ -9438,13 +9532,13 @@ async function updateBlufContent() {
     const _phone = selectedContact.phone || '';
     const _email = selectedContact.email || '';
     if (_qaCall) {
-      _qaCall.href = _phone ? 'tel:' + _phone : '#';
+      _qaCall.href = _phone ? 'tel:' + normalizePhone(_phone) : '#';
       _qaCall.style.opacity = _phone ? '1' : '0.35';
       _qaCall.style.pointerEvents = _phone ? 'auto' : 'none';
       _qaCall.title = _phone ? 'Call ' + selectedContact.first : 'No phone on file — go to Profile to add';
     }
     if (_qaText) {
-      _qaText.href = _phone ? 'sms:' + _phone : '#';
+      _qaText.href = _phone ? 'sms:' + normalizePhone(_phone) : '#';
       _qaText.style.opacity = _phone ? '1' : '0.35';
       _qaText.style.pointerEvents = _phone ? 'auto' : 'none';
       _qaText.title = _phone ? 'Text ' + selectedContact.first : 'No phone on file — go to Profile to add';
@@ -9456,7 +9550,7 @@ async function updateBlufContent() {
       _qaEmail.title = _email ? 'Email ' + selectedContact.first : 'No email on file — go to Profile to add';
     }
     if (_qaVideo) {
-      _qaVideo.href = _phone ? 'facetime:' + _phone : '#';
+      _qaVideo.href = _phone ? 'facetime:' + normalizePhone(_phone) : '#';
       _qaVideo.style.opacity = _phone ? '1' : '0.35';
       _qaVideo.style.pointerEvents = _phone ? 'auto' : 'none';
       _qaVideo.title = _phone ? 'Video call ' + selectedContact.first : 'No phone on file — go to Profile to add';
@@ -10801,6 +10895,19 @@ async function loadProfile() {
     const ecPhone = document.getElementById('profileEmergencyPhone');
     const notes = document.getElementById('profileNotes');
 
+    /* Load phone/email from contact data */
+    var phoneField = document.getElementById('profilePhone');
+    var emailField = document.getElementById('profileEmail');
+    if (phoneField) {
+      var contactData = (typeof DEMO_CONTACTS !== 'undefined' && contactId !== 'self')
+        ? DEMO_CONTACTS.find(function(c) { return c.id === contactId; }) : null;
+      phoneField.value = (contactData && contactData.phone) || '';
+    }
+    if (emailField) {
+      var contactData2 = (typeof DEMO_CONTACTS !== 'undefined' && contactId !== 'self')
+        ? DEMO_CONTACTS.find(function(c) { return c.id === contactId; }) : null;
+      emailField.value = (contactData2 && contactData2.email) || '';
+    }
     if (profile) {
       if (bday) bday.value = profile.birthday || '';
       if (addr) addr.value = profile.address || '';
@@ -10849,6 +10956,21 @@ async function saveProfile() {
     emergencyPhone: (document.getElementById('profileEmergencyPhone') || {}).value || '',
     notes: (document.getElementById('profileNotes') || {}).value || ''
   };
+  /* Also save phone/email to contact record */
+  var _phoneVal = (document.getElementById('profilePhone') || {}).value || '';
+  var _emailVal = (document.getElementById('profileEmail') || {}).value || '';
+  if (contactId !== 'self' && typeof DEMO_CONTACTS !== 'undefined') {
+    var _cidx = DEMO_CONTACTS.findIndex(function(c) { return c.id === contactId; });
+    if (_cidx !== -1) {
+      DEMO_CONTACTS[_cidx].phone = _phoneVal.trim();
+      DEMO_CONTACTS[_cidx].email = _emailVal.trim();
+      try { RemielDB.putContact(DEMO_CONTACTS[_cidx]); } catch(e) {}
+      if (selectedContact && selectedContact.id === contactId) {
+        selectedContact.phone = _phoneVal.trim();
+        selectedContact.email = _emailVal.trim();
+      }
+    }
+  }
   try {
     await RemielDB.putProfile(profile);
     /* Flash saved message */
@@ -11307,21 +11429,25 @@ function onPressEnd(e) {
               const _qcBase = _qaNode.contact;
               const _qc = DEMO_CONTACTS.find(c => c.id === _qcBase.id) || _qcBase;
               if (_qi.type === 'video' && _qc.phone) {
-                window.location.href = 'facetime:' + _qc.phone;
+                window.location.href = 'facetime:' + normalizePhone(_qc.phone);
               } else if (_qi.type === 'video' && !_qc.phone) {
                 openQuickDial('video', _qc.first, _qc.id);
               } else if (_qi.type === 'phone' && _qc.phone) {
-                window.location.href = 'tel:' + _qc.phone;
+                window.location.href = 'tel:' + normalizePhone(_qc.phone);
               } else if (_qi.type === 'sms' && _qc.phone) {
-                window.location.href = 'sms:' + _qc.phone;
+                window.location.href = 'sms:' + normalizePhone(_qc.phone);
               } else if (_qi.type === 'email' && _qc.email) {
                 window.location.href = 'mailto:' + _qc.email;
               } else {
-                /* No contact info — open quick-dial for phone/text, toast for email */
-                if ((_qi.type === 'phone' || _qi.type === 'sms') && _qc) {
+                /* No contact info — open quick-dial overlay */
+                if (_qi.type === 'email' && _qc) {
+                  openQuickDial('email', _qc.first, _qc.id);
+                } else if ((_qi.type === 'phone' || _qi.type === 'sms') && _qc) {
                   openQuickDial(_qi.type === 'sms' ? 'sms' : 'call', _qc.first, _qc.id);
+                } else if (_qi.type === 'video' && _qc) {
+                  openQuickDial('video', _qc.first, _qc.id);
                 } else {
-                  showToast(_qi.type === 'email' ? 'No email on file — go to Profile to add' : 'No phone on file — go to Profile to add');
+                  showToast('No contact info on file');
                 }
               }
               pressStarted = false;
@@ -11478,6 +11604,7 @@ let mediaOX = 0, mediaOY = 0;
 let mediaZoom = 1;
 let cachedMediaW = 0, cachedMediaH = 0;
 let mediaFrame = null; // off-screen canvas caching last good video frame
+let mediaIsGif = false; // true when center sphere has an animated GIF
 let dragging = false;
 let dragStartX = 0, dragStartY = 0, dragOXStart = 0, dragOYStart = 0;
 
@@ -11652,6 +11779,7 @@ function handleMedia(e) {
     );
   }
 
+  mediaIsGif = (f.type === 'image/gif' || f.name.toLowerCase().endsWith('.gif'));
   if (f.type.startsWith('video/')) {
     mediaType = 'video';
     videoEl.src = url;
@@ -11687,7 +11815,7 @@ function handleMedia(e) {
       mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
       showPhotoControls();
       document.getElementById('mediaHint').textContent =
-        'Drag to reposition · Pinch or scroll to zoom';
+        mediaIsGif ? 'Drag to reposition · Pinch or scroll to zoom · GIF loops' : 'Drag to reposition · Pinch or scroll to zoom';
       setTimeout(closeOverlay, 700);
     };
     img.src = url;
@@ -12069,8 +12197,8 @@ function drawSphereView(t) {
       const px = cx + mediaOX - dw / 2;
       const py = cy + mediaOY - dh / 2;
       ctx.drawImage(media, px, py, dw, dh);
-      /* Capture video frame to off-screen canvas (survives Safari suspension) */
-      if (mediaType === 'video') {
+      /* Capture video/GIF frame to off-screen canvas (survives Safari suspension) */
+      if (mediaType === 'video' || mediaIsGif) {
         if (!mediaFrame) mediaFrame = document.createElement('canvas');
         if (mediaFrame.width !== mW || mediaFrame.height !== mH) {
           mediaFrame.width = mW; mediaFrame.height = mH;
@@ -12524,6 +12652,10 @@ function drawNetworkView(t) {
         cachedMediaW = vw; cachedMediaH = vh;
       }
     }
+    /* Re-capture animated GIF frame to mediaFrame each tick (browser animates <img>) */
+    if (media && mediaIsGif && mediaType === "image" && cachedMediaW > 0 && cachedMediaH > 0) {
+      mediaFrame.getContext("2d").drawImage(media, 0, 0, cachedMediaW, cachedMediaH);
+    }
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, cr * 0.82, 0, Math.PI * 2); ctx.clip();
     ctx.globalAlpha = 1.0;
@@ -12689,6 +12821,10 @@ function frame(ts) {
       if (mediaType === 'video' && media.readyState >= 2 && mediaFrame) {
         mediaFrame.getContext('2d').drawImage(media, 0, 0, mediaFrame.width, mediaFrame.height);
         miniPhoto = { img: mediaFrame, w: mediaFrame.width, h: mediaFrame.height };
+      } else if (mediaIsGif && mediaType === 'image' && mediaFrame && cachedMediaW > 0) {
+        /* Re-capture animated GIF to mediaFrame for mini-sphere */
+        mediaFrame.getContext('2d').drawImage(media, 0, 0, cachedMediaW, cachedMediaH);
+        miniPhoto = { img: mediaFrame, w: cachedMediaW, h: cachedMediaH };
       } else if (mediaType === 'image' && media.naturalWidth > 0) {
         miniPhoto = { img: media, w: media.naturalWidth, h: media.naturalHeight };
       }
@@ -18449,8 +18585,8 @@ document.querySelectorAll('#qaVideoBtn, #qaCallBtn, #qaTextBtn, #qaEmailBtn').fo
       if ((isCall || isText || isVideo) && selectedContact) {
         /* Open quick-dial so user can enter a number */
         openQuickDial(isVideo ? 'video' : (isText ? 'sms' : 'call'), selectedContact.first, selectedContact.id);
-      } else if (isEmail) {
-        showToast('No email on file — go to Profile to add');
+      } else if (isEmail && selectedContact) {
+        openQuickDial('email', selectedContact.first, selectedContact.id);
       } else {
         showToast('No phone on file — go to Profile to add');
       }
@@ -18551,6 +18687,23 @@ function openContactModal(mode, contact) {
 }
 
 
+
+/* ── Phone number normalization for tel:/sms:/facetime: URLs ── */
+function normalizePhone(raw) {
+  if (!raw) return '';
+  var s = raw.replace(/[\s\-\(\)\.]/g, '');
+  /* Already has + prefix (international) — keep as-is */
+  if (s.charAt(0) === '+') return s;
+  /* Starts with 00 (international prefix in some countries) — convert to + */
+  if (s.indexOf('00') === 0 && s.length > 4) return '+' + s.substring(2);
+  /* US/Canada 10-digit — add +1 */
+  if (/^\d{10}$/.test(s)) return '+1' + s;
+  /* US/Canada 11-digit starting with 1 */
+  if (/^1\d{10}$/.test(s)) return '+' + s;
+  /* Anything else — return cleaned digits (let the OS sort it out) */
+  return s;
+}
+
 /* ── Quick-Dial: let users enter a number inline when contact has none ── */
 var _qdMode = 'call'; /* 'call' or 'sms' */
 var _qdContactId = null;
@@ -18561,16 +18714,30 @@ function openQuickDial(mode, contactName, contactId) {
   var title = document.getElementById('quickDialTitle');
   var actionBtn = document.getElementById('quickDialAction');
   var inp = document.getElementById('quickDialInput');
-  title.textContent = (contactName ? contactName + ': ' : '') + 'Add Number';
-  if (mode === 'sms') {
-    actionBtn.textContent = 'Text';
-    actionBtn.className = 'quick-dial-text';
-  } else if (mode === 'video') {
-    actionBtn.textContent = 'Video Call';
+  if (mode === 'email') {
+    title.textContent = (contactName ? contactName + ': ' : '') + 'Add Email';
+    actionBtn.textContent = 'Email';
     actionBtn.className = 'quick-dial-call';
+    inp.type = 'email';
+    inp.placeholder = 'Enter email address';
+    inp.maxLength = 60;
+    inp.inputMode = 'email';
   } else {
-    actionBtn.textContent = 'Call';
-    actionBtn.className = 'quick-dial-call';
+    title.textContent = (contactName ? contactName + ': ' : '') + 'Add Number';
+    inp.type = 'tel';
+    inp.placeholder = 'Enter phone number';
+    inp.maxLength = 20;
+    inp.inputMode = 'tel';
+    if (mode === 'sms') {
+      actionBtn.textContent = 'Text';
+      actionBtn.className = 'quick-dial-text';
+    } else if (mode === 'video') {
+      actionBtn.textContent = 'Video Call';
+      actionBtn.className = 'quick-dial-call';
+    } else {
+      actionBtn.textContent = 'Call';
+      actionBtn.className = 'quick-dial-call';
+    }
   }
   inp.value = '';
   document.getElementById('quickDialOverlay').classList.add('open');
@@ -18580,33 +18747,102 @@ function openQuickDial(mode, contactName, contactId) {
 function closeQuickDial() {
   document.getElementById('quickDialOverlay').classList.remove('open');
 }
+/* ── Contacts list popup (settings screen) ── */
+function openContactsPopup() {
+  var list = document.getElementById('contactsPopupList');
+  var title = document.getElementById('contactsPopupTitle');
+  if (!list) return;
+  list.innerHTML = '';
+  var contacts = (typeof DEMO_CONTACTS !== 'undefined') ? DEMO_CONTACTS : [];
+  title.textContent = 'Your Contacts (' + contacts.length + ')';
+  if (contacts.length === 0) {
+    list.innerHTML = '<p style="color:rgba(160,170,210,0.6);font-size:13px;text-align:center;padding:20px 0;">No contacts yet</p>';
+  } else {
+    contacts.forEach(function(c) {
+      var initials = (c.first[0] + (c.last ? c.last[0] : '')).toUpperCase();
+      var row = document.createElement('div');
+      row.className = 'contacts-popup-item';
+      row.onclick = function() {
+        closeContactsPopup();
+        /* Navigate to this contact's sphere */
+        var node = nodes.find(function(n) { return n.contact && n.contact.id === c.id; });
+        if (node) { enterDetail(node.contact); }
+      };
+      var avatar = document.createElement('div');
+      avatar.className = 'contacts-popup-avatar';
+      /* Try to show contact photo */
+      var photo = contactPhotos.get(c.id);
+      if (photo && photo.img && photo.img.src) {
+        var img = document.createElement('img');
+        img.src = photo.img.src;
+        avatar.appendChild(img);
+      } else {
+        avatar.textContent = initials;
+      }
+      var info = document.createElement('div');
+      info.innerHTML = '<div class="contacts-popup-name">' + c.first + ' ' + (c.last || '') + '</div>' +
+        '<div class="contacts-popup-cat">' + (c.cat || 'other') + (c.phone ? ' · ' + c.phone : '') + '</div>';
+      row.appendChild(avatar);
+      row.appendChild(info);
+      list.appendChild(row);
+    });
+  }
+  document.getElementById('contactsPopupOverlay').classList.add('open');
+}
+
+function closeContactsPopup() {
+  document.getElementById('contactsPopupOverlay').classList.remove('open');
+}
+
+
+/* ── Overlay language switcher (intro video + onboarding) ── */
+function _setLangOverlay(btn, locale) {
+  /* Update all lang-overlay-switcher buttons */
+  document.querySelectorAll('.lang-overlay-switcher button').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.lang === locale);
+  });
+  /* Also sync the settings switcher */
+  document.querySelectorAll('.lang-switcher .lang-switcher__btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.lang === locale);
+    b.setAttribute('aria-checked', b.dataset.lang === locale ? 'true' : 'false');
+  });
+  if (typeof I18n !== 'undefined') I18n.setLocale(locale);
+}
+
 
 function execQuickDial() {
-  var num = document.getElementById('quickDialInput').value.trim();
-  if (!num) {
+  var val = document.getElementById('quickDialInput').value.trim();
+  if (!val) {
     document.getElementById('quickDialInput').focus();
     return;
   }
-  /* Save number to contact if we know which one */
+  /* Save to contact if we know which one */
   if (_qdContactId) {
     var idx = DEMO_CONTACTS.findIndex(function(c) { return c.id === _qdContactId; });
     if (idx !== -1) {
-      DEMO_CONTACTS[idx].phone = num;
+      if (_qdMode === 'email') {
+        DEMO_CONTACTS[idx].email = val;
+      } else {
+        DEMO_CONTACTS[idx].phone = val;
+      }
       try { RemielDB.putContact(DEMO_CONTACTS[idx]); } catch(e) {}
       if (selectedContact && selectedContact.id === _qdContactId) {
-        selectedContact.phone = num;
+        if (_qdMode === 'email') { selectedContact.email = val; }
+        else { selectedContact.phone = val; }
       }
       /* Refresh BLUF buttons */
       updateBlufContent().catch(function() {});
     }
   }
   closeQuickDial();
-  if (_qdMode === 'sms') {
-    window.location.href = 'sms:' + num;
+  if (_qdMode === 'email') {
+    window.location.href = 'mailto:' + val;
+  } else if (_qdMode === 'sms') {
+    window.location.href = 'sms:' + normalizePhone(val);
   } else if (_qdMode === 'video') {
-    window.location.href = 'facetime:' + num;
+    window.location.href = 'facetime:' + normalizePhone(val);
   } else {
-    window.location.href = 'tel:' + num;
+    window.location.href = 'tel:' + normalizePhone(val);
   }
 }
 
