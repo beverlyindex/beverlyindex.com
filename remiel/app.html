@@ -4452,6 +4452,14 @@
 .social-import-result { font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-top: 10px; }
 .social-import-result.success { background: rgba(46,213,115,0.15); color: #2ed573; }
 .social-import-result.error { background: rgba(248,113,113,0.15); color: #f87171; }
+.contact-picker-btn { position: relative; overflow: hidden; }
+.contact-picker-btn::after { content: ''; position: absolute; top: 4px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: #4CAF50; box-shadow: 0 0 4px rgba(76,175,80,0.6); }
+.contact-picker-progress { display: none; align-items: center; gap: 10px; padding: 12px; background: rgba(76,175,80,0.08); border-radius: 8px; margin-top: 10px; font-size: 12px; color: var(--text-primary, #fff); }
+.contact-picker-progress.active { display: flex; }
+.contact-picker-progress .cp-spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.15); border-top-color: #4CAF50; border-radius: 50%; animation: cpSpin 0.8s linear infinite; flex-shrink: 0; }
+@keyframes cpSpin { to { transform: rotate(360deg); } }
+.cp-photo-thumb { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08); }
+.cp-no-photo { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-dim, #999); flex-shrink: 0; }
 
 /* ── Location Sharing ── */
 .loc-share-section { margin-top: 10px; }
@@ -5033,12 +5041,20 @@
           <span class="si-icon" style="background:#FFFC00;color:#000;">&#x1F47B;</span>
           <span class="si-label">Snapchat</span>
         </button>
+        <button class="social-import-btn contact-picker-btn" id="contactPickerBtn" onclick="SocialImport.pickFromDevice()">
+          <span class="si-icon" style="background:linear-gradient(135deg,#4CAF50,#2196F3);">&#x1F4F1;</span>
+          <span class="si-label">Phone Contacts</span>
+        </button>
       </div>
       <div style="margin-top:10px;">
         <button class="social-import-btn" onclick="SocialImport.open('manual')" style="width:100%;justify-content:center;">
           <span class="si-icon" style="background:rgba(255,255,255,0.1);">+</span>
           <span class="si-label">Paste or Type Contacts</span>
         </button>
+      </div>
+      <div class="contact-picker-progress" id="contactPickerProgress">
+        <div class="cp-spinner"></div>
+        <span id="cpProgressText">Reading contacts from device...</span>
       </div>
     </div>
   </div>
@@ -15990,6 +16006,9 @@ const SocialImport = (() => {
     _$('siParseBtn').style.display = '';
     _$('siImportBtn').style.display = 'none';
 
+    _$('siTextarea').style.display = '';
+    _$('siHint').style.display = '';
+    _$('siImportBtn').onclick = function() { SocialImport.doImport(); };
     _$('socialImportModal').classList.add('active');
     setTimeout(function() { _$('siTextarea').focus(); }, 100);
   }
@@ -16174,12 +16193,296 @@ const SocialImport = (() => {
     return el.innerHTML;
   }
 
+  /* ── Contact Picker API (device address book import) ── */
+  let _pickedContacts = [];
+  let _pickedPhotos = {};  /* idx -> Blob */
+
+  function _isContactPickerSupported() {
+    return ('contacts' in navigator && 'ContactsManager' in window);
+  }
+
+  async function pickFromDevice() {
+    if (!_isContactPickerSupported()) {
+      /* Fallback for unsupported browsers (iOS Safari, desktop) */
+      showToast('Contact Picker is not supported on this browser. Use Chrome on Android, or paste contacts manually.');
+      open('manual');
+      return;
+    }
+
+    var progressEl = document.getElementById('contactPickerProgress');
+    var progressText = document.getElementById('cpProgressText');
+
+    try {
+      /* Determine supported properties */
+      var supported = await navigator.contacts.getProperties();
+      var props = ['name', 'tel', 'email'];
+      if (supported.includes('icon')) props.push('icon');
+      if (supported.includes('address')) props.push('address');
+
+      progressEl.classList.add('active');
+      progressText.textContent = 'Opening device contacts...';
+
+      /* Launch the native contact picker */
+      var results = await navigator.contacts.select(props, { multiple: true });
+
+      if (!results || results.length === 0) {
+        progressEl.classList.remove('active');
+        showToast('No contacts selected');
+        return;
+      }
+
+      progressText.textContent = 'Processing ' + results.length + ' contact' + (results.length !== 1 ? 's' : '') + '...';
+
+      /* Parse picked contacts into our format */
+      _pickedContacts = [];
+      _pickedPhotos = {};
+
+      for (var i = 0; i < results.length; i++) {
+        var r = results[i];
+        var fullName = (r.name && r.name[0]) ? r.name[0] : '';
+        var nameParts = fullName.trim().split(/\s+/);
+        var first = nameParts[0] || 'Contact';
+        var last = nameParts.slice(1).join(' ') || '';
+        /* Primary phone & email (first in list) */
+        var phone = (r.tel && r.tel[0]) ? r.tel[0] : '';
+        var email = (r.email && r.email[0]) ? r.email[0] : '';
+
+        /* Collect ALL additional phone numbers and emails */
+        var extraPhones = (r.tel && r.tel.length > 1) ? r.tel.slice(1) : [];
+        var extraEmails = (r.email && r.email.length > 1) ? r.email.slice(1) : [];
+        var extraInfo = [];
+        if (extraPhones.length > 0) extraInfo.push('Also: ' + extraPhones.join(', '));
+        if (extraEmails.length > 0) extraInfo.push('Email: ' + extraEmails.join(', '));
+
+        /* Address if available */
+        var address = '';
+        if (r.address && r.address[0]) {
+          var a = r.address[0];
+          var addrParts = [a.streetAddress, a.city, a.region, a.postalCode, a.country].filter(Boolean);
+          address = addrParts.join(', ');
+          if (address) extraInfo.push('Address: ' + address);
+        }
+
+        var entry = {
+          _idx: i,
+          _selected: true,
+          first: first,
+          last: last,
+          phone: phone,
+          email: email,
+          address: address,
+          extraPhones: extraPhones,
+          extraEmails: extraEmails,
+          notes: extraInfo.length > 0 ? extraInfo.join(' | ') : '',
+          source: 'device',
+        };
+        _pickedContacts.push(entry);
+
+        /* Store photo blob for later */
+        if (r.icon && r.icon[0] && r.icon[0] instanceof Blob) {
+          _pickedPhotos[i] = r.icon[0];
+        }
+      }
+
+      progressEl.classList.remove('active');
+
+      /* Show preview in the existing social import modal */
+      _showPickedPreview();
+
+    } catch (err) {
+      progressEl.classList.remove('active');
+      if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+        showToast('Contact access was denied. Please allow access in your browser settings.');
+      } else if (err.name !== 'AbortError') {
+        /* AbortError = user cancelled the picker, no message needed */
+        console.warn('Contact Picker error:', err);
+        showToast('Could not read contacts: ' + (err.message || 'Unknown error'));
+      }
+    }
+  }
+
+  function _showPickedPreview() {
+    _currentPlatform = 'device';
+    _parsedContacts = [];
+
+    _$('siTitle').textContent = 'Import from Device';
+    _$('siSubtitle').textContent = _pickedContacts.length + ' contact' + (_pickedContacts.length !== 1 ? 's' : '') + ' selected from your phone';
+    _$('siTextarea').style.display = 'none';
+    _$('siHint').style.display = 'none';
+    _$('siResult').style.display = 'none';
+    _$('siParseBtn').style.display = 'none';
+    _$('siImportBtn').style.display = '';
+    _$('siImportBtn').onclick = function() { importPickedContacts(); };
+
+    /* Build preview list with photos */
+    var preview = _$('siPreview');
+    preview.innerHTML = '';
+
+    _pickedContacts.forEach(function(c) {
+      var div = document.createElement('div');
+      div.className = 'social-import-preview-item';
+      var displayName = _esc(c.first + (c.last ? ' ' + c.last : ''));
+      var detail = [c.phone, c.email].filter(Boolean).join(' \u00b7 ') || '';
+
+      /* Photo thumbnail or initials */
+      var photoHtml = '';
+      if (_pickedPhotos[c._idx]) {
+        var url = URL.createObjectURL(_pickedPhotos[c._idx]);
+        photoHtml = '<img class="cp-photo-thumb" src="' + url + '" alt="">';
+      } else {
+        var initials = (c.first[0] || '').toUpperCase() + (c.last ? c.last[0].toUpperCase() : '');
+        photoHtml = '<span class="cp-no-photo">' + _esc(initials) + '</span>';
+      }
+
+      div.innerHTML =
+        '<input type="checkbox" class="si-check" checked data-idx="' + c._idx + '" onchange="SocialImport.togglePicked(' + c._idx + ',this.checked)">' +
+        photoHtml +
+        '<span>' + displayName + (detail ? ' <span style="color:var(--text-dim);font-size:11px;">' + _esc(detail) + '</span>' : '') + '</span>';
+      preview.appendChild(div);
+    });
+
+    preview.style.display = 'block';
+    _$('socialImportModal').classList.add('active');
+  }
+
+  function togglePicked(idx, checked) {
+    var c = _pickedContacts.find(function(p) { return p._idx === idx; });
+    if (c) c._selected = checked;
+  }
+
+  async function importPickedContacts() {
+    var selected = _pickedContacts.filter(function(c) { return c._selected; });
+    if (selected.length === 0) {
+      _showResult('No contacts selected.', true);
+      return;
+    }
+
+    _$('siImportBtn').disabled = true;
+    _$('siImportBtn').textContent = 'Importing...';
+
+    var imported = 0;
+    var skipped = 0;
+    var photosStored = 0;
+
+    for (var i = 0; i < selected.length; i++) {
+      var c = selected[i];
+      try {
+        /* Check for duplicate by name */
+        var allContacts = await RemielDB.getAllContacts();
+        var duplicate = allContacts.some(function(existing) {
+          return existing.first && existing.first.toLowerCase() === c.first.toLowerCase() &&
+                 (existing.last || '').toLowerCase() === (c.last || '').toLowerCase();
+        });
+        if (duplicate) { skipped++; continue; }
+
+        var newId = Date.now() + i;  /* offset to prevent ID collision */
+        var importNotes = 'Imported from device contacts';
+        if (c.notes) importNotes += ' | ' + c.notes;
+
+        var newContact = {
+          id: newId,
+          first: c.first,
+          last: c.last || '',
+          cat: 'friend',
+          sev: 3,
+          phone: c.phone || '',
+          email: c.email || '',
+          notes: importNotes,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+
+        /* Store address in profile if available */
+        if (c.address) {
+          try {
+            await RemielDB.putProfile({
+              contactId: newId,
+              address: c.address,
+              birthday: '',
+              doctor: '',
+              allergies: '',
+              emergencyName: '',
+              emergencyPhone: '',
+              notes: '',
+            });
+          } catch(ae) { console.warn('Contact Picker: profile save failed', ae); }
+        }
+
+        await RemielDB.putContact(newContact);
+        DEMO_CONTACTS.push(newContact);
+        imported++;
+
+        /* Store photo if available and load into galaxy */
+        if (_pickedPhotos[c._idx]) {
+          try {
+            var photoBlob = _pickedPhotos[c._idx];
+            await RemielDB.putPhoto(newId, photoBlob);
+            photosStored++;
+            /* Load into contactPhotos map so galaxy sphere shows it immediately */
+            (function(cId, blob) {
+              var _cpUrl = URL.createObjectURL(blob);
+              var _cpImg = new Image();
+              _cpImg.onload = function() {
+                contactPhotos.set(cId, { img: _cpImg, w: _cpImg.naturalWidth, h: _cpImg.naturalHeight });
+              };
+              _cpImg.src = _cpUrl;
+            })(newId, photoBlob);
+          } catch (pe) {
+            console.warn('Contact Picker: photo store failed for', c.first, pe);
+          }
+        }
+
+        if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) {
+          SyncEngine.markDirty();
+        }
+      } catch (e) {
+        console.warn('Contact Picker: import failed for', c.first, e);
+        skipped++;
+      }
+    }
+
+    var msg = 'Imported ' + imported + ' contact' + (imported !== 1 ? 's' : '');
+    if (photosStored > 0) msg += ' with ' + photosStored + ' photo' + (photosStored !== 1 ? 's' : '');
+    if (skipped > 0) msg += ' (' + skipped + ' skipped as duplicates)';
+    msg += '.';
+
+    _showResult(msg, false);
+    _$('siImportBtn').style.display = 'none';
+    _$('siImportBtn').disabled = false;
+    _$('siImportBtn').textContent = 'Import Selected';
+
+    /* Revoke photo object URLs */
+    var thumbs = document.querySelectorAll('.cp-photo-thumb');
+    thumbs.forEach(function(img) { try { URL.revokeObjectURL(img.src); } catch(e){} });
+
+    /* Clean up */
+    _pickedContacts = [];
+    _pickedPhotos = {};
+
+    /* Rebuild galaxy */
+    buildNodes(true);
+    if (typeof loadAndRender === 'function') {
+      setTimeout(function() { loadAndRender(); }, 500);
+    }
+  }
+
+  /* Hide contact picker button on unsupported browsers at startup */
+  try {
+    if (!_isContactPickerSupported()) {
+      var cpBtn = document.getElementById('contactPickerBtn');
+      if (cpBtn) cpBtn.style.display = 'none';
+    }
+  } catch(e) {}
+
   return {
     open: open,
     close: close,
     parse: parse,
     toggleItem: toggleItem,
     doImport: doImport,
+    pickFromDevice: pickFromDevice,
+    togglePicked: togglePicked,
+    importPickedContacts: importPickedContacts,
   };
 })();
 
