@@ -4164,9 +4164,8 @@
   .bluf-qa-btn {
     flex: 1;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
     padding: 10px 4px;
     background: var(--nous-panel, rgba(16,18,28,0.55));
     border: 1px solid var(--nous-line, rgba(42,51,72,0.5));
@@ -4185,10 +4184,7 @@
     border-color: rgba(255,255,255,0.14);
   }
   .bluf-qa-btn:active { transform: scale(0.96); background: rgba(56,189,248,0.08); border-color: rgba(56,189,248,0.3); }
-  .bluf-qa-icon {
-    font-size: 18px;
-    line-height: 1;
-  }
+  /* bluf-qa-icon removed — text-only labels */
 
 
   /* ═══════════════════════════════════
@@ -5742,22 +5738,10 @@
 
       <!-- Quick Action Bar -->
       <div class="bluf-quick-actions" id="blufQuickActions">
-        <button class="bluf-qa-btn sc-video-btn" id="qaVideoBtn" onclick="event.stopPropagation(); SentinelCall.callFocused();">
-          <span class="bluf-qa-icon">📹</span>
-          Video
-        </button>
-        <a class="bluf-qa-btn" id="qaCallBtn" href="tel:" onclick="event.stopPropagation()">
-          <span class="bluf-qa-icon">📞</span>
-          Call
-        </a>
-        <a class="bluf-qa-btn" id="qaTextBtn" href="sms:" onclick="event.stopPropagation()">
-          <span class="bluf-qa-icon">💬</span>
-          Text
-        </a>
-        <a class="bluf-qa-btn" id="qaEmailBtn" href="mailto:" onclick="event.stopPropagation()">
-          <span class="bluf-qa-icon">✉️</span>
-          Email
-        </a>
+        <button class="bluf-qa-btn sc-video-btn" id="qaVideoBtn" onclick="event.stopPropagation(); SentinelCall.callFocused();">Video</button>
+        <a class="bluf-qa-btn" id="qaCallBtn" href="tel:" onclick="event.stopPropagation()">Phone</a>
+        <a class="bluf-qa-btn" id="qaTextBtn" href="sms:" onclick="event.stopPropagation()">Text</a>
+        <a class="bluf-qa-btn" id="qaEmailBtn" href="mailto:" onclick="event.stopPropagation()">Email</a>
       </div>
 
   </div>
@@ -5832,6 +5816,7 @@
   </div>
 </div>
 <button class="add-person-fab hidden" id="addPersonFab" onclick="toggleAddModal()" aria-label="Add person">+</button>
+<button class="add-person-fab hidden" id="importContactsFab" onclick="openImportContacts()" aria-label="Import contacts" title="Import from Phone" style="bottom:100px;width:42px;height:42px;font-size:16px;background:linear-gradient(135deg,#4CAF50,#2196F3);">&#x1F4F1;</button>
 
 <!-- ═══ Contact Add/Edit Modal ═══ -->
 <div class="contact-modal-overlay" id="contactModalOverlay" onclick="if(event.target===this)closeContactModal()">
@@ -5843,6 +5828,11 @@
       </div>
       <span class="cm-photo-label" onclick="document.getElementById('cmPhotoFileInput').click()">Add photo or video</span>
       <input type="file" id="cmPhotoFileInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" hidden onchange="handleCmPhoto(event)">
+    </div>
+    <div id="cmImportRow" style="text-align:center;margin:-2px 0 6px;">
+      <button onclick="closeContactModal(); setTimeout(function(){ var sp = document.getElementById('settingsPanel'); if(!sp.classList.contains('open')) SettingsPanel.open(); var sec = document.getElementById('socialImportSection'); if(sec) sec.scrollIntoView({behavior:'smooth',block:'center'}); }, 300);" style="background:none;border:none;color:#4CAF50;font-size:12px;cursor:pointer;padding:4px 8px;text-decoration:underline;font-family:inherit;">
+        &#x1F4F1; Import multiple from Phone Contacts
+      </button>
     </div>
     <input class="contact-modal-input" id="cmFirstName" type="text" placeholder="First name (required)" maxlength="30" autocomplete="off">
     <input class="contact-modal-input" id="cmLastName" type="text" placeholder="Last name" maxlength="30" autocomplete="off">
@@ -6221,25 +6211,36 @@ async function launchGalaxy(savedContacts) {
     }
 
     /* Restore contact photos from blob storage */
-    const photos = await RemielDB.getAllPhotos();
+    let photos = [];
+    try {
+      photos = await RemielDB.getAllPhotos();
+    } catch(photoErr) {
+      console.warn('RemielDB: getAllPhotos failed', photoErr);
+    }
     console.log('RemielDB: loaded', photos.length, 'photo(s) from storage');
     for (const p of photos) {
-      if (p.blob instanceof Blob) {
-        const blobType = p.blob.type || '';
+      try {
+        if (!p || !p.contactId) continue;
+        /* Handle both Blob and raw ArrayBuffer/typed array from some IDB impls */
+        let blob = p.blob;
+        if (!blob) { console.warn('RemielDB: no blob for', p.contactId); continue; }
+        if (!(blob instanceof Blob)) {
+          /* Some browsers store the blob differently after serialization */
+          try { blob = new Blob([blob]); } catch(e) { console.warn('RemielDB: blob conversion failed for', p.contactId); continue; }
+        }
+        const blobType = blob.type || '';
+        console.log('RemielDB: restoring photo for', p.contactId, 'type:', blobType, 'size:', blob.size);
+        if (blob.size === 0) { console.warn('RemielDB: empty blob for', p.contactId); continue; }
         if (blobType.startsWith('video/')) {
           /* Video blob — load as looping video element */
-          if (p.contactId === 'self') {
-            loadBroadcastIntoSphere('self', p.blob);
-          } else {
-            loadBroadcastIntoSphere(p.contactId, p.blob);
-          }
+          loadBroadcastIntoSphere(p.contactId, blob);
         } else {
           /* Image/GIF blob — load as Image */
-          const url = URL.createObjectURL(p.blob);
+          const url = URL.createObjectURL(blob);
           const img = new Image();
           await new Promise((res) => {
             img.onload = res;
-            img.onerror = res;
+            img.onerror = () => { console.warn('RemielDB: image load failed for', p.contactId); res(); };
             img.src = url;
           });
           if (img.naturalWidth > 0) {
@@ -6255,10 +6256,16 @@ async function launchGalaxy(savedContacts) {
             } else {
               contactPhotos.set(p.contactId, { img, w: img.naturalWidth, h: img.naturalHeight });
             }
+            console.log('RemielDB: photo restored for', p.contactId, img.naturalWidth + 'x' + img.naturalHeight);
+          } else {
+            console.warn('RemielDB: image decoded with 0 width for', p.contactId);
           }
         }
+      } catch(restoreErr) {
+        console.warn('RemielDB: photo restore error for', p.contactId, restoreErr);
       }
     }
+    console.log('RemielDB: contactPhotos map now has', contactPhotos.size, 'entries');
 
     /* Restore broadcast videos on startup — show in sphere until replaced */
     try {
@@ -6503,7 +6510,21 @@ const RemielDB = (() => {
     if (blob instanceof File || (blob && blob.constructor && blob.constructor.name === 'File')) {
       blob = new Blob([await blob.arrayBuffer()], { type: blob.type || 'image/png' });
     }
+    if (!blob || blob.size === 0) {
+      console.warn('RemielDB.putPhoto: refusing empty blob for', contactId);
+      return false;
+    }
+    console.log('RemielDB.putPhoto:', contactId, 'type:', blob.type, 'size:', blob.size);
     var result = await promisify(tx('photos', 'readwrite').put({ contactId, blob, updatedAt: Date.now() }));
+    /* Verify the write succeeded by reading it back */
+    try {
+      var verify = await promisify(tx('photos', 'readonly').get(contactId));
+      if (!verify || !verify.blob) {
+        console.error('RemielDB.putPhoto: VERIFICATION FAILED for', contactId, '— photo not persisted!');
+      } else {
+        console.log('RemielDB.putPhoto: verified OK for', contactId, 'stored size:', verify.blob.size || verify.blob.byteLength || '?');
+      }
+    } catch(ve) { console.warn('RemielDB.putPhoto: verify read failed', ve); }
     /* Clear synced flag so next sync pushes this photo */
     try { await putSetting('_photoSynced_' + contactId, null); } catch(e) {}
     if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
@@ -9584,7 +9605,7 @@ const SentinelGuide = (() => {
 
   function onFocusSphere(contactName) {
     if (!_seen['focus-actions']) {
-      show('focus-actions', 'Call, text, or email ' + contactName + ' with the icons below', 'bottom', 5000);
+      show('focus-actions', 'Tap Video, Phone, Text, or Email beside ' + contactName, 'bottom', 5000);
     } else if (!_seen['focus-double']) {
       show('focus-double', 'Double-tap ' + contactName + '\'s sphere to see their full status', 'bottom', 4500);
     }
@@ -10108,54 +10129,58 @@ function getContactHeadline(contact) {
 
 /* ── Quick-action icon drawing for focused spheres ── */
 function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
-  /* Four icons: video, phone, SMS, email — drawn below the sphere */
-  const iconY = sy + r + 28 * s;          /* Below name label */
-  const iconSpacing = Math.max(22, 28 * s);
-  const iconR = Math.max(9, 11 * s);
-  const icons = [
-    { type: 'video', cx: sx - iconSpacing * 1.5 },
-    { type: 'phone', cx: sx - iconSpacing * 0.5 },
-    { type: 'sms',   cx: sx + iconSpacing * 0.5 },
-    { type: 'email', cx: sx + iconSpacing * 1.5 }
-  ];
-
-  /* Fade-in animation — icons pulse in */
-  const fadeAlpha = Math.min(1, 0.75 + 0.25 * Math.sin(t * 0.004));
-
-  for (const icon of icons) {
-    /* Circle background */
-    ctx.globalAlpha = 0.85 * fadeAlpha;
-    ctx.fillStyle = 'rgba(255,210,77,0.18)';
-    ctx.beginPath();
-    ctx.arc(icon.cx, iconY, iconR, 0, Math.PI * 2);
-    ctx.fill();
-
-    /* Circle border */
-    ctx.strokeStyle = '#ffd24d';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(icon.cx, iconY, iconR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    /* Icon symbol */
-    ctx.globalAlpha = 0.95 * fadeAlpha;
-    ctx.fillStyle = '#ffd24d';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const iFs = Math.max(8, Math.round(10 * s));
-    ctx.font = iFs + 'px system-ui, sans-serif';
-
-    if (icon.type === 'video') {
-      ctx.fillText('\u{1F4F9}', icon.cx, iconY);        /* 📹 video camera */
-    } else if (icon.type === 'phone') {
-      ctx.fillText('\u260E', icon.cx, iconY);           /* ☎ phone */
-    } else if (icon.type === 'sms') {
-      ctx.fillText('\u{1F4AC}', icon.cx, iconY);        /* 💬 speech bubble */
-    } else if (icon.type === 'email') {
-      ctx.fillText('\u2709', icon.cx, iconY);            /* ✉ envelope */
-    }
+  /* Four text labels arranged to the RIGHT of the focused sphere */
+  var labelFs = Math.max(9, Math.round(11 * s));
+  var lineH = Math.max(16, Math.round(20 * s));
+  var labels = ['Video', 'Phone', 'Text', 'Email'];
+  var startX = sx + r + Math.max(14, 18 * s); /* right of sphere edge */
+  var startY = sy - (labels.length * lineH) / 2 + lineH / 2;
+  var fadeAlpha = Math.min(1, 0.75 + 0.25 * Math.sin(t * 0.004));
+  /* Check if labels would go off-screen right; flip to left side if so */
+  var cvW = ctx.canvas.width / (window.devicePixelRatio || 1);
+  var flipLeft = (startX + 60) > cvW;
+  if (flipLeft) {
+    startX = sx - r - Math.max(14, 18 * s);
   }
-  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.font = '600 ' + labelFs + 'px system-ui, -apple-system, sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = flipLeft ? 'right' : 'left';
+  for (var i = 0; i < labels.length; i++) {
+    var ly = startY + i * lineH;
+    /* Tap-target pill background */
+    var tw = ctx.measureText(labels[i]).width;
+    var px = 8, py = 3;
+    var pillX = flipLeft ? startX - tw - px : startX - px;
+    var pillW = tw + px * 2;
+    var pillH = labelFs + py * 2;
+    var pillY = ly - pillH / 2;
+    ctx.globalAlpha = 0.65 * fadeAlpha;
+    ctx.fillStyle = 'rgba(16,18,28,0.82)';
+    var cr = pillH / 2;
+    ctx.beginPath();
+    ctx.moveTo(pillX + cr, pillY);
+    ctx.lineTo(pillX + pillW - cr, pillY);
+    ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + cr, cr);
+    ctx.lineTo(pillX + pillW, pillY + pillH - cr);
+    ctx.arcTo(pillX + pillW, pillY + pillH, pillX + pillW - cr, pillY + pillH, cr);
+    ctx.lineTo(pillX + cr, pillY + pillH);
+    ctx.arcTo(pillX, pillY + pillH, pillX, pillY + pillH - cr, cr);
+    ctx.lineTo(pillX, pillY + cr);
+    ctx.arcTo(pillX, pillY, pillX + cr, pillY, cr);
+    ctx.closePath();
+    ctx.fill();
+    /* Pill border */
+    ctx.globalAlpha = 0.5 * fadeAlpha;
+    ctx.strokeStyle = 'rgba(56,189,248,0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    /* Label text */
+    ctx.globalAlpha = 0.95 * fadeAlpha;
+    ctx.fillStyle = '#e0ecff';
+    ctx.fillText(labels[i], startX, ly);
+  }
+  ctx.restore();
 }
 
 /* ── Next Action Engine (CareCircle mechanics) ── */
@@ -11216,21 +11241,26 @@ function onPressEnd(e) {
           const _qaCb = pulseOn ? (1 + (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseAmp * Math.sin(performance.now() * (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseSpd + _qaNode.tx)) : 1;
           const _qaR = Math.max(2, _qaNode.r * _qaS * _qaMul * _qaCb);
           const _qaSx = _qaP.sx, _qaSy = _qaP.sy;
-          const _qaIconY = _qaSy + _qaR + 28 * _qaS;
-          const _qaSpacing = Math.max(22, 28 * _qaS);
-          const _qaIconR = Math.max(9, 11 * _qaS) + 6;  /* +6 for tap target padding */
+          /* Hit-test text labels on right (or left) side of sphere */
+          var _qaLabelFs = Math.max(9, Math.round(11 * _qaS));
+          var _qaLineH = Math.max(16, Math.round(20 * _qaS));
+          var _qaLabels = ['video', 'phone', 'sms', 'email'];
+          var _qaStartX = _qaSx + _qaR + Math.max(14, 18 * _qaS);
+          var _qaStartY = _qaSy - (_qaLabels.length * _qaLineH) / 2 + _qaLineH / 2;
+          var _qaCvW = CV.width / DPR;
+          var _qaFlip = (_qaStartX + 60) > _qaCvW;
+          if (_qaFlip) { _qaStartX = _qaSx - _qaR - Math.max(14, 18 * _qaS); }
           const _qaRect = CV.getBoundingClientRect();
           const _qaTx = clientX - _qaRect.left;
           const _qaTy = clientY - _qaRect.top;
-          const _qaIcons = [
-            { type: 'video', cx: _qaSx - _qaSpacing * 1.5 },
-            { type: 'phone', cx: _qaSx - _qaSpacing * 0.5 },
-            { type: 'sms',   cx: _qaSx + _qaSpacing * 0.5 },
-            { type: 'email', cx: _qaSx + _qaSpacing * 1.5 }
-          ];
-          for (const _qi of _qaIcons) {
-            const _qDist = Math.hypot(_qaTx - _qi.cx, _qaTy - _qaIconY);
-            if (_qDist <= _qaIconR) {
+          var _qaHitW = 70; /* generous tap width */
+          for (var _qai = 0; _qai < _qaLabels.length; _qai++) {
+            var _qi = { type: _qaLabels[_qai] };
+            var _qly = _qaStartY + _qai * _qaLineH;
+            var _qaHitLeft = _qaFlip ? _qaStartX - _qaHitW : _qaStartX - 8;
+            var _qaHitRight = _qaFlip ? _qaStartX + 8 : _qaStartX + _qaHitW;
+            if (_qaTx >= _qaHitLeft && _qaTx <= _qaHitRight &&
+                _qaTy >= _qly - _qaLineH / 2 && _qaTy <= _qly + _qaLineH / 2) {
               /* Icon tapped — trigger action */
               /* Fresh lookup from DEMO_CONTACTS to pick up edits */
               const _qcBase = _qaNode.contact;
@@ -11484,6 +11514,13 @@ function handleContactPhoto(e) {
   const contactId = selectedContact.id;
   const url = URL.createObjectURL(f);
 
+  /* Persist to IndexedDB FIRST, then load into memory */
+  RemielDB.putPhoto(contactId, f).then(function() {
+    console.log('Photo saved to DB for', contactId, '— now loading into sphere');
+  }).catch(function(err) {
+    console.error('RemielDB: photo save FAILED for', contactId, err);
+  });
+
   if (f.type.startsWith('video/')) {
     /* Video file — load as looping video element for sphere playback */
     const video = document.createElement('video');
@@ -11496,9 +11533,6 @@ function handleContactPhoto(e) {
       contactPhotos.set(contactId, { img: video, w: video.videoWidth, h: video.videoHeight, isVideo: true });
       const lbl = document.getElementById('contactPhotoBtnLabel');
       if (lbl) lbl.textContent = 'Change Photo';
-      RemielDB.putPhoto(contactId, f).catch(err =>
-        console.warn('RemielDB: photo save failed', err)
-      );
     });
   } else {
     /* Image or GIF — load as Image element */
@@ -11511,9 +11545,6 @@ function handleContactPhoto(e) {
       });
       const lbl = document.getElementById('contactPhotoBtnLabel');
       if (lbl) lbl.textContent = 'Change Photo';
-      RemielDB.putPhoto(contactId, f).catch(err =>
-        console.warn('RemielDB: photo save failed', err)
-      );
     };
     img.onerror = () => { console.warn('Failed to load contact photo'); };
     img.src = url;
@@ -18536,6 +18567,21 @@ function closeContactModal() {
   if (fab) fab.classList.remove('fab-open');
   _resetCmPhoto();
 }
+function openImportContacts() {
+  /* If Contact Picker API is available (Chrome Android), use it directly */
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    SocialImport.pickFromDevice();
+    return;
+  }
+  /* Otherwise open Settings and scroll to the Import Contacts section */
+  var sp = document.getElementById('settingsPanel');
+  if (!sp.classList.contains('open')) SettingsPanel.open();
+  setTimeout(function() {
+    var sec = document.getElementById('socialImportSection');
+    if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 300);
+}
+
 function toggleAddModal() {
   const overlay = document.getElementById('contactModalOverlay');
   const fab = document.getElementById('addPersonFab');
@@ -18609,10 +18655,12 @@ async function saveContactModal() {
       await RemielDB.putContact(newContact);
     } catch (e) { console.warn('Contact add failed', e); }
 
-    // Save staged photo/video from the modal
+    // Save staged photo/video from the modal — AWAIT the DB write
     if (_cmPhotoBlob) {
       try {
+        console.log('Saving modal photo for new contact', newId, 'type:', _cmPhotoBlob.type, 'size:', _cmPhotoBlob.size);
         await RemielDB.putPhoto(newId, _cmPhotoBlob);
+        console.log('Modal photo persisted for', newId);
         if (_cmPhotoIsVideo) {
           loadBroadcastIntoSphere(newId, _cmPhotoBlob);
         } else {
@@ -18621,11 +18669,15 @@ async function saveContactModal() {
             var _img = new Image();
             _img.onload = function() {
               contactPhotos.set(cId, { img: _img, w: _img.naturalWidth, h: _img.naturalHeight });
+              console.log('Modal photo loaded into sphere for', cId);
+            };
+            _img.onerror = function() {
+              console.error('Modal photo Image load FAILED for', cId);
             };
             _img.src = _url;
           })(newId, _cmPhotoBlob);
         }
-      } catch(e) { console.warn('Modal photo save failed', e); }
+      } catch(e) { console.error('Modal photo save FAILED', newId, e); }
     }
 
     // Rebuild constellation nodes
@@ -18665,11 +18717,13 @@ async function deleteContactFromModal() {
 /* ── FAB visibility: show only in network mode when BLUF and overlays are closed ── */
 function updateFabVisibility() {
   const fab = document.getElementById('addPersonFab');
+  const impFab = document.getElementById('importContactsFab');
   if (!fab) return;
   const shouldShow = (appState === 'network' || appState === 'self') && !blufOpen &&
     !document.getElementById('contactModalOverlay').classList.contains('open') &&
     !document.getElementById('overlay').classList.contains('open');
   fab.classList.toggle('hidden', !shouldShow);
+  if (impFab) impFab.classList.toggle('hidden', !shouldShow);
 }
 
 /* Patch enterNetwork / enterSelf / openBluf / closeBluf to update FAB visibility */
