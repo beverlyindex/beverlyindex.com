@@ -9053,6 +9053,7 @@ let videoRevealed = false;
 let blufLastTapTime = 0;
 
 function openBluf(sphereScreenY) {
+  if (_restModeActive) _exitRestMode();
   SentinelGuide.onOpenBluf();
   blufOpen = true;
   callRevealed = false;
@@ -9401,6 +9402,56 @@ let bcMuted = false;
 
 /* ── Sphere focus / single-double tap state ── */
 let focusedContactId = null;   /* ID of the currently focused orbit sphere */
+
+/* ── Rest Mode — auto-dream when idle ── */
+var _lastInteractionTime = Date.now();
+var _restModeActive = false;
+var _restCycleTimer = null;
+var _REST_IDLE_MS = 30000;      /* 30 seconds of no touch → rest mode */
+var _REST_CYCLE_MS = 12000;     /* cycle dream image every 12 seconds */
+
+/* Track all user interactions for rest mode */
+['pointerdown', 'pointermove', 'touchstart', 'mousedown', 'keydown', 'wheel', 'scroll'].forEach(function(evt) {
+  document.addEventListener(evt, _markInteraction, { passive: true, capture: true });
+});
+
+function _markInteraction() {
+  _lastInteractionTime = Date.now();
+  if (_restModeActive) _exitRestMode();
+}
+
+function _exitRestMode() {
+  _restModeActive = false;
+  if (_restCycleTimer) { clearInterval(_restCycleTimer); _restCycleTimer = null; }
+  /* If rest mode set the focusedContactId, clear it */
+  if (focusedContactId && !blufOpen) {
+    focusedContactId = null;
+  }
+}
+
+function _enterRestMode() {
+  if (_restModeActive) return;
+  if (blufOpen || appState !== 'network') return;
+  _restModeActive = true;
+  _cycleDreamContact();
+  _restCycleTimer = setInterval(_cycleDreamContact, _REST_CYCLE_MS);
+}
+
+function _cycleDreamContact() {
+  if (blufOpen || appState !== 'network') { _exitRestMode(); return; }
+  /* Pick a random contact that has a photo, or any contact if none have photos */
+  var withPhotos = DEMO_CONTACTS.filter(function(c) { return contactPhotos.has(c.id); });
+  var pool = withPhotos.length > 0 ? withPhotos : DEMO_CONTACTS;
+  if (pool.length === 0) return;
+  /* Avoid showing the same contact twice in a row */
+  var pick;
+  var attempts = 0;
+  do {
+    pick = pool[Math.floor(Math.random() * pool.length)];
+    attempts++;
+  } while (pick.id === focusedContactId && pool.length > 1 && attempts < 5);
+  focusedContactId = pick.id;
+}
 let sphereTapTimer = null;     /* Timer for single/double tap detection */
 let sphereTapTarget = null;    /* { isCenter, contactId, sphereScreenY } from first tap */
 const SPHERE_TAP_MS = 300;    /* Window for double tap detection */
@@ -12056,6 +12107,12 @@ function drawNetworkView(t) {
 
   /* Physics */
   stepPhys();
+
+  /* ── Rest Mode — auto-dream idle check ── */
+  if (!_restModeActive && !blufOpen && appState === 'network' &&
+      (Date.now() - _lastInteractionTime) > _REST_IDLE_MS && DEMO_CONTACTS.length > 0) {
+    _enterRestMode();
+  }
 
   /* Auto-spin */
   if (netSpin && !netDragging) netYaw += 0.0022;
