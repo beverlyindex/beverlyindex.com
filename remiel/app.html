@@ -1245,7 +1245,7 @@
     position: fixed;
     inset: 0;
     z-index: 9000;
-    display: none;
+    display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -6811,9 +6811,16 @@ window.addEventListener('beforeinstallprompt', (e) => {
   deferredA2hsPrompt = e;
 });
 
-/* Gate screen eliminated — go straight to video intro */
-(function() {
-  beginVideoIntro();
+/* Auto-authenticate: set the primary code and submit the gate automatically */
+(async function autoGateEntry() {
+  try {
+    var input = document.getElementById('gateInput');
+    if (input) { input.value = 'BEVR'; }
+    await submitGateCode();
+  } catch(e) {
+    /* Fallback: skip gate directly */
+    beginVideoIntro();
+  }
 })();
 
 async function submitGateCode() {
@@ -9482,11 +9489,11 @@ function _updateGroupMonitorUI() {
           hrDisplay +
         '</div>' +
         '<div style="display:flex;gap:8px;align-items:center;">' +
-          '<select onchange="bioGroupMapDevice('' + devId + '', this.value ? parseInt(this.value) : null)" ' +
+          '<select onchange="bioGroupMapDevice(\'' + devId + '\', this.value ? parseInt(this.value) : null)" ' +
             'style="flex:1;background:rgba(0,0,0,0.3);color:var(--text-bright);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:5px 8px;font-size:11px;appearance:auto;-webkit-appearance:auto;">' +
             contactOpts +
           '</select>' +
-          '<button onclick="bioGroupDisconnect('' + devId + '')" ' +
+          '<button onclick="bioGroupDisconnect(\'' + devId + '\')" ' +
             'style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">Disconnect</button>' +
         '</div>' +
       '</div>';
@@ -12635,8 +12642,8 @@ var RosterImport = (function() {
               '<div class="gp-banner-body">' +
                 '<p>No faces detected in this image.</p>' +
                 '<p style="font-weight:400;font-size:13px;opacity:0.8">Try a clearer photo where faces are visible and well-lit. Close-up group shots work best.</p>' +
-                '<button class="gp-retry-btn" onclick="document.getElementById('gpDropZone').style.display='';document.getElementById('gpFacePreview').innerHTML='';document.getElementById('gpFileInput').click()">Try Another Photo</button>' +
-                '<button class="gp-alt-btn" onclick="RosterImport.switchTab('image')" style="margin-left:8px">Use Image OCR Instead</button>' +
+                '<button class="gp-retry-btn" onclick="document.getElementById(&apos;gpDropZone&apos;).style.display=&apos;&apos;;document.getElementById(&apos;gpFacePreview&apos;).innerHTML=&apos;&apos;;document.getElementById(&apos;gpFileInput&apos;).click()">Try Another Photo</button>' +
+                '<button class="gp-alt-btn" onclick="RosterImport.switchTab(&apos;image&apos;)" style="margin-left:8px">Use Image OCR Instead</button>' +
               '</div>' +
             '</div>';
           return;
@@ -12692,8 +12699,8 @@ var RosterImport = (function() {
             '<div class="gp-banner-body">' +
               '<p>Face detection failed</p>' +
               '<p style="font-weight:400;font-size:13px;opacity:0.8">' + (err.message || 'Could not load the face detection engine. Check your internet connection and try again.') + '</p>' +
-              '<button class="gp-retry-btn" onclick="document.getElementById('gpDropZone').style.display='';document.getElementById('gpFacePreview').innerHTML='';document.getElementById('gpFileInput').click()">Try Again</button>' +
-              '<button class="gp-alt-btn" onclick="RosterImport.switchTab('image')" style="margin-left:8px">Use Image OCR Instead</button>' +
+              '<button class="gp-retry-btn" onclick="document.getElementById(&apos;gpDropZone&apos;).style.display=&apos;&apos;;document.getElementById(&apos;gpFacePreview&apos;).innerHTML=&apos;&apos;;document.getElementById(&apos;gpFileInput&apos;).click()">Try Again</button>' +
+              '<button class="gp-alt-btn" onclick="RosterImport.switchTab(&apos;image&apos;)" style="margin-left:8px">Use Image OCR Instead</button>' +
             '</div>' +
           '</div>';
       });
@@ -12706,7 +12713,7 @@ var RosterImport = (function() {
           '<div class="gp-banner-body">' +
             '<p>Could not load this image</p>' +
             '<p style="font-weight:400;font-size:13px;opacity:0.8">The file may be corrupted or in an unsupported format.</p>' +
-            '<button class="gp-retry-btn" onclick="document.getElementById('gpDropZone').style.display='';document.getElementById('gpFacePreview').innerHTML='';document.getElementById('gpFileInput').click()">Try Another Photo</button>' +
+            '<button class="gp-retry-btn" onclick="document.getElementById(&apos;gpDropZone&apos;).style.display=&apos;&apos;;document.getElementById(&apos;gpFacePreview&apos;).innerHTML=&apos;&apos;;document.getElementById(&apos;gpFileInput&apos;).click()">Try Another Photo</button>' +
           '</div>' +
         '</div>';
     };
