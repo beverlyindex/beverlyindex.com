@@ -4542,6 +4542,9 @@
 .cp-photo-thumb { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08); }
 .cp-no-photo { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-dim, #999); flex-shrink: 0; }
 
+  /* Hidden container to keep GIF images animating for canvas draw */
+  #gifAnimationHost { position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; overflow:hidden; pointer-events:none; }
+
 /* ── Onboarding Roster Shortcut ── */
 .ob-divider { display:flex; align-items:center; gap:12px; margin:18px 0 14px; width:100%; }
 .ob-divider-line { flex:1; height:1px; background:rgba(255,255,255,0.06); }
@@ -10347,6 +10350,22 @@ var RosterImport = (function() {
     document.getElementById('rosterImportBtn').style.display = 'none';
     var ocrP = document.getElementById('rosterOcrProgress');
     if (ocrP) ocrP.style.display = 'none';
+    /* Reset paste area */
+    var pa = document.getElementById('rosterPasteArea');
+    if (pa) pa.value = '';
+    /* Restore modal body if it was replaced by success screen */
+    var mb = document.querySelector('.roster-modal .roster-body');
+    if (mb && mb.querySelector('.roster-import-btn') === null) {
+      /* Success screen is showing — need to rebuild the body. Just close and reopen overlay */
+      document.getElementById('rosterOverlay').classList.remove('open');
+      setTimeout(function() {
+        location.reload();
+      }, 100);
+      return;
+    }
+    /* Restore header close button if hidden */
+    var hdr = document.querySelector('.roster-modal .roster-header button');
+    if (hdr) hdr.style.display = '';
     switchTab('image');
   }
 
@@ -10452,8 +10471,38 @@ var RosterImport = (function() {
 
   function _parseRosterText(text) {
     var results = [];
-    var lines = text.split(/\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+    var lines = text.split(/\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 1; });
     if (!lines.length) return results;
+
+    /* ── Junk filters ── */
+    var JUNK_RE = /^(#|name[\s,]|first[\s,]|last[\s,]|player[\s,]|roster|team[\s,]|no\.\s|jersey|subscribe|learn more|sign in|log in|my account|nfl\s|shop|tickets|fantasy|menu|home|footer|copyright|privacy|terms|©|\d{4}\s*(nfl|mlb|nba|nhl)|cookie|accept|close|search|navigation|breadcrumb|skip to|advertisement|sponsored|loading|prev|next|page \d|showing|filter|sort by|see all|view all|back to|more info|get more|download|install|app store|google play|follow us|social|share|tweet|facebook|instagram|youtube|tiktok|contact us|about us|help|faq|sitemap|accessibility|all rights)/i;
+
+    var WEB_NOISE_RE = /^(x|menu|vs\.?|at\s|am|pm|est|pst|cst|mst|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|mon|tue|wed|thu|fri|sat|sun|today|yesterday|tomorrow|live|final|win|loss|record|streak|schedule|standings|scores|stats|news|video|photos?|gallery|more|expand|collapse|show|hide|tab[s]?|section|header|row|column|table|game|games|season|week \d)$/i;
+
+    /* Comprehensive sports position set */
+    var POS_SET = new Set([
+      'qb','rb','wr','te','ol','c','og','ot','g','t','fb','hb','k','p','ls',
+      'de','dt','dl','nt','lb','ilb','olb','mlb','cb','s','ss','fs','db','saf',
+      'edge','nickel','dime','flex',
+      'pg','sg','sf','pf','gf','c/f','f/c','g/f',
+      'sp','rp','cp','1b','2b','3b','rf','lf','cf','dh','if','of','rhp','lhp',
+      'lw','rw','ld','rd','gk','g/d','d/rw','d/lw',
+      'gk','cb','lb','rb','lwb','rwb','cdm','cm','cam','lm','rm','lw','rw',
+      'cf','st','ss','am','dm','mf','fw','df',
+      'act','active','inactive','ir','pup','res','sus','ret','ps','exp','r',
+      'vet','rook','rookie','starter','backup','reserve',
+      'hc','oc','dc','st','qbc','rbc','wrc','dbc','dlc','lbc','stc','asst',
+      'head coach','offensive coordinator','defensive coordinator',
+      'coach','trainer','manager','director','coordinator','analyst','scout'
+    ]);
+
+    /* Status/column words that appear in roster tables */
+    var STATUS_WORDS = new Set(['act','active','inactive','ir','pup','injured','reserve','exempt',
+      'suspended','practice','squad','questionable','doubtful','probable','out','dnp','day-to-day',
+      'healthy','limited','full','did not participate']);
+
+    /* Common college abbreviations and names to strip */
+    var COLLEGE_RE = /\b(alabama|arizona|arkansas|auburn|baylor|boston|brigham|cal|california|carolina|central|cincinnati|clemson|coastal|colorado|connecticut|cornell|dartmouth|duke|east|eastern|florida|fresno|georgia|gonzaga|hawaii|houston|idaho|illinois|indiana|iowa|kansas|kentucky|lsu|louisiana|louisville|maine|maryland|massachusetts|memphis|miami|michigan|minnesota|mississippi|missouri|montana|navy|nebraska|nevada|north|northern|northwestern|notre dame|ohio|oklahoma|ole miss|oregon|penn|pittsburgh|princeton|purdue|rice|rutgers|san\s+(diego|jose|francisco)|smu|south|southern|stanford|syracuse|temple|tennessee|texas|tcu|troy|tulane|tulsa|uab|ucf|ucla|uconn|umass|unlv|usc|utah|utsa|vanderbilt|villanova|virginia|vmi|wake\s+forest|washington|weber|west\s+virginia|western|wisconsin|wyoming|yale|young|holy\s+cross|michigan\s+state|ohio\s+state|penn\s+state|ball\s+state|boise\s+state|iowa\s+state|kansas\s+state|kent\s+state|utah\s+state|san\s+diego\s+state|app\w*\s+state|florida\s+state|georgia\s+tech)\b/i;
 
     var delim = null;
     for (var li = 0; li < Math.min(lines.length, 5); li++) {
@@ -10467,17 +10516,23 @@ var RosterImport = (function() {
     });
 
     lines.forEach(function(line) {
-      // Skip obvious headers
-      if (/^(#|name|first|last|player|roster|team|no\.|jersey)/i.test(line)) return;
-      if (line.length < 2) return;
+      /* Skip obvious junk */
+      if (JUNK_RE.test(line)) return;
+      if (WEB_NOISE_RE.test(line.replace(/\s+/g, ' ').trim())) return;
+      if (line.length < 3 || line.length > 200) return;
 
-      // Strip leading numbers/bullets
+      /* Skip lines that are mostly numbers or special chars */
+      var alphaCount = (line.match(/[a-zA-Z]/g) || []).length;
+      if (alphaCount < 3) return;
+      if (alphaCount / line.length < 0.3) return;
+
+      /* Strip leading numbers/bullets */
       line = line.replace(/^[\d]+[.)\-:\s]+/, '').replace(/^[-*•·]\s*/, '').trim();
-      if (!line) return;
+      if (!line || line.length < 3) return;
 
       var phone = '';
       var email = '';
-      // Extract phone
+      /* Extract phone */
       var phoneMatch = line.match(/(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
       if (phoneMatch) {
         phone = phoneMatch[1].replace(/[^\d+]/g, '');
@@ -10485,12 +10540,15 @@ var RosterImport = (function() {
         else if (phone.length === 11 && phone[0] === '1') phone = '+' + phone;
         line = line.replace(phoneMatch[0], '').trim();
       }
-      // Extract email
+      /* Extract email */
       var emailMatch = line.match(/([\w.+-]+@[\w.-]+\.[a-z]{2,})/i);
       if (emailMatch) {
         email = emailMatch[1];
         line = line.replace(emailMatch[0], '').trim();
       }
+
+      /* Extract position if present */
+      var position = '';
 
       var parts;
       if (delim === 'MULTI_SPACE') {
@@ -10498,46 +10556,82 @@ var RosterImport = (function() {
       } else if (delim) {
         parts = line.split(delim === '\t' ? /\t/ : delim === '|' ? /\|/ : /,/);
       } else {
+        /* No clear delimiter — split by spaces and identify name tokens */
         parts = [line];
       }
 
       parts = parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
 
-      // First part should be the name
       var rawName = parts[0] || '';
-      // Remove trailing position indicators
-      rawName = rawName.replace(/\s*[-–]\s*$/, '').trim();
+      rawName = rawName.replace(/\s*[-–—]\s*$/, '').trim();
 
-      // Split name into first/last
-      var nameParts = rawName.split(/\s+/).filter(function(p) {
-        return !_POS.has(p.toLowerCase()) && !/^\d+$/.test(p) && p.length > 0;
+      /* Tokenize and filter aggressively */
+      var tokens = rawName.split(/\s+/);
+      var nameTokens = [];
+      var extraTokens = [];
+
+      tokens.forEach(function(tok) {
+        var lower = tok.toLowerCase().replace(/[^a-z]/g, '');
+        /* Skip if it is a known position, status, or pure number */
+        if (POS_SET.has(lower)) { if (!position) position = tok.toUpperCase(); return; }
+        if (STATUS_WORDS.has(lower)) return;
+        if (/^\d+$/.test(tok)) return;
+        /* Skip single characters unless they are initials (followed by period or part of name like T.J.) */
+        if (tok.length === 1 && !/^[A-Z]$/.test(tok)) return;
+        /* Skip tokens that look like garbled OCR (random 2-char combos) */
+        if (tok.length === 2 && /^[A-Z][a-z]$/.test(tok) && !['Al','Ed','Bo','Jo','Ty','CJ','DJ','TJ','AJ','JJ','JR','Jr','Sr','II','IV','VI'].includes(tok)) {
+          return;
+        }
+        /* Skip bracketed junk */
+        if (/^\[.*\]$/.test(tok) || /^\(.*\)$/.test(tok)) return;
+        /* Skip tokens that are just special characters */
+        if (/^[^a-zA-Z]+$/.test(tok)) return;
+
+        /* Check if it looks like a college name (multi-word matched separately) */
+        if (COLLEGE_RE.test(tok) && nameTokens.length >= 2) return;
+
+        nameTokens.push(tok);
       });
 
-      if (!nameParts.length) return;
-
-      var first = _titleCase(nameParts[0]);
-      var last = nameParts.length > 1 ? _titleCase(nameParts.slice(1).join(' ')) : '';
-
-      // Check for phone/email in remaining parts
-      if (!phone && parts.length > 1) {
+      /* Also check remaining parts for phone/email/position */
+      if (parts.length > 1) {
         for (var pi = 1; pi < parts.length; pi++) {
-          var pm = parts[pi].match(/(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
-          if (pm) { phone = pm[1].replace(/[^\d+]/g, ''); break; }
-        }
-      }
-      if (!email && parts.length > 1) {
-        for (var ei = 1; ei < parts.length; ei++) {
-          var em = parts[ei].match(/([\w.+-]+@[\w.-]+\.[a-z]{2,})/i);
-          if (em) { email = em[1]; break; }
+          var pval = parts[pi].trim();
+          if (!pval) continue;
+          var pLow = pval.toLowerCase().replace(/[^a-z]/g, '');
+          if (POS_SET.has(pLow) && !position) { position = pval.toUpperCase(); continue; }
+          if (!phone) {
+            var pm = pval.match(/(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
+            if (pm) { phone = pm[1].replace(/[^\d+]/g, ''); continue; }
+          }
+          if (!email) {
+            var em = pval.match(/([\w.+-]+@[\w.-]+\.[a-z]{2,})/i);
+            if (em) { email = em[1]; continue; }
+          }
         }
       }
 
-      // Duplicate check
-      var fullName = (first + ' ' + last).toLowerCase().trim();
-      if (existingNames[fullName]) return;
+      /* Limit name tokens — a real person name is 2-5 tokens */
+      if (nameTokens.length > 5) nameTokens = nameTokens.slice(0, 5);
+      if (!nameTokens.length) return;
 
-      if (first && first.length < 30) {
-        results.push({ first: first, last: last, phone: phone, email: email, checked: true });
+      /* Must have at least a first name of 2+ letters */
+      if (nameTokens[0].replace(/[^a-zA-Z]/g, '').length < 2) return;
+
+      var first = _titleCase(nameTokens[0]);
+      var last = nameTokens.length > 1 ? _titleCase(nameTokens.slice(1).join(' ')) : '';
+
+      /* Additional validation: skip if the full name matches common non-name patterns */
+      var fullCheck = (first + ' ' + last).toLowerCase().trim();
+      if (/^(the|this|that|they|there|here|what|which|where|when|how|more|less|all|any|some|new|old|big|small|get|set|add|see|try|use|buy|sell|win|run|play|show|hide|open|close|back|home|page|view|edit|save|load|find|help)(\s|$)/i.test(fullCheck)) return;
+
+      /* Duplicate check */
+      if (existingNames[fullCheck]) return;
+
+      if (first.length >= 2 && first.length < 30) {
+        var entry = { first: first, last: last, phone: phone, email: email, checked: true };
+        if (position) entry.position = position;
+        results.push(entry);
       }
     });
 
@@ -10569,10 +10663,38 @@ var RosterImport = (function() {
       var emailMatch = card.match(/^EMAIL[;:].*?([\w.+-]+@[\w.-]+\.[a-z]{2,})/mi);
       if (emailMatch) email = emailMatch[1];
 
+      /* Parse embedded photo if present */
+      var photo = '';
+      var cardLines = card.split('\n');
+      var photoLines = [];
+      var inPhoto = false;
+      for (var cl = 0; cl < cardLines.length; cl++) {
+        if (/^PHOTO[;:]/i.test(cardLines[cl])) {
+          inPhoto = true;
+          /* Skip the PHOTO header line itself */
+          continue;
+        }
+        if (inPhoto) {
+          if (/^[A-Z][A-Z]/.test(cardLines[cl]) && cardLines[cl].indexOf(':') > 0) {
+            inPhoto = false;
+          } else {
+            photoLines.push(cardLines[cl].trim());
+          }
+        }
+      }
+      if (photoLines.length) {
+        var photoData = photoLines.join('');
+        var pTypeMatch = card.match(/PHOTO[;:].*?TYPE=([A-Za-z]+)/i);
+        var pType = (pTypeMatch ? pTypeMatch[1] : 'jpeg').toLowerCase();
+        if (photoData.length > 50) {
+          photo = 'data:image/' + pType + ';base64,' + photoData;
+        }
+      }
+
       if (first) {
         var fullName = (first + ' ' + last).toLowerCase().trim();
         if (!existingNames[fullName]) {
-          results.push({ first: _titleCase(first), last: _titleCase(last), phone: phone, email: email, checked: true });
+          results.push({ first: _titleCase(first), last: _titleCase(last), phone: phone, email: email, photo: photo, checked: true });
         }
       }
     });
@@ -10591,6 +10713,7 @@ var RosterImport = (function() {
     var countEl = '<div class="roster-preview-count">' + _parsed.length + ' contact' + (_parsed.length !== 1 ? 's' : '') + ' found</div>';
     var items = _parsed.map(function(p, i) {
       var details = [];
+      if (p.position) details.push(p.position);
       if (p.phone) details.push(p.phone);
       if (p.email) details.push(p.email);
       return '<div class="roster-preview-item">' +
@@ -10641,15 +10764,40 @@ var RosterImport = (function() {
     buildNodes(false);
     try { updateBlufContent(); } catch(e) {}
 
-    close();
+    /* Update onboarding contact list if in onboarding */
+    try {
+      var obContacts = document.getElementById('obContacts');
+      if (obContacts) {
+        typeof renderObContacts === 'function' && renderObContacts();
+      }
+      var obCount = document.getElementById('obCount');
+      if (obCount) {
+        obCount.textContent = DEMO_CONTACTS.length + ' people added';
+      }
+      var obNextBtn = document.getElementById('obNextBtn');
+      if (obNextBtn && DEMO_CONTACTS.length > 0) {
+        obNextBtn.disabled = false;
+      }
+    } catch(e) {}
 
-    // Show toast
-    var toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#C5A55A;color:#000;padding:12px 24px;border-radius:12px;font:600 14px "Hanken Grotesk",system-ui,sans-serif;z-index:10001;opacity:0;transition:opacity .3s';
-    toast.textContent = imported + ' contact' + (imported !== 1 ? 's' : '') + ' imported!';
-    document.body.appendChild(toast);
-    requestAnimationFrame(function() { toast.style.opacity = '1'; });
-    setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 400); }, 2500);
+    /* Show success overlay inside the modal instead of just closing */
+    var modalBody = document.querySelector('.roster-modal .roster-body');
+    var modalHeader = document.querySelector('.roster-modal .roster-header');
+    if (modalBody) {
+      modalBody.innerHTML =
+        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px">' +
+          '<div style="width:64px;height:64px;border-radius:50%;background:rgba(76,175,80,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:16px">' +
+            '<svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</div>' +
+          '<p style="color:#4CAF50;font:700 22px \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 8px">' + imported + ' Contact' + (imported !== 1 ? 's' : '') + ' Imported!</p>' +
+          '<p style="color:rgba(255,255,255,0.5);font:400 14px/1.4 \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 24px">Added to your ' + (cat === 'personal' ? 'Personal' : cat === 'professional' ? 'Professional' : 'circle') + ' circle</p>' +
+          '<button onclick="RosterImport.close()" style="background:#C5A55A;color:#000;border:none;padding:12px 32px;border-radius:10px;font:600 15px \'Hanken Grotesk\',system-ui,sans-serif;cursor:pointer">Done</button>' +
+        '</div>';
+    }
+    if (modalHeader) {
+      var closeBtn = modalHeader.querySelector('button');
+      if (closeBtn) closeBtn.style.display = 'none';
+    }
   }
 
   // Drag-and-drop support for image tab
@@ -12139,13 +12287,27 @@ function handleContactPhoto(e) {
     });
   } else {
     /* Image or GIF — load as Image element */
+    const isGif = f.type === 'image/gif' || (f.name && f.name.toLowerCase().endsWith('.gif'));
     const img = new Image();
     img.onload = () => {
       contactPhotos.set(contactId, {
         img: img,
         w: img.naturalWidth,
-        h: img.naturalHeight
+        h: img.naturalHeight,
+        isGif: isGif
       });
+      /* For GIFs, append to hidden DOM host so browser keeps animating frames */
+      if (isGif) {
+        img.id = 'gif_contact_' + contactId;
+        img.style.cssText = 'position:absolute;width:1px;height:1px';
+        var host = document.getElementById('gifAnimationHost');
+        if (host) {
+          /* Remove old GIF for this contact if any */
+          var old = document.getElementById('gif_contact_' + contactId);
+          if (old) old.remove();
+          host.appendChild(img);
+        }
+      }
       const lbl = document.getElementById('contactPhotoBtnLabel');
       if (lbl) lbl.textContent = 'Change Photo';
     };
@@ -12158,6 +12320,9 @@ function handleContactPhoto(e) {
 /* Remove a contact's photo */
 function clearContactPhoto() {
   if (!selectedContact) return;
+  /* Remove GIF from animation host if present */
+  var gifEl = document.getElementById('gif_contact_' + selectedContact.id);
+  if (gifEl) gifEl.remove();
   contactPhotos.delete(selectedContact.id);
   const lbl = document.getElementById('contactPhotoBtnLabel');
   if (lbl) lbl.textContent = 'Set Photo';
@@ -19775,5 +19940,8 @@ const MedImageReader = (() => {
   </div>
 
 
+
+  <!-- Hidden host for GIF images so browser keeps animating them for canvas -->
+  <div id="gifAnimationHost"></div>
 </body>
 </html>
