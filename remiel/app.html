@@ -4541,6 +4541,44 @@
 @keyframes cpSpin { to { transform: rotate(360deg); } }
 .cp-photo-thumb { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08); }
 .cp-no-photo { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-dim, #999); flex-shrink: 0; }
+/* ── Roster Import ── */
+.roster-btn { display:flex; align-items:center; gap:8px; width:100%; padding:14px 16px; background:rgba(197,165,90,0.10); border:1px solid rgba(197,165,90,0.25); border-radius:12px; color:#C5A55A; font:600 14px/1 "Hanken Grotesk",system-ui,sans-serif; cursor:pointer; transition:all .2s; margin-top:12px; }
+.roster-btn:active { transform:scale(0.97); }
+.roster-btn svg { flex-shrink:0; }
+.roster-modal-overlay { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s; }
+.roster-modal-overlay.open { opacity:1; pointer-events:auto; }
+.roster-modal { width:92vw; max-width:440px; max-height:85vh; background:var(--card-bg,#1a1a2e); border-radius:20px; overflow:hidden; display:flex; flex-direction:column; }
+.roster-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px 14px; border-bottom:1px solid rgba(255,255,255,0.06); }
+.roster-header h3 { margin:0; font:700 17px/1.2 "Hanken Grotesk",system-ui,sans-serif; color:#fff; }
+.roster-close { background:none; border:none; color:#999; font-size:22px; cursor:pointer; padding:4px; line-height:1; }
+.roster-tabs { display:flex; gap:0; padding:0 20px; border-bottom:1px solid rgba(255,255,255,0.06); }
+.roster-tab { flex:1; padding:12px 0; text-align:center; font:600 13px/1 "Hanken Grotesk",system-ui,sans-serif; color:#666; background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; transition:all .2s; }
+.roster-tab.active { color:#C5A55A; border-bottom-color:#C5A55A; }
+.roster-body { flex:1; overflow-y:auto; padding:16px 20px; }
+.roster-drop-zone { border:2px dashed rgba(197,165,90,0.3); border-radius:14px; padding:36px 20px; text-align:center; transition:all .2s; cursor:pointer; }
+.roster-drop-zone.dragover { border-color:#C5A55A; background:rgba(197,165,90,0.08); }
+.roster-drop-zone svg { margin:0 auto 10px; display:block; }
+.roster-drop-zone p { margin:0; color:#999; font-size:13px; line-height:1.5; }
+.roster-drop-zone p strong { color:#C5A55A; }
+.roster-textarea { width:100%; min-height:140px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; color:#fff; font:13px/1.6 monospace; padding:12px; resize:vertical; }
+.roster-textarea::placeholder { color:#555; }
+.roster-cat-row { display:flex; align-items:center; gap:8px; margin:14px 0 8px; flex-wrap:wrap; }
+.roster-cat-row label { font:600 12px/1 "Hanken Grotesk",system-ui,sans-serif; color:#999; text-transform:uppercase; letter-spacing:0.5px; }
+.roster-cat-select { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:#fff; padding:6px 10px; font:13px "Hanken Grotesk",system-ui,sans-serif; }
+.roster-preview { margin-top:12px; }
+.roster-preview-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+.roster-preview-item input[type=checkbox] { accent-color:#C5A55A; width:16px; height:16px; }
+.roster-preview-name { flex:1; font:14px/1.3 "Hanken Grotesk",system-ui,sans-serif; color:#fff; }
+.roster-preview-name small { display:block; font-size:11px; color:#777; margin-top:2px; }
+.roster-preview-count { font:600 12px/1 "Hanken Grotesk",system-ui,sans-serif; color:#C5A55A; padding:8px 0; }
+.roster-import-btn { width:100%; padding:14px; background:#C5A55A; color:#000; font:700 15px/1 "Hanken Grotesk",system-ui,sans-serif; border:none; border-radius:12px; cursor:pointer; margin-top:12px; transition:all .2s; }
+.roster-import-btn:disabled { opacity:0.4; cursor:default; }
+.roster-import-btn:not(:disabled):active { transform:scale(0.97); }
+.roster-ocr-progress { margin:16px 0; }
+.roster-ocr-bar { height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; }
+.roster-ocr-bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#C5A55A,#e8d48b); border-radius:3px; transition:width .3s; }
+.roster-ocr-status { font:12px/1 "Hanken Grotesk",system-ui,sans-serif; color:#999; margin-top:6px; text-align:center; }
+.roster-file-input { display:none; }
 
 /* ── Location Sharing ── */
 .loc-share-section { margin-top: 10px; }
@@ -5145,7 +5183,63 @@
       </div>
       <div class="contact-picker-progress" id="contactPickerProgress">
         <div class="cp-spinner"></div>
+      <!-- Roster Import -->
+      <button class="roster-btn" onclick="RosterImport.open()" aria-label="Import roster">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="#C5A55A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6M12 18v-6M9 15h6" stroke="#C5A55A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Import Roster (Image, Paste, or File)
+      </button>
         <span id="cpProgressText">Reading contacts from device...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Roster Import Modal -->
+  <div class="roster-modal-overlay" id="rosterOverlay" onclick="if(event.target===this)RosterImport.close()">
+    <div class="roster-modal">
+      <div class="roster-header">
+        <h3>Import Roster</h3>
+        <button class="roster-close" onclick="RosterImport.close()">&times;</button>
+      </div>
+      <div class="roster-tabs">
+        <button class="roster-tab active" data-tab="image" onclick="RosterImport.switchTab('image')">&#128247; Image</button>
+        <button class="roster-tab" data-tab="paste" onclick="RosterImport.switchTab('paste')">&#128203; Paste</button>
+        <button class="roster-tab" data-tab="file" onclick="RosterImport.switchTab('file')">&#128196; File</button>
+      </div>
+      <div class="roster-body">
+        <div id="rosterTabImage">
+          <div class="roster-drop-zone" id="rosterDropZone" onclick="document.getElementById('rosterFileImg').click()">
+            <svg width="40" height="40" fill="none" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="#C5A55A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <p><strong>Tap to choose</strong> or drop an image<br>Screenshot of a roster, contact list, etc.</p>
+          </div>
+          <input type="file" class="roster-file-input" id="rosterFileImg" accept="image/*" onchange="RosterImport.handleImageFile(this)">
+          <div class="roster-ocr-progress" id="rosterOcrProgress" style="display:none">
+            <div class="roster-ocr-bar"><div class="roster-ocr-bar-fill" id="rosterOcrFill"></div></div>
+            <div class="roster-ocr-status" id="rosterOcrStatus">Initializing OCR...</div>
+          </div>
+        </div>
+        <div id="rosterTabPaste" style="display:none">
+          <textarea class="roster-textarea" id="rosterPasteArea" placeholder="Paste names here...&#10;&#10;John Smith&#10;Jane Doe, +1-555-123-4567&#10;Bob Johnson bob@email.com&#10;&#10;Also handles CSV, tab-separated, and vCard"></textarea>
+          <button class="roster-import-btn" style="background:rgba(197,165,90,0.15);color:#C5A55A;margin-top:10px" onclick="RosterImport.parseText()">Parse Names</button>
+        </div>
+        <div id="rosterTabFile" style="display:none">
+          <div class="roster-drop-zone" onclick="document.getElementById('rosterFileCsv').click()">
+            <svg width="40" height="40" fill="none" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="#C5A55A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="#C5A55A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <p><strong>Tap to choose</strong> a file<br>.csv, .tsv, .txt, or .vcf (vCard)</p>
+          </div>
+          <input type="file" class="roster-file-input" id="rosterFileCsv" accept=".csv,.tsv,.txt,.vcf,.vcard" onchange="RosterImport.handleFile(this)">
+        </div>
+        <div class="roster-cat-row">
+          <label>Category:</label>
+          <select class="roster-cat-select" id="rosterCatSelect">
+            <option value="friend">Friend</option>
+            <option value="family">Family</option>
+            <option value="professional">Professional</option>
+            <option value="team">Team</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="roster-preview" id="rosterPreview"></div>
+        <button class="roster-import-btn" id="rosterImportBtn" style="display:none" onclick="RosterImport.doImport()">Import Selected</button>
       </div>
     </div>
   </div>
@@ -6080,6 +6174,21 @@ const VALID_HASHES = new Set([
   '1d86a55e665006e5ebf3e19a208b77fcc11478075acb3190f993ff2c06f077e2',  /* NXLP — tester-3 */
   '7104ff5be2a110f3d94588986fb06741ca958a732324444c399449c58e319afa'   /* WQKZ — tester-4 */
 ]);
+
+/* ── Tesseract OCR lazy loader ── */
+var _tesseractReady = null;
+function _loadTesseract() {
+  if (_tesseractReady) return _tesseractReady;
+  _tesseractReady = new Promise(function(resolve, reject) {
+    if (window.Tesseract) { resolve(window.Tesseract); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+    s.onload = function() { resolve(window.Tesseract); };
+    s.onerror = function() { reject(new Error('Failed to load Tesseract.js')); };
+    document.head.appendChild(s);
+  });
+  return _tesseractReady;
+}
 
 /* ── Code usage tracking ── */
 const CODE_LABELS = {
@@ -10242,6 +10351,354 @@ const SentinelHeadlines = (() => {
   }
 
   return { get, start, stop, refreshAll, refreshOne, computeHeadline };
+})();
+
+/* ── RosterImport Module ── */
+var RosterImport = (function() {
+  var _parsed = [];
+  var _POS = new Set(['qb','rb','wr','te','ol','dl','lb','cb','s','k','p','c','og','ot','de','dt','ng','fs','ss','fb','hb','se',
+    'gk','lw','rw','lm','rm','cm','cdm','cam','lf','rf','cf','cb','lb','rb','lwb','rwb','sw','st','am',
+    'pg','sg','sf','pf','c','g','f',
+    'sp','1b','2b','3b','ss','lf','cf','rf','dh','rp','lhp','rhp','closer','setup',
+    'center','wing','forward','defender','goalie','keeper','midfielder','striker','winger','libero',
+    'pitcher','catcher','shortstop','outfielder','infielder','designated','utility',
+    'guard','tackle','end','safety','corner','linebacker','receiver','back','kicker','punter']);
+
+  function open() {
+    document.getElementById('rosterOverlay').classList.add('open');
+    _parsed = [];
+    document.getElementById('rosterPreview').innerHTML = '';
+    document.getElementById('rosterImportBtn').style.display = 'none';
+    var ocrP = document.getElementById('rosterOcrProgress');
+    if (ocrP) ocrP.style.display = 'none';
+    switchTab('image');
+  }
+
+  function close() {
+    document.getElementById('rosterOverlay').classList.remove('open');
+  }
+
+  function switchTab(tab) {
+    ['image','paste','file'].forEach(function(t) {
+      var el = document.getElementById('rosterTab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (el) el.style.display = t === tab ? '' : 'none';
+    });
+    document.querySelectorAll('.roster-tab').forEach(function(btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
+    });
+  }
+
+  function handleImageFile(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var prog = document.getElementById('rosterOcrProgress');
+    var fill = document.getElementById('rosterOcrFill');
+    var status = document.getElementById('rosterOcrStatus');
+    prog.style.display = '';
+    fill.style.width = '0%';
+    status.textContent = 'Loading OCR engine...';
+
+    _loadTesseract().then(function(Tesseract) {
+      status.textContent = 'Reading image...';
+      fill.style.width = '20%';
+      return Tesseract.recognize(file, 'eng', {
+        logger: function(m) {
+          if (m.status === 'recognizing text') {
+            var pct = Math.round(20 + m.progress * 70);
+            fill.style.width = pct + '%';
+            status.textContent = 'Recognizing text... ' + Math.round(m.progress * 100) + '%';
+          }
+        }
+      });
+    }).then(function(result) {
+      fill.style.width = '100%';
+      status.textContent = 'Done!';
+      var text = result.data.text || '';
+      if (!text.trim()) {
+        status.textContent = 'No text found in image. Try a clearer photo.';
+        return;
+      }
+      _parsed = _parseRosterText(text);
+      _showPreview();
+      setTimeout(function() { prog.style.display = 'none'; }, 1500);
+    }).catch(function(err) {
+      status.textContent = 'OCR failed: ' + err.message;
+      fill.style.width = '0%';
+    });
+    input.value = '';
+  }
+
+  function parseText() {
+    var raw = document.getElementById('rosterPasteArea').value.trim();
+    if (!raw) return;
+    if (raw.toUpperCase().indexOf('BEGIN:VCARD') >= 0) {
+      _parsed = _parseVCard(raw);
+    } else {
+      _parsed = _parseRosterText(raw);
+    }
+    _showPreview();
+  }
+
+  function handleFile(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var text = e.target.result;
+      var ext = file.name.split('.').pop().toLowerCase();
+      if (ext === 'vcf' || ext === 'vcard' || text.toUpperCase().indexOf('BEGIN:VCARD') >= 0) {
+        _parsed = _parseVCard(text);
+      } else {
+        _parsed = _parseRosterText(text);
+      }
+      _showPreview();
+    };
+    reader.readAsText(file);
+    input.value = '';
+  }
+
+  function _detectDelimiter(line) {
+    if (line.indexOf('\t') >= 0) return '\t';
+    var commas = (line.match(/,/g) || []).length;
+    var pipes = (line.match(/\|/g) || []).length;
+    if (pipes >= 2) return '|';
+    if (commas >= 2) return ',';
+    if (/  {2,}/.test(line)) return 'MULTI_SPACE';
+    return null;
+  }
+
+  function _titleCase(s) {
+    return s.replace(/\b(mc|mac|de|di|van|von|la|le|el|al|ben|bin|o')?(\w)/gi, function(m, prefix, ch) {
+      if (prefix) return prefix.charAt(0).toUpperCase() + prefix.slice(1) + ch.toUpperCase();
+      return ch.toUpperCase();
+    }).replace(/\b(Iii|Iv|Vi|Vii|Viii|Ii)\b/g, function(m) { return m.toUpperCase(); });
+  }
+
+  function _parseRosterText(text) {
+    var results = [];
+    var lines = text.split(/\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+    if (!lines.length) return results;
+
+    var delim = null;
+    for (var li = 0; li < Math.min(lines.length, 5); li++) {
+      delim = _detectDelimiter(lines[li]);
+      if (delim) break;
+    }
+
+    var existingNames = {};
+    DEMO_CONTACTS.forEach(function(c) {
+      existingNames[(c.first + ' ' + c.last).toLowerCase().trim()] = true;
+    });
+
+    lines.forEach(function(line) {
+      // Skip obvious headers
+      if (/^(#|name|first|last|player|roster|team|no\.|jersey)/i.test(line)) return;
+      if (line.length < 2) return;
+
+      // Strip leading numbers/bullets
+      line = line.replace(/^[\d]+[.)\-:\s]+/, '').replace(/^[-*•·]\s*/, '').trim();
+      if (!line) return;
+
+      var phone = '';
+      var email = '';
+      // Extract phone
+      var phoneMatch = line.match(/(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
+      if (phoneMatch) {
+        phone = phoneMatch[1].replace(/[^\d+]/g, '');
+        if (phone.length === 10) phone = '+1' + phone;
+        else if (phone.length === 11 && phone[0] === '1') phone = '+' + phone;
+        line = line.replace(phoneMatch[0], '').trim();
+      }
+      // Extract email
+      var emailMatch = line.match(/([\w.+-]+@[\w.-]+\.[a-z]{2,})/i);
+      if (emailMatch) {
+        email = emailMatch[1];
+        line = line.replace(emailMatch[0], '').trim();
+      }
+
+      var parts;
+      if (delim === 'MULTI_SPACE') {
+        parts = line.split(/  +/);
+      } else if (delim) {
+        parts = line.split(delim === '\t' ? /\t/ : delim === '|' ? /\|/ : /,/);
+      } else {
+        parts = [line];
+      }
+
+      parts = parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
+
+      // First part should be the name
+      var rawName = parts[0] || '';
+      // Remove trailing position indicators
+      rawName = rawName.replace(/\s*[-–]\s*$/, '').trim();
+
+      // Split name into first/last
+      var nameParts = rawName.split(/\s+/).filter(function(p) {
+        return !_POS.has(p.toLowerCase()) && !/^\d+$/.test(p) && p.length > 0;
+      });
+
+      if (!nameParts.length) return;
+
+      var first = _titleCase(nameParts[0]);
+      var last = nameParts.length > 1 ? _titleCase(nameParts.slice(1).join(' ')) : '';
+
+      // Check for phone/email in remaining parts
+      if (!phone && parts.length > 1) {
+        for (var pi = 1; pi < parts.length; pi++) {
+          var pm = parts[pi].match(/(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
+          if (pm) { phone = pm[1].replace(/[^\d+]/g, ''); break; }
+        }
+      }
+      if (!email && parts.length > 1) {
+        for (var ei = 1; ei < parts.length; ei++) {
+          var em = parts[ei].match(/([\w.+-]+@[\w.-]+\.[a-z]{2,})/i);
+          if (em) { email = em[1]; break; }
+        }
+      }
+
+      // Duplicate check
+      var fullName = (first + ' ' + last).toLowerCase().trim();
+      if (existingNames[fullName]) return;
+
+      if (first && first.length < 30) {
+        results.push({ first: first, last: last, phone: phone, email: email, checked: true });
+      }
+    });
+
+    return results;
+  }
+
+  function _parseVCard(text) {
+    var results = [];
+    var cards = text.split(/BEGIN:VCARD/i).filter(function(c) { return c.trim(); });
+    var existingNames = {};
+    DEMO_CONTACTS.forEach(function(c) {
+      existingNames[(c.first + ' ' + c.last).toLowerCase().trim()] = true;
+    });
+
+    cards.forEach(function(card) {
+      var first = '', last = '', phone = '', email = '';
+      var fnMatch = card.match(/^FN[;:](.*)$/mi);
+      var nMatch = card.match(/^N[;:]([^;]*);([^;]*)/mi);
+      if (nMatch) {
+        last = (nMatch[1] || '').trim();
+        first = (nMatch[2] || '').trim();
+      } else if (fnMatch) {
+        var np = fnMatch[1].trim().split(/\s+/);
+        first = np[0] || '';
+        last = np.slice(1).join(' ');
+      }
+      var telMatch = card.match(/^TEL[;:].*?([\d+() .-]{7,})/mi);
+      if (telMatch) phone = telMatch[1].replace(/[^\d+]/g, '');
+      var emailMatch = card.match(/^EMAIL[;:].*?([\w.+-]+@[\w.-]+\.[a-z]{2,})/mi);
+      if (emailMatch) email = emailMatch[1];
+
+      if (first) {
+        var fullName = (first + ' ' + last).toLowerCase().trim();
+        if (!existingNames[fullName]) {
+          results.push({ first: _titleCase(first), last: _titleCase(last), phone: phone, email: email, checked: true });
+        }
+      }
+    });
+
+    return results;
+  }
+
+  function _showPreview() {
+    var container = document.getElementById('rosterPreview');
+    var btn = document.getElementById('rosterImportBtn');
+    if (!_parsed.length) {
+      container.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0">No contacts found. Try a different format.</p>';
+      btn.style.display = 'none';
+      return;
+    }
+    var countEl = '<div class="roster-preview-count">' + _parsed.length + ' contact' + (_parsed.length !== 1 ? 's' : '') + ' found</div>';
+    var items = _parsed.map(function(p, i) {
+      var details = [];
+      if (p.phone) details.push(p.phone);
+      if (p.email) details.push(p.email);
+      return '<div class="roster-preview-item">' +
+        '<input type="checkbox" ' + (p.checked ? 'checked' : '') + ' onchange="RosterImport._toggle(' + i + ',this.checked)">' +
+        '<div class="roster-preview-name">' + _esc(p.first + ' ' + p.last) +
+        (details.length ? '<small>' + _esc(details.join(' · ')) + '</small>' : '') +
+        '</div></div>';
+    }).join('');
+    container.innerHTML = countEl + items;
+    btn.style.display = '';
+    btn.textContent = 'Import ' + _parsed.filter(function(p) { return p.checked; }).length + ' Contacts';
+  }
+
+  function _toggle(idx, val) {
+    if (_parsed[idx]) _parsed[idx].checked = val;
+    var btn = document.getElementById('rosterImportBtn');
+    var count = _parsed.filter(function(p) { return p.checked; }).length;
+    btn.textContent = 'Import ' + count + ' Contact' + (count !== 1 ? 's' : '');
+    btn.disabled = count === 0;
+  }
+
+  function _esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  async function doImport() {
+    var selected = _parsed.filter(function(p) { return p.checked; });
+    if (!selected.length) return;
+    var cat = document.getElementById('rosterCatSelect').value;
+    var imported = 0;
+
+    for (var i = 0; i < selected.length; i++) {
+      var p = selected[i];
+      var newId = Date.now() + i;
+      var newContact = {
+        id: newId,
+        first: p.first,
+        last: p.last || '',
+        cat: cat,
+        sev: 2,
+        phone: p.phone || '',
+        email: p.email || '',
+        sentinelId: 'sentinel_' + newId + '_' + Math.random().toString(36).substr(2, 6)
+      };
+      DEMO_CONTACTS.push(newContact);
+      try { await RemielDB.putContact(newContact); } catch (e) {}
+      imported++;
+    }
+
+    buildNodes(false);
+    try { updateBlufContent(); } catch(e) {}
+
+    close();
+
+    // Show toast
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#C5A55A;color:#000;padding:12px 24px;border-radius:12px;font:600 14px "Hanken Grotesk",system-ui,sans-serif;z-index:10001;opacity:0;transition:opacity .3s';
+    toast.textContent = imported + ' contact' + (imported !== 1 ? 's' : '') + ' imported!';
+    document.body.appendChild(toast);
+    requestAnimationFrame(function() { toast.style.opacity = '1'; });
+    setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 400); }, 2500);
+  }
+
+  // Drag-and-drop support for image tab
+  setTimeout(function() {
+    var dz = document.getElementById('rosterDropZone');
+    if (dz) {
+      dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
+      dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
+      dz.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dz.classList.remove('dragover');
+        var file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+          var dt = new DataTransfer();
+          dt.items.add(file);
+          var inp = document.getElementById('rosterFileImg');
+          inp.files = dt.files;
+          handleImageFile(inp);
+        }
+      });
+    }
+  }, 500);
+
+  return { open: open, close: close, switchTab: switchTab, handleImageFile: handleImageFile,
+           parseText: parseText, handleFile: handleFile, doImport: doImport, _toggle: _toggle };
 })();
 
 function getContactHeadline(contact) {
