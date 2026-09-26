@@ -1245,7 +1245,7 @@
     position: fixed;
     inset: 0;
     z-index: 9000;
-    display: flex;
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -6811,24 +6811,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
   deferredA2hsPrompt = e;
 });
 
-/* Check if user already passed the index.html gate (localStorage) */
-(async function checkSessionAccess() {
-  try {
-    /* Check localStorage first (persistent), fall back to sessionStorage (legacy) */
-    var stored = localStorage.getItem('rm:access') || sessionStorage.getItem('rm:access');
-    if (stored) {
-      const hash = await sha256('carecircle:' + stored);
-      if (VALID_HASHES.has(hash)) {
-        /* Migrate to localStorage if it was only in sessionStorage */
-        try { localStorage.setItem('rm:access', stored); } catch(e2) {}
-        /* Already authenticated — skip gate, play video intro */
-        beginVideoIntro();
-        return;
-      }
-    }
-  } catch(e) { /* storage may be unavailable */ }
-  /* Not pre-authenticated: show the gate screen (already visible by default) */
-  document.getElementById('gateInput').focus();
+/* Gate screen eliminated — go straight to video intro */
+(function() {
+  beginVideoIntro();
 })();
 
 async function submitGateCode() {
