@@ -3890,6 +3890,55 @@
   .add-person-fab.hidden { display: none !important; }
 
 
+
+  /* ── Quick-Dial Popup ── */
+  .quick-dial-overlay {
+    position: fixed; inset: 0; z-index: 9998;
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s; pointer-events: none;
+  }
+  .quick-dial-overlay.open { opacity: 1; pointer-events: auto; }
+  .quick-dial-box {
+    background: rgba(22,22,35,0.96); border: 1px solid rgba(56,189,248,0.2);
+    border-radius: 16px; padding: 24px; width: min(320px, 85vw);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+    text-align: center;
+  }
+  .quick-dial-title {
+    font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.85);
+    margin-bottom: 16px; letter-spacing: 0.5px;
+  }
+  .quick-dial-input {
+    width: 100%; box-sizing: border-box; padding: 12px 14px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(56,189,248,0.2);
+    border-radius: 10px; color: #fff; font-size: 18px;
+    font-family: inherit; text-align: center; letter-spacing: 1px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .quick-dial-input:focus { border-color: rgba(56,189,248,0.5); }
+  .quick-dial-input::placeholder { color: rgba(255,255,255,0.3); font-size: 14px; }
+  .quick-dial-actions {
+    display: flex; gap: 10px; margin-top: 16px;
+  }
+  .quick-dial-actions button {
+    flex: 1; padding: 10px 0; border-radius: 10px; border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: background 0.15s, transform 0.1s;
+  }
+  .quick-dial-actions button:active { transform: scale(0.95); }
+  .quick-dial-cancel {
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
+  }
+  .quick-dial-call {
+    background: rgba(56,189,248,0.2); color: #38bdf8;
+    border: 1px solid rgba(56,189,248,0.3) !important;
+  }
+  .quick-dial-text {
+    background: rgba(74,222,128,0.2); color: #4ade80;
+    border: 1px solid rgba(74,222,128,0.3) !important;
+  }
+
   /* ── Modal close X ── */
   .contact-modal-hdr {
     display: flex; align-items: center; justify-content: space-between; width: 100%;
@@ -5729,6 +5778,17 @@
 </div>
 
 <!-- ═══ Add Person FAB (network constellation view) ═══ -->
+<!-- Quick-Dial Popup -->
+<div class="quick-dial-overlay" id="quickDialOverlay" onclick="if(event.target===this)closeQuickDial()">
+  <div class="quick-dial-box">
+    <div class="quick-dial-title" id="quickDialTitle">Add Number</div>
+    <input class="quick-dial-input" id="quickDialInput" type="tel" placeholder="Enter phone number" maxlength="20" autocomplete="off">
+    <div class="quick-dial-actions">
+      <button class="quick-dial-cancel" onclick="closeQuickDial()">Cancel</button>
+      <button class="quick-dial-call" id="quickDialAction" onclick="execQuickDial()">Call</button>
+    </div>
+  </div>
+</div>
 <button class="add-person-fab hidden" id="addPersonFab" onclick="toggleAddModal()" aria-label="Add person">+</button>
 
 <!-- ═══ Contact Add/Edit Modal ═══ -->
@@ -8204,6 +8264,18 @@ function buildNodes(fresh) {
     };
   });
   networkExpanded = true;
+}
+
+
+/* ── focusContact: navigate galaxy to a specific contact by ID ── */
+function focusContact(id) {
+  var numId = typeof id === 'string' ? parseInt(id, 10) : id;
+  if (isNaN(numId)) numId = id;
+  var contact = DEMO_CONTACTS.find(function(c) { return c.id === numId || String(c.id) === String(id); });
+  if (!contact) return;
+  if (appState !== 'network') enterNetwork();
+  selectedContact = contact;
+  openBluf();
 }
 
 function projectNode(node) {
@@ -11062,8 +11134,12 @@ function onPressEnd(e) {
               } else if (_qi.type === 'email' && _qc.email) {
                 window.location.href = 'mailto:' + _qc.email;
               } else {
-                /* No contact info — instructive toast */
-                showToast(_qi.type === 'email' ? 'No email on file — go to Profile to add' : 'No phone on file — go to Profile to add');
+                /* No contact info — open quick-dial for phone/text, toast for email */
+                if ((_qi.type === 'phone' || _qi.type === 'sms') && _qc) {
+                  openQuickDial(_qi.type === 'sms' ? 'sms' : 'call', _qc.first, _qc.id);
+                } else {
+                  showToast(_qi.type === 'email' ? 'No email on file — go to Profile to add' : 'No phone on file — go to Profile to add');
+                }
               }
               pressStarted = false;
               netDragging = false;
@@ -11115,11 +11191,18 @@ function onPressEnd(e) {
             SentinelGuide.onFocusSphere(hit.node.contact.first);
           }
           sphereTapTimer = setTimeout(() => {
-            /* Single tap confirmed — sphere stays focused/enlarged */
+            /* Single tap confirmed */
             sphereTapTimer = null;
+            var _tapWasCenter = sphereTapTarget && sphereTapTarget.isCenter;
             sphereTapTarget = null;
-            /* Resume gentle spin after focus */
-            setTimeout(() => { if (!blufOpen) netSpin = true; }, 3000);
+            if (_tapWasCenter) {
+              /* Center sphere tap → open Add Person modal for quick add */
+              openContactModal('add');
+            } else {
+              /* Contact sphere stays focused/enlarged */
+              /* Resume gentle spin after focus */
+              setTimeout(() => { if (!blufOpen) netSpin = true; }, 3000);
+            }
           }, SPHERE_TAP_MS);
         }
       } else {
@@ -16497,7 +16580,7 @@ const SocialImport = (() => {
           var action = _suggestAction(c, lastInt, lastMood);
           var actionHtml = action ? '<div class="pulse-card-action">' + action + '</div>' : '';
 
-          html += '<div class="pulse-card" onclick="ThePulse.close(); if(typeof focusContact===\'function\') focusContact(\'' + (c.id || '').replace(/'/g, '') + '\')">' +
+          html += '<div class="pulse-card" onclick="ThePulse.close(); if(typeof focusContact===\'function\') focusContact(\'' + String(c.id || '').replace(/'/g, '') + '\')">' +
             '<div class="pulse-card-top">' +
               '<div class="pulse-card-sev" style="background:' + SEV_COLORS[sev] + ';"></div>' +
               '<div class="pulse-card-name">' + name + '</div>' +
@@ -17815,16 +17898,17 @@ document.querySelectorAll('#qaVideoBtn, #qaCallBtn, #qaTextBtn, #qaEmailBtn').fo
     if (this.style.pointerEvents === 'none' || parseFloat(this.style.opacity) < 0.5) {
       e.preventDefault();
       e.stopPropagation();
-      const isEmail = this.id === 'qaEmailBtn';
-      const msg = isEmail
-        ? 'No email on file — go to Profile to add'
-        : 'No phone on file — go to Profile to add';
-      const t = document.createElement('div');
-      t.textContent = msg;
-      t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.15);color:#f87171;padding:8px 18px;border-radius:20px;font-size:11px;font-weight:600;z-index:9999;backdrop-filter:blur(12px);border:1px solid rgba(239,68,68,0.25);pointer-events:none;';
-      document.body.appendChild(t);
-      setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; }, 2200);
-      setTimeout(() => t.remove(), 2600);
+      var isEmail = this.id === 'qaEmailBtn';
+      var isCall = this.id === 'qaCallBtn';
+      var isText = this.id === 'qaTextBtn';
+      if ((isCall || isText) && selectedContact) {
+        /* Open quick-dial so user can enter a number */
+        openQuickDial(isText ? 'sms' : 'call', selectedContact.first, selectedContact.id);
+      } else if (isEmail) {
+        showToast('No email on file — go to Profile to add');
+      } else {
+        showToast('No phone on file — go to Profile to add');
+      }
     }
   }, true);
 });
@@ -17893,6 +17977,61 @@ function openContactModal(mode, contact) {
   var _fab = document.getElementById('addPersonFab');
   if (_fab) _fab.classList.add('fab-open');
   setTimeout(() => firstInput.focus(), 200);
+}
+
+
+/* ── Quick-Dial: let users enter a number inline when contact has none ── */
+var _qdMode = 'call'; /* 'call' or 'sms' */
+var _qdContactId = null;
+
+function openQuickDial(mode, contactName, contactId) {
+  _qdMode = mode || 'call';
+  _qdContactId = contactId || null;
+  var title = document.getElementById('quickDialTitle');
+  var actionBtn = document.getElementById('quickDialAction');
+  var inp = document.getElementById('quickDialInput');
+  title.textContent = (contactName ? contactName + ': ' : '') + 'Add Number';
+  if (mode === 'sms') {
+    actionBtn.textContent = 'Text';
+    actionBtn.className = 'quick-dial-text';
+  } else {
+    actionBtn.textContent = 'Call';
+    actionBtn.className = 'quick-dial-call';
+  }
+  inp.value = '';
+  document.getElementById('quickDialOverlay').classList.add('open');
+  setTimeout(function() { inp.focus(); }, 200);
+}
+
+function closeQuickDial() {
+  document.getElementById('quickDialOverlay').classList.remove('open');
+}
+
+function execQuickDial() {
+  var num = document.getElementById('quickDialInput').value.trim();
+  if (!num) {
+    document.getElementById('quickDialInput').focus();
+    return;
+  }
+  /* Save number to contact if we know which one */
+  if (_qdContactId) {
+    var idx = DEMO_CONTACTS.findIndex(function(c) { return c.id === _qdContactId; });
+    if (idx !== -1) {
+      DEMO_CONTACTS[idx].phone = num;
+      try { RemielDB.putContact(DEMO_CONTACTS[idx]); } catch(e) {}
+      if (selectedContact && selectedContact.id === _qdContactId) {
+        selectedContact.phone = num;
+      }
+      /* Refresh BLUF buttons */
+      updateBlufContent().catch(function() {});
+    }
+  }
+  closeQuickDial();
+  if (_qdMode === 'sms') {
+    window.location.href = 'sms:' + num;
+  } else {
+    window.location.href = 'tel:' + num;
+  }
 }
 
 function closeContactModal() {
@@ -18011,7 +18150,7 @@ async function deleteContactFromModal() {
 function updateFabVisibility() {
   const fab = document.getElementById('addPersonFab');
   if (!fab) return;
-  const shouldShow = appState === 'network' && !blufOpen &&
+  const shouldShow = (appState === 'network' || appState === 'self') && !blufOpen &&
     !document.getElementById('contactModalOverlay').classList.contains('open') &&
     !document.getElementById('overlay').classList.contains('open');
   fab.classList.toggle('hidden', !shouldShow);
