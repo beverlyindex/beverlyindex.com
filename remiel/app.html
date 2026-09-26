@@ -6221,13 +6221,15 @@ async function launchGalaxy(savedContacts) {
     for (const p of photos) {
       try {
         if (!p || !p.contactId) continue;
-        /* Handle both Blob and raw ArrayBuffer/typed array from some IDB impls */
-        let blob = p.blob;
-        if (!blob) { console.warn('RemielDB: no blob for', p.contactId); continue; }
-        if (!(blob instanceof Blob)) {
-          /* Some browsers store the blob differently after serialization */
-          try { blob = new Blob([blob]); } catch(e) { console.warn('RemielDB: blob conversion failed for', p.contactId); continue; }
+        /* Reconstruct Blob from stored ArrayBuffer+mimeType, or legacy blob field */
+        let blob;
+        if (p.buffer) {
+          try { blob = new Blob([p.buffer], { type: p.mimeType || 'image/png' }); }
+          catch(e) { console.warn('RemielDB: ArrayBuffer→Blob failed for', p.contactId); continue; }
+        } else if (p.blob) {
+          blob = p.blob instanceof Blob ? p.blob : (() => { try { return new Blob([p.blob]); } catch(e) { return null; } })();
         }
+        if (!blob) { console.warn('RemielDB: no photo data for', p.contactId); continue; }
         const blobType = blob.type || '';
         console.log('RemielDB: restoring photo for', p.contactId, 'type:', blobType, 'size:', blob.size);
         if (blob.size === 0) { console.warn('RemielDB: empty blob for', p.contactId); continue; }
@@ -6506,23 +6508,42 @@ const RemielDB = (() => {
 
   async function putPhoto(contactId, blob) {
     await open();
-    /* Safari IDB rejects File objects — convert to plain Blob */
-    if (blob instanceof File || (blob && blob.constructor && blob.constructor.name === 'File')) {
-      blob = new Blob([await blob.arrayBuffer()], { type: blob.type || 'image/png' });
-    }
-    if (!blob || blob.size === 0) {
-      console.warn('RemielDB.putPhoto: refusing empty blob for', contactId);
+    /* Convert any input (File, Blob, ArrayBuffer) to ArrayBuffer + type for Safari IDB compat */
+    var mimeType = 'image/png';
+    var arrayBuf;
+    if (blob instanceof File || blob instanceof Blob) {
+      mimeType = blob.type || 'image/png';
+      if (blob.size === 0) {
+        console.warn('RemielDB.putPhoto: refusing empty blob for', contactId);
+        return false;
+      }
+      arrayBuf = await blob.arrayBuffer();
+    } else if (blob instanceof ArrayBuffer) {
+      arrayBuf = blob;
+    } else if (blob && blob.buffer instanceof ArrayBuffer) {
+      arrayBuf = blob.buffer;
+    } else {
+      console.warn('RemielDB.putPhoto: unrecognized data type for', contactId);
       return false;
     }
-    console.log('RemielDB.putPhoto:', contactId, 'type:', blob.type, 'size:', blob.size);
-    var result = await promisify(tx('photos', 'readwrite').put({ contactId, blob, updatedAt: Date.now() }));
+    if (!arrayBuf || arrayBuf.byteLength === 0) {
+      console.warn('RemielDB.putPhoto: refusing empty data for', contactId);
+      return false;
+    }
+    console.log('RemielDB.putPhoto:', contactId, 'type:', mimeType, 'bytes:', arrayBuf.byteLength);
+    var result = await promisify(tx('photos', 'readwrite').put({
+      contactId: contactId,
+      buffer: arrayBuf,
+      mimeType: mimeType,
+      updatedAt: Date.now()
+    }));
     /* Verify the write succeeded by reading it back */
     try {
       var verify = await promisify(tx('photos', 'readonly').get(contactId));
-      if (!verify || !verify.blob) {
-        console.error('RemielDB.putPhoto: VERIFICATION FAILED for', contactId, '— photo not persisted!');
+      if (!verify || !verify.buffer) {
+        console.error('RemielDB.putPhoto: VERIFICATION FAILED for', contactId);
       } else {
-        console.log('RemielDB.putPhoto: verified OK for', contactId, 'stored size:', verify.blob.size || verify.blob.byteLength || '?');
+        console.log('RemielDB.putPhoto: verified OK for', contactId, 'stored bytes:', verify.buffer.byteLength);
       }
     } catch(ve) { console.warn('RemielDB.putPhoto: verify read failed', ve); }
     /* Clear synced flag so next sync pushes this photo */
@@ -10129,35 +10150,44 @@ function getContactHeadline(contact) {
 
 /* ── Quick-action icon drawing for focused spheres ── */
 function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
-  /* Four text labels arranged to the RIGHT of the focused sphere */
-  var labelFs = Math.max(9, Math.round(11 * s));
-  var lineH = Math.max(16, Math.round(20 * s));
+  /* Modern action labels — vertically stacked beside the focused sphere */
+  var labelFs = Math.max(10, Math.round(12 * s));
+  var lineH = Math.max(22, Math.round(26 * s));
   var labels = ['Video', 'Phone', 'Text', 'Email'];
-  var startX = sx + r + Math.max(14, 18 * s); /* right of sphere edge */
-  var startY = sy - (labels.length * lineH) / 2 + lineH / 2;
+  var gap = Math.max(14, 18 * s);
+  var totalH = labels.length * lineH;
+  var startY = sy - totalH / 2 + lineH / 2;
   var fadeAlpha = Math.min(1, 0.75 + 0.25 * Math.sin(t * 0.004));
-  /* Check if labels would go off-screen right; flip to left side if so */
+
+  /* Determine side: right of sphere, flip left if near screen edge */
   var cvW = ctx.canvas.width / (window.devicePixelRatio || 1);
-  var flipLeft = (startX + 60) > cvW;
-  if (flipLeft) {
-    startX = sx - r - Math.max(14, 18 * s);
-  }
+  var startX = sx + r + gap;
+  var flipLeft = (startX + 80) > cvW;
+  if (flipLeft) startX = sx - r - gap;
+
   ctx.save();
-  ctx.font = '600 ' + labelFs + 'px system-ui, -apple-system, sans-serif';
+  ctx.font = '500 ' + labelFs + 'px -apple-system, system-ui, "Segoe UI", sans-serif';
   ctx.textBaseline = 'middle';
-  ctx.textAlign = flipLeft ? 'right' : 'left';
+
+  /* Measure widest label for consistent pill width */
+  var maxW = 0;
+  for (var m = 0; m < labels.length; m++) {
+    var mw = ctx.measureText(labels[m]).width;
+    if (mw > maxW) maxW = mw;
+  }
+  var px = 12, py = 5;
+  var pillW = maxW + px * 2;
+  var pillH = labelFs + py * 2;
+  var cr = 6;
+
   for (var i = 0; i < labels.length; i++) {
     var ly = startY + i * lineH;
-    /* Tap-target pill background */
-    var tw = ctx.measureText(labels[i]).width;
-    var px = 8, py = 3;
-    var pillX = flipLeft ? startX - tw - px : startX - px;
-    var pillW = tw + px * 2;
-    var pillH = labelFs + py * 2;
+    var pillX = flipLeft ? startX - pillW : startX;
+
+    /* Frosted pill background */
+    ctx.globalAlpha = 0.72 * fadeAlpha;
+    ctx.fillStyle = 'rgba(12,14,24,0.88)';
     var pillY = ly - pillH / 2;
-    ctx.globalAlpha = 0.65 * fadeAlpha;
-    ctx.fillStyle = 'rgba(16,18,28,0.82)';
-    var cr = pillH / 2;
     ctx.beginPath();
     ctx.moveTo(pillX + cr, pillY);
     ctx.lineTo(pillX + pillW - cr, pillY);
@@ -10170,15 +10200,18 @@ function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
     ctx.arcTo(pillX, pillY, pillX + cr, pillY, cr);
     ctx.closePath();
     ctx.fill();
-    /* Pill border */
-    ctx.globalAlpha = 0.5 * fadeAlpha;
-    ctx.strokeStyle = 'rgba(56,189,248,0.35)';
-    ctx.lineWidth = 0.8;
+
+    /* Subtle border with glow */
+    ctx.globalAlpha = 0.45 * fadeAlpha;
+    ctx.strokeStyle = 'rgba(100,180,255,0.3)';
+    ctx.lineWidth = 1;
     ctx.stroke();
-    /* Label text */
+
+    /* Label text — centered in pill */
     ctx.globalAlpha = 0.95 * fadeAlpha;
-    ctx.fillStyle = '#e0ecff';
-    ctx.fillText(labels[i], startX, ly);
+    ctx.fillStyle = '#d8e8ff';
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[i], pillX + pillW / 2, ly);
   }
   ctx.restore();
 }
@@ -11242,23 +11275,25 @@ function onPressEnd(e) {
           const _qaR = Math.max(2, _qaNode.r * _qaS * _qaMul * _qaCb);
           const _qaSx = _qaP.sx, _qaSy = _qaP.sy;
           /* Hit-test text labels on right (or left) side of sphere */
-          var _qaLabelFs = Math.max(9, Math.round(11 * _qaS));
-          var _qaLineH = Math.max(16, Math.round(20 * _qaS));
+          var _qaLabelFs = Math.max(10, Math.round(12 * _qaS));
+          var _qaLineH = Math.max(22, Math.round(26 * _qaS));
           var _qaLabels = ['video', 'phone', 'sms', 'email'];
-          var _qaStartX = _qaSx + _qaR + Math.max(14, 18 * _qaS);
-          var _qaStartY = _qaSy - (_qaLabels.length * _qaLineH) / 2 + _qaLineH / 2;
+          var _qaGap = Math.max(14, 18 * _qaS);
+          var _qaStartX = _qaSx + _qaR + _qaGap;
+          var _qaTotalH = _qaLabels.length * _qaLineH;
+          var _qaStartY = _qaSy - _qaTotalH / 2 + _qaLineH / 2;
           var _qaCvW = CV.width / DPR;
-          var _qaFlip = (_qaStartX + 60) > _qaCvW;
-          if (_qaFlip) { _qaStartX = _qaSx - _qaR - Math.max(14, 18 * _qaS); }
+          var _qaFlip = (_qaStartX + 80) > _qaCvW;
+          if (_qaFlip) { _qaStartX = _qaSx - _qaR - _qaGap; }
           const _qaRect = CV.getBoundingClientRect();
           const _qaTx = clientX - _qaRect.left;
           const _qaTy = clientY - _qaRect.top;
-          var _qaHitW = 70; /* generous tap width */
+          var _qaHitW = 80; /* generous tap width matching pill */
           for (var _qai = 0; _qai < _qaLabels.length; _qai++) {
             var _qi = { type: _qaLabels[_qai] };
             var _qly = _qaStartY + _qai * _qaLineH;
-            var _qaHitLeft = _qaFlip ? _qaStartX - _qaHitW : _qaStartX - 8;
-            var _qaHitRight = _qaFlip ? _qaStartX + 8 : _qaStartX + _qaHitW;
+            var _qaHitLeft = _qaFlip ? _qaStartX - _qaHitW : _qaStartX;
+            var _qaHitRight = _qaFlip ? _qaStartX : _qaStartX + _qaHitW;
             if (_qaTx >= _qaHitLeft && _qaTx <= _qaHitRight &&
                 _qaTy >= _qly - _qaLineH / 2 && _qaTy <= _qly + _qaLineH / 2) {
               /* Icon tapped — trigger action */
