@@ -4556,7 +4556,24 @@
 .ob-roster-title { font:600 14px/1.3 "Hanken Grotesk",system-ui,sans-serif; color:#C5A55A; margin:0 0 4px; }
 .ob-roster-desc { font:400 12px/1.4 "Hanken Grotesk",system-ui,sans-serif; color:rgba(160,160,200,0.5); margin:0; }
 /* ── Roster Import ── */
-.roster-btn { display:flex; align-items:center; gap:8px; width:100%; padding:14px 16px; background:rgba(197,165,90,0.10); border:1px solid rgba(197,165,90,0.25); border-radius:12px; color:#C5A55A; font:600 14px/1 "Hanken Grotesk",system-ui,sans-serif; cursor:pointer; transition:all .2s; margin-top:12px; }
+
+  /* ── Group Photo face detection ── */
+  .gp-overlay { position:absolute; top:0; left:0; pointer-events:none; }
+  .gp-face-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:8px; padding:8px 0; }
+  .gp-face-card { position:relative; background:rgba(255,255,255,0.05); border:1px solid rgba(197,165,90,0.2); border-radius:8px; padding:6px; text-align:center; cursor:pointer; transition:all .2s; }
+  .gp-face-card:hover { border-color:rgba(197,165,90,0.5); background:rgba(197,165,90,0.08); }
+  .gp-face-card.selected { border-color:#4CAF50; background:rgba(76,175,80,0.08); }
+  .gp-face-img { width:56px; height:56px; border-radius:50%; object-fit:cover; display:block; margin:0 auto 4px; }
+  .gp-face-name { font:500 11px/1.2 "Hanken Grotesk",system-ui,sans-serif; color:rgba(255,255,255,0.7); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gp-face-name input { width:100%; background:transparent; border:none; border-bottom:1px solid rgba(197,165,90,0.3); color:#fff; font:inherit; text-align:center; padding:2px 0; outline:none; }
+  .gp-face-name input:focus { border-color:#C5A55A; }
+  .gp-progress { display:flex; align-items:center; gap:8px; padding:12px 0; color:rgba(255,255,255,0.6); font:400 13px/1 "Hanken Grotesk",system-ui,sans-serif; }
+  .gp-progress .gp-spin { width:16px; height:16px; border:2px solid rgba(197,165,90,0.2); border-top-color:#C5A55A; border-radius:50%; animation:cpSpin .8s linear infinite; }
+  .gp-stats { display:flex; gap:16px; padding:8px 0; font:400 13px/1 "Hanken Grotesk",system-ui,sans-serif; color:rgba(255,255,255,0.5); }
+  .gp-stats strong { color:#C5A55A; }
+  .gp-select-all { display:flex; align-items:center; gap:6px; padding:6px 0; font:400 12px/1 "Hanken Grotesk",system-ui,sans-serif; color:rgba(255,255,255,0.5); cursor:pointer; }
+
+  .roster-btn { display:flex; align-items:center; gap:8px; width:100%; padding:14px 16px; background:rgba(197,165,90,0.10); border:1px solid rgba(197,165,90,0.25); border-radius:12px; color:#C5A55A; font:600 14px/1 "Hanken Grotesk",system-ui,sans-serif; cursor:pointer; transition:all .2s; margin-top:12px; }
 .roster-btn:active { transform:scale(0.97); }
 .roster-btn svg { flex-shrink:0; }
 .roster-modal-overlay { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s; }
@@ -6167,6 +6184,37 @@ function _loadTesseract() {
     document.head.appendChild(s);
   });
   return _tesseractReady;
+}
+
+/* ── face-api.js lazy loader ── */
+var _faceApiReady = null;
+var _faceApiModelsLoaded = false;
+function _loadFaceApi() {
+  if (_faceApiReady) return _faceApiReady;
+  _faceApiReady = new Promise(function(resolve, reject) {
+    if (window.faceapi) {
+      if (!_faceApiModelsLoaded) {
+        _faceApiModelsLoaded = true;
+        faceapi.nets.tinyFaceDetector.loadFromUri(
+          'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
+        ).then(function() { resolve(window.faceapi); })
+         .catch(reject);
+      } else { resolve(window.faceapi); }
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js';
+    s.onload = function() {
+      _faceApiModelsLoaded = true;
+      faceapi.nets.tinyFaceDetector.loadFromUri(
+        'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
+      ).then(function() { resolve(window.faceapi); })
+       .catch(reject);
+    };
+    s.onerror = function() { reject(new Error('Failed to load face-api.js')); };
+    document.head.appendChild(s);
+  });
+  return _faceApiReady;
 }
 
 /* ── Code usage tracking ── */
@@ -10374,8 +10422,9 @@ var RosterImport = (function() {
   }
 
   function switchTab(tab) {
-    ['image','paste','file'].forEach(function(t) {
-      var el = document.getElementById('rosterTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    ['image','paste','file','group'].forEach(function(t) {
+      var id = t === 'group' ? 'rosterTabGroup' : 'rosterTab' + t.charAt(0).toUpperCase() + t.slice(1);
+      var el = document.getElementById(id);
       if (el) el.style.display = t === tab ? '' : 'none';
     });
     document.querySelectorAll('.roster-tab').forEach(function(btn) {
@@ -10737,6 +10786,266 @@ var RosterImport = (function() {
 
   function _esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+  /* ── Group Photo face detection ── */
+  var _gpFaces = [];      // detected face crops [{canvas, x, y, w, h, name}]
+  var _gpOrigImg = null;  // original uploaded image element
+
+  function handleGroupPhoto(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var prog = document.getElementById('gpProgress');
+    var fill = document.getElementById('gpProgressFill');
+    var status = document.getElementById('gpStatus');
+    var preview = document.getElementById('gpFacePreview');
+    var importBtn = document.getElementById('gpImportBtn');
+    prog.style.display = '';
+    fill.style.width = '0%';
+    status.textContent = 'Loading face detection...';
+    preview.innerHTML = '';
+    importBtn.style.display = 'none';
+    _gpFaces = [];
+
+    // Load face-api.js and process image in parallel with OCR
+    var imgUrl = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function() {
+      _gpOrigImg = img;
+
+      // Run face detection and OCR in parallel
+      Promise.all([
+        _loadFaceApi().then(function(faceapi) {
+          status.textContent = 'Detecting faces...';
+          fill.style.width = '30%';
+          var opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.35 });
+          return faceapi.detectAllFaces(img, opts);
+        }),
+        _loadTesseract().then(function(Tesseract) {
+          return Tesseract.recognize(file, 'eng', {
+            logger: function(m) {
+              if (m.status === 'recognizing text') {
+                var pct = Math.round(50 + m.progress * 30);
+                fill.style.width = pct + '%';
+              }
+            }
+          });
+        }).catch(function() { return { data: { text: '' } }; })
+      ]).then(function(results) {
+        var detections = results[0];
+        var ocrResult = results[1];
+        var ocrText = (ocrResult && ocrResult.data && ocrResult.data.text) || '';
+
+        if (!detections || detections.length === 0) {
+          status.textContent = 'No faces detected. Try a clearer photo with visible faces.';
+          fill.style.width = '100%';
+          return;
+        }
+
+        status.textContent = 'Cropping ' + detections.length + ' faces...';
+        fill.style.width = '85%';
+
+        // Sort faces: top-to-bottom rows, then left-to-right within rows
+        var sorted = detections.slice().sort(function(a, b) {
+          var rowA = Math.floor(a.box.y / (img.height * 0.12));
+          var rowB = Math.floor(b.box.y / (img.height * 0.12));
+          if (rowA !== rowB) return rowA - rowB;
+          return a.box.x - b.box.x;
+        });
+
+        // Extract names from OCR text
+        var nameLines = _extractNamesFromOCR(ocrText);
+
+        // Crop each face
+        _gpFaces = sorted.map(function(det, idx) {
+          var box = det.box;
+          // Expand crop area slightly for better headshots
+          var pad = Math.round(Math.max(box.width, box.height) * 0.35);
+          var cx = Math.max(0, Math.round(box.x - pad));
+          var cy = Math.max(0, Math.round(box.y - pad));
+          var cw = Math.min(img.width - cx, Math.round(box.width + pad * 2));
+          var ch = Math.min(img.height - cy, Math.round(box.height + pad * 2));
+
+          var canvas = document.createElement('canvas');
+          canvas.width = 128;
+          canvas.height = 128;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, cx, cy, cw, ch, 0, 0, 128, 128);
+
+          return {
+            canvas: canvas,
+            x: box.x,
+            y: box.y,
+            w: box.width,
+            h: box.height,
+            name: nameLines[idx] || '',
+            selected: true
+          };
+        });
+
+        fill.style.width = '100%';
+        status.textContent = detections.length + ' faces detected' + (nameLines.length > 0 ? ', ' + nameLines.length + ' names found' : '') + '.';
+        _showGroupPhotoPreview();
+      }).catch(function(err) {
+        status.textContent = 'Face detection failed: ' + err.message;
+        fill.style.width = '0%';
+        console.error('Group photo error:', err);
+      });
+    };
+    img.onerror = function() {
+      status.textContent = 'Failed to load image.';
+    };
+    img.src = imgUrl;
+    input.value = '';
+  }
+
+  function _extractNamesFromOCR(text) {
+    if (!text || !text.trim()) return [];
+    var names = [];
+    var lines = text.split(/\n/);
+    // Common junk patterns
+    var junkRe = /^(page|row|platoon|squad|company|battalion|regiment|division|section|https?:|www\.|copyright|\d{4}[\s-]|photo|image|fig|caption)/i;
+    var numOnlyRe = /^[\d\s.,;:()-]+$/;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line || line.length < 3) continue;
+      if (junkRe.test(line)) continue;
+      if (numOnlyRe.test(line)) continue;
+
+      // Try to split lines that contain multiple comma-separated names
+      var parts = line.split(/[,;]+/);
+      for (var p = 0; p < parts.length; p++) {
+        var part = parts[p].trim();
+        if (!part || part.length < 2) continue;
+        // Clean up: remove leading numbers, periods, parenthetical content
+        part = part.replace(/^[\d.]+\s*/, '').replace(/\s*\(.*?\)\s*/g, '').trim();
+        // Must have at least 2 chars and contain a letter
+        if (part.length >= 2 && /[a-zA-Z]/.test(part)) {
+          // Limit to reasonable name length
+          var words = part.split(/\s+/).slice(0, 4);
+          names.push(words.map(function(w) {
+            return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+          }).join(' '));
+        }
+      }
+    }
+    return names;
+  }
+
+  function _showGroupPhotoPreview() {
+    var preview = document.getElementById('gpFacePreview');
+    var importBtn = document.getElementById('gpImportBtn');
+    if (!_gpFaces.length) { preview.innerHTML = ''; importBtn.style.display = 'none'; return; }
+
+    var html = '<div class="gp-stats">' + _gpFaces.length + ' faces found &mdash; name each person and select who to import</div>';
+    html += '<div style="margin-bottom:8px"><label style="display:flex;align-items:center;gap:6px;color:#C5A55A;font-size:13px;cursor:pointer"><input type="checkbox" id="gpSelectAll" checked onchange="RosterImport.toggleAllFaces(this.checked)"> Select All</label></div>';
+    html += '<div class="gp-face-grid">';
+
+    for (var i = 0; i < _gpFaces.length; i++) {
+      var face = _gpFaces[i];
+      var dataUrl = face.canvas.toDataURL('image/png');
+      html += '<div class="gp-face-card' + (face.selected ? ' selected' : '') + '" data-idx="' + i + '" onclick="RosterImport.toggleFace(' + i + ')">';
+      html += '<img class="gp-face-img" src="' + dataUrl + '" alt="Face ' + (i + 1) + '">';
+      html += '<div class="gp-face-name" onclick="event.stopPropagation()">';
+      html += '<input type="text" placeholder="Name" value="' + (face.name || '').replace(/"/g, '&quot;') + '" onchange="RosterImport.setFaceName(' + i + ',this.value)" onfocus="event.stopPropagation()">';
+      html += '</div>';
+      html += '<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px">#' + (i + 1) + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    preview.innerHTML = html;
+    importBtn.style.display = '';
+    importBtn.textContent = 'Import ' + _gpFaces.filter(function(f) { return f.selected; }).length + ' Selected';
+  }
+
+  function toggleFace(idx) {
+    if (idx < 0 || idx >= _gpFaces.length) return;
+    _gpFaces[idx].selected = !_gpFaces[idx].selected;
+    var card = document.querySelector('.gp-face-card[data-idx="' + idx + '"]');
+    if (card) card.classList.toggle('selected', _gpFaces[idx].selected);
+    var btn = document.getElementById('gpImportBtn');
+    if (btn) btn.textContent = 'Import ' + _gpFaces.filter(function(f) { return f.selected; }).length + ' Selected';
+  }
+
+  function toggleAllFaces(checked) {
+    _gpFaces.forEach(function(f, i) {
+      f.selected = checked;
+      var card = document.querySelector('.gp-face-card[data-idx="' + i + '"]');
+      if (card) card.classList.toggle('selected', checked);
+    });
+    var btn = document.getElementById('gpImportBtn');
+    if (btn) btn.textContent = 'Import ' + _gpFaces.filter(function(f) { return f.selected; }).length + ' Selected';
+  }
+
+  function setFaceName(idx, name) {
+    if (idx >= 0 && idx < _gpFaces.length) _gpFaces[idx].name = name.trim();
+  }
+
+  async function doGroupImport() {
+    var selected = _gpFaces.filter(function(f) { return f.selected; });
+    if (!selected.length) { alert('No faces selected to import.'); return; }
+
+    var cat = (document.getElementById('rosterCatSelect') || {}).value || 'other';
+    var imported = 0;
+
+    for (var i = 0; i < selected.length; i++) {
+      var face = selected[i];
+      var nameParts = (face.name || ('Person ' + (i + 1))).split(/\s+/);
+      var first = nameParts[0] || 'Person';
+      var last = nameParts.slice(1).join(' ') || '';
+
+      var id = 'gp_' + Date.now() + '_' + i;
+      var contact = {
+        id: id,
+        first: first,
+        last: last,
+        cat: cat,
+        sev: 'green',
+        phone: '',
+        email: ''
+      };
+      DEMO_CONTACTS.push(contact);
+
+      // Store face crop as contact photo
+      try {
+        var blob = await new Promise(function(resolve) {
+          face.canvas.toBlob(resolve, 'image/png');
+        });
+        var photoImg = new Image();
+        photoImg.src = face.canvas.toDataURL('image/png');
+        contactPhotos.set(id, { img: photoImg, w: 128, h: 128, isVideo: false, isGif: false });
+      } catch(e) { /* photo storage failed, continue */ }
+
+      imported++;
+    }
+
+    // Rebuild constellation
+    if (typeof buildNodes === 'function') buildNodes(true);
+    if (typeof renderObContacts === 'function') renderObContacts();
+
+    // Update onboarding count
+    var obCount = document.getElementById('obContactCount');
+    if (obCount) obCount.textContent = DEMO_CONTACTS.length;
+    var obNext = document.getElementById('obNextBtn');
+    if (obNext && DEMO_CONTACTS.length > 0) obNext.style.display = '';
+
+    // Show success in modal
+    var modalBody = document.querySelector('.roster-modal .roster-body');
+    var modalHeader = document.querySelector('.roster-modal .roster-header');
+    if (modalBody) {
+      modalBody.innerHTML = '<div style="text-align:center;padding:40px 20px">' +
+        '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" style="margin-bottom:16px">' +
+        '<circle cx="12" cy="12" r="10" stroke="#4CAF50" stroke-width="2"/>' +
+        '<path d="M8 12l2.5 2.5L16 9" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>' +
+        '<p style="font-size:22px;font-weight:700;color:#C5A55A;margin:0 0 8px">' +
+        imported + ' Contacts Imported!</p>' +
+        '<p style="font-size:13px;color:rgba(255,255,255,0.5);margin:0 0 24px">from group photo face detection</p>' +
+        '<button onclick="RosterImport.close()" style="background:linear-gradient(135deg,#C5A55A,#8B7332);color:#000;border:none;' +
+        'padding:12px 32px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer">Done</button></div>';
+    }
+    if (modalHeader) modalHeader.style.display = 'none';
+  }
+
   async function doImport() {
     var selected = _parsed.filter(function(p) { return p.checked; });
     if (!selected.length) return;
@@ -10822,7 +11131,10 @@ var RosterImport = (function() {
   }, 500);
 
   return { open: open, close: close, switchTab: switchTab, handleImageFile: handleImageFile,
-           parseText: parseText, handleFile: handleFile, doImport: doImport, _toggle: _toggle };
+           parseText: parseText, handleFile: handleFile, doImport: doImport, _toggle: _toggle,
+           handleGroupPhoto: handleGroupPhoto, toggleFace: toggleFace,
+           toggleAllFaces: toggleAllFaces, setFaceName: setFaceName,
+           doGroupImport: doGroupImport };
 })();
 
 function getContactHeadline(contact) {
@@ -19899,6 +20211,7 @@ const MedImageReader = (() => {
         <button class="roster-tab active" data-tab="image" onclick="RosterImport.switchTab('image')">&#128247; Image</button>
         <button class="roster-tab" data-tab="paste" onclick="RosterImport.switchTab('paste')">&#128203; Paste</button>
         <button class="roster-tab" data-tab="file" onclick="RosterImport.switchTab('file')">&#128196; File</button>
+        <button class="roster-tab" data-tab="group" onclick="RosterImport.switchTab('group')">&#128101; Group</button>
       </div>
       <div class="roster-body">
         <div id="rosterTabImage">
@@ -19922,6 +20235,19 @@ const MedImageReader = (() => {
             <p><strong>Tap to choose</strong> a file<br>.csv, .tsv, .txt, or .vcf (vCard)</p>
           </div>
           <input type="file" class="roster-file-input" id="rosterFileCsv" accept=".csv,.tsv,.txt,.vcf,.vcard" onchange="RosterImport.handleFile(this)">
+        </div>
+        <div id="rosterTabGroup" style="display:none">
+          <div class="roster-drop-zone" id="gpDropZone" onclick="document.getElementById('gpFileInput').click()">
+            <svg width="40" height="40" fill="none" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2" stroke="#C5A55A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="7" r="4" stroke="#C5A55A" stroke-width="1.5"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="#C5A55A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <p><strong>Tap to choose</strong> a group photo<br>Team photo, platoon roster, class picture, etc.<br><span style="font-size:11px;color:rgba(255,255,255,0.4)">AI will detect individual faces</span></p>
+          </div>
+          <input type="file" class="roster-file-input" id="gpFileInput" accept="image/*" onchange="RosterImport.handleGroupPhoto(this)">
+          <div class="gp-progress" id="gpProgress" style="display:none">
+            <div class="roster-ocr-bar"><div class="roster-ocr-bar-fill" id="gpProgressFill"></div></div>
+            <div class="roster-ocr-status" id="gpStatus">Initializing...</div>
+          </div>
+          <div id="gpFacePreview"></div>
+          <button class="roster-import-btn" id="gpImportBtn" style="display:none;background:linear-gradient(135deg,#C5A55A,#8B7332);color:#000" onclick="RosterImport.doGroupImport()">Import Selected</button>
         </div>
         <div class="roster-cat-row">
           <label>Category:</label>
