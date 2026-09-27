@@ -5558,6 +5558,20 @@ button:active:not(:disabled), [role="button"]:active, .btn:active { transform: s
   color: #7dd3fc; font-family: 'Hanken Grotesk', system-ui, sans-serif; text-align: inherit;
 }
 .field-hint[hidden] { display: none; }
+/* Guide.go: the rim and one-line hint on the control a direction points to */
+.guide-rim {
+  box-shadow: 0 0 0 2px var(--adv-rim), 0 0 14px 3px rgba(56,212,255,0.45) !important;
+  border-color: var(--adv-rim) !important;
+  animation: btnAdvanceGlow 1.6s ease-in-out infinite;
+  outline: none;
+}
+@media (prefers-reduced-motion: reduce) { .guide-rim { animation: none !important; } }
+.guide-hint { margin-bottom: 6px; }
+.guide-link {
+  background: none; border: none; padding: 2px 0; margin: 0 0 0 4px; color: #38d4ff; font: inherit; font-weight: 600;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer; min-height: 32px;
+}
+.guide-link:focus-visible { outline: 2px solid var(--adv-rim); outline-offset: 2px; }
 
 /* Primary: one bright accent fill with dark text */
 .ob-primary, .contact-modal-save, .profile-save-btn, .ledger-send, .checkin-submit-btn,
@@ -11834,6 +11848,51 @@ const I18n = (function () {
     "cd.s.extension": "Int.",
     "roster.gp.head": "Ricerca dei volti in questa foto",
     "guide.rosterFile": "Scegli un file CSV, TSV, di testo, Excel .xlsx o vCard. Una riga di intestazione come Nome, Cognome, Qualifica, Reparto, Telefono ed Email compila i dettagli.",
+  });
+
+  /* Guide and Magnet strings (EN) */
+  Object.assign(_strings.en, {
+    "guide.showMe": "Show me",
+    "guide.addItNow": "Add it now",
+    "guide.h.sid": "Type the 8 character Sentinel ID here, then tap Save Changes.",
+    "guide.h.phone": "Type the phone number here, then tap Save Changes.",
+    "guide.h.email": "Type the email address here, then tap Save Changes.",
+    "guide.h.call": "Your Sentinel ID is shown above. Copy it, or share your call link with people you trust.",
+    "guide.h.circle": "Type an email, @handle or Sentinel ID, then tap Invite.",
+    "guide.h.account": "Tap here to connect this device. Messages, calls and invitations then reach other people.",
+    "guide.h.accountIn": "This device is signed in. Your account settings are here.",
+    "guide.h.code": "Type the invite code here, then tap Attach email.",
+    "guide.h.discover": "Leave this on so people who have your number or email can find you.",
+    "guide.h.myPhone": "Type your phone number, then tap Save number.",
+    "guide.h.push": "Turn this switch on to hear about messages and requests while the app is closed.",
+    "guide.h.location": "Tap Share My Location Now to send your position once.",
+    "guide.h.pulseAdd": "Tap + Add person to add someone.",
+    "guide.h.search": "Type a team name here, then tap Search.",
+    "guide.h.paste": "Type or paste one name per line here.",
+    "guide.h.upload": "Tap Upload to choose a photo of the label.",
+    "guide.h.signInFirst": "That part of Settings appears once this device is connected. Connect it here first.",
+  });
+  /* Guide and Magnet strings (IT) */
+  Object.assign(_strings.it, {
+    "guide.showMe": "Mostrami",
+    "guide.addItNow": "Aggiungilo ora",
+    "guide.h.sid": "Scrivi qui l'ID Sentinel di 8 caratteri, poi tocca Salva modifiche.",
+    "guide.h.phone": "Scrivi qui il numero di telefono, poi tocca Salva modifiche.",
+    "guide.h.email": "Scrivi qui l'indirizzo email, poi tocca Salva modifiche.",
+    "guide.h.call": "Il tuo ID Sentinel è qui sopra. Copialo, oppure condividi il tuo link di chiamata con persone di fiducia.",
+    "guide.h.circle": "Scrivi un'email, un @handle o un ID Sentinel, poi tocca Invita.",
+    "guide.h.account": "Tocca qui per collegare questo dispositivo. Così messaggi, chiamate e inviti arrivano alle altre persone.",
+    "guide.h.accountIn": "Questo dispositivo ha già effettuato l'accesso. Le impostazioni del tuo account sono qui.",
+    "guide.h.code": "Scrivi qui il codice di invito, poi tocca Collega l’email.",
+    "guide.h.discover": "Lascialo attivo perché chi ha il tuo numero o la tua email possa trovarti.",
+    "guide.h.myPhone": "Scrivi il tuo numero di telefono, poi tocca Salva numero.",
+    "guide.h.push": "Attiva questo interruttore per ricevere messaggi e richieste anche ad app chiusa.",
+    "guide.h.location": "Tocca Condividi ora la mia posizione per inviare la tua posizione una volta.",
+    "guide.h.pulseAdd": "Tocca + Aggiungi persona per aggiungere qualcuno.",
+    "guide.h.search": "Scrivi qui il nome di una squadra, poi tocca Cerca.",
+    "guide.h.paste": "Scrivi o incolla qui un nome per riga.",
+    "guide.h.upload": "Tocca Carica per scegliere una foto dell'etichetta.",
+    "guide.h.signInFirst": "Quella parte delle Impostazioni compare quando questo dispositivo è collegato. Collegalo prima qui.",
   });
 
   function t(key, params) {
@@ -31175,6 +31234,200 @@ const SentinelCall = (function() {
   };
 })();
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   Guide: actionable directions. Guide.go(target, opts) closes what is
+   open, opens the exact panel, scrolls the field or button into view,
+   focuses it, rims it for 6 seconds and shows a one-line hint under it.
+   Every string that tells the user to do something names the place and
+   offers a "Show me" button that calls Guide.go.
+   Targets: contact.sentinelId, contact.phone, contact.email (opts.contactId),
+   settings.call, settings.circle, settings.account (opts.field: discover,
+   phone, code), settings.push, settings.location, pulse.add, roster.search,
+   roster.paste, medimg.upload.
+   ═══════════════════════════════════════════════════════════════════ */
+var Guide = (function () {
+  'use strict';
+  var RIM_MS = 6000;
+  var _last = null;
+
+  function _t(key, params) { try { return I18n.t(key, params); } catch (e) { return key; } }
+  function $(id) { return document.getElementById(id); }
+  function _wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function _isOpen(id) {
+    var el = $(id);
+    if (!el) return false;
+    return ['open', 'active', 'visible', 'show'].some(function (c) { return el.classList.contains(c); });
+  }
+  function _visible(el) {
+    if (!el || !el.isConnected) return false;
+    if (!el.getClientRects().length) return false;
+    for (var e = el; e && e.nodeType === 1; e = e.parentElement) {
+      var cs = getComputedStyle(e);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    }
+    return true;
+  }
+  function _authed() {
+    try { return typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated() && !SyncEngine.isLocalOnly(); } catch (e) { return false; }
+  }
+  function _contact(id) {
+    try { return DEMO_CONTACTS.find(function (c) { return c.id === id || String(c.id) === String(id); }) || null; } catch (e) { return null; }
+  }
+
+  /* Close every panel, card and dialog except the call screens and the
+     one named in keep. */
+  function closeAll(keep) {
+    var toast = document.querySelector('.rs-action-toast');
+    if (toast) toast.remove();
+    try { SentinelGuide.hideAll(true); } catch (e) {}
+    var closers = [
+      ['medImgOverlay', function () { MedImageReader.close(); }],
+      ['rosterOverlay', function () { RosterImport.close(); }],
+      ['socialImportModal', function () { SocialImport.close(); }],
+      ['contactModalOverlay', function () { closeContactModal(); }],
+      ['quickDialOverlay', function () { closeQuickDial(); }],
+      ['contactsPopupOverlay', function () { closeContactsPopup(); }],
+      ['svEditor', function () { SentinelViews.closeEditor(); }],
+      ['svOverlay', function () { SentinelViews.closePanel(); }],
+      ['contactListView', function () { ContactListView.close(); }],
+      ['pulseOverlay', function () { ThePulse.close(); }],
+      ['sentinelMsgOverlay', function () { SentinelMessaging.close(); }],
+      ['alertPanel', function () { AlertEngine.closePanel(); }],
+      ['settingsPanel', function () { SettingsPanel.close(); }],
+      ['blufOverlay', function () { closeBluf(); }],
+      ['overlay', function () { closeOverlay(); }]
+    ];
+    closers.forEach(function (c) {
+      if (c[0] === keep || !_isOpen(c[0])) return;
+      try { c[1](); } catch (e) {}
+    });
+  }
+
+  function _openSettings() {
+    if (!_isOpen('settingsPanel')) {
+      try { SettingsPanel.open(); } catch (e) {}
+      try { SentinelCall.updateSettingsDisplay(); } catch (e) {}
+    }
+    try { AccountPanel.render(); } catch (e) {}
+  }
+  function _openContact(opts) {
+    var c = _contact(opts && opts.contactId);
+    if (!c) return false;
+    try { selectedContact = c; } catch (e) {}
+    openContactModal('edit', c);
+    return true;
+  }
+  function _accountEl(field) {
+    if (field === 'discover') return $('acctDiscoverToggleRow') || $('acctDiscoverToggle');
+    if (field === 'phone') return $('acctPhoneInput');
+    if (field === 'code') {
+      try { AccountPanel.show('claim'); } catch (e) {}
+      var code = $('acctClaimCode');
+      if (code) code.style.display = '';
+      return code;
+    }
+    var picks = ['acctSetup', 'syncAuthBtn', 'acctUseOtherBtn', 'acctDiscoverToggleRow', 'syncSection'];
+    for (var i = 0; i < picks.length; i++) {
+      var el = $(picks[i]);
+      if (el && picks[i] === 'acctSetup') el = el.querySelector('button');
+      if (_visible(el)) return el;
+    }
+    return $('syncSection');
+  }
+
+  /* [open(opts) -> false to abort, element(opts), hint key, panel to keep] */
+  var TARGETS = {
+    'contact.sentinelId': [_openContact, function () { return $('cmSentinelId'); }, 'guide.h.sid', 'contactModalOverlay'],
+    'contact.phone': [_openContact, function () { return $('cmPhone'); }, 'guide.h.phone', 'contactModalOverlay'],
+    'contact.email': [_openContact, function () { return $('cmEmail'); }, 'guide.h.email', 'contactModalOverlay'],
+    'settings.call': [_openSettings, function () { return document.querySelector('#settingsPanel [onclick*="SentinelCall.shareCallLink"]'); }, 'guide.h.call', 'settingsPanel'],
+    'settings.circle': [_openSettings, function () { return $('circleInviteInput'); }, 'guide.h.circle', 'settingsPanel', true],
+    'settings.account': [_openSettings, function (o) { return _accountEl(o && o.field); }, null, 'settingsPanel'],
+    'settings.push': [_openSettings, function () { var t = $('pushToggle'); return t ? (t.closest('.push-toggle-row') || t) : null; }, 'guide.h.push', 'settingsPanel', true],
+    'settings.location': [_openSettings, function () { return document.querySelector('#locationShareSection [onclick*="LocationShare.shareNow"]'); }, 'guide.h.location', 'settingsPanel', true],
+    'pulse.add': [function () { try { ThePulse.open(); } catch (e) {} }, function () { return $('pulseAddBtn'); }, 'guide.h.pulseAdd', 'pulseOverlay'],
+    'roster.search': [function () { if (!_isOpen('rosterOverlay')) RosterImport.open(); RosterImport.switchTab('search'); }, function () { return $('rsQuery'); }, 'guide.h.search', 'rosterOverlay'],
+    'roster.paste': [function () { if (!_isOpen('rosterOverlay')) RosterImport.open(); RosterImport.switchTab('paste'); }, function () { return $('rosterPasteArea'); }, 'guide.h.paste', 'rosterOverlay'],
+    'medimg.upload': [function () {}, function () { var i = $('medImgFileInput'); return i ? i.closest('label') : null; }, 'guide.h.upload', 'medImgOverlay']
+  };
+  var ACCOUNT_HINTS = { discover: 'guide.h.discover', phone: 'guide.h.myPhone', code: 'guide.h.code' };
+
+  function _clear() {
+    if (!_last) return;
+    clearTimeout(_last.timer);
+    try { _last.el.classList.remove('guide-rim'); } catch (e) {}
+    try { if (_last.hint) _last.hint.remove(); } catch (e) {}
+    _last = null;
+  }
+
+  function _mark(el, text) {
+    _clear();
+    el.classList.add('guide-rim');
+    var hint = null;
+    if (text) {
+      hint = document.createElement('span');
+      hint.className = 'field-hint guide-hint';
+      hint.setAttribute('role', 'status');
+      hint.setAttribute('aria-live', 'polite');
+      hint.textContent = text;
+      el.insertAdjacentElement('afterend', hint);
+    }
+    try { if (typeof A11y !== 'undefined' && text) A11y.announce(text); } catch (e) {}
+    _last = { el: el, hint: hint, timer: setTimeout(_clear, RIM_MS) };
+  }
+
+  async function go(target, opts) {
+    opts = opts || {};
+    var def = TARGETS[target];
+    if (!def) return false;
+    /* A Settings section that only exists once signed in points at Account */
+    if (def[4] && !_authed()) { return go('settings.account', { hint: 'guide.h.signInFirst' }); }
+    closeAll(def[3]);
+    await _wait(60);
+    if (def[0](opts) === false) return false;
+    var el = null;
+    for (var i = 0; i < 20 && !_visible(el); i++) { await _wait(50); el = def[1](opts); }
+    if (!el) return false;
+    var det = el.closest('details');
+    if (det && !det.open) det.open = true;
+    try { el.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
+    var focusEl = /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(el.tagName) ? el : el.querySelector('input, button, textarea, select');
+    if (focusEl) { try { focusEl.focus({ preventScroll: true }); } catch (e) {} }
+    var hintKey = opts.hint || def[2] || (target === 'settings.account' ? (ACCOUNT_HINTS[opts.field] || (_authed() ? 'guide.h.accountIn' : 'guide.h.account')) : null);
+    _mark(el, hintKey ? _t(hintKey, opts.params) : '');
+    return true;
+  }
+
+  /* {label, run} for showActionToast */
+  function action(target, opts, labelKey) {
+    return { label: _t(labelKey || 'guide.showMe'), run: function () { go(target, opts); } };
+  }
+  /* Inline button for HTML notes: the delegated handler below calls go() */
+  function linkHtml(target, opts, labelKey) {
+    var o = String(JSON.stringify(opts || {})).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    return '<button type="button" class="guide-link" data-guide="' + target + '" data-guide-opts="' + o + '">' +
+      String(_t(labelKey || 'guide.showMe')).replace(/</g, '&lt;') + '</button>';
+  }
+  function linkEl(target, opts, labelKey) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'guide-link';
+    b.textContent = _t(labelKey || 'guide.showMe');
+    b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); go(target, opts); });
+    return b;
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-guide]') : null;
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var opts = {};
+    try { opts = JSON.parse(b.getAttribute('data-guide-opts') || '{}'); } catch (x) {}
+    go(b.getAttribute('data-guide'), opts);
+  }, true);
+
+  return { go: go, action: action, linkHtml: linkHtml, linkEl: linkEl, closeAll: closeAll, targets: Object.keys(TARGETS) };
+})();
 
 document.querySelectorAll('#qaVideoBtn, #qaCallBtn, #qaTextBtn, #qaEmailBtn').forEach(btn => {
   btn.addEventListener('click', function(e) {
