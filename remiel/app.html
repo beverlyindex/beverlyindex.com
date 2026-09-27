@@ -6431,6 +6431,7 @@
               <button class="ledger-type-chip" data-type="texted" onclick="selectLedgerType('texted'); event.stopPropagation();"><span class="ledger-type-chip-icon">💬</span> Texted</button>
               <button class="ledger-type-chip" data-type="visited" onclick="selectLedgerType('visited'); event.stopPropagation();"><span class="ledger-type-chip-icon">👋</span> Visited</button>
               <button class="ledger-type-chip" data-type="video" onclick="selectLedgerType('video'); event.stopPropagation();"><span class="ledger-type-chip-icon">🎥</span> Video</button>
+              <button class="ledger-type-chip" data-type="voice" onclick="selectLedgerType('voice'); event.stopPropagation();"><span class="ledger-type-chip-icon">🎙️</span> Voice</button>
               <button class="ledger-type-chip selected" data-type="note" onclick="selectLedgerType('note'); event.stopPropagation();"><span class="ledger-type-chip-icon">📝</span> Note</button>
             </div>
             <div id="ledgerVoiceStatus"></div>
@@ -14245,9 +14246,15 @@ function toggleVoiceDictation() {
     if (micBtn) micBtn.classList.remove('recording');
     if (status) status.innerHTML = '';
 
-    /* Auto-submit if we got text */
+    /* Never auto-submit dictated text: leave it in the input for review. */
     if (input && input.value.trim()) {
-      sendLedgerEntry(_selectedLedgerType || 'note');
+      if (status) {
+        const d = document.createElement('div');
+        d.className = 'ledger-voice-status';
+        d.textContent = _t('ledger.reviewDictation', 'Review, then tap Log');
+        status.appendChild(d);
+      }
+      try { input.focus(); } catch (e) {}
     }
   };
 
