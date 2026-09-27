@@ -19556,6 +19556,9 @@ function drawNetworkView(t) {
 
 function frame(ts) {
   requestAnimationFrame(frame);
+  /* An opaque full screen overlay (The Pulse) hides the stage: skip drawing so
+     the main thread stays free for the overlay's own work */
+  if (window._stagePaused) return;
   const t = ts || 0;
   if (CV.width !== lastW) { lastW = CV.width; initFX(); }
 
@@ -25690,6 +25693,7 @@ const SocialImport = (() => {
       if (overlay) {
         overlay.classList.add('open');
         _setupChrome(overlay);
+        setTimeout(function () { if (overlay.classList.contains('open')) window._stagePaused = true; }, 400);
         _loadFeed();
       }
     }
@@ -25697,6 +25701,7 @@ const SocialImport = (() => {
     function close() {
       var overlay = document.getElementById('pulseOverlay');
       if (overlay) overlay.classList.remove('open');
+      window._stagePaused = false;
     }
 
     function _setFilter(sev) {
@@ -25826,7 +25831,9 @@ const SocialImport = (() => {
       })();
     }
 
+    var _feedGen = 0;
     async function _loadFeed() {
+      var _gen = ++_feedGen;
       var cardsEl = document.getElementById('pulseCards');
       var chipsEl = document.getElementById('pulseSevChips');
       if (!cardsEl || !chipsEl) return;
@@ -25844,9 +25851,17 @@ const SocialImport = (() => {
           return;
         }
 
-        /* Severity from the single engine (computeSeverity) for every card */
+        /* Severity from the single engine (computeSeverity) for every card,
+           in chunks so the overlay paints at once and shows progress */
         var rows = [];
+        var _prog = document.createElement('div');
+        _prog.className = 'pulse-empty pulse-loading';
+        _prog.innerHTML = '<span class="busy-spin" aria-hidden="true"></span><span></span>';
+        var _setProg = function (k) { _prog.lastChild.textContent = _t('busy.loading', 'Loading') + ' ' + k + ' / ' + contacts.length; };
+        _setProg(0);
+        if (contacts.length > 8) { cardsEl.innerHTML = ''; cardsEl.appendChild(_prog); }
         for (var i = 0; i < contacts.length; i++) {
+          if (i && i % 8 === 0) { _setProg(i); await new Promise(function (res) { setTimeout(res, 0); }); if (_gen !== _feedGen) return; }
           var c = contacts[i];
           var comp = null;
           try { comp = await computeSeverity(c.id); } catch (e) {}
@@ -25881,6 +25896,7 @@ const SocialImport = (() => {
         }
 
         var html = _addHtml();
+        var _flushed = 0;
         for (var j = 0; j < rows.length; j++) {
           var r = rows[j];
           var c2 = r.c;
@@ -25930,8 +25946,20 @@ const SocialImport = (() => {
             '</div>' +
             '<div class="pulse-card-body">' + bodyLines.join('<br>') + actionHtml + '</div>' +
           '</div>';
+          /* Progressive render: show the first cards while the rest compute */
+          if (j === 11 && rows.length > 12) {
+            cardsEl.innerHTML = html; cardsEl.appendChild(_prog); _setProg(12);
+            await new Promise(function (res) { setTimeout(res, 0); });
+            if (_gen !== _feedGen) return;
+          } else if (j > 11 && j % 12 === 11) {
+            _prog.remove(); cardsEl.insertAdjacentHTML('beforeend', html.slice(_flushed)); cardsEl.appendChild(_prog); _setProg(j + 1);
+            await new Promise(function (res) { setTimeout(res, 0); });
+            if (_gen !== _feedGen) return;
+          }
+          if (j % 12 === 11) _flushed = html.length;
         }
-        cardsEl.innerHTML = html;
+        if (_flushed && cardsEl.contains(_prog)) { _prog.remove(); cardsEl.insertAdjacentHTML('beforeend', html.slice(_flushed)); }
+        else cardsEl.innerHTML = html;
 
       } catch (e) {
         cardsEl.innerHTML = _addHtml() + '<div class="pulse-empty">' + _esc(_t('pulse.error', 'Could not load the feed: ') + e.message) + '</div>';
