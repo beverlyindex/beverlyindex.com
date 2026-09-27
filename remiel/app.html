@@ -7628,7 +7628,11 @@ function _libPill(labelKey, fallback) {
   document.body.appendChild(el);
   return el;
 }
-function _loadScriptWithProgress(src, labelKey, fallback, isReady) {
+/* A hard load failure (the script request itself failed) rejects at once with
+   err.hardFail, and the pill turns into a failure line with Retry and Cancel.
+   opts.failKey is the failure wording; opts.onRetry runs on the pill's Retry. */
+function _loadScriptWithProgress(src, labelKey, fallback, isReady, opts) {
+  opts = opts || {};
   return new Promise(function (resolve, reject) {
     if (isReady()) { resolve(); return; }
     var pill = _libPill(labelKey, fallback), settled = false, slowT = null, tag = null;
@@ -7642,10 +7646,26 @@ function _loadScriptWithProgress(src, labelKey, fallback, isReady) {
       tag = document.createElement('script');
       tag.src = src;
       tag.onload = function () { if (isReady()) finish(true); };
-      tag.onerror = function () { showSlow(true); };
+      tag.onerror = function () { hardFail(); };
       document.head.appendChild(tag);
       clearTimeout(slowT);
       slowT = setTimeout(function () { showSlow(false); }, 20000);
+    }
+    function hardFail() {
+      if (settled) return;
+      settled = true; clearTimeout(slowT);
+      pill.classList.add('lib-failed');
+      pill.setAttribute('role', 'alert');
+      var sp = pill.querySelector('.busy-spin'); if (sp) sp.remove();
+      pill.querySelectorAll('button').forEach(function (b) { b.remove(); });
+      pill.querySelector('.lib-pill-t').textContent = opts.failKey ? _t(opts.failKey, fallback) : _t(labelKey, fallback) + '. ' + _t('lib.failed', 'It could not be loaded. Check your connection and try again.');
+      var r = document.createElement('button'); r.type = 'button'; r.textContent = _t('lib.retry', 'Retry');
+      r.onclick = function () { try { pill.remove(); } catch (e) {} if (typeof opts.onRetry === 'function') opts.onRetry(); };
+      var c = document.createElement('button'); c.type = 'button'; c.textContent = _t('busy.cancel', 'Cancel');
+      c.onclick = function () { try { pill.remove(); } catch (e) {} if (typeof opts.onCancel === 'function') opts.onCancel(); };
+      pill.appendChild(r); pill.appendChild(c);
+      var err = new Error('load failed'); err.hardFail = true;
+      reject(err);
     }
     function showSlow(failed) {
       if (settled || pill.querySelector('button')) return;
@@ -7662,12 +7682,14 @@ function _loadScriptWithProgress(src, labelKey, fallback, isReady) {
 }
 
 var _tesseractReady = null;
-function _loadTesseract() {
+function _loadTesseract(onRetry, onCancel) {
   if (_tesseractReady) return _tesseractReady;
+  document.querySelectorAll('.lib-pill.lib-failed').forEach(function (p) { p.remove(); });
   _tesseractReady = _loadScriptWithProgress(
     'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js',
     'lib.tesseract', 'Loading text reader (about 10 MB, first time only)',
-    function () { return !!window.Tesseract; }
+    function () { return !!window.Tesseract; },
+    { failKey: 'roster.err.load', onRetry: onRetry || function () { _loadTesseract().catch(function () {}); }, onCancel: onCancel }
   ).then(function () { return window.Tesseract; }, function (e) { _tesseractReady = null; throw e; });
   return _tesseractReady;
 }
@@ -9649,6 +9671,7 @@ const I18n = (function () {
     'backup.deriving': "Securing with your passphrase",
     'lib.retry': "Retry",
     'lib.slow': "This is taking longer than usual.",
+    'lib.failed': "It could not be loaded. Check your connection and try again.",
     'lib.peer': "Connecting to calling service",
     'lib.faceapi': "Loading face finder (first time only)",
     'lib.tesseract': "Loading text reader (about 10 MB, first time only)",
@@ -10122,6 +10145,7 @@ const I18n = (function () {
     'backup.deriving': "Protezione con la passphrase",
     'lib.retry': "Riprova",
     'lib.slow': "Ci vuole più del solito.",
+    'lib.failed': "Non è stato possibile caricarlo. Controlla la connessione e riprova.",
     'lib.peer': "Connessione al servizio di chiamata",
     'lib.faceapi': "Caricamento riconoscimento volti (solo la prima volta)",
     'lib.tesseract': "Caricamento lettore di testo (circa 10 MB, solo la prima volta)",
@@ -10941,7 +10965,7 @@ const I18n = (function () {
     "roster.st.fileReading": "Reading file",
     "roster.st.fileRows": "Read {rows} rows. Found {n} names. Check the list, then tap Import Selected.",
     "roster.st.fileNone": "Read {rows} rows but found no names. Check the file has one person per row, or use the Paste tab.",
-    "roster.err.load": "The name reader could not load. Check your internet connection, then tap Retry.",
+    "roster.err.load": "The text reader could not be loaded. Check your connection and try again.",
     "roster.err.tooLarge": "This image is too large (over 25 MB). Choose a smaller image or a screenshot.",
     "roster.err.unsupported": "This file is not an image this browser can open. Use a JPG, PNG, or screenshot.",
     "roster.err.ocr": "The name reader stopped with an error: {msg}",
@@ -10994,7 +11018,7 @@ const I18n = (function () {
     "roster.st.fileReading": "Lettura del file",
     "roster.st.fileRows": "Lette {rows} righe. Trovati {n} nomi. Controlla l’elenco, poi tocca Importa i selezionati.",
     "roster.st.fileNone": "Lette {rows} righe ma nessun nome trovato. Verifica che il file abbia una persona per riga, oppure usa la scheda Incolla.",
-    "roster.err.load": "Non è stato possibile caricare il lettore dei nomi. Controlla la connessione a internet, poi tocca Riprova.",
+    "roster.err.load": "Non è stato possibile caricare il lettore di testo. Controlla la connessione e riprova.",
     "roster.err.tooLarge": "Questa immagine è troppo grande (oltre 25 MB). Scegli un’immagine più piccola o uno screenshot.",
     "roster.err.unsupported": "Questo file non è un’immagine che il browser può aprire. Usa un JPG, un PNG o uno screenshot.",
     "roster.err.ocr": "Il lettore dei nomi si è fermato con un errore: {msg}",
@@ -17365,14 +17389,14 @@ var RosterImport = (function() {
     el.setAttribute('role', kind === 'err' ? 'alert' : 'status');
     el.innerHTML = '<span class="roster-status-msg"></span>';
     el.firstChild.textContent = msg;
-    if (action) {
+    [].concat(action || []).forEach(function(a) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'roster-status-btn';
-      b.textContent = action.label;
-      b.onclick = function(e) { e.stopPropagation(); action.fn(); };
+      b.textContent = a.label;
+      b.onclick = function(e) { e.stopPropagation(); a.fn(); };
       el.appendChild(b);
-    }
+    });
   }
 
   function _ocrUi(pct, text) {
@@ -17419,6 +17443,7 @@ var RosterImport = (function() {
   }
 
   function retryImage() {
+    document.querySelectorAll('.lib-pill.lib-failed').forEach(function(p) { p.remove(); });
     if (_lastImgFile) _runImageOcr(_lastImgFile);
     else _pickImage();
   }
@@ -17428,7 +17453,7 @@ var RosterImport = (function() {
     if (prog) prog.style.display = 'none';
     var dz = document.getElementById('rosterDropZone');
     if (dz) dz.style.display = '';
-    _status('err', msg, { label: _t('roster.st.retry'), fn: retryImage });
+    _status('err', msg, [{ label: _t('roster.st.retry'), fn: retryImage }, { label: _t('busy.cancel'), fn: cancelImage }]);
   }
 
   function _tagged(kind, err) {
@@ -17500,7 +17525,7 @@ var RosterImport = (function() {
         if (!im) throw _tagged('decode', new Error('decode'));
         img = im;
         _ocrUi(3, loadText);
-        return _withTimeout(_loadTesseract(), 35000, 'load').catch(function(e) { throw (e && e.rosterKind) ? e : _tagged('load', e); });
+        return _withTimeout(_loadTesseract(retryImage, cancelImage), 35000, 'load').catch(function(e) { throw (e && e.rosterKind) ? e : _tagged('load', e); });
       })
       .then(function(tess) {
         if (!alive() || !img) return null;
@@ -17595,6 +17620,7 @@ var RosterImport = (function() {
 
   /* Cancel mid read: the worker is stopped and the tab goes back to its start */
   function cancelImage() {
+    document.querySelectorAll('.lib-pill.lib-failed').forEach(function(p) { p.remove(); });
     _cancelOcr();
     _resetImageTab();
     _status('info', _t('roster.st.cancelled'), { label: _t('roster.st.chooseImage'), fn: _pickImage });
