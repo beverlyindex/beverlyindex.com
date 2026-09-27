@@ -6319,7 +6319,7 @@
                     data-i18n-placeholder="med.searchPlaceholder"
                     placeholder="Search or enter medication name…"
                     autocomplete="off" autocorrect="off" spellcheck="false">
-                  <button class="med-cam-btn" id="medCamBtn" onclick="MedImageReader.open()" aria-label="Scan medication label" title="Scan label with camera">
+                  <button class="med-cam-btn" id="medCamBtn" onclick="MedImageReader.open()" aria-label="Scan medication label" title="Photograph a medication label. The text is read on this device and matched against the medication list; you confirm the name before it is added.">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
                   </button>
                   <div class="med-autocomplete" id="medAutocomplete"></div>
@@ -17345,12 +17345,44 @@ const AlertEngine = (() => {
                 type: ALERT_TYPES.REFILL_DUE,
                 sevLevel: pillsLeft === 0 ? 1 : 2,
                 message: med.name + ' for ' + cName + (pillsLeft === 0
-                  ? ' needs a refill now — supply is empty.'
+                  ? ' needs a refill now: supply is empty.'
                   : ' has only ' + pillsLeft + ' pill' + (pillsLeft !== 1 ? 's' : '') + ' left.'),
                 timestamp: existingById[aid] ? existingById[aid].timestamp : now
               });
             }
           }
+        }
+      }
+    } catch (e) { /* medications store may not exist yet */ }
+
+    /* 6) Dose overdue: a scheduled dose time has passed today with no log */
+    try {
+      if (typeof MedicationTracker !== 'undefined' && MedicationTracker.dueSlotsOn) {
+        const allMeds = await RemielDB.getAllMedications();
+        const nowD = new Date();
+        const todayK = MedicationTracker.dayKey(now);
+        for (const med of (allMeds || [])) {
+          if (med.active === false) continue;
+          const slots = MedicationTracker.dueSlotsOn(med.frequency, nowD);
+          if (!slots.length) continue;
+          const todayLog = (med.doseLog || []).filter(d => MedicationTracker.dayKey(d.ts) === todayK);
+          /* 30 minute grace after each scheduled time */
+          const overdue = slots.filter(sl => {
+            const due = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate(), sl.hh, sl.mm).getTime();
+            if (now < due + 30 * 60000) return false;
+            return !todayLog.some(d => d.slotIndex === sl.slotIndex);
+          });
+          if (!overdue.length) continue;
+          const cName = med.contactName || 'Someone';
+          const aid = 'med::' + med.id + '::' + ALERT_TYPES.DOSE_OVERDUE + '::' + todayK;
+          if (isDismissed(aid)) continue;
+          const n = overdue.length;
+          generated.push({
+            id: aid, contactId: med.contactId, contactName: cName,
+            type: ALERT_TYPES.DOSE_OVERDUE, sevLevel: 2,
+            message: _t('alert.doseOverdue', '{med} for {name}: {count} scheduled dose(s) today not logged yet.', { med: med.name, name: cName, count: n }),
+            timestamp: existingById[aid] ? existingById[aid].timestamp : now
+          });
         }
       }
     } catch (e) { /* medications store may not exist yet */ }
@@ -17871,14 +17903,16 @@ const DailySummary = (() => {
     if (allMoods.length === 0) return 0;
 
     const DAY_MS = 86400000;
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    /* Date-only comparison: map each local calendar date to a UTC day number
+       so 23 or 25 hour DST days never merge or split days. */
+    const dayNum = (d) => Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
+    const today = dayNum(new Date());
 
-    // Build a set of day offsets that have a mood entry
     const daySet = new Set();
     allMoods.forEach(m => {
-      const dayOffset = Math.floor((todayStart - new Date(new Date(m.ts).getFullYear(), new Date(m.ts).getMonth(), new Date(m.ts).getDate()).getTime()) / DAY_MS);
-      daySet.add(dayOffset);
+      const t = m.ts || m.timestamp;
+      if (!t) return;
+      daySet.add(today - dayNum(new Date(t)));
     });
 
     // Count consecutive days starting from today (0) or yesterday (1)
@@ -17905,7 +17939,7 @@ const DailySummary = (() => {
           results.push({
             name: c.first || c.last || c.id,
             sevLevel: sev.sevLevel,
-            daysSinceContact: Math.round(sev.daysSinceContact),
+            daysSinceContact: (typeof sev.daysSinceContact === 'number') ? Math.round(sev.daysSinceContact) : null,
             moodTrend: sev.moodTrend
           });
         }
@@ -17953,7 +17987,7 @@ const DailySummary = (() => {
       // Show severity label + reason
       const sevLabel = SEV_KEYS[c.sevLevel] ? I18n.t(SEV_KEYS[c.sevLevel]) : '';
       let reason = '';
-      if (c.daysSinceContact > 3 && c.daysSinceContact < 900) {
+      if (typeof c.daysSinceContact === 'number' && c.daysSinceContact > 3) {
         reason = I18n.t('dd.daysNoContact', { count: c.daysSinceContact });
       } else if (c.moodTrend < -0.3) {
         reason = I18n.t('dd.moodDecline');
@@ -18088,8 +18122,26 @@ const DailySummary = (() => {
     renderAlerts(alertContacts);
     renderMeds(meds);
     renderStreak(streak);
+    renderCheckInButton();
 
     show();
+  }
+
+  /* ── "Check in now" entry point into the self check-in flow ── */
+  function renderCheckInButton() {
+    const card = document.getElementById('dailyDigest');
+    if (!card || document.getElementById('ddCheckInBtn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'ddCheckInBtn';
+    btn.type = 'button';
+    btn.textContent = _t('dd.checkInNow', 'Check in now');
+    btn.title = _t('dd.checkInNowTip', 'Log how you are feeling, with an optional short voice note');
+    btn.style.cssText = 'margin-top:10px;padding:8px 14px;border-radius:10px;border:1px solid rgba(56,189,248,0.35);background:rgba(56,189,248,0.08);color:#38bdf8;font-size:12px;cursor:pointer;font-family:inherit;';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (typeof SelfCheckIn !== 'undefined' && SelfCheckIn.show) SelfCheckIn.show();
+    });
+    card.appendChild(btn);
   }
 
   /* ── Init ── */
@@ -18242,8 +18294,23 @@ const MedicationTracker = (() => {
     tid:      ['08:00', '14:00', '20:00'],
     qid:      ['08:00', '12:00', '16:00', '20:00'],
     weekly:   ['08:00 Mon'],
-    asNeeded: []
+    asNeeded: [],
+    prn:      []
   };
+
+  /* Scheduled dose times due on the given date as [{slotIndex, hh, mm}].
+     Weekly doses fall on Monday. As-needed has no schedule. */
+  function dueSlotsOn(frequency, date) {
+    const times = FREQ_TIMES[frequency || 'daily'] || [];
+    const out = [];
+    times.forEach((t, i) => {
+      const m = /^(\d{2}):(\d{2})(?:\s+(Mon))?$/.exec(t);
+      if (!m) return;
+      if (m[3] && date.getDay() !== 1) return;
+      out.push({ slotIndex: i, hh: parseInt(m[1], 10), mm: parseInt(m[2], 10) });
+    });
+    return out;
+  }
 
   let meds = [];
   let currentContactId = null;
@@ -18460,7 +18527,7 @@ const MedicationTracker = (() => {
       const todayLog = (med.doseLog || []).filter(d => dayKey(d.ts) === today2);
       const expectedDoses = (FREQ_TIMES[med.frequency] || []).length || 1;
       const takenCount = todayLog.filter(d => d.action === 'taken').length;
-      const allTaken = takenCount >= expectedDoses && med.frequency !== 'asNeeded';
+      const allTaken = takenCount >= expectedDoses && dosesPerDay(med.frequency) > 0;
 
       let refillHtml = '';
       if (typeof med.pillsLeft === 'number' && med.pillsLeft >= 0) {
@@ -18655,7 +18722,9 @@ const MedicationTracker = (() => {
     setTimeout(() => loadMeds(), 800);
   }
 
-  return { init, loadMeds, updatePreview };
+  function getFormulary() { return FORMULARY.slice(); }
+
+  return { init, loadMeds, updatePreview, getFormulary, dueSlotsOn, dayKey };
 })();
 
 /* ══════════════════════════════════════════════════════════════
@@ -22428,12 +22497,12 @@ const MedImageReader = (() => {
       }).catch(() => {
         video.style.display = 'none';
         captureBtn.style.display = 'none';
-        result.textContent = 'Camera unavailable — use Upload instead';
+        result.textContent = 'Camera unavailable. Use Upload instead.';
       });
     } else {
       video.style.display = 'none';
       captureBtn.style.display = 'none';
-      result.textContent = 'Camera unavailable — use Upload instead';
+      result.textContent = 'Camera unavailable. Use Upload instead.';
     }
   }
 
@@ -22497,32 +22566,41 @@ const MedImageReader = (() => {
     input.value = '';
   }
 
-  function processImage(canvas) {
+  /* Read the label text on this device with Tesseract.js (loaded on first
+     use from cdnjs), then match the words against the full medication
+     formulary. If nothing is read or matched, show the quick-pick list. */
+  async function processImage(canvas) {
     const result = document.getElementById('medImgResult');
-    result.textContent = 'Analyzing image…';
-
-    /* Use built-in text detection API if available, otherwise fall back to formulary matching */
-    if ('TextDetector' in window) {
-      const detector = new TextDetector();
-      detector.detect(canvas).then(texts => {
-        const allText = texts.map(t => t.rawValue).join(' ');
-        const matches = matchFormulary(allText);
-        showMatches(matches, allText);
-      }).catch(() => {
-        /* Fallback: prompt user to type or use formulary search */
-        fallbackAnalysis();
-      });
-    } else if (typeof Tesseract !== 'undefined') {
-      /* If Tesseract.js were loaded */
-      fallbackAnalysis();
-    } else {
-      fallbackAnalysis();
+    result.textContent = 'Reading label text on this device…';
+    let text = '';
+    try {
+      if ('TextDetector' in window) {
+        try {
+          const texts = await new TextDetector().detect(canvas);
+          text = texts.map(t => t.rawValue).join(' ');
+        } catch (e) { text = ''; }
+      }
+      if (!text.trim()) {
+        const T = (typeof _loadTesseract === 'function') ? await _loadTesseract() : window.Tesseract;
+        if (T && T.recognize) {
+          const res = await T.recognize(canvas, 'eng');
+          text = (res && res.data && res.data.text) || '';
+        }
+      }
+    } catch (e) {
+      console.warn('[MedImageReader] OCR failed:', e);
+      text = '';
     }
+    const matches = matchFormulary(text);
+    if (matches.length) showMatches(matches, text);
+    else fallbackAnalysis(!!text.trim());
   }
 
-  function fallbackAnalysis() {
+  function fallbackAnalysis(hadText) {
     const result = document.getElementById('medImgResult');
-    result.innerHTML = 'Image captured! Text recognition requires a supported browser.<br>' +
+    result.innerHTML = (hadText
+      ? 'Text was read but no known medication name matched.'
+      : 'No readable text was found in the image.') + '<br>' +
       '<strong>Tap a medication below or type the name manually:</strong>';
 
     /* Show common medications as quick-pick buttons */
@@ -22540,24 +22618,46 @@ const MedImageReader = (() => {
     result.appendChild(quickPick);
   }
 
+  function _lev(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    let prev = new Array(n + 1), cur = new Array(n + 1);
+    for (let j = 0; j <= n; j++) prev[j] = j;
+    for (let i = 1; i <= m; i++) {
+      cur[0] = i;
+      for (let j = 1; j <= n; j++) {
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+      [prev, cur] = [cur, prev];
+    }
+    return prev[n];
+  }
+
+  /* Match OCR text against the full formulary (MedicationTracker list).
+     A name matches if it appears as a substring, or if a run of OCR words of
+     the same word count is within normalised Levenshtein distance 0.34. */
   function matchFormulary(text) {
     if (!text) return [];
-    const upper = text.toUpperCase();
-    const FORMULARY = typeof MedicationTracker !== 'undefined' ? [] : [];
-    /* Access the internal formulary via duck typing */
-    const allMeds = [
-      'Acetaminophen','Ibuprofen','Aspirin','Naproxen','Amoxicillin','Azithromycin',
-      'Ciprofloxacin','Doxycycline','Lisinopril','Losartan','Amlodipine','Metoprolol',
-      'Atenolol','Metformin','Atorvastatin','Rosuvastatin','Simvastatin','Omeprazole',
-      'Pantoprazole','Sertraline','Fluoxetine','Escitalopram','Venlafaxine','Duloxetine',
-      'Bupropion','Trazodone','Gabapentin','Pregabalin','Levothyroxine','Prednisone',
-      'Albuterol','Montelukast','Cetirizine','Loratadine','Hydrochlorothiazide',
-      'Furosemide','Warfarin','Apixaban','Clopidogrel','Insulin Glargine','Insulin Lispro',
-      'Alprazolam','Lorazepam','Diazepam','Clonazepam','Lamotrigine','Topiramate',
-      'Carbamazepine','Tamsulosin','Finasteride','Cyclobenzaprine','Tramadol','Sumatriptan',
-      'Zolpidem','Melatonin','Vitamin D','Multivitamin'
-    ];
-    return allMeds.filter(m => upper.includes(m.toUpperCase()));
+    const list = (typeof MedicationTracker !== 'undefined' && MedicationTracker.getFormulary)
+      ? MedicationTracker.getFormulary().map(f => f.name) : [];
+    const norm = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    const words = norm.split(' ').filter(w => w.length >= 3);
+    const found = [];
+    list.forEach(name => {
+      const n = name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!n) return;
+      if (norm.indexOf(n) !== -1) { found.push({ name, d: 0 }); return; }
+      const k = n.split(' ').length;
+      let best = 1;
+      for (let i = 0; i + k <= words.length; i++) {
+        const cand = words.slice(i, i + k).join(' ');
+        const d = _lev(cand, n) / Math.max(cand.length, n.length);
+        if (d < best) best = d;
+      }
+      if (best <= 0.34) found.push({ name, d: best });
+    });
+    found.sort((a, b) => a.d - b.d);
+    return found.slice(0, 6).map(f => f.name);
   }
 
   function showMatches(matches, rawText) {
