@@ -27709,8 +27709,11 @@ const SyncEngine = (() => {
         if (photo.buffer) blob = new Blob([photo.buffer], { type: photo.mimeType || 'image/png' });
         else if (photo.blob instanceof Blob) blob = photo.blob;
         if (!blob || !blob.size) continue;
-        blob = await _preparePhoto(blob);
-        if (blob.size > PHOTO_MAX_BYTES) {
+        /* Animated GIFs and clips go as their original bytes with the real type */
+        var kind = photo.kind || SphereMedia.kindFromMime(blob.type);
+        var motion = kind === 'gif' || kind === 'video';
+        if (!motion) blob = await _preparePhoto(blob);
+        if (blob.size > (motion ? SphereMedia.SYNC_MAX : PHOTO_MAX_BYTES)) {
           await RemielDB.putSetting(syncKey, 'too_large');
           tooLarge++;
           continue;
@@ -27720,7 +27723,8 @@ const SyncEngine = (() => {
         if (!serverContact) continue; /* contact not on the server yet; retried next sync */
         var clientRef = 'photo:' + deviceId + ':' + photo.contactId + ':' + (photo.updatedAt || 0);
         var fd = new FormData();
-        fd.append('file', blob, 'photo-' + photo.contactId + (blob.type === 'image/jpeg' ? '.jpg' : ''));
+        var ext = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov' }[blob.type] || '';
+        fd.append('file', blob, 'photo-' + photo.contactId + ext);
         fd.append('blob_type', 'photo');
         fd.append('contact_id', String(serverContact));
         fd.append('client_ref', clientRef);
@@ -27783,11 +27787,13 @@ const SyncEngine = (() => {
           if (!photoRes.ok) { failed++; continue; }
           var buf = await photoRes.arrayBuffer();
           if (!buf || !buf.byteLength) continue;
-          var mt = entry.mime_type || photoRes.headers.get('Content-Type') || 'image/png';
-          await RemielDB.rawPut('photos', { contactId: localCid, buffer: buf, mimeType: mt, updatedAt: Date.now() });
+          var mt = String(entry.mime_type || photoRes.headers.get('Content-Type') || 'image/png').split(';')[0];
+          var pk = SphereMedia.kindFromMime(mt);
+          if (pk === 'gif' && SphereMedia.gifFrameCount(new Uint8Array(buf), 2) < 2) pk = 'photo';
+          await RemielDB.rawPut('photos', { contactId: localCid, buffer: buf, mimeType: mt, kind: pk, updatedAt: Date.now() });
           await RemielDB.putSetting(syncKey, entry.id);
           pulled++;
-          _showPulledPhoto(localCid, buf, mt);
+          _showPulledPhoto(localCid, buf, mt, pk);
         } catch (dlErr) { failed++; }
       }
       if (!failed && typeof data.current_version === 'number') {
@@ -27800,12 +27806,19 @@ const SyncEngine = (() => {
     }
   }
 
-  function _showPulledPhoto(cid, buf, mt) {
+  function _showPulledPhoto(cid, buf, mt, kind) {
     try {
-      if (cid === 'self' || typeof contactPhotos === 'undefined' || mt.indexOf('image/') !== 0) return;
+      if (typeof contactPhotos === 'undefined') return;
+      var blob = new Blob([buf], { type: mt });
+      if (kind === 'gif' || kind === 'video') {
+        if (cid === 'self') SphereMedia.applySelf(blob, kind).then(function() { try { SelfSphere.syncControls(); } catch (e) {} }).catch(function() {});
+        else SphereMedia.show(cid, blob, kind).catch(function() {});
+        return;
+      }
+      if (cid === 'self' || mt.indexOf('image/') !== 0) return;
       var img = new Image();
       img.onload = function() { contactPhotos.set(cid, { img: img, w: img.naturalWidth, h: img.naturalHeight }); };
-      img.src = URL.createObjectURL(new Blob([buf], { type: mt }));
+      img.src = URL.createObjectURL(blob);
     } catch (e) {}
   }
 
