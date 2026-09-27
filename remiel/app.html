@@ -10427,7 +10427,7 @@ async function _obSaveAndLaunch() {
       first: p.first,
       last: p.last || '',
       cat: catMap[p.cat] || 'other',
-      sev: 2,
+      sev: 4, /* new: Quiet until something is logged */
       phone: '',
       email: ''
     });
@@ -13016,7 +13016,8 @@ const SentinelGuide = (() => {
   /* ── Contextual triggers ── */
   let _launchOfferQueued = false;
   function onEnterSelf() {
-    hideAll();
+    /* The daily summary tip belongs to the self view: keep it */
+    ['top', 'bottom'].forEach((pos) => { if (_slots[pos] !== 'tour-offer' && _slots[pos] !== 'daily-summary') hide(pos); });
     /* Repeat an unanswered tour offer once on a later launch */
     if (!_launchOfferQueued) {
       _launchOfferQueued = true;
@@ -13061,8 +13062,9 @@ const SentinelGuide = (() => {
     const ready = (typeof appRevealed === 'undefined' || appRevealed) && (!ob || ob.hidden) &&
       card && !card.classList.contains('hidden') && card.offsetParent !== null &&
       (typeof appState === 'undefined' || appState === 'self');
-    if (ready) { show('daily-summary', undefined, undefined, undefined, card); return; }
-    if (tries < 20) setTimeout(() => onDailySummary(tries + 1), 1000);
+    /* Wait until the screen has settled (entering the self view clears banners) */
+    if (ready && tries >= 2) { show('daily-summary', undefined, undefined, undefined, card); return; }
+    if (tries < 20) setTimeout(() => onDailySummary(tries + 1), ready ? 800 : 1000);
   }
   function onRestMode() { show('rest-mode'); }
 
@@ -15654,7 +15656,7 @@ var RosterImport = (function() {
         first: first,
         last: last,
         cat: cat,
-        sev: 2,
+        sev: 4, /* new: Quiet until something is logged */
         phone: '',
         email: '',
         sentinelId: ''
@@ -15723,7 +15725,7 @@ var RosterImport = (function() {
         first: p.first,
         last: p.last || '',
         cat: cat,
-        sev: 2,
+        sev: 4, /* new: Quiet until something is logged */
         phone: p.phone || '',
         email: p.email || '',
         sentinelId: ''
@@ -26751,7 +26753,7 @@ async function saveContactModal() {
       first: first,
       last: last || '',
       cat: _cmCat,
-      sev: 2,
+      sev: 4, /* new: Quiet until something is logged */
       phone: phone,
       email: email,
       sentinelId: (document.getElementById('cmSentinelId').value.trim() || '').toUpperCase()
