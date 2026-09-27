@@ -15177,6 +15177,101 @@ function clearContactPhoto() {
 }
 
 /* Draw a contact photo clipped into a circle — used by orbit sphere renderer */
+/* ── Shared clip pool: newest circle-shared video note per contact, drawn in
+   the sphere core. At most 3 hidden <video> elements alive, only for the
+   focused sphere and the nearest spheres. Frames are cached to a canvas so
+   Safari suspension does not blank the sphere. ── */
+const SharedClipPool = (function() {
+  const MAX = 3;
+  const _pool = new Map(); /* contactId -> { url, video, frame, w, h, ready } */
+  let _wanted = new Set();
+  let _lastSelect = 0;
+
+  function _urlFor(id) {
+    try {
+      if (typeof VideoNoteShare !== 'undefined' && VideoNoteShare.getLatestSharedForContact) {
+        return VideoNoteShare.getLatestSharedForContact(id) || null;
+      }
+    } catch (e) {}
+    return null;
+  }
+  function _release(id) {
+    const e = _pool.get(id);
+    if (!e) return;
+    try { e.video.pause(); e.video.removeAttribute('src'); e.video.load(); } catch (err) {}
+    if (e.video.parentNode) e.video.parentNode.removeChild(e.video);
+    _pool.delete(id);
+  }
+  function _create(id, url) {
+    const v = document.createElement('video');
+    v.muted = true; v.loop = true; v.playsInline = true;
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    v.crossOrigin = 'anonymous';
+    v.preload = 'auto';
+    /* Off-screen but not display:none (Safari suspends display:none videos) */
+    v.style.cssText = 'position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;';
+    v.setAttribute('aria-hidden', 'true');
+    const e = { url: url, video: v, frame: document.createElement('canvas'), w: 0, h: 0, ready: false };
+    v.addEventListener('loadeddata', () => {
+      e.w = v.videoWidth || 128; e.h = v.videoHeight || 128;
+      e.frame.width = Math.min(256, e.w); e.frame.height = Math.round(e.frame.width * e.h / e.w) || e.frame.width;
+      e.ready = true;
+      if (!_reduced()) v.play().catch(() => {});
+    });
+    v.addEventListener('ended', () => { v.currentTime = 0; if (!_reduced()) v.play().catch(() => {}); });
+    v.addEventListener('error', () => { e.failed = true; });
+    v.src = url;
+    document.body.appendChild(v);
+    _pool.set(id, e);
+    return e;
+  }
+  function _reduced() {
+    return (typeof A11y !== 'undefined' && A11y.reducedMotion) ? A11y.reducedMotion() : false;
+  }
+  /* Called once per frame from the network draw; re-evaluates at most 4x/s */
+  function select() {
+    const now = performance.now();
+    if (now - _lastSelect < 250) return;
+    _lastSelect = now;
+    if (typeof NODES === 'undefined' || appState !== 'network') {
+      if (_pool.size) Array.from(_pool.keys()).forEach(_release);
+      return;
+    }
+    const cands = [];
+    for (let i = 0; i < NODES.length; i++) {
+      const n = NODES[i];
+      const url = _urlFor(n.contact.id);
+      if (!url) continue;
+      let sc = 0;
+      try { sc = projectNode(n).scale; } catch (err) {}
+      if (focusedContactId === n.contact.id) sc += 1000;
+      cands.push({ id: n.contact.id, url: url, sc: sc });
+    }
+    cands.sort((a, b) => b.sc - a.sc);
+    _wanted = new Set(cands.slice(0, MAX).map(c => c.id));
+    Array.from(_pool.keys()).forEach(id => {
+      const want = cands.find(c => c.id === id);
+      if (!_wanted.has(id) || !want || want.url !== _pool.get(id).url) _release(id);
+    });
+    cands.slice(0, MAX).forEach(c => { if (!_pool.has(c.id)) _create(c.id, c.url); });
+  }
+  /* Returns { img, w, h, isVideo } for drawContactPhotoInSphere, or null */
+  function frameFor(id) {
+    const e = _pool.get(id);
+    if (!e || !e.ready || e.failed) return null;
+    const v = e.video;
+    try {
+      if (v.readyState >= 2) {
+        e.frame.getContext('2d').drawImage(v, 0, 0, e.frame.width, e.frame.height);
+        e.hasFrame = true;
+      }
+    } catch (err) { e.failed = true; return null; }
+    if (!e.hasFrame) return null;
+    return { img: e.frame, w: e.frame.width, h: e.frame.height, isVideo: true, shared: true };
+  }
+  return { select: select, frameFor: frameFor, release: _release };
+})();
+
 function drawContactPhotoInSphere(ctx, photo, sx, sy, r) {
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
@@ -16077,17 +16172,21 @@ function drawNetworkView(t) {
     ctx.globalCompositeOperation = 'source-over';
 
     /* Contact photo — if loaded, draw image inside sphere with vignette */
-    const cPhoto = contactPhotos.get(node.contact.id);
+    /* Priority: shared clip > local video note > photo */
+    const _sharedFrame = SharedClipPool.frameFor(node.contact.id);
+    const cPhoto = _sharedFrame || contactPhotos.get(node.contact.id);
     if (cPhoto && cPhoto.img && r > 4) {
       if (alphaOverride) { ctx.globalAlpha = alphaOverride; }
       drawContactPhotoInSphere(ctx, cPhoto, sx, sy, r);
     }
 
     /* ── Inner energy ring (category-colored) ── */
-    const _cBio = node.contact.bio || { motionIntensity: 0, heartRate: 0 };
-    const _cMI = Math.min(1, _cBio.motionIntensity || 0);
-    const _cHR = _cBio.heartRate || 0;
-    const _cHRConn = _cHR > 0;
+    const _cRing = (typeof Biometrics !== 'undefined' && Biometrics.getRingState)
+      ? Biometrics.getRingState(node.contact.id)
+      : { motion: (node.contact.bio && node.contact.bio.motionIntensity) || 0, heartRate: (node.contact.bio && node.contact.bio.heartRate) || 0, hrConnected: !!(node.contact.bio && node.contact.bio.heartRate > 0) };
+    const _cMI = Math.min(1, _cRing.motion || 0);
+    const _cHR = _cRing.heartRate || 0;
+    const _cHRConn = !!_cRing.hrConnected && _cHR > 0;
     const _cInnerLW = (2.5 + _cMI * 2) * s * focusMul;
     const _cInnerGlow = (6 + _cMI * 8) * s;
     const _cInnerAlpha = (0.35 + _cMI * 0.2) + 0.08 * Math.sin(t * 0.004 + node.tx);
@@ -16337,6 +16436,9 @@ function drawNetworkView(t) {
   /* ── Compute circle aggregate for center HUD ── */
   _computeCircleAggregate();
 
+  /* Shared clips: keep video elements only for focused or nearest spheres */
+  SharedClipPool.select();
+
   /* ── PASS 1: Draw contact spheres BEHIND center (back to front) ── */
   for (const item of _behindNodes) {
     _drawOneContactSphere(item, null);
@@ -16425,8 +16527,12 @@ function drawNetworkView(t) {
     ctx.restore();
   }
 
-  /* Inner energy ring (category) — enhanced by BioMotion */
-  const _bMI = _bio.enabled ? _bio.motionIntensity : 0;
+  /* Inner energy ring (category), enhanced by BioMotion. Ring state comes from
+     Biometrics.getRingState: heart rate works even when motion is off. */
+  const _selfRing = (typeof Biometrics !== 'undefined' && Biometrics.getRingState)
+    ? Biometrics.getRingState('self')
+    : { motion: _bio.enabled ? _bio.motionIntensity : 0, heartRate: _bio.heartRate || 0, hrConnected: !!_bio.hrConnected };
+  const _bMI = _bio.enabled ? Math.min(1, _selfRing.motion || 0) : 0;
   const _bGI = _bio.enabled ? _bio.gyroIntensity : 0;
   /* Motion boosts ring thickness: 4 base → up to 7 when very active */
   const _innerLW = 4 + _bMI * 3;
@@ -16450,8 +16556,8 @@ function drawNetworkView(t) {
   /* NOUS status ring (outer — severity) — enhanced by BioMotion */
   const outerCR = cr * 1.1;
   /* Heart rate sync: if BLE HR connected, override pulse speed to match BPM */
-  const _hrPulseSpd = (_bio.enabled && _bio.hrConnected && _bio.heartRate > 0)
-    ? (_bio.heartRate / 60) * 0.0063  /* convert BPM to radians-per-ms matching original scale */
+  const _hrPulseSpd = (_selfRing.hrConnected && _selfRing.heartRate > 0)
+    ? (_selfRing.heartRate / 60) * 0.0063  /* convert BPM to radians-per-ms matching original scale */
     : usv.pulseSpd;
   /* Motion boosts outer ring thickness: 3 → up to 5 */
   const _outerLW = 3 + _bMI * 2;
