@@ -5650,6 +5650,7 @@
         <div class="settings-data-stat"><span class="sds-num" id="statLedger">—</span><span class="sds-label">Interactions</span></div>
       </div>
       <p id="settingsLastBackup" style="font-size:11px;"></p>
+      <div style="display:flex;gap:8px;margin-top:8px;"><button class="settings-action-btn" id="settingsCheckInBtn" onclick="SelfCheckIn.show()" style="flex:1;">Check in now</button><button class="settings-action-btn secondary" id="settingsNousBtn" onclick="NousClient.showConnectDialog()" style="flex:1;" title="Optional: connect a NOUS endpoint for voice analysis beyond what this device does">NOUS connection</button></div>
     </div>
   </div>
 
@@ -6393,11 +6394,45 @@
         </div>
       </div>
 
+      <!-- Pull: Voice Check-in -->
+      <div class="bluf-pull" id="pull_voicecheckin">
+        <div class="bluf-pull-header" onclick="togglePull('voicecheckin')">
+          <div class="bluf-section-label">Voice Check-in</div>
+          <span class="bluf-pull-preview" id="pullPrev_voicecheckin">Record up to 30 seconds</span>
+          <span class="bluf-pull-chevron">&#9660;</span>
+        </div>
+        <div class="bluf-pull-body">
+          <div class="bluf-pull-content">
+            <div class="voice-checkin-container" id="voiceCheckinUI">
+              <p class="voice-prompt">Say a few sentences about <em>how things are going</em>. The recording stays on this device; only simple sound measurements are compared with earlier recordings.</p>
+              <button class="voice-record-btn" id="voiceRecordBtn" onclick="VoiceCheckin.toggleRecording(); event.stopPropagation();" aria-label="Record voice check-in" title="Start or stop a voice check-in (30 seconds max)">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </button>
+              <div class="voice-timer idle" id="voiceTimer">tap to record &middot; 30s max</div>
+              <div class="voice-waveform" id="voiceWaveform" style="display:none;"></div>
+              <div class="voice-mic-error" id="voiceMicError" style="display:none;"></div>
+              <div class="voice-capture-result" id="voiceCaptureResult" style="display:none;">
+                <div class="vcr-header"><span class="vcr-saved">Recorded</span><span class="vcr-duration" id="voiceResultDuration">00:00</span></div>
+                <div class="vcr-status" id="voiceResultStatus"></div>
+                <div class="vcr-actions">
+                  <button class="vcr-action-btn" onclick="VoiceCheckin.discard(); event.stopPropagation();">Discard</button>
+                  <button class="vcr-action-btn primary" onclick="VoiceCheckin.save(); event.stopPropagation();">Save</button>
+                </div>
+              </div>
+              <div class="voice-history" id="voiceHistory">
+                <div class="voice-history-label">Recent check-ins</div>
+                <div class="voice-history-empty" id="voiceHistoryEmpty">No voice check-ins yet.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Pull 8: NOUS Intelligence -->
       <div class="bluf-pull" id="pull_intelligence">
         <div class="bluf-pull-header" onclick="togglePull('intelligence')">
           <div class="bluf-section-label">NOUS Intelligence</div>
-          <span class="bluf-pull-preview" id="pullPrev_intelligence">Cognitive insights &middot; Premium</span>
+          <span class="bluf-pull-preview" id="pullPrev_intelligence">Optional NOUS connection</span>
           <span class="bluf-pull-chevron">&#9660;</span>
         </div>
         <div class="bluf-pull-body">
@@ -6405,7 +6440,7 @@
             <div class="nous-intel-container" id="nousIntelUI">
               <div class="nous-intel-header">
                 <span class="nih-badge">NOUS</span>
-                <span class="nih-status" id="nousConnectionStatus">Awaiting connection</span>
+                <span class="nih-status" id="nousConnectionStatus">Not connected</span>
               </div>
               <div class="nous-intel-card locked">
                 <div class="nic-icon">
@@ -6415,11 +6450,11 @@
                 </div>
                 <div class="nic-body">
                   <div class="nic-title-row">
-                    <span class="nic-title">Cognitive Activation Profile</span>
+                    <span class="nic-title">Voice Baseline</span>
                     <span class="nic-lock"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
                   </div>
-                  <p class="nic-desc">Maps cognitive patterns from voice biomarkers captured during check-ins. Tracks neural oscillation signatures over time to build your unique VOCA baseline.</p>
-                  <span class="nic-status coming-soon">Coming soon</span>
+                  <p class="nic-desc" id="nousCardVoca">Once a NOUS endpoint is connected, this card will show the voice baseline NOUS builds from your check-ins and the scores from your latest session.</p>
+                  <span class="nic-status coming-soon" id="nousCardVocaStatus">Not connected</span>
                 </div>
               </div>
               <div class="nous-intel-card locked">
@@ -6430,11 +6465,11 @@
                 </div>
                 <div class="nic-body">
                   <div class="nic-title-row">
-                    <span class="nic-title">Reflections Journal Analysis</span>
+                    <span class="nic-title">Cognitive Patterns</span>
                     <span class="nic-lock"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
                   </div>
-                  <p class="nic-desc">Draws insight from your written reflections and mood entries. Identifies recurring cognitive patterns and surfaces connections you may not notice day to day.</p>
-                  <span class="nic-status coming-soon">Coming soon</span>
+                  <p class="nic-desc" id="nousCardPatterns">Once connected, this card will list the cognitive patterns NOUS reports for this person across their check-ins.</p>
+                  <span class="nic-status coming-soon" id="nousCardPatternsStatus">Not connected</span>
                 </div>
               </div>
               <div class="nous-intel-card locked">
@@ -6445,16 +6480,16 @@
                 </div>
                 <div class="nic-body">
                   <div class="nic-title-row">
-                    <span class="nic-title">Dream Intelligence</span>
+                    <span class="nic-title">Neural Oscillation Signatures</span>
                     <span class="nic-lock"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
                   </div>
-                  <p class="nic-desc">Weaves dream journal entries into your broader cognitive profile. Surfaces thematic threads across your waking and sleeping awareness.</p>
-                  <span class="nic-status coming-soon">Coming soon</span>
+                  <p class="nic-desc" id="nousCardNOS">Once connected, this card will show the neural oscillation signatures NOUS returns for this person's profile.</p>
+                  <span class="nic-status coming-soon" id="nousCardNOSStatus">Not connected</span>
                 </div>
               </div>
               <div class="nous-divider"></div>
               <div class="nous-connect-prompt" id="nousConnectPrompt">
-                <p>Connect to <em>NOUS</em> to unlock cognitive insights drawn from your voice, reflections, and awareness patterns.</p>
+                <p id="nousConnectText">Not connected. Remiel Sentinel works without this; connect a NOUS endpoint in Settings to enable it.</p>
                 <button class="nous-connect-btn" onclick="NousClient.showConnectDialog()">Configure Connection</button>
               </div>
             </div>
@@ -13606,7 +13641,7 @@ function startSeverityTimer() {
 }
 
 /* ── Unified Pull Accordion ── */
-const PULL_IDS = ['videonote', 'location', 'lastcontact', 'profile', 'nextaction', 'issues', 'medication', 'ledger', 'intelligence'];
+const PULL_IDS = ['videonote', 'location', 'lastcontact', 'profile', 'nextaction', 'issues', 'medication', 'ledger', 'voicecheckin', 'intelligence'];
 
 function togglePull(pullId) {
   const el = document.getElementById('pull_' + pullId);
@@ -16644,15 +16679,30 @@ const SettingsPanel = (function () {
 })();
 
 
-// ── NousClient — stub API module ──────────────────────────────
+// ── NousClient: optional connection to a NOUS endpoint ────────
+/* Contract (NOUS is a separate platform; Remiel Sentinel works without it):
+   GET  {endpoint}/health                 -> 2xx when reachable (5 s timeout)
+   POST {endpoint}/voice  multipart       fields: audio, contact_id, duration_sec, local_features (JSON)
+        -> {ok, session_id, scores:{cognitive_load, mood, anxiety, hyper, norm_i}, headline}
+   GET  {endpoint}/profile/{contactId}    -> {vocaBaseline, cognitivePatterns, neuralOscillationSignatures}
+   All requests carry Authorization: Bearer {key}. Failed voice submissions go
+   into the IDB setting 'nous_retry' and are sent after the next successful
+   checkConnection(). */
 const NousClient = (function () {
   'use strict';
+
+  const RETRY_KEY = 'nous_retry';
+  const RETRY_MAX = 20;
+  const HEALTH_TTL_MS = 5 * 60 * 1000;
 
   let _configured = false;
   let _apiKey = null;
   let _endpoint = null;
+  let _connected = false;
+  let _checkedAt = 0;
+  let _draining = false;
 
-  async function _loadConfig() {
+  const _ready = (async function _loadConfig() {
     try {
       if (typeof RemielDB !== 'undefined' && RemielDB.getSetting) {
         _apiKey = await RemielDB.getSetting('nous_api_key');
@@ -16660,16 +16710,32 @@ const NousClient = (function () {
         _configured = !!(_apiKey && _endpoint);
       }
     } catch (e) { /* silent */ }
+  })();
+
+  function _base() { return String(_endpoint || '').replace(/\/+$/, ''); }
+  function _headers() { return _apiKey ? { 'Authorization': 'Bearer ' + _apiKey } : {}; }
+
+  async function _fetchT(url, opts, ms) {
+    const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), ms) : null;
+    try {
+      return await fetch(url, Object.assign({}, opts, ctl ? { signal: ctl.signal } : {}));
+    } finally { if (timer) clearTimeout(timer); }
   }
 
-  _loadConfig();
+  function isConfigured() { return _configured; }
 
-  function isConnected() { return false; }
+  /* Cached result of the last health check; stale after 5 minutes. */
+  function isConnected() {
+    return _configured && _connected && (Date.now() - _checkedAt) < HEALTH_TTL_MS;
+  }
 
   async function configure(apiKey, endpoint) {
     _apiKey = apiKey;
     _endpoint = endpoint;
     _configured = !!(apiKey && endpoint);
+    _connected = false;
+    _checkedAt = 0;
     try {
       if (typeof RemielDB !== 'undefined' && RemielDB.putSetting) {
         await RemielDB.putSetting('nous_api_key', apiKey || '');
@@ -16680,28 +16746,119 @@ const NousClient = (function () {
   }
 
   async function checkConnection() {
+    await _ready;
     if (!_configured || !_endpoint) {
+      _connected = false;
       return { connected: false, reason: 'not_configured' };
     }
-    return { connected: false, reason: 'service_unavailable', message: 'NOUS API is not yet available. Migration to Nebius in progress.' };
+    try {
+      const res = await _fetchT(_base() + '/health', { method: 'GET', headers: _headers() }, 5000);
+      _connected = res.ok;
+      _checkedAt = Date.now();
+      if (res.ok) {
+        _drainRetry();
+        return { connected: true };
+      }
+      return { connected: false, reason: res.status === 401 || res.status === 403 ? 'unauthorized' : 'http_' + res.status,
+        message: res.status === 401 || res.status === 403 ? 'The endpoint rejected the API key.' : 'The endpoint answered with status ' + res.status + '.' };
+    } catch (e) {
+      _connected = false;
+      _checkedAt = Date.now();
+      return { connected: false, reason: 'unreachable', message: 'Could not reach the endpoint within 5 seconds.' };
+    }
   }
 
-  async function submitVoice(audioBlob, contactId) {
-    if (!isConnected()) {
-      return {
-        success: false, stored: true,
-        message: 'Voice captured and stored locally. NOUS analysis will be available when connected.',
-        vocaBaseline: null, cognitivePatterns: null, neuralOscillationSignatures: null
-      };
+  async function _post(blob, contactId, meta) {
+    const fd = new FormData();
+    const type = (blob && blob.type) || 'audio/webm';
+    const ext = type.indexOf('mp4') !== -1 ? 'm4a' : type.indexOf('ogg') !== -1 ? 'ogg' : 'webm';
+    fd.append('audio', blob, 'checkin.' + ext);
+    fd.append('contact_id', String(contactId));
+    fd.append('duration_sec', String((meta && meta.duration) || 0));
+    fd.append('local_features', JSON.stringify((meta && meta.features) || null));
+    const res = await _fetchT(_base() + '/voice', { method: 'POST', headers: _headers(), body: fd }, 30000);
+    if (!res.ok) throw new Error('http_' + res.status);
+    const data = await res.json();
+    if (!data || data.ok === false) throw new Error('rejected');
+    return {
+      success: true, stored: true,
+      sessionId: data.session_id || null,
+      scores: data.scores || null,
+      headline: data.headline || null
+    };
+  }
+
+  async function _enqueue(blob, contactId, meta) {
+    try {
+      const q = (await RemielDB.getSetting(RETRY_KEY)) || [];
+      q.push({ blob, contactId: String(contactId), meta: meta || {}, ts: Date.now() });
+      while (q.length > RETRY_MAX) q.shift();
+      await RemielDB.putSetting(RETRY_KEY, q);
+    } catch (e) { /* silent */ }
+  }
+
+  async function _drainRetry() {
+    if (_draining) return;
+    _draining = true;
+    try {
+      const q = (await RemielDB.getSetting(RETRY_KEY)) || [];
+      const left = [];
+      for (let i = 0; i < q.length; i++) {
+        const item = q[i];
+        try {
+          const r = await _post(item.blob, item.contactId, item.meta);
+          if (item.meta && item.meta.entryId && RemielDB.getVoiceEntries) {
+            const entries = await RemielDB.getVoiceEntries(item.contactId);
+            const e = (entries || []).find(x => x.id === item.meta.entryId);
+            if (e) { e.nousResult = r; await RemielDB.addVoiceEntry(e); }
+          }
+        } catch (e) { left.push(item); }
+      }
+      await RemielDB.putSetting(RETRY_KEY, left);
+    } catch (e) { /* silent */ }
+    _draining = false;
+  }
+
+  async function getRetryCount() {
+    try { return ((await RemielDB.getSetting(RETRY_KEY)) || []).length; } catch (e) { return 0; }
+  }
+
+  /* meta: {duration, features, entryId} */
+  async function submitVoice(audioBlob, contactId, meta) {
+    await _ready;
+    if (!_configured) {
+      return { success: false, stored: true, configured: false, message: 'Saved on this device. NOUS is not connected.' };
     }
-    return { success: true, stored: true, vocaBaseline: {}, cognitivePatterns: [], neuralOscillationSignatures: [] };
+    if (!isConnected()) await checkConnection();
+    if (!isConnected()) {
+      await _enqueue(audioBlob, contactId, meta);
+      return { success: false, stored: true, queued: true, message: 'Saved on this device. It will be sent to NOUS when the endpoint is reachable.' };
+    }
+    try {
+      return await _post(audioBlob, contactId, meta);
+    } catch (e) {
+      await _enqueue(audioBlob, contactId, meta);
+      return { success: false, stored: true, queued: true, message: 'Saved on this device. Sending to NOUS failed; it will be retried.' };
+    }
   }
 
   async function getProfile(contactId) {
-    if (!isConnected()) {
-      return { success: false, available: false, message: 'Connect to NOUS to unlock cognitive insights.', profile: null };
+    await _ready;
+    if (!_configured) return { success: false, configured: false, profile: null };
+    if (!isConnected()) await checkConnection();
+    if (!isConnected()) return { success: false, configured: true, profile: null, message: 'NOUS endpoint not reachable.' };
+    try {
+      const res = await _fetchT(_base() + '/profile/' + encodeURIComponent(String(contactId)), { method: 'GET', headers: _headers() }, 10000);
+      if (!res.ok) return { success: false, configured: true, profile: null, message: 'Profile request failed (status ' + res.status + ').' };
+      const d = await res.json();
+      return { success: true, configured: true, profile: {
+        vocaBaseline: d.vocaBaseline || null,
+        cognitivePatterns: d.cognitivePatterns || null,
+        neuralOscillationSignatures: d.neuralOscillationSignatures || null
+      } };
+    } catch (e) {
+      return { success: false, configured: true, profile: null, message: 'Profile request failed.' };
     }
-    return { success: true, available: true, profile: { cognitiveActivation: {}, voiceBiomarkers: {}, reflections: [], dreamIntelligence: [] } };
   }
 
   function showConnectDialog() {
@@ -16719,7 +16876,7 @@ const NousClient = (function () {
 
     overlay.innerHTML = '<div style="width:100%;max-width:340px;background:#141824;border:1px solid rgba(42,51,72,0.5);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:14px;">' +
       '<h3 style="font-family:\'Instrument Serif\',serif;font-size:20px;color:var(--text,#e0e4ec);margin:0;">Connect to NOUS</h3>' +
-      '<p style="font-family:\'Hanken Grotesk\',sans-serif;font-size:13px;color:var(--text-dim,#6b7280);line-height:1.5;margin:0;">Enter your NOUS API credentials. These are stored locally on your device.</p>' +
+      '<p style="font-family:\'Hanken Grotesk\',sans-serif;font-size:13px;color:var(--text-dim,#6b7280);line-height:1.5;margin:0;">Optional. Remiel Sentinel works fully without this. If you have a NOUS endpoint, enter its URL and API key; they are stored only on this device. Voice check-ins will then also be sent to that endpoint for analysis.</p>' +
       '<label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim,#6b7280);">Endpoint URL' +
         '<input id="nousInputEndpoint" type="url" placeholder="https://nous.example.com" style="display:block;width:100%;margin-top:4px;padding:8px 10px;font-family:\'JetBrains Mono\',monospace;font-size:12px;background:rgba(24,28,42,0.6);border:1px solid rgba(42,51,72,0.5);border-radius:8px;color:var(--text,#e0e4ec);outline:none;box-sizing:border-box;">' +
       '</label>' +
@@ -16728,7 +16885,7 @@ const NousClient = (function () {
       '</label>' +
       '<div style="display:flex;gap:8px;margin-top:4px;">' +
         '<button onclick="document.getElementById(\'nousConnectOverlay\').style.display=\'none\'" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(42,51,72,0.5);background:transparent;color:var(--text-dim,#6b7280);font-family:\'JetBrains Mono\',monospace;font-size:11px;cursor:pointer;">Cancel</button>' +
-        '<button onclick="NousClient._handleConnect()" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--rim-cyan,#38bdf8);background:rgba(56,189,248,0.06);color:var(--rim-cyan,#38bdf8);font-family:\'JetBrains Mono\',monospace;font-size:11px;cursor:pointer;">Connect</button>' +
+        '<button onclick="NousClient._handleConnect()" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--rim-cyan,#38bdf8);background:rgba(56,189,248,0.06);color:var(--rim-cyan,#38bdf8);font-family:\'JetBrains Mono\',monospace;font-size:11px;cursor:pointer;">Save and test</button>' +
       '</div>' +
       '<p id="nousConnectMsg" style="font-family:\'Hanken Grotesk\',sans-serif;font-size:12px;color:var(--text-dim,#6b7280);text-align:center;margin:0;min-height:16px;"></p>' +
     '</div>';
@@ -16751,27 +16908,28 @@ const NousClient = (function () {
     const ak = document.getElementById('nousInputApiKey').value.trim();
     const msg = document.getElementById('nousConnectMsg');
     if (!ep) { msg.textContent = 'Please enter an endpoint URL.'; msg.style.color = '#e05252'; return; }
-    msg.textContent = 'Saving configuration...';
+    if (!ak) { msg.textContent = 'Please enter the API key.'; msg.style.color = '#e05252'; return; }
+    msg.textContent = 'Saving and testing the connection...';
     msg.style.color = 'var(--text-dim, #6b7280)';
     await configure(ak, ep);
     const result = await checkConnection();
     if (result.connected) {
       msg.textContent = 'Connected to NOUS.';
       msg.style.color = '#5fbf7a';
-      NousIntelligence.updateConnectionStatus(true);
+      NousIntelligence.init();
       setTimeout(() => { document.getElementById('nousConnectOverlay').style.display = 'none'; }, 1200);
     } else {
-      msg.textContent = result.message || 'Could not reach NOUS. Configuration saved for when the service is available.';
+      msg.textContent = (result.message || 'Could not reach the endpoint.') + ' Settings saved; Remiel Sentinel keeps working on this device.';
       msg.style.color = 'var(--rim-cyan, #38bdf8)';
       NousIntelligence.updateConnectionStatus(false);
     }
   }
 
-  return { isConnected, configure, checkConnection, submitVoice, getProfile, showConnectDialog, _handleConnect };
+  return { isConfigured, isConnected, configure, checkConnection, submitVoice, getProfile, getRetryCount, showConnectDialog, _handleConnect };
 })();
 
 
-// ── VoiceCheckin — recording & UI logic ───────────────────────
+// ── VoiceCheckin: recording & UI logic ────────────────────────
 const VoiceCheckin = (function () {
   'use strict';
 
@@ -16789,6 +16947,7 @@ const VoiceCheckin = (function () {
   let audioCtx = null;
 
   function $(id) { return document.getElementById(id); }
+  function _idle() { return _t('voice.idle', 'tap to record · 30s max'); }
 
   function formatTime(sec) {
     const m = Math.floor(sec / 60);
@@ -16807,8 +16966,18 @@ const VoiceCheckin = (function () {
       ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
 
+  /* Pick a recorder mime type the browser supports. Safari records
+     audio/mp4; Chrome and Firefox record webm or ogg. */
+  function pickMimeType() {
+    if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return '';
+    const prefs = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/aac', 'audio/ogg;codecs=opus'];
+    for (let i = 0; i < prefs.length; i++) if (MediaRecorder.isTypeSupported(prefs[i])) return prefs[i];
+    return '';
+  }
+
   function initWaveform(stream) {
     const wf = $('voiceWaveform');
+    if (!wf) return;
     wf.style.display = 'flex';
     wf.innerHTML = '';
     const barCount = 32;
@@ -16854,6 +17023,7 @@ const VoiceCheckin = (function () {
 
   function showStaticWaveform() {
     const wf = $('voiceWaveform');
+    if (!wf) return;
     wf.style.display = 'flex';
     const bars = wf.querySelectorAll('.voice-waveform-bar');
     bars.forEach((b, i) => {
@@ -16874,13 +17044,7 @@ const VoiceCheckin = (function () {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      let mimeType = 'audio/webm;codecs=opus';
-      if (typeof MediaRecorder.isTypeSupported === 'function') {
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
-                     MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
-        }
-      }
+      const mimeType = pickMimeType();
       audioChunks = [];
       const opts = mimeType ? { mimeType } : {};
       mediaRecorder = new MediaRecorder(stream, opts);
@@ -16895,7 +17059,7 @@ const VoiceCheckin = (function () {
         isRecording = false;
         clearInterval(recordingTimer);
         if (audioChunks.length === 0) return;
-        const type = mediaRecorder.mimeType || 'audio/webm';
+        const type = mediaRecorder.mimeType || mimeType || 'audio/mp4';
         lastBlob = new Blob(audioChunks, { type });
         lastDuration = secondsElapsed;
         showCaptureResult();
@@ -16942,7 +17106,7 @@ const VoiceCheckin = (function () {
 
   function showCaptureResult() {
     $('voiceResultDuration').textContent = formatTime(lastDuration);
-    $('voiceResultStatus').textContent = 'Voice captured. Analyzing prosodic features...';
+    $('voiceResultStatus').textContent = _t('voice.captured', 'Recorded. Save to keep it on this device and compare it with earlier check-ins.');
     showStaticWaveform();
     $('voiceCaptureResult').style.display = 'flex';
   }
@@ -16951,55 +17115,86 @@ const VoiceCheckin = (function () {
     return (typeof selectedContact !== 'undefined' && selectedContact) ? selectedContact.id : 'self';
   }
 
-  async function save() {
-    if (!lastBlob) return;
+  /* Shared pipeline used by the voice pull and by SelfCheckIn:
+     extract features, score against the existing baseline FIRST, then fold
+     this session into the baseline, store the entry with its blob, log the
+     interaction, and send to NOUS when connected (queued otherwise).
+     opts: {note, source, quiet} */
+  async function processAndStore(blob, duration, contactId, opts) {
+    opts = opts || {};
     const entry = {
       id: 'vc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-      contactId: getCurrentContactId(),
-      blob: lastBlob,
-      duration: lastDuration,
+      contactId: contactId,
+      blob: blob,
+      mimeType: blob && blob.type,
+      duration: duration || 0,
       ts: Date.now(),
+      note: opts.note || '',
+      source: opts.source || 'voicecheckin',
       nousResult: null
     };
-    /* ── Sentinel Voice Intelligence: extract features + score wellness ── */
+    let message = '';
     try {
-      const _extraction = await SentinelFeatureExtractor.extract(lastBlob);
+      const _extraction = await SentinelFeatureExtractor.extract(blob);
       if (_extraction.features) {
         entry.voiceFeatures = _extraction.features;
         entry.voiceMeta = { frameCount: _extraction.frameCount, voicedFrames: _extraction.voicedFrames, totalFrames: _extraction.totalFrames };
-        const _bl = await SentinelBaseline.update(entry.contactId, _extraction.features);
-        entry.baselineN = _bl.n;
-        if (SentinelBaseline.isMature(_bl)) {
-          const _ws = await SentinelWellnessScorer.score(entry.contactId, _extraction.features);
+        const _before = await SentinelBaseline.load(contactId);
+        if (SentinelBaseline.isMature(_before)) {
+          const _ws = await SentinelWellnessScorer.score(contactId, _extraction.features);
           entry.wellnessState = _ws.state;
           entry.wellnessConfidence = _ws.confidence;
           if (_ws.state !== 'Stable' && _ws.confidence >= 0.5) {
-            showToast('Voice analysis: ' + _ws.state.toLowerCase() + ' pattern detected');
+            const words = { Distressed: 'more strained', Low: 'flatter', Agitated: 'more tense', Elevated: 'livelier' };
+            message = _t('voice.differs', 'This recording sounded {how} than usual for this voice.', { how: words[_ws.state] || 'different' });
+          } else {
+            message = _t('voice.usual', 'This recording sounded close to usual for this voice.');
           }
-        } else {
-          showToast('Baseline building: ' + _bl.n + '/' + SentinelBaseline.MIN_SESSIONS + ' sessions');
         }
+        const _bl = await SentinelBaseline.update(contactId, _extraction.features);
+        entry.baselineN = _bl.n;
+        if (!SentinelBaseline.isMature(_before)) {
+          message = _t('voice.baseline', 'Learning this voice: {n} of {min} recordings so far.', { n: _bl.n, min: SentinelBaseline.MIN_SESSIONS });
+        }
+      } else if (_extraction.error) {
+        message = _t('voice.tooShort', 'Saved. The recording was too short to measure (2 seconds minimum).');
       }
     } catch (_feErr) { console.warn('[VoiceCheckin] Feature extraction failed:', _feErr); }
-    /* ── NOUS integration (if connected) ── */
-    try {
-      entry.nousResult = await NousClient.submitVoice(lastBlob, entry.contactId);
-    } catch (e) {
-      entry.nousResult = { success: false, stored: true, message: 'Submission failed. Stored locally.' };
-    }
+
+    /* Store first so the blob is safe even if NOUS is slow */
     try { await RemielDB.addVoiceEntry(entry); } catch (e) {}
     try {
       if (typeof RemielDB.addInteraction === 'function') {
         await RemielDB.addInteraction({
-          type: 'voice_checkin', contactId: entry.contactId,
-          ts: entry.ts, duration: entry.duration,
-          note: 'Voice check-in recorded (' + formatTime(entry.duration) + ')'
+          type: 'voice_checkin', contactId: contactId,
+          ts: entry.ts, timestamp: entry.ts, duration: entry.duration,
+          note: opts.note || ('Voice check-in recorded (' + formatTime(entry.duration) + ')')
         });
       }
     } catch (e) {}
+
+    try {
+      entry.nousResult = await NousClient.submitVoice(blob, contactId, { duration: entry.duration, features: entry.voiceFeatures || null, entryId: entry.id });
+    } catch (e) {
+      entry.nousResult = { success: false, stored: true, message: 'Saved on this device.' };
+    }
+    try { await RemielDB.addVoiceEntry(entry); } catch (e) {}
+    if (entry.nousResult && entry.nousResult.success && typeof NousIntelligence !== 'undefined') {
+      NousIntelligence.showSession(contactId, entry.nousResult);
+    }
+
+    if (!opts.quiet && message && typeof showToast === 'function') showToast(message);
+    return { entry, message };
+  }
+
+  async function save() {
+    if (!lastBlob) return;
+    const blob = lastBlob, dur = lastDuration, cid = getCurrentContactId();
+    $('voiceResultStatus').textContent = _t('voice.saving', 'Saving on this device...');
+    await processAndStore(blob, dur, cid, { source: 'voicecheckin' });
     $('voiceCaptureResult').style.display = 'none';
     $('voiceWaveform').style.display = 'none';
-    $('voiceTimer').textContent = 'tap to record · 30s max';
+    $('voiceTimer').textContent = _idle();
     $('voiceTimer').className = 'voice-timer idle';
     lastBlob = null;
     lastDuration = 0;
@@ -17011,7 +17206,7 @@ const VoiceCheckin = (function () {
     lastDuration = 0;
     $('voiceCaptureResult').style.display = 'none';
     $('voiceWaveform').style.display = 'none';
-    $('voiceTimer').textContent = 'tap to record · 30s max';
+    $('voiceTimer').textContent = _idle();
     $('voiceTimer').className = 'voice-timer idle';
   }
 
@@ -17025,6 +17220,10 @@ const VoiceCheckin = (function () {
     const existing = container.querySelectorAll('.voice-history-entry');
     existing.forEach(el => el.remove());
     const empty = $('voiceHistoryEmpty');
+    const prev = $('pullPrev_voicecheckin');
+    if (prev) prev.textContent = entries.length
+      ? _t('voice.prevLast', 'Last: {when}', { when: formatTimestamp(entries[0].ts) })
+      : _t('voice.prevEmpty', 'Record up to 30 seconds');
     if (entries.length === 0) { if (empty) empty.style.display = 'block'; return; }
     if (empty) empty.style.display = 'none';
     const shown = entries.slice(0, 10);
@@ -17033,11 +17232,11 @@ const VoiceCheckin = (function () {
       el.className = 'voice-history-entry';
       el.setAttribute('data-voice-id', entry.id);
       const hasNous = entry.nousResult && entry.nousResult.success;
-      const statusDot = hasNous ? '<span style="width:6px;height:6px;border-radius:50%;background:#5fbf7a;flex-shrink:0;"></span>' : '';
+      const statusDot = hasNous ? '<span title="Sent to NOUS" style="width:6px;height:6px;border-radius:50%;background:#5fbf7a;flex-shrink:0;"></span>' : '';
       el.innerHTML =
         '<div class="vhe-left"><div class="vhe-icon"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/></svg></div>' +
         '<span class="vhe-ts">' + formatTimestamp(entry.ts) + '</span>' + statusDot + '</div>' +
-        '<span class="vhe-dur">' + formatTime(entry.duration) + '</span>';
+        '<span class="vhe-dur">' + formatTime(entry.duration || 0) + '</span>';
       el.addEventListener('click', () => playEntry(entry));
       container.appendChild(el);
     });
@@ -17053,43 +17252,111 @@ const VoiceCheckin = (function () {
     } catch (e) {}
   }
 
-  function init() { loadHistory(); }
+  function init() {
+    const t = $('voiceTimer');
+    if (t && !isRecording && t.classList.contains('idle')) t.textContent = _idle();
+    loadHistory();
+  }
 
-  return { toggleRecording, save, discard, loadHistory, init, playEntry };
+  return { toggleRecording, save, discard, loadHistory, init, playEntry, processAndStore, pickMimeType };
 })();
 
 
-// ── NousIntelligence — intelligence pull logic ────────────────
+// ── NousIntelligence: intelligence pull logic ─────────────────
 const NousIntelligence = (function () {
   'use strict';
 
-  function updateConnectionStatus(connected) {
+  const NOT_CONNECTED = 'Not connected. Remiel Sentinel works without this; connect a NOUS endpoint in Settings to enable it.';
+
+  function _esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  /* Render any JSON value as a compact, escaped list */
+  function _render(v, depth) {
+    depth = depth || 0;
+    if (v == null) return '<em>' + _esc(_t('nous.none', 'Nothing reported yet.')) + '</em>';
+    if (typeof v !== 'object') return _esc(typeof v === 'number' ? Math.round(v * 1000) / 1000 : v);
+    if (depth > 2) return _esc(JSON.stringify(v).slice(0, 120));
+    const items = Array.isArray(v) ? v.map((x, i) => [null, x]) : Object.keys(v).map(k => [k, v[k]]);
+    if (!items.length) return '<em>' + _esc(_t('nous.none', 'Nothing reported yet.')) + '</em>';
+    return '<ul style="margin:4px 0 0 14px;padding:0;">' + items.slice(0, 12).map(([k, x]) =>
+      '<li>' + (k ? '<strong>' + _esc(k) + ':</strong> ' : '') + _render(x, depth + 1) + '</li>').join('') + '</ul>';
+  }
+
+  function _setCard(id, html, status, cls) {
+    const d = document.getElementById(id);
+    if (d) d.innerHTML = html;
+    const s = document.getElementById(id + 'Status');
+    if (s) { s.textContent = status; s.className = 'nic-status ' + (cls || 'coming-soon'); }
+  }
+
+  const FUTURE = {
+    nousCardVoca: 'Once a NOUS endpoint is connected, this card will show the voice baseline NOUS builds from your check-ins and the scores from your latest session.',
+    nousCardPatterns: 'Once connected, this card will list the cognitive patterns NOUS reports for this person across their check-ins.',
+    nousCardNOS: 'Once connected, this card will show the neural oscillation signatures NOUS returns for this person\'s profile.'
+  };
+
+  function updateConnectionStatus(connected, configured) {
     const el = document.getElementById('nousConnectionStatus');
-    if (!el) return;
-    if (connected) {
-      el.textContent = 'Connected';
-      el.classList.add('connected');
-      document.querySelectorAll('.nous-intel-card.locked').forEach(card => {
-        card.classList.remove('locked');
-        const status = card.querySelector('.nic-status');
-        if (status) { status.className = 'nic-status available'; status.textContent = 'Connected'; }
-        const lock = card.querySelector('.nic-lock');
-        if (lock) lock.style.display = 'none';
-      });
-      const prompt = document.getElementById('nousConnectPrompt');
-      if (prompt) prompt.style.display = 'none';
-    } else {
-      el.textContent = 'Awaiting connection';
-      el.classList.remove('connected');
+    const prompt = document.getElementById('nousConnectPrompt');
+    const txt = document.getElementById('nousConnectText');
+    if (el) {
+      el.textContent = connected ? _t('nous.connected', 'Connected')
+        : configured ? _t('nous.unreachable', 'Endpoint not reachable') : _t('nous.notConnected', 'Not connected');
+      el.classList.toggle('connected', !!connected);
     }
+    document.querySelectorAll('.nous-intel-card').forEach(card => {
+      card.classList.toggle('locked', !connected);
+      const lock = card.querySelector('.nic-lock');
+      if (lock) lock.style.display = connected ? 'none' : '';
+    });
+    if (txt) txt.textContent = configured && !connected
+      ? _t('nous.unreachableText', 'A NOUS endpoint is saved but did not answer. Voice check-ins are kept on this device and will be sent when it is reachable.')
+      : _t('nous.notConnectedText', NOT_CONNECTED);
+    if (prompt) prompt.style.display = connected ? 'none' : '';
+    if (!connected) {
+      Object.keys(FUTURE).forEach(id => _setCard(id, _esc(_t(id + '.future', FUTURE[id])), configured ? _t('nous.unreachableShort', 'Not reachable') : _t('nous.notConnected', 'Not connected')));
+    }
+  }
+
+  function _cid() {
+    return (typeof selectedContact !== 'undefined' && selectedContact) ? selectedContact.id : 'self';
+  }
+
+  /* Latest session scores from submitVoice, shown under the voice baseline */
+  function showSession(contactId, r) {
+    if (String(contactId) !== String(_cid()) || !r || !r.success) return;
+    const d = document.getElementById('nousCardVoca');
+    if (!d) return;
+    let box = document.getElementById('nousCardSession');
+    if (!box) { box = document.createElement('div'); box.id = 'nousCardSession'; d.parentNode.insertBefore(box, d.nextSibling); }
+    box.className = 'nic-desc';
+    box.innerHTML = '<strong>' + _esc(_t('nous.latest', 'Latest session')) + '</strong>' +
+      (r.headline ? '<div>' + _esc(r.headline) + '</div>' : '') + _render(r.scores);
   }
 
   async function init() {
     const result = await NousClient.checkConnection();
-    updateConnectionStatus(result.connected);
+    const configured = NousClient.isConfigured();
+    updateConnectionStatus(result.connected, configured);
+    const prev = document.getElementById('pullPrev_intelligence');
+    if (prev) prev.textContent = result.connected ? _t('nous.prevConnected', 'NOUS connected') : _t('nous.prevOptional', 'Optional NOUS connection');
+    if (!result.connected) return;
+    const cid = _cid();
+    _setCard('nousCardVoca', _esc(_t('nous.loading', 'Loading...')), _t('nous.connected', 'Connected'), 'available');
+    const p = await NousClient.getProfile(cid);
+    if (!p.success || !p.profile) {
+      const m = _esc(p.message || _t('nous.profileFailed', 'Profile not available.'));
+      ['nousCardVoca', 'nousCardPatterns', 'nousCardNOS'].forEach(id => _setCard(id, m, _t('nous.connected', 'Connected'), 'available'));
+      return;
+    }
+    _setCard('nousCardVoca', _render(p.profile.vocaBaseline), _t('nous.connected', 'Connected'), 'available');
+    _setCard('nousCardPatterns', _render(p.profile.cognitivePatterns), _t('nous.connected', 'Connected'), 'available');
+    _setCard('nousCardNOS', _render(p.profile.neuralOscillationSignatures), _t('nous.connected', 'Connected'), 'available');
   }
 
-  return { updateConnectionStatus, init };
+  return { updateConnectionStatus, init, showSession };
 })();
 
 
@@ -18153,7 +18420,7 @@ const DailySummary = (() => {
     setTimeout(() => build(), 1200);
   }
 
-  return { init, build, hide };
+  return { init, build, hide, calcStreak };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -20955,25 +21222,30 @@ const SocialImport = (() => {
     const NUDGE_MORNING_HOUR = 8;
     const NUDGE_EVENING_HOUR = 20;
 
+    const SCHEDULE_IDB_KEY = 'checkinSchedule';   /* {morning:bool, evening:bool} */
+
     let _selectedMood = null;
     let _voiceBlob = null;
+    let _voiceDuration = 0;
+    let _voiceStart = 0;
     let _voiceRecorder = null;
     let _voiceChunks = [];
     let _isRecording = false;
     let _nudgeTimer = null;
+    let _schedule = { morning: false, evening: false };
 
     function pickMood(val) {
       _selectedMood = val;
       var btns = document.querySelectorAll('.checkin-mood-btn');
       btns.forEach(function(b) {
-        b.classList.toggle('selected', parseInt(b.getAttribute('data-val')) === val);
+        b.classList.toggle('selected', parseInt(b.getAttribute('data-val'), 10) === val);
       });
       _updateSubmit();
     }
 
     function _updateSubmit() {
       var btn = document.getElementById('checkinSubmitBtn');
-      if (btn) btn.disabled = !_selectedMood;
+      if (btn) btn.disabled = !_selectedMood || _isRecording;
     }
 
     async function toggleVoice() {
@@ -20988,23 +21260,36 @@ const SocialImport = (() => {
       try {
         var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         _voiceChunks = [];
-        _voiceRecorder = new MediaRecorder(stream);
-        _voiceRecorder.ondataavailable = function(e) { if (e.data.size > 0) _voiceChunks.push(e.data); };
+        var mime = (typeof VoiceCheckin !== 'undefined' && VoiceCheckin.pickMimeType) ? VoiceCheckin.pickMimeType() : '';
+        _voiceRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        _voiceRecorder.ondataavailable = function(e) { if (e.data && e.data.size > 0) _voiceChunks.push(e.data); };
         _voiceRecorder.onstop = function() {
-          _voiceBlob = new Blob(_voiceChunks, { type: 'audio/webm' });
           stream.getTracks().forEach(function(t) { t.stop(); });
+          _voiceDuration = Math.max(0, Math.round((Date.now() - _voiceStart) / 1000));
+          if (_voiceChunks.length) {
+            _voiceBlob = new Blob(_voiceChunks, { type: _voiceRecorder.mimeType || mime || 'audio/mp4' });
+          }
           var label = document.getElementById('checkinVoiceLabel');
-          if (label) label.textContent = 'Voice recorded (' + Math.round(_voiceBlob.size / 1024) + ' KB)';
+          if (label) label.textContent = _voiceBlob
+            ? _t('checkin.voiceRecorded', 'Voice note recorded ({sec}s). Tap to record again.', { sec: _voiceDuration })
+            : _t('checkin.voiceEmpty', 'Nothing was recorded. Tap to try again.');
           _updateSubmit();
         };
-        _voiceRecorder.start();
+        _voiceBlob = null;
+        _voiceStart = Date.now();
+        _voiceRecorder.start(250);
         _isRecording = true;
         var btn = document.getElementById('checkinVoiceBtn');
         if (btn) btn.classList.add('recording');
         var label = document.getElementById('checkinVoiceLabel');
-        if (label) label.textContent = 'Stop Recording...';
+        if (label) label.textContent = _t('checkin.stop', 'Recording. Tap to stop.');
+        _updateSubmit();
+        /* 30 second cap, same as the voice check-in pull */
+        setTimeout(function() { if (_isRecording) _stopVoice(); }, 30000);
       } catch (err) {
         console.error('SelfCheckIn voice error:', err);
+        var l2 = document.getElementById('checkinVoiceLabel');
+        if (l2) l2.textContent = _t('checkin.micDenied', 'Microphone not available. You can still log your mood.');
       }
     }
 
@@ -21018,97 +21303,105 @@ const SocialImport = (() => {
     }
 
     async function submit() {
-      if (!_selectedMood) return;
+      if (!_selectedMood || _isRecording) return;
+      var level = _selectedMood;
 
       var note = '';
       var noteEl = document.getElementById('checkinNote');
       if (noteEl) note = noteEl.value.trim();
 
       try {
-        // Log mood
-        var moodId = 'mood_self_' + Date.now();
+        /* Same shape as the main mood logger (logMood): level 1..5 and ts,
+           plus label, note and source for display. */
+        var ts = Date.now();
         await RemielDB.addMood({
-          id: moodId,
           contactId: 'self',
-          value: _selectedMood * 2,
-          label: MOOD_LABELS[_selectedMood],
+          level: level,
+          ts: ts,
+          label: MOOD_LABELS[level],
           note: note,
-          ts: Date.now(),
+          source: 'self'
         });
 
-        // Log voice entry if recorded
-        if (_voiceBlob) {
-          var voiceId = 'vc_self_' + Date.now();
-          await RemielDB.addVoiceEntry({
-            id: voiceId,
-            contactId: 'self',
-            transcript: note || '(voice check-in)',
-            durationSec: 0,
-            ts: Date.now(),
-          });
-
-          // Also log as interaction
-          await RemielDB.addInteraction({
-            type: 'voice_checkin',
-            contactId: 'self',
-            ts: Date.now(),
-            note: note || 'Self voice check-in',
-          });
+        /* Voice note goes through the same pipeline as the voice pull:
+           blob and duration stored, features scored, NOUS when connected. */
+        if (_voiceBlob && typeof VoiceCheckin !== 'undefined' && VoiceCheckin.processAndStore) {
+          var blob = _voiceBlob, dur = _voiceDuration;
+          VoiceCheckin.processAndStore(blob, dur, 'self', { note: note || 'Self check-in voice note', source: 'selfcheckin', quiet: true })
+            .catch(function(e) { console.warn('SelfCheckIn voice pipeline failed:', e); });
         }
 
-        // Store last nudge time to prevent duplicate nudges today
-        try { localStorage.setItem(LAST_NUDGE_KEY, Date.now().toString()); } catch(e) {}
+        try { localStorage.setItem(LAST_NUDGE_KEY, String(ts)); } catch(e) {}
+        try { await RemielDB.putSetting('checkinLastTs', ts); } catch(e) {}
 
         dismiss();
 
-        // Show confirmation via AlertEngine if available
-        if (typeof AlertEngine !== 'undefined' && AlertEngine.showNotification) {
-          AlertEngine.showNotification(
-            'Check-in Logged',
-            MOOD_LABELS[_selectedMood] + (note ? ' — ' + note.substring(0, 40) : ''),
-            'checkin-confirm'
-          );
+        if (typeof showToast === 'function') {
+          showToast(_t('checkin.logged', 'Check-in saved: {label}', { label: MOOD_LABELS[level] }));
         }
+        var prev = document.getElementById('pullPrev_mood');
+        if (prev && typeof MOOD_FACES !== 'undefined' && (typeof selectedContact === 'undefined' || !selectedContact)) {
+          prev.textContent = MOOD_FACES[level] + ' ' + MOOD_LABELS[level];
+        }
+        if (typeof DailySummary !== 'undefined' && DailySummary.build) { try { DailySummary.build(); } catch(e) {} }
       } catch (err) {
         console.error('SelfCheckIn submit error:', err);
+        if (typeof showToast === 'function') showToast(_t('checkin.failed', 'Could not save the check-in.'));
       }
+    }
+
+    /* Morning and evening toggles inside the check-in panel itself */
+    function _renderScheduleRow() {
+      var row = document.querySelector('#checkinNudge .checkin-schedule-row');
+      if (!row) return;
+      if (!document.getElementById('checkinSchedMorning')) {
+        row.innerHTML =
+          '<span style="flex-basis:100%;">' + _t('checkin.remind', 'Remind me to check in:') + '</span>' +
+          '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="checkinSchedMorning"> ' + _t('checkin.morning', 'Morning (8:00)') + '</label>' +
+          '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="checkinSchedEvening"> ' + _t('checkin.evening', 'Evening (20:00)') + '</label>';
+        row.style.flexWrap = 'wrap';
+        row.style.gap = '8px 16px';
+        document.getElementById('checkinSchedMorning').addEventListener('change', function(e) { setSchedule({ morning: e.target.checked }); });
+        document.getElementById('checkinSchedEvening').addEventListener('change', function(e) { setSchedule({ evening: e.target.checked }); });
+      }
+      document.getElementById('checkinSchedMorning').checked = !!_schedule.morning;
+      document.getElementById('checkinSchedEvening').checked = !!_schedule.evening;
     }
 
     function show() {
       _selectedMood = null;
       _voiceBlob = null;
+      _voiceDuration = 0;
       _isRecording = false;
       _voiceChunks = [];
 
       var nudge = document.getElementById('checkinNudge');
       if (!nudge) return;
 
-      // Reset UI
+      /* Opened from Settings: close the panel so the check-in is visible */
+      var sp = document.getElementById('settingsPanel');
+      if (sp && sp.classList.contains('open') && typeof SettingsPanel !== 'undefined' && SettingsPanel.close) {
+        try { SettingsPanel.close(); } catch(e) {}
+      }
+
       document.querySelectorAll('.checkin-mood-btn').forEach(function(b) { b.classList.remove('selected'); });
       var noteEl = document.getElementById('checkinNote');
       if (noteEl) noteEl.value = '';
       var voiceLabel = document.getElementById('checkinVoiceLabel');
-      if (voiceLabel) voiceLabel.textContent = 'Record Voice Note';
+      if (voiceLabel) voiceLabel.textContent = _t('checkin.recordVoice', 'Record Voice Note');
       var voiceBtn = document.getElementById('checkinVoiceBtn');
       if (voiceBtn) voiceBtn.classList.remove('recording');
       _updateSubmit();
 
-      // Update streak
       _updateStreak();
+      _renderScheduleRow();
 
-      // Update schedule toggle
-      var schedToggle = document.getElementById('checkinScheduleToggle');
-      if (schedToggle) {
-        try { schedToggle.checked = localStorage.getItem(SCHEDULE_KEY) === '1'; } catch(e) {}
-      }
-
-      // Set greeting based on time of day
       var title = document.getElementById('checkinTitle');
       if (title) {
         var h = new Date().getHours();
-        if (h < 12) title.textContent = 'Good morning — how are you?';
-        else if (h < 17) title.textContent = 'Afternoon check-in';
-        else title.textContent = 'Evening reflection';
+        if (h < 12) title.textContent = _t('checkin.titleMorning', 'Good morning. How are you?');
+        else if (h < 17) title.textContent = _t('checkin.titleAfternoon', 'Afternoon check-in');
+        else title.textContent = _t('checkin.titleEvening', 'Evening reflection');
       }
 
       nudge.classList.add('visible');
@@ -21125,29 +21418,6 @@ const SocialImport = (() => {
       try {
         if (typeof DailySummary !== 'undefined' && DailySummary.calcStreak) {
           streak = await DailySummary.calcStreak();
-        } else {
-          // Fallback streak calc
-          var allMoods = [];
-          try { allMoods = await RemielDB.getMoodsByContact('self'); } catch(e) {}
-          if (allMoods.length > 0) {
-            var DAY_MS = 86400000;
-            var now = new Date();
-            var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-            var daySet = new Set();
-            allMoods.forEach(function(m) {
-              var ts = m.ts || m.timestamp;
-              var d = new Date(ts);
-              var offset = Math.floor((todayStart - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / DAY_MS);
-              daySet.add(offset);
-            });
-            var start = daySet.has(0) ? 0 : 1;
-            if (daySet.has(0) || daySet.has(1)) {
-              for (var d = start; d < 365; d++) {
-                if (daySet.has(d)) streak++;
-                else break;
-              }
-            }
-          }
         }
       } catch(e) {}
 
@@ -21158,85 +21428,81 @@ const SocialImport = (() => {
       if (row) row.style.display = streak > 0 ? 'flex' : 'none';
     }
 
-    function setSchedule(enabled) {
-      try { localStorage.setItem(SCHEDULE_KEY, enabled ? '1' : '0'); } catch(e) {}
-      if (enabled) {
-        _scheduleNextNudge();
-        // Send push subscription nudge times to service worker
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'CHECKIN_SCHEDULE',
-            morning: NUDGE_MORNING_HOUR,
-            evening: NUDGE_EVENING_HOUR,
-            enabled: true,
-          });
-        }
-      } else {
-        if (_nudgeTimer) { clearTimeout(_nudgeTimer); _nudgeTimer = null; }
-      }
+    /* setSchedule(true|false) sets both; setSchedule({morning, evening}) merges.
+       Persisted in IDB settings (localStorage kept only as a mirror). */
+    function setSchedule(val) {
+      if (typeof val === 'boolean') _schedule = { morning: val, evening: val };
+      else if (val && typeof val === 'object') _schedule = Object.assign({}, _schedule, val);
+      try { RemielDB.putSetting(SCHEDULE_IDB_KEY, _schedule); } catch(e) {}
+      try { localStorage.setItem(SCHEDULE_KEY, (_schedule.morning || _schedule.evening) ? '1' : '0'); } catch(e) {}
+      if (_schedule.morning || _schedule.evening) _scheduleNextNudge();
+      else if (_nudgeTimer) { clearTimeout(_nudgeTimer); _nudgeTimer = null; }
     }
 
     function _scheduleNextNudge() {
       if (_nudgeTimer) clearTimeout(_nudgeTimer);
+      var hours = [];
+      if (_schedule.morning) hours.push(NUDGE_MORNING_HOUR);
+      if (_schedule.evening) hours.push(NUDGE_EVENING_HOUR);
+      if (!hours.length) return;
 
       var now = new Date();
-      var h = now.getHours();
-      var nextNudge;
-
-      if (h < NUDGE_MORNING_HOUR) {
-        nextNudge = new Date(now.getFullYear(), now.getMonth(), now.getDate(), NUDGE_MORNING_HOUR, 0, 0);
-      } else if (h < NUDGE_EVENING_HOUR) {
-        nextNudge = new Date(now.getFullYear(), now.getMonth(), now.getDate(), NUDGE_EVENING_HOUR, 0, 0);
-      } else {
-        // Next morning
-        var tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        nextNudge = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), NUDGE_MORNING_HOUR, 0, 0);
+      var nextNudge = null;
+      for (var dayAdd = 0; dayAdd < 2 && !nextNudge; dayAdd++) {
+        for (var i = 0; i < hours.length; i++) {
+          var cand = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayAdd, hours[i], 0, 0);
+          if (cand.getTime() > now.getTime()) { nextNudge = cand; break; }
+        }
       }
+      if (!nextNudge) return;
 
-      var delay = nextNudge.getTime() - now.getTime();
-      if (delay < 0) delay = 60000; // fallback 1 min
-
+      var delay = Math.max(60000, nextNudge.getTime() - now.getTime());
       _nudgeTimer = setTimeout(function() {
         _triggerNudge();
-        _scheduleNextNudge(); // schedule next one
+        _scheduleNextNudge();
       }, delay);
     }
 
     function _triggerNudge() {
-      // Check if already checked in recently
       try {
-        var last = parseInt(localStorage.getItem(LAST_NUDGE_KEY) || '0');
-        var hoursSince = (Date.now() - last) / 3600000;
-        if (hoursSince < 4) return; // Skip if checked in < 4 hours ago
+        var last = parseInt(localStorage.getItem(LAST_NUDGE_KEY) || '0', 10);
+        if ((Date.now() - last) / 3600000 < 4) return;
       } catch(e) {}
 
-      // Show nudge card if app is open
       if (document.visibilityState === 'visible') {
         show();
       }
 
-      // Also trigger a push notification if enabled
-      if (typeof PushNotify !== 'undefined') {
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          var h = new Date().getHours();
-          var timeLabel = h < 12 ? 'morning' : 'evening';
-          navigator.serviceWorker.controller.postMessage({
-            type: 'SHOW_NOTIFICATION',
-            title: 'Remiel — Time for your ' + timeLabel + ' check-in',
-            body: 'How are you feeling? Take a moment to log your mood.',
-            tag: 'checkin-nudge',
-            url: './',
-          });
-        }
+      /* Local notification while the app is open in the background.
+         Reminders do not fire when the app is fully closed. */
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller &&
+          'Notification' in window && Notification.permission === 'granted') {
+        var h = new Date().getHours();
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          title: h < 12 ? _t('checkin.nudgeMorning', 'Remiel Sentinel: morning check-in') : _t('checkin.nudgeEvening', 'Remiel Sentinel: evening check-in'),
+          body: _t('checkin.nudgeBody', 'How are you feeling? Take a moment to log your mood.'),
+          tag: 'checkin-nudge',
+          url: './',
+        });
       }
     }
 
-    function init() {
-      try {
-        var scheduled = localStorage.getItem(SCHEDULE_KEY) === '1';
-        if (scheduled) _scheduleNextNudge();
-      } catch(e) {}
+    async function init() {
+      var stored = null;
+      try { stored = await RemielDB.getSetting(SCHEDULE_IDB_KEY); } catch(e) {}
+      if (stored && typeof stored === 'object') {
+        _schedule = { morning: !!stored.morning, evening: !!stored.evening };
+      } else {
+        /* Migrate the old single localStorage flag */
+        try {
+          if (localStorage.getItem(SCHEDULE_KEY) === '1') {
+            _schedule = { morning: true, evening: true };
+            try { RemielDB.putSetting(SCHEDULE_IDB_KEY, _schedule); } catch(e) {}
+          }
+        } catch(e) {}
+      }
+      if (_schedule.morning || _schedule.evening) _scheduleNextNudge();
     }
 
     return {
