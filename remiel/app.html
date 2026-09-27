@@ -21373,6 +21373,15 @@ const SyncEngine = (() => {
   const DEVICE_SECRET_KEY = '_device_secret';
   const ID_FAIL_KEY = '_identity_failures';
   const LAST_SYNC_TS_KEY = '_sync_last_ts';
+  /* "Keep my data on this device only": no device account, no push or pull */
+  const LOCAL_ONLY_KEY = '_sync_local_only';
+  const DROPPED_KEY = '_sync_dropped';
+  const PUSH_CHUNK = 400;
+  const PULL_LIMIT = 500;
+  const MAX_ITEM_ATTEMPTS = 3;
+  const PHOTO_MAX_EDGE = 1280;
+  const PHOTO_QUALITY = 0.82;
+  const PHOTO_MAX_BYTES = 3.5 * 1024 * 1024;
 
   let _apiBase = null;
   let _accessToken = null;
@@ -21397,6 +21406,9 @@ const SyncEngine = (() => {
   let _refreshPromise = null;
   let _identityPromise = null;
   let _identityPoll = null;
+  let _localOnly = false;
+  let _droppedCount = 0;
+  let _photoTooLarge = 0;
   let _readyResolve = null;
   const _ready = new Promise(function(res) { _readyResolve = res; });
   const MAX_RETRY_DELAY = 60000;
@@ -21438,6 +21450,8 @@ const SyncEngine = (() => {
         try { _serverIdMap = JSON.parse(mapStr) || {}; } catch(e) { _serverIdMap = {}; }
       }
       _pendingChanges = await RemielDB.queueCount();
+      _localOnly = !!(await RemielDB.getSetting(LOCAL_ONLY_KEY));
+      _droppedCount = parseInt(await RemielDB.getSetting(DROPPED_KEY) || '0', 10) || 0;
     } catch (e) {
       console.warn('SyncEngine: config load failed', e);
     }
@@ -21503,6 +21517,9 @@ const SyncEngine = (() => {
       online: navigator.onLine,
       pendingChanges: _pendingChanges,
       lastSyncError: _lastSyncError,
+      localOnly: _localOnly,
+      dropped: _droppedCount,
+      photoTooLarge: _photoTooLarge,
     };
   }
 
@@ -21702,13 +21719,19 @@ const SyncEngine = (() => {
     if (!sameUser) await RemielDB.putSetting(FULL_DONE_KEY, true);
     await _saveConfig();
     _stopIdentityPoll();
+    /* One Sentinel ID per account: this device adopts the server's (QA1 M1) */
+    await registerSentinelId();
     _emitStatus();
     return data;
   }
 
   async function logout() {
     var rt = _refreshToken;
-    if (_apiBase && _accessToken && rt) {
+    /* Stop push to this device before the tokens go (QA2 M8) */
+    if (isAuthenticated() && typeof PushNotify !== 'undefined' && PushNotify.unsubscribe) {
+      try { await PushNotify.unsubscribe(); } catch (e) {}
+    }
+    if (_apiBase && _accessToken && rt && !_localOnly) {
       try { await _fetch('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token: rt }) }); } catch (e) {}
     }
     stopAutoSync();
@@ -21716,6 +21739,8 @@ const SyncEngine = (() => {
     _userId = null; _displayName = null; _handle = null; _email = null; _claimed = false; _serverSentinelId = null;
     await _resetSyncState();
     await _saveConfig();
+    /* Messages of the next account start from the beginning */
+    try { await RemielDB.putSetting('_msg_cursor', null); } catch (e) {}
     /* Do not silently re-create the device account after an explicit sign out */
     try { await RemielDB.putSetting(SIGNED_OUT_KEY, true); } catch (e) {}
     _lastSyncError = null;
@@ -21840,12 +21865,20 @@ const SyncEngine = (() => {
     return data;
   }
 
-  /* SentinelCall owns the id; this only reads the setting and registers it */
+  /* One Sentinel ID per account. When the server already has one, this device
+     adopts it into the local sentinelCallId setting (a second device must not
+     overwrite it). Only when the server has none is the local id registered. */
   async function registerSentinelId() {
     try {
-      if (!isAuthenticated() || !navigator.onLine) return false;
+      if (!isAuthenticated()) return false;
       var sid = await RemielDB.getSetting('sentinelCallId');
-      if (!sid || sid === _serverSentinelId) return false;
+      if (_serverSentinelId) {
+        if (sid && String(sid).toUpperCase() === String(_serverSentinelId).toUpperCase()) return false;
+        await RemielDB.putSetting('sentinelCallId', String(_serverSentinelId).toUpperCase());
+        try { window.dispatchEvent(new CustomEvent('sentinel:sentinelid', { detail: { id: _serverSentinelId } })); } catch (e) {}
+        return true;
+      }
+      if (!sid || !navigator.onLine) return false;
       await updateProfile({ sentinel_id: sid });
       return true;
     } catch (e) { return false; }
@@ -21854,7 +21887,8 @@ const SyncEngine = (() => {
   // ── Payload builders ──
 
   function _contactRefOut(cRef) {
-    if (cRef === 'self') return { contact_id: 'self', contact_client_id: null };
+    /* The user themself: the server stores contact_client_id 'self' and returns contact_id 'self' */
+    if (cRef === 'self') return { contact_id: null, contact_client_id: 'self' };
     var n = typeof cRef === 'string' && /^\d+$/.test(cRef) ? parseInt(cRef, 10) : cRef;
     return {
       contact_id: _serverIdMap['contact_' + n] || n || null,
@@ -22045,6 +22079,117 @@ const SyncEngine = (() => {
 
   // ── Push: send local changes to server ──
 
+  /* Split a payload into requests of at most PUSH_CHUNK rows. Contacts go
+     first so later chunks can reference their server ids. */
+  function _chunkPayload(payload) {
+    var chunks = [];
+    var cur = null, n = 0;
+    function fresh() { cur = _emptyPayload(); n = 0; chunks.push(cur); }
+    fresh();
+    ['contacts', 'moods', 'interactions', 'medications', 'voice_entries', 'settings'].forEach(function(k) {
+      (payload[k] || []).forEach(function(item) {
+        if (n >= PUSH_CHUNK) fresh();
+        cur[k].push(item); n++;
+      });
+    });
+    Object.keys(payload.deleted || {}).forEach(function(k) {
+      (payload.deleted[k] || []).forEach(function(id) {
+        if (n >= PUSH_CHUNK) fresh();
+        cur.deleted[k].push(id); n++;
+      });
+    });
+    if (payload.bio_snapshot) chunks[0].bio_snapshot = payload.bio_snapshot;
+    if (payload.contact_bio_updates) chunks[0].contact_bio_updates = payload.contact_bio_updates;
+    return chunks;
+  }
+
+  /* Fill in contact and record server ids learned from earlier chunks */
+  function _refreshChunkIds(chunk) {
+    chunk.contacts.forEach(function(c) { if (!c.server_id) c.server_id = _serverIdMap['contact_' + c.client_id] || null; });
+    [['moods', 'mood_'], ['interactions', 'interaction_'], ['medications', 'med_'], ['voice_entries', 'voice_']].forEach(function(pair) {
+      chunk[pair[0]].forEach(function(it) {
+        if (!it.server_id) it.server_id = _serverIdMap[pair[1] + it.client_id] || null;
+        if (typeof it.contact_client_id === 'number') {
+          var sid = _serverIdMap['contact_' + it.contact_client_id];
+          if (sid) it.contact_id = sid;
+        }
+      });
+    });
+  }
+
+  function _applyMaps(result, sent) {
+    [['contact', 'contact_map'], ['mood', 'mood_map'], ['interaction', 'interaction_map'],
+     ['medication', 'medication_map'], ['voice', 'voice_map']].forEach(function(pair) {
+      var m = result[pair[1]];
+      if (!m) return;
+      Object.keys(m).forEach(function(clientId) { _serverIdMap[PREFIX[pair[0]] + clientId] = m[clientId]; });
+    });
+    /* Drop map entries for acknowledged deletes; failed deletes keep theirs for the retry */
+    var failedDel = {};
+    (result.errors || []).forEach(function(e) { if (e && e.type === 'delete') failedDel[String(e.id)] = true; });
+    ['contact', 'mood', 'interaction', 'medication', 'voice'].forEach(function(type) {
+      var gone = (sent.deleted[PLURAL[type]] || []).filter(function(id) { return !failedDel[String(id)]; });
+      if (!gone.length) return;
+      Object.keys(_serverIdMap).forEach(function(k) {
+        if (k.indexOf(PREFIX[type]) === 0 && gone.indexOf(_serverIdMap[k]) !== -1) delete _serverIdMap[k];
+      });
+    });
+  }
+
+  /* Queue keys (type:client_id) of the items the server rejected */
+  function _errorKeys(errors) {
+    var keys = {};
+    (errors || []).forEach(function(e) {
+      if (!e) return;
+      if (e.type === 'setting' && e.key != null) { keys['setting:' + e.key] = e; return; }
+      if (e.type === 'delete') {
+        var type = Object.keys(PLURAL).filter(function(t) { return PLURAL[t] === e.table; })[0];
+        if (!type) return;
+        var local = _reverseLookup(type, e.id);
+        if (local !== null) keys[type + ':' + String(local)] = e;
+        return;
+      }
+      if (e.client_id != null && PREFIX[e.type]) keys[e.type + ':' + String(e.client_id)] = e;
+    });
+    return keys;
+  }
+
+  /* Rows the server rejected stay queued and are retried up to MAX_ITEM_ATTEMPTS
+     times, then dropped with a warning and counted in the status. */
+  async function _settleQueue(rows, errKeys, full) {
+    var remove = [];
+    var kept = {};
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.type === 'photo') continue; /* drained by pushPhotos */
+      var k = r.type + ':' + String(r.client_id);
+      if (!errKeys[k]) { remove.push(r.qid); continue; }
+      if (kept[k]) { remove.push(r.qid); continue; } /* one retry row per item */
+      kept[k] = true;
+      var attempts = (r.attempts || 0) + 1;
+      if (attempts >= MAX_ITEM_ATTEMPTS) {
+        console.warn('SyncEngine: dropping ' + k + ' after ' + attempts + ' rejected pushes:', errKeys[k].error);
+        remove.push(r.qid);
+        _droppedCount++;
+      } else {
+        try { await RemielDB.rawPut('syncQueue', Object.assign({}, r, { attempts: attempts })); } catch (e) {}
+      }
+    }
+    /* A full push is not queue based: queue a retry for rejected items that have no row */
+    if (full) {
+      var ks = Object.keys(errKeys);
+      for (var j = 0; j < ks.length; j++) {
+        if (kept[ks[j]]) continue;
+        var cut = ks[j].indexOf(':');
+        var type = ks[j].slice(0, cut), raw = ks[j].slice(cut + 1);
+        var cid = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+        try { await RemielDB.rawPut('syncQueue', { type: type, op: 'put', client_id: cid, payload: null, ts: Date.now(), attempts: 1 }); } catch (e) {}
+      }
+    }
+    await RemielDB.queueRemove(remove);
+    try { await RemielDB.putSetting(DROPPED_KEY, _droppedCount); } catch (e) {}
+  }
+
   async function _pushInner() {
     var rows = await RemielDB.queueGetAll();
     var fullDone = await RemielDB.getSetting(FULL_DONE_KEY);
@@ -22056,30 +22201,30 @@ const SyncEngine = (() => {
       return { success: true, empty: true };
     }
 
-    var res = await _fetch('/sync/push', { method: 'POST', body: JSON.stringify(payload) });
-    if (!res.ok) throw await _errDetail(res, 'Push failed: ' + res.status);
-    var result = await res.json();
-
-    [['contact', 'contact_map'], ['mood', 'mood_map'], ['interaction', 'interaction_map'],
-     ['medication', 'medication_map'], ['voice', 'voice_map']].forEach(function(pair) {
-      var m = result[pair[1]];
-      if (!m) return;
-      Object.keys(m).forEach(function(clientId) { _serverIdMap[PREFIX[pair[0]] + clientId] = m[clientId]; });
-    });
-    /* Drop map entries for acknowledged deletes */
-    ['contact', 'mood', 'interaction', 'medication', 'voice'].forEach(function(type) {
-      var gone = payload.deleted[PLURAL[type]];
-      if (!gone.length) return;
-      Object.keys(_serverIdMap).forEach(function(k) {
-        if (k.indexOf(PREFIX[type]) === 0 && gone.indexOf(_serverIdMap[k]) !== -1) delete _serverIdMap[k];
-      });
-    });
+    var deviceId = await _deviceId();
+    var chunks = _chunkPayload(payload);
+    var errors = [];
+    var version = null;
+    for (var c = 0; c < chunks.length; c++) {
+      var chunk = chunks[c];
+      _refreshChunkIds(chunk);
+      chunk.device_id = deviceId;
+      var res = await _fetch('/sync/push', { method: 'POST', body: JSON.stringify(chunk) });
+      if (!res.ok) {
+        /* Keep what earlier chunks mapped; the retry sends those with server ids */
+        await _saveConfig();
+        throw await _errDetail(res, 'Push failed: ' + res.status);
+      }
+      var result = await res.json();
+      _applyMaps(result, chunk);
+      if (result.errors && result.errors.length) errors = errors.concat(result.errors);
+      version = result.current_version;
+    }
     /* _lastSyncVersion is advanced by pull only, so other devices' writes are never skipped */
     await _saveConfig();
-    /* Remove only rows that were part of this push; photo rows are drained by pushPhotos */
-    await RemielDB.queueRemove(rows.filter(function(r) { return r.type !== 'photo'; }).map(function(r) { return r.qid; }));
+    await _settleQueue(rows, _errorKeys(errors), full);
     if (full) await RemielDB.putSetting(FULL_DONE_KEY, true);
-    return { success: true, version: result.current_version, errors: result.errors || [] };
+    return { success: true, version: version, errors: errors, chunks: chunks.length };
   }
 
   async function push() {
@@ -22116,7 +22261,7 @@ const SyncEngine = (() => {
 
   function _resolveLocalContact(item, d) {
     var cid = item.contact_id !== undefined ? item.contact_id : (d && d.contact_id);
-    if (cid === 'self') return 'self';
+    if (cid === 'self' || item.contact_client_id === 'self') return 'self';
     var local = _reverseLookup('contact', cid);
     if (local !== null) return local;
     return null;
@@ -22242,10 +22387,20 @@ const SyncEngine = (() => {
     await RemielDB.rawPut('settings', { key: key, value: val, updatedAt: Date.now() });
   }
 
+  /* Latest readings from Circle members who share bio, keyed by user_id */
+  var _peerBio = {};
+  function getCircleBio() { return _peerBio; }
+
   function _applyCircleBio(list) {
-    if (!Array.isArray(list) || typeof DEMO_CONTACTS === 'undefined') return;
+    if (!Array.isArray(list)) return;
+    var peers = {};
+    list.forEach(function(e) { if (e && e.user_id) peers[String(e.user_id)] = e; });
+    _peerBio = peers;
+    try { window.dispatchEvent(new CustomEvent('sentinel:circlebio', { detail: { count: Object.keys(peers).length } })); } catch (e) {}
+    if (typeof DEMO_CONTACTS === 'undefined') return;
     for (var b = 0; b < list.length; b++) {
       var bioSnap = list[b];
+      if (bioSnap.user_id) continue; /* peer entries are shown in The Circle */
       var localCid = null;
       if (bioSnap.contact_id) localCid = _reverseLookup('contact', bioSnap.contact_id);
       if (localCid === null && typeof bioSnap.contact_client_id === 'number') localCid = bioSnap.contact_client_id;
@@ -22261,8 +22416,23 @@ const SyncEngine = (() => {
     }
   }
 
+  /* Pages through /sync/pull (limit PULL_LIMIT) while the server reports has_more */
   async function _pullInner() {
-    var res = await _fetch('/sync/pull?since_version=' + _lastSyncVersion, { method: 'GET' });
+    var changed = 0, pages = 0;
+    for (;;) {
+      var r = await _pullPage();
+      changed += r.applied;
+      pages++;
+      if (!r.hasMore || pages >= 200) break;
+    }
+    if (changed) {
+      try { window.dispatchEvent(new CustomEvent('sentinel:datachanged', { detail: { source: 'sync', count: changed } })); } catch (e) {}
+    }
+    return { success: true, version: _lastSyncVersion, applied: changed, pages: pages };
+  }
+
+  async function _pullPage() {
+    var res = await _fetch('/sync/pull?since_version=' + _lastSyncVersion + '&limit=' + PULL_LIMIT, { method: 'GET' });
     if (!res.ok) throw await _errDetail(res, 'Pull failed: ' + res.status);
     var data = await res.json();
     var pending = await _pendingIndex();
@@ -22281,12 +22451,10 @@ const SyncEngine = (() => {
     for (var v = 0; v < voices.length; v++) { try { await _applyVoice(voices[v], pending); changed++; } catch (e) {} }
     _applyCircleBio(data.circle_bio);
 
+    var prevVersion = _lastSyncVersion;
     if (typeof data.current_version === 'number') _lastSyncVersion = data.current_version;
     await _saveConfig();
-    if (changed) {
-      try { window.dispatchEvent(new CustomEvent('sentinel:datachanged', { detail: { source: 'sync', count: changed } })); } catch (e) {}
-    }
-    return { success: true, version: _lastSyncVersion, applied: changed };
+    return { applied: changed, hasMore: !!data.has_more && _lastSyncVersion > prevVersion };
   }
 
   async function pull() {
@@ -22446,6 +22614,40 @@ const SyncEngine = (() => {
     return id;
   }
 
+  /* Downscale to PHOTO_MAX_EDGE on the long side and re-encode as JPEG, so a
+     phone photo fits the server's 4 MB upload limit. Falls back to the
+     original when the browser cannot decode it. */
+  async function _preparePhoto(blob) {
+    try {
+      var src = null, w = 0, h = 0;
+      if (typeof createImageBitmap === 'function') {
+        src = await createImageBitmap(blob); w = src.width; h = src.height;
+      } else {
+        src = await new Promise(function(res, rej) {
+          var im = new Image();
+          im.onload = function() { res(im); };
+          im.onerror = rej;
+          im.src = URL.createObjectURL(blob);
+        });
+        w = src.naturalWidth; h = src.naturalHeight;
+      }
+      if (!w || !h) return blob;
+      var scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(src, 0, 0, cw, ch);
+      if (src.close) { try { src.close(); } catch (e) {} }
+      var out = await new Promise(function(res) { canvas.toBlob(res, 'image/jpeg', PHOTO_QUALITY); });
+      return out && out.size ? out : blob;
+    } catch (e) {
+      return blob;
+    }
+  }
+
   async function pushPhotos() {
     if (!isAuthenticated()) return { skipped: true, reason: 'not authenticated' };
     try {
@@ -22453,22 +22655,30 @@ const SyncEngine = (() => {
       var rows = await RemielDB.queueGetAll();
       var photoRows = rows.filter(function(r) { return r.type === 'photo'; });
       var deviceId = await _deviceId();
-      var pushed = 0, failed = 0;
+      var pushed = 0, failed = 0, tooLarge = 0;
       for (var i = 0; i < (allPhotos || []).length; i++) {
         var photo = allPhotos[i];
         if (!photo || photo.contactId === undefined || photo.contactId === null) continue;
         var syncKey = '_photoSynced_' + photo.contactId;
-        if (await RemielDB.getSetting(syncKey)) continue;
+        var mark = await RemielDB.getSetting(syncKey);
+        if (mark === 'too_large') { tooLarge++; continue; } /* retried when the photo changes */
+        if (mark) continue;
         var blob = null;
         if (photo.buffer) blob = new Blob([photo.buffer], { type: photo.mimeType || 'image/png' });
         else if (photo.blob instanceof Blob) blob = photo.blob;
         if (!blob || !blob.size) continue;
+        blob = await _preparePhoto(blob);
+        if (blob.size > PHOTO_MAX_BYTES) {
+          await RemielDB.putSetting(syncKey, 'too_large');
+          tooLarge++;
+          continue;
+        }
 
         var serverContact = photo.contactId === 'self' ? 'self' : (_serverIdMap['contact_' + photo.contactId] || null);
         if (!serverContact) continue; /* contact not on the server yet; retried next sync */
         var clientRef = 'photo:' + deviceId + ':' + photo.contactId + ':' + (photo.updatedAt || 0);
         var fd = new FormData();
-        fd.append('file', blob, 'photo-' + photo.contactId);
+        fd.append('file', blob, 'photo-' + photo.contactId + (blob.type === 'image/jpeg' ? '.jpg' : ''));
         fd.append('blob_type', 'photo');
         fd.append('contact_id', String(serverContact));
         fd.append('client_ref', clientRef);
@@ -22479,12 +22689,17 @@ const SyncEngine = (() => {
           await RemielDB.putSetting(syncKey, result.id || result.url || true);
           await RemielDB.putSetting('_photoRef_' + photo.contactId, clientRef);
           pushed++;
+        } else if (res.status === 413) {
+          await RemielDB.putSetting(syncKey, 'too_large');
+          tooLarge++;
         } else {
           failed++;
         }
       }
+      _photoTooLarge = tooLarge;
       if (!failed && photoRows.length) await RemielDB.queueRemove(photoRows.map(function(r) { return r.qid; }));
-      return { pushed: pushed, failed: failed };
+      _emitStatus();
+      return { pushed: pushed, failed: failed, tooLarge: tooLarge };
     } catch (e) {
       return { error: e.message };
     }
