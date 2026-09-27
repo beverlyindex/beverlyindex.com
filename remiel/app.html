@@ -6,6 +6,10 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#080a10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -6520,6 +6524,7 @@
               <button class="ledger-type-chip" data-type="texted" onclick="selectLedgerType('texted'); event.stopPropagation();"><span class="ledger-type-chip-icon">💬</span> <span data-i18n="ledger.texted">Texted</span></button>
               <button class="ledger-type-chip" data-type="visited" onclick="selectLedgerType('visited'); event.stopPropagation();"><span class="ledger-type-chip-icon">👋</span> <span data-i18n="ledger.visited">Visited</span></button>
               <button class="ledger-type-chip" data-type="video" onclick="selectLedgerType('video'); event.stopPropagation();"><span class="ledger-type-chip-icon">🎥</span> <span data-i18n="ledger.video">Video</span></button>
+              <button class="ledger-type-chip" data-type="voice" onclick="selectLedgerType('voice'); event.stopPropagation();"><span class="ledger-type-chip-icon">🎙️</span> <span data-i18n="ledger.voice">Voice</span></button>
               <button class="ledger-type-chip selected" data-type="note" onclick="selectLedgerType('note'); event.stopPropagation();"><span class="ledger-type-chip-icon">📝</span> <span data-i18n="ledger.note">Note</span></button>
             </div>
             <div id="ledgerVoiceStatus"></div>
@@ -7040,7 +7045,17 @@ function beginVideoIntro() {
   gateEl.style.zIndex = '0';
   gateEl.style.opacity = '0';
 
-  /* Phase 2: Beverly Index company splash — full screen, 4 second hold */
+  /* Reduced motion: no splash hold, no video. Go straight to the app. */
+  var _reduce = false;
+  try { _reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
+  if (_reduce) { revealApp(); return; }
+
+  /* Returning users get a short splash (1.5s); first launch keeps 4s. */
+  var _returning = false;
+  try { _returning = localStorage.getItem('rm:obDone') === '1'; } catch (e) {}
+  var _splashMs = _returning ? 1500 : 4000;
+
+  /* Phase 2: Beverly Index company splash, full screen hold */
   biSplash.classList.add('active');
 
   /* Preload the video WHILE the splash is showing so it is ready to play */
@@ -7053,8 +7068,12 @@ function beginVideoIntro() {
   var _videoReady = false;
   var _splashDone = false;
 
+  var _crossfaded = false;
   function _tryCrossfade() {
     if (!_videoReady || !_splashDone) return;
+    /* Never re-show the intro once the app is revealed (late canplay). */
+    if (appRevealed || _crossfaded) return;
+    _crossfaded = true;
     /* Video is loaded AND splash timer elapsed — crossfade now.
        Activate video intro FIRST (underneath), then fade out splash on top. */
     introEl.classList.add('active');
@@ -7083,19 +7102,32 @@ function beginVideoIntro() {
       biSplash.classList.remove('active');
       setTimeout(function() { revealApp(); }, 800);
     }
-  }, 6000);
+  }, _splashMs + 2000);
 
   setTimeout(function() {
     _splashDone = true;
     _tryCrossfade();
-  }, 4000);
+  }, _splashMs);
+}
+
+function _stopIntroMedia() {
+  try {
+    const videoEl = document.getElementById('introVideo');
+    if (videoEl) {
+      videoEl.pause();
+      videoEl.removeAttribute('src');
+      videoEl.load();
+    }
+  } catch (e) {}
+  const introEl = document.getElementById('videoIntro');
+  const biSplash = document.getElementById('biSplash');
+  if (introEl) introEl.classList.remove('active');
+  if (biSplash) biSplash.classList.remove('active');
 }
 
 function skipIntro() {
-  const videoEl = document.getElementById('introVideo');
-  videoEl.pause();
-  videoEl.removeAttribute('src');
-  videoEl.load();
+  /* Skip must always work, even if revealApp already ran. */
+  _stopIntroMedia();
   revealApp();
 }
 
@@ -7103,12 +7135,11 @@ async function revealApp() {
   if (appRevealed) return;
   appRevealed = true;
 
-  const introEl = document.getElementById('videoIntro');
   const gateEl = document.getElementById('gateScreen');
 
-  /* Hide intro & gate */
-  introEl.classList.remove('active');
-  gateEl.classList.add('hidden');
+  /* Hide intro, splash and gate; stop the intro video */
+  _stopIntroMedia();
+  if (gateEl) gateEl.classList.add('hidden');
 
   /* ── Open IndexedDB and decide: onboarding or galaxy ── */
   try {
@@ -7117,6 +7148,7 @@ async function revealApp() {
 
     const obDone = await RemielDB.getSetting('onboardingComplete');
     const saved = await RemielDB.getAllContacts();
+    if (obDone || saved.length > 0) { try { localStorage.setItem('rm:obDone', '1'); } catch (e) {} }
 
     if (obDone) {
       /* Returning user — go straight to galaxy */
@@ -8724,6 +8756,7 @@ const I18n = (function () {
     'ledger.visited': "Visited",
     'ledger.video': "Video",
     'ledger.note': "Note",
+    'ledger.voice': "Voice",
     'pulse.open': "Open The Pulse",
     'checkin.notePh': "Optional: add a quick note...",
     'checkin.orVoice': "or record a voice note",
@@ -9116,6 +9149,7 @@ const I18n = (function () {
     'ledger.visited': "Visita",
     'ledger.video': "Video",
     'ledger.note': "Nota",
+    'ledger.voice': "Voce",
     'pulse.open': "Apri The Pulse",
     'checkin.notePh': "Facoltativo: aggiungi una breve nota...",
     'checkin.orVoice': "oppure registra una nota vocale",
@@ -10127,6 +10161,11 @@ const CATS = {
 };
 let curCat = 'family';
 let pulseOn = true;
+/* prefers-reduced-motion: live media query; the draw loop reads this to stop
+   auto-spin, pulsing and rest mode. Exposed as A11y.reducedMotion(). */
+let _rmMQ = null;
+try { _rmMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null; } catch (e) {}
+function _reducedMotionNow() { return !!(_rmMQ && _rmMQ.matches); }
 let otherLabel = 'Other';
 let sphereName = '';
 
@@ -10729,6 +10768,15 @@ function _decayContactLiveness(bio) {
   /* Flicker fades from 1.0 → 0 over the threshold period */
   bio.liveFlicker = bio.isLive ? Math.max(0, 1 - (age / BIO_LIVE_THRESHOLD_MS)) : 0;
 }
+
+/* ── Sync status for the Circle Command HUD dot (from SyncEngine events) ── */
+const _hudSync = { state: 'offline', pending: 0, authenticated: false };
+window.addEventListener('sentinel:syncstatus', function(ev) {
+  const d = (ev && ev.detail) || {};
+  _hudSync.state = d.state || 'offline';
+  _hudSync.pending = Number(d.pending) || 0;
+  _hudSync.authenticated = !!d.authenticated;
+});
 
 /* ── Circle aggregate for center sphere HUD ── */
 let _circleAggregate = {
@@ -12078,6 +12126,7 @@ function _exitRestMode() {
 
 function _enterRestMode() {
   if (_restModeActive) return;
+  if (_reducedMotionNow()) return; /* rest mode auto-cycles focus: off under reduced motion */
   if (blufOpen || appState !== 'network') return;
   _restModeActive = true;
   if (typeof SentinelGuide !== 'undefined') SentinelGuide.onRestMode();
@@ -13916,23 +13965,28 @@ const SentinelViews = (() => {
     _updateBadge();
     closePanel();
     /* Guide user */
-    if (typeof SentinelGuide !== 'undefined') {
-      const view = getActiveView();
-      if (view) {
-        SentinelGuide.showBanner(TYPE_LABELS[view.type] + ' view "' + view.name + '" active — tap badge to change', 3000);
-      } else {
-        SentinelGuide.showBanner('Showing all contacts', 2000);
-      }
+    const view = getActiveView();
+    if (view) {
+      _svBanner('views-active', _t('views.bannerActive', '{type} view "{name}" active. Tap the badge to change.', { type: TYPE_LABELS[view.type], name: view.name }));
+    } else {
+      _svBanner('views-all', _t('views.bannerAll', 'Showing all contacts'));
     }
+  }
+
+  /* Safe banner: SentinelGuide may be missing or may throw. */
+  function _svBanner(id, text) {
+    try {
+      if (typeof SentinelGuide !== 'undefined' && SentinelGuide.showBanner) {
+        SentinelGuide.showBanner(id, text, { position: 'bottom' });
+      }
+    } catch (e) { console.warn('[SentinelViews] banner failed', e); }
   }
 
   function clearView() {
     _activeViewId = null;
     _applyFilter();
     _updateBadge();
-    if (typeof SentinelGuide !== 'undefined') {
-      SentinelGuide.showBanner('Showing all contacts', 2000);
-    }
+    _svBanner('views-all', _t('views.bannerAll', 'Showing all contacts'));
   }
 
   /* ── Editor ── */
@@ -14032,33 +14086,41 @@ const SentinelViews = (() => {
     }
   }
 
+  let _saving = false;
   function saveView() {
+    if (_saving) return;
     const nameInput = document.getElementById('svNameInput');
     const name = nameInput ? nameInput.value.trim() : '';
     if (!name || _selectedIds.size === 0) return;
 
     const contactIds = Array.from(_selectedIds);
+    const btn = document.getElementById('svSaveBtn');
+    _saving = true;
+    if (btn) btn.disabled = true;
+    const editingId = _editingViewId;
+    /* Clear the editing state first so a second save cannot create a duplicate. */
+    _editingViewId = null;
+    _selectedIds = new Set();
 
-    if (_editingViewId) {
-      /* Update existing */
-      updateView(_editingViewId, { name, contactIds });
-      if (typeof SentinelGuide !== 'undefined') {
-        SentinelGuide.showBanner('View "' + name + '" updated', 2500);
+    try {
+      if (editingId) {
+        /* Update existing */
+        updateView(editingId, { name, contactIds });
+        _svBanner('views-updated', _t('views.bannerUpdated', 'View "{name}" updated', { name: name }));
+      } else {
+        /* Create new */
+        const view = createView(name, _editorType, contactIds);
+        /* Auto-activate the new view */
+        _activeViewId = view.id;
+        _applyFilter();
+        _updateBadge();
+        _svBanner('views-created', _t('views.bannerCreated', 'View "{name}" created and now active', { name: name }));
       }
-    } else {
-      /* Create new */
-      const view = createView(name, _editorType, contactIds);
-      /* Auto-activate the new view */
-      _activeViewId = view.id;
-      _applyFilter();
-      _updateBadge();
-      if (typeof SentinelGuide !== 'undefined') {
-        SentinelGuide.showBanner('View "' + name + '" created — now active', 3000);
-      }
+    } finally {
+      try { closeEditor(); } catch (e) { console.warn('[SentinelViews] closeEditor failed', e); }
+      try { _renderPanel(); } catch (e) {}
+      _saving = false;
     }
-
-    closeEditor();
-    _renderPanel();
   }
 
   /* ── Delete confirmation ── */
@@ -14069,9 +14131,7 @@ const SentinelViews = (() => {
     if (confirm(I18n.t('confirm.deleteView', { name: view.name }))) {
       deleteView(id);
       _renderPanel();
-      if (typeof SentinelGuide !== 'undefined') {
-        SentinelGuide.showBanner('View deleted', 2000);
-      }
+      _svBanner('views-deleted', _t('views.bannerDeleted', 'View deleted'));
     }
   }
 
@@ -14106,7 +14166,24 @@ var RosterImport = (function() {
     'pitcher','catcher','shortstop','outfielder','infielder','designated','utility',
     'guard','tackle','end','safety','corner','linebacker','receiver','back','kicker','punter']);
 
+  var _origBodyHTML = null;
+  function _captureBody() {
+    var mb = document.querySelector('.roster-modal .roster-body');
+    if (mb && _origBodyHTML === null && document.getElementById('rosterPreview')) _origBodyHTML = mb.innerHTML;
+  }
+  /* Rebuild the modal body if the success screen replaced it. */
+  function _restoreBody() {
+    var mb = document.querySelector('.roster-modal .roster-body');
+    if (!mb) return;
+    if (!document.getElementById('rosterPreview') && _origBodyHTML !== null) {
+      mb.innerHTML = _origBodyHTML;
+      _bindDropZones();
+    }
+  }
+
   function open() {
+    _captureBody();
+    _restoreBody();
     document.getElementById('rosterOverlay').classList.add('open');
     _parsed = [];
     document.getElementById('rosterPreview').innerHTML = '';
@@ -14116,16 +14193,6 @@ var RosterImport = (function() {
     /* Reset paste area */
     var pa = document.getElementById('rosterPasteArea');
     if (pa) pa.value = '';
-    /* Restore modal body if it was replaced by success screen */
-    var mb = document.querySelector('.roster-modal .roster-body');
-    if (mb && mb.querySelector('.roster-import-btn') === null) {
-      /* Success screen is showing — need to rebuild the body. Just close and reopen overlay */
-      document.getElementById('rosterOverlay').classList.remove('open');
-      setTimeout(function() {
-        location.reload();
-      }, 100);
-      return;
-    }
     /* Restore header close button if hidden */
     var hdr = document.querySelector('.roster-modal .roster-header button');
     if (hdr) hdr.style.display = '';
@@ -14917,6 +14984,7 @@ var RosterImport = (function() {
     var catLabel = cat === 'personal' ? 'Personal' : cat === 'professional' ? 'Professional' : cat === 'team' ? 'Team' : cat === 'family' ? 'Family' : 'circle';
     var modalBody = document.querySelector('.roster-modal .roster-body');
     var modalHeader = document.querySelector('.roster-modal .roster-header');
+    _captureBody();
     if (modalBody) {
       modalBody.innerHTML =
         '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px">' +
@@ -14981,6 +15049,7 @@ var RosterImport = (function() {
     /* Show success overlay inside the modal instead of just closing */
     var modalBody = document.querySelector('.roster-modal .roster-body');
     var modalHeader = document.querySelector('.roster-modal .roster-header');
+    _captureBody();
     if (modalBody) {
       modalBody.innerHTML =
         '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px">' +
@@ -14999,7 +15068,7 @@ var RosterImport = (function() {
   }
 
   // Drag-and-drop support for image tab
-  setTimeout(function() {
+  function _bindDropZones() {
     var dz = document.getElementById('rosterDropZone');
     if (dz) {
       dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
@@ -15017,10 +15086,6 @@ var RosterImport = (function() {
         }
       });
     }
-  }, 500);
-
-  // Drag-and-drop support for group photo tab
-  setTimeout(function() {
     var gpDz = document.getElementById('gpDropZone');
     if (gpDz) {
       gpDz.addEventListener('dragover', function(e) { e.preventDefault(); gpDz.classList.add('dragover'); });
@@ -15039,7 +15104,8 @@ var RosterImport = (function() {
         }
       });
     }
-  }, 500);
+  }
+  setTimeout(function() { _captureBody(); _bindDropZones(); }, 500);
 
   return { open: open, close: close, switchTab: switchTab, handleImageFile: handleImageFile,
            parseText: parseText, handleFile: handleFile, doImport: doImport, _toggle: _toggle, _editName: _editName,
@@ -15527,9 +15593,15 @@ function toggleVoiceDictation() {
     if (micBtn) micBtn.classList.remove('recording');
     if (status) status.innerHTML = '';
 
-    /* Auto-submit if we got text */
+    /* Never auto-submit dictated text: leave it in the input for review. */
     if (input && input.value.trim()) {
-      sendLedgerEntry(_selectedLedgerType || 'note');
+      if (status) {
+        const d = document.createElement('div');
+        d.className = 'ledger-voice-status';
+        d.textContent = _t('ledger.reviewDictation', 'Review, then tap Log');
+        status.appendChild(d);
+      }
+      try { input.focus(); } catch (e) {}
     }
   };
 
@@ -15950,6 +16022,13 @@ let overlayOpen = false;
 let pressTimer = null;
 let pressStarted = false;
 let pressStartX = 0, pressStartY = 0;
+/* Gesture tracking: origin of the press, max distance travelled over the whole
+   press (tap vs drag), and a short ring buffer of rotation samples for momentum. */
+let _pressOriginX = 0, _pressOriginY = 0, _pressMaxDist = 0;
+const NET_DRAG_THRESHOLD = 8;
+const NET_VEL_WINDOW_MS = 80;
+const NET_HOLD_STILL_MS = 120;
+let _netVelBuf = [];
 const HOLD_MS = 500;
 const MOVE_THRESHOLD = 10;
 
@@ -15982,6 +16061,35 @@ function handleOverlayClick(e) {
   if (e.target === document.getElementById('overlay')) closeOverlay();
 }
 
+/* Quick action for a contact (galaxy icons and the accessible list view).
+   type: 'video' | 'phone' | 'sms' | 'email' */
+function runContactQuickAction(type, c) {
+  if (!c) return;
+  if (type === 'video' && c.phone) {
+    window.location.href = 'facetime:' + normalizePhone(c.phone);
+  } else if (type === 'video' && !c.phone) {
+    openQuickDial('video', c.first, c.id);
+  } else if (type === 'phone' && c.phone) {
+    window.location.href = 'tel:' + normalizePhone(c.phone);
+  } else if (type === 'sms') {
+    /* RSM: open in-app messaging instead of native SMS */
+    SentinelMessaging.openFor(c.id);
+  } else if (type === 'email' && c.email) {
+    window.location.href = 'mailto:' + c.email;
+  } else {
+    /* No contact info: open quick-dial overlay */
+    if (type === 'email' && c) {
+      openQuickDial('email', c.first, c.id);
+    } else if (type === 'phone' && c) {
+      openQuickDial('call', c.first, c.id);
+    } else if (type === 'video' && c) {
+      openQuickDial('video', c.first, c.id);
+    } else {
+      showToast('No contact info on file');
+    }
+  }
+}
+
 function onPressStart(e) {
   if (overlayOpen || blufOpen) return;
   if (dragging) return;
@@ -15989,6 +16097,10 @@ function onPressStart(e) {
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
   pressStartX = clientX;
   pressStartY = clientY;
+  _pressOriginX = clientX;
+  _pressOriginY = clientY;
+  _pressMaxDist = 0;
+  _netVelBuf = [];
   pressStarted = true;
 
   if (appState === 'self') {
@@ -16030,29 +16142,39 @@ function onPressMove(e) {
   const dx = clientX - pressStartX;
   const dy = clientY - pressStartY;
 
+  {
+    const ox = clientX - _pressOriginX, oy = clientY - _pressOriginY;
+    const od = Math.sqrt(ox*ox + oy*oy);
+    if (od > _pressMaxDist) _pressMaxDist = od;
+  }
+
   if (appState === 'network') {
-    // Drag to rotate galaxy (with momentum tracking)
-    if (Math.sqrt(dx*dx + dy*dy) > 12) {
+    // Drag to rotate galaxy. The threshold only separates tap from drag;
+    // once crossed, every move applies its delta (no step quantisation).
+    const now = performance.now();
+    if (!netDragging) {
+      if (_pressMaxDist <= NET_DRAG_THRESHOLD) return;
       netDragging = true;
       netSpin = false;
       if (netMomentumRAF) { cancelAnimationFrame(netMomentumRAF); netMomentumRAF = 0; }
-      const now = performance.now();
-      const dt = now - netLastDragT;
-      netYaw += dx * 0.004;
-      netPitch += dy * 0.004;
-      netPitch = Math.max(-1.2, Math.min(1.2, netPitch));
-      /* Track velocity from last few pixels of movement */
-      if (dt > 0 && dt < 100) {
-        const alpha = 0.4; /* smoothing factor */
-        netVelYaw = alpha * (dx * 0.004 / (dt / 16.67)) + (1 - alpha) * netVelYaw;
-        netVelPitch = alpha * (dy * 0.004 / (dt / 16.67)) + (1 - alpha) * netVelPitch;
-      }
-      netLastDragX = clientX;
-      netLastDragY = clientY;
+      netLastDragX = pressStartX;
+      netLastDragY = pressStartY;
       netLastDragT = now;
-      pressStartX = clientX;
-      pressStartY = clientY;
+      _netVelBuf = [];
     }
+    const mdx = clientX - netLastDragX;
+    const mdy = clientY - netLastDragY;
+    const dYaw = mdx * 0.004;
+    let dPitch = mdy * 0.004;
+    netYaw += dYaw;
+    const newPitch = Math.max(-1.2, Math.min(1.2, netPitch + dPitch));
+    dPitch = newPitch - netPitch;
+    netPitch = newPitch;
+    _netVelBuf.push({ t: now, yaw: dYaw, pitch: dPitch });
+    while (_netVelBuf.length && now - _netVelBuf[0].t > NET_VEL_WINDOW_MS) _netVelBuf.shift();
+    netLastDragX = clientX;
+    netLastDragY = clientY;
+    netLastDragT = now;
     return;
   }
 
@@ -16074,19 +16196,18 @@ function onPressEnd(e) {
   if (appState === 'network') {
     const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
     const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
-    const _totalDx = clientX - (pressStartX || clientX);
-    const _totalDy = clientY - (pressStartY || clientY);
-    const _totalDist = Math.sqrt(_totalDx*_totalDx + _totalDy*_totalDy);
+    /* Whole-press travel, not just the final displacement */
+    const _totalDist = _pressMaxDist;
 
-    /* ── Quick-action icon tap — check FIRST, even if slight drag ── */
-    if (pressStarted && focusedContactId && _totalDist < 30) {
+    /* ── Quick-action icon tap: only for a real tap (total drag < 8px) ── */
+    if (pressStarted && !netDragging && focusedContactId && _totalDist < NET_DRAG_THRESHOLD) {
       if (focusedContactId) {
         const _qaNode = NODES.find(n => n.contact.id === focusedContactId);
         if (_qaNode) {
           const _qaP = projectNode(_qaNode);
           const _qaS = _qaP.scale;
           const _qaMul = FOCUS_SCALE;
-          const _qaCb = pulseOn ? (1 + (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseAmp * Math.sin(performance.now() * (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseSpd + _qaNode.tx)) : 1;
+          const _qaCb = (pulseOn && !_reducedMotionNow()) ? (1 + (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseAmp * Math.sin(performance.now() * (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseSpd + _qaNode.tx)) : 1;
           const _qaR = Math.max(2, _qaNode.r * _qaS * _qaMul * _qaCb);
           const _qaSx = _qaP.sx, _qaSy = _qaP.sy;
           /* Hit-test text labels on right (or left) side of sphere */
@@ -16115,29 +16236,7 @@ function onPressEnd(e) {
               /* Fresh lookup from DEMO_CONTACTS to pick up edits */
               const _qcBase = _qaNode.contact;
               const _qc = DEMO_CONTACTS.find(c => c.id === _qcBase.id) || _qcBase;
-              if (_qi.type === 'video' && _qc.phone) {
-                window.location.href = 'facetime:' + normalizePhone(_qc.phone);
-              } else if (_qi.type === 'video' && !_qc.phone) {
-                openQuickDial('video', _qc.first, _qc.id);
-              } else if (_qi.type === 'phone' && _qc.phone) {
-                window.location.href = 'tel:' + normalizePhone(_qc.phone);
-              } else if (_qi.type === 'sms') {
-                /* RSM — open in-app messaging instead of native SMS */
-                SentinelMessaging.openFor(_qc.id);
-              } else if (_qi.type === 'email' && _qc.email) {
-                window.location.href = 'mailto:' + _qc.email;
-              } else {
-                /* No contact info — open quick-dial overlay */
-                if (_qi.type === 'email' && _qc) {
-                  openQuickDial('email', _qc.first, _qc.id);
-                } else if (_qi.type === 'phone' && _qc) {
-                  openQuickDial('call', _qc.first, _qc.id);
-                } else if (_qi.type === 'video' && _qc) {
-                  openQuickDial('video', _qc.first, _qc.id);
-                } else {
-                  showToast('No contact info on file');
-                }
-              }
+              runContactQuickAction(_qi.type, _qc);
               pressStarted = false;
               netDragging = false;
               stage.classList.remove('pressing');
@@ -16209,24 +16308,45 @@ function onPressEnd(e) {
         if (sphereTapTimer) { clearTimeout(sphereTapTimer); sphereTapTimer = null; sphereTapTarget = null; }
       }
     } else if (netDragging) {
-      // Apply momentum with deceleration on drag release
+      // Momentum from the last 80ms of samples; zero if the pointer held still.
+      const _now = performance.now();
+      netVelYaw = 0; netVelPitch = 0;
+      if (_now - netLastDragT <= NET_HOLD_STILL_MS) {
+        const _recent = _netVelBuf.filter(sm => _now - sm.t <= NET_VEL_WINDOW_MS);
+        if (_recent.length) {
+          const _span = Math.max(16.67, _now - _recent[0].t + 16.67);
+          let _sy = 0, _sp = 0;
+          _recent.forEach(sm => { _sy += sm.yaw; _sp += sm.pitch; });
+          /* velocity in radians per 60fps frame */
+          netVelYaw = _sy / (_span / 16.67);
+          netVelPitch = _sp / (_span / 16.67);
+        }
+      }
+      _netVelBuf = [];
       const speed = Math.sqrt(netVelYaw * netVelYaw + netVelPitch * netVelPitch);
       if (speed > 0.0005) {
-        const friction = 0.94; /* deceleration factor per frame */
         let vy = netVelYaw, vp = netVelPitch;
-        (function momentumStep() {
-          vy *= friction;
-          vp *= friction;
-          netYaw += vy;
-          netPitch += vp;
-          netPitch = Math.max(-1.2, Math.min(1.2, netPitch));
+        let _lastT = performance.now();
+        const momentumStep = function() {
+          const tNow = performance.now();
+          const dt = Math.min(100, Math.max(1, tNow - _lastT));
+          _lastT = tNow;
+          const k = dt / 16.67;
+          const f = Math.pow(0.94, k); /* frame-rate independent friction */
+          vy *= f;
+          vp *= f;
+          netYaw += vy * k;
+          const np = netPitch + vp * k;
+          if (np > 1.2 || np < -1.2) { netPitch = Math.max(-1.2, Math.min(1.2, np)); vp = 0; }
+          else netPitch = np;
           if (Math.abs(vy) > 0.00008 || Math.abs(vp) > 0.00008) {
             netMomentumRAF = requestAnimationFrame(momentumStep);
           } else {
             netMomentumRAF = 0;
             if (!blufOpen) netSpin = true;
           }
-        })();
+        };
+        netMomentumRAF = requestAnimationFrame(momentumStep);
       } else {
         setTimeout(() => { if (!blufOpen) netSpin = true; }, 1500);
       }
@@ -16253,36 +16373,7 @@ function cancelPress() {
   stage.classList.remove('pressing');
 }
 
-// Attach press handlers
-stage.addEventListener('mousedown', e => {
-  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea') || e.target.closest('label')) return;
-  if (overlayOpen) { startDrag(e); }
-  else { onPressStart(e); }
-});
-stage.addEventListener('touchstart', e => {
-  /* Let back button, network hint, and other buttons receive native click */
-  if (e.target.closest('.back-btn') || e.target.closest('button') || e.target.closest('a')) return;
-  if (overlayOpen) { startDrag(e); }
-  else { e.preventDefault(); onPressStart(e); }
-}, { passive: false });
-
-window.addEventListener('mousemove', e => {
-  if (overlayOpen) { moveDrag(e); }
-  else { onPressMove(e); }
-});
-window.addEventListener('touchmove', e => {
-  if (overlayOpen) { moveDrag(e); }
-  else { onPressMove(e); }
-}, { passive: false });
-
-window.addEventListener('mouseup', e => {
-  if (overlayOpen) { dragging = false; }
-  else { onPressEnd(e); dragging = false; }
-});
-window.addEventListener('touchend', e => {
-  if (overlayOpen) { dragging = false; }
-  else { onPressEnd(e); dragging = false; }
-});
+// Attach press handlers (see unified gesture input below)
 
 
 /* ── Media state (photo or video) ── */
@@ -16440,6 +16531,101 @@ function clearContactPhoto() {
 }
 
 /* Draw a contact photo clipped into a circle — used by orbit sphere renderer */
+/* ── Shared clip pool: newest circle-shared video note per contact, drawn in
+   the sphere core. At most 3 hidden <video> elements alive, only for the
+   focused sphere and the nearest spheres. Frames are cached to a canvas so
+   Safari suspension does not blank the sphere. ── */
+const SharedClipPool = (function() {
+  const MAX = 3;
+  const _pool = new Map(); /* contactId -> { url, video, frame, w, h, ready } */
+  let _wanted = new Set();
+  let _lastSelect = 0;
+
+  function _urlFor(id) {
+    try {
+      if (typeof VideoNoteShare !== 'undefined' && VideoNoteShare.getLatestSharedForContact) {
+        return VideoNoteShare.getLatestSharedForContact(id) || null;
+      }
+    } catch (e) {}
+    return null;
+  }
+  function _release(id) {
+    const e = _pool.get(id);
+    if (!e) return;
+    try { e.video.pause(); e.video.removeAttribute('src'); e.video.load(); } catch (err) {}
+    if (e.video.parentNode) e.video.parentNode.removeChild(e.video);
+    _pool.delete(id);
+  }
+  function _create(id, url) {
+    const v = document.createElement('video');
+    v.muted = true; v.loop = true; v.playsInline = true;
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    v.crossOrigin = 'anonymous';
+    v.preload = 'auto';
+    /* Off-screen but not display:none (Safari suspends display:none videos) */
+    v.style.cssText = 'position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;';
+    v.setAttribute('aria-hidden', 'true');
+    const e = { url: url, video: v, frame: document.createElement('canvas'), w: 0, h: 0, ready: false };
+    v.addEventListener('loadeddata', () => {
+      e.w = v.videoWidth || 128; e.h = v.videoHeight || 128;
+      e.frame.width = Math.min(256, e.w); e.frame.height = Math.round(e.frame.width * e.h / e.w) || e.frame.width;
+      e.ready = true;
+      if (!_reduced()) v.play().catch(() => {});
+    });
+    v.addEventListener('ended', () => { v.currentTime = 0; if (!_reduced()) v.play().catch(() => {}); });
+    v.addEventListener('error', () => { e.failed = true; });
+    v.src = url;
+    document.body.appendChild(v);
+    _pool.set(id, e);
+    return e;
+  }
+  function _reduced() {
+    return (typeof A11y !== 'undefined' && A11y.reducedMotion) ? A11y.reducedMotion() : false;
+  }
+  /* Called once per frame from the network draw; re-evaluates at most 4x/s */
+  function select() {
+    const now = performance.now();
+    if (now - _lastSelect < 250) return;
+    _lastSelect = now;
+    if (typeof NODES === 'undefined' || appState !== 'network') {
+      if (_pool.size) Array.from(_pool.keys()).forEach(_release);
+      return;
+    }
+    const cands = [];
+    for (let i = 0; i < NODES.length; i++) {
+      const n = NODES[i];
+      const url = _urlFor(n.contact.id);
+      if (!url) continue;
+      let sc = 0;
+      try { sc = projectNode(n).scale; } catch (err) {}
+      if (focusedContactId === n.contact.id) sc += 1000;
+      cands.push({ id: n.contact.id, url: url, sc: sc });
+    }
+    cands.sort((a, b) => b.sc - a.sc);
+    _wanted = new Set(cands.slice(0, MAX).map(c => c.id));
+    Array.from(_pool.keys()).forEach(id => {
+      const want = cands.find(c => c.id === id);
+      if (!_wanted.has(id) || !want || want.url !== _pool.get(id).url) _release(id);
+    });
+    cands.slice(0, MAX).forEach(c => { if (!_pool.has(c.id)) _create(c.id, c.url); });
+  }
+  /* Returns { img, w, h, isVideo } for drawContactPhotoInSphere, or null */
+  function frameFor(id) {
+    const e = _pool.get(id);
+    if (!e || !e.ready || e.failed) return null;
+    const v = e.video;
+    try {
+      if (v.readyState >= 2) {
+        e.frame.getContext('2d').drawImage(v, 0, 0, e.frame.width, e.frame.height);
+        e.hasFrame = true;
+      }
+    } catch (err) { e.failed = true; return null; }
+    if (!e.hasFrame) return null;
+    return { img: e.frame, w: e.frame.width, h: e.frame.height, isVideo: true, shared: true };
+  }
+  return { select: select, frameFor: frameFor, release: _release };
+})();
+
 function drawContactPhotoInSphere(ctx, photo, sx, sy, r) {
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
@@ -16562,78 +16748,188 @@ function moveDrag(e) {
   mediaOY = dragOYStart + (p.y - dragStartY);
 }
 
-/* ── Galaxy pinch zoom (network mode) ── */
-let netPinchDist = 0;
-stage.addEventListener('touchstart', e => {
-  if (e.touches.length === 2 && appState === 'network') {
-    cancelPress();
-    netDragging = false;
-    if (netMomentumRAF) { cancelAnimationFrame(netMomentumRAF); netMomentumRAF = 0; }
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    netPinchDist = Math.sqrt(dx*dx + dy*dy);
-  }
-}, { passive: false });
-stage.addEventListener('touchmove', e => {
-  if (e.touches.length === 2 && appState === 'network' && netPinchDist > 0) {
-    e.preventDefault();
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const ratio = dist / netPinchDist;
-    netZoom *= ratio;
-    netZoom = Math.max(NET_ZOOM_MIN, Math.min(NET_ZOOM_MAX, netZoom));
-    NET_DIST = NET_DIST_BASE / netZoom;
-    netPinchDist = dist;
-  }
-}, { passive: false });
-stage.addEventListener('touchend', e => {
-  if (e.touches.length < 2) netPinchDist = 0;
-});
-
-/* ── Pinch zoom ── */
-let lastPinchDist = 0;
-stage.addEventListener('touchstart', e => {
-  if (e.touches.length === 2) {
-    cancelPress();
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    lastPinchDist = Math.sqrt(dx*dx + dy*dy);
-  }
-}, { passive: false });
-stage.addEventListener('touchmove', e => {
-  if (e.touches.length === 2 && media) {
-    e.preventDefault();
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (lastPinchDist > 0) {
-      mediaZoom *= dist / lastPinchDist;
-      mediaZoom = Math.max(0.3, Math.min(3, mediaZoom));
-      document.getElementById('zoomSlider').value = mediaZoom;
+/* ── Unified gesture input: drag, tap, pinch, wheel ──
+   One code path. Pointer Events when available; touch and mouse listeners
+   only as a fallback. Pinch in the galaxy changes netZoom only; pinch on the
+   self sphere (or in the setup overlay) changes mediaZoom only. */
+function _gIgnoreTarget(t) {
+  return !!(t && t.closest && (t.closest('button') || t.closest('a') || t.closest('input') ||
+    t.closest('select') || t.closest('textarea') || t.closest('label') || t.closest('.back-btn')));
+}
+let _gPinchDist = 0;
+let _gPinching = false;
+function _gDist(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return Math.sqrt(dx*dx + dy*dy); }
+function _gPinchBegin(a, b) {
+  cancelPress();
+  netDragging = false;
+  dragging = false;
+  if (netMomentumRAF) { cancelAnimationFrame(netMomentumRAF); netMomentumRAF = 0; }
+  _gPinching = true;
+  _gPinchDist = _gDist(a, b);
+}
+function _gPinchUpdate(a, b) {
+  const dist = _gDist(a, b);
+  if (_gPinchDist > 0 && dist > 0) {
+    const ratio = dist / _gPinchDist;
+    if (appState === 'network' && !overlayOpen) {
+      netZoom = Math.max(NET_ZOOM_MIN, Math.min(NET_ZOOM_MAX, netZoom * ratio));
+      NET_DIST = NET_DIST_BASE / netZoom;
+    } else if (media && appState !== 'network' || media && overlayOpen) {
+      mediaZoom = Math.max(0.3, Math.min(3, mediaZoom * ratio));
+      const zs = document.getElementById('zoomSlider');
+      if (zs) zs.value = mediaZoom;
     }
-    lastPinchDist = dist;
   }
-}, { passive: false });
-stage.addEventListener('touchend', e => {
-  if (e.touches.length < 2) lastPinchDist = 0;
-});
+  _gPinchDist = dist;
+}
+/* After a pinch, one finger remains: continue as a drag from that point
+   without a jump and without triggering a tap. */
+function _gResumeFrom(x, y) {
+  _gPinching = false;
+  _gPinchDist = 0;
+  if (appState === 'network' && !overlayOpen) {
+    pressStarted = true;
+    pressStartX = x; pressStartY = y;
+    _pressOriginX = x; _pressOriginY = y;
+    _pressMaxDist = Infinity;
+    netDragging = true;
+    netSpin = false;
+    netLastDragX = x; netLastDragY = y; netLastDragT = performance.now();
+    _netVelBuf = [];
+  } else {
+    pressStarted = false;
+  }
+}
+function _gFinishPinch() {
+  _gPinching = false;
+  _gPinchDist = 0;
+  pressStarted = false;
+  netDragging = false;
+  dragging = false;
+  stage.classList.remove('pressing');
+  setTimeout(() => { if (!blufOpen && appState === 'network') netSpin = true; }, 1500);
+}
 
-/* ── Scroll zoom ── */
+if (window.PointerEvent) {
+  const _gPtrs = new Map();
+  stage.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (_gIgnoreTarget(e.target)) return;
+    _gPtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+    if (_gPtrs.size === 2) {
+      const pts = Array.from(_gPtrs.values());
+      _gPinchBegin(pts[0], pts[1]);
+      return;
+    }
+    if (_gPtrs.size > 2) return;
+    if (overlayOpen) { startDrag(e); }
+    else { e.preventDefault(); onPressStart(e); }
+  });
+  stage.addEventListener('pointermove', e => {
+    if (!_gPtrs.has(e.pointerId)) {
+      /* Hover with no press: nothing to do */
+      return;
+    }
+    _gPtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (_gPinching) {
+      if (_gPtrs.size >= 2) {
+        const pts = Array.from(_gPtrs.values());
+        e.preventDefault();
+        _gPinchUpdate(pts[0], pts[1]);
+      }
+      return;
+    }
+    if (overlayOpen) { moveDrag(e); }
+    else { onPressMove(e); }
+  }, { passive: false });
+  const _gUp = e => {
+    if (!_gPtrs.has(e.pointerId)) return;
+    _gPtrs.delete(e.pointerId);
+    try { stage.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (_gPinching) {
+      if (_gPtrs.size === 1) {
+        const rest = Array.from(_gPtrs.values())[0];
+        _gResumeFrom(rest.x, rest.y);
+      } else if (_gPtrs.size === 0) {
+        _gFinishPinch();
+      }
+      return;
+    }
+    if (_gPtrs.size > 0) return;
+    if (overlayOpen) { dragging = false; return; }
+    if (e.type === 'pointercancel') { cancelPress(); netDragging = false; dragging = false; return; }
+    onPressEnd(e);
+    dragging = false;
+  };
+  stage.addEventListener('pointerup', _gUp);
+  stage.addEventListener('pointercancel', _gUp);
+} else {
+  /* Fallback: mouse */
+  stage.addEventListener('mousedown', e => {
+    if (_gIgnoreTarget(e.target)) return;
+    if (overlayOpen) { startDrag(e); }
+    else { onPressStart(e); }
+  });
+  window.addEventListener('mousemove', e => {
+    if (overlayOpen) { moveDrag(e); }
+    else { onPressMove(e); }
+  });
+  window.addEventListener('mouseup', e => {
+    if (overlayOpen) { dragging = false; }
+    else { onPressEnd(e); dragging = false; }
+  });
+  /* Fallback: touch (single handler set, including pinch) */
+  const _tp = t => ({ x: t.clientX, y: t.clientY });
+  stage.addEventListener('touchstart', e => {
+    if (_gIgnoreTarget(e.target)) return;
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      _gPinchBegin(_tp(e.touches[0]), _tp(e.touches[1]));
+      return;
+    }
+    if (e.touches.length > 2) return;
+    if (overlayOpen) { startDrag(e); }
+    else { e.preventDefault(); onPressStart(e); }
+  }, { passive: false });
+  window.addEventListener('touchmove', e => {
+    if (_gPinching) {
+      if (e.touches.length >= 2) {
+        e.preventDefault();
+        _gPinchUpdate(_tp(e.touches[0]), _tp(e.touches[1]));
+      }
+      return;
+    }
+    if (overlayOpen) { moveDrag(e); }
+    else { onPressMove(e); }
+  }, { passive: false });
+  window.addEventListener('touchend', e => {
+    if (_gPinching) {
+      if (e.touches.length === 1) _gResumeFrom(e.touches[0].clientX, e.touches[0].clientY);
+      else if (e.touches.length === 0) _gFinishPinch();
+      return;
+    }
+    if (e.touches.length > 0) return;
+    if (overlayOpen) { dragging = false; }
+    else { onPressEnd(e); dragging = false; }
+  });
+  window.addEventListener('touchcancel', () => { cancelPress(); netDragging = false; dragging = false; _gPinching = false; _gPinchDist = 0; });
+}
+
+/* ── Scroll zoom (multiplicative) ── */
 stage.addEventListener('wheel', e => {
   if (appState === 'network' && !overlayOpen) {
-    /* Galaxy scroll-to-zoom */
+    /* Galaxy scroll-to-zoom, same clamp as pinch */
     e.preventDefault();
-    netZoom += e.deltaY * -0.001;
-    netZoom = Math.max(NET_ZOOM_MIN, Math.min(NET_ZOOM_MAX, netZoom));
+    netZoom = Math.max(NET_ZOOM_MIN, Math.min(NET_ZOOM_MAX, netZoom * Math.exp(-e.deltaY * 0.001)));
     NET_DIST = NET_DIST_BASE / netZoom;
     return;
   }
   if (!media) return;
   e.preventDefault();
-  mediaZoom += e.deltaY * -0.002;
-  mediaZoom = Math.max(0.3, Math.min(3, mediaZoom));
-  document.getElementById('zoomSlider').value = mediaZoom;
+  mediaZoom = Math.max(0.3, Math.min(3, mediaZoom * Math.exp(-e.deltaY * 0.002)));
+  const zs = document.getElementById('zoomSlider');
+  if (zs) zs.value = mediaZoom;
 }, { passive: false });
 
 
@@ -16825,7 +17121,7 @@ let lastW = CV.width;
 function drawSphereView(t) {
   const w=CV.width, h=CV.height, cx=w/2, cy=h/2;
   const baseR = Math.min(w,h)/2*0.78;
-  const pf = pulseOn ? 1+0.02*Math.sin(t*0.003) : 1;
+  const pf = (pulseOn && !_reducedMotionNow()) ? 1+0.02*Math.sin(t*0.003) : 1;
   const R = baseR * pf;
   const c = CATS[curCat];
 
@@ -16961,7 +17257,7 @@ function drawSphereView(t) {
   /* NOUS STATUS RING (outer) */
   const sv = SEVS[curSev];
   const outerR = R * 1.15;
-  const sevPulse = pulseOn ? 1 + sv.pulseAmp * Math.sin(t * sv.pulseSpd) : 1;
+  const sevPulse = (pulseOn && !_reducedMotionNow()) ? 1 + sv.pulseAmp * Math.sin(t * sv.pulseSpd) : 1;
   const oR = outerR * sevPulse;
 
   ctx.lineWidth = 7 * DPR;
@@ -17132,7 +17428,7 @@ function drawNetworkView(t) {
   }
 
   /* Auto-spin */
-  if (netSpin && !netDragging) netYaw += 0.0022;
+  if (netSpin && !netDragging && !_reducedMotionNow()) netYaw += 0.0022;
 
   /* Project and depth-sort (back to front) */
   const projected = NODES.map(node => ({ node, p: projectNode(node) }));
@@ -17187,7 +17483,7 @@ function drawNetworkView(t) {
     const isFocused = focusedContactId === node.contact.id;
     const focusMul = isFocused ? FOCUS_SCALE : 1;
     /* Breathing — gentle scale pulse per-sphere, gated by pulseOn */
-    const _cb = pulseOn ? (1 + (SEVS[node.contact.sev] || SEVS[4]).pulseAmp * Math.sin(t * (SEVS[node.contact.sev] || SEVS[4]).pulseSpd + node.tx)) : 1;
+    const _cb = (pulseOn && !_reducedMotionNow()) ? (1 + (SEVS[node.contact.sev] || SEVS[4]).pulseAmp * Math.sin(t * (SEVS[node.contact.sev] || SEVS[4]).pulseSpd + node.tx)) : 1;
     const r = Math.max(2, node.r * s * focusMul * _cb);
     const sx = p.sx, sy = p.sy;
     const isUrgent = node.contact.sev <= 1;
@@ -17200,7 +17496,7 @@ function drawNetworkView(t) {
     let haloMul = 4.2;
     let pulseA = 0;
     if (isUrgent) {
-      pulseA = 0.5 + 0.5 * Math.sin(t * 7 + node.tx);
+      pulseA = _reducedMotionNow() ? 0.5 : 0.5 + 0.5 * Math.sin(t * 7 + node.tx);
       haloMul = 4.6 + pulseA * 1.8;
     }
     const halo = r * haloMul;
@@ -17230,17 +17526,21 @@ function drawNetworkView(t) {
     ctx.globalCompositeOperation = 'source-over';
 
     /* Contact photo — if loaded, draw image inside sphere with vignette */
-    const cPhoto = contactPhotos.get(node.contact.id);
+    /* Priority: shared clip > local video note > photo */
+    const _sharedFrame = SharedClipPool.frameFor(node.contact.id);
+    const cPhoto = _sharedFrame || contactPhotos.get(node.contact.id);
     if (cPhoto && cPhoto.img && r > 4) {
       if (alphaOverride) { ctx.globalAlpha = alphaOverride; }
       drawContactPhotoInSphere(ctx, cPhoto, sx, sy, r);
     }
 
     /* ── Inner energy ring (category-colored) ── */
-    const _cBio = node.contact.bio || { motionIntensity: 0, heartRate: 0 };
-    const _cMI = Math.min(1, _cBio.motionIntensity || 0);
-    const _cHR = _cBio.heartRate || 0;
-    const _cHRConn = _cHR > 0;
+    const _cRing = (typeof Biometrics !== 'undefined' && Biometrics.getRingState)
+      ? Biometrics.getRingState(node.contact.id)
+      : { motion: (node.contact.bio && node.contact.bio.motionIntensity) || 0, heartRate: (node.contact.bio && node.contact.bio.heartRate) || 0, hrConnected: !!(node.contact.bio && node.contact.bio.heartRate > 0) };
+    const _cMI = Math.min(1, _cRing.motion || 0);
+    const _cHR = _cRing.heartRate || 0;
+    const _cHRConn = !!_cRing.hrConnected && _cHR > 0;
     const _cInnerLW = (2.5 + _cMI * 2) * s * focusMul;
     const _cInnerGlow = (6 + _cMI * 8) * s;
     const _cInnerAlpha = (0.35 + _cMI * 0.2) + 0.08 * Math.sin(t * 0.004 + node.tx);
@@ -17490,6 +17790,9 @@ function drawNetworkView(t) {
   /* ── Compute circle aggregate for center HUD ── */
   _computeCircleAggregate();
 
+  /* Shared clips: keep video elements only for focused or nearest spheres */
+  SharedClipPool.select();
+
   /* ── PASS 1: Draw contact spheres BEHIND center (back to front) ── */
   for (const item of _behindNodes) {
     _drawOneContactSphere(item, null);
@@ -17502,7 +17805,7 @@ function drawNetworkView(t) {
   const selfStageW = Math.min(400, W * 0.88);
   const centerFactor = W < 500 ? 0.22 : 0.26;
   const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
-  const breathe = pulseOn ? (1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd)) : 1;
+  const breathe = (pulseOn && !_reducedMotionNow()) ? (1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd)) : 1;
   const cr = centerR * breathe;
 
   /* Outer glow (additive) — category color */
@@ -17578,8 +17881,12 @@ function drawNetworkView(t) {
     ctx.restore();
   }
 
-  /* Inner energy ring (category) — enhanced by BioMotion */
-  const _bMI = _bio.enabled ? _bio.motionIntensity : 0;
+  /* Inner energy ring (category), enhanced by BioMotion. Ring state comes from
+     Biometrics.getRingState: heart rate works even when motion is off. */
+  const _selfRing = (typeof Biometrics !== 'undefined' && Biometrics.getRingState)
+    ? Biometrics.getRingState('self')
+    : { motion: _bio.enabled ? _bio.motionIntensity : 0, heartRate: _bio.heartRate || 0, hrConnected: !!_bio.hrConnected };
+  const _bMI = _bio.enabled ? Math.min(1, _selfRing.motion || 0) : 0;
   const _bGI = _bio.enabled ? _bio.gyroIntensity : 0;
   /* Motion boosts ring thickness: 4 base → up to 7 when very active */
   const _innerLW = 4 + _bMI * 3;
@@ -17603,8 +17910,8 @@ function drawNetworkView(t) {
   /* NOUS status ring (outer — severity) — enhanced by BioMotion */
   const outerCR = cr * 1.1;
   /* Heart rate sync: if BLE HR connected, override pulse speed to match BPM */
-  const _hrPulseSpd = (_bio.enabled && _bio.hrConnected && _bio.heartRate > 0)
-    ? (_bio.heartRate / 60) * 0.0063  /* convert BPM to radians-per-ms matching original scale */
+  const _hrPulseSpd = (_selfRing.hrConnected && _selfRing.heartRate > 0)
+    ? (_selfRing.heartRate / 60) * 0.0063  /* convert BPM to radians-per-ms matching original scale */
     : usv.pulseSpd;
   /* Motion boosts outer ring thickness: 3 → up to 5 */
   const _outerLW = 3 + _bMI * 2;
@@ -17678,9 +17985,32 @@ function drawNetworkView(t) {
     var _activeViewObj = (typeof SentinelViews !== 'undefined') ? SentinelViews.getActiveView() : null;
     const _ccLabel = _activeViewObj ? _activeViewObj.name.toUpperCase() : 'CIRCLE COMMAND';
     let _ccX = _hudX - ctx.measureText(_ccLabel).width * 0.6;
+    const _ccStartX = _ccX;
     for (let _ci = 0; _ci < _ccLabel.length; _ci++) {
       ctx.fillText(_ccLabel[_ci], _ccX, _hudBaseY - 2);
       _ccX += ctx.measureText(_ccLabel[_ci]).width + 1.5;
+    }
+    /* Sync status dot, left of the HUD label (only when signed in) */
+    if (_hudSync.authenticated) {
+      const _sdCol = _hudSync.state === 'synced' ? '#4ade80'
+        : (_hudSync.state === 'pending' || _hudSync.state === 'syncing') ? '#fbbf24'
+        : _hudSync.state === 'error' ? '#f87171' : '#94a3b8';
+      const _sdR = Math.max(2.5, _hudSmFs * 0.32);
+      const _sdX = _ccStartX - _sdR - 6;
+      const _sdY = _hudBaseY - 2 - _hudSmFs * 0.38;
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = _sdCol;
+      ctx.beginPath(); ctx.arc(_sdX, _sdY, _sdR, 0, Math.PI * 2); ctx.fill();
+      if (_hudSync.pending > 0) {
+        ctx.font = `600 ${Math.max(6, _hudSmFs - 1)}px "Hanken Grotesk", system-ui, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(_hudSync.pending), _sdX - _sdR - 3, _sdY);
+      }
+      ctx.restore();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
     }
 
     /* Active count / total */
@@ -18110,9 +18440,7 @@ const SettingsPanel = (function () {
   function init() {
     const pwInput = $('exportPassphrase');
     if (pwInput) pwInput.addEventListener('input', updateStrength);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && $('settingsPanel').classList.contains('open')) closePanel();
-    });
+    /* Escape is handled once, centrally, by A11y (topmost dialog closes). */
     checkBackupReminder();
   }
 
@@ -19544,19 +19872,67 @@ const AlertEngine = (() => {
       });
     }
 
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
+    /* Escape handled centrally by A11y. */
   }
 
   /* ── Service worker registration ── */
   function registerSW() {
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.register('./sw.js').then((reg) => {
-      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      /* A worker already waiting from an earlier visit: offer the update */
+      if (reg.waiting && navigator.serviceWorker.controller) _showUpdateBanner(reg.waiting);
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
-        if (nw) nw.addEventListener('statechange', () => {});
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            _showUpdateBanner(nw);
+          }
+        });
       });
     }).catch(() => {});
+    /* Reload once when the new worker takes control */
+    let _swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!_swUpdateRequested || _swReloaded) return;
+      _swReloaded = true;
+      window.location.reload();
+    });
+  }
+
+  let _swUpdateRequested = false;
+  function _showUpdateBanner(worker) {
+    if (document.getElementById('swUpdateBanner')) return;
+    const tt = (typeof _t === 'function') ? _t : function(k, f) { return f; };
+    const bar = document.createElement('div');
+    bar.id = 'swUpdateBanner';
+    bar.setAttribute('role', 'status');
+    bar.setAttribute('aria-live', 'polite');
+    bar.style.cssText = 'position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:100000;' +
+      'display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:10px 14px;border-radius:12px;' +
+      'background:#131a27;color:#e5e7eb;border:1px solid rgba(197,165,90,0.5);box-shadow:0 8px 24px rgba(0,0,0,0.45);' +
+      'font:500 13px "Hanken Grotesk",system-ui,sans-serif;';
+    const msg = document.createElement('span');
+    msg.textContent = tt('pwa.updateReady', 'A new version of Remiel Sentinel is ready.');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = tt('pwa.reload', 'Reload');
+    btn.style.cssText = 'background:#C5A55A;color:#000;border:0;border-radius:8px;padding:6px 12px;font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;';
+    btn.addEventListener('click', () => {
+      _swUpdateRequested = true;
+      btn.disabled = true;
+      try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (e) { window.location.reload(); }
+      /* Safety: reload anyway if controllerchange never fires */
+      setTimeout(() => { if (_swUpdateRequested) window.location.reload(); }, 4000);
+    });
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.setAttribute('aria-label', tt('pwa.dismiss', 'Dismiss'));
+    close.textContent = '\u00d7';
+    close.style.cssText = 'background:none;border:0;color:#9ca3af;font-size:18px;cursor:pointer;padding:0 4px;';
+    close.addEventListener('click', () => bar.remove());
+    bar.appendChild(msg); bar.appendChild(btn); bar.appendChild(close);
+    document.body.appendChild(bar);
   }
 
   /* ── Init ── */
@@ -19608,89 +19984,151 @@ const A11y = (() => {
     requestAnimationFrame(() => { el.textContent = msg; });
   }
 
-  /* ── Focus trap for modal dialogs ── */
+  /* ── Modal registry: known dialogs and how to close each ──
+     Visibility is read from the open/active/visible classes these modules use. */
+  const MODALS = [
+    { id: 'contactListView',     close: () => ContactListView.close() },
+    { id: 'swUpdateBanner',      close: null, skip: true },
+    { id: 'medImgOverlay',       close: () => MedImageReader.close() },
+    { id: 'scIncomingOverlay',   close: () => SentinelCall.rejectIncoming() },
+    { id: 'scOverlay',           close: () => SentinelCall.hangUp() },
+    { id: 'syncPromptOverlay',   close: () => SyncPrompt.dismiss() },
+    { id: 'rosterOverlay',       close: () => RosterImport.close() },
+    { id: 'socialImportModal',   close: () => SocialImport.close() },
+    { id: 'contactModalOverlay', close: () => closeContactModal() },
+    { id: 'quickDialOverlay',    close: () => closeQuickDial() },
+    { id: 'contactsPopupOverlay',close: () => closeContactsPopup() },
+    { id: 'svEditor',            close: () => SentinelViews.closeEditor() },
+    { id: 'svOverlay',           close: () => SentinelViews.closePanel() },
+    { id: 'pulseOverlay',        close: () => ThePulse.close() },
+    { id: 'sentinelMsgOverlay',  close: () => SentinelMessaging.close() },
+    { id: 'checkinNudge',        close: () => SelfCheckIn.dismiss() },
+    { id: 'alertPanel',          close: () => AlertEngine.closePanel() },
+    { id: 'settingsPanel',       close: () => SettingsPanel.close() },
+    { id: 'blufOverlay',         close: () => closeBluf() },
+    { id: 'overlay',             close: () => closeOverlay() }
+  ];
+  const OPEN_CLASSES = ['open', 'active', 'visible', 'show'];
+  const _stack = []; /* [{ el, prevFocus, close }] topmost last */
+
+  function _isShown(el) {
+    if (!el || !el.isConnected || el.hidden) return false;
+    for (let i = 0; i < OPEN_CLASSES.length; i++) {
+      if (el.classList.contains(OPEN_CLASSES[i])) return true;
+    }
+    return false;
+  }
+  function _entryFor(el) { return _stack.find(x => x.el === el) || null; }
+  function _closerFor(el) {
+    const m = MODALS.find(x => x.id === el.id);
+    if (m && m.close) return m.close;
+    return function () {
+      /* Generic: press a close button inside, else drop the open class */
+      const btn = el.querySelector('[aria-label="Close"], [aria-label="close"], .close, [class*="close"]');
+      if (btn && typeof btn.click === 'function') { btn.click(); return; }
+      OPEN_CLASSES.forEach(c => el.classList.remove(c));
+    };
+  }
+  function _focusables(container) {
+    return Array.from(container.querySelectorAll(FOCUSABLE)).filter(n => n.offsetParent !== null || n === document.activeElement);
+  }
+  function _push(el) {
+    if (!el || _entryFor(el)) return;
+    const m = MODALS.find(x => x.id === el.id);
+    if (m && m.skip) return;
+    if (!el.getAttribute('role')) el.setAttribute('role', 'dialog');
+    if (!el.hasAttribute('aria-modal')) el.setAttribute('aria-modal', 'true');
+    _stack.push({ el: el, prevFocus: document.activeElement, close: _closerFor(el) });
+    setTimeout(() => {
+      if (!_isShown(el) || el.contains(document.activeElement)) return;
+      const f = _focusables(el);
+      try {
+        if (f.length) f[0].focus();
+        else { el.setAttribute('tabindex', '-1'); el.focus(); }
+      } catch (e) {}
+    }, 60);
+  }
+  function _pop(el) {
+    const i = _stack.findIndex(x => x.el === el);
+    if (i < 0) return;
+    const entry = _stack.splice(i, 1)[0];
+    /* Restore focus only if it was inside the dialog that closed */
+    if (!document.activeElement || document.activeElement === document.body || el.contains(document.activeElement)) {
+      const pf = entry.prevFocus;
+      if (pf && pf.isConnected && typeof pf.focus === 'function') { try { pf.focus(); } catch (e) {} }
+    }
+  }
+  function _sync() {
+    MODALS.forEach(m => {
+      const el = document.getElementById(m.id);
+      if (!el) return;
+      if (_isShown(el)) _push(el); else if (_entryFor(el)) _pop(el);
+    });
+    /* Generic dialogs not in the registry */
+    document.querySelectorAll('[role="dialog"]').forEach(el => {
+      if (MODALS.some(m => m.id === el.id)) return;
+      if (el.parentElement && el.parentElement.closest('[role="dialog"], ' + MODALS.map(m => '#' + m.id).join(','))) return;
+      if (_isShown(el)) _push(el); else if (_entryFor(el)) _pop(el);
+    });
+    for (let i = _stack.length - 1; i >= 0; i--) {
+      if (!_isShown(_stack[i].el)) _pop(_stack[i].el);
+    }
+  }
+
+  /* Public API kept for existing callers: now stack based */
   function trapFocus(container) {
     if (!container) return;
-    _prevFocus = document.activeElement;
-    _trapEl = container;
-
-    const focusables = container.querySelectorAll(FOCUSABLE);
-    if (focusables.length === 0) {
-      container.setAttribute('tabindex', '-1');
-      container.focus();
-      return;
-    }
-
-    _trapHandler = function (e) {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(container.querySelectorAll(FOCUSABLE));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    container.addEventListener('keydown', _trapHandler);
-
-    // Focus first focusable element
-    setTimeout(() => { focusables[0].focus(); }, 50);
+    _push(container);
   }
-
   function releaseFocus() {
-    if (_trapEl && _trapHandler) {
-      _trapEl.removeEventListener('keydown', _trapHandler);
-    }
-    _trapEl = null;
-    _trapHandler = null;
-    if (_prevFocus && typeof _prevFocus.focus === 'function') {
-      try { _prevFocus.focus(); } catch (e) {}
-    }
-    _prevFocus = null;
+    setTimeout(_sync, 0);
   }
 
-  /* ── Keyboard: Escape to close overlays ── */
+  /* Single Tab trap for the topmost dialog */
+  function _onTab(e) {
+    if (e.key !== 'Tab' || !_stack.length) return;
+    const top = _stack[_stack.length - 1].el;
+    const f = _focusables(top);
+    if (!f.length) { e.preventDefault(); return; }
+    const first = f[0], last = f[f.length - 1];
+    if (!top.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; }
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  function _observe() {
+    let pending = false;
+    const mo = new MutationObserver(muts => {
+      let relevant = false;
+      for (let i = 0; i < muts.length && !relevant; i++) {
+        const t = muts[i].target;
+        if (t.nodeType !== 1) continue;
+        if (t.id && MODALS.some(m => m.id === t.id)) relevant = true;
+        else if (t.getAttribute && t.getAttribute('role') === 'dialog') relevant = true;
+      }
+      if (!relevant || pending) return;
+      pending = true;
+      requestAnimationFrame(() => { pending = false; _sync(); });
+    });
+    mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+  }
+
+  /* ── Keyboard: Escape closes the topmost dialog, once ── */
   function setupEscapeHandlers() {
+    document.addEventListener('keydown', _onTab, true);
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
-
-      /* Settings panel */
-      const settings = document.getElementById('settingsPanel');
-      if (settings && settings.classList.contains('open')) {
-        if (typeof SettingsPanel !== 'undefined') SettingsPanel.close();
-        releaseFocus();
-        e.stopPropagation();
-        return;
+      _sync();
+      /* Let text inputs inside a combobox or IME keep Escape */
+      if (e.isComposing) return;
+      const top = _stack[_stack.length - 1];
+      if (!top) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try { top.close(); } catch (err) {
+        OPEN_CLASSES.forEach(c => top.el.classList.remove(c));
       }
-
-      /* Alert panel */
-      const alertPanel = document.getElementById('alertPanel');
-      if (alertPanel && alertPanel.classList.contains('open')) {
-        if (typeof AlertEngine !== 'undefined') AlertEngine.closePanel();
-        releaseFocus();
-        e.stopPropagation();
-        return;
-      }
-
-      /* BLUF overlay */
-      const bluf = document.getElementById('blufOverlay');
-      if (bluf && bluf.classList.contains('open')) {
-        if (typeof closeBluf === 'function') closeBluf();
-        releaseFocus();
-        e.stopPropagation();
-        return;
-      }
-
-      /* Overlay panel (sphere config) */
-      const overlay = document.getElementById('overlayPanel');
-      if (overlay && overlay.style.display !== 'none' && !overlay.hidden) {
-        if (typeof closeOverlay === 'function') closeOverlay();
-        releaseFocus();
-        e.stopPropagation();
-        return;
-      }
+      setTimeout(_sync, 0);
     });
   }
 
@@ -19709,7 +20147,26 @@ const A11y = (() => {
 
   /* ── Reduced motion detection ── */
   function prefersReducedMotion() {
-    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return (typeof _reducedMotionNow === 'function') ? _reducedMotionNow()
+      : !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  function _watchReducedMotion() {
+    const apply = () => {
+      const on = prefersReducedMotion();
+      document.documentElement.classList.toggle('reduce-motion', on);
+      if (on) {
+        try { if (typeof _restModeActive !== 'undefined' && _restModeActive) _exitRestMode(); } catch (e) {}
+        try {
+          const iv = document.getElementById('introVideo');
+          if (iv) { iv.autoplay = false; iv.removeAttribute('autoplay'); }
+        } catch (e) {}
+      }
+    };
+    apply();
+    try {
+      if (_rmMQ && _rmMQ.addEventListener) _rmMQ.addEventListener('change', apply);
+      else if (_rmMQ && _rmMQ.addListener) _rmMQ.addListener(apply);
+    } catch (e) {}
   }
 
   /* ── Hook into BLUF open/close for focus management ── */
@@ -19755,11 +20212,11 @@ const A11y = (() => {
           VideoNoteShare.updateVisibility();
           VideoNoteShare.loadShared();
         }
-      }
-    if (typeof PushNotify !== 'undefined') {
-      PushNotify.updateVisibility();
-      PushNotify.checkStatus();
-    };
+        if (typeof PushNotify !== 'undefined') {
+          PushNotify.updateVisibility();
+          PushNotify.checkStatus();
+        }
+      };
     }
     if (typeof _origClose === 'function') {
       SettingsPanel.close = function () {
@@ -19805,19 +20262,186 @@ const A11y = (() => {
     hookBlufFocus();
     hookSettingsFocus();
     enhancePullHeaders();
+    _watchReducedMotion();
+    _observe();
+    _sync();
 
     /* Announce page load for screen readers */
     announce('Remiel Sentinel loaded');
   }
 
-  return { init, announce, trapFocus, releaseFocus, prefersReducedMotion, FOCUSABLE };
+  return { init, announce, trapFocus, releaseFocus, prefersReducedMotion, reducedMotion: prefersReducedMotion, FOCUSABLE };
+})();
+
+/* ═══════════════════════════════════════════════════════════
+   ContactListView: accessible list alternative to the galaxy canvas.
+   A "List view" button (network mode) opens a scrollable, keyboard
+   navigable list with Open, Call, Message and Video for each contact.
+   The canvas is aria-hidden while the list is open.
+   ═══════════════════════════════════════════════════════════ */
+const ContactListView = (() => {
+  'use strict';
+  let _built = false;
+
+  function _el(tag, attrs, text) {
+    const e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(k => {
+      if (k === 'style') e.style.cssText = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    });
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function _build() {
+    if (_built) return;
+    _built = true;
+    const css = document.createElement('style');
+    css.textContent =
+      '.clv-toggle{position:fixed;bottom:20px;right:80px;z-index:8000;height:48px;padding:0 16px;border-radius:24px;border:1px solid rgba(255,255,255,0.18);' +
+      'background:rgba(19,26,39,0.92);color:#e5e7eb;font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;display:none;}' +
+      'body.network-active .clv-toggle{display:block;}' +
+      '.clv-toggle:focus-visible,.clv-btn:focus-visible,.clv-close:focus-visible{outline:2px solid #C5A55A;outline-offset:2px;}' +
+      '.clv-overlay{position:fixed;inset:0;z-index:9500;background:rgba(3,4,8,0.72);display:none;align-items:flex-end;justify-content:center;}' +
+      '.clv-overlay.open{display:flex;}' +
+      '.clv-panel{width:min(560px,100%);max-height:85vh;display:flex;flex-direction:column;background:#0e1219;color:#e5e7eb;border-radius:16px 16px 0 0;' +
+      'border:1px solid rgba(255,255,255,0.1);padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));box-sizing:border-box;}' +
+      '.clv-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}' +
+      '.clv-title{font:700 17px "Hanken Grotesk",system-ui,sans-serif;margin:0;}' +
+      '.clv-close{background:none;border:0;color:#9ca3af;font-size:24px;cursor:pointer;min-width:44px;min-height:44px;}' +
+      '.clv-list{list-style:none;margin:0;padding:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}' +
+      '.clv-item{padding:12px 4px;border-top:1px solid rgba(255,255,255,0.07);}' +
+      '.clv-name{font:600 15px "Hanken Grotesk",system-ui,sans-serif;margin:0 0 2px;}' +
+      '.clv-meta{font:400 12px "Hanken Grotesk",system-ui,sans-serif;color:#9ca3af;margin:0 0 8px;}' +
+      '.clv-actions{display:flex;flex-wrap:wrap;gap:8px;}' +
+      '.clv-btn{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:#e5e7eb;' +
+      'font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;}' +
+      '.clv-btn.primary{background:#C5A55A;color:#000;border-color:#C5A55A;}' +
+      '.clv-empty{padding:16px 4px;color:#9ca3af;font:400 14px "Hanken Grotesk",system-ui,sans-serif;}';
+    document.head.appendChild(css);
+
+    const btn = _el('button', { type: 'button', id: 'clvToggle', class: 'clv-toggle', 'aria-haspopup': 'dialog', 'aria-controls': 'contactListView' },
+      _t('a11y.listView', 'List view'));
+    btn.addEventListener('click', open);
+    document.body.appendChild(btn);
+
+    const ov = _el('div', { id: 'contactListView', class: 'clv-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'clvTitle' });
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    const panel = _el('div', { class: 'clv-panel' });
+    const head = _el('div', { class: 'clv-head' });
+    head.appendChild(_el('h2', { id: 'clvTitle', class: 'clv-title' }, _t('a11y.listTitle', 'Your circle')));
+    const x = _el('button', { type: 'button', class: 'clv-close', 'aria-label': _t('a11y.closeList', 'Close list') }, '×');
+    x.addEventListener('click', close);
+    head.appendChild(x);
+    panel.appendChild(head);
+    panel.appendChild(_el('ul', { id: 'clvList', class: 'clv-list', 'aria-labelledby': 'clvTitle' }));
+    ov.appendChild(panel);
+    document.body.appendChild(ov);
+  }
+
+  function _catLabel(cat) {
+    const map = { family: _t('cat.family', 'Family'), professional: _t('cat.professional', 'Professional'),
+      friend: _t('cat.friend', 'Friend'), other: (typeof otherLabel !== 'undefined' && otherLabel) ? otherLabel : _t('cat.other', 'Other') };
+    return map[cat] || cat || map.other;
+  }
+  function _lastLabel(days) {
+    if (days == null) return _t('a11y.lastNever', 'No contact logged');
+    const d = Math.round(days);
+    if (d <= 0) return _t('a11y.lastToday', 'Last contact today');
+    if (d === 1) return _t('a11y.lastYesterday', 'Last contact yesterday');
+    return _t('a11y.lastDays', 'Last contact {n} days ago', { n: d });
+  }
+
+  function _contacts() {
+    let list = (typeof DEMO_CONTACTS !== 'undefined') ? DEMO_CONTACTS.slice() : [];
+    try {
+      if (typeof SentinelViews !== 'undefined' && SentinelViews.getActiveView && SentinelViews.getActiveView()) {
+        const f = SentinelViews.getFilteredContacts && SentinelViews.getFilteredContacts();
+        if (Array.isArray(f) && f.length) list = f.slice();
+      }
+    } catch (e) {}
+    return list.sort((a, b) => (a.sev - b.sev) || String(a.first || '').localeCompare(String(b.first || '')));
+  }
+
+  function _action(label, cls, fn) {
+    const b = _el('button', { type: 'button', class: 'clv-btn' + (cls ? ' ' + cls : '') }, label);
+    b.addEventListener('click', fn);
+    return b;
+  }
+
+  function _render() {
+    const ul = document.getElementById('clvList');
+    if (!ul) return;
+    ul.textContent = '';
+    const list = _contacts();
+    if (!list.length) {
+      ul.appendChild(_el('li', { class: 'clv-empty' }, _t('a11y.listEmpty', 'No contacts yet.')));
+      return;
+    }
+    list.forEach(c => {
+      const name = [c.first, c.last].filter(Boolean).join(' ') || _t('a11y.unnamed', 'Unnamed');
+      const sevLabel = (typeof SEVS !== 'undefined' && SEVS[c.sev]) ? SEVS[c.sev].label : '';
+      const li = _el('li', { class: 'clv-item' });
+      li.appendChild(_el('p', { class: 'clv-name' }, name));
+      const meta = _el('p', { class: 'clv-meta' }, _catLabel(c.cat) + ' \u00b7 ' + sevLabel);
+      li.appendChild(meta);
+      const acts = _el('div', { class: 'clv-actions', role: 'group', 'aria-label': name });
+      acts.appendChild(_action(_t('a11y.open', 'Open'), 'primary', () => {
+        close();
+        if (typeof enterDetail === 'function') enterDetail(c, Math.round(window.innerHeight * 0.35));
+      }));
+      acts.appendChild(_action(_t('a11y.call', 'Call'), '', () => { close(); runContactQuickAction('phone', c); }));
+      acts.appendChild(_action(_t('a11y.message', 'Message'), '', () => { close(); runContactQuickAction('sms', c); }));
+      acts.appendChild(_action(_t('a11y.video', 'Video'), '', () => { close(); runContactQuickAction('video', c); }));
+      li.appendChild(acts);
+      ul.appendChild(li);
+      /* Last contact is async: fill in when known */
+      if (typeof computeSeverity === 'function') {
+        computeSeverity(c.id).then(sv => {
+          meta.textContent = _catLabel(c.cat) + ' \u00b7 ' + sevLabel + ' \u00b7 ' + _lastLabel(sv ? sv.daysSinceContact : null);
+        }).catch(() => {});
+      }
+    });
+  }
+
+  function _setCanvasHidden(on) {
+    const cv = document.getElementById('sphere');
+    const st = document.getElementById('stage');
+    [cv, st].forEach(el => {
+      if (!el) return;
+      if (on) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden');
+    });
+  }
+
+  function open() {
+    _build();
+    _render();
+    const ov = document.getElementById('contactListView');
+    ov.classList.add('open');
+    _setCanvasHidden(true);
+    const t = document.getElementById('clvToggle');
+    if (t) t.setAttribute('aria-expanded', 'true');
+    A11y.trapFocus(ov);
+  }
+  function close() {
+    const ov = document.getElementById('contactListView');
+    if (!ov || !ov.classList.contains('open')) return;
+    ov.classList.remove('open');
+    _setCanvasHidden(false);
+    const t = document.getElementById('clvToggle');
+    if (t) { t.setAttribute('aria-expanded', 'false'); try { t.focus(); } catch (e) {} }
+    A11y.releaseFocus();
+  }
+  function init() { _build(); }
+  return { init, open, close };
 })();
 
 /* Start accessibility engine early */
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => A11y.init());
+  document.addEventListener('DOMContentLoaded', () => { A11y.init(); ContactListView.init(); });
 } else {
   A11y.init();
+  ContactListView.init();
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -25439,7 +26063,7 @@ function updateFabVisibility() {
     bRow.innerHTML =
       '<span class="setting-label">Breathing effects</span>' +
       '<label class="setting-toggle"><input type="checkbox" id="breatheToggle" ' +
-      (pulseOn ? 'checked' : '') + '><span class="toggle-track"><span class="toggle-thumb"></span></span></label>';
+      ((pulseOn && !_reducedMotionNow()) ? 'checked' : '') + '><span class="toggle-track"><span class="toggle-thumb"></span></span></label>';
     lastRow.parentNode.insertBefore(bRow, lastRow.nextSibling);
     document.getElementById('breatheToggle').addEventListener('change', function() {
       pulseOn = this.checked;
