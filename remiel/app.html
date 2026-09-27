@@ -10190,6 +10190,22 @@ const miniCtx = miniCV ? miniCV.getContext('2d') : null;
    SEVERITY ENGINE — Compute urgency from real data
    ═══════════════════════════════════ */
 
+/* Local translation helper for Client C strings: uses I18n when the key
+   exists, otherwise the English fallback. {name} params are substituted. */
+function _t(key, fallback, params) {
+  let str = fallback;
+  try {
+    if (typeof I18n !== 'undefined' && I18n.t) {
+      const v = I18n.t(key, params);
+      if (v && v !== key) return v;
+    }
+  } catch (e) {}
+  if (params && typeof str === 'string') {
+    str = str.replace(/\{(\w+)\}/g, function (m, k) { return params[k] !== undefined ? params[k] : m; });
+  }
+  return str;
+}
+
 /* Shared dose-frequency helper. Used by computeSeverity and SentinelHeadlines
    so every place agrees: weekly is one dose per 7 days (1/7 per day), and
    as-needed medication (stored as 'asNeeded'; 'prn' accepted as an alias)
@@ -11546,14 +11562,18 @@ const SentinelHeadlines = (() => {
     /* Signal 1: Interaction recency */
     let interactions = [];
     try { interactions = await RemielDB.getInteractionsByContact(cid); } catch(_) {}
-    let daysSince = 999;
-    if (interactions.length > 0) {
-      const last = interactions[interactions.length - 1];
-      daysSince = (now - (last.timestamp || last.ts || 0)) / DAY_MS;
+    /* Newest real contact by timestamp; null when there has never been one */
+    let daysSince = null;
+    const _real = interactions.filter(e => SEV_CONTACT_TYPES.indexOf(e.type) !== -1);
+    if (_real.length > 0) {
+      const lastTs = Math.max(..._real.map(e => e.timestamp || e.ts || 0));
+      daysSince = (now - lastTs) / DAY_MS;
     }
-    if (daysSince > 21) candidates.push({ headline: 'NO CONTACT IN ' + Math.round(daysSince) + ' DAYS', priority: P.OVERDUE_CONTACT + 5 });
-    else if (daysSince > 14) candidates.push({ headline: "HASN'T HEARD FROM YOU IN 2 WEEKS", priority: P.OVERDUE_CONTACT });
-    else if (daysSince > 7) candidates.push({ headline: 'BEEN A WHILE — REACH OUT', priority: P.OVERDUE_CONTACT - 5 });
+    if (daysSince !== null) {
+      if (daysSince > 21) candidates.push({ headline: _t('hl.noContactDays', 'NO CONTACT IN {count} DAYS', { count: Math.round(daysSince) }), priority: P.OVERDUE_CONTACT + 5 });
+      else if (daysSince > 14) candidates.push({ headline: _t('hl.twoWeeks', "HASN'T HEARD FROM YOU IN 2 WEEKS"), priority: P.OVERDUE_CONTACT });
+      else if (daysSince > 7) candidates.push({ headline: _t('hl.beenAWhile', 'BEEN A WHILE: REACH OUT'), priority: P.OVERDUE_CONTACT - 5 });
+    }
 
     const recentIx = interactions.filter(e => (now - (e.timestamp || e.ts || 0)) < 7 * DAY_MS);
     if (recentIx.length === 0 && interactions.length > 0) candidates.push({ headline: 'QUIET WEEK', priority: P.QUIET_WEEK });
@@ -11562,7 +11582,8 @@ const SentinelHeadlines = (() => {
     /* Signal 2: Mood trajectory */
     let moods = [];
     try { moods = await RemielDB.getMoodsByContact(cid); } catch(_) {}
-    const recentMoods = moods.filter(m => (now - (m.timestamp || m.ts || 0)) < 14 * DAY_MS);
+    const recentMoods = moods.filter(m => typeof m.level === 'number' && (now - (m.ts || m.timestamp || 0)) < 14 * DAY_MS)
+      .sort((a, b) => (a.ts || a.timestamp || 0) - (b.ts || b.timestamp || 0));
     const last5 = recentMoods.slice(-5);
     if (last5.length > 0) {
       const avgMood = last5.reduce((s, m) => s + (m.level || 3), 0) / last5.length;
@@ -11583,11 +11604,10 @@ const SentinelHeadlines = (() => {
     try {
       const meds = (await RemielDB.getMedicationsByContact(cid)).filter(m => m.active !== false);
       if (meds.length > 0) {
-        const FREQ_SLOTS = { daily: 1, bid: 2, tid: 3, qid: 4, weekly: 0.143, asNeeded: 0 };
         const cutoff48 = now - 48 * 3600 * 1000;
         let missed = 0;
         for (const med of meds) {
-          const slots = FREQ_SLOTS[med.frequency || 'daily'] || 0;
+          const slots = dosesPerDay(med.frequency);
           if (!slots) continue;
           const expected = Math.round(slots * 2);
           const taken = (med.doseLog || []).filter(d => d.ts >= cutoff48 && d.action === 'taken').length;
@@ -11602,15 +11622,22 @@ const SentinelHeadlines = (() => {
     try {
       const profile = await RemielDB.getProfile(cid);
       if (profile && profile.birthday) {
-        const bd = new Date(profile.birthday + 'T00:00:00');
+        /* Whole calendar days between local dates (no time-of-day or DST
+           drift), with wrap into next year once this year's date has passed. */
+        const parts = String(profile.birthday).split('-');
+        const bMonth = parseInt(parts[1], 10) - 1, bDay = parseInt(parts[2], 10);
         const today = new Date();
-        const thisYearBd = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
-        const diff = (thisYearBd - today) / DAY_MS;
-        if (diff >= 0 && diff < 1) candidates.push({ headline: 'BIRTHDAY TODAY! 🎂', priority: P.BIRTHDAY_TODAY });
-        else if (diff >= 1 && diff <= 3) candidates.push({ headline: 'BIRTHDAY IN ' + Math.ceil(diff) + ' DAYS', priority: P.BIRTHDAY_SOON });
-        else if (diff >= 4 && diff <= 7) candidates.push({ headline: 'BIRTHDAY THIS WEEK', priority: P.BIRTHDAY_SOON - 10 });
-        /* Yesterday */
-        if (diff < 0 && diff > -2) candidates.push({ headline: 'BIRTHDAY WAS YESTERDAY', priority: P.BIRTHDAY_SOON - 5 });
+        const t0 = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+        const dayDiff = (y) => Math.round((Date.UTC(y, bMonth, bDay) - t0) / DAY_MS);
+        let diff = dayDiff(today.getFullYear());
+        const yesterday = diff === -1 || dayDiff(today.getFullYear() + 1) === -1 || dayDiff(today.getFullYear() - 1) === -1;
+        if (diff < 0) diff = dayDiff(today.getFullYear() + 1);
+        if (!isNaN(diff)) {
+          if (diff === 0) candidates.push({ headline: _t('hl.bdayToday', 'BIRTHDAY TODAY! 🎂'), priority: P.BIRTHDAY_TODAY });
+          else if (diff >= 1 && diff <= 3) candidates.push({ headline: diff === 1 ? _t('hl.bdayTomorrow', 'BIRTHDAY TOMORROW') : _t('hl.bdayInDays', 'BIRTHDAY IN {count} DAYS', { count: diff }), priority: P.BIRTHDAY_SOON });
+          else if (diff >= 4 && diff <= 7) candidates.push({ headline: _t('hl.bdayWeek', 'BIRTHDAY THIS WEEK'), priority: P.BIRTHDAY_SOON - 10 });
+          else if (yesterday) candidates.push({ headline: _t('hl.bdayYesterday', 'BIRTHDAY WAS YESTERDAY'), priority: P.BIRTHDAY_SOON - 5 });
+        }
       }
     } catch(_) {}
 
@@ -11636,10 +11663,12 @@ const SentinelHeadlines = (() => {
         const age = (now - (wellness.ts || 0)) / DAY_MS;
         if (age < 7) {
           const vMap = {
-            'Distressed': { h: 'VOICE SIGNALS CONCERN', p: P.VOICE_DISTRESS },
-            'Low': { h: 'VOICE SOUNDS STRAINED', p: P.VOICE_LOW },
-            'Agitated': { h: 'VOCAL STRESS DETECTED', p: P.VOICE_AGITATED },
-            'Elevated': { h: 'SOUNDING ENERGIZED', p: P.VOICE_ELEVATED }
+            /* On-device heuristic compared with this person's own recordings;
+               wording describes a difference, never a diagnosis. */
+            'Distressed': { h: _t('hl.voiceStrained', 'VOICE SOUNDED STRAINED COMPARED WITH THEIR USUAL'), p: P.VOICE_DISTRESS },
+            'Low': { h: _t('hl.voiceFlat', 'VOICE SOUNDED FLATTER THAN THEIR USUAL'), p: P.VOICE_LOW },
+            'Agitated': { h: _t('hl.voiceTense', 'VOICE SOUNDED MORE TENSE THAN THEIR USUAL'), p: P.VOICE_AGITATED },
+            'Elevated': { h: _t('hl.voiceLively', 'VOICE SOUNDED LIVELIER THAN THEIR USUAL'), p: P.VOICE_ELEVATED }
           };
           const v = vMap[wellness.state];
           if (v) candidates.push({ headline: v.h, priority: v.p });
