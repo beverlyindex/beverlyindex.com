@@ -7679,20 +7679,365 @@ var SphereMedia = (function () {
 
   function localOnlyNotice() { return _t('media.localOnly', 'Kept on this device only (over 4 MB)'); }
 
-  /* Load stored media into a contact sphere */
-  function show(cid, blob, kind) {
+  /* ── Playback. Animated media is drawn into one canvas per sphere (entry.img),
+     which every renderer already draws like a photo; entry.still keeps the first
+     frame for DOM avatars and for spheres outside the decode budget. ── */
+  var MAX_ACTIVE = 3, MAX_EDGE = 512, MAX_FRAMES = 150;
+  var _entries = new Map(); /* key ('self' or contact id as string) -> entry */
+  var _active = new Set();
+  var _raf = 0, _lastSel = 0;
+
+  function _reduced() {
+    try { return (typeof A11y !== 'undefined' && A11y.reducedMotion) ? !!A11y.reducedMotion() : false; } catch (e) { return false; }
+  }
+  function _fitSize(w, h) {
+    var sc = Math.min(1, MAX_EDGE / Math.max(w || 1, h || 1));
+    return { w: Math.max(1, Math.round(w * sc)), h: Math.max(1, Math.round(h * sc)) };
+  }
+  function _canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function _normDelay(d) { return d <= 10 ? 100 : Math.max(20, d); }
+
+  /* GIF structure: logical screen, palettes and each frame's control data */
+  function gifParse(u8) {
+    if (!/^GIF8[79]a$/.test(_str(u8, 0, 6))) throw new Error('not a gif');
+    var W = u8[6] | (u8[7] << 8), H = u8[8] | (u8[9] << 8), pf = u8[10], p = 13, gct = null;
+    if (pf & 0x80) { var n = 3 * (1 << ((pf & 7) + 1)); gct = u8.subarray(p, p + n); p += n; }
+    var frames = [], gce = { delay: 0, disposal: 0, trans: -1 };
+    while (p < u8.length) {
+      var b = u8[p++];
+      if (b === 0x3B) break;
+      if (b === 0x21) {
+        var label = u8[p++];
+        if (label === 0xF9 && u8[p] === 4) {
+          var f = u8[p + 1];
+          gce = { disposal: (f >> 2) & 7, trans: (f & 1) ? u8[p + 4] : -1, delay: (u8[p + 2] | (u8[p + 3] << 8)) * 10 };
+        }
+        while (p < u8.length) { var sz = u8[p++]; if (!sz) break; p += sz; }
+      } else if (b === 0x2C) {
+        var fx = u8[p] | (u8[p + 1] << 8), fy = u8[p + 2] | (u8[p + 3] << 8);
+        var fw = u8[p + 4] | (u8[p + 5] << 8), fh = u8[p + 6] | (u8[p + 7] << 8), fpf = u8[p + 8];
+        p += 9;
+        var lct = null;
+        if (fpf & 0x80) { var n2 = 3 * (1 << ((fpf & 7) + 1)); lct = u8.subarray(p, p + n2); p += n2; }
+        var minCode = u8[p++], chunks = [], total = 0;
+        while (p < u8.length) { var s2 = u8[p++]; if (!s2) break; chunks.push(u8.subarray(p, p + s2)); total += s2; p += s2; }
+        frames.push({ x: fx, y: fy, w: fw, h: fh, pal: lct || gct, interlace: !!(fpf & 0x40), minCode: minCode,
+          chunks: chunks, total: total, delay: gce.delay, disposal: gce.disposal, trans: gce.trans });
+        gce = { delay: 0, disposal: 0, trans: -1 };
+      } else break;
+    }
+    return { W: W, H: H, frames: frames };
+  }
+
+  /* LZW decode of one frame's image data into palette indices */
+  function _lzw(minCode, chunks, total, npix) {
+    var data = new Uint8Array(total), o = 0;
+    for (var k = 0; k < chunks.length; k++) { data.set(chunks[k], o); o += chunks[k].length; }
+    var out = new Uint8Array(npix);
+    var clear = 1 << minCode, eoi = clear + 1;
+    var size = minCode + 1, mask = (1 << size) - 1, next = eoi + 1, old = -1, first = 0;
+    var prefix = new Int16Array(4096), suffix = new Uint8Array(4096), stack = new Uint8Array(4097);
+    for (var i = 0; i < clear; i++) { prefix[i] = -1; suffix[i] = i; }
+    var datum = 0, bits = 0, op = 0;
+    for (var j = 0; j < data.length && op < npix; j++) {
+      datum |= data[j] << bits; bits += 8;
+      while (bits >= size && op < npix) {
+        var code = datum & mask; datum >>>= size; bits -= size;
+        if (code === clear) { size = minCode + 1; mask = (1 << size) - 1; next = eoi + 1; old = -1; continue; }
+        if (code === eoi) { j = data.length; break; }
+        if (old === -1) { out[op++] = suffix[code]; old = code; first = code; continue; }
+        var sp = 0, c = code;
+        if (code >= next) { stack[sp++] = first; c = old; }
+        while (c > eoi) { stack[sp++] = suffix[c]; c = prefix[c]; }
+        first = suffix[c]; stack[sp++] = first;
+        if (next < 4096) {
+          prefix[next] = old; suffix[next] = first; next++;
+          if ((next & mask) === 0 && next < 4096) { size++; mask = (1 << size) - 1; }
+        }
+        old = code;
+        while (sp > 0 && op < npix) out[op++] = stack[--sp];
+      }
+    }
+    return out;
+  }
+
+  /* Which frames to keep: every frame up to MAX_FRAMES, else an even sample.
+     A kept frame's delay covers the frames sampled away after it. */
+  function _plan(meta) {
+    var n = meta.frames.length, step = Math.max(1, Math.ceil(n / MAX_FRAMES)), keep = [], delays = [];
+    for (var i = 0; i < n; i += step) {
+      var d = 0;
+      for (var k = i; k < Math.min(n, i + step); k++) d += _normDelay(meta.frames[k].delay);
+      keep.push(i); delays.push(d);
+    }
+    return { keep: keep, delays: delays };
+  }
+
+  /* Inline decoder: compositing with disposal methods 0 to 3 */
+  function _decodeInline(u8, meta, plan, onlyFirst) {
+    var W = meta.W || 1, H = meta.H || 1, sz = _fitSize(W, H);
+    var work = _canvas(W, H), wx = work.getContext('2d');
+    var img = wx.createImageData(W, H), px = img.data, saved = null;
+    var keepSet = new Set(plan.keep), out = [];
+    for (var i = 0; i < meta.frames.length; i++) {
+      var f = meta.frames[i];
+      if (f.disposal === 3) saved = new Uint8ClampedArray(px);
+      var npix = f.w * f.h, idx = _lzw(f.minCode, f.chunks, f.total, npix), pal = f.pal;
+      if (pal) {
+        var rows = [];
+        if (f.interlace) {
+          [[0, 8], [4, 8], [2, 4], [1, 2]].forEach(function (pp) { for (var r = pp[0]; r < f.h; r += pp[1]) rows.push(r); });
+        } else for (var r2 = 0; r2 < f.h; r2++) rows.push(r2);
+        for (var ri = 0; ri < rows.length; ri++) {
+          var y = f.y + rows[ri];
+          if (y >= H) continue;
+          for (var xx = 0; xx < f.w; xx++) {
+            var x = f.x + xx;
+            if (x >= W) continue;
+            var ci = idx[ri * f.w + xx];
+            if (ci === f.trans) continue;
+            var q = (y * W + x) * 4;
+            px[q] = pal[ci * 3]; px[q + 1] = pal[ci * 3 + 1]; px[q + 2] = pal[ci * 3 + 2]; px[q + 3] = 255;
+          }
+        }
+      }
+      if (keepSet.has(i)) {
+        wx.putImageData(img, 0, 0);
+        var c = _canvas(sz.w, sz.h);
+        c.getContext('2d').drawImage(work, 0, 0, sz.w, sz.h);
+        out.push(c);
+        if (onlyFirst) break;
+      }
+      if (f.disposal === 2) {
+        for (var yy = f.y; yy < Math.min(H, f.y + f.h); yy++)
+          for (var x2 = f.x; x2 < Math.min(W, f.x + f.w); x2++) { var q2 = (yy * W + x2) * 4; px[q2] = px[q2 + 1] = px[q2 + 2] = px[q2 + 3] = 0; }
+      } else if (f.disposal === 3 && saved) {
+        px.set(saved);
+      }
+    }
+    return out;
+  }
+
+  /* WebCodecs ImageDecoder when present (it composites frames itself) */
+  async function _decodeWebCodecs(buf, meta, plan, onlyFirst) {
+    var dec = new ImageDecoder({ data: buf, type: 'image/gif' });
+    try {
+      await dec.tracks.ready;
+      try { await dec.completed; } catch (e) {}
+      var sz = _fitSize(meta.W, meta.H), out = [];
+      var list = onlyFirst ? [0] : plan.keep;
+      for (var i = 0; i < list.length; i++) {
+        var r = await dec.decode({ frameIndex: list[i] });
+        var c = _canvas(sz.w, sz.h);
+        c.getContext('2d').drawImage(r.image, 0, 0, sz.w, sz.h);
+        try { r.image.close(); } catch (e) {}
+        out.push(c);
+      }
+      return out;
+    } finally { try { dec.close(); } catch (e) {} }
+  }
+
+  async function decodeGif(blob, onlyFirst) {
+    var buf = await blob.arrayBuffer(), u8 = new Uint8Array(buf);
+    var meta = gifParse(u8), plan = _plan(meta), frames = null;
+    if (typeof ImageDecoder === 'function') {
+      try { frames = await _decodeWebCodecs(buf, meta, plan, onlyFirst); } catch (e) { frames = null; }
+    }
+    if (!frames || !frames.length) frames = _decodeInline(u8, meta, plan, onlyFirst);
+    var sz = _fitSize(meta.W, meta.H);
+    return { frames: frames, delays: plan.delays, w: sz.w, h: sz.h, total: plan.delays.reduce(function (a, b) { return a + b; }, 0) };
+  }
+
+  /* Poster when the browser cannot decode a clip (for example some MOV files) */
+  function _poster(w, h) {
+    var c = _canvas(w, h), x = c.getContext('2d');
+    var g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1e293b'); g.addColorStop(1, '#0b1220');
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    var r = Math.min(w, h) * 0.16;
+    x.fillStyle = 'rgba(224,242,254,0.85)';
+    x.beginPath(); x.moveTo(w / 2 - r * 0.6, h / 2 - r); x.lineTo(w / 2 + r, h / 2); x.lineTo(w / 2 - r * 0.6, h / 2 + r); x.closePath(); x.fill();
+    return c;
+  }
+
+  function _makeVideo(url) {
+    var v = document.createElement('video');
+    v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto';
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    /* Off screen but not display:none, which Safari suspends */
+    v.style.cssText = 'position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;';
+    v.setAttribute('aria-hidden', 'true');
+    v.addEventListener('ended', function () { v.currentTime = 0; if (!_reduced()) v.play().catch(function () {}); });
+    v.src = url;
+    document.body.appendChild(v);
+    return v;
+  }
+  function _dropVideo(e) {
+    if (!e.video) return;
+    try { e.video.pause(); e.video.removeAttribute('src'); e.video.load(); } catch (err) {}
+    if (e.video.parentNode) e.video.parentNode.removeChild(e.video);
+    e.video = null;
+  }
+  function _waitVideo(v, ms) {
+    return new Promise(function (res) {
+      var done = false, fin = function (ok) { if (done) return; done = true; clearTimeout(to); res(ok); };
+      var to = setTimeout(function () { fin(v.readyState >= 2); }, ms);
+      v.addEventListener('loadeddata', function () { fin(true); }, { once: true });
+      v.addEventListener('error', function () { fin(false); }, { once: true });
+      if (v.readyState >= 2) fin(true);
+    });
+  }
+
+  function release(key) {
+    key = String(key);
+    var e = _entries.get(key);
+    if (!e) return;
+    _dropVideo(e);
+    e.frames = null;
+    if (e.url) { try { URL.revokeObjectURL(e.url); } catch (err) {} }
+    _entries.delete(key); _active.delete(key);
+  }
+
+  /* Build an entry for animated media; resolves once the first frame is drawn */
+  async function load(key, blob, kind) {
+    key = String(key);
+    release(key);
+    var e = { key: key, kind: kind, blob: blob, mime: blob.type, url: URL.createObjectURL(blob), isAnim: true,
+      img: null, still: null, w: 0, h: 0, frames: null, delays: null, total: 0, t0: performance.now(), shown: -1 };
+    if (kind === 'gif') {
+      var first = await decodeGif(blob, true);
+      if (!first.frames.length) throw new Error('gif');
+      e.w = first.w; e.h = first.h; e.still = first.frames[0];
+    } else {
+      var v = _makeVideo(e.url), ok = await _waitVideo(v, 6000);
+      if (ok && v.videoWidth > 0) {
+        var sz = _fitSize(v.videoWidth, v.videoHeight);
+        e.w = sz.w; e.h = sz.h; e.still = _canvas(sz.w, sz.h);
+        try { e.still.getContext('2d').drawImage(v, 0, 0, sz.w, sz.h); } catch (err) {}
+        e.video = v;
+        _dropVideo(e); /* recreated when the sphere enters the decode budget */
+      } else {
+        try { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); } catch (err) {}
+        e.failed = true; e.w = 512; e.h = 512; e.still = _poster(512, 512);
+      }
+    }
+    e.img = _canvas(e.w, e.h);
+    e.img.getContext('2d').drawImage(e.still, 0, 0);
+    _entries.set(key, e);
+    _lastSel = 0;
+    _ensureLoop();
+    return e;
+  }
+
+  function _activate(e) {
+    if (_reduced() || e.failed) return;
+    if (e.kind === 'gif') {
+      if (e.frames || e.decoding) return;
+      e.decoding = true;
+      decodeGif(e.blob, false).then(function (d) {
+        e.decoding = false;
+        if (!_active.has(e.key) || _entries.get(e.key) !== e) return;
+        e.frames = d.frames; e.delays = d.delays; e.total = d.total || 100; e.t0 = performance.now(); e.shown = -1;
+      }).catch(function () { e.decoding = false; e.failed = true; });
+    } else {
+      if (!e.video) e.video = _makeVideo(e.url);
+      e.video.play().catch(function () {});
+    }
+  }
+  function _deactivate(e) {
+    e.frames = null; e.delays = null; e.shown = -1;
+    _dropVideo(e);
+    try { var x = e.img.getContext('2d'); x.clearRect(0, 0, e.w, e.h); x.drawImage(e.still, 0, 0); } catch (err) {}
+  }
+
+  /* Decode budget: the centre sphere, the focused or open person, then the nearest */
+  function _select(now) {
+    if (now - _lastSel < 250) return;
+    _lastSel = now;
+    var scores = [];
+    _entries.forEach(function (e, key) {
+      var sc = 0;
+      if (key === 'self') sc = 5000;
+      else {
+        try { if (typeof selectedContact !== 'undefined' && selectedContact && String(selectedContact.id) === key) sc += 2000; } catch (err) {}
+        try { if (typeof focusedContactId !== 'undefined' && String(focusedContactId) === key) sc += 1000; } catch (err) {}
+        try {
+          if (typeof NODES !== 'undefined' && typeof appState !== 'undefined' && appState === 'network') {
+            for (var i = 0; i < NODES.length; i++) if (String(NODES[i].contact.id) === key) { sc += projectNode(NODES[i]).scale || 0; break; }
+          }
+        } catch (err) {}
+      }
+      scores.push({ key: key, sc: sc });
+    });
+    scores.sort(function (a, b) { return b.sc - a.sc; });
+    var want = new Set(scores.slice(0, MAX_ACTIVE).map(function (s) { return s.key; }));
+    _active.forEach(function (key) { if (!want.has(key)) { _active.delete(key); var e = _entries.get(key); if (e) _deactivate(e); } });
+    want.forEach(function (key) { var e = _entries.get(key); if (!e) return; _active.add(key); _activate(e); });
+  }
+
+  function _tick(now) {
+    var rm = _reduced();
+    _active.forEach(function (key) {
+      var e = _entries.get(key);
+      if (!e || e.failed) return;
+      var x = e.img.getContext('2d');
+      if (rm) {
+        if (e.shown !== 0) { x.clearRect(0, 0, e.w, e.h); x.drawImage(e.still, 0, 0); e.shown = 0; }
+        if (e.video && !e.video.paused) e.video.pause();
+        return;
+      }
+      if (e.kind === 'gif') {
+        if (!e.frames || !e.frames.length) return;
+        var t = (now - e.t0) % e.total, i = 0;
+        while (i < e.delays.length - 1 && t >= e.delays[i]) { t -= e.delays[i]; i++; }
+        if (i !== e.shown) { x.clearRect(0, 0, e.w, e.h); x.drawImage(e.frames[i], 0, 0, e.w, e.h); e.shown = i; }
+      } else if (e.video) {
+        if (e.video.paused) e.video.play().catch(function () {});
+        if (e.video.readyState >= 2) { try { x.drawImage(e.video, 0, 0, e.w, e.h); e.shown = 1; } catch (err) {} }
+      }
+    });
+  }
+
+  function _loop(now) {
+    _raf = 0;
+    if (!_entries.size) return;
+    try { _select(now); _tick(now); } catch (e) {}
+    _raf = requestAnimationFrame(_loop);
+  }
+  function _ensureLoop() { if (!_raf) _raf = requestAnimationFrame(_loop); }
+
+  /* Load stored media into a contact sphere; resolves with the sphere entry */
+  async function show(cid, blob, kind) {
     kind = kind || kindFromMime(blob && blob.type);
-    if (kind === 'video') { loadBroadcastIntoSphere(cid, blob); return Promise.resolve(); }
+    if (kind === 'gif' || kind === 'video') {
+      var e = await load(cid, blob, kind);
+      var entry = { img: e.img, still: e.still, w: e.w, h: e.h, kind: kind, isAnim: true, url: e.url, failed: !!e.failed, mime: e.mime };
+      contactPhotos.set(cid, entry);
+      return entry;
+    }
+    release(cid);
     return new Promise(function (res) {
       var img = new Image();
-      img.onload = function () { contactPhotos.set(cid, { img: img, w: img.naturalWidth, h: img.naturalHeight }); res(); };
-      img.onerror = function () { res(); };
+      img.onload = function () { var en = { img: img, w: img.naturalWidth, h: img.naturalHeight, kind: 'photo' }; contactPhotos.set(cid, en); res(en); };
+      img.onerror = function () { res(null); };
       img.src = URL.createObjectURL(blob);
     });
   }
 
+  /* Put animated media in the centre sphere; the canvas is both media and mediaFrame */
+  async function applySelf(blob, kind) {
+    var e = await load('self', blob, kind);
+    try { videoEl.pause(); videoEl.removeAttribute('src'); } catch (err) {}
+    media = e.img; mediaType = 'image'; mediaIsGif = false; mediaFrame = e.img;
+    cachedMediaW = e.w; cachedMediaH = e.h;
+    return e;
+  }
+  function selfEntry() { return _entries.get('self') || null; }
+  function cannotPlayNotice() { return _t('media.cannotPlay', 'This clip cannot play in this browser. A still is shown.'); }
+
   return { SYNC_MAX: SYNC_MAX, ACCEPT: ACCEPT, kindFromMime: kindFromMime, gifFrameCount: gifFrameCount,
-    sniff: sniff, prepare: prepare, localOnlyNotice: localOnlyNotice, show: show };
+    sniff: sniff, prepare: prepare, localOnlyNotice: localOnlyNotice, show: show, load: load, release: release,
+    applySelf: applySelf, selfEntry: selfEntry, decodeGif: decodeGif, gifParse: gifParse, cannotPlayNotice: cannotPlayNotice,
+    activeCount: function () { return _active.size; } };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -8118,9 +8463,16 @@ async function launchGalaxy(savedContacts) {
         const blobType = blob.type || '';
         console.log('RemielDB: restoring photo for', p.contactId, 'type:', blobType, 'size:', blob.size);
         if (blob.size === 0) { console.warn('RemielDB: empty blob for', p.contactId); continue; }
-        if (blobType.startsWith('video/')) {
-          /* Video blob — load as looping video element */
-          loadBroadcastIntoSphere(p.contactId, blob);
+        /* Records before the media model have no kind: detect from the bytes */
+        let _kind = p.kind;
+        if (!_kind) { try { _kind = (await SphereMedia.sniff(blob)).kind; } catch (e) { _kind = SphereMedia.kindFromMime(blobType); } }
+        if (_kind === 'gif' || _kind === 'video') {
+          if (p.contactId === 'self') {
+            try { PhotoFit.loadSelf(); } catch (e) {}
+            await SphereMedia.applySelf(blob, _kind);
+          } else {
+            await SphereMedia.show(p.contactId, blob, _kind);
+          }
         } else {
           /* Image/GIF blob — load as Image */
           const url = URL.createObjectURL(blob);
@@ -10798,6 +11150,7 @@ const I18n = (function () {
     "self.fitHint": "Drag the preview to position, pinch or scroll to zoom.",
     "self.previewAria": "Preview of your sphere",
     "media.localOnly": "Kept on this device only (over 4 MB)",
+    "media.cannotPlay": "This clip cannot play in this browser. A still is shown.",
     "views.newTitle": "New {type} view",
     "views.editTitle": "Edit {type} view",
     "views.title": "Circle Views",
@@ -11067,6 +11420,7 @@ const I18n = (function () {
     "self.fitHint": "Trascina l’anteprima per posizionarla, pizzica o scorri per lo zoom.",
     "self.previewAria": "Anteprima della tua sfera",
     "media.localOnly": "Conservato solo su questo dispositivo (oltre 4 MB)",
+    "media.cannotPlay": "Questa clip non può essere riprodotta in questo browser. Viene mostrata un’immagine fissa.",
     "views.newTitle": "Nuova vista {type}",
     "views.editTitle": "Modifica vista {type}",
     "views.title": "Viste della cerchia",
@@ -20869,16 +21223,17 @@ const PhotoFit = (() => {
   const _av = new WeakMap();
   function avatarUrl(photo, px, f) {
     if (!photo || !photo.img || !(photo.w > 0)) return '';
+    const src = photo.still || photo.img; /* animated media: first frame in DOM avatars */
     const key = px + '|' + JSON.stringify(f || null);
-    let m = _av.get(photo.img);
+    let m = _av.get(src);
     if (m && m[key] && !photo.isVideo) return m[key];
     try {
       const c = document.createElement('canvas'); c.width = c.height = px;
       const x = c.getContext('2d');
       x.beginPath(); x.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2); x.clip();
-      draw(x, photo.img, photo.w, photo.h, px / 2, px / 2, px / 2, f);
+      draw(x, src, photo.w, photo.h, px / 2, px / 2, px / 2, f);
       const u = c.toDataURL('image/jpeg', 0.85);
-      if (!m) { m = {}; _av.set(photo.img, m); }
+      if (!m) { m = {}; _av.set(src, m); }
       m[key] = u;
       return u;
     } catch (e) { return ''; }
@@ -20925,38 +21280,20 @@ function drawContactPhotoInSphere(ctx, photo, sx, sy, r, fit) {
 async function applySelfMedia(file) {
   const prep = await SphereMedia.prepare(file);
   const f = prep.blob;
-  const isVideo = prep.kind === 'video';
-  mediaIsGif = prep.kind === 'gif';
   applySelfMedia.localOnly = prep.localOnly;
-  if (isVideo) {
-    /* The clip is the sphere media record itself, so it syncs like a photo */
-    const okV = await RemielDB.putPhoto('self', f, 'video');
-    if (okV === false) throw new Error('store');
+  applySelfMedia.failed = false;
+  if (prep.kind === 'gif' || prep.kind === 'video') {
+    /* The GIF or clip is the sphere media record itself, so it syncs like a photo */
+    const e = await SphereMedia.applySelf(f, prep.kind);
+    applySelfMedia.failed = !!e.failed;
+    const okA = await RemielDB.putPhoto('self', f, prep.kind);
+    if (okA === false) throw new Error('store');
     await RemielDB.putSetting('selfSphereClearedAt', null).catch(() => {});
-    const url = URL.createObjectURL(f);
-    mediaType = 'video';
-    videoEl.src = url; videoEl.load();
-    videoEl.play().catch(() => {});
-    await new Promise((res, rej) => {
-      const to = setTimeout(res, 4000);
-      videoEl.addEventListener('loadeddata', function onLoad() {
-        videoEl.removeEventListener('loadeddata', onLoad);
-        clearTimeout(to);
-        media = videoEl;
-        const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
-        if (vw > 0 && vh > 0) {
-          cachedMediaW = vw; cachedMediaH = vh;
-          if (!mediaFrame) mediaFrame = document.createElement('canvas');
-          mediaFrame.width = vw; mediaFrame.height = vh;
-          mediaFrame.getContext('2d').drawImage(videoEl, 0, 0, vw, vh);
-        }
-        PhotoFit.resetSelf();
-        res();
-      });
-      videoEl.addEventListener('error', function onErr() { videoEl.removeEventListener('error', onErr); clearTimeout(to); rej(new Error('video')); }, { once: true });
-    });
-    return 'video';
+    PhotoFit.resetSelf();
+    return prep.kind;
   }
+  SphereMedia.release('self');
+  mediaIsGif = false;
   const blob = f;
   const url = URL.createObjectURL(blob);
   const img = new Image();
@@ -20966,7 +21303,7 @@ async function applySelfMedia(file) {
   videoEl.removeAttribute('src');
   media = img;
   cachedMediaW = img.naturalWidth || img.width; cachedMediaH = img.naturalHeight || img.height;
-  if (!mediaFrame) mediaFrame = document.createElement('canvas');
+  mediaFrame = document.createElement('canvas');
   mediaFrame.width = cachedMediaW; mediaFrame.height = cachedMediaH;
   mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
   const ok = await RemielDB.putPhoto('self', blob, prep.kind);
@@ -20977,6 +21314,7 @@ async function applySelfMedia(file) {
 }
 
 async function clearSelfMedia() {
+  SphereMedia.release('self');
   media = null; mediaType = null; mediaFrame = null; mediaIsGif = false;
   cachedMediaW = 0; cachedMediaH = 0;
   PhotoFit.resetSelf();
@@ -21107,7 +21445,8 @@ const SelfSphere = (() => {
     try {
       await applySelfMedia(f);
       unbusy(b);
-      _refreshAll(applySelfMedia.localOnly ? SphereMedia.localOnlyNotice() : _t('self.updated', 'Photo updated'));
+      _refreshAll(applySelfMedia.failed ? SphereMedia.cannotPlayNotice()
+        : applySelfMedia.localOnly ? SphereMedia.localOnlyNotice() : _t('self.updated', 'Photo updated'));
     } catch (err) {
       unbusy(b);
       console.warn('[SelfSphere] update failed', err);
@@ -21199,8 +21538,8 @@ const SelfSphere = (() => {
     const rs = q('[data-ss="reset"]');
     if (rs) rs.onclick = () => { PhotoFit.resetSelf(); _status(root, _t('self.updated', 'Photo updated'), false); };
     /* Video clips: keep the preview moving while the block is on screen */
-    if (mediaType === 'video' && !host._ssTick) {
-      host._ssTick = setInterval(() => { if (!host.isConnected) { clearInterval(host._ssTick); host._ssTick = 0; return; } _drawPreview(host.querySelector('.ss-preview')); }, 250);
+    if ((mediaType === 'video' || SphereMedia.selfEntry()) && !host._ssTick) {
+      host._ssTick = setInterval(() => { if (!host.isConnected) { clearInterval(host._ssTick); host._ssTick = 0; return; } _drawPreview(host.querySelector('.ss-preview')); }, SphereMedia.selfEntry() ? 100 : 250);
     }
     const rm = q('[data-ss="remove"]');
     if (rm) rm.onclick = async () => {
@@ -22678,8 +23017,8 @@ function frame(ts) {
         /* Re-capture animated GIF to mediaFrame for mini-sphere */
         mediaFrame.getContext('2d').drawImage(media, 0, 0, cachedMediaW, cachedMediaH);
         miniPhoto = { img: mediaFrame, w: cachedMediaW, h: cachedMediaH };
-      } else if (mediaType === 'image' && media.naturalWidth > 0) {
-        miniPhoto = { img: media, w: media.naturalWidth, h: media.naturalHeight };
+      } else if (mediaType === 'image' && (media.naturalWidth || media.width) > 0) {
+        miniPhoto = { img: media, w: media.naturalWidth || media.width, h: media.naturalHeight || media.height };
       }
     }
     if (miniPhoto && miniPhoto.img) {
