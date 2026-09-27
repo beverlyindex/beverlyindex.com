@@ -10745,6 +10745,11 @@ async function _obSaveAndLaunch() {
   /* Launch the galaxy with the newly-saved contacts */
   const saved = await RemielDB.getAllContacts();
   await launchGalaxy(saved);
+  /* New users land in the network view so they see their people at once;
+     enterNetwork shows the net-tap guidance banner. */
+  if (saved.length > 0 && appState !== 'network') {
+    try { enterNetwork(); } catch (e) { console.warn('obLaunch enterNetwork', e); }
+  }
   setTimeout(() => { if (typeof SentinelTour !== 'undefined') SentinelTour.offer(); }, 4000);
 }
 
@@ -11680,11 +11685,31 @@ const NET_DIST_BASE = 640; /* original NET_DIST — zoom scales this */
 // NODES declared above (before resize)
 let networkExpanded = false;
 
+/* Small circles (N <= 6): place people on a ring that always projects at least
+   1.6 times the centre sphere radius away from the centre. The vertical offset
+   is invariant under auto-spin (yaw), so each person alternates above and below
+   the centre while the angles around the vertical axis are spread evenly. */
+const SMALL_CIRCLE_MAX = 6;
+function _smallRingTarget(i, N) {
+  if (N > SMALL_CIRCLE_MAX || N < 1) return null;
+  const W = CV.width / DPR;
+  const cR = Math.max(38, Math.round((Math.min(400, W * 0.88)) * (W < 500 ? 0.22 : 0.26)));
+  const s0 = NET_FOV / (NET_FOV + NET_DIST);
+  const rh = Math.min(1.9 * cR, W / 2 - 40) / s0;
+  const back = NET_FOV / (NET_FOV + NET_DIST + rh);
+  const y = (1.6 * cR * 1.2) / back;
+  const th = (i / N) * Math.PI * 2 + Math.PI / 2;
+  const sign = N === 1 ? 1 : (i % 2 === 0 ? -1 : 1);
+  return [Math.cos(th) * rh, sign * y, Math.sin(th) * rh];
+}
+
 function rebuildNodeTargets() {
   const smaller = Math.min(CV.width / DPR, CV.height / DPR);
   const shellR = Math.max(200, Math.round(smaller * 0.6));
   const N = DEMO_CONTACTS.length;
   NODES.forEach((node, i) => {
+    const _ring = _smallRingTarget(i, NODES.length);
+    if (_ring) { node.tx = _ring[0]; node.ty = _ring[1]; node.tz = _ring[2]; return; }
     const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
     const fr = Math.sqrt(Math.max(0, 1 - fy * fy));
     const th = i * 2.399963229728653 + Math.sin(i * 127.1) * 0.22;
@@ -11705,19 +11730,25 @@ function buildNodes(fresh) {
   const smaller = Math.min(CV.width / DPR, CV.height / DPR);
   /* Orbit shell must clear the enlarged center sphere — use 0.72 instead of 0.6 */
   const shellR = Math.max(260, Math.round(smaller * 0.78));
-  const nodeR = Math.max(20, Math.round(smaller * 0.042));
+  const nodeR = N <= SMALL_CIRCLE_MAX ? Math.max(20, Math.round(smaller * 0.075 * (NET_FOV + NET_DIST) / NET_FOV)) : Math.max(20, Math.round(smaller * 0.042));
 
   /* Ensure every contact has bio field before building nodes */
   _source.forEach(_ensureContactBio);
   NODES = _source.map((contact, i) => {
-    const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
-    const fr = Math.sqrt(Math.max(0, 1 - fy * fy));
-    const th = i * 2.399963229728653 + Math.sin(i * 127.1) * 0.22;
-    let tx = Math.cos(th) * fr, ty = fy, tz = Math.sin(th) * fr;
-    const L = Math.hypot(tx, ty, tz) || 1;
-    tx = tx / L * shellR;
-    ty = ty / L * shellR;
-    tz = tz / L * shellR;
+    let tx, ty, tz;
+    const _ring = _smallRingTarget(i, N);
+    if (_ring) {
+      tx = _ring[0]; ty = _ring[1]; tz = _ring[2];
+    } else {
+      const fy = (1 - 2 * (i + 0.5) / N) * 0.82;
+      const fr = Math.sqrt(Math.max(0, 1 - fy * fy));
+      const th = i * 2.399963229728653 + Math.sin(i * 127.1) * 0.22;
+      tx = Math.cos(th) * fr; ty = fy; tz = Math.sin(th) * fr;
+      const L = Math.hypot(tx, ty, tz) || 1;
+      tx = tx / L * shellR;
+      ty = ty / L * shellR;
+      tz = tz / L * shellR;
+    }
 
     return {
       contact: contact,
@@ -13312,6 +13343,8 @@ const SentinelGuide = (() => {
   /* ── Contextual triggers ── */
   let _launchOfferQueued = false;
   function onEnterSelf() {
+    /* A delayed self-view call must not replace network guidance */
+    if (typeof appState !== 'undefined' && appState === 'network') return;
     /* The daily summary tip belongs to the self view: keep it */
     ['top', 'bottom'].forEach((pos) => { if (_slots[pos] !== 'tour-offer' && _slots[pos] !== 'daily-summary') hide(pos); });
     /* Repeat an unanswered tour offer once on a later launch */
@@ -18709,7 +18742,8 @@ function drawNetworkView(t) {
       const _nameR = { x: p.sx - _nw / 2, y: p.sy + _r + 2 * _s, w: _nw, h: _nfs + 2 };
       const _hlR = { x: p.sx - 60 * _s, y: p.sy - _r - 8 * _s - _hfs - 2, w: 120 * _s, h: _hfs + 4 };
       if (_isF) { node._lblName = 1; node._lblHl = true; _placed.push(_nameR, _hlR); continue; }
-      const _nameOk = !_ov(_nameR, _cHit) && !_placed.some(q => _ov(q, _nameR));
+      /* Small circles are laid out clear of the centre, so names stay readable. */
+      const _nameOk = projected.length <= SMALL_CIRCLE_MAX || (!_ov(_nameR, _cHit) && !_placed.some(q => _ov(q, _nameR)));
       node._lblName = _nameOk ? 1 : 0.28;
       if (_nameOk) _placed.push(_nameR);
       const _hlOk = _nameOk && !_ov(_hlR, _cHit) && !_placed.some(q => _ov(q, _hlR));
