@@ -8788,6 +8788,10 @@ const I18n = (function () {
     'qa.video': "Video call {name}",
     'qa.noPhone': "No phone on file. Add one in Profile.",
     'qa.noEmail': "No email on file. Add one in Profile.",
+    'qa.missingPhone': "No phone number saved for {name}.",
+    'qa.missingEmail': "No email saved for {name}.",
+    'qa.missingSid': "Add {name}'s Sentinel ID to video call in Remiel Sentinel.",
+    'qa.edit': "Edit",
     'confirm.deleteView': "Delete view \"{name}\"? This cannot be undone.",
     'confirm.signOut': "Sign out? Your local data stays on this device.",
     'confirm.removePerson': "Remove this person? This cannot be undone.",
@@ -9182,6 +9186,10 @@ const I18n = (function () {
     'qa.video': "Videochiama {name}",
     'qa.noPhone': "Nessun telefono salvato. Aggiungilo nel Profilo.",
     'qa.noEmail': "Nessuna email salvata. Aggiungila nel Profilo.",
+    'qa.missingPhone': "Nessun numero di telefono salvato per {name}.",
+    'qa.missingEmail': "Nessuna email salvata per {name}.",
+    'qa.missingSid': "Aggiungi l'ID Sentinel di {name} per videochiamare in Remiel Sentinel.",
+    'qa.edit': "Modifica",
     'confirm.deleteView': "Eliminare la vista \"{name}\"? Non si può annullare.",
     'confirm.signOut': "Vuoi uscire? I tuoi dati restano su questo dispositivo.",
     'confirm.removePerson': "Rimuovere questa persona? Non si può annullare.",
@@ -12057,10 +12065,12 @@ async function updateBlufContent() {
     if (_qaEmail) _qaEmail.style.display = '';
     const _phone = selectedContact.phone || '';
     const _email = selectedContact.email || '';
+    /* QA3 #5: dimmed buttons stay tappable; a tap explains what is missing. */
     if (_qaCall) {
       _qaCall.href = _phone ? 'tel:' + normalizePhone(_phone) : '#';
       _qaCall.style.opacity = _phone ? '1' : '0.35';
-      _qaCall.style.pointerEvents = _phone ? 'auto' : 'none';
+      _qaCall.style.pointerEvents = 'auto';
+      _qaCall.dataset.missing = _phone ? '' : 'phone';
       _qaCall.title = _phone ? I18n.t('qa.call', { name: selectedContact.first }) : I18n.t('qa.noPhone');
     }
     if (_qaText) {
@@ -12074,14 +12084,24 @@ async function updateBlufContent() {
     if (_qaEmail) {
       _qaEmail.href = _email ? 'mailto:' + _email : '#';
       _qaEmail.style.opacity = _email ? '1' : '0.35';
-      _qaEmail.style.pointerEvents = _email ? 'auto' : 'none';
+      _qaEmail.style.pointerEvents = 'auto';
+      _qaEmail.dataset.missing = _email ? '' : 'email';
       _qaEmail.title = _email ? I18n.t('qa.email', { name: selectedContact.first }) : I18n.t('qa.noEmail');
     }
     if (_qaVideo) {
-      _qaVideo.href = _phone ? 'facetime:' + normalizePhone(_phone) : '#';
-      _qaVideo.style.opacity = _phone ? '1' : '0.35';
-      _qaVideo.style.pointerEvents = _phone ? 'auto' : 'none';
-      _qaVideo.title = _phone ? I18n.t('qa.video', { name: selectedContact.first }) : I18n.t('qa.noPhone');
+      /* QA3 #4: Video uses Sentinel Call when the contact has a Sentinel ID;
+         facetime: only as the Apple fallback. */
+      const _canVideo = _rsHasSid(selectedContact) || (_rsIsApple() && !!_phone);
+      _qaVideo.href = '#';
+      _qaVideo.style.opacity = _canVideo ? '1' : '0.35';
+      _qaVideo.style.pointerEvents = 'auto';
+      _qaVideo.dataset.missing = _canVideo ? '' : 'sid';
+      _qaVideo.title = _canVideo ? I18n.t('qa.video', { name: selectedContact.first }) : I18n.t('qa.missingSid', { name: selectedContact.first });
+      _qaVideo.onclick = function(e) {
+        e.preventDefault(); e.stopPropagation();
+        if (this.dataset.missing) return; /* the capture listener shows the hint */
+        startVideoWith(selectedContact);
+      };
     }
   }
 
@@ -16087,12 +16107,66 @@ function handleOverlayClick(e) {
 
 /* Quick action for a contact (galaxy icons and the accessible list view).
    type: 'video' | 'phone' | 'sms' | 'email' */
+function _rsHasSid(c) { return !!(c && typeof c.sentinelId === 'string' && /^[A-Z0-9]{8}$/i.test(c.sentinelId.trim())); }
+function _rsIsApple() {
+  try { return /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent || ''); } catch (e) { return false; }
+}
+
+/* Toast with tappable actions: actions = [{ label, run }]. */
+function showActionToast(msg, actions, ms) {
+  try { if (typeof A11y !== 'undefined') A11y.announce(msg); } catch (e) {}
+  var old = document.querySelector('.rs-action-toast');
+  if (old) old.remove();
+  var t = document.createElement('div');
+  t.className = 'rs-action-toast';
+  t.setAttribute('role', 'status');
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);max-width:min(92vw,420px);' +
+    'background:rgba(12,22,34,0.96);color:#e6f6ff;padding:10px 14px;border-radius:14px;font-size:13px;' +
+    'z-index:100002;border:1px solid rgba(56,189,248,0.35);display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
+  var span = document.createElement('span');
+  span.textContent = msg; span.style.flex = '1 1 180px';
+  t.appendChild(span);
+  var timer = null;
+  function close() { if (timer) clearTimeout(timer); t.remove(); }
+  (actions || []).forEach(function (a) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = a.label;
+    b.style.cssText = 'background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:10px;padding:6px 12px;font-weight:600;cursor:pointer;font-size:12px;';
+    b.addEventListener('click', function (e) { e.stopPropagation(); close(); try { a.run(); } catch (err) { console.warn(err); } });
+    t.appendChild(b);
+  });
+  document.body.appendChild(t);
+  timer = setTimeout(close, ms || 6000);
+  return t;
+}
+
+function _rsEditContact(c) {
+  try {
+    if (c && (!selectedContact || selectedContact.id !== c.id)) selectedContact = c;
+    openContactModal('edit', c);
+  } catch (e) { console.warn('edit contact failed', e); }
+}
+
+/* What is missing for this action, with Edit offered. */
+function explainMissingAction(kind, c) {
+  var name = (c && c.first) || I18n.t('call.thisContact');
+  var key = kind === 'email' ? 'qa.missingEmail' : (kind === 'sid' ? 'qa.missingSid' : 'qa.missingPhone');
+  showActionToast(I18n.t(key, { name: name }), [{ label: I18n.t('qa.edit'), run: function () { _rsEditContact(c); } }]);
+}
+
+/* Video: Sentinel Call when the contact has a Sentinel ID; FaceTime on
+   Apple devices with a phone number; otherwise ask for the Sentinel ID. */
+function startVideoWith(c) {
+  if (!c) return;
+  if (_rsHasSid(c) && typeof SentinelCall !== 'undefined') { SentinelCall.callContact(c); return; }
+  if (_rsIsApple() && c.phone) { window.location.href = 'facetime:' + normalizePhone(c.phone); return; }
+  explainMissingAction('sid', c);
+}
+
 function runContactQuickAction(type, c) {
   if (!c) return;
-  if (type === 'video' && c.phone) {
-    window.location.href = 'facetime:' + normalizePhone(c.phone);
-  } else if (type === 'video' && !c.phone) {
-    openQuickDial('video', c.first, c.id);
+  if (type === 'video') {
+    startVideoWith(c);
   } else if (type === 'phone' && c.phone) {
     window.location.href = 'tel:' + normalizePhone(c.phone);
   } else if (type === 'sms') {
@@ -16106,10 +16180,8 @@ function runContactQuickAction(type, c) {
       openQuickDial('email', c.first, c.id);
     } else if (type === 'phone' && c) {
       openQuickDial('call', c.first, c.id);
-    } else if (type === 'video' && c) {
-      openQuickDial('video', c.first, c.id);
     } else {
-      showToast('No contact info on file');
+      showToast(I18n.t('qa.noPhone'));
     }
   }
 }
@@ -25681,21 +25753,12 @@ const SentinelCall = (function() {
 
 document.querySelectorAll('#qaVideoBtn, #qaCallBtn, #qaTextBtn, #qaEmailBtn').forEach(btn => {
   btn.addEventListener('click', function(e) {
-    if (this.style.pointerEvents === 'none' || parseFloat(this.style.opacity) < 0.5) {
+    /* QA3 #5: a dimmed button explains what is missing and offers Edit. */
+    if (this.dataset.missing) {
       e.preventDefault();
       e.stopPropagation();
-      var isEmail = this.id === 'qaEmailBtn';
-      var isCall = this.id === 'qaCallBtn';
-      var isText = this.id === 'qaTextBtn';
-      var isVideo = this.id === 'qaVideoBtn';
-      if ((isCall || isText || isVideo) && selectedContact) {
-        /* Open quick-dial so user can enter a number */
-        openQuickDial(isVideo ? 'video' : (isText ? 'sms' : 'call'), selectedContact.first, selectedContact.id);
-      } else if (isEmail && selectedContact) {
-        openQuickDial('email', selectedContact.first, selectedContact.id);
-      } else {
-        showToast(I18n.t('qa.noPhone'));
-      }
+      if (selectedContact) explainMissingAction(this.dataset.missing, selectedContact);
+      else showToast(I18n.t('qa.noPhone'));
     }
   }, true);
 });
