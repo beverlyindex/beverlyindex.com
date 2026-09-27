@@ -31229,17 +31229,19 @@ function openContactModal(mode, contact) {
       if (circle && icon) {
         icon.style.display = 'none';
         circle.classList.add('has-media');
-        if (_existingPhoto.isVideo && _existingPhoto.img && _existingPhoto.img.src) {
+        /* Animated media keeps its object URL: the editor shows it moving */
+        var _esrc = _existingPhoto.url || (_existingPhoto.img && _existingPhoto.img.src);
+        if ((_existingPhoto.isVideo || _existingPhoto.kind === 'video') && _esrc && !_existingPhoto.failed) {
           var _evid = document.createElement('video');
-          _evid.src = _existingPhoto.img.src;
+          _evid.src = _esrc;
           _evid.muted = true; _evid.loop = true; _evid.playsInline = true;
           _evid.setAttribute('playsinline', '');
           _evid.autoplay = true;
           _evid.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
           circle.appendChild(_evid);
-        } else if (_existingPhoto.img && _existingPhoto.img.src) {
+        } else if (_esrc || _existingPhoto.still) {
           var _eimg = document.createElement('img');
-          _eimg.src = _existingPhoto.img.src;
+          _eimg.src = (_existingPhoto.kind === 'video' || !_esrc) ? _existingPhoto.still.toDataURL('image/jpeg', 0.85) : _esrc;
           _eimg.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
           circle.appendChild(_eimg);
         }
