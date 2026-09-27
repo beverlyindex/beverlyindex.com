@@ -5424,6 +5424,10 @@ button:active:not(:disabled), [role="button"]:active, .btn:active { transform: s
 .ui-confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
 .ui-confirm-actions button { min-height:44px; padding:0 18px; border-radius:10px; border:1px solid rgba(148,163,184,0.4); background:transparent; color:#e2e8f0; font-size:14px; }
 .ui-confirm-actions .ui-confirm-yes { background:#38bdf8; color:#0f172a; border-color:#38bdf8; font-weight:600; }
+.lib-pill { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(96px + env(safe-area-inset-bottom, 0px)); z-index:100001;
+  max-width:calc(100vw - 32px); display:flex; flex-wrap:wrap; align-items:center; gap:6px; background:rgba(15,23,42,0.94); color:#e2e8f0;
+  border:1px solid rgba(56,189,248,0.35); border-radius:14px; padding:8px 14px; font-size:12px; }
+.lib-pill button { background:transparent; color:#38bdf8; border:1px solid rgba(56,189,248,0.5); border-radius:8px; padding:4px 10px; font-size:12px; min-height:32px; }
 </style>
 
 
@@ -7143,17 +7147,58 @@ const VALID_HASHES = new Set([
 ]);
 
 /* ── Tesseract OCR lazy loader ── */
+/* Library loader with a visible progress pill; after 20s it offers Retry,
+   which injects a fresh script tag. The promise is reset on failure. */
+function _libPill(labelKey, fallback) {
+  var el = document.createElement('div');
+  el.className = 'lib-pill';
+  el.setAttribute('role', 'status');
+  el.innerHTML = '<span class="busy-spin" aria-hidden="true"></span><span class="lib-pill-t"></span>';
+  el.querySelector('.lib-pill-t').textContent = _t(labelKey, fallback);
+  document.body.appendChild(el);
+  return el;
+}
+function _loadScriptWithProgress(src, labelKey, fallback, isReady) {
+  return new Promise(function (resolve, reject) {
+    if (isReady()) { resolve(); return; }
+    var pill = _libPill(labelKey, fallback), settled = false, slowT = null, tag = null;
+    function finish(ok, err) {
+      if (settled) return; settled = true; clearTimeout(slowT);
+      try { pill.remove(); } catch (e) {}
+      if (ok) resolve(); else reject(err);
+    }
+    function inject() {
+      if (tag) { try { tag.remove(); } catch (e) {} }
+      tag = document.createElement('script');
+      tag.src = src;
+      tag.onload = function () { if (isReady()) finish(true); };
+      tag.onerror = function () { showSlow(true); };
+      document.head.appendChild(tag);
+      clearTimeout(slowT);
+      slowT = setTimeout(function () { showSlow(false); }, 20000);
+    }
+    function showSlow(failed) {
+      if (settled || pill.querySelector('button')) return;
+      var t = pill.querySelector('.lib-pill-t');
+      t.textContent = _t(labelKey, fallback) + '. ' + _t('lib.slow', 'This is taking longer than usual.');
+      var r = document.createElement('button'); r.type = 'button'; r.textContent = _t('lib.retry', 'Retry');
+      r.onclick = function () { r.remove(); t.textContent = _t(labelKey, fallback); inject(); };
+      var c = document.createElement('button'); c.type = 'button'; c.textContent = _t('busy.cancel', 'Cancel');
+      c.onclick = function () { finish(false, new Error('Loading cancelled')); };
+      pill.appendChild(r); pill.appendChild(c);
+    }
+    inject();
+  });
+}
+
 var _tesseractReady = null;
 function _loadTesseract() {
   if (_tesseractReady) return _tesseractReady;
-  _tesseractReady = new Promise(function(resolve, reject) {
-    if (window.Tesseract) { resolve(window.Tesseract); return; }
-    var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
-    s.onload = function() { resolve(window.Tesseract); };
-    s.onerror = function() { reject(new Error('Failed to load Tesseract.js')); };
-    document.head.appendChild(s);
-  });
+  _tesseractReady = _loadScriptWithProgress(
+    'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js',
+    'lib.tesseract', 'Loading text reader (about 10 MB, first time only)',
+    function () { return !!window.Tesseract; }
+  ).then(function () { return window.Tesseract; }, function (e) { _tesseractReady = null; throw e; });
   return _tesseractReady;
 }
 
@@ -7162,29 +7207,18 @@ var _faceApiReady = null;
 var _faceApiModelsLoaded = false;
 function _loadFaceApi() {
   if (_faceApiReady) return _faceApiReady;
-  _faceApiReady = new Promise(function(resolve, reject) {
-    if (window.faceapi) {
-      if (!_faceApiModelsLoaded) {
-        _faceApiModelsLoaded = true;
-        faceapi.nets.tinyFaceDetector.loadFromUri(
-          'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights'
-        ).then(function() { resolve(window.faceapi); })
-         .catch(reject);
-      } else { resolve(window.faceapi); }
-      return;
-    }
-    var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js';
-    s.onload = function() {
-      _faceApiModelsLoaded = true;
-      faceapi.nets.tinyFaceDetector.loadFromUri(
-        'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights'
-      ).then(function() { resolve(window.faceapi); })
-       .catch(reject);
-    };
-    s.onerror = function() { reject(new Error('Failed to load face-api.js')); };
-    document.head.appendChild(s);
-  });
+  var W = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+  _faceApiReady = _loadScriptWithProgress(
+    'https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js',
+    'lib.faceapi', 'Loading face finder (first time only)',
+    function () { return !!window.faceapi; }
+  ).then(function () {
+    if (_faceApiModelsLoaded) return window.faceapi;
+    var pill = _libPill('lib.faceapi', 'Loading face finder (first time only)');
+    return faceapi.nets.tinyFaceDetector.loadFromUri(W).then(function () {
+      _faceApiModelsLoaded = true; pill.remove(); return window.faceapi;
+    }, function (e) { pill.remove(); throw e; });
+  }).catch(function (e) { _faceApiReady = null; throw e; });
   return _faceApiReady;
 }
 
