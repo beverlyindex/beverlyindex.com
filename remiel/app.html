@@ -19638,13 +19638,23 @@ async function startBcStream() {
     placeholder.hidden = true;
     bcStream.getAudioTracks().forEach(t => { t.enabled = !bcMuted; });
     document.getElementById('bcStatus').textContent = _t('bc.active', 'Camera active');
+    _bcCamState(true);
   } catch (err) {
     unbusy(_bcBtn);
+    _bcCamState(false);
     console.warn('[Broadcast] Camera access denied:', err);
     document.getElementById('bcStatus').textContent = _t('bc.unavailable', 'Camera not available');
     placeholder.hidden = false;
     liveVideo.hidden = true;
   }
+}
+
+/* Keeps the camera toggle in step with the stream, however the stream was started */
+function _bcCamState(on) {
+  const btn = document.getElementById('bcCameraBtn');
+  if (btn) { btn.classList.toggle('active', !!on); btn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  const label = document.getElementById('bcCameraLabel');
+  if (label) label.textContent = on ? _t('broadcast.cameraOff', 'Camera Off') : _t('broadcast.cameraOn', 'Camera On');
 }
 
 function stopBcStream() {
@@ -19662,7 +19672,11 @@ function toggleBcRecord() {
 
 function startBcRecording() {
   if (!bcStream) {
-    document.getElementById('bcStatus').textContent = _t('bc.openFirst', 'Turn the camera on first');
+    /* Camera is off: start it, then record */
+    startBcStream().then(() => {
+      if (bcStream) startBcRecording();
+      else document.getElementById('bcStatus').textContent = _t('bc.openFirst', 'Turn the camera on first');
+    });
     return;
   }
   bcChunks = [];
