@@ -5407,6 +5407,23 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
   font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 4px;
 }
 
+
+/* Pressed and busy feedback on every control */
+button:active:not(:disabled), [role="button"]:active, .btn:active { transform: scale(0.97); filter: brightness(1.15); }
+.is-busy { cursor: progress !important; opacity: 0.85; }
+.busy-spin { display:inline-block; width:0.9em; height:0.9em; margin-right:0.45em; vertical-align:-0.12em;
+  border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation: busySpin 0.7s linear infinite; }
+@keyframes busySpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .busy-spin { animation-duration: 2s; } }
+.busy-cancel { margin-left:8px; background:transparent; color:#fda4af; border:1px solid rgba(253,164,175,0.5); border-radius:8px; padding:4px 10px; font-size:12px; }
+.lib-progress { font-size:12px; color:#94a3b8; margin:6px 0; }
+.lib-progress button { margin-left:8px; font-size:12px; }
+.ui-confirm-overlay { position:fixed; inset:0; z-index:100002; background:rgba(2,6,23,0.72); display:flex; align-items:center; justify-content:center; padding:16px; }
+.ui-confirm-box { background:#0f172a; color:#e2e8f0; border:1px solid rgba(56,189,248,0.3); border-radius:14px; padding:20px; max-width:360px; width:100%; }
+.ui-confirm-msg { margin:0 0 16px; font-size:15px; line-height:1.45; }
+.ui-confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
+.ui-confirm-actions button { min-height:44px; padding:0 18px; border-radius:10px; border:1px solid rgba(148,163,184,0.4); background:transparent; color:#e2e8f0; font-size:14px; }
+.ui-confirm-actions .ui-confirm-yes { background:#38bdf8; color:#0f172a; border-color:#38bdf8; font-weight:600; }
 </style>
 
 
@@ -6952,6 +6969,104 @@ function showToast(msg) {
   document.body.appendChild(toast);
   setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
   setTimeout(function() { toast.remove(); }, 2500);
+}
+
+/* ── Busy feedback: immediate pressed state for any control doing slow work ── */
+function busy(el, label) {
+  if (!el || !el.classList) return el;
+  if (el.classList.contains('is-busy')) return el;
+  el.classList.add('is-busy');
+  el.setAttribute('aria-busy', 'true');
+  el._busySince = Date.now();
+  if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') { el._busyWasDisabled = el.disabled; el.disabled = true; }
+  if (label && el.tagName === 'BUTTON') {
+    el._busyHtml = el.innerHTML;
+    el.innerHTML = '<span class="busy-spin" aria-hidden="true"></span><span class="busy-word"></span>';
+    el.lastChild.textContent = label;
+  }
+  _busyWatch();
+  return el;
+}
+function unbusy(el) {
+  if (!el || !el.classList || !el.classList.contains('is-busy')) return;
+  el.classList.remove('is-busy');
+  el.removeAttribute('aria-busy');
+  if (el._busyHtml != null) { el.innerHTML = el._busyHtml; el._busyHtml = null; }
+  if (el._busyWasDisabled != null) { el.disabled = el._busyWasDisabled; el._busyWasDisabled = null; }
+  el._busyToasted = el._busyCancelShown = false;
+  if (el._busyCancel) { try { el._busyCancel.remove(); } catch (e) {} el._busyCancel = null; }
+}
+/* Global safety: a control busy over 8s gets a reassurance toast; over 20s a Cancel where possible */
+var _busyTimer = null;
+function _busyWatch() {
+  if (_busyTimer) return;
+  _busyTimer = setInterval(function () {
+    var list = document.querySelectorAll('.is-busy');
+    if (!list.length) { clearInterval(_busyTimer); _busyTimer = null; return; }
+    var now = Date.now();
+    list.forEach(function (el) {
+      var age = now - (el._busySince || now);
+      if (age > 8000 && !el._busyToasted) {
+        el._busyToasted = true;
+        showToast(typeof I18n !== 'undefined' ? I18n.t('busy.still') : 'Still working on it');
+      }
+      if (age > 20000 && !el._busyCancelShown && typeof el._onBusyCancel === 'function') {
+        el._busyCancelShown = true;
+        var c = document.createElement('button');
+        c.type = 'button';
+        c.className = 'busy-cancel';
+        c.textContent = typeof I18n !== 'undefined' ? I18n.t('busy.cancel') : 'Cancel';
+        c.addEventListener('click', function () { try { el._onBusyCancel(); } catch (e) {} unbusy(el); });
+        el.insertAdjacentElement('afterend', c);
+        el._busyCancel = c;
+      }
+    });
+  }, 1000);
+}
+/* Busy state for the control that triggered the current event, if any */
+function busyFromEvent(label) {
+  try {
+    var e = window.event;
+    var t = e && e.target && e.target.closest && e.target.closest('button,[role="button"],.btn');
+    if (t) return busy(t, label);
+  } catch (x) {}
+  return null;
+}
+
+/* In-app confirmation, replacing native confirm() (which feels like a hang on Android) */
+function uiConfirm(message, okLabel) {
+  return new Promise(function (resolve) {
+    var ov = document.createElement('div');
+    ov.className = 'ui-confirm-overlay';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = '<div class="ui-confirm-box"><p class="ui-confirm-msg"></p>' +
+      '<div class="ui-confirm-actions"><button type="button" class="ui-confirm-no"></button>' +
+      '<button type="button" class="ui-confirm-yes"></button></div></div>';
+    ov.querySelector('.ui-confirm-msg').textContent = message;
+    var tt = function (k, d) { try { var v = I18n.t(k); return v && v !== k ? v : d; } catch (e) { return d; } };
+    ov.querySelector('.ui-confirm-no').textContent = tt('busy.cancel', 'Cancel');
+    ov.querySelector('.ui-confirm-yes').textContent = okLabel || tt('confirm.ok', 'Confirm');
+    var done = function (v) {
+      document.removeEventListener('keydown', onKey, true);
+      try { if (typeof A11y !== 'undefined') A11y.releaseFocus(ov); } catch (e) {}
+      ov.remove();
+      resolve(v);
+    };
+    var onKey = function (e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+    ov.querySelector('.ui-confirm-no').onclick = function () { done(false); };
+    ov.querySelector('.ui-confirm-yes').onclick = function () { done(true); };
+    ov.addEventListener('click', function (e) { if (e.target === ov) done(false); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(ov);
+    try { if (typeof A11y !== 'undefined') A11y.trapFocus(ov); } catch (e) {}
+    ov.querySelector('.ui-confirm-yes').focus();
+  });
+}
+
+/* Yield so the browser can paint feedback before heavy synchronous work */
+function nextPaint() {
+  return new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 0); }); });
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -8957,6 +9072,20 @@ const I18n = (function () {
     'confirm.deleteView': "Delete view \"{name}\"? This cannot be undone.",
     'confirm.signOut': "Sign out? Your local data stays on this device.",
     'confirm.removePerson': "Remove this person? This cannot be undone.",
+    'backup.deriving': "Securing with your passphrase",
+    'lib.retry': "Retry",
+    'lib.slow': "This is taking longer than usual.",
+    'lib.peer': "Connecting to calling service",
+    'lib.faceapi': "Loading face finder (first time only)",
+    'lib.tesseract': "Loading text reader (about 10 MB, first time only)",
+    'busy.decrypting': "Decrypting",
+    'busy.encrypting': "Encrypting",
+    'busy.loading': "Loading",
+    'busy.opening': "Opening",
+    'busy.saving': "Saving",
+    'confirm.ok': "Confirm",
+    'busy.cancel': "Cancel",
+    'busy.still': "Still working on it",
     'dd.attention': "{count} people need your attention.",
     'dd.attentionOne': "1 person needs your attention.",
     'toast.pickerUnsupported': "This browser cannot open your phone contacts. Use Chrome on Android, or paste your contacts.",
@@ -9392,6 +9521,20 @@ const I18n = (function () {
     'confirm.deleteView': "Eliminare la vista \"{name}\"? Non si può annullare.",
     'confirm.signOut': "Vuoi uscire? I tuoi dati restano su questo dispositivo.",
     'confirm.removePerson': "Rimuovere questa persona? Non si può annullare.",
+    'backup.deriving': "Protezione con la passphrase",
+    'lib.retry': "Riprova",
+    'lib.slow': "Ci vuole più del solito.",
+    'lib.peer': "Connessione al servizio di chiamata",
+    'lib.faceapi': "Caricamento riconoscimento volti (solo la prima volta)",
+    'lib.tesseract': "Caricamento lettore di testo (circa 10 MB, solo la prima volta)",
+    'busy.decrypting': "Decifratura",
+    'busy.encrypting': "Cifratura",
+    'busy.loading': "Caricamento",
+    'busy.opening': "Apertura",
+    'busy.saving': "Salvataggio",
+    'confirm.ok': "Conferma",
+    'busy.cancel': "Annulla",
+    'busy.still': "Ci stiamo ancora lavorando",
     'dd.attention': "{count} persone hanno bisogno di te.",
     'dd.attentionOne': "1 persona ha bisogno di te.",
     'toast.pickerUnsupported': "Questo browser non può aprire la rubrica. Usa Chrome su Android oppure incolla i contatti.",
@@ -15292,11 +15435,11 @@ const SentinelViews = (() => {
   }
 
   /* ── Delete confirmation ── */
-  function confirmDelete(id) {
+  async function confirmDelete(id) {
     const view = _views.find(v => v.id === id);
     if (!view) return;
-    /* Simple confirm — inline */
-    if (confirm(I18n.t('confirm.deleteView', { name: view.name }))) {
+    /* In-app confirm */
+    if (await uiConfirm(I18n.t('confirm.deleteView', { name: view.name }))) {
       deleteView(id);
       _renderPanel();
       _svBanner('views-deleted', _t('views.bannerDeleted', 'View deleted'));
@@ -19858,7 +20001,7 @@ const SettingsPanel = (function () {
   }
 
   async function doSyncLogout() {
-    if (!confirm(I18n.t('confirm.signOut'))) return;
+    if (!(await uiConfirm(I18n.t('confirm.signOut')))) return;
     await SyncEngine.logout();
     updateSyncUI();
   }
@@ -22582,7 +22725,7 @@ const MedicationTracker = (() => {
   async function confirmDelete(medId) {
     const t = typeof I18n !== 'undefined' ? I18n : null;
     const msg = t ? t.t('med.confirmDelete') : 'Remove this medication?';
-    if (!confirm(msg)) return;
+    if (!(await uiConfirm(msg))) return;
     await RemielDB.deleteMedication(medId);
     await loadMeds();
     showToast(t ? t.t('med.deleted') : 'Medication removed');
@@ -24399,8 +24542,8 @@ const CircleManager = (() => {
       rm.className = 'circle-btn decline';
       rm.style.cssText = 'align-self:flex-start;margin-top:4px;';
       rm.textContent = _t('circle.remove', 'Remove');
-      rm.addEventListener('click', function() {
-        if (confirm(_t('circle.removeConfirm', 'Remove this connection? All sharing with them stops.'))) removeConnection(conn.id);
+      rm.addEventListener('click', async function() {
+        if (await uiConfirm(_t('circle.removeConfirm', 'Remove this connection? All sharing with them stops.'))) removeConnection(conn.id);
       });
       box.appendChild(rm);
     } else if (conn.direction === 'sent') {
@@ -27419,7 +27562,7 @@ const SentinelCall = (function() {
   }
 
   async function regenerateId() {
-    if (!confirm(_t('call.regenConfirm', 'Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.'))) return;
+    if (!(await uiConfirm(_t('call.regenConfirm', 'Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.')))) return;
     if (_currentCall) { showToast(_t('call.endFirst', 'End the current call first')); return; }
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let id = '';
