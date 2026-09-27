@@ -5786,7 +5786,6 @@
     <div class="settings-section-title" data-i18n="circle.title">The Circle</div>
     <p class="settings-help" data-i18n="help.set.circle"></p>
     <div class="settings-card">
-      <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">Connect with people you care about. Nothing is shared until you turn on a switch for that person, and each switch stops sharing when turned off.</p>
 
       <!-- Invite form -->
       <div class="circle-invite-form">
@@ -22820,8 +22819,6 @@ const CircleManager = (() => {
 
   /* One honest sentence per sharing toggle */
   var SHARE_COPY = {
-    share_contacts: ['Contacts', 'Shares your contact list with this person until you turn it off.'],
-    share_moods: ['Moods', 'Shares your mood check-ins with this person until you turn it off.'],
     share_location: ['Location', 'Lets this person see the location you choose to share, only when you tap Share; stops when off.'],
     share_media: ['Video notes', 'Lets this person watch video notes you share; stops when you turn it off.'],
     share_bio: ['Biometrics', 'Shares your motion and heart rate readings with this person until you turn it off.'],
@@ -22983,15 +22980,20 @@ const CircleManager = (() => {
       '<div class="circle-info">' +
         '<div class="circle-name">' + _esc(peer.display_name || peer.handle || 'Unknown') + '</div>' +
         '<div class="circle-handle">' + sub.join(' \u00b7 ') + '</div>' +
+        '<div class="circle-peer-bio" style="display:none;font-size:11px;color:var(--text-dim);margin-top:4px;"></div>' +
         '<div class="circle-sharing"></div>' +
       '</div>' +
       '<span class="circle-status ' + statusClass + '">' + _esc(statusLabel) + '</span>';
+    if (conn.status === 'accepted' && peer.user_id) {
+      var bioEl = li.querySelector('.circle-peer-bio');
+      bioEl.setAttribute('data-peer', String(peer.user_id));
+      _fillPeerBio(bioEl);
+    }
 
     if (conn.status === 'accepted') {
       var box = li.querySelector('.circle-sharing');
       box.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-top:6px;';
-      [['share_contacts', 'contacts'], ['share_moods', 'moods'], ['share_location', 'location'],
-       ['share_media', 'media'], ['share_bio', 'bio']].forEach(function(pair) {
+      [['share_location', 'location'], ['share_media', 'media'], ['share_bio', 'bio']].forEach(function(pair) {
         box.appendChild(_sharingToggle(conn.id, pair[0], !!sharing[pair[1]]));
       });
       var rm = document.createElement('button');
@@ -23012,6 +23014,30 @@ const CircleManager = (() => {
       box2.appendChild(cancel);
     }
     return li;
+  }
+
+  /* Latest heart rate and movement from a member who shares bio with you
+     (from the circle_bio list of the last pull). Plain text only. */
+  function _fillPeerBio(el) {
+    var all = (typeof SyncEngine !== 'undefined' && SyncEngine.getCircleBio) ? SyncEngine.getCircleBio() : {};
+    var b = all[el.getAttribute('data-peer')];
+    if (!b) { el.textContent = ''; el.style.display = 'none'; return; }
+    var parts = [];
+    var hr = Number(b.heartRate);
+    if (hr > 0) parts.push(_t('circle.bio.hr', 'Heart rate {hr} bpm').replace('{hr}', String(Math.round(hr))));
+    var mv = Number(b.motionIntensity);
+    if (b.motionIntensity != null && isFinite(mv)) {
+      parts.push(_t('circle.bio.motion', 'Movement {mv}%').replace('{mv}', String(Math.max(0, Math.min(100, Math.round(mv * 100))))));
+    }
+    if (!parts.length) { el.textContent = ''; el.style.display = 'none'; return; }
+    var ts = Number(b.timestamp);
+    if (ts > 0) parts.push(_t('circle.bio.at', 'Updated {time}').replace('{time}', new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })));
+    el.textContent = parts.join('. ') + '.';
+    el.style.display = '';
+  }
+
+  function _refreshPeerBio() {
+    try { document.querySelectorAll('#circleConnectedList .circle-peer-bio[data-peer]').forEach(_fillPeerBio); } catch (e) {}
   }
 
   function _sharingToggle(connId, key, isOn) {
@@ -23110,6 +23136,7 @@ const CircleManager = (() => {
       }
     } catch (e) {}
     updateVisibility();
+    window.addEventListener('sentinel:circlebio', _refreshPeerBio);
     var inp = _$('circleInviteInput');
     if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); sendInvite(); } });
   }
