@@ -1528,10 +1528,16 @@
     border-radius: 8px;
     color: #ffd24d;
     cursor: pointer;
-    pointer-events: auto;
+    pointer-events: none;
     font: 600 13px/1 "Hanken Grotesk", system-ui, sans-serif;
     vertical-align: middle;
   }
+  .sentinel-guide.visible .guide-dismiss { pointer-events: auto; }
+  /* A banner that is held while a dialog, action toast or overlay is open:
+     kept in its slot, but invisible and never in the way */
+  .sentinel-guide.guide-held,
+  .sentinel-guide.guide-held .guide-dismiss,
+  .sentinel-guide.guide-held .guide-action { visibility: hidden; opacity: 0; pointer-events: none !important; }
   .sentinel-guide .guide-dismiss:hover { border-color: rgba(255,210,77,0.45); }
   .sentinel-guide .guide-dismiss:focus-visible,
   .sentinel-guide .guide-action:focus-visible { outline: 2px solid #ffd24d; outline-offset: 2px; }
@@ -14264,6 +14270,7 @@ const SentinelGuide = (() => {
     el.setAttribute('role', 'status');
     el.classList.add('visible');
     _slots[slot] = id;
+    _syncHeld();
     _ctx[slot] = opts.sticky ? null : { at: Date.now() + 450, state: (typeof appState !== 'undefined' ? appState : null), dlg: undefined };
     _avoid(el, slot, opts.anchor);
     clearTimeout(_timers[slot]);
@@ -14330,10 +14337,35 @@ const SentinelGuide = (() => {
   }
 
   function _holdBanners() {
-    if (_topDialog()) return true;
+    const top = _topDialog();
+    if (top && top.id !== 'onboarding') return true;
     try { if (document.body.classList.contains('rs-overlay-open')) return true; } catch (_) {}
-    return !!document.querySelector('.ui-confirm-overlay');
+    return !!document.querySelector('.ui-confirm-overlay, .rs-action-toast');
   }
+
+  /* Hide (not just hold) banners already on screen while something is open over
+     the app, and bring them back afterwards */
+  function _syncHeld() {
+    const held = _holdBanners();
+    ['guideTop', 'guideBottom'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const on = held && el.classList.contains('visible');
+      if (el.classList.contains('guide-held') !== on) {
+        el.classList.toggle('guide-held', on);
+        if (on) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden');
+      }
+    });
+  }
+  setInterval(_syncHeld, 120);
+  try {
+    let _heldPending = false;
+    new MutationObserver(() => {
+      if (_heldPending) return;
+      _heldPending = true;
+      Promise.resolve().then(() => { _heldPending = false; _syncHeld(); });
+    }).observe(document.body, { childList: true, subtree: false, attributes: true, attributeFilter: ['class'] });
+  } catch (_) {}
 
   /* Topmost open dialog according to the A11y stack (null when none) */
   function _topDialog() {
@@ -14360,7 +14392,7 @@ const SentinelGuide = (() => {
 
   function hide(position) {
     const el = document.getElementById(position === 'top' ? 'guideTop' : 'guideBottom');
-    if (el) el.classList.remove('visible');
+    if (el) { el.classList.remove('visible'); el.classList.remove('guide-held'); el.removeAttribute('aria-hidden'); }
     _slots[position] = null;
     _ctx[position] = null;
     clearTimeout(_timers[position]);
