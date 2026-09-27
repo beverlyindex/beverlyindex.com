@@ -5204,6 +5204,19 @@
 .sentinel-msg-overlay.open {
   opacity: 1; pointer-events: auto;
 }
+/* QA3 #2: the floating List view and Pulse buttons (z-index 8000) must never
+   cover the message input, Send, or any full-screen overlay. */
+body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none !important; }
+body:has(#sentinelMsgOverlay.open, .sv-overlay.open, .sentinel-call-overlay.active, #quickDialOverlay.open, #contactModalOverlay.open) .clv-toggle,
+body:has(#sentinelMsgOverlay.open, .sv-overlay.open, .sentinel-call-overlay.active, #quickDialOverlay.open, #contactModalOverlay.open) #pulseBtn { display: none !important; }
+.sentinel-msg-unknown { padding: 8px 12px; border-bottom: 1px solid rgba(56,189,248,0.12); display: flex; flex-direction: column; gap: 6px; }
+.sentinel-msg-unknown[hidden] { display: none; }
+.sentinel-msg-unknown-title { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,0.6); }
+.sentinel-msg-unknown-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #e6f6ff; }
+.sentinel-msg-unknown-row .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; background: none; border: 0; color: inherit; text-align: left; font: inherit; padding: 4px 0; }
+.sentinel-msg-unknown-row .sid { font-family: monospace; opacity: 0.7; }
+.sentinel-msg-unknown-row .add, .sentinel-msg-add { background: rgba(56,189,248,0.18); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4); border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.sentinel-msg-add { margin-top: 8px; }
 .sentinel-msg-panel {
   width: min(380px, 88vw); height: 100%;
   background: rgba(12,14,22,0.96);
@@ -6844,6 +6857,13 @@
 
 <script>
 /* ── Global Toast Notification ── */
+/* Full-screen overlay flag: body.rs-overlay-open while any registered overlay is open. */
+function rsOverlayFlag(name, on) {
+  var set = rsOverlayFlag._open || (rsOverlayFlag._open = {});
+  if (on) set[name] = 1; else delete set[name];
+  try { document.body.classList.toggle('rs-overlay-open', Object.keys(set).length > 0); } catch (e) {}
+}
+
 function showToast(msg) {
   if (typeof A11y !== 'undefined') A11y.announce(msg);
   var existing = document.querySelector('.sentinel-toast');
@@ -8892,6 +8912,13 @@ const I18n = (function () {
     'msg.noSidNote': "Saved on this device. Add their Sentinel ID to deliver.",
     'msg.signInNote': "Saved on this device. Sign in to Remiel Sentinel to deliver.",
     'msg.unknownNote': "Not in your contacts. Add them as a contact to keep this thread.",
+    'msg.newFromId': "New message from {who}, Sentinel ID {sid}.",
+    'msg.read': "Read",
+    'msg.add': "Add",
+    'msg.addContact': "Add as contact",
+    'msg.unknownList': "Not in your contacts",
+    'msg.added': "Added {name} to your contacts",
+    'call.callingLabel': "Calling",
     'msg.empty': "Messages are delivered through Remiel Sentinel when both of you have Sentinel IDs",
     'msg.you': "You",
     'msg.retry': "Retry",
@@ -9290,6 +9317,13 @@ const I18n = (function () {
     'msg.noSidNote': "Salvato su questo dispositivo. Aggiungi il suo ID Sentinel per consegnarlo.",
     'msg.signInNote': "Salvato su questo dispositivo. Accedi a Remiel Sentinel per consegnarlo.",
     'msg.unknownNote': "Non è tra i tuoi contatti. Aggiungilo per tenere questa conversazione.",
+    'msg.newFromId': "Nuovo messaggio da {who}, ID Sentinel {sid}.",
+    'msg.read': "Leggi",
+    'msg.add': "Aggiungi",
+    'msg.addContact': "Aggiungi ai contatti",
+    'msg.unknownList': "Non nei tuoi contatti",
+    'msg.added': "{name} aggiunto ai tuoi contatti",
+    'call.callingLabel': "Chiamata",
     'msg.empty': "I messaggi passano da Remiel Sentinel quando entrambi avete un ID Sentinel",
     'msg.you': "Tu",
     'msg.retry': "Riprova",
@@ -13447,8 +13481,10 @@ const SentinelMessaging = (() => {
 
     /* Open overlay */
     const overlay = document.getElementById('sentinelMsgOverlay');
+    _renderUnknownStrip(contactId).catch(() => {});
     if (overlay) {
       overlay.classList.add('open');
+      rsOverlayFlag('messaging', true);
       /* Focus input after animation */
       setTimeout(() => {
         const inp = document.getElementById('sentinelMsgInput');
@@ -13472,6 +13508,113 @@ const SentinelMessaging = (() => {
     _stopOpenPoll();
     const overlay = document.getElementById('sentinelMsgOverlay');
     if (overlay) overlay.classList.remove('open');
+    rsOverlayFlag('messaging', false);
+  }
+
+  /* ── M5: unknown senders ── */
+  const _UNKNOWN_IDX = '_msg_unknown_threads';
+  function _tp(key, fallback, params) {
+    let v = _t(key, fallback);
+    if (params) v = v.replace(/\{(\w+)\}/g, (m, k) => (params[k] !== undefined ? params[k] : m));
+    return v;
+  }
+  async function _getUnknownIdx() {
+    try { const m = await RemielDB.getSetting(_UNKNOWN_IDX); return (m && typeof m === 'object') ? m : {}; }
+    catch (_) { return {}; }
+  }
+  async function _putUnknownIdx(m) { try { await RemielDB.putSetting(_UNKNOWN_IDX, m); } catch (_) {} }
+  function _sidFromKey(key) {
+    const k = String(key).replace(/^unknown:/, '');
+    return _isValidSid(k) ? k.toUpperCase() : null;
+  }
+
+  async function _noteUnknown(key, label, isNew) {
+    const idx = await _getUnknownIdx();
+    const sid = _sidFromKey(key);
+    idx[key] = { label: label || sid || '', sid: sid, ts: Date.now() };
+    await _putUnknownIdx(idx);
+    if (_activeContactId) _renderUnknownStrip(_activeContactId).catch(() => {});
+    if (!isNew) return;
+    const who = label || sid || _t('msg.someone', 'someone');
+    const msg = sid
+      ? _tp('msg.newFromId', 'New message from {who}, Sentinel ID {sid}.', { who: who, sid: sid })
+      : _t('msg.newFrom', 'New message from') + ' ' + who;
+    const actions = [{ label: _t('msg.read', 'Read'), run: () => openFor(key) }];
+    if (sid) actions.push({ label: _t('msg.add', 'Add'), run: () => addUnknownSender(key) });
+    if (typeof showActionToast === 'function') showActionToast(msg, actions, 9000);
+    else showToast(msg);
+  }
+
+  /* Create a contact from an unknown sender, move the thread, open it. */
+  async function addUnknownSender(key) {
+    const sid = _sidFromKey(key);
+    if (!sid) { showToast(_t('msg.addToReply', 'add them as a contact to reply')); return; }
+    const existing = _findContactBySid(sid);
+    if (existing) { await _mergeUnknownInto(key, existing.id); openFor(existing.id); return; }
+    const idx = await _getUnknownIdx();
+    let label = (idx[key] && idx[key].label) || _unknownNames[key] || sid;
+    label = String(label).replace(/^@/, '').trim() || sid;
+    const parts = label.split(/\s+/);
+    const contact = {
+      id: Date.now(),
+      first: parts[0],
+      last: parts.slice(1).join(' '),
+      cat: 'other', sev: 2, phone: '', email: '',
+      sentinelId: sid
+    };
+    try { DEMO_CONTACTS.push(contact); } catch (_) {}
+    try { await RemielDB.putContact(contact); } catch (e) { console.warn('[SentinelMessaging] add contact failed', e); }
+    try { if (typeof buildNodes === 'function') buildNodes(false); } catch (_) {}
+    await _mergeUnknownInto(key, contact.id);
+    showToast(_tp('msg.added', 'Added {name} to your contacts', { name: contact.first }));
+    openFor(contact.id);
+  }
+
+  async function _mergeUnknownInto(key, contactId) {
+    const src = await _loadThread(key);
+    if (src.length) {
+      const dst = await _loadThread(contactId);
+      src.forEach(m => {
+        if (dst.some(x => x.id === m.id)) return;
+        dst.push(Object.assign({}, m, { from: m.from === 'center' ? 'center' : contactId }));
+      });
+      dst.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      await _saveThread(contactId, dst);
+    }
+    try { await RemielDB.putSetting(_DB_PREFIX + key, []); } catch (_) {}
+    const idx = await _getUnknownIdx();
+    delete idx[key];
+    await _putUnknownIdx(idx);
+    delete _unknownNames[key];
+  }
+
+  /* Unknown threads listed at the top of the messaging panel. */
+  async function _renderUnknownStrip(activeId) {
+    const panel = document.querySelector('#sentinelMsgOverlay .sentinel-msg-panel');
+    const threadEl = document.getElementById('sentinelMsgThread');
+    if (!panel || !threadEl) return;
+    let strip = document.getElementById('sentinelMsgUnknown');
+    if (!strip) {
+      strip = document.createElement('div');
+      strip.id = 'sentinelMsgUnknown';
+      strip.className = 'sentinel-msg-unknown';
+      panel.insertBefore(strip, threadEl);
+    }
+    const idx = await _getUnknownIdx();
+    const keys = Object.keys(idx).sort((a, b) => (idx[b].ts || 0) - (idx[a].ts || 0));
+    if (!keys.length) { strip.hidden = true; strip.innerHTML = ''; return; }
+    strip.hidden = false;
+    let html = '<div class="sentinel-msg-unknown-title">' + _escHtml(_t('msg.unknownList', 'Not in your contacts')) + '</div>';
+    keys.forEach(k => {
+      const e = idx[k] || {};
+      const active = k === activeId;
+      html += '<div class="sentinel-msg-unknown-row">'
+        + '<button type="button" class="who" onclick="SentinelMessaging.openFor(\'' + _escAttrJs(k) + '\')"' + (active ? ' aria-current="true"' : '') + '>'
+        + _escHtml(e.label || e.sid || '') + (e.sid ? ' <span class="sid">' + _escHtml(e.sid) + '</span>' : '') + '</button>'
+        + (e.sid ? '<button type="button" class="add" onclick="SentinelMessaging.addUnknownSender(\'' + _escAttrJs(k) + '\')">' + _escHtml(_t('msg.add', 'Add')) + '</button>' : '')
+        + '</div>';
+    });
+    strip.innerHTML = html;
   }
 
   /* ── Send message from center sphere ── */
@@ -13638,7 +13781,9 @@ const SentinelMessaging = (() => {
           key = 'unknown:' + (fromSid || m.from_user_id || 'sender');
           const who = m.from_handle ? '@' + m.from_handle : (m.from_display_name || fromSid || _t('msg.someone', 'someone'));
           _unknownNames[key] = m.from_display_name || who;
-          showToast(_t('msg.newFrom', 'New message from') + ' ' + who + ': ' + _t('msg.addToReply', 'add them as a contact to reply'));
+          const before = await _loadThread(key);
+          const isNew = !(serverId && before.some(x => x.serverId === serverId));
+          await _noteUnknown(key, _unknownNames[key], isNew);
         }
         await receiveResponse(key, m.text, { serverId: serverId, ts: m.ts });
       }
@@ -13674,7 +13819,11 @@ const SentinelMessaging = (() => {
     let note = '';
     if (noSid) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.noSidNote', 'Saved on this device. Add their Sentinel ID to deliver.')) + '</div>';
     else if (!_authed()) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.signInNote', 'Saved on this device. Sign in to Remiel Sentinel to deliver.')) + '</div>';
-    else if (isUnknown) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.unknownNote', 'Not in your contacts. Add them as a contact to keep this thread.')) + '</div>';
+    else if (isUnknown) {
+      note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.unknownNote', 'Not in your contacts. Add them as a contact to keep this thread.'));
+      if (_sidFromKey(contactId)) note += '<br><button type="button" class="sentinel-msg-add" onclick="SentinelMessaging.addUnknownSender(\'' + _escAttrJs(contactId) + '\')">' + _escHtml(_t('msg.addContact', 'Add as contact')) + '</button>';
+      note += '</div>';
+    }
 
     if (messages.length === 0) {
       threadEl.innerHTML = '<div class="sentinel-msg-empty">' + _escHtml(_t('msg.empty', 'Messages are delivered through Remiel Sentinel when both of you have Sentinel IDs')) + '</div>' + note;
@@ -13799,7 +13948,7 @@ const SentinelMessaging = (() => {
   }
 
   return {
-    openFor, close, send, retry, receiveResponse, poll,
+    openFor, close, send, retry, receiveResponse, poll, addUnknownSender,
     getTickerData, getLatestMessageText,
     loadBlufSection,
     get activeContactId() { return _activeContactId; },
@@ -15914,7 +16063,9 @@ function startBcRecording() {
     recordBtn.textContent = 'Record';
     recordBtn.classList.remove('recording');
     if (bcChunks.length > 0) {
-      const blob = new Blob(bcChunks, { type: bcRecorder.mimeType || 'video/webm' });
+      /* M3: store the note with a clean base type (no codec parameters). */
+      const _baseType = String(bcRecorder.mimeType || 'video/webm').split(';')[0].trim() || 'video/webm';
+      const blob = new Blob(bcChunks, { type: _baseType });
       showBcPlayback(blob);
       document.getElementById('bcStatus').textContent = 'Recording saved';
     }
@@ -23747,10 +23898,14 @@ const SocialImport = (() => {
       if (btn) btn.textContent = _t('vn.uploading', 'Uploading...');
 
       try {
-        var mimeType = (bcLastBlob.type || 'video/webm').split(';')[0];
-        var ext = mimeType.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+        /* M3: codec parameters (video/webm;codecs=vp9,opus) make the server
+           reject the part with 415. Send the bytes with the base type only. */
+        var mimeType = (bcLastBlob.type || 'video/webm').split(';')[0].trim().toLowerCase() || 'video/webm';
+        if (mimeType.indexOf('video/') !== 0 && mimeType.indexOf('audio/') !== 0) mimeType = 'video/webm';
+        var ext = mimeType.indexOf('mp4') !== -1 ? 'mp4' : (mimeType.indexOf('quicktime') !== -1 ? 'mov' : 'webm');
+        var uploadBlob = new Blob([bcLastBlob], { type: mimeType });
         var form = new FormData();
-        form.append('file', bcLastBlob, 'videonote-' + Date.now() + '.' + ext);
+        form.append('file', uploadBlob, 'videonote-' + Date.now() + '.' + ext);
         form.append('blob_type', 'videonote');
         var cid = _currentContactId();
         if (cid) form.append('contact_id', String(cid));
@@ -25390,9 +25545,10 @@ const SentinelCall = (function() {
     if (status) status.style.display = '';
     if (callerName) callerName.textContent = name;
     if (avatar) avatar.textContent = initials || '?';
-    if (label) label.innerHTML = '<span class="sc-connecting-dots">Calling</span>';
+    if (label) label.innerHTML = '<span class="sc-connecting-dots">' + _t('call.callingLabel', 'Calling') + '</span>';
     if (timer) timer.hidden = true;
     if (overlay) overlay.classList.add('active');
+    rsOverlayFlag('call', true);
   }
 
   function _showIncoming(call) {
@@ -25407,6 +25563,7 @@ const SentinelCall = (function() {
     if (callerName) callerName.textContent = name;
     if (avatar) avatar.textContent = initials;
     if (overlay) overlay.classList.add('active');
+    rsOverlayFlag('call', true);
 
     _playRingtone();
 
@@ -25460,6 +25617,7 @@ const SentinelCall = (function() {
 
     if (overlay) overlay.classList.remove('active');
     if (incoming) incoming.classList.remove('active');
+    rsOverlayFlag('call', false);
     if (localVid) localVid.srcObject = null;
     if (remoteVid) remoteVid.srcObject = null;
     if (timer) timer.hidden = true;
@@ -25910,11 +26068,13 @@ function openQuickDial(mode, contactName, contactId) {
   }
   inp.value = '';
   document.getElementById('quickDialOverlay').classList.add('open');
+  rsOverlayFlag('quickDial', true);
   setTimeout(function() { inp.focus(); }, 200);
 }
 
 function closeQuickDial() {
   document.getElementById('quickDialOverlay').classList.remove('open');
+  rsOverlayFlag('quickDial', false);
 }
 /* ── Contacts list popup (settings screen) ── */
 function openContactsPopup() {
