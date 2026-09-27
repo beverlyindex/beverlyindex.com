@@ -5583,6 +5583,18 @@ button:active:not(:disabled), [role="button"]:active, .btn:active { transform: s
 .acct-magnet-phone .settings-input { flex: 1; margin: 0; min-width: 0; }
 .rs-onrs { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: #7dd3fc; letter-spacing: 0.2px; white-space: nowrap; margin-left: 6px; }
 .rs-presence { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px #22c55e; display: inline-block; }
+.magnet-prompt {
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); transform: translateX(-50%);
+  width: min(92vw, 420px); z-index: 100012; display: grid; grid-template-columns: 44px 1fr; gap: 10px 12px; align-items: center;
+  padding: 14px; border-radius: 16px; background: rgba(8,20,32,0.97); border: 1px solid rgba(56,212,255,0.5);
+  box-shadow: 0 10px 34px rgba(0,0,0,0.55); color: #e6f6ff; font: 14px/1.4 "Hanken Grotesk", system-ui, sans-serif;
+}
+.magnet-prompt-av { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg,#0e3a52,#1d4f6e); font-weight: 700; font-size: 18px; color: #7dd3fc; }
+.magnet-prompt-row { grid-column: 1 / -1; display: flex; gap: 10px; }
+.magnet-prompt-row button { flex: 1; min-height: 44px; border-radius: 12px; font: 600 14px/1 "Hanken Grotesk", system-ui, sans-serif; cursor: pointer; }
+.magnet-accept { background: var(--lit-fill); color: var(--lit-ink); border: none; }
+.magnet-later { background: transparent; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.2); }
+.sentinel-msg-bubble.sent.awaiting { opacity: 0.85; border-style: dashed; }
 .guide-link:focus-visible { outline: 2px solid var(--adv-rim); outline-offset: 2px; }
 
 /* Primary: one bright accent fill with dark text */
@@ -11921,6 +11933,13 @@ const I18n = (function () {
     "magnet.notFound": "{name} was not found on Remiel Sentinel with the saved phone number or email. Ask for the Sentinel ID and type it in Person card, Edit, Sentinel ID.",
     "magnet.noPhoneEmail": "To find {name}, save their phone number or email first: Person card, Edit, Phone number.",
     "magnet.needSignIn": "Finding people needs this device connected: Settings, Account.",
+    "magnet.wants": "{name} wants to connect. Accept to call and message each other with one tap",
+    "magnet.accept": "Accept",
+    "magnet.notNow": "Not now",
+    "magnet.accepted": "{name} is connected. You can call and message each other with one tap.",
+    "magnet.acceptFailed": "Could not accept right now. The request stays here; try again in a moment.",
+    "magnet.requestSent": "Asked {name} to connect on Remiel Sentinel. Your message goes out as soon as they accept.",
+    "magnet.awaiting": "Waiting for {name} to accept",
   });
   /* Guide and Magnet strings (IT) */
   Object.assign(_strings.it, {
@@ -11969,6 +11988,13 @@ const I18n = (function () {
     "magnet.notFound": "{name} non è stato trovato su Remiel Sentinel con il numero o l'email salvati. Chiedi l'ID Sentinel e scrivilo in Scheda della persona, Modifica, ID Sentinel.",
     "magnet.noPhoneEmail": "Per trovare {name}, salva prima il suo numero di telefono o la sua email: Scheda della persona, Modifica, Numero di telefono.",
     "magnet.needSignIn": "Per trovare le persone questo dispositivo deve essere collegato: Impostazioni, Account.",
+    "magnet.wants": "{name} vuole collegarsi. Accetta per chiamarvi e scrivervi con un tocco",
+    "magnet.accept": "Accetta",
+    "magnet.notNow": "Non ora",
+    "magnet.accepted": "{name} è collegato. Potete chiamarvi e scrivervi con un tocco.",
+    "magnet.acceptFailed": "Impossibile accettare adesso. La richiesta resta qui; riprova tra poco.",
+    "magnet.requestSent": "Hai chiesto a {name} di collegarsi su Remiel Sentinel. Il tuo messaggio parte appena accetta.",
+    "magnet.awaiting": "In attesa che {name} accetti",
   });
 
   function t(key, params) {
@@ -16288,6 +16314,9 @@ const SentinelMessaging = (() => {
 
     /* Render thread */
     await _renderThread(contactId);
+    if (contact && !_isValidSid(contact.sentinelId || '') && typeof Magnet !== 'undefined' && Magnet && Magnet.canFind(contact)) {
+      Magnet.matchOne(contact).then(found => { if (found && _activeContactId === contactId) _renderThread(contactId); }).catch(() => {});
+    }
 
     /* Open overlay */
     const overlay = document.getElementById('sentinelMsgOverlay');
@@ -16345,6 +16374,7 @@ const SentinelMessaging = (() => {
     await _putUnknownIdx(idx);
     if (_activeContactId) _renderUnknownStrip(_activeContactId).catch(() => {});
     if (!isNew) return;
+    if (sid && typeof Magnet !== 'undefined' && Magnet) { Magnet.promptUnknown(sid, label); return; }
     const who = label || sid || _t('msg.someone', 'someone');
     const msg = sid
       ? _tp('msg.newFromId', 'New message from {who}, Sentinel ID {sid}.', { who: who, sid: sid })
@@ -16443,12 +16473,16 @@ const SentinelMessaging = (() => {
       (contact && _isValidSid(contact.sentinelId)) || String(contactId).indexOf('unknown:') === 0
     );
 
+    /* Magnet: a matched person who has not accepted yet gets a link
+       request; the message waits and goes out when they accept. */
+    const awaitLink = canDeliver && typeof Magnet !== 'undefined' && Magnet && Magnet.needsLink(contact);
+
     const msg = {
       id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       from: 'center',
       text: text,
       ts: Date.now(),
-      state: canDeliver ? 'pending' : 'local'
+      state: awaitLink ? 'awaiting' : (canDeliver ? 'pending' : 'local')
     };
 
     const thread = await _loadThread(contactId);
@@ -16456,7 +16490,27 @@ const SentinelMessaging = (() => {
     await _saveThread(contactId, thread);
     await _renderThread(contactId);
 
+    if (awaitLink) {
+      const st = await Magnet.requestLink(contact);
+      if (st === 'accepted') await flushAwaiting(contactId);
+      return;
+    }
     if (canDeliver) await _deliver(contactId, msg.id);
+  }
+
+  /* Deliver every message that waited for a link request to be accepted */
+  async function flushAwaiting(contactId) {
+    const thread = await _loadThread(contactId);
+    const ids = thread.filter(m => m.from === 'center' && m.state === 'awaiting').map(m => m.id);
+    for (const id of ids) await _deliver(contactId, id);
+    if (!ids.length) await _refresh(contactId);
+  }
+
+  /* Move an unknown sender's thread into a contact (after Accept) */
+  async function adoptUnknown(sid, contactId) {
+    const key = 'unknown:' + String(sid || '').toUpperCase();
+    await _mergeUnknownInto(key, contactId);
+    if (_activeContactId === key) openFor(contactId);
   }
 
   /* ── Deliver one stored message through the relay ── */
@@ -16613,6 +16667,7 @@ const SentinelMessaging = (() => {
     if (state === 'pending') return _t('msg.state.pending', 'Sending');
     if (state === 'failed') return _t('msg.state.failed', 'Not delivered');
     if (state === 'local') return _t('msg.state.local', 'Saved on this device');
+    if (state === 'awaiting') return _tp('magnet.awaiting', 'Waiting for {name} to accept', { name: _contactLabel(_activeContactId) });
     return _t('msg.state.delivered', 'Delivered');
   }
 
@@ -16758,7 +16813,7 @@ const SentinelMessaging = (() => {
   }
 
   return {
-    openFor, close, send, retry, receiveResponse, poll, addUnknownSender,
+    openFor, close, send, retry, receiveResponse, poll, addUnknownSender, flushAwaiting, adoptUnknown,
     getTickerData, getLatestMessageText,
     loadBlufSection,
     get activeContactId() { return _activeContactId; },
@@ -20743,9 +20798,17 @@ function explainMissingAction(kind, c) {
 
 /* Video: Sentinel Call when the contact has a Sentinel ID; FaceTime on
    Apple devices with a phone number; otherwise ask for the Sentinel ID. */
-function startVideoWith(c) {
+async function startVideoWith(c) {
   if (!c) return;
-  if (_rsHasSid(c) && typeof SentinelCall !== 'undefined') { SentinelCall.callContact(c); return; }
+  /* Magnet: one tap. A person with a saved phone or email is looked up first. */
+  if (!_rsHasSid(c) && typeof Magnet !== 'undefined' && Magnet && Magnet.canFind(c)) {
+    try { await Magnet.matchOne(c); } catch (e) {}
+  }
+  if (_rsHasSid(c) && typeof SentinelCall !== 'undefined') {
+    if (typeof Magnet !== 'undefined' && Magnet && Magnet.needsLink(c)) Magnet.requestLink(c).catch(function () {});
+    SentinelCall.callContact(c);
+    return;
+  }
   if (_rsIsApple() && c.phone) { window.location.href = 'facetime:' + normalizePhone(c.phone); return; }
   if (!_rsIsApple()) { offerGoogleMeet(c); return; }
   explainMissingAction('sid', c);
