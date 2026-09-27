@@ -9125,10 +9125,17 @@ function initBioMotion() {
   }
   _bio.supported = true;
 
-  /* Check if saved preference exists */
+  /* Check if saved preference exists. On iOS the permission prompt may only
+     be shown from a user gesture, so on load we never call requestPermission;
+     the user re-enables from the Settings toggle instead. */
   RemielDB.getSetting('bioMotionEnabled').then(function(saved) {
-    if (saved === true) {
-      _requestMotionPermission();
+    if (saved !== true) return;
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      _bio.enabled = false;
+      _updateBioUI();
+    } else {
+      _bio.permGranted = true;
+      _startMotionListening();
     }
   }).catch(function() {});
 }
@@ -9159,12 +9166,24 @@ function _requestMotionPermission() {
   }
 }
 
+/* Handler references so listeners can be removed before re-adding */
+var _bioMotionHandler = null;
+var _bioOrientHandler = null;
+function _bioRemoveMotionListeners() {
+  if (_bioMotionHandler) window.removeEventListener('devicemotion', _bioMotionHandler, { passive: true });
+  if (_bioOrientHandler) window.removeEventListener('deviceorientation', _bioOrientHandler, { passive: true });
+  _bioMotionHandler = null;
+  _bioOrientHandler = null;
+}
+
 /* ── Start listening to DeviceMotion events ── */
 function _startMotionListening() {
   _bio.enabled = true;
   RemielDB.putSetting('bioMotionEnabled', true).catch(function() {});
 
-  window.addEventListener('devicemotion', function(e) {
+  /* Remove any previous listeners first so repeated toggles never stack */
+  _bioRemoveMotionListeners();
+  _bioMotionHandler = function(e) {
     if (!_bio.enabled) return;
     /* Prefer accelerationIncludingGravity minus gravity,
        fall back to acceleration (which excludes gravity) */
@@ -9176,14 +9195,16 @@ function _startMotionListening() {
     const az = aNoG.z != null ? aNoG.z : ((a.z || 0) - 9.81);
     const r = e.rotationRate || {};
     _bioUpdateMotion(ax, ay, az, r.alpha, r.beta, r.gamma);
-  }, { passive: true });
+  };
+  window.addEventListener('devicemotion', _bioMotionHandler, { passive: true });
 
   /* Also listen for orientation (tilt data) */
-  window.addEventListener('deviceorientation', function(e) {
+  _bioOrientHandler = function(e) {
     if (!_bio.enabled) return;
     _bio.tilt.beta = e.beta || 0;   /* front-back tilt (-180 to 180) */
     _bio.tilt.gamma = e.gamma || 0; /* left-right tilt (-90 to 90) */
-  }, { passive: true });
+  };
+  window.addEventListener('deviceorientation', _bioOrientHandler, { passive: true });
 
   _updateBioUI();
   console.log('BioMotion: motion sensing active');
@@ -9192,6 +9213,7 @@ function _startMotionListening() {
 /* ── Stop motion sensing ── */
 function _stopMotionListening() {
   _bio.enabled = false;
+  _bioRemoveMotionListeners();
   _bio.motionIntensity = 0;
   _bio.gyroIntensity = 0;
   _bio.rawAccel = 0;
@@ -9303,10 +9325,34 @@ function _updateBioUI() {
   }
 }
 
-/* ── Periodic UI refresh for live motion readout ── */
+/* ── Periodic UI refresh for live motion readout ──
+   Runs only while the Settings panel is open and the page is visible. */
 setInterval(function() {
-  if (_bio.enabled) _updateBioUI();
+  if (!_bio.enabled) return;
+  if (document.visibilityState === 'hidden') return;
+  var sp = document.getElementById('settingsPanel');
+  if (!sp || !sp.classList.contains('open')) return;
+  _updateBioUI();
 }, 500);
+
+/* ── Ring state for a contact (or 'self'). Heart rate is reported even when
+   motion sensing is off; the renderer should read this rather than gating
+   heart rate on _bio.enabled. ── */
+var Biometrics = window.Biometrics || {};
+Biometrics.getRingState = function(contactId) {
+  if (contactId == null || contactId === 'self') {
+    return {
+      motion: _bio.enabled ? _bio.motionIntensity : 0,
+      heartRate: _bio.hrConnected ? (_bio.heartRate || 0) : 0,
+      hrConnected: !!_bio.hrConnected
+    };
+  }
+  var dc = (typeof DEMO_CONTACTS !== 'undefined')
+    ? DEMO_CONTACTS.find(function(c) { return String(c.id) === String(contactId); }) : null;
+  var b = (dc && dc.bio) || {};
+  return { motion: b.motionIntensity || 0, heartRate: b.heartRate || 0, hrConnected: (b.heartRate || 0) > 0 };
+};
+window.Biometrics = Biometrics;
 
 /* ═══════════════════════════════════
    REMIEL SENTINEL — Three-State System
@@ -9376,7 +9422,7 @@ async function bioGroupAddDevice() {
       /* Push HR to mapped contact's bio */
       if (devEntry.contactId) {
         var dc = (typeof DEMO_CONTACTS !== 'undefined')
-          ? DEMO_CONTACTS.find(function(c) { return c.id === devEntry.contactId; })
+          ? DEMO_CONTACTS.find(function(c) { return String(c.id) === String(devEntry.contactId); })
           : null;
         if (dc) {
           if (!dc.bio) dc.bio = { motionIntensity: 0, heartRate: 0, lastUpdate: 0 };
@@ -9392,7 +9438,7 @@ async function bioGroupAddDevice() {
       devEntry.heartRate = 0;
       /* Clear the contact's bio HR */
       if (devEntry.contactId && typeof DEMO_CONTACTS !== 'undefined') {
-        var dc = DEMO_CONTACTS.find(function(c) { return c.id === devEntry.contactId; });
+        var dc = DEMO_CONTACTS.find(function(c) { return String(c.id) === String(devEntry.contactId); });
         if (dc && dc.bio && dc.bio.source === 'ble') {
           dc.bio.heartRate = 0;
         }
@@ -9422,7 +9468,7 @@ function bioGroupMapDevice(deviceId, contactId) {
 
   /* Clear old mapping if this contact was mapped to another device */
   _bioGroupMonitor.devices.forEach(function(d) {
-    if (d.contactId === contactId && d !== dev) {
+    if (d.contactId != null && String(d.contactId) === String(contactId) && d !== dev) {
       d.contactId = null;
     }
   });
@@ -9431,7 +9477,7 @@ function bioGroupMapDevice(deviceId, contactId) {
 
   /* Push current HR to contact immediately */
   if (contactId && dev.heartRate > 0 && typeof DEMO_CONTACTS !== 'undefined') {
-    var dc = DEMO_CONTACTS.find(function(c) { return c.id === contactId; });
+    var dc = DEMO_CONTACTS.find(function(c) { return String(c.id) === String(contactId); });
     if (dc) {
       if (!dc.bio) dc.bio = { motionIntensity: 0, heartRate: 0, lastUpdate: 0 };
       _updateContactBioTrend(dc.bio, null, dev.heartRate);
@@ -9454,7 +9500,7 @@ function bioGroupDisconnect(deviceId) {
   } catch(e) {}
   /* Clear contact bio */
   if (dev.contactId && typeof DEMO_CONTACTS !== 'undefined') {
-    var dc = DEMO_CONTACTS.find(function(c) { return c.id === dev.contactId; });
+    var dc = DEMO_CONTACTS.find(function(c) { return String(c.id) === String(dev.contactId); });
     if (dc && dc.bio && dc.bio.source === 'ble') {
       dc.bio.heartRate = 0;
     }
@@ -9481,7 +9527,7 @@ function _updateGroupMonitorUI() {
       var contactOpts = '<option value="">— Assign to contact —</option>';
       if (typeof DEMO_CONTACTS !== 'undefined') {
         DEMO_CONTACTS.forEach(function(c) {
-          var sel = (dev.contactId === c.id) ? ' selected' : '';
+          var sel = (String(dev.contactId) === String(c.id)) ? ' selected' : '';
           contactOpts += '<option value="' + c.id + '"' + sel + '>' + (c.first || '') + ' ' + (c.last || '') + '</option>';
         });
       }
@@ -9492,7 +9538,7 @@ function _updateGroupMonitorUI() {
           hrDisplay +
         '</div>' +
         '<div style="display:flex;gap:8px;align-items:center;">' +
-          '<select onchange="bioGroupMapDevice(\'' + devId + '\', this.value ? parseInt(this.value) : null)" ' +
+          '<select onchange="bioGroupMapDevice(\'' + devId + '\', this.value ? this.value : null)" ' +
             'style="flex:1;background:rgba(0,0,0,0.3);color:var(--text-bright);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:5px 8px;font-size:11px;appearance:auto;-webkit-appearance:auto;">' +
             contactOpts +
           '</select>' +
