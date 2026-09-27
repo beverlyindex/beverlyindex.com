@@ -23098,8 +23098,10 @@ const SyncEngine = (() => {
     return Object.assign({
       client_id: m.id,
       server_id: _serverIdMap['mood_' + m.id] || null,
-      value: m.value, label: m.label || null, note: m.note || null,
-      timestamp: m.timestamp || Date.now(),
+      /* Local moods are stored as {level, ts}; the server column is value/timestamp */
+      value: (m.level !== undefined && m.level !== null) ? m.level : (m.value !== undefined ? m.value : null),
+      label: m.label || null, note: m.note || null,
+      timestamp: m.ts || m.timestamp || Date.now(),
     }, _contactRefOut(m.contactId));
   }
 
@@ -23510,8 +23512,11 @@ const SyncEngine = (() => {
       if (cRef === null) return; /* unknown contact: skip rather than attach to the wrong person */
       rec.contactId = cRef;
       if (type === 'mood') {
-        rec.value = d.value; rec.label = d.label || null; rec.note = d.note || null;
-        rec.timestamp = _num(d.timestamp) || Date.now();
+        var lv = (d.value === null || d.value === undefined || d.value === '') ? NaN : Number(d.value);
+        rec.level = isNaN(lv) ? (rec.level !== undefined ? rec.level : 3) : lv;
+        rec.value = rec.level; rec.label = d.label || null; rec.note = d.note || null;
+        rec.ts = _num(d.timestamp) || rec.ts || Date.now();
+        rec.timestamp = rec.ts;
       } else if (type === 'interaction') {
         rec.type = d.type || null; rec.direction = d.direction || null;
         rec.note = d.note || null; rec.duration = d.duration || null;
@@ -23815,9 +23820,21 @@ const SyncEngine = (() => {
   }
 
   /* Called by RemielDB.importAll: the id map and versions no longer match local ids */
+  /* After a backup import the imported records are the whole truth. Do not
+     pull older server rows back in: keep the server version cursor where it
+     is (so nothing old is re-applied) and mark every imported record for a
+     full push, which the server matches by client id. */
   async function resetAfterImport() {
-    _serverIdMap = {}; _lastSyncVersion = 0; _blobSyncVersion = 0; _photoTooLarge = 0;
+    _serverIdMap = {}; _blobSyncVersion = 0; _photoTooLarge = 0;
     _pendingChanges = 0;
+    try {
+      var cur = null;
+      if (_apiBase && _accessToken) {
+        var r = await apiFetch('/sync/pull?since_version=999999999&limit=1');
+        if (r && r.ok) { var j = await r.json(); cur = _num(j.current_version); }
+      }
+      if (cur !== null && !isNaN(cur)) { _lastSyncVersion = cur; await RemielDB.putSetting(LAST_VERSION_KEY, cur); }
+    } catch (e) {}
     _emitStatus();
   }
 
