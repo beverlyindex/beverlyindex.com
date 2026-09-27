@@ -1403,7 +1403,7 @@
     height: 100dvh;
     object-fit: cover;
   }
-  .video-intro .skip-btn {
+  .video-intro .skip-btn, .bi-splash .skip-btn {
     position: absolute;
     bottom: max(32px, env(safe-area-inset-bottom, 0px));
     right: max(24px, env(safe-area-inset-right, 0px));
@@ -1421,7 +1421,7 @@
     transition: background 0.2s, color 0.2s;
     z-index: 2;
   }
-  .video-intro .skip-btn:hover {
+  .video-intro .skip-btn:hover, .bi-splash .skip-btn:hover {
     background: rgba(255,255,255,0.15);
     color: rgba(255,255,255,0.85);
   }
@@ -5204,6 +5204,19 @@
 .sentinel-msg-overlay.open {
   opacity: 1; pointer-events: auto;
 }
+/* QA3 #2: the floating List view and Pulse buttons (z-index 8000) must never
+   cover the message input, Send, or any full-screen overlay. */
+body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none !important; }
+body:has(#sentinelMsgOverlay.open, .sv-overlay.open, .sentinel-call-overlay.active, #quickDialOverlay.open, #contactModalOverlay.open) .clv-toggle,
+body:has(#sentinelMsgOverlay.open, .sv-overlay.open, .sentinel-call-overlay.active, #quickDialOverlay.open, #contactModalOverlay.open) #pulseBtn { display: none !important; }
+.sentinel-msg-unknown { padding: 8px 12px; border-bottom: 1px solid rgba(56,189,248,0.12); display: flex; flex-direction: column; gap: 6px; }
+.sentinel-msg-unknown[hidden] { display: none; }
+.sentinel-msg-unknown-title { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,0.6); }
+.sentinel-msg-unknown-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #e6f6ff; }
+.sentinel-msg-unknown-row .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; background: none; border: 0; color: inherit; text-align: left; font: inherit; padding: 4px 0; }
+.sentinel-msg-unknown-row .sid { font-family: monospace; opacity: 0.7; }
+.sentinel-msg-unknown-row .add, .sentinel-msg-add { background: rgba(56,189,248,0.18); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4); border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.sentinel-msg-add { margin-top: 8px; }
 .sentinel-msg-panel {
   width: min(380px, 88vw); height: 100%;
   background: rgba(12,14,22,0.96);
@@ -5375,6 +5388,7 @@
 <!-- ═══ Beverly Index Splash ═══ -->
 <div class="bi-splash" id="biSplash" aria-label="Beverly Index">
   <img src="beverly-index-logo.png" alt="Beverly Index" draggable="false">
+  <button class="skip-btn" onclick="skipIntro()" aria-label="Skip intro">Skip</button>
 </div>
 
 <!-- ═══ Video Intro ═══ -->
@@ -5415,6 +5429,7 @@
     <p class="ob-media-hint" id="obSelfMediaHint" data-i18n="onboard.name.mediaHint">Photo or short video required</p>
     <input class="ob-input" id="obUserName" type="text" placeholder="Your first name" data-i18n-placeholder="onboard.name.placeholder" autocomplete="off" maxlength="30" style="text-align:center; font-size:16px; margin-bottom:24px;">
     <button class="ob-btn ob-primary" id="obNameBtn" onclick="obNext(2)" disabled data-i18n="onboard.continue">Continue</button>
+    <button type="button" id="obSignInLink" onclick="obSignInExisting()" data-i18n="onboard.signinLink" style="display:block;margin:14px auto 0;background:none;border:0;color:#38bdf8;font-size:13px;text-decoration:underline;cursor:pointer;padding:6px 8px;">Already use Remiel Sentinel on another device? Sign in</button>
   </div>
 
   <!-- Step 2: Welcome -->
@@ -6852,6 +6867,13 @@
 
 <script>
 /* ── Global Toast Notification ── */
+/* Full-screen overlay flag: body.rs-overlay-open while any registered overlay is open. */
+function rsOverlayFlag(name, on) {
+  var set = rsOverlayFlag._open || (rsOverlayFlag._open = {});
+  if (on) set[name] = 1; else delete set[name];
+  try { document.body.classList.toggle('rs-overlay-open', Object.keys(set).length > 0); } catch (e) {}
+}
+
 function showToast(msg) {
   if (typeof A11y !== 'undefined') A11y.announce(msg);
   var existing = document.querySelector('.sentinel-toast');
@@ -6861,7 +6883,7 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
     'background:rgba(56,189,248,0.2);color:#38bdf8;padding:8px 20px;border-radius:20px;' +
-    'font-size:12px;font-weight:600;z-index:9999;backdrop-filter:blur(12px);' +
+    'font-size:12px;font-weight:600;z-index:100001;backdrop-filter:blur(12px);' +
     'border:1px solid rgba(56,189,248,0.3);pointer-events:none;';
   document.body.appendChild(toast);
   setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
@@ -6994,6 +7016,16 @@ function trackCodeUsage(codeHash) {
 }
 
 let appRevealed = false;
+/* M4: a ?call= guest link never shows onboarding. Read before
+   SentinelCall.checkCallInvite cleans the URL. */
+let _guestCallMode = false;
+try { _guestCallMode = !!new URLSearchParams(window.location.search).get('call'); } catch (e) {}
+/* B1: revealApp needs RemielDB, I18n and the modules declared further down
+   this script. _appScriptReady resolves at the very end of the script block,
+   so a reveal requested early (reduced motion, fast skip) waits instead of
+   hitting the temporal dead zone. */
+let _resolveAppScriptReady;
+const _appScriptReady = new Promise(function (res) { _resolveAppScriptReady = res; });
 let animRunning = false;
 
 /* ── PWA Add-to-Home-Screen prompt capture ── */
@@ -7061,7 +7093,7 @@ function beginVideoIntro() {
   /* Reduced motion: no splash hold, no video. Go straight to the app. */
   var _reduce = false;
   try { _reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
-  if (_reduce) { revealApp(); return; }
+  if (_reduce) { setTimeout(function () { revealApp(); }, 0); return; }
 
   /* Returning users get a short splash (1.5s); first launch keeps 4s. */
   var _returning = false;
@@ -7154,6 +7186,9 @@ async function revealApp() {
   _stopIntroMedia();
   if (gateEl) gateEl.classList.add('hidden');
 
+  /* Wait until the whole script has evaluated (B1: TDZ on RemielDB). */
+  try { await _appScriptReady; } catch (e) {}
+
   /* ── Open IndexedDB and decide: onboarding or galaxy ── */
   try {
     await RemielDB.open();
@@ -7170,14 +7205,18 @@ async function revealApp() {
       /* Upgrade path: existing contacts from before onboarding existed */
       await RemielDB.putSetting('onboardingComplete', true);
       await launchGalaxy(saved);
+    } else if (_guestCallMode) {
+      /* Guest call link: the join overlay is the only screen. */
     } else {
       /* First launch — show onboarding wizard */
       showOnboarding();
     }
   } catch(e) {
     console.warn('RemielDB: open failed, launching with defaults', e);
-    await RemielDB.seedContacts(DEMO_CONTACTS);
-    await launchGalaxy(null);
+    try {
+      if (typeof RemielDB !== 'undefined') await RemielDB.seedContacts(DEMO_CONTACTS);
+    } catch (e2) { console.warn('RemielDB: seed failed', e2); }
+    try { await launchGalaxy(null); } catch (e3) { console.warn('launchGalaxy failed', e3); }
   }
 }
 
@@ -7910,6 +7949,7 @@ const I18n = (function () {
 
       'onboard.name.title':       'Set up your sphere',
       'onboard.name.subtitle':    'Your name and image appear at the center of your galaxy.',
+      'onboard.signinLink':       'Already use Remiel Sentinel on another device? Sign in',
       'onboard.name.placeholder':  'Your first name',
       'onboard.continue':          'Continue',
 
@@ -8317,6 +8357,7 @@ const I18n = (function () {
 
       'onboard.name.title':       'Come ti chiamiamo?',
       'onboard.name.subtitle':    'Questo è il nome che appare sulla tua sfera.',
+      'onboard.signinLink':       'Usi già Remiel Sentinel su un altro dispositivo? Accedi',
       'onboard.name.placeholder':  'Il tuo nome',
       'onboard.continue':          'Continua',
 
@@ -8840,6 +8881,10 @@ const I18n = (function () {
     'qa.video': "Video call {name}",
     'qa.noPhone': "No phone on file. Add one in Profile.",
     'qa.noEmail': "No email on file. Add one in Profile.",
+    'qa.missingPhone': "No phone number saved for {name}.",
+    'qa.missingEmail': "No email saved for {name}.",
+    'qa.missingSid': "Add {name}'s Sentinel ID to video call in Remiel Sentinel.",
+    'qa.edit': "Edit",
     'confirm.deleteView': "Delete view \"{name}\"? This cannot be undone.",
     'confirm.signOut': "Sign out? Your local data stays on this device.",
     'confirm.removePerson': "Remove this person? This cannot be undone.",
@@ -8940,6 +8985,13 @@ const I18n = (function () {
     'msg.noSidNote': "Saved on this device. Add their Sentinel ID to deliver.",
     'msg.signInNote': "Saved on this device. Sign in to Remiel Sentinel to deliver.",
     'msg.unknownNote': "Not in your contacts. Add them as a contact to keep this thread.",
+    'msg.newFromId': "New message from {who}, Sentinel ID {sid}.",
+    'msg.read': "Read",
+    'msg.add': "Add",
+    'msg.addContact': "Add as contact",
+    'msg.unknownList': "Not in your contacts",
+    'msg.added': "Added {name} to your contacts",
+    'call.callingLabel': "Calling",
     'msg.empty': "Messages are delivered through Remiel Sentinel when both of you have Sentinel IDs",
     'msg.you': "You",
     'msg.retry': "Retry",
@@ -9093,6 +9145,7 @@ const I18n = (function () {
     'call.couldNotPlace': "Could not place call",
     'call.selectFirst': "Select a contact first",
     'call.libFailed': "Could not load video calling library",
+    'call.unavailable': "Video calling is not available right now",
     'call.calling': "Calling...",
     'call.connectFailed': "Connection failed",
     'call.regenConfirm': "Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.",
@@ -9251,6 +9304,10 @@ const I18n = (function () {
     'qa.video': "Videochiama {name}",
     'qa.noPhone': "Nessun telefono salvato. Aggiungilo nel Profilo.",
     'qa.noEmail': "Nessuna email salvata. Aggiungila nel Profilo.",
+    'qa.missingPhone': "Nessun numero di telefono salvato per {name}.",
+    'qa.missingEmail': "Nessuna email salvata per {name}.",
+    'qa.missingSid': "Aggiungi l'ID Sentinel di {name} per videochiamare in Remiel Sentinel.",
+    'qa.edit': "Modifica",
     'confirm.deleteView': "Eliminare la vista \"{name}\"? Non si può annullare.",
     'confirm.signOut': "Vuoi uscire? I tuoi dati restano su questo dispositivo.",
     'confirm.removePerson': "Rimuovere questa persona? Non si può annullare.",
@@ -9351,6 +9408,13 @@ const I18n = (function () {
     'msg.noSidNote': "Salvato su questo dispositivo. Aggiungi il suo ID Sentinel per consegnarlo.",
     'msg.signInNote': "Salvato su questo dispositivo. Accedi a Remiel Sentinel per consegnarlo.",
     'msg.unknownNote': "Non è tra i tuoi contatti. Aggiungilo per tenere questa conversazione.",
+    'msg.newFromId': "Nuovo messaggio da {who}, ID Sentinel {sid}.",
+    'msg.read': "Leggi",
+    'msg.add': "Aggiungi",
+    'msg.addContact': "Aggiungi ai contatti",
+    'msg.unknownList': "Non nei tuoi contatti",
+    'msg.added': "{name} aggiunto ai tuoi contatti",
+    'call.callingLabel': "Chiamata",
     'msg.empty': "I messaggi passano da Remiel Sentinel quando entrambi avete un ID Sentinel",
     'msg.you': "Tu",
     'msg.retry': "Riprova",
@@ -9504,6 +9568,7 @@ const I18n = (function () {
     'call.couldNotPlace': "Impossibile avviare la chiamata",
     'call.selectFirst': "Prima scegli un contatto",
     'call.libFailed': "Impossibile caricare la libreria per le videochiamate",
+    'call.unavailable': "Le videochiamate non sono disponibili in questo momento",
     'call.calling': "Chiamata in corso...",
     'call.connectFailed': "Connessione non riuscita",
     'call.regenConfirm': "Creare un nuovo ID Sentinel? Chi ha il tuo vecchio ID o link di chiamata non potrà più raggiungerti.",
@@ -9682,6 +9747,78 @@ function showOnboarding() {
   el.hidden = false;
   renderA2hsInstructions();
 }
+
+/* M2: second device. Open the existing Settings sign-in form; when sync
+   reports an authenticated email login, close onboarding and open the
+   galaxy with the pulled data. Settings sits below onboarding, so the
+   wizard is hidden while the form is open and restored if the user backs out. */
+var _obSignIn = { armed: false, done: false, obs: null, uid: null };
+function _obSyncUid() {
+  try { return (typeof SyncEngine !== 'undefined' && typeof SyncEngine.getUserId === 'function') ? (SyncEngine.getUserId() || null) : null; } catch (e) { return null; }
+}
+function obSignInExisting() {
+  var ob = document.getElementById('onboarding');
+  var panel = document.getElementById('settingsPanel');
+  if (typeof SettingsPanel === 'undefined' || !panel) return;
+  _obSignIn.armed = true;
+  _obSignIn.done = false;
+  _obSignIn.uid = _obSyncUid(); /* a silent device account must not count as signing in */
+  if (ob) ob.hidden = true;
+  try { if (typeof SettingsPanel.syncTab === 'function') SettingsPanel.syncTab('login'); } catch (e) {}
+  try { if (typeof SettingsPanel.open === 'function') SettingsPanel.open(); else panel.classList.add('open'); } catch (e) { panel.classList.add('open'); }
+  setTimeout(function () {
+    var form = document.getElementById('syncAuthForm');
+    if (form && form.scrollIntoView) form.scrollIntoView({ block: 'center' });
+    var em = document.getElementById('syncEmail');
+    if (em) { try { em.focus({ preventScroll: true }); } catch (e) {} }
+  }, 150);
+  /* Backing out of Settings without signing in returns to the wizard. */
+  if (_obSignIn.obs) _obSignIn.obs.disconnect();
+  _obSignIn.obs = new MutationObserver(function () {
+    if (panel.classList.contains('open') || _obSignIn.done) return;
+    _obSignIn.obs.disconnect(); _obSignIn.obs = null;
+    setTimeout(function () {
+      if (_obSignIn.done) return;
+      _obSignIn.armed = false;
+      var stage = document.getElementById('stage');
+      if (ob && (!stage || stage.style.display === 'none')) ob.hidden = false;
+    }, 300);
+  });
+  _obSignIn.obs.observe(panel, { attributes: true, attributeFilter: ['class'] });
+}
+
+async function _obFinishAfterSignIn() {
+  if (_obSignIn.done) return;
+  _obSignIn.done = true;
+  _obSignIn.armed = false;
+  if (_obSignIn.obs) { _obSignIn.obs.disconnect(); _obSignIn.obs = null; }
+  /* Give the first pull a moment to land (contacts, photos). */
+  var contacts = [];
+  for (var i = 0; i < 20; i++) {
+    try { contacts = await RemielDB.getAllContacts(); } catch (e) { contacts = []; }
+    var st = null;
+    try { st = (typeof SyncEngine !== 'undefined' && SyncEngine.getStatus) ? SyncEngine.getStatus() : null; } catch (e) {}
+    if (contacts.length > 0 && (!st || st.state !== 'syncing')) break;
+    await new Promise(function (r) { setTimeout(r, 400); });
+  }
+  try { await RemielDB.putSetting('onboardingComplete', true); } catch (e) {}
+  try { localStorage.setItem('rm:obDone', '1'); } catch (e) {}
+  var ob = document.getElementById('onboarding');
+  if (ob) ob.hidden = true;
+  try { if (typeof SettingsPanel !== 'undefined' && SettingsPanel.close) SettingsPanel.close(); } catch (e) {}
+  var stage = document.getElementById('stage');
+  if (!stage || stage.style.display === 'none') {
+    try { await launchGalaxy(contacts.length ? contacts : null); } catch (e) { console.warn('launchGalaxy after sign in failed', e); }
+  }
+}
+
+window.addEventListener('sentinel:syncstatus', function (ev) {
+  var d = (ev && ev.detail) || {};
+  if (!_obSignIn.armed || _obSignIn.done || !d.authenticated) return;
+  var uid = _obSyncUid();
+  if (_obSignIn.uid && uid === _obSignIn.uid) return;
+  _obFinishAfterSignIn();
+});
 
 /* ── Onboarding media handlers ── */
 var _obSelfMediaBlob = null;
@@ -12143,10 +12280,12 @@ async function updateBlufContent() {
     if (_qaEmail) _qaEmail.style.display = '';
     const _phone = selectedContact.phone || '';
     const _email = selectedContact.email || '';
+    /* QA3 #5: dimmed buttons stay tappable; a tap explains what is missing. */
     if (_qaCall) {
       _qaCall.href = _phone ? 'tel:' + normalizePhone(_phone) : '#';
       _qaCall.style.opacity = _phone ? '1' : '0.35';
-      _qaCall.style.pointerEvents = _phone ? 'auto' : 'none';
+      _qaCall.style.pointerEvents = 'auto';
+      _qaCall.dataset.missing = _phone ? '' : 'phone';
       _qaCall.title = _phone ? I18n.t('qa.call', { name: selectedContact.first }) : I18n.t('qa.noPhone');
     }
     if (_qaText) {
@@ -12160,14 +12299,24 @@ async function updateBlufContent() {
     if (_qaEmail) {
       _qaEmail.href = _email ? 'mailto:' + _email : '#';
       _qaEmail.style.opacity = _email ? '1' : '0.35';
-      _qaEmail.style.pointerEvents = _email ? 'auto' : 'none';
+      _qaEmail.style.pointerEvents = 'auto';
+      _qaEmail.dataset.missing = _email ? '' : 'email';
       _qaEmail.title = _email ? I18n.t('qa.email', { name: selectedContact.first }) : I18n.t('qa.noEmail');
     }
     if (_qaVideo) {
-      _qaVideo.href = _phone ? 'facetime:' + normalizePhone(_phone) : '#';
-      _qaVideo.style.opacity = _phone ? '1' : '0.35';
-      _qaVideo.style.pointerEvents = _phone ? 'auto' : 'none';
-      _qaVideo.title = _phone ? I18n.t('qa.video', { name: selectedContact.first }) : I18n.t('qa.noPhone');
+      /* QA3 #4: Video uses Sentinel Call when the contact has a Sentinel ID;
+         facetime: only as the Apple fallback. */
+      const _canVideo = _rsHasSid(selectedContact) || (_rsIsApple() && !!_phone);
+      _qaVideo.href = '#';
+      _qaVideo.style.opacity = _canVideo ? '1' : '0.35';
+      _qaVideo.style.pointerEvents = 'auto';
+      _qaVideo.dataset.missing = _canVideo ? '' : 'sid';
+      _qaVideo.title = _canVideo ? I18n.t('qa.video', { name: selectedContact.first }) : I18n.t('qa.missingSid', { name: selectedContact.first });
+      _qaVideo.onclick = function(e) {
+        e.preventDefault(); e.stopPropagation();
+        if (this.dataset.missing) return; /* the capture listener shows the hint */
+        startVideoWith(selectedContact);
+      };
     }
   }
 
@@ -13513,8 +13662,10 @@ const SentinelMessaging = (() => {
 
     /* Open overlay */
     const overlay = document.getElementById('sentinelMsgOverlay');
+    _renderUnknownStrip(contactId).catch(() => {});
     if (overlay) {
       overlay.classList.add('open');
+      rsOverlayFlag('messaging', true);
       /* Focus input after animation */
       setTimeout(() => {
         const inp = document.getElementById('sentinelMsgInput');
@@ -13538,6 +13689,113 @@ const SentinelMessaging = (() => {
     _stopOpenPoll();
     const overlay = document.getElementById('sentinelMsgOverlay');
     if (overlay) overlay.classList.remove('open');
+    rsOverlayFlag('messaging', false);
+  }
+
+  /* ── M5: unknown senders ── */
+  const _UNKNOWN_IDX = '_msg_unknown_threads';
+  function _tp(key, fallback, params) {
+    let v = _t(key, fallback);
+    if (params) v = v.replace(/\{(\w+)\}/g, (m, k) => (params[k] !== undefined ? params[k] : m));
+    return v;
+  }
+  async function _getUnknownIdx() {
+    try { const m = await RemielDB.getSetting(_UNKNOWN_IDX); return (m && typeof m === 'object') ? m : {}; }
+    catch (_) { return {}; }
+  }
+  async function _putUnknownIdx(m) { try { await RemielDB.putSetting(_UNKNOWN_IDX, m); } catch (_) {} }
+  function _sidFromKey(key) {
+    const k = String(key).replace(/^unknown:/, '');
+    return _isValidSid(k) ? k.toUpperCase() : null;
+  }
+
+  async function _noteUnknown(key, label, isNew) {
+    const idx = await _getUnknownIdx();
+    const sid = _sidFromKey(key);
+    idx[key] = { label: label || sid || '', sid: sid, ts: Date.now() };
+    await _putUnknownIdx(idx);
+    if (_activeContactId) _renderUnknownStrip(_activeContactId).catch(() => {});
+    if (!isNew) return;
+    const who = label || sid || _t('msg.someone', 'someone');
+    const msg = sid
+      ? _tp('msg.newFromId', 'New message from {who}, Sentinel ID {sid}.', { who: who, sid: sid })
+      : _t('msg.newFrom', 'New message from') + ' ' + who;
+    const actions = [{ label: _t('msg.read', 'Read'), run: () => openFor(key) }];
+    if (sid) actions.push({ label: _t('msg.add', 'Add'), run: () => addUnknownSender(key) });
+    if (typeof showActionToast === 'function') showActionToast(msg, actions, 9000);
+    else showToast(msg);
+  }
+
+  /* Create a contact from an unknown sender, move the thread, open it. */
+  async function addUnknownSender(key) {
+    const sid = _sidFromKey(key);
+    if (!sid) { showToast(_t('msg.addToReply', 'add them as a contact to reply')); return; }
+    const existing = _findContactBySid(sid);
+    if (existing) { await _mergeUnknownInto(key, existing.id); openFor(existing.id); return; }
+    const idx = await _getUnknownIdx();
+    let label = (idx[key] && idx[key].label) || _unknownNames[key] || sid;
+    label = String(label).replace(/^@/, '').trim() || sid;
+    const parts = label.split(/\s+/);
+    const contact = {
+      id: Date.now(),
+      first: parts[0],
+      last: parts.slice(1).join(' '),
+      cat: 'other', sev: 2, phone: '', email: '',
+      sentinelId: sid
+    };
+    try { DEMO_CONTACTS.push(contact); } catch (_) {}
+    try { await RemielDB.putContact(contact); } catch (e) { console.warn('[SentinelMessaging] add contact failed', e); }
+    try { if (typeof buildNodes === 'function') buildNodes(false); } catch (_) {}
+    await _mergeUnknownInto(key, contact.id);
+    showToast(_tp('msg.added', 'Added {name} to your contacts', { name: contact.first }));
+    openFor(contact.id);
+  }
+
+  async function _mergeUnknownInto(key, contactId) {
+    const src = await _loadThread(key);
+    if (src.length) {
+      const dst = await _loadThread(contactId);
+      src.forEach(m => {
+        if (dst.some(x => x.id === m.id)) return;
+        dst.push(Object.assign({}, m, { from: m.from === 'center' ? 'center' : contactId }));
+      });
+      dst.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      await _saveThread(contactId, dst);
+    }
+    try { await RemielDB.putSetting(_DB_PREFIX + key, []); } catch (_) {}
+    const idx = await _getUnknownIdx();
+    delete idx[key];
+    await _putUnknownIdx(idx);
+    delete _unknownNames[key];
+  }
+
+  /* Unknown threads listed at the top of the messaging panel. */
+  async function _renderUnknownStrip(activeId) {
+    const panel = document.querySelector('#sentinelMsgOverlay .sentinel-msg-panel');
+    const threadEl = document.getElementById('sentinelMsgThread');
+    if (!panel || !threadEl) return;
+    let strip = document.getElementById('sentinelMsgUnknown');
+    if (!strip) {
+      strip = document.createElement('div');
+      strip.id = 'sentinelMsgUnknown';
+      strip.className = 'sentinel-msg-unknown';
+      panel.insertBefore(strip, threadEl);
+    }
+    const idx = await _getUnknownIdx();
+    const keys = Object.keys(idx).sort((a, b) => (idx[b].ts || 0) - (idx[a].ts || 0));
+    if (!keys.length) { strip.hidden = true; strip.innerHTML = ''; return; }
+    strip.hidden = false;
+    let html = '<div class="sentinel-msg-unknown-title">' + _escHtml(_t('msg.unknownList', 'Not in your contacts')) + '</div>';
+    keys.forEach(k => {
+      const e = idx[k] || {};
+      const active = k === activeId;
+      html += '<div class="sentinel-msg-unknown-row">'
+        + '<button type="button" class="who" onclick="SentinelMessaging.openFor(\'' + _escAttrJs(k) + '\')"' + (active ? ' aria-current="true"' : '') + '>'
+        + _escHtml(e.label || e.sid || '') + (e.sid ? ' <span class="sid">' + _escHtml(e.sid) + '</span>' : '') + '</button>'
+        + (e.sid ? '<button type="button" class="add" onclick="SentinelMessaging.addUnknownSender(\'' + _escAttrJs(k) + '\')">' + _escHtml(_t('msg.add', 'Add')) + '</button>' : '')
+        + '</div>';
+    });
+    strip.innerHTML = html;
   }
 
   /* ── Send message from center sphere ── */
@@ -13704,7 +13962,9 @@ const SentinelMessaging = (() => {
           key = 'unknown:' + (fromSid || m.from_user_id || 'sender');
           const who = m.from_handle ? '@' + m.from_handle : (m.from_display_name || fromSid || _t('msg.someone', 'someone'));
           _unknownNames[key] = m.from_display_name || who;
-          showToast(_t('msg.newFrom', 'New message from') + ' ' + who + ': ' + _t('msg.addToReply', 'add them as a contact to reply'));
+          const before = await _loadThread(key);
+          const isNew = !(serverId && before.some(x => x.serverId === serverId));
+          await _noteUnknown(key, _unknownNames[key], isNew);
         }
         await receiveResponse(key, m.text, { serverId: serverId, ts: m.ts });
       }
@@ -13740,7 +14000,11 @@ const SentinelMessaging = (() => {
     let note = '';
     if (noSid) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.noSidNote', 'Saved on this device. Add their Sentinel ID to deliver.')) + '</div>';
     else if (!_authed()) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.signInNote', 'Saved on this device. Sign in to Remiel Sentinel to deliver.')) + '</div>';
-    else if (isUnknown) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.unknownNote', 'Not in your contacts. Add them as a contact to keep this thread.')) + '</div>';
+    else if (isUnknown) {
+      note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.unknownNote', 'Not in your contacts. Add them as a contact to keep this thread.'));
+      if (_sidFromKey(contactId)) note += '<br><button type="button" class="sentinel-msg-add" onclick="SentinelMessaging.addUnknownSender(\'' + _escAttrJs(contactId) + '\')">' + _escHtml(_t('msg.addContact', 'Add as contact')) + '</button>';
+      note += '</div>';
+    }
 
     if (messages.length === 0) {
       threadEl.innerHTML = '<div class="sentinel-msg-empty">' + _escHtml(_t('msg.empty', 'Messages are delivered through Remiel Sentinel when both of you have Sentinel IDs')) + '</div>' + note;
@@ -13865,7 +14129,7 @@ const SentinelMessaging = (() => {
   }
 
   return {
-    openFor, close, send, retry, receiveResponse, poll,
+    openFor, close, send, retry, receiveResponse, poll, addUnknownSender,
     getTickerData, getLatestMessageText,
     loadBlufSection,
     get activeContactId() { return _activeContactId; },
@@ -15980,7 +16244,9 @@ function startBcRecording() {
     recordBtn.textContent = 'Record';
     recordBtn.classList.remove('recording');
     if (bcChunks.length > 0) {
-      const blob = new Blob(bcChunks, { type: bcRecorder.mimeType || 'video/webm' });
+      /* M3: store the note with a clean base type (no codec parameters). */
+      const _baseType = String(bcRecorder.mimeType || 'video/webm').split(';')[0].trim() || 'video/webm';
+      const blob = new Blob(bcChunks, { type: _baseType });
       showBcPlayback(blob);
       document.getElementById('bcStatus').textContent = 'Recording saved';
     }
@@ -16173,12 +16439,66 @@ function handleOverlayClick(e) {
 
 /* Quick action for a contact (galaxy icons and the accessible list view).
    type: 'video' | 'phone' | 'sms' | 'email' */
+function _rsHasSid(c) { return !!(c && typeof c.sentinelId === 'string' && /^[A-Z0-9]{8}$/i.test(c.sentinelId.trim())); }
+function _rsIsApple() {
+  try { return /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent || ''); } catch (e) { return false; }
+}
+
+/* Toast with tappable actions: actions = [{ label, run }]. */
+function showActionToast(msg, actions, ms) {
+  try { if (typeof A11y !== 'undefined') A11y.announce(msg); } catch (e) {}
+  var old = document.querySelector('.rs-action-toast');
+  if (old) old.remove();
+  var t = document.createElement('div');
+  t.className = 'rs-action-toast';
+  t.setAttribute('role', 'status');
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);max-width:min(92vw,420px);' +
+    'background:rgba(12,22,34,0.96);color:#e6f6ff;padding:10px 14px;border-radius:14px;font-size:13px;' +
+    'z-index:100002;border:1px solid rgba(56,189,248,0.35);display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
+  var span = document.createElement('span');
+  span.textContent = msg; span.style.flex = '1 1 180px';
+  t.appendChild(span);
+  var timer = null;
+  function close() { if (timer) clearTimeout(timer); t.remove(); }
+  (actions || []).forEach(function (a) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = a.label;
+    b.style.cssText = 'background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:10px;padding:6px 12px;font-weight:600;cursor:pointer;font-size:12px;';
+    b.addEventListener('click', function (e) { e.stopPropagation(); close(); try { a.run(); } catch (err) { console.warn(err); } });
+    t.appendChild(b);
+  });
+  document.body.appendChild(t);
+  timer = setTimeout(close, ms || 6000);
+  return t;
+}
+
+function _rsEditContact(c) {
+  try {
+    if (c && (!selectedContact || selectedContact.id !== c.id)) selectedContact = c;
+    openContactModal('edit', c);
+  } catch (e) { console.warn('edit contact failed', e); }
+}
+
+/* What is missing for this action, with Edit offered. */
+function explainMissingAction(kind, c) {
+  var name = (c && c.first) || I18n.t('call.thisContact');
+  var key = kind === 'email' ? 'qa.missingEmail' : (kind === 'sid' ? 'qa.missingSid' : 'qa.missingPhone');
+  showActionToast(I18n.t(key, { name: name }), [{ label: I18n.t('qa.edit'), run: function () { _rsEditContact(c); } }]);
+}
+
+/* Video: Sentinel Call when the contact has a Sentinel ID; FaceTime on
+   Apple devices with a phone number; otherwise ask for the Sentinel ID. */
+function startVideoWith(c) {
+  if (!c) return;
+  if (_rsHasSid(c) && typeof SentinelCall !== 'undefined') { SentinelCall.callContact(c); return; }
+  if (_rsIsApple() && c.phone) { window.location.href = 'facetime:' + normalizePhone(c.phone); return; }
+  explainMissingAction('sid', c);
+}
+
 function runContactQuickAction(type, c) {
   if (!c) return;
-  if (type === 'video' && c.phone) {
-    window.location.href = 'facetime:' + normalizePhone(c.phone);
-  } else if (type === 'video' && !c.phone) {
-    openQuickDial('video', c.first, c.id);
+  if (type === 'video') {
+    startVideoWith(c);
   } else if (type === 'phone' && c.phone) {
     window.location.href = 'tel:' + normalizePhone(c.phone);
   } else if (type === 'sms') {
@@ -16192,10 +16512,8 @@ function runContactQuickAction(type, c) {
       openQuickDial('email', c.first, c.id);
     } else if (type === 'phone' && c) {
       openQuickDial('call', c.first, c.id);
-    } else if (type === 'video' && c) {
-      openQuickDial('video', c.first, c.id);
     } else {
-      showToast('No contact info on file');
+      showToast(I18n.t('qa.noPhone'));
     }
   }
 }
@@ -24045,10 +24363,14 @@ const SocialImport = (() => {
       if (btn) btn.textContent = _t('vn.uploading', 'Uploading...');
 
       try {
-        var mimeType = (bcLastBlob.type || 'video/webm').split(';')[0];
-        var ext = mimeType.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+        /* M3: codec parameters (video/webm;codecs=vp9,opus) make the server
+           reject the part with 415. Send the bytes with the base type only. */
+        var mimeType = (bcLastBlob.type || 'video/webm').split(';')[0].trim().toLowerCase() || 'video/webm';
+        if (mimeType.indexOf('video/') !== 0 && mimeType.indexOf('audio/') !== 0) mimeType = 'video/webm';
+        var ext = mimeType.indexOf('mp4') !== -1 ? 'mp4' : (mimeType.indexOf('quicktime') !== -1 ? 'mov' : 'webm');
+        var uploadBlob = new Blob([bcLastBlob], { type: mimeType });
         var form = new FormData();
-        form.append('file', bcLastBlob, 'videonote-' + Date.now() + '.' + ext);
+        form.append('file', uploadBlob, 'videonote-' + Date.now() + '.' + ext);
         form.append('blob_type', 'videonote');
         var cid = _currentContactId();
         if (cid) form.append('contact_id', String(cid));
@@ -25521,13 +25843,37 @@ const SentinelCall = (function() {
   }
 
   /* ── Call a contact by ID ── */
-  async function callContact(contactId) {
-    if (typeof SentinelGuide !== 'undefined') SentinelGuide.onCall();
-    if (_currentCall) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
+  let _callBusy = false;
+  async function callContact(contactOrId) {
+    if (_callBusy) return;
+    _callBusy = true;
+    try { await _callContact(contactOrId); }
+    finally { _callBusy = false; }
+  }
+
+  /* Make sure the PeerJS library is loaded and our peer exists. One toast on failure. */
+  async function _ensurePeer() {
+    if (_peer && !_peer.destroyed) return true;
+    try { await _loadPeerJS(); }
+    catch (e) {
+      showToast(_t('call.unavailable', 'Video calling is not available right now'));
+      return false;
+    }
+    try {
+      if (!_myId) _myId = await RemielDB.getSetting('sentinelCallId');
+      if (!_peer || _peer.destroyed) await _initPeer();
+    } catch (e) { console.warn('SentinelCall: peer init failed', e); }
     if (!_peer || _peer.destroyed) {
       showToast(_t('call.notReady', 'Video calling not ready. Try again in a moment.'));
-      return;
+      return false;
     }
+    return true;
+  }
+
+  async function _callContact(contactOrId) {
+    if (typeof SentinelGuide !== 'undefined') { try { SentinelGuide.onCall(); } catch (e) {} }
+    if (_currentCall) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
+    const contactId = (contactOrId && typeof contactOrId === 'object') ? contactOrId.id : contactOrId;
 
     let contact;
     try { contact = await RemielDB.getContact(contactId); } catch(e) {}
@@ -25538,6 +25884,10 @@ const SentinelCall = (function() {
       showToast(_t('call.noSid', 'No Sentinel ID for') + ' ' + (contact.first || _t('call.thisContact', 'this contact')) + '. ' + _t('call.addSidHint', 'Tap their sphere, then Edit to add it.'));
       return;
     }
+
+    /* Library and signalling first: never open the camera or an overlay
+       when calling cannot work (CDN blocked, offline). */
+    if (!(await _ensurePeer())) return;
 
     try {
       _localStream = await _getStream();
@@ -25559,8 +25909,9 @@ const SentinelCall = (function() {
     const remotePeerId = 'sentinel-' + targetId.trim().toLowerCase();
     let call = null;
     try {
+      const callerName = await _getMyName();
       call = _peer.call(remotePeerId, _localStream, {
-        metadata: { callerName: (await _getMyName()), callerId: _myId }
+        metadata: { callerName: callerName, callerId: _myId }
       });
     } catch (e) { call = null; }
     if (!call) {
@@ -25723,9 +26074,10 @@ const SentinelCall = (function() {
     if (status) status.style.display = '';
     if (callerName) callerName.textContent = name;
     if (avatar) avatar.textContent = initials || '?';
-    if (label) label.innerHTML = '<span class="sc-connecting-dots">Calling</span>';
+    if (label) label.innerHTML = '<span class="sc-connecting-dots">' + _t('call.callingLabel', 'Calling') + '</span>';
     if (timer) timer.hidden = true;
     if (overlay) overlay.classList.add('active');
+    rsOverlayFlag('call', true);
   }
 
   function _showIncoming(call) {
@@ -25740,6 +26092,7 @@ const SentinelCall = (function() {
     if (callerName) callerName.textContent = name;
     if (avatar) avatar.textContent = initials;
     if (overlay) overlay.classList.add('active');
+    rsOverlayFlag('call', true);
 
     _playRingtone();
 
@@ -25793,6 +26146,7 @@ const SentinelCall = (function() {
 
     if (overlay) overlay.classList.remove('active');
     if (incoming) incoming.classList.remove('active');
+    rsOverlayFlag('call', false);
     if (localVid) localVid.srcObject = null;
     if (remoteVid) remoteVid.srcObject = null;
     if (timer) timer.hidden = true;
@@ -25856,8 +26210,13 @@ const SentinelCall = (function() {
     const callTarget = params.get('call');
     if (!callTarget) return false;
     _guestTargetId = callTarget.toUpperCase();
-    /* Show guest overlay instead of gate */
-    document.getElementById('scGuestOverlay').classList.remove('hidden');
+    /* Show guest overlay instead of gate. It is authored inside the Settings
+       panel, so move it to <body> to escape that stacking context (M4). */
+    const _gOv = document.getElementById('scGuestOverlay');
+    if (_gOv && _gOv.parentNode !== document.body) document.body.appendChild(_gOv);
+    _gOv.classList.remove('hidden');
+    const _ob = document.getElementById('onboarding');
+    if (_ob) _ob.hidden = true;
     /* Hide the gate so only the guest overlay is visible */
     var _gateEl = document.getElementById('gateScreen');
     if (_gateEl) _gateEl.style.display = 'none';
@@ -25877,12 +26236,38 @@ const SentinelCall = (function() {
     return true;
   }
 
+  function _guestBackToJoin(msg) {
+    const ov = document.getElementById('scGuestOverlay');
+    if (ov) ov.classList.remove('hidden');
+    const st = document.getElementById('scGuestStatus');
+    if (st) st.textContent = msg || '';
+    const btn = document.getElementById('scGuestJoinBtn');
+    const inp = document.getElementById('scGuestName');
+    if (btn && inp) btn.disabled = inp.value.trim().length < 1;
+  }
+
+  let _guestJoining = false;
   async function guestJoinCall() {
     const name = document.getElementById('scGuestName').value.trim();
     if (!name || !_guestTargetId) return;
-    if (_currentCall) return;
+    if (_currentCall || _guestJoining) return;
+    _guestJoining = true;
+    try { await _guestJoin(name); }
+    catch (e) {
+      console.warn('SentinelCall: guest join failed', e);
+      endCall();
+      if (_guestPeer) { try { _guestPeer.destroy(); } catch (e2) {} _guestPeer = null; }
+      showToast(_t('call.unavailable', 'Video calling is not available right now'));
+      _guestBackToJoin('');
+    }
+    finally { _guestJoining = false; }
+  }
+
+  async function _guestJoin(name) {
     const statusEl = document.getElementById('scGuestStatus');
+    const joinBtn = document.getElementById('scGuestJoinBtn');
     statusEl.textContent = _t('call.connecting', 'Connecting...');
+    if (joinBtn) joinBtn.disabled = true;
 
     /* Generate a temp guest Sentinel ID */
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -25895,7 +26280,8 @@ const SentinelCall = (function() {
     try {
       await _loadPeerJS();
     } catch(e) {
-      statusEl.textContent = _t('call.libFailed', 'Could not load video calling library');
+      showToast(_t('call.unavailable', 'Video calling is not available right now'));
+      _guestBackToJoin('');
       return;
     }
 
@@ -25904,9 +26290,13 @@ const SentinelCall = (function() {
     const guestPeerId = 'sentinel-' + guestId.toLowerCase();
     const guestPeer = new Peer(guestPeerId, { debug: 0, config: { iceServers: iceServers } });
     _guestPeer = guestPeer;
+    /* Leaving (hang up, no answer, error) releases the camera and returns
+       the guest to the join screen. */
     const destroyGuest = () => {
       if (_guestPeer === guestPeer) _guestPeer = null;
       try { guestPeer.destroy(); } catch (e) {}
+      _cleanupMedia();
+      _guestBackToJoin(document.getElementById('scGuestStatus').textContent);
     };
 
     guestPeer.on('open', async () => {
@@ -25951,21 +26341,26 @@ const SentinelCall = (function() {
       if (err && err.type === 'peer-unavailable') {
         showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
       }
-      statusEl.textContent = _t('call.connectFailed', 'Connection failed') + ': ' + ((err && err.message) || '');
+      statusEl.textContent = _t('call.connectFailed', 'Connection failed');
       endCall();
       destroyGuest();
     });
   }
 
   /* Helper to load PeerJS if not loaded */
+  /* Resolves when window.Peer exists; rejects on error, offline, or after 8 s. */
   function _loadPeerJS() {
     return new Promise((resolve, reject) => {
       if (window.Peer) { resolve(); return; }
+      if (navigator.onLine === false) { reject(new Error('offline')); return; }
+      let done = false;
+      const finish = (ok) => { if (done) return; done = true; clearTimeout(t); ok && window.Peer ? resolve() : reject(new Error('PeerJS load failed')); };
+      const t = setTimeout(() => finish(false), 8000);
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
       s.crossOrigin = 'anonymous';
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('PeerJS load failed'));
+      s.onload = () => finish(true);
+      s.onerror = () => { try { s.remove(); } catch (e) {} finish(false); };
       document.head.appendChild(s);
     });
   }
@@ -26033,7 +26428,7 @@ const SentinelCall = (function() {
   }
 
   return {
-    init, callContact, callFocused,
+    init, callContact, callFocused, ensurePeer: _ensurePeer,
     acceptIncoming, rejectIncoming, hangUp, endCall,
     toggleMute, flipCamera,
     getMyId, isInCall,
@@ -26045,21 +26440,12 @@ const SentinelCall = (function() {
 
 document.querySelectorAll('#qaVideoBtn, #qaCallBtn, #qaTextBtn, #qaEmailBtn').forEach(btn => {
   btn.addEventListener('click', function(e) {
-    if (this.style.pointerEvents === 'none' || parseFloat(this.style.opacity) < 0.5) {
+    /* QA3 #5: a dimmed button explains what is missing and offers Edit. */
+    if (this.dataset.missing) {
       e.preventDefault();
       e.stopPropagation();
-      var isEmail = this.id === 'qaEmailBtn';
-      var isCall = this.id === 'qaCallBtn';
-      var isText = this.id === 'qaTextBtn';
-      var isVideo = this.id === 'qaVideoBtn';
-      if ((isCall || isText || isVideo) && selectedContact) {
-        /* Open quick-dial so user can enter a number */
-        openQuickDial(isVideo ? 'video' : (isText ? 'sms' : 'call'), selectedContact.first, selectedContact.id);
-      } else if (isEmail && selectedContact) {
-        openQuickDial('email', selectedContact.first, selectedContact.id);
-      } else {
-        showToast(I18n.t('qa.noPhone'));
-      }
+      if (selectedContact) explainMissingAction(this.dataset.missing, selectedContact);
+      else showToast(I18n.t('qa.noPhone'));
     }
   }, true);
 });
@@ -26211,11 +26597,13 @@ function openQuickDial(mode, contactName, contactId) {
   }
   inp.value = '';
   document.getElementById('quickDialOverlay').classList.add('open');
+  rsOverlayFlag('quickDial', true);
   setTimeout(function() { inp.focus(); }, 200);
 }
 
 function closeQuickDial() {
   document.getElementById('quickDialOverlay').classList.remove('open');
+  rsOverlayFlag('quickDial', false);
 }
 /* ── Contacts list popup (settings screen) ── */
 function openContactsPopup() {
@@ -26789,6 +27177,8 @@ const MedImageReader = (() => {
   else setTimeout(fill, 800);
 })();
 
+/* B1: every declaration above is now initialised; release any queued reveal. */
+try { _resolveAppScriptReady(); } catch (e) {}
 </script>
 
   <!-- Roster Import Modal -->
