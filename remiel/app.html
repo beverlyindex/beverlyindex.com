@@ -9862,6 +9862,15 @@ function _decayContactLiveness(bio) {
   bio.liveFlicker = bio.isLive ? Math.max(0, 1 - (age / BIO_LIVE_THRESHOLD_MS)) : 0;
 }
 
+/* ── Sync status for the Circle Command HUD dot (from SyncEngine events) ── */
+const _hudSync = { state: 'offline', pending: 0, authenticated: false };
+window.addEventListener('sentinel:syncstatus', function(ev) {
+  const d = (ev && ev.detail) || {};
+  _hudSync.state = d.state || 'offline';
+  _hudSync.pending = Number(d.pending) || 0;
+  _hudSync.authenticated = !!d.authenticated;
+});
+
 /* ── Circle aggregate for center sphere HUD ── */
 let _circleAggregate = {
   activeCount: 0, totalCount: 0,
@@ -16631,9 +16640,32 @@ function drawNetworkView(t) {
     var _activeViewObj = (typeof SentinelViews !== 'undefined') ? SentinelViews.getActiveView() : null;
     const _ccLabel = _activeViewObj ? _activeViewObj.name.toUpperCase() : 'CIRCLE COMMAND';
     let _ccX = _hudX - ctx.measureText(_ccLabel).width * 0.6;
+    const _ccStartX = _ccX;
     for (let _ci = 0; _ci < _ccLabel.length; _ci++) {
       ctx.fillText(_ccLabel[_ci], _ccX, _hudBaseY - 2);
       _ccX += ctx.measureText(_ccLabel[_ci]).width + 1.5;
+    }
+    /* Sync status dot, left of the HUD label (only when signed in) */
+    if (_hudSync.authenticated) {
+      const _sdCol = _hudSync.state === 'synced' ? '#4ade80'
+        : (_hudSync.state === 'pending' || _hudSync.state === 'syncing') ? '#fbbf24'
+        : _hudSync.state === 'error' ? '#f87171' : '#94a3b8';
+      const _sdR = Math.max(2.5, _hudSmFs * 0.32);
+      const _sdX = _ccStartX - _sdR - 6;
+      const _sdY = _hudBaseY - 2 - _hudSmFs * 0.38;
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = _sdCol;
+      ctx.beginPath(); ctx.arc(_sdX, _sdY, _sdR, 0, Math.PI * 2); ctx.fill();
+      if (_hudSync.pending > 0) {
+        ctx.font = `600 ${Math.max(6, _hudSmFs - 1)}px "Hanken Grotesk", system-ui, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(_hudSync.pending), _sdX - _sdR - 3, _sdY);
+      }
+      ctx.restore();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
     }
 
     /* Active count / total */
