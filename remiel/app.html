@@ -5570,13 +5570,20 @@
     <div class="settings-section-title" data-i18n="sync.account">Account</div>
     <p class="settings-help" data-i18n="help.set.account"></p>
     <div class="settings-card">
+      <!-- Where the data lives, and the off switch for the server copy (AccountPanel) -->
+      <p id="acctPrivacyText" style="font-size:12px;color:var(--text-primary);margin:0 0 8px;line-height:1.45;" data-i18n="acct.privacy">Remiel Sentinel keeps a private copy of your data on its server so you can use it on another device. Turn this off to keep everything on this device only.</p>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:12px;">
+        <input type="checkbox" id="acctLocalOnlyToggle" onchange="AccountPanel.setLocalOnly(this.checked)" style="accent-color:var(--accent,#6c5ce7);width:16px;height:16px;flex-shrink:0;">
+        <span data-i18n="acct.localToggle">Keep my data on this device only</span>
+      </label>
+      <div class="settings-status" id="acctLocalStatus"></div>
       <!-- Device identity and sync status (AccountPanel) -->
       <div id="acctIdentity" style="margin-bottom:12px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
           <span id="acctSyncDot" style="width:8px;height:8px;border-radius:50%;background:#9ca3af;flex-shrink:0;"></span>
-          <span id="acctSyncText" style="font-size:11px;color:var(--text-dim);">On this device only</span>
+          <span id="acctSyncText" style="font-size:11px;color:var(--text-dim);">Not connected yet</span>
         </div>
-        <div id="acctWho" style="font-weight:600;font-size:13px;margin-bottom:4px;">Not connected. Your data stays on this device.</div>
+        <div id="acctWho" style="font-weight:600;font-size:13px;margin-bottom:4px;">Not connected yet. Your data is saved on this device.</div>
         <div id="acctSetup" style="display:none;">
           <button class="settings-action-btn secondary" onclick="AccountPanel.doSetup()" style="width:100%;margin-top:6px;">Connect this device</button>
           <div class="settings-status" id="acctSetupStatus"></div>
@@ -5609,6 +5616,8 @@
           <div class="settings-status" id="acctClaimStatus"></div>
         </div>
       </div>
+      <!-- Hidden while local only mode is on -->
+      <div id="acctSyncControls">
       <!-- Not authenticated: show auth form (second devices sign in here) -->
       <div id="syncAuthForm">
         <div id="syncAuthToggle" style="display:flex;gap:8px;margin-bottom:12px;">
@@ -5637,6 +5646,7 @@
           <button class="settings-action-btn secondary" id="syncLogoutBtn" onclick="SettingsPanel.doSyncLogout()" data-i18n="auth.signout">Sign Out</button>
         </div>
         <div class="settings-status" id="syncStatus"></div>
+      </div>
       </div>
     </div>
   </div>
@@ -5929,7 +5939,7 @@
     <div class="settings-section-title" data-i18n="help.title">Help</div>
     <p class="settings-help" data-i18n="help.set.help"></p>
     <div class="settings-card">
-      <p data-i18n="help.how">Remiel Sentinel shows the people you care about as spheres around your own. You log calls, visits, moods and medications, and each person gets a status from Quiet to Critical so you can see who may need you first. Your data stays on this device unless you connect an account or turn on sharing for someone in The Circle.</p>
+      <p data-i18n="help.how">Remiel Sentinel shows the people you care about as spheres around your own. You log calls, visits, moods and medications, and each person gets a status from Quiet to Critical so you can see who may need you first. Your data is saved on this device, and a private copy is kept on the Remiel Sentinel server so you can use it on another device. You can turn that copy off in Settings, Account. People in The Circle see only what you turn on for them.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         <button class="settings-action-btn" id="helpTourBtn" onclick="SettingsPanel.close(); setTimeout(function(){ SentinelTour.start(); }, 350);" style="flex:1;min-width:130px;" data-i18n="help.tour">Take the tour</button>
         <button class="settings-action-btn secondary" id="helpResetBtn" onclick="SentinelGuide.reset().then(function(){ showToast(I18n.t('help.resetDone')); });" style="flex:1;min-width:130px;" data-i18n="help.reset">Show tips again</button>
@@ -7348,8 +7358,9 @@ document.getElementById('stage').style.display = 'none';
 
 /* ═══════════════════════════════════════════════════════════
    IndexedDB Persistence Layer — Remiel Sentinel
-   All personal data stored device-local. No server, no cloud.
-   Schema designed for export/import from day one.
+   Every record is written here first. SyncEngine keeps a private copy on
+   the Remiel Sentinel server unless the user turns on "Keep my data on this
+   device only" (_sync_local_only). Schema designed for export/import.
    ═══════════════════════════════════════════════════════════ */
 
 const RemielDB = (() => {
@@ -7448,11 +7459,33 @@ const RemielDB = (() => {
   /* ── Sync queue (P1.3): every local write appends {type, op, client_id, ts} ── */
   function _hasQueue() { return !!(_db && _db.objectStoreNames.contains('syncQueue')); }
 
+  /* The queue keeps growing while sync is off (local only mode), so it is
+     bounded: past QUEUE_MAX rows the oldest are dropped. The full snapshot
+     push that follows turning sync back on covers anything dropped. */
+  const QUEUE_MAX = 5000;
+  async function _trimQueue() {
+    const n = await promisify(tx('syncQueue', 'readonly').count());
+    if (n <= QUEUE_MAX) return;
+    let drop = n - QUEUE_MAX;
+    const store = _db.transaction('syncQueue', 'readwrite').objectStore('syncQueue');
+    await new Promise((res, rej) => {
+      const cur = store.openCursor();
+      cur.onsuccess = () => {
+        const c = cur.result;
+        if (!c || drop <= 0) return;
+        c.delete(); drop--; c.continue();
+      };
+      store.transaction.oncomplete = res;
+      store.transaction.onerror = () => rej(store.transaction.error);
+    });
+  }
+
   async function enqueue(type, op, clientId) {
     try {
       await open();
       if (_hasQueue() && clientId !== undefined && clientId !== null) {
         await promisify(tx('syncQueue', 'readwrite').add({ type: type, op: op, client_id: clientId, payload: null, ts: Date.now() }));
+        await _trimQueue();
       }
     } catch (e) { /* queue is best effort; the full snapshot path still covers it */ }
     try { if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty(); } catch (e) {}
@@ -8713,14 +8746,14 @@ const I18n = (function () {
     'settings.motion': "Motion Sensing",
     'settings.bioMonitor': "Circle Bio Monitor",
     'help.set.language': "Changes the language of Remiel Sentinel on this device. Your choice is saved.",
-    'help.set.account': "Optional. Without an account everything stays on this device. With one, your data syncs so you can use it on another device.",
+    'help.set.account': "Your data is saved on this device, and a private copy is kept on the Remiel Sentinel server so you can use it on another device. You can turn that copy off below.",
     'help.set.location': "Shares your position once, when you tap Share, and only with Circle members who have Location turned on. Nothing is tracked in the background.",
     'help.set.videonotes': "Video notes that people in your Circle chose to share with you in the last 7 days.",
     'help.set.push': "Notifications arrive only after push is enabled on the server and you allow them here.",
     'help.set.motion': "Uses your phone motion to change how your own ring glows. A Bluetooth heart rate strap can set the ring pulse. Readings stay on this device unless you share them in The Circle.",
     'help.set.biomonitor': "Pair Bluetooth heart rate monitors and link each one to a person, for example at training. Works in Chrome only.",
     'help.set.data': "What is saved on this device, and a quick way to check in.",
-    'help.set.circle': "Invite people who also use Remiel Sentinel. Nothing is shared until you turn on a switch for that person.",
+    'help.set.circle': "Invite people who also use Remiel Sentinel. They see nothing of yours until you turn on a switch for that person, and each switch stops sharing when you turn it off.",
     'help.set.import': "Adds people from a list you paste, a file, a photo of a roster or your phone contacts. Nothing is sent to the social networks.",
     'help.set.call': "Your Sentinel ID is an 8 character code. Give it, or your call link, to someone so they can video call you in Remiel Sentinel.",
     'help.set.export': "Saves all your data into one locked file. Write down the passphrase: if you lose it, nobody can open the backup, not even us.",
@@ -8728,7 +8761,7 @@ const I18n = (function () {
     'help.set.danger': "Deletes everything on this device. Make a backup first if you may want it back.",
     'help.set.help': "Tips and a short tour of the app.",
     'help.title': "Help",
-    'help.how': "Remiel Sentinel shows the people you care about as spheres around your own. You log calls, visits, moods and medications, and each person gets a status from Quiet to Critical so you can see who may need you first. Your data stays on this device unless you connect an account or turn on sharing for someone in The Circle.",
+    'help.how': "Remiel Sentinel shows the people you care about as spheres around your own. You log calls, visits, moods and medications, and each person gets a status from Quiet to Critical so you can see who may need you first. Your data is saved on this device, and a private copy is kept on the Remiel Sentinel server so you can use it on another device. You can turn that copy off in Settings, Account. People in The Circle see only what you turn on for them.",
     'help.tour': "Take the tour",
     'help.reset': "Show tips again",
     'help.resetDone': "Tips will show again as you use the app",
@@ -9025,10 +9058,16 @@ const I18n = (function () {
     'checkin.nudgeBody': "How are you feeling? Take a moment to log your mood.",
     'acct.never': "not yet",
     'acct.justNow': "just now",
-    'acct.localOnly': "On this device only",
+    'acct.localOnly': "Not connected yet",
     'acct.pending': "pending",
     'acct.lastSync': "last sync",
-    'acct.notSignedIn': "Not connected. Your data stays on this device.",
+    'acct.notSignedIn': "Not connected yet. Your data is saved on this device.",
+    'acct.privacy': "Remiel Sentinel keeps a private copy of your data on its server so you can use it on another device. Turn this off to keep everything on this device only.",
+    'acct.localToggle': "Keep my data on this device only",
+    'acct.localOnNote': "Nothing is sent to the server now. The Circle, location sharing, messages and notifications are off until you turn this switch off.",
+    'acct.localOffNote': "Copying your data to the server so you can use it on another device.",
+    'acct.photoTooLarge': "Photo too large to sync",
+    'acct.dropped': "{n} changes could not be synced",
     'acct.unnamed': "you",
     'acct.signedInAs': "Signed in on this device as",
     'acct.email': "Email",
@@ -9060,21 +9099,33 @@ const I18n = (function () {
     'call.endFirst': "End the current call first",
     'call.regenServerFail': "(not yet saved to your account; try again later)",
     'call.newId': "New Sentinel ID",
-    'circle.share.share_contacts': "Contacts",
-    'circle.share.share_moods': "Moods",
     'circle.share.share_location': "Location",
     'circle.share.share_media': "Video notes",
     'circle.share.share_bio': "Biometrics",
-    'circle.consent.share_contacts': "Shares your contact list with this person until you turn it off.",
-    'circle.consent.share_moods': "Shares your mood check-ins with this person until you turn it off.",
     'circle.consent.share_location': "Lets this person see the location you choose to share, only when you tap Share; stops when off.",
     'circle.consent.share_media': "Lets this person watch video notes you share; stops when you turn it off.",
     'circle.consent.share_bio': "Shares your motion and heart rate readings with this person until you turn it off.",
+    'circle.bio.hr': "Heart rate {hr} bpm",
+    'circle.bio.motion': "Movement {mv}%",
+    'circle.bio.at': "Updated {time}",
     'acct.state.synced': "Synced",
     'acct.state.pending': "Changes waiting to sync",
     'acct.state.syncing': "Syncing",
     'acct.state.offline': "Offline, saved on this device",
     'acct.state.error': "Sync problem, will retry",
+    'acct.state.local': "Local only",
+    'sp.titleSignup': "Create your account",
+    'sp.titleLogin': "Welcome back",
+    'sp.body': "Automatic sync setup did not work. You can create an account or sign in, or keep using Remiel Sentinel on this device only.",
+    'sp.signup': "Sign up",
+    'sp.signin': "Sign in",
+    'sp.email': "Email",
+    'sp.password': "Password",
+    'sp.displayName': "Display name (optional)",
+    'sp.createBtn': "Create account",
+    'sp.skip': "Skip for now",
+    'sp.need': "Enter your email and password.",
+    'sp.failed': "Could not sign in or create the account.",
   });
   Object.assign(_strings.it, {
     'onboard.name.uploadAria': "Carica una tua foto o un video",
@@ -9106,14 +9157,14 @@ const I18n = (function () {
     'settings.motion': "Sensore di movimento",
     'settings.bioMonitor': "Monitor cardiaci della cerchia",
     'help.set.language': "Cambia la lingua di Remiel Sentinel su questo dispositivo. La tua scelta viene salvata.",
-    'help.set.account': "Facoltativo. Senza account tutto resta su questo dispositivo. Con un account i dati si sincronizzano e puoi usarli anche su un altro dispositivo.",
+    'help.set.account': "I tuoi dati sono salvati su questo dispositivo e una copia privata è conservata sul server di Remiel Sentinel, così puoi usarli su un altro dispositivo. Puoi disattivare questa copia qui sotto.",
     'help.set.location': "Condivide la tua posizione una volta sola, quando tocchi Condividi, e solo con chi nella cerchia ha la posizione attiva. Niente viene seguito in background.",
     'help.set.videonotes': "Le videonote che le persone della tua cerchia hanno scelto di condividere con te negli ultimi 7 giorni.",
     'help.set.push': "Le notifiche arrivano solo quando le notifiche push sono attive sul server e tu le permetti qui.",
     'help.set.motion': "Usa il movimento del telefono per cambiare la luce del tuo anello. Una fascia cardio Bluetooth può dare il ritmo al battito dell’anello. I dati restano su questo dispositivo se non li condividi nella cerchia.",
     'help.set.biomonitor': "Collega dei cardiofrequenzimetri Bluetooth e abbina ognuno a una persona, per esempio durante un allenamento. Funziona solo in Chrome.",
     'help.set.data': "Cosa è salvato su questo dispositivo, e un modo rapido per registrare come stai.",
-    'help.set.circle': "Invita persone che usano anche loro Remiel Sentinel. Niente viene condiviso finché non attivi un interruttore per quella persona.",
+    'help.set.circle': "Invita persone che usano anche loro Remiel Sentinel. Non vedono niente di tuo finché non attivi un interruttore per quella persona, e ogni interruttore smette di condividere quando lo spegni.",
     'help.set.import': "Aggiunge persone da un elenco incollato, da un file, dalla foto di un elenco o dalla rubrica del telefono. Niente viene inviato ai social network.",
     'help.set.call': "Il tuo ID Sentinel è un codice di 8 caratteri. Dallo a qualcuno, oppure manda il tuo link, così potrà videochiamarti in Remiel Sentinel.",
     'help.set.export': "Salva tutti i tuoi dati in un unico file protetto. Scrivi la passphrase da qualche parte: se la perdi, nessuno potrà aprire il backup, nemmeno noi.",
@@ -9121,7 +9172,7 @@ const I18n = (function () {
     'help.set.danger': "Cancella tutto su questo dispositivo. Fai prima un backup se pensi di volerlo recuperare.",
     'help.set.help': "Suggerimenti e un breve giro dell’app.",
     'help.title': "Aiuto",
-    'help.how': "Remiel Sentinel mostra le persone a cui tieni come sfere intorno alla tua. Tu registri chiamate, visite, umore e farmaci, e ogni persona riceve uno stato, da Tranquillo a Critico, così vedi subito chi potrebbe avere bisogno di te. I tuoi dati restano su questo dispositivo, a meno che tu non colleghi un account o attivi la condivisione con qualcuno nella cerchia.",
+    'help.how': "Remiel Sentinel mostra le persone a cui tieni come sfere intorno alla tua. Tu registri chiamate, visite, umore e farmaci, e ogni persona riceve uno stato, da Tranquillo a Critico, così vedi subito chi potrebbe avere bisogno di te. I tuoi dati sono salvati su questo dispositivo e una copia privata è conservata sul server di Remiel Sentinel, così puoi usarli su un altro dispositivo. Puoi disattivare questa copia in Impostazioni, Account. Le persone nella cerchia vedono solo ciò che attivi per loro.",
     'help.tour': "Fai il giro guidato",
     'help.reset': "Mostra di nuovo i suggerimenti",
     'help.resetDone': "I suggerimenti torneranno a comparire mentre usi l’app",
@@ -9418,10 +9469,16 @@ const I18n = (function () {
     'checkin.nudgeBody': "Come ti senti? Prenditi un momento per registrare il tuo umore.",
     'acct.never': "non ancora",
     'acct.justNow': "adesso",
-    'acct.localOnly': "Solo su questo dispositivo",
+    'acct.localOnly': "Non ancora collegato",
     'acct.pending': "in attesa",
     'acct.lastSync': "ultima sincronizzazione",
-    'acct.notSignedIn': "Non collegato. I tuoi dati restano su questo dispositivo.",
+    'acct.notSignedIn': "Non ancora collegato. I tuoi dati sono salvati su questo dispositivo.",
+    'acct.privacy': "Remiel Sentinel conserva una copia privata dei tuoi dati sul suo server, così puoi usarli su un altro dispositivo. Disattivala per tenere tutto solo su questo dispositivo.",
+    'acct.localToggle': "Tieni i miei dati solo su questo dispositivo",
+    'acct.localOnNote': "Adesso non viene inviato niente al server. La cerchia, la condivisione della posizione, i messaggi e le notifiche restano spenti finché non disattivi questo interruttore.",
+    'acct.localOffNote': "Copia dei tuoi dati sul server in corso, così puoi usarli su un altro dispositivo.",
+    'acct.photoTooLarge': "Foto troppo grande per la sincronizzazione",
+    'acct.dropped': "{n} modifiche non sincronizzate",
     'acct.unnamed': "tu",
     'acct.signedInAs': "Accesso su questo dispositivo come",
     'acct.email': "Email",
@@ -9453,21 +9510,33 @@ const I18n = (function () {
     'call.endFirst': "Prima chiudi la chiamata in corso",
     'call.regenServerFail': "(non ancora salvato nel tuo account; riprova più tardi)",
     'call.newId': "Nuovo ID Sentinel",
-    'circle.share.share_contacts': "Contatti",
-    'circle.share.share_moods': "Umori",
     'circle.share.share_location': "Posizione",
     'circle.share.share_media': "Videonote",
     'circle.share.share_bio': "Dati biometrici",
-    'circle.consent.share_contacts': "Condivide la tua lista di contatti con questa persona finché non lo spegni.",
-    'circle.consent.share_moods': "Condivide i tuoi check-in dell’umore con questa persona finché non lo spegni.",
     'circle.consent.share_location': "Questa persona vede la posizione che scegli di condividere, solo quando tocchi Condividi; si ferma quando lo spegni.",
     'circle.consent.share_media': "Questa persona può guardare le videonote che condividi; si ferma quando lo spegni.",
     'circle.consent.share_bio': "Condivide i tuoi dati di movimento e battito con questa persona finché non lo spegni.",
+    'circle.bio.hr': "Battito {hr} bpm",
+    'circle.bio.motion': "Movimento {mv}%",
+    'circle.bio.at': "Aggiornato {time}",
     'acct.state.synced': "Sincronizzato",
     'acct.state.pending': "Modifiche in attesa di sincronizzazione",
     'acct.state.syncing': "Sincronizzazione",
     'acct.state.offline': "Offline, salvato su questo dispositivo",
     'acct.state.error': "Problema di sincronizzazione, riprovo",
+    'acct.state.local': "Solo locale",
+    'sp.titleSignup': "Crea il tuo account",
+    'sp.titleLogin': "Bentornato",
+    'sp.body': "La configurazione automatica della sincronizzazione non ha funzionato. Puoi creare un account o accedere, oppure continuare a usare Remiel Sentinel solo su questo dispositivo.",
+    'sp.signup': "Registrati",
+    'sp.signin': "Accedi",
+    'sp.email': "Email",
+    'sp.password': "Password",
+    'sp.displayName': "Nome visualizzato (facoltativo)",
+    'sp.createBtn': "Crea account",
+    'sp.skip': "Salta per ora",
+    'sp.need': "Scrivi la tua email e la password.",
+    'sp.failed': "Impossibile accedere o creare l’account.",
   });
 
   function t(key, params) {
@@ -21491,6 +21560,7 @@ const SyncEngine = (() => {
   // ── Status (P1.3) ──
 
   function _computeState() {
+    if (_localOnly) return 'local';
     if (!navigator.onLine || !isAuthenticated()) return 'offline';
     if (_syncInProgress) return 'syncing';
     if (_lastSyncError) return 'error';
@@ -21593,6 +21663,7 @@ const SyncEngine = (() => {
      and a single-flight refresh on 401. Never throws for HTTP errors. */
   async function _fetch(path, options) {
     options = options || {};
+    if (_localOnly) throw new Error('Local only: sync is off');
     if (!_apiBase) throw new Error('Not configured');
     var url = /^https?:\/\//.test(path) ? path : _apiBase + path;
     var isForm = (typeof FormData !== 'undefined') && options.body instanceof FormData;
@@ -21655,7 +21726,9 @@ const SyncEngine = (() => {
 
   // ── Auth ──
 
-  function isAuthenticated() { return !!(_apiBase && _accessToken && _userId); }
+  /* False while local only mode is on: tokens are kept but never used */
+  function isAuthenticated() { return !_localOnly && !!(_apiBase && _accessToken && _userId); }
+  function isLocalOnly() { return _localOnly; }
   function getUserId() { return _userId; }
   function getDisplayName() { return _displayName; }
   function getApiBase() { return _apiBase; }
@@ -21777,6 +21850,7 @@ const SyncEngine = (() => {
     if (_identityPromise) return _identityPromise;
     _identityPromise = (async function() {
       try {
+        if (_localOnly) return false;
         if (await RemielDB.getSetting(SIGNED_OUT_KEY)) return false;
         var name = await RemielDB.getSetting('userSphereName');
         if (!name || !String(name).trim()) return false;
@@ -21820,7 +21894,7 @@ const SyncEngine = (() => {
     if (_identityPoll || isAuthenticated()) return;
     var started = Date.now();
     _identityPoll = setInterval(function() {
-      if (isAuthenticated() || Date.now() - started > 600000) { _stopIdentityPoll(); return; }
+      if (_localOnly || isAuthenticated() || Date.now() - started > 600000) { _stopIdentityPoll(); return; }
       ensureIdentity();
     }, 5000);
   }
@@ -22599,6 +22673,40 @@ const SyncEngine = (() => {
 
   function ready() { return _ready; }
 
+  /* "Keep my data on this device only". On: sync stops, no device account is
+     created, tokens are kept but unused, and the queue keeps collecting.
+     Off: the device account is created (or reused) and everything is pushed. */
+  async function setLocalOnly(on) {
+    on = !!on;
+    _localOnly = on;
+    try { await RemielDB.putSetting(LOCAL_ONLY_KEY, on ? true : null); } catch (e) {}
+    if (on) {
+      stopAutoSync();
+      _stopIdentityPoll();
+      _lastSyncError = null;
+    } else {
+      try {
+        await RemielDB.putSetting(SIGNED_OUT_KEY, null);
+        await RemielDB.putSetting(ID_FAIL_KEY, 0);
+        await RemielDB.putSetting(FULL_DONE_KEY, false);
+      } catch (e) {}
+      if (isAuthenticated()) startAutoSync();
+      else { window.addEventListener('online', _onOnline); ensureIdentity(); _startIdentityPoll(); }
+    }
+    try { if (typeof CircleManager !== 'undefined' && CircleManager.updateVisibility) CircleManager.updateVisibility(); } catch (e) {}
+    try { if (typeof LocationShare !== 'undefined' && LocationShare.updateVisibility) LocationShare.updateVisibility(); } catch (e) {}
+    try { if (typeof PushNotify !== 'undefined' && PushNotify.updateVisibility) PushNotify.updateVisibility(); } catch (e) {}
+    await _refreshPendingCount();
+    return _localOnly;
+  }
+
+  /* Called by RemielDB.importAll: the id map and versions no longer match local ids */
+  async function resetAfterImport() {
+    _serverIdMap = {}; _lastSyncVersion = 0; _blobSyncVersion = 0; _photoTooLarge = 0;
+    _pendingChanges = 0;
+    _emitStatus();
+  }
+
   /* Re-enable automatic device identity after an explicit sign out */
   async function useDeviceIdentity() {
     try { await RemielDB.putSetting(SIGNED_OUT_KEY, null); await RemielDB.putSetting(ID_FAIL_KEY, 0); } catch (e) {}
@@ -22783,6 +22891,8 @@ const SyncEngine = (() => {
     pushPhotos: pushPhotos, pullPhotos: pullPhotos, syncPhotos: syncPhotos,
     startAutoSync: startAutoSync, stopAutoSync: stopAutoSync, getStatus: getStatus,
     markDirty: markDirty, getPendingCount: getPendingCount,
+    setLocalOnly: setLocalOnly, isLocalOnly: isLocalOnly, resetAfterImport: resetAfterImport,
+    getCircleBio: getCircleBio,
     apiFetch: _fetch,
   };
 })();
@@ -25046,6 +25156,7 @@ const AccountPanel = (function() {
     syncing: ['#60a5fa', 'Syncing'],
     offline: ['#9ca3af', 'Offline, saved on this device'],
     error: ['#f87171', 'Sync problem, will retry'],
+    local: ['#9ca3af', 'Local only'],
   };
 
   function renderStatus() {
@@ -25054,12 +25165,19 @@ const AccountPanel = (function() {
     var dot = _$('acctSyncDot'), txt = _$('acctSyncText');
     if (dot && txt) {
       var s = STATE_TEXT[st.state] || STATE_TEXT.offline;
-      var label = st.authenticated ? _t('acct.state.' + st.state, s[1]) : _t('acct.localOnly', 'On this device only');
+      var label = st.localOnly ? _t('acct.state.local', 'Local only')
+        : st.authenticated ? _t('acct.state.' + st.state, s[1]) : _t('acct.localOnly', 'Not connected yet');
       dot.style.background = st.authenticated ? s[0] : '#9ca3af';
+      var extra = [];
+      if (st.photoTooLarge > 0 && !st.localOnly) extra.push(_t('acct.photoTooLarge', 'Photo too large to sync'));
+      if (st.dropped > 0) extra.push(_t('acct.dropped', '{n} changes could not be synced').replace('{n}', String(st.dropped)));
       txt.textContent = label +
-        (st.pending > 0 ? ' · ' + st.pending + ' ' + _t('acct.pending', 'pending') : '') +
-        (st.authenticated ? ' · ' + _t('acct.lastSync', 'last sync') + ' ' + _ago(st.lastSync) : '');
+        (st.pending > 0 && !st.localOnly ? ' · ' + st.pending + ' ' + _t('acct.pending', 'pending') : '') +
+        (st.authenticated ? ' · ' + _t('acct.lastSync', 'last sync') + ' ' + _ago(st.lastSync) : '') +
+        (extra.length ? ' · ' + extra.join(' · ') : '');
     }
+    var tg = _$('acctLocalOnlyToggle');
+    if (tg && tg.checked !== !!st.localOnly) tg.checked = !!st.localOnly;
     if (_wasAuthed !== st.authenticated) {
       _wasAuthed = st.authenticated;
       render();
@@ -25075,8 +25193,20 @@ const AccountPanel = (function() {
     var st = SyncEngine.getStatus();
     var who = _$('acctWho'), main = _$('acctMain'), claimBox = _$('acctClaimForm'), editBox = _$('acctEditForm'), setup = _$('acctSetup');
     if (!who) return;
+    var tg = _$('acctLocalOnlyToggle');
+    if (tg) tg.checked = !!st.localOnly;
+    var controls = _$('acctSyncControls');
+    if (controls) controls.style.display = st.localOnly ? 'none' : '';
+    if (st.localOnly) {
+      who.textContent = _t('acct.localOnNote', 'Nothing is sent to the server now. The Circle, location sharing, messages and notifications are off until you turn this switch off.');
+      if (main) main.style.display = 'none';
+      if (setup) setup.style.display = 'none';
+      if (claimBox) claimBox.style.display = 'none';
+      if (editBox) editBox.style.display = 'none';
+      return;
+    }
     if (!st.authenticated) {
-      who.textContent = _t('acct.notSignedIn', 'Not connected. Your data stays on this device.');
+      who.textContent = _t('acct.notSignedIn', 'Not connected yet. Your data is saved on this device.');
       if (main) main.style.display = 'none';
       if (setup) setup.style.display = '';
       if (claimBox) claimBox.style.display = 'none';
@@ -25098,6 +25228,15 @@ const AccountPanel = (function() {
       if (n && !n.value) n.value = st.displayName || '';
       if (h && !h.value) h.value = st.handle || '';
     }
+  }
+
+  async function setLocalOnly(on) {
+    if (typeof SyncEngine === 'undefined' || !SyncEngine.setLocalOnly) return;
+    try { await SyncEngine.setLocalOnly(!!on); } catch (e) {}
+    _msg('acctLocalStatus', on ? '' : _t('acct.localOffNote', 'Copying your data to the server so you can use it on another device.'));
+    if (!on) setTimeout(function() { _msg('acctLocalStatus', ''); }, 6000);
+    _wasAuthed = null;
+    render(); renderStatus();
   }
 
   function show(view) { _view = view || 'main'; _msg('acctClaimStatus', ''); _msg('acctEditStatus', ''); render(); }
@@ -25174,7 +25313,7 @@ const AccountPanel = (function() {
   }
 
   init();
-  return { render: render, renderStatus: renderStatus, show: show, doClaim: doClaim, doEdit: doEdit, doSetup: doSetup };
+  return { render: render, renderStatus: renderStatus, show: show, doClaim: doClaim, doEdit: doEdit, doSetup: doSetup, setLocalOnly: setLocalOnly };
 })();
 
 /* Load PeerJS dynamically */
