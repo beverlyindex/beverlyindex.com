@@ -11,15 +11,19 @@ const PRECACHE_URLS = [
   './app.html',
   './manifest.json',
   './sw.js',
-  './remiel-logo.png'
+  './remiel-logo.png',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
-/* ── Install: pre-cache core shell ── */
+/* ── Install: pre-cache core shell ──
+   No automatic skipWaiting: an updated worker waits until the app shows the
+   "new version" banner and the user taps Reload (message SKIP_WAITING). */
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(PRECACHE_URLS.map((u) => cache.add(u).catch(() => {})))
+    )
   );
 });
 
@@ -36,33 +40,57 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-/* ── Fetch: cache-first with stale-while-revalidate for shell assets ── */
+/* ── Fetch: cache-first with background revalidation for shell assets ──
+   Never cache partial (206) or non-200 responses, Range requests, or
+   anything under videos/. Offline misses fall back to the cached app shell
+   for navigations and to a 503 Response otherwise (never undefined). */
+function _isCacheable(request, url) {
+  if (request.headers.has('range')) return false;
+  if (/\/videos\//.test(url.pathname)) return false;
+  return true;
+}
+
+function _offlineFallback(request) {
+  if (request.mode === 'navigate') {
+    return caches.match('./app.html').then((r) => r || caches.match('./')).then((r) =>
+      r || new Response('Remiel Sentinel is offline. Please reconnect and try again.', {
+        status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      })
+    );
+  }
+  return Promise.resolve(new Response('Offline', {
+    status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+  }));
+}
+
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const request = event.request;
+  if (request.method !== 'GET') return;
 
-  const url = new URL(event.request.url);
+  const url = new URL(request.url);
 
-  /* Only cache same-origin resources */
+  /* Only handle same-origin resources */
   if (url.origin !== self.location.origin) return;
 
+  /* Range and video requests go straight to the network, never cached */
+  if (!_isCacheable(request, url)) return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      /* Stale-while-revalidate: serve cache immediately,
-         fetch in background to keep cache fresh */
-      const networkFetch = fetch(event.request).then((response) => {
-        if (response && response.ok && response.type === 'basic') {
+    caches.match(request).then((cached) => {
+      const networkFetch = fetch(request).then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, clone);
-          });
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
         }
         return response;
-      }).catch(() => {
-        /* Network unavailable — offline is fine, cache is served above */
-        return undefined;
       });
 
-      return cached || networkFetch;
+      if (cached) {
+        /* Serve cache now; refresh in the background, ignore failures */
+        event.waitUntil(networkFetch.catch(() => {}));
+        return cached;
+      }
+      return networkFetch.catch(() => _offlineFallback(request));
     })
   );
 });
