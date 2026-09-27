@@ -18526,6 +18526,21 @@ var RosterImport = (function() {
     if (idx >= 0 && idx < _gpFaces.length) _gpFaces[idx].name = name.trim();
   }
 
+  /* Import buttons stay lit while working: busy() with a live "Importing k of n" */
+  function _importBusy(btn, k, n) {
+    if (!btn) return;
+    var text = n ? _t('roster.importingN', { k: k, n: n }) : _t('roster.importing');
+    if (!btn.classList.contains('is-busy')) busy(btn, text);
+    var w = btn.querySelector('.busy-word');
+    if (w) w.textContent = text;
+  }
+  function _importIdle(btn, text) {
+    if (!btn) return;
+    unbusy(btn);
+    btn.disabled = false;
+    btn.textContent = text;
+  }
+
   async function doGroupImport() {
     if (_importing) return;
     var selected = _gpFaces.filter(function(f) { return f.selected; });
@@ -18537,12 +18552,13 @@ var RosterImport = (function() {
     var seen = _existingNameSet(inWizard);
     var added = 0, skipped = 0;
     _importing = true;
-    if (btn) { btn.disabled = true; btn.textContent = _t('roster.importing'); }
-    _status('info', _t('roster.importing'));
+    _importBusy(btn, 0, selected.length);
+    _status('info', _t('roster.importingN', { k: 0, n: selected.length }));
 
     try {
       for (var i = 0; i < selected.length; i++) {
         var face = selected[i];
+        _importBusy(btn, i + 1, selected.length);
         var nameParts = (face.name || ('Person ' + (i + 1))).split(/\s+/);
         var first = nameParts[0] || 'Person';
         var last = nameParts.slice(1).join(' ') || '';
@@ -18584,7 +18600,7 @@ var RosterImport = (function() {
       }
     } catch (err) {
       _importing = false;
-      if (btn) { btn.disabled = false; btn.textContent = _t('roster.importN', { n: selected.length }); }
+      _importIdle(btn, _t('roster.importN', { n: selected.length }));
       _status('err', _t('roster.err.import', { msg: (err && err.message) || String(err) }));
       return;
     }
@@ -18632,7 +18648,7 @@ var RosterImport = (function() {
   async function _afterImport(added, skipped, inWizard, btn, labelFn, photoJobs) {
     if (!added) {
       var why = skipped ? _t('roster.res.allDupes') : _t('roster.res.noneSelected');
-      if (btn) { btn.disabled = false; btn.textContent = labelFn(); }
+      _importIdle(btn, labelFn());
       if (inWizard) {
         close();
         var note = document.getElementById('obRosterNote');
@@ -18644,7 +18660,7 @@ var RosterImport = (function() {
       return;
     }
     var line = _resultLine(added, skipped);
-    if (btn) btn.textContent = line;
+    _importIdle(btn, line);
     _status('ok', line);
 
     if (inWizard) {
@@ -18772,13 +18788,13 @@ var RosterImport = (function() {
     var added = 0, skipped = _parseDupes, jobs = [];
     var src = _source || { kind: 'paste', ref: null };
     _importing = true;
-    btn.disabled = true;
-    btn.textContent = _t('roster.importing');
-    _status('info', _t('roster.importing'));
+    _importBusy(btn, 0, selected.length);
+    _status('info', _t('roster.importingN', { k: 0, n: selected.length }));
 
     try {
       for (var i = 0; i < selected.length; i++) {
         var p = selected[i];
+        _importBusy(btn, i + 1, selected.length);
         var key = (p.first + ' ' + (p.last || '')).toLowerCase().trim();
         if (seen[key]) { skipped++; continue; }
         seen[key] = true;
@@ -18814,16 +18830,14 @@ var RosterImport = (function() {
           } else if (p.headshot) jobs.push({ id: newContact.id, key: key, url: p.headshot });
         }
         added++;
-        if ((i + 1) % 25 === 0 && i + 1 < selected.length) {
+        if ((i + 1) % 5 === 0 && i + 1 < selected.length) {
           _status('info', _t('roster.importingN', { k: i + 1, n: selected.length }));
-          btn.textContent = _t('roster.importingN', { k: i + 1, n: selected.length });
           await _yield();
         }
       }
     } catch (err) {
       _importing = false;
-      btn.disabled = false;
-      btn.textContent = _importLabel();
+      _importIdle(btn, _importLabel());
       _status('err', _t('roster.err.import', { msg: (err && err.message) || String(err) }), { label: _t('roster.st.retry'), fn: doImport });
       return;
     }
