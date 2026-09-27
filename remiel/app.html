@@ -11005,6 +11005,7 @@ const I18n = (function () {
   Object.assign(_strings.en, {
     "roster.tab.search": "Search",
     "roster.fileHint": "<strong>Tap to choose</strong> a file<br>.csv, .tsv, .txt, .xlsx, or .vcf (vCard)",
+    "roster.rs.connecting": "Connecting to Remiel Sentinel...",
     "roster.rs.offline": "Search needs Remiel Sentinel sync. Turn sync on in Settings, or read a screenshot of the roster with the Image tab.",
     "roster.rs.useImage": "Use Image",
     "roster.rs.ph": "Team name, city or abbreviation",
@@ -11101,6 +11102,7 @@ const I18n = (function () {
   Object.assign(_strings.it, {
     "roster.tab.search": "Cerca",
     "roster.fileHint": "<strong>Tocca per scegliere</strong> un file<br>.csv, .tsv, .txt, .xlsx o .vcf (vCard)",
+    "roster.rs.connecting": "Connessione a Remiel Sentinel in corso...",
     "roster.rs.offline": "La ricerca richiede la sincronizzazione di Remiel Sentinel. Attivala nelle Impostazioni, oppure leggi uno screenshot dell’elenco con la scheda Immagine.",
     "roster.rs.useImage": "Usa Immagine",
     "roster.rs.ph": "Nome della squadra, città o sigla",
@@ -11488,6 +11490,16 @@ function _obOpenCamera(mode) {
 })();
 
 function obNext(step) {
+  /* Leaving step 1 with a name: save it now so the device identity is created
+     before step 3 (Roster Search needs it). obFinish saves it again. */
+  if (step > 1 && !document.getElementById('obStep1').hidden) {
+    var _obNm = (document.getElementById('obUserName') || {}).value;
+    _obNm = String(_obNm || '').trim();
+    if (_obNm) {
+      userSphereName = _obNm; sphereName = _obNm;
+      RemielDB.putSetting('userSphereName', _obNm).catch(function() {});
+    }
+  }
   /* Hide all steps, show the target */
   document.getElementById('obStep1').hidden = (step !== 1);
   document.getElementById('obStep2').hidden = (step !== 2);
@@ -17198,7 +17210,7 @@ var RosterImport = (function() {
       var gpPrev = document.getElementById('gpFacePreview');
       if (gpDz && gpPrev && !gpPrev.innerHTML.trim()) gpDz.style.display = '';
     }
-    if (tab === 'search') _searchInit();
+    if (tab === 'search') { if (_connState === 2) _connState = 0; _searchInit(); }
     BtnSystem.refresh();
   }
 
@@ -18723,8 +18735,33 @@ var RosterImport = (function() {
     var on = _online();
     var note = document.getElementById('rsOffline');
     var form = document.getElementById('rsForm');
-    if (note) note.hidden = on;
+    var conn = document.getElementById('rsConnecting');
+    /* Identity may still be on its way (for example during onboarding):
+       show Connecting for up to 8 s, retry once, then fall back to the offline note. */
+    var wait = !on && _connState === 0 && _canConnect();
+    if (wait) _waitForIdentity();
+    var waiting = !on && _connState === 1;
+    if (conn) conn.hidden = !waiting;
+    if (note) note.hidden = on || waiting;
     if (form) form.hidden = !on;
+  }
+  var _connState = 0; /* 0 idle, 1 waiting, 2 done */
+  function _canConnect() {
+    try { return typeof SyncEngine !== 'undefined' && !SyncEngine.isLocalOnly() && navigator.onLine; } catch (e) { return false; }
+  }
+  function _waitForIdentity() {
+    _connState = 1;
+    var t0 = Date.now();
+    (function poll() {
+      if (_online()) { _connState = 0; _searchInit(); BtnSystem.refresh(); return; }
+      if (Date.now() - t0 < 8000) { setTimeout(poll, 250); return; }
+      var p;
+      try { p = SyncEngine.ensureIdentity(); } catch (e) { p = Promise.resolve(false); }
+      Promise.resolve(p).then(function() {}, function() {}).then(function() {
+        _connState = _online() ? 0 : 2;
+        _searchInit(); BtnSystem.refresh();
+      });
+    })();
   }
   function _rsProgress(pct, text) {
     var p = document.getElementById('rsProgress');
@@ -30892,6 +30929,9 @@ try { _resolveAppScriptReady(); } catch (e) {}
       </div>
       <div class="roster-body">
         <div id="rosterTabSearch">
+          <div class="rs-offline" id="rsConnecting" hidden role="status" aria-live="polite">
+            <p data-i18n="roster.rs.connecting">Connecting to Remiel Sentinel...</p>
+          </div>
           <div class="rs-offline" id="rsOffline" hidden>
             <p data-i18n="roster.rs.offline">Search needs Remiel Sentinel sync. Turn sync on in Settings, or read a screenshot of the roster with the Image tab.</p>
             <button type="button" class="roster-status-btn" onclick="RosterImport.switchTab('image')" data-i18n="roster.rs.useImage">Use Image</button>
