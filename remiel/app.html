@@ -27078,6 +27078,33 @@ const SyncEngine = (() => {
     };
   }
 
+  /* The Magnet state (Sentinel ID, linked, matched user id, link state)
+     travels to the owner's other devices inside the synced details JSON
+     under _rs; the server stores details as given. */
+  var _SID_RE = /^[A-Z0-9]{8}$/i;
+  function _detailsOut(c) {
+    var base = (c.details && typeof c.details === 'object' && !Array.isArray(c.details)) ? Object.assign({}, c.details) : {};
+    delete base._rs;
+    var sid = typeof c.sentinelId === 'string' ? c.sentinelId.trim().toUpperCase() : '';
+    if (_SID_RE.test(sid)) {
+      base._rs = { sid: sid, linked: !!c.linked, uid: c.rsUserId || null, ls: c.linkState || null };
+    }
+    return Object.keys(base).length ? base : null;
+  }
+  function _detailsIn(rec, details) {
+    var d = Object.assign({}, details);
+    var rs = d._rs;
+    delete d._rs;
+    rec.details = d;
+    if (!rs || typeof rs !== 'object') return;
+    var sid = typeof rs.sid === 'string' ? rs.sid.trim().toUpperCase() : '';
+    /* A pulled ID fills or updates; an empty one never clears a typed ID */
+    if (_SID_RE.test(sid)) rec.sentinelId = sid;
+    if (rs.linked) rec.linked = true;
+    if (rs.uid) rec.rsUserId = rs.uid;
+    if (rs.ls === 'accepted' || (rs.ls && rec.linkState !== 'accepted')) rec.linkState = rs.ls;
+  }
+
   function _contactOut(c) {
     return {
       client_id: c.id,
@@ -27085,7 +27112,7 @@ const SyncEngine = (() => {
       first: c.first || '', last: c.last || '',
       cat: c.cat || null, sev: typeof c.sev === 'number' ? c.sev : null,
       phone: c.phone || '', notes: c.notes || '',
-      details: (c.details && typeof c.details === 'object') ? c.details : null,
+      details: _detailsOut(c),
       created_at: c.createdAt || null, updated_at: c.updatedAt || null,
     };
   }
@@ -27520,7 +27547,7 @@ const SyncEngine = (() => {
       if (d.sev !== undefined && d.sev !== null) rec.sev = d.sev;
       if (d.phone !== undefined) rec.phone = d.phone;
       if (d.notes !== undefined) rec.notes = d.notes;
-      if (d.details && typeof d.details === 'object' && !Array.isArray(d.details)) rec.details = d.details;
+      if (d.details && typeof d.details === 'object' && !Array.isArray(d.details)) _detailsIn(rec, d.details);
       if (rec.sev === undefined || rec.sev === null) rec.sev = 0;
       if (!rec.createdAt) rec.createdAt = _num(d.created_at) || Date.now();
       rec.updatedAt = remoteTs || Date.now();
