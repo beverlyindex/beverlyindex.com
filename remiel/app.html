@@ -1493,29 +1493,56 @@
     opacity: 1;
     pointer-events: auto;
   }
+  /* Top banners sit below the header (Settings, alerts bell, title);
+     bottom banners sit above the floating List view and Pulse buttons. */
   .sentinel-guide.top {
-    top: max(env(safe-area-inset-top, 12px), 12px);
+    top: calc(max(env(safe-area-inset-top, 0px), 0px) + 68px);
     transform: translateX(-50%) translateY(-8px);
   }
   .sentinel-guide.top.visible {
     transform: translateX(-50%) translateY(0);
   }
   .sentinel-guide.bottom {
-    bottom: max(calc(env(safe-area-inset-bottom, 12px) + 10px), 22px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
     transform: translateX(-50%) translateY(8px);
   }
   .sentinel-guide.bottom.visible {
     transform: translateX(-50%) translateY(0);
   }
+  /* A real button: keyboard reachable, at least 4.5:1 on the banner */
   .sentinel-guide .guide-dismiss {
     display: inline-block;
-    margin-left: 12px;
-    color: rgba(255,210,77,0.5);
+    margin-left: 10px;
+    padding: 2px 6px;
+    min-width: 24px;
+    min-height: 24px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: #ffd24d;
     cursor: pointer;
     pointer-events: auto;
-    font-size: 11px;
+    font: 600 13px/1 "Hanken Grotesk", system-ui, sans-serif;
     vertical-align: middle;
   }
+  .sentinel-guide .guide-dismiss:hover { border-color: rgba(255,210,77,0.45); }
+  .sentinel-guide .guide-dismiss:focus-visible,
+  .sentinel-guide .guide-action:focus-visible { outline: 2px solid #ffd24d; outline-offset: 2px; }
+  /* Visible keyboard focus on every Settings control */
+  #settingsPanel button:focus-visible,
+  #settingsPanel a:focus-visible,
+  #settingsPanel [role="button"]:focus-visible,
+  #settingsPanel [tabindex]:focus-visible,
+  #bioHRBtn:focus-visible, #bioGroupAddBtn:focus-visible,
+  .roster-btn:focus-visible {
+    outline: 2px solid #ffd24d !important;
+    outline-offset: 2px !important;
+  }
+  /* Floating buttons never sit on top of an open overlay */
+  body.rs-overlay-open .pulse-btn,
+  body.rs-overlay-open #pulseBtn,
+  body.rs-overlay-open #clvToggle,
+  body.rs-overlay-open .clv-toggle { display: none !important; }
   .sentinel-guide .guide-icon {
     margin-right: 6px;
     font-size: 14px;
@@ -12410,6 +12437,11 @@ const SentinelGuide = (() => {
   let _loaded = false;
   const _slots = { top: null, bottom: null };
   const _timers = { top: null, bottom: null };
+  /* Screen each visible banner belongs to: { at, state, dlg }. A banner hides
+     itself when its screen changes or its dialog closes. */
+  const _ctx = { top: null, bottom: null };
+  /* Banners that could not get a slot and must not be lost (the tour offer) */
+  const _queue = [];
 
   /* id: [i18nKey, trigger, position, once] */
   const BANNERS = {
@@ -12441,7 +12473,7 @@ const SentinelGuide = (() => {
     'circle-invite':  ['guide.circleInvite',  'tap Invite in The Circle',    'top',    true],
     'location-share': ['guide.locationShare', 'tap Share My Location Now',   'top',    true],
     'daily-summary':  ['guide.dailySummary',  'daily summary shown',         'bottom', true],
-    'alerts-bell':    ['guide.alertsBell',    'tap the alerts bell',         'top',    true],
+    'alerts-bell':    ['guide.alertsBell',    'tap the alerts bell',         'bottom', true],
     'rest-mode':      ['guide.restMode',      'rest mode starts',            'bottom', true],
     'backup-export':  ['guide.backupExport',  'tap Export Backup',           'top',    true],
   };
@@ -12460,7 +12492,6 @@ const SentinelGuide = (() => {
     ['#bioMotionToggle', 'bio-motion'],
     ['#bioHRBtn', 'bio-hr'],
     ['#bioGroupAddBtn', 'bio-group'],
-    ['[onclick*="SentinelViews.openPanel"]', 'views'],
     ['[onclick*="LocationShare.shareNow"]', 'location-share'],
     ['[onclick*="CircleManager.sendInvite"]', 'circle-invite'],
     ['[onclick*="SentinelCall.copyMyId"], [onclick*="SentinelCall.shareCallLink"]', 'call-id'],
@@ -12500,15 +12531,20 @@ const SentinelGuide = (() => {
     try { if (id !== 'tour-offer' && SentinelTour.active) return false; } catch (_) {}
     if (_slots.top === id || _slots.bottom === id) return false;
     let slot = pos;
-    /* Never more than two banners: use the other slot if free, otherwise drop */
+    /* Never more than two banners: use the other slot if free, otherwise
+       queue it (when asked) or drop it */
     if (_slots[slot] && !opts.replace) {
       const other = slot === 'top' ? 'bottom' : 'top';
-      if (_slots[other]) return false;
+      if (_slots[other]) {
+        if (opts.queue && !_queue.some(q => q.id === id)) _queue.push({ id: id, text: text, opts: opts });
+        return false;
+      }
       slot = other;
     }
     const el = _slotEl(slot);
     if (!el) return false;
     el.textContent = '';
+    el.style.top = ''; el.style.bottom = '';
     const icon = document.createElement('span');
     icon.className = 'guide-icon';
     icon.textContent = '✨';
@@ -12534,19 +12570,33 @@ const SentinelGuide = (() => {
       later.type = 'button';
       later.className = 'guide-action guide-later';
       later.textContent = opts.laterLabel;
-      later.addEventListener('click', (e) => { e.stopPropagation(); dismiss(id, slot); });
+      later.addEventListener('click', (e) => {
+        e.stopPropagation(); dismiss(id, slot);
+        if (typeof opts.onDismiss === 'function') { try { opts.onDismiss(); } catch (_) {} }
+      });
       el.appendChild(later);
     }
-    const x = document.createElement('span');
+    const x = document.createElement('button');
+    x.type = 'button';
     x.className = 'guide-dismiss';
-    x.setAttribute('role', 'button');
     x.setAttribute('aria-label', _tr('guide.dismiss'));
     x.textContent = '✕';
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismiss(id, slot);
+      if (typeof opts.onDismiss === 'function') { try { opts.onDismiss(); } catch (_) {} }
+    });
     el.appendChild(x);
-    el.onclick = (e) => { if (e.target.closest('.guide-action')) return; dismiss(id, slot); };
+    el.onclick = (e) => {
+      if (e.target.closest('.guide-action') || e.target.closest('.guide-dismiss')) return;
+      dismiss(id, slot);
+      if (typeof opts.onDismiss === 'function') { try { opts.onDismiss(); } catch (_) {} }
+    };
     el.setAttribute('role', 'status');
     el.classList.add('visible');
     _slots[slot] = id;
+    _ctx[slot] = opts.sticky ? null : { at: Date.now() + 450, state: (typeof appState !== 'undefined' ? appState : null), dlg: undefined };
+    _avoid(el, slot, opts.anchor);
     clearTimeout(_timers[slot]);
     if (!opts.persistent) {
       const ms = opts.duration || Math.max(5000, Math.min(12000, text.length * 70));
@@ -12563,7 +12613,8 @@ const SentinelGuide = (() => {
       return _render(id, text, { position: position || (row ? row[2] : 'bottom'), duration: duration, once: row ? row[3] : true });
     }
     if (!row) return false;
-    return _render(id, _tr(row[0], text || undefined), { position: row[2], once: row[3] });
+    const params = (text && typeof text === 'object' && !text.nodeType) ? text : undefined;
+    return _render(id, _tr(row[0], params), { position: row[2], once: row[3], anchor: arguments[4] || null });
   }
 
   /* Public API used by other modules:
@@ -12582,20 +12633,61 @@ const SentinelGuide = (() => {
     }
     return _render(id, String(text), {
       position: opts.position || (BANNERS[id] ? BANNERS[id][2] : 'top'),
+      queue: !!opts.queue,
+      sticky: !!opts.sticky,
+      onDismiss: opts.onDismiss,
+      anchor: opts.anchor,
       persistent: !!opts.persistent,
       once: opts.once !== false,
       duration: opts.duration,
       actionLabel: opts.actionLabel,
       onAction: opts.onAction,
       laterLabel: opts.laterLabel,
-      replace: opts.once === false
+      replace: opts.once === false && !opts.queue
     });
   }
+
+  /* Never cover the control a banner describes: if the banner overlaps its
+     anchor, move it just past the anchor on the far side. */
+  function _avoid(el, slot, anchor) {
+    if (!anchor || !anchor.getBoundingClientRect) return;
+    requestAnimationFrame(() => {
+      const a = anchor.getBoundingClientRect();
+      const b = el.getBoundingClientRect();
+      if (!a.width || !(a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom)) return;
+      if (a.top + a.height / 2 < innerHeight / 2) { el.style.bottom = 'auto'; el.style.top = Math.round(a.bottom + 10) + 'px'; }
+      else { el.style.top = 'auto'; el.style.bottom = Math.round(innerHeight - a.top + 10) + 'px'; }
+    });
+  }
+
+  /* Topmost open dialog according to the A11y stack (null when none) */
+  function _topDialog() {
+    try { if (typeof A11y !== 'undefined' && A11y.topDialog) return A11y.topDialog(); } catch (_) {}
+    return null;
+  }
+
+  /* Watchdog: hide banners whose screen closed; then offer a queued banner */
+  setInterval(() => {
+    ['top', 'bottom'].forEach((slot) => {
+      const c = _ctx[slot];
+      if (!_slots[slot] || !c) return;
+      const now = Date.now();
+      const top = _topDialog();
+      if (c.dlg === undefined) { if (now >= c.at) { c.dlg = top; c.state = (typeof appState !== 'undefined' ? appState : null); } return; }
+      const st = (typeof appState !== 'undefined' ? appState : null);
+      if (st !== c.state || top !== c.dlg) hide(slot);
+    });
+    if (_queue.length && (!_slots.top || !_slots.bottom)) {
+      const q = _queue.shift();
+      _render(q.id, q.text, Object.assign({}, q.opts, { queue: false }));
+    }
+  }, 400);
 
   function hide(position) {
     const el = document.getElementById(position === 'top' ? 'guideTop' : 'guideBottom');
     if (el) el.classList.remove('visible');
     _slots[position] = null;
+    _ctx[position] = null;
     clearTimeout(_timers[position]);
   }
 
@@ -12605,7 +12697,10 @@ const SentinelGuide = (() => {
     if (id && id.indexOf('transient-') !== 0) { _seen[id] = 'dismissed'; _persist(); }
   }
 
-  function hideAll() { hide('top'); hide('bottom'); }
+  /* The tour offer survives screen changes; hideAll(true) removes it too */
+  function hideAll(all) {
+    ['top', 'bottom'].forEach((pos) => { if (all || _slots[pos] !== 'tour-offer') hide(pos); });
+  }
 
   function seen(id) { return !!_seen[id]; }
 
@@ -12614,7 +12709,7 @@ const SentinelGuide = (() => {
     Object.keys(_seen).forEach((k) => { delete _seen[k]; });
     try { await RemielDB.putSetting('guideSeen', {}); } catch (_) {}
     try { await RemielDB.putSetting('pulseFirstUseSeen', false); } catch (_) {}
-    hideAll();
+    hideAll(true);
     initPullHelp();
   }
 
@@ -12647,8 +12742,14 @@ const SentinelGuide = (() => {
   }
 
   /* ── Contextual triggers ── */
+  let _launchOfferQueued = false;
   function onEnterSelf() {
     hideAll();
+    /* Repeat an unanswered tour offer once on a later launch */
+    if (!_launchOfferQueued) {
+      _launchOfferQueued = true;
+      setTimeout(() => { try { if (typeof SentinelTour !== 'undefined') SentinelTour.offer(); } catch (_) {} }, 4500);
+    }
     if (!_seen['self-tap']) show('self-tap');
     else if (!_seen['self-hold']) show('self-hold');
   }
@@ -12679,7 +12780,18 @@ const SentinelGuide = (() => {
   function onCheckin() { show('checkin'); }
   function onCall() { show('call-first'); }
   function onMessage() { show('msg-first'); }
-  function onDailySummary() { show('daily-summary'); }
+  /* Only once the app is revealed, onboarding is gone and the summary card is
+     really on screen; otherwise check again for a short while. */
+  function onDailySummary(tries) {
+    tries = tries || 0;
+    const card = document.getElementById('dailyDigest');
+    const ob = document.getElementById('onboarding');
+    const ready = (typeof appRevealed === 'undefined' || appRevealed) && (!ob || ob.hidden) &&
+      card && !card.classList.contains('hidden') && card.offsetParent !== null &&
+      (typeof appState === 'undefined' || appState === 'self');
+    if (ready) { show('daily-summary', undefined, undefined, undefined, card); return; }
+    if (tries < 20) setTimeout(() => onDailySummary(tries + 1), 1000);
+  }
   function onRestMode() { show('rest-mode'); }
 
   /* Delegated click triggers (capture phase, never blocks the click) */
@@ -12687,11 +12799,24 @@ const SentinelGuide = (() => {
     const t = e.target;
     if (!t || !t.closest) return;
     for (let i = 0; i < CLICKS.length; i++) {
-      if (t.closest(CLICKS[i][0])) { show(CLICKS[i][1]); break; }
+      const hit = t.closest(CLICKS[i][0]);
+      if (hit) { show(CLICKS[i][1], undefined, undefined, undefined, hit); break; }
     }
   }, true);
 
-  document.addEventListener('DOMContentLoaded', () => { _ready.then(initPullHelp); });
+  document.addEventListener('DOMContentLoaded', () => {
+    _ready.then(initPullHelp);
+    /* Circle Views help fires on the real entry point (tapping your own
+       sphere or the badge both call SentinelViews.openPanel) */
+    try {
+      if (typeof SentinelViews !== 'undefined' && typeof SentinelViews.openPanel === 'function' && !SentinelViews.openPanel._guided) {
+        const orig = SentinelViews.openPanel;
+        const wrapped = function () { const r = orig.apply(this, arguments); setTimeout(() => show('views'), 350); return r; };
+        wrapped._guided = true;
+        SentinelViews.openPanel = wrapped;
+      }
+    } catch (_) {}
+  });
   window.addEventListener('localeChanged', () => {
     document.querySelectorAll('.bluf-pull-help').forEach((h) => {
       const k = h.getAttribute('data-i18n');
@@ -12892,7 +13017,7 @@ const SentinelTour = (() => {
 
   function start() {
     if (_active) return;
-    if (typeof SentinelGuide !== 'undefined') SentinelGuide.hideAll();
+    if (typeof SentinelGuide !== 'undefined') SentinelGuide.hideAll(true);
     _steps = _build();
     _ensureDom();
     _i = 0;
@@ -12914,15 +13039,26 @@ const SentinelTour = (() => {
     try { RemielDB.putSetting('tourDone', completed ? 'done' : 'skipped'); } catch (_) {}
   }
 
-  /* Offer the tour once, at the end of onboarding */
+  /* Offer the tour at the end of onboarding. The offer is queued (never
+     dropped) when both banner slots are busy. If it is never answered it is
+     offered once more on the next launch. Settings, Help always has it. */
+  let _offeredThisSession = false;
   async function offer() {
-    let done = null;
+    if (_offeredThisSession || _active) return;
+    let done = null, answered = null, shown = 0, obDone = null;
     try { done = await RemielDB.getSetting('tourDone'); } catch (_) {}
-    if (done) return;
+    try { answered = await RemielDB.getSetting('tourOfferAnswered'); } catch (_) {}
+    try { shown = (await RemielDB.getSetting('tourOfferShown')) || 0; } catch (_) {}
+    try { obDone = await RemielDB.getSetting('onboardingComplete'); } catch (_) {}
+    if (done || answered || shown >= 2 || !obDone) return;
     if (typeof SentinelGuide === 'undefined') return;
+    _offeredThisSession = true;
+    try { RemielDB.putSetting('tourOfferShown', shown + 1); } catch (_) {}
+    const answer = () => { try { RemielDB.putSetting('tourOfferAnswered', true); } catch (_) {} };
     SentinelGuide.showBanner('tour-offer', 'tour.offer', {
-      position: 'bottom', persistent: true, once: true,
-      actionLabel: _tr('tour.offerYes'), onAction: start, laterLabel: _tr('tour.later')
+      position: 'bottom', persistent: true, once: false, queue: true, sticky: true,
+      actionLabel: _tr('tour.offerYes'), onAction: () => { answer(); start(); },
+      laterLabel: _tr('tour.later'), onDismiss: answer
     });
   }
 
@@ -20371,7 +20507,42 @@ const A11y = (() => {
     for (let i = _stack.length - 1; i >= 0; i--) {
       if (!_isShown(_stack[i].el)) _pop(_stack[i].el);
     }
+    _applyInert();
   }
+
+  /* Closed overlays must not be reachable with Tab: a registered dialog that
+     is neither open (by class) nor visibly on screen gets inert. Collapsed
+     BLUF pull bodies are inert too. Only inert set here is ever cleared here. */
+  function _visuallyShown(el) {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.05) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return false;
+    return r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+  }
+  function _setInert(el, on) {
+    if (on) { if (!el.inert) { el.inert = true; el._a11yInert = true; } }
+    else if (el._a11yInert) { el.inert = false; el._a11yInert = false; }
+  }
+  function _applyInert() {
+    MODALS.forEach(m => {
+      if (m.skip) return;
+      const el = document.getElementById(m.id);
+      if (!el) return;
+      if (_isShown(el)) { _setInert(el, false); return; }
+      _setInert(el, !_visuallyShown(el));
+    });
+    /* Boot screens that stay in the DOM after they fade out */
+    ['gateScreen', 'videoIntro', 'biSplash', 'scGuestOverlay'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) _setInert(el, !_visuallyShown(el));
+    });
+    document.querySelectorAll('.bluf-pull').forEach(p => {
+      const body = p.querySelector('.bluf-pull-body');
+      if (body) _setInert(body, !p.classList.contains('open'));
+    });
+  }
+  function topDialog() { return _stack.length ? _stack[_stack.length - 1].el : null; }
 
   /* Public API kept for existing callers: now stack based */
   function trapFocus(container) {
@@ -20409,6 +20580,8 @@ const A11y = (() => {
       requestAnimationFrame(() => { pending = false; _sync(); });
     });
     mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+    /* Overlays opened or closed by inline style, and closing transitions */
+    setInterval(_applyInert, 500);
   }
 
   /* ── Keyboard: Escape closes the topmost dialog, once ── */
@@ -20568,7 +20741,7 @@ const A11y = (() => {
     announce('Remiel Sentinel loaded');
   }
 
-  return { init, announce, trapFocus, releaseFocus, prefersReducedMotion, reducedMotion: prefersReducedMotion, FOCUSABLE };
+  return { init, announce, trapFocus, releaseFocus, prefersReducedMotion, reducedMotion: prefersReducedMotion, FOCUSABLE, topDialog };
 })();
 
 /* ═══════════════════════════════════════════════════════════
