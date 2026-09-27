@@ -12128,7 +12128,7 @@ const CV = document.getElementById('sphere');
 const ctx = CV.getContext('2d');
 const stage = document.getElementById('stage');
 const sphereLabelsEl = document.getElementById('sphereLabels');
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
+const DPR = Math.min(window.devicePixelRatio || 1, 3); /* 3x phones get a 3x canvas so HUD text stays crisp */
 
 /* ── Forward declarations (needed by resize before full init) ── */
 let appState = 'self'; // 'self' | 'network'
@@ -20724,6 +20724,23 @@ const SharedClipPool = (function() {
   return { select: select, frameFor: frameFor, release: _release };
 })();
 
+/* HUD text: every HUD string goes through here. Characters are measured and
+   placed one by one from a left edge so spacing is identical on Safari (no
+   ctx.letterSpacing) and Chrome; the run is centred on cx. Returns its box. */
+function hudSpacedText(c, text, cx, y, spacing) {
+  const chars = Array.from(String(text || ''));
+  const ws = chars.map(ch => c.measureText(ch).width);
+  const total = ws.reduce((a, b) => a + b, 0) + spacing * Math.max(0, chars.length - 1);
+  const prevAlign = c.textAlign;
+  c.textAlign = 'left';
+  let x = cx - total / 2;
+  const left = x;
+  if (!spacing) c.fillText(chars.join(''), x, y);
+  else chars.forEach((ch, i) => { c.fillText(ch, x, y); x += ws[i] + spacing; });
+  c.textAlign = prevAlign;
+  return { left: left, right: left + total };
+}
+
 /* ── PhotoFit: the one rule for placing a photo inside a circle. Used by the
    self view, the network centre sphere, contact spheres, the person card mini
    sphere, the Your sphere preview and every DOM avatar, so a photo looks the
@@ -22424,8 +22441,8 @@ function drawNetworkView(t) {
   /* ── Circle Aggregate HUD — only on center sphere (command center) ── */
   _computeCircleAggregate();
   if (_circleAggregate.totalCount > 0) {
-    const _hudFs = Math.max(7, Math.round(centerR * 0.16));
-    const _hudSmFs = Math.max(6, Math.round(centerR * 0.13));
+    const _hudFs = Math.max(11, Math.round(centerR * 0.16));
+    const _hudSmFs = Math.max(10, Math.round(centerR * 0.13)); /* 10 px floor keeps the HUD readable at 360 px */
     const _hudX = cx;
     const _hudBaseY = cy - centerR * 1.1 - 10;
 
@@ -22433,24 +22450,20 @@ function drawNetworkView(t) {
     ctx.font = `600 ${_hudSmFs}px "Hanken Grotesk", system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillStyle = `rgba(${uc.r},${uc.g},${uc.b},0.45)`;
-    /* Manual letter-spacing for cross-browser compat */
+    ctx.fillStyle = `rgba(${uc.r},${uc.g},${uc.b},0.8)`;
+    /* Letter spacing is placed by hand (Safari has no ctx.letterSpacing): see hudSpacedText */
     /* Show active view name or default CIRCLE COMMAND */
     var _activeViewObj = (typeof SentinelViews !== 'undefined') ? SentinelViews.getActiveView() : null;
     const _ccLabel = _activeViewObj ? _activeViewObj.name.toUpperCase() : I18n.t('net.circleLabel');
-    let _ccX = _hudX - ctx.measureText(_ccLabel).width * 0.6;
-    const _ccStartX = _ccX;
-    for (let _ci = 0; _ci < _ccLabel.length; _ci++) {
-      ctx.fillText(_ccLabel[_ci], _ccX, _hudBaseY - 2);
-      _ccX += ctx.measureText(_ccLabel[_ci]).width + 1.5;
-    }
+    const _ccBox = hudSpacedText(ctx, _ccLabel, _hudX, _hudBaseY - 2, _hudSmFs * 0.14);
+    const _ccStartX = _ccBox.left;
     /* Sync status dot, left of the HUD label (only when signed in) */
     if (_hudSync.authenticated) {
       const _sdCol = _hudSync.state === 'synced' ? '#4ade80'
         : (_hudSync.state === 'pending' || _hudSync.state === 'syncing') ? '#fbbf24'
         : _hudSync.state === 'error' ? '#f87171' : '#94a3b8';
       const _sdR = Math.max(2.5, _hudSmFs * 0.32);
-      const _sdX = _ccStartX - _sdR - 6;
+      const _sdX = _ccStartX - _sdR - Math.max(4, _hudSmFs * 0.55);
       const _sdY = _hudBaseY - 2 - _hudSmFs * 0.38;
       ctx.save();
       ctx.globalAlpha = 0.9;
@@ -22458,9 +22471,9 @@ function drawNetworkView(t) {
       ctx.beginPath(); ctx.arc(_sdX, _sdY, _sdR, 0, Math.PI * 2); ctx.fill();
       if (_hudSync.pending > 0) {
         ctx.font = `600 ${Math.max(6, _hudSmFs - 1)}px "Hanken Grotesk", system-ui, sans-serif`;
-        ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
-        ctx.fillText(String(_hudSync.pending), _sdX - _sdR - 3, _sdY);
+        const _pdTxt = String(_hudSync.pending);
+        hudSpacedText(ctx, _pdTxt, _sdX - _sdR - 3 - ctx.measureText(_pdTxt).width / 2, _sdY, 0);
       }
       ctx.restore();
       ctx.textAlign = 'center';
@@ -22474,10 +22487,10 @@ function drawNetworkView(t) {
       ? _circleAggregate.activeCount / _circleAggregate.totalCount : 0;
     const _activeColor = _activePct > 0.5 ? 'rgba(74,222,128,0.8)' /* green */
       : _activePct > 0 ? 'rgba(251,191,36,0.8)' /* amber */
-      : 'rgba(148,163,184,0.5)'; /* gray */
+      : 'rgba(186,198,214,0.85)'; /* gray */
     ctx.fillStyle = _activeColor;
     const _activeY = _hudBaseY - 2 - Math.round(_hudSmFs * 1.35) - 4;
-    ctx.fillText(_activeLabel, _hudX, _activeY);
+    hudSpacedText(ctx, _activeLabel, _hudX, _activeY, 0);
 
     /* Trend summary arrows: ↑N ↓N —N */
     if (_circleAggregate.trendingUp > 0 || _circleAggregate.trendingDown > 0) {
@@ -22492,21 +22505,21 @@ function drawNetworkView(t) {
         _trendParts.push('=' + _circleAggregate.steady);
       const _trendText = _trendParts.join('  ');
       ctx.fillStyle = 'rgba(203,213,225,0.6)';
-      ctx.fillText(_trendText, _hudX, _trendY);
+      hudSpacedText(ctx, _trendText, _hudX, _trendY, 0);
     }
 
     /* Aggregate HR readout if any contacts have HR */
     if (_circleAggregate.avgHR > 0) {
-      const _hrY = cy + centerR * 1.1 + 6 + _hudFs + 6;
+      const _hrY = cy + centerR * 1.1 + 6 + _nameFs + 6; /* below the name, whatever its size */
       ctx.font = `500 ${_hudSmFs}px "Hanken Grotesk", system-ui, sans-serif`;
       ctx.textBaseline = 'top';
       const _avgHRText = 'avg ' + Math.round(_circleAggregate.avgHR) + ' bpm';
       ctx.fillStyle = 'rgba(248,113,113,0.65)';
-      ctx.fillText(_avgHRText, _hudX, _hrY);
+      hudSpacedText(ctx, _avgHRText, _hudX, _hrY, 0);
 
       if (_circleAggregate.maxHR > 0 && _circleAggregate.activeCount > 1) {
         ctx.fillStyle = 'rgba(248,113,113,0.45)';
-        ctx.fillText('peak ' + Math.round(_circleAggregate.maxHR), _hudX, _hrY + _hudSmFs + 2);
+        hudSpacedText(ctx, 'peak ' + Math.round(_circleAggregate.maxHR), _hudX, _hrY + _hudSmFs + 2, 0);
       }
       ctx.textBaseline = 'alphabetic';
     }
