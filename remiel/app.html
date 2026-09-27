@@ -6,6 +6,10 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#080a10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18535,12 +18539,60 @@ const AlertEngine = (() => {
   function registerSW() {
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.register('./sw.js').then((reg) => {
-      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      /* A worker already waiting from an earlier visit: offer the update */
+      if (reg.waiting && navigator.serviceWorker.controller) _showUpdateBanner(reg.waiting);
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
-        if (nw) nw.addEventListener('statechange', () => {});
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            _showUpdateBanner(nw);
+          }
+        });
       });
     }).catch(() => {});
+    /* Reload once when the new worker takes control */
+    let _swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!_swUpdateRequested || _swReloaded) return;
+      _swReloaded = true;
+      window.location.reload();
+    });
+  }
+
+  let _swUpdateRequested = false;
+  function _showUpdateBanner(worker) {
+    if (document.getElementById('swUpdateBanner')) return;
+    const tt = (typeof _t === 'function') ? _t : function(k, f) { return f; };
+    const bar = document.createElement('div');
+    bar.id = 'swUpdateBanner';
+    bar.setAttribute('role', 'status');
+    bar.setAttribute('aria-live', 'polite');
+    bar.style.cssText = 'position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:100000;' +
+      'display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:10px 14px;border-radius:12px;' +
+      'background:#131a27;color:#e5e7eb;border:1px solid rgba(197,165,90,0.5);box-shadow:0 8px 24px rgba(0,0,0,0.45);' +
+      'font:500 13px "Hanken Grotesk",system-ui,sans-serif;';
+    const msg = document.createElement('span');
+    msg.textContent = tt('pwa.updateReady', 'A new version of Remiel Sentinel is ready.');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = tt('pwa.reload', 'Reload');
+    btn.style.cssText = 'background:#C5A55A;color:#000;border:0;border-radius:8px;padding:6px 12px;font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;';
+    btn.addEventListener('click', () => {
+      _swUpdateRequested = true;
+      btn.disabled = true;
+      try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (e) { window.location.reload(); }
+      /* Safety: reload anyway if controllerchange never fires */
+      setTimeout(() => { if (_swUpdateRequested) window.location.reload(); }, 4000);
+    });
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.setAttribute('aria-label', tt('pwa.dismiss', 'Dismiss'));
+    close.textContent = '\u00d7';
+    close.style.cssText = 'background:none;border:0;color:#9ca3af;font-size:18px;cursor:pointer;padding:0 4px;';
+    close.addEventListener('click', () => bar.remove());
+    bar.appendChild(msg); bar.appendChild(btn); bar.appendChild(close);
+    document.body.appendChild(bar);
   }
 
   /* ── Init ── */
