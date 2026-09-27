@@ -19663,7 +19663,32 @@ const SettingsPanel = (function () {
   }
 
   /* ── Crypto ── */
+  /* PBKDF2 runs in an inline Web Worker so the tap never freezes the UI */
+  let _kdfWorkerUrl = null;
+  function _kdfBitsInWorker(passphrase, salt) {
+    return new Promise(function (resolve, reject) {
+      let w;
+      try {
+        if (!_kdfWorkerUrl) {
+          const src = 'self.onmessage=async function(e){try{var d=e.data;' +
+            'var km=await crypto.subtle.importKey("raw",new TextEncoder().encode(d.pw),{name:"PBKDF2"},false,["deriveBits"]);' +
+            'var b=await crypto.subtle.deriveBits({name:"PBKDF2",salt:d.salt,iterations:d.it,hash:"SHA-256"},km,256);' +
+            'self.postMessage({ok:true,bits:b},[b]);}catch(x){self.postMessage({ok:false,err:String(x&&x.message||x)});}};';
+          _kdfWorkerUrl = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+        }
+        w = new Worker(_kdfWorkerUrl);
+      } catch (e) { reject(e); return; }
+      w.onmessage = function (e) { w.terminate(); if (e.data && e.data.ok) resolve(e.data.bits); else reject(new Error(e.data && e.data.err || 'kdf')); };
+      w.onerror = function (e) { w.terminate(); reject(new Error(e.message || 'kdf worker')); };
+      w.postMessage({ pw: passphrase, salt: salt, it: PBKDF2_ITERATIONS });
+    });
+  }
   async function deriveKey(passphrase, salt) {
+    let bits = null;
+    try { bits = await _kdfBitsInWorker(passphrase, salt); } catch (e) { bits = null; }
+    if (bits) {
+      return crypto.subtle.importKey('raw', bits, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    }
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       'raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
@@ -19731,8 +19756,10 @@ const SettingsPanel = (function () {
     const pw = $('exportPassphrase').value;
     if (!pw || strengthScore(pw) < 2) return;
     const status = $('exportStatus');
-    status.textContent = 'Exporting...';
+    const _btn = busy($('exportBtn'), _t('busy.encrypting', 'Encrypting'));
+    status.textContent = _t('backup.deriving', 'Securing with your passphrase') + '...';
     status.className = 'settings-status';
+    await nextPaint();
     try {
       const dump = await RemielDB.exportAll();
       dump._remielBackup = true;
@@ -19759,6 +19786,7 @@ const SettingsPanel = (function () {
       status.textContent = 'Export failed: ' + (e.message || e);
       status.className = 'settings-status error';
     }
+    unbusy(_btn);
   }
 
   /* ── Import ── */
@@ -19784,8 +19812,10 @@ const SettingsPanel = (function () {
     const pw = $('importPassphrase').value;
     if (!pw || !importFileData) return;
     const status = $('importStatus');
-    status.textContent = 'Decrypting...';
+    const _btn = busy($('importDecryptBtn'), _t('busy.decrypting', 'Decrypting'));
+    status.textContent = _t('backup.deriving', 'Securing with your passphrase') + '...';
     status.className = 'settings-status';
+    await nextPaint();
     try {
       const json = await decrypt(importFileData, pw);
       const dump = JSON.parse(json);
@@ -19807,13 +19837,16 @@ const SettingsPanel = (function () {
       status.className = 'settings-status error';
       decryptedDump = null;
     }
+    unbusy(_btn);
   }
 
   async function doImport() {
     if (!decryptedDump) return;
     const status = $('importStatus');
+    busy($('importConfirmBtn'), _t('busy.saving', 'Saving'));
     status.textContent = 'Importing...';
     status.className = 'settings-status';
+    await nextPaint();
     try {
       await RemielDB.importAll(decryptedDump);
       status.textContent = 'Data restored successfully. Reloading...';
@@ -19824,6 +19857,7 @@ const SettingsPanel = (function () {
     } catch (e) {
       status.textContent = 'Import failed: ' + (e.message || e);
       status.className = 'settings-status error';
+      unbusy($('importConfirmBtn'));
     }
   }
 
