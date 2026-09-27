@@ -10480,6 +10480,7 @@ const I18n = (function () {
     "cd.s.credential": "Cred",
     "cd.s.department": "Dept",
     "cd.s.extension": "Ext",
+    "roster.gp.head": "Finding faces in this photo",
     "guide.rosterFile": "Choose a CSV, TSV, text, Excel .xlsx or vCard file. A header row such as Name, Title, Department, Phone and Email fills in the details.",
   });
   Object.assign(_strings.it, {
@@ -10575,6 +10576,7 @@ const I18n = (function () {
     "cd.s.credential": "Titolo",
     "cd.s.department": "Reparto",
     "cd.s.extension": "Int.",
+    "roster.gp.head": "Ricerca dei volti in questa foto",
     "guide.rosterFile": "Scegli un file CSV, TSV, di testo, Excel .xlsx o vCard. Una riga di intestazione come Nome, Cognome, Qualifica, Reparto, Telefono ed Email compila i dettagli.",
   });
 
@@ -17521,6 +17523,8 @@ var RosterImport = (function() {
     stage(5, _t('roster.gp.loading'));
 
     var imgUrl = URL.createObjectURL(file);
+    var gpThumb = document.getElementById('gpThumb');
+    if (gpThumb) gpThumb.src = imgUrl; /* thumbnail at once, before detection starts */
     var img = new Image();
     img.onload = function() {
       if (!alive()) return;
@@ -17748,7 +17752,7 @@ var RosterImport = (function() {
         if (inWizard) {
           var faceBlob = null;
           try { faceBlob = await new Promise(function(res) { face.canvas.toBlob(res, 'image/png'); }); } catch (e) {}
-          _obAddToWizard(first, last, cat, faceBlob);
+          _obAddToWizard(first, last, cat, faceBlob, { details: { source: { kind: 'group', ref: null } } });
           added++;
           continue;
         }
@@ -17762,7 +17766,8 @@ var RosterImport = (function() {
           sev: 4, /* new: Quiet until something is logged */
           phone: '',
           email: '',
-          sentinelId: ''
+          sentinelId: '',
+          details: { source: { kind: 'group', ref: null } }
         };
         DEMO_CONTACTS.push(contact);
         try { await RemielDB.putContact(contact); } catch (e) {}
@@ -30207,6 +30212,7 @@ try { _resolveAppScriptReady(); } catch (e) {}
           </div>
           <input type="file" class="roster-file-input" id="gpFileInput" accept="image/*" onchange="RosterImport.handleGroupPhoto(this)">
           <div class="gp-progress" id="gpProgress" style="display:none">
+            <div class="roster-ocr-thumb-wrap"><img class="roster-ocr-thumb" id="gpThumb" alt=""><div class="roster-ocr-head" data-i18n="roster.gp.head">Finding faces in this photo</div></div>
             <div class="roster-ocr-bar"><div class="roster-ocr-bar-fill" id="gpProgressFill"></div></div>
             <div class="roster-ocr-status" id="gpStatus" aria-live="polite"></div>
           </div>
