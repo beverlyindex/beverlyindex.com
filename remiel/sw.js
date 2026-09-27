@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-sentinel-v34';
+const CACHE_NAME = 'remiel-sentinel-v35';
 
 const PRECACHE_URLS = [
   './',
@@ -148,6 +148,8 @@ self.addEventListener('notificationclick', (event) => {
         for (let i = 0; i < clientList.length; i++) {
           const client = clientList[i];
           if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+            /* Tell the open app what was tapped (for example a link request) */
+            try { client.postMessage({ type: 'NOTIFICATION_CLICK', url: targetUrl }); } catch (e) {}
             return client.focus();
           }
         }

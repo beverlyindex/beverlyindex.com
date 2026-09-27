@@ -32105,6 +32105,13 @@ var Magnet = (function () {
       if (_authed() && !_start._seenAuth) { _start._seenAuth = true; ping(); poll(); refreshPresence(); schedule(); }
     });
     setTimeout(function () { if (_authed()) { _start._seenAuth = true; ping(); poll(); refreshPresence(); schedule(); } }, 2500);
+    /* A tapped link request notification, or the app opened on #link */
+    try {
+      if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
+        if (e.data && e.data.type === 'NOTIFICATION_CLICK' && /#link/.test(String(e.data.url || ''))) poll();
+      });
+    } catch (e) {}
+    if (location.hash === '#link') setTimeout(poll, 3000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _start);
   else setTimeout(_start, 0);
