@@ -4782,6 +4782,22 @@
 .roster-done-banner button { position:absolute; top:6px; right:6px; width:32px; height:32px; border:none; background:transparent; color:rgba(255,255,255,0.7); font-size:20px; cursor:pointer; border-radius:8px; }
 .ob-roster-note { margin:8px 0 0; font:13px/1.4 "Hanken Grotesk",system-ui,sans-serif; color:#e8d48b; }
 .ob-roster-note:empty { display:none; }
+/* Contact record details: BLUF Profile list and editor group */
+.cd-list { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0 0 12px; padding:0 0 10px; border-bottom:1px solid rgba(42,51,72,0.3); }
+.cd-list[hidden] { display:none; }
+.cd-list dt { font-family:var(--nous-mono, monospace); font-size:10px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:var(--text-muted, #5a6a8a); padding-top:2px; }
+.cd-list dd { margin:0; font-family:var(--nous-font, "Hanken Grotesk", system-ui, sans-serif); font-size:13px; color:var(--nous-ink, #e0e4ec); overflow-wrap:anywhere; }
+.contact-modal { max-height:calc(100dvh - 32px); overflow-y:auto; }
+.cm-more { border:1px solid rgba(43,76,126,0.2); border-radius:10px; padding:0 12px; }
+.cm-more summary { cursor:pointer; min-height:40px; display:flex; align-items:center; gap:6px; color:#9fb3d1; font:600 13px 'Hanken Grotesk',system-ui,sans-serif; }
+.cm-more-count { color:#C5A55A; font-weight:500; }
+.cm-more-body { padding:0 0 10px; }
+.cm-more-group { border:none; margin:6px 0 0; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:6px 8px; }
+.cm-more-group legend { font:700 11px 'Hanken Grotesk',system-ui,sans-serif; text-transform:uppercase; letter-spacing:.5px; color:#C5A55A; padding:6px 0 4px; }
+.cm-more-field { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.cm-more-field span { font:600 10px 'Hanken Grotesk',system-ui,sans-serif; color:rgba(160,160,200,0.7); text-transform:uppercase; letter-spacing:.3px; }
+.cm-more-field input { width:100%; box-sizing:border-box; padding:8px 10px; background:rgba(255,255,255,0.04); border:1px solid rgba(43,76,126,0.2); border-radius:8px; color:#e0e4ec; font:14px 'Hanken Grotesk',system-ui,sans-serif; min-height:38px; }
+.cm-more-field input:focus { border-color:rgba(56,189,248,0.45); outline:none; }
 
 /* ── Location Sharing ── */
 .loc-share-section { margin-top: 10px; }
@@ -6458,6 +6474,7 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
         </div>
         <div class="bluf-pull-body">
           <div class="bluf-pull-content">
+            <dl class="cd-list" id="blufDetailList" hidden></dl>
             <div class="profile-form" id="profileForm">
               <div class="profile-field-group">
                 <label class="profile-field-label" data-i18n="profile.phone">Phone</label>
@@ -6863,6 +6880,10 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
     <input class="contact-modal-input" id="cmPhone" type="tel" placeholder="Phone number" data-i18n-placeholder="profile.phonePh" maxlength="20" autocomplete="off">
     <input class="contact-modal-input" id="cmEmail" type="email" placeholder="Email address" data-i18n-placeholder="profile.emailPh" maxlength="60" autocomplete="off">
     <input class="contact-modal-input" id="cmSentinelId" type="text" placeholder="Sentinel ID (for video calls)" data-i18n-placeholder="cm.sidPh" maxlength="8" autocomplete="off" style="text-transform:uppercase; letter-spacing:2px; font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace,monospace; font-size:15px;">
+    <details class="cm-more" id="cmMoreDetails">
+      <summary><span data-i18n="cd.more">More details</span> <span class="cm-more-count" id="cmMoreCount"></span></summary>
+      <div class="cm-more-body" id="cmMoreBody"></div>
+    </details>
     <div class="contact-modal-cat-row" id="cmCatRow">
       <button class="contact-modal-cat active" data-cat="family" onclick="cmSetCat(this)">
         <span class="contact-modal-cat-dot" style="background:rgb(56,189,248)"></span><span data-i18n="category.family">Family</span>
@@ -10317,6 +10338,93 @@ const I18n = (function () {
     "roster.gp.namePh": "Nome",
     "roster.gp.noneSel": "Nessun volto selezionato. Tocca i volti per selezionarli.",
   });
+  /* CONTACT DETAILS KEYS (EN and IT in step) */
+  Object.assign(_strings.en, {
+    "cd.more": "More details",
+    "cd.g.sports": "Sports",
+    "cd.g.service": "Service",
+    "cd.g.medical": "Medical",
+    "cd.rookie": "Rookie",
+    "cd.years": "{n} yrs",
+    "cd.f.number": "Number",
+    "cd.f.position": "Position",
+    "cd.f.heightIn": "Height",
+    "cd.f.weightLb": "Weight",
+    "cd.f.age": "Age",
+    "cd.f.birthDate": "Born",
+    "cd.f.birthPlace": "Birthplace",
+    "cd.f.college": "College",
+    "cd.f.experience": "Experience",
+    "cd.f.rosterStatus": "Status",
+    "cd.f.team": "Team",
+    "cd.f.rank": "Rank",
+    "cd.f.unit": "Unit",
+    "cd.f.mos": "MOS",
+    "cd.f.grade": "Grade",
+    "cd.f.squad": "Squad",
+    "cd.f.credential": "Credential",
+    "cd.f.department": "Department",
+    "cd.f.specialty": "Specialty",
+    "cd.f.role": "Role",
+    "cd.f.room": "Room",
+    "cd.f.extension": "Extension",
+    "cd.f.pager": "Pager",
+    "cd.f.shift": "Shift",
+    "cd.s.number": "#",
+    "cd.s.position": "Pos",
+    "cd.s.heightIn": "Ht",
+    "cd.s.weightLb": "Wt",
+    "cd.s.experience": "Exp",
+    "cd.s.birthDate": "Born",
+    "cd.s.birthPlace": "From",
+    "cd.s.rosterStatus": "Status",
+    "cd.s.credential": "Cred",
+    "cd.s.department": "Dept",
+    "cd.s.extension": "Ext",
+  });
+  Object.assign(_strings.it, {
+    "cd.more": "Altri dettagli",
+    "cd.g.sports": "Sport",
+    "cd.g.service": "Servizio",
+    "cd.g.medical": "Sanità",
+    "cd.rookie": "Esordiente",
+    "cd.years": "{n} anni",
+    "cd.f.number": "Numero",
+    "cd.f.position": "Ruolo",
+    "cd.f.heightIn": "Altezza",
+    "cd.f.weightLb": "Peso",
+    "cd.f.age": "Età",
+    "cd.f.birthDate": "Nato il",
+    "cd.f.birthPlace": "Luogo di nascita",
+    "cd.f.college": "College",
+    "cd.f.experience": "Esperienza",
+    "cd.f.rosterStatus": "Stato",
+    "cd.f.team": "Squadra",
+    "cd.f.rank": "Grado",
+    "cd.f.unit": "Unità",
+    "cd.f.mos": "MOS",
+    "cd.f.grade": "Livello",
+    "cd.f.squad": "Squadra operativa",
+    "cd.f.credential": "Titolo",
+    "cd.f.department": "Reparto",
+    "cd.f.specialty": "Specialità",
+    "cd.f.role": "Mansione",
+    "cd.f.room": "Stanza",
+    "cd.f.extension": "Interno",
+    "cd.f.pager": "Cercapersone",
+    "cd.f.shift": "Turno",
+    "cd.s.number": "#",
+    "cd.s.position": "Ruolo",
+    "cd.s.heightIn": "Alt",
+    "cd.s.weightLb": "Peso",
+    "cd.s.experience": "Esp",
+    "cd.s.birthDate": "Nato",
+    "cd.s.birthPlace": "Da",
+    "cd.s.rosterStatus": "Stato",
+    "cd.s.credential": "Titolo",
+    "cd.s.department": "Reparto",
+    "cd.s.extension": "Int.",
+  });
 
   function t(key, params) {
     var str = (_strings[_locale] && _strings[_locale][key])
@@ -12824,6 +12932,7 @@ async function updateBlufContent() {
   const viewCat = selectedContact ? selectedContact.cat : curCat;
   const viewName = selectedContact ? (selectedContact.first + ' ' + selectedContact.last) : sphereName;
   const contactId = selectedContact ? selectedContact.id : 'self';
+  try { ContactDetails.renderBluf(selectedContact); } catch (e) {} /* Profile details at once; the rest of the card loads below */
 
   /* Clear previous alert indicator if present */
   const _oldAlertInd = document.querySelector('.bluf-alert-indicator');
@@ -15461,6 +15570,192 @@ const SentinelViews = (() => {
 })();
 
 /* ── RosterImport Module ── */
+/* ══════════════════════════════════════════════════════════════
+   ContactDetails: optional profile fields on a contact record.
+   Stored as contact.details = { number, position, ..., source:{kind, ref} }
+   and synced as the server's details JSON column. Every field is optional.
+   ══════════════════════════════════════════════════════════════ */
+var ContactDetails = (function() {
+  var GROUPS = [
+    { id: 'sports', fields: ['number', 'position', 'heightIn', 'weightLb', 'age', 'birthDate', 'birthPlace', 'college', 'experience', 'rosterStatus', 'team'] },
+    { id: 'service', fields: ['rank', 'unit', 'mos', 'grade', 'squad'] },
+    { id: 'medical', fields: ['credential', 'department', 'specialty', 'role', 'room', 'extension', 'pager', 'shift'] }
+  ];
+  var FIELDS = [];
+  GROUPS.forEach(function(g) { FIELDS = FIELDS.concat(g.fields); });
+  var SOURCE_KINDS = { search: 1, image: 1, paste: 1, file: 1, group: 1 };
+
+  function _t(k, fb) {
+    if (typeof I18n === 'undefined') return fb || k;
+    var v = I18n.t(k);
+    return (v && v !== k) ? v : (fb || k);
+  }
+  function _esc(s) { var d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+
+  /* Height from 74, "74", 6'2", 6-2, "6 ft 2 in" or 188 cm, in whole inches */
+  function parseHeight(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return (v >= 36 && v <= 100) ? Math.round(v) : null;
+    var s = String(v).trim().toLowerCase().replace(/[’′]/g, "'").replace(/[”″]/g, '"');
+    var m = /^(\d)\s*(?:'|ft|feet|-|\s)\s*(\d{1,2})\s*(?:"|''|in|inches)?$/.exec(s);
+    if (m && +m[2] < 12) return +m[1] * 12 + +m[2];
+    m = /^(\d)\s*(?:'|ft|feet)$/.exec(s);
+    if (m) return +m[1] * 12;
+    m = /^(\d{3})\s*cm$/.exec(s);
+    if (m) return Math.round(+m[1] / 2.54);
+    m = /^(\d{2,3})\s*(?:"|in|inches)?$/.exec(s);
+    if (m && +m[1] >= 36 && +m[1] <= 100) return +m[1];
+    return null;
+  }
+  function fmtHeight(inches) {
+    var n = Number(inches);
+    if (!isFinite(n) || n <= 0) return '';
+    return Math.floor(n / 12) + "' " + (Math.round(n) % 12) + '"';
+  }
+  function parseNum(v, lo, hi) {
+    if (v == null || v === '') return null;
+    var m = /(\d{1,3}(?:\.\d+)?)/.exec(String(v));
+    if (!m) return null;
+    var n = Math.round(Number(m[1]));
+    return (n >= lo && n <= hi) ? n : null;
+  }
+  /* ISO date from YYYY-MM-DD, M/D/YYYY or "Dec 2, 1995"; anything else is dropped */
+  function parseDate(v) {
+    if (!v) return null;
+    var s = String(v).trim();
+    var m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+    var y, mo, d;
+    if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s))) { mo = +m[1]; d = +m[2]; y = +m[3]; if (y < 100) y += y > 30 ? 1900 : 2000; }
+    else {
+      var t = Date.parse(s);
+      if (isNaN(t) || !/[a-z]/i.test(s) || !/\d{4}/.test(s)) return null;
+      var dt = new Date(t); y = dt.getFullYear(); mo = dt.getMonth() + 1; d = dt.getDate();
+    }
+    if (!(y > 1900 && y < 2100 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) return null;
+    return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
+  }
+
+  /* Normalise one value for a field; returns null when it should not be stored */
+  function normalize(field, v) {
+    if (v == null) return null;
+    if (field === 'heightIn') return parseHeight(v);
+    if (field === 'weightLb') return parseNum(v, 50, 700);
+    if (field === 'age') return parseNum(v, 1, 120);
+    if (field === 'experience') {
+      if (/^\s*(r|rookie)\s*$/i.test(String(v))) return 0;
+      return parseNum(v, 0, 60);
+    }
+    if (field === 'birthDate') return parseDate(v);
+    var s = String(v).replace(/\s+/g, ' ').trim();
+    if (field === 'number') { var dm = /\d{1,3}/.exec(s); return dm ? String(parseInt(dm[0], 10)) : null; }
+    if (field === 'position') { s = s.replace(/[^A-Za-z0-9\/ ]/g, '').trim(); return s && s.length <= 12 ? (s.length <= 5 ? s.toUpperCase() : s) : null; }
+    return s ? s.slice(0, 80) : null;
+  }
+
+  /* Only known, present fields survive; source is kept when well formed */
+  function clean(d) {
+    var out = {};
+    if (!d || typeof d !== 'object') return out;
+    FIELDS.forEach(function(f) {
+      var v = normalize(f, d[f]);
+      if (v !== null && v !== undefined && v !== '') out[f] = v;
+    });
+    if (d.source && SOURCE_KINDS[d.source.kind]) out.source = { kind: d.source.kind, ref: d.source.ref != null ? String(d.source.ref).slice(0, 200) : null };
+    return out;
+  }
+
+  function label(f) { return _t('cd.f.' + f, f); }
+  function display(f, v) {
+    if (f === 'heightIn') return fmtHeight(v);
+    if (f === 'weightLb') return v + ' lb';
+    if (f === 'experience') return Number(v) === 0 ? _t('cd.rookie', 'Rookie') : _t('cd.years', '{n} yrs').replace('{n}', v);
+    if (f === 'number') return '#' + v;
+    if (f === 'birthDate') {
+      try { return new Date(v + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return v; }
+    }
+    return String(v);
+  }
+  function present(c) {
+    var d = (c && c.details) || {};
+    return FIELDS.filter(function(f) { return d[f] !== undefined && d[f] !== null && d[f] !== ''; });
+  }
+
+  /* Compact two column list of only the fields that are present */
+  function listHtml(c) {
+    var d = (c && c.details) || {};
+    var keys = present(c);
+    if (!keys.length) return '';
+    return keys.map(function(f) {
+      return '<dt>' + _esc(label(f)) + '</dt><dd>' + _esc(display(f, d[f])) + '</dd>';
+    }).join('');
+  }
+  /* One short line for the Profile pull preview, e.g. "#8 QB New York Jets" */
+  function summary(c) {
+    var d = (c && c.details) || {};
+    var bits = [];
+    if (d.number) bits.push('#' + d.number);
+    ['position', 'rank', 'credential', 'department', 'team', 'unit'].forEach(function(f) { if (d[f] && bits.length < 3) bits.push(d[f]); });
+    return bits.join(' ');
+  }
+
+  function renderBluf(c) {
+    var el = document.getElementById('blufDetailList');
+    if (!el) return;
+    var html = listHtml(c);
+    el.innerHTML = html;
+    el.hidden = !html;
+    var prev = document.getElementById('pullPrev_profile');
+    var sum = summary(c);
+    if (prev && sum && prev.textContent === _t('pull.preview.profile', 'Add details')) prev.textContent = sum;
+  }
+
+  /* The contact editor's collapsed "More details" group, built once */
+  function _buildEditor() {
+    var host = document.getElementById('cmMoreBody');
+    if (!host || host.getAttribute('data-built')) return host;
+    host.innerHTML = GROUPS.map(function(g) {
+      return '<fieldset class="cm-more-group"><legend>' + _esc(_t('cd.g.' + g.id, g.id)) + '</legend>' +
+        g.fields.map(function(f) {
+          var type = f === 'birthDate' ? 'date' : 'text';
+          var mode = (f === 'weightLb' || f === 'age' || f === 'experience') ? ' inputmode="numeric"' : '';
+          var ph = f === 'heightIn' ? ' placeholder="6\' 2&quot;"' : '';
+          return '<label class="cm-more-field"><span>' + _esc(label(f)) + '</span>' +
+            '<input type="' + type + '" data-cd="' + f + '"' + mode + ph + ' maxlength="80" autocomplete="off"></label>';
+        }).join('') + '</fieldset>';
+    }).join('');
+    host.setAttribute('data-built', '1');
+    return host;
+  }
+  function fillEditor(c) {
+    var host = _buildEditor();
+    if (!host) return;
+    var d = (c && c.details) || {};
+    host.querySelectorAll('input[data-cd]').forEach(function(inp) {
+      var f = inp.getAttribute('data-cd');
+      var v = d[f];
+      inp.value = v == null ? '' : (f === 'heightIn' ? fmtHeight(v) : String(v));
+    });
+    var box = document.getElementById('cmMoreDetails');
+    if (box) box.open = false;
+    var n = document.getElementById('cmMoreCount');
+    if (n) n.textContent = present(c).length ? '(' + present(c).length + ')' : '';
+  }
+  /* Reads the editor into c.details, keeping the import source */
+  function applyEditor(c) {
+    var host = document.getElementById('cmMoreBody');
+    if (!c || !host || !host.getAttribute('data-built')) return c;
+    var raw = { source: c.details && c.details.source };
+    host.querySelectorAll('input[data-cd]').forEach(function(inp) { raw[inp.getAttribute('data-cd')] = inp.value; });
+    c.details = clean(raw);
+    return c;
+  }
+
+  return { GROUPS: GROUPS, FIELDS: FIELDS, clean: clean, normalize: normalize, parseHeight: parseHeight,
+           fmtHeight: fmtHeight, parseDate: parseDate, label: label, display: display, listHtml: listHtml,
+           summary: summary, renderBluf: renderBluf, fillEditor: fillEditor, applyEditor: applyEditor };
+})();
+
 var RosterImport = (function() {
   var _parsed = [];
   var _POS = new Set(['qb','rb','wr','te','ol','dl','lb','cb','s','k','p','c','og','ot','de','dt','ng','fs','ss','fb','hb','se',
@@ -17283,6 +17578,7 @@ async function loadProfile() {
         prev.textContent = typeof I18n !== 'undefined' ? I18n.t('pull.preview.profile') : 'Add details';
       }
     }
+    try { ContactDetails.renderBluf(contactId === 'self' ? null : DEMO_CONTACTS.find(function(c) { return c.id === contactId; })); } catch (e) {}
   } catch (e) {
     console.warn('[Profile] Load failed:', e);
   }
@@ -23622,6 +23918,7 @@ const SyncEngine = (() => {
       first: c.first || '', last: c.last || '',
       cat: c.cat || null, sev: typeof c.sev === 'number' ? c.sev : null,
       phone: c.phone || '', notes: c.notes || '',
+      details: (c.details && typeof c.details === 'object') ? c.details : null,
       created_at: c.createdAt || null, updated_at: c.updatedAt || null,
     };
   }
@@ -24056,6 +24353,7 @@ const SyncEngine = (() => {
       if (d.sev !== undefined && d.sev !== null) rec.sev = d.sev;
       if (d.phone !== undefined) rec.phone = d.phone;
       if (d.notes !== undefined) rec.notes = d.notes;
+      if (d.details && typeof d.details === 'object' && !Array.isArray(d.details)) rec.details = d.details;
       if (rec.sev === undefined || rec.sev === null) rec.sev = 0;
       if (!rec.createdAt) rec.createdAt = _num(d.created_at) || Date.now();
       rec.updatedAt = remoteTs || Date.now();
@@ -27954,6 +28252,7 @@ function openContactModal(mode, contact) {
     _resetCmPhoto();
   }
 
+  try { ContactDetails.fillEditor(mode === 'edit' ? selectedContact : null); } catch (e) {}
   overlay.classList.add('open');
   rsOverlayFlag('contactEditor', true);
   var _fab = document.getElementById('addPersonFab');
@@ -28186,6 +28485,7 @@ async function saveContactModal() {
       DEMO_CONTACTS[idx].phone = phone;
       DEMO_CONTACTS[idx].email = email;
       DEMO_CONTACTS[idx].sentinelId = (document.getElementById('cmSentinelId').value.trim() || '').toUpperCase();
+      ContactDetails.applyEditor(DEMO_CONTACTS[idx]);
 
       // Persist to IndexedDB
       try {
@@ -28200,6 +28500,7 @@ async function saveContactModal() {
         selectedContact.phone = phone;
         selectedContact.email = email;
         selectedContact.sentinelId = DEMO_CONTACTS[idx].sentinelId;
+        selectedContact.details = DEMO_CONTACTS[idx].details;
       }
 
       // Rebuild constellation nodes and refresh BLUF
@@ -28220,6 +28521,7 @@ async function saveContactModal() {
       sentinelId: (document.getElementById('cmSentinelId').value.trim() || '').toUpperCase()
     };
 
+    ContactDetails.applyEditor(newContact);
     DEMO_CONTACTS.push(newContact);
 
     // Persist to IndexedDB
