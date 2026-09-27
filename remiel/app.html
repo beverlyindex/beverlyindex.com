@@ -5174,6 +5174,31 @@ span.rp-thumb { cursor:default; }
 }
 .sv-card-btn:hover { color: #e2e8f0; background: rgba(255,255,255,0.08); }
 .sv-card-btn.delete:hover { color: #f87171; }
+.ss-block { margin: 0 0 14px; padding: 12px; border-radius: 12px; border: 1px solid rgba(56,189,248,0.25); background: rgba(56,189,248,0.05); font-family: 'Hanken Grotesk', system-ui, sans-serif; }
+.ss-head { display: flex; gap: 12px; align-items: center; }
+.ss-preview { position: static; top: auto; left: auto; width: 72px; height: 72px; border-radius: 50%; flex: none; touch-action: none; cursor: grab; box-shadow: 0 0 0 1px rgba(56,189,248,0.35); }
+.ss-fit { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ss-fit-row { display: flex; align-items: center; gap: 10px; color: #cbd5e1; font-size: 12px; flex-wrap: wrap; }
+.ss-fit-row input[type=range] { flex: 1 1 140px; min-width: 0; }
+.ss-whole-lbl { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 auto; cursor: pointer; }
+.ss-reset { min-height: 36px; }
+.pf-av { border-radius: 50%; display: inline-block; vertical-align: middle; flex: none; }
+.ss-thumb { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; display: block; flex: none; }
+.ss-initials { display: flex; align-items: center; justify-content: center; background: rgba(56,189,248,0.18); color: #e0f2fe; font-weight: 700; font-size: 20px; }
+.ss-title { color: #e2e8f0; font-weight: 700; font-size: 14px; }
+.ss-sub { color: #94a3b8; font-size: 12px; line-height: 1.35; margin-top: 2px; }
+.ss-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.ss-btn { min-height: 40px; padding: 8px 10px; border-radius: 10px; font: 600 12px 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer; }
+.ss-sec { border: 1px solid var(--lit-fill); color: #7dd3fc; background: rgba(56,189,248,0.08); }
+.ss-sec:hover { background: rgba(56,189,248,0.2); color: #e0f2fe; }
+.ss-danger { border-color: #f87171; color: #fca5a5; background: rgba(248,113,113,0.08); }
+.ss-status { min-height: 16px; margin-top: 8px; font-size: 12px; color: #86efac; }
+.ss-status.err { color: #fca5a5; }
+.ss-status:empty { min-height: 0; margin: 0; }
+.ss-cam-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(4,6,12,0.92); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.ss-cam-box { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+.ss-cam-video { width: 100%; border-radius: 12px; background: #000; transform: scaleX(-1); }
+.ss-cam-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .sv-create-row {
   display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
 }
@@ -6383,23 +6408,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <div class="hint" style="font-size:10px;">Shown on status pulse every 3rd cycle</div>
     </div>
 
-    <!-- Upload -->
-    <div class="row" style="justify-content:center;">
-      <button class="upload-btn" onclick="document.getElementById('mediaInput').click()">Upload Photo / Video</button>
-      <input type="file" id="mediaInput" accept="image/*,video/*" onchange="handleMedia(event)">
-    </div>
-
-    <!-- Photo controls (shown when media loaded) -->
-    <div id="photoControls" hidden>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;">
-        <div class="zoom-row">
-          <label>Zoom</label>
-          <input type="range" id="zoomSlider" min="0.3" max="3" step="0.05" value="1">
-        </div>
-        <div class="hint" id="mediaHint">Drag to reposition &middot; Pinch or scroll to zoom</div>
-        <button class="btn" onclick="resetPhoto()">Reset Position</button>
-      </div>
-    </div>
+    <!-- Your sphere: the same block as Circle Views and the own person card -->
+    <div class="row" id="ovSelfSphere" style="display:block;width:100%;max-width:420px;"></div>
 
     <!-- Continue — always visible so user can exit config -->
     <button class="continue-btn" onclick="closeOverlay()">CONTINUE</button>
@@ -6542,6 +6552,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         </div>
       </div>
 
+      <!-- Your sphere (own card only) -->
+      <div id="blufSelfSphere" hidden></div>
       <!-- Derivation tags -->
       <div class="bluf-tags" id="blufTags"></div>
       <!-- Bev-tile data grid -->
@@ -8020,6 +8032,7 @@ async function launchGalaxy(savedContacts) {
           });
           if (img.naturalWidth > 0) {
             if (p.contactId === 'self') {
+              try { PhotoFit.loadSelf(); } catch (e) {}
               media = img;
               mediaType = 'image';
               mediaIsGif = (p.mimeType === 'image/gif');
@@ -8057,6 +8070,10 @@ async function launchGalaxy(savedContacts) {
           if (contactPhotos.has(cid)) continue;
         }
         const latest = await RemielDB.getLatestBroadcast(cid);
+        if (cid === 'self' && latest) {
+          const _clr = await RemielDB.getSetting('selfSphereClearedAt').catch(() => null);
+          if (_clr && latest.timestamp <= _clr) continue;
+        }
         if (latest && latest.blob) {
           loadBroadcastIntoSphere(cid, latest.blob);
         }
@@ -8064,6 +8081,7 @@ async function launchGalaxy(savedContacts) {
     } catch(e) { /* broadcasts store may not exist yet */ }
 
     /* Restore user settings */
+    try { await PhotoFit.loadSelf(); } catch (e) {}
     const savedCat = await RemielDB.getSetting('userCat');
     if (savedCat) { userCat = savedCat; curCat = savedCat; }
     const savedSev = await RemielDB.getSetting('userSev');
@@ -10655,6 +10673,29 @@ const I18n = (function () {
     "views.edit": "Edit view",
     "views.delete": "Delete view",
     "views.addContact": "Add new contact",
+    "self.title": "Your sphere",
+    "self.subHas": "This image shows in the centre of your circle.",
+    "self.subNone": "Add a photo or a short clip for the centre of your circle.",
+    "self.change": "Change photo",
+    "self.take": "Take photo",
+    "self.clip": "Record short clip",
+    "self.remove": "Remove photo",
+    "self.saving": "Saving",
+    "self.updated": "Photo updated",
+    "self.error": "That file could not be used. Try another photo or clip.",
+    "self.starting": "Starting camera",
+    "self.camDenied": "Camera access was not allowed. You can choose a photo instead.",
+    "self.recordGo": "Record 5 seconds",
+    "self.snap": "Capture",
+    "self.recording": "Recording",
+    "self.removing": "Removing",
+    "self.removed": "Photo removed",
+    "self.removeError": "The photo could not be removed. Try again.",
+    "self.zoom": "Zoom",
+    "self.whole": "Fit whole photo",
+    "self.reset": "Reset fit",
+    "self.fitHint": "Drag the preview to position, pinch or scroll to zoom.",
+    "self.previewAria": "Preview of your sphere",
     "views.newTitle": "New {type} view",
     "views.editTitle": "Edit {type} view",
     "views.title": "Circle Views",
@@ -10900,6 +10941,29 @@ const I18n = (function () {
     "views.edit": "Modifica la vista",
     "views.delete": "Elimina la vista",
     "views.addContact": "Aggiungi un contatto",
+    "self.title": "La tua sfera",
+    "self.subHas": "Questa immagine appare al centro della tua cerchia.",
+    "self.subNone": "Aggiungi una foto o una breve clip per il centro della tua cerchia.",
+    "self.change": "Cambia foto",
+    "self.take": "Scatta foto",
+    "self.clip": "Registra breve clip",
+    "self.remove": "Rimuovi foto",
+    "self.saving": "Salvataggio",
+    "self.updated": "Foto aggiornata",
+    "self.error": "Impossibile usare questo file. Prova con un’altra foto o clip.",
+    "self.starting": "Avvio fotocamera",
+    "self.camDenied": "Accesso alla fotocamera non consentito. Puoi scegliere una foto.",
+    "self.recordGo": "Registra 5 secondi",
+    "self.snap": "Scatta",
+    "self.recording": "Registrazione",
+    "self.removing": "Rimozione",
+    "self.removed": "Foto rimossa",
+    "self.removeError": "Impossibile rimuovere la foto. Riprova.",
+    "self.zoom": "Zoom",
+    "self.whole": "Mostra la foto intera",
+    "self.reset": "Ripristina",
+    "self.fitHint": "Trascina l’anteprima per posizionarla, pizzica o scorri per lo zoom.",
+    "self.previewAria": "Anteprima della tua sfera",
     "views.newTitle": "Nuova vista {type}",
     "views.editTitle": "Modifica vista {type}",
     "views.title": "Viste della cerchia",
@@ -11816,48 +11880,10 @@ async function _obSaveAndLaunch() {
     if (nameInput) nameInput.value = userSphereName;
   }
 
-  /* Persist self-sphere media from onboarding */
+  /* Persist self-sphere media from onboarding (same path as Your sphere) */
   if (_obSelfMediaBlob) {
-    try {
-      if (_obSelfMediaType === 'video') {
-        const url = URL.createObjectURL(_obSelfMediaBlob);
-        videoEl.src = url; videoEl.load();
-        await new Promise((res) => {
-          videoEl.addEventListener('loadeddata', function _ld() {
-            videoEl.removeEventListener('loadeddata', _ld);
-            media = videoEl; mediaType = 'video';
-            const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
-            if (vw > 0 && vh > 0) {
-              cachedMediaW = vw; cachedMediaH = vh;
-              if (!mediaFrame) mediaFrame = document.createElement('canvas');
-              mediaFrame.width = vw; mediaFrame.height = vh;
-              mediaFrame.getContext('2d').drawImage(videoEl, 0, 0, vw, vh);
-            }
-            res();
-          });
-          setTimeout(res, 3000);
-        });
-        videoEl.play().catch(() => {});
-      } else {
-        _obSelfMediaBlob = await downscalePhoto(_obSelfMediaBlob, 1280);
-        const url = URL.createObjectURL(_obSelfMediaBlob);
-        const img = new Image();
-        await new Promise((res) => {
-          img.onload = () => {
-            media = img; mediaType = 'image';
-            cachedMediaW = img.naturalWidth || img.width;
-            cachedMediaH = img.naturalHeight || img.height;
-            if (!mediaFrame) mediaFrame = document.createElement('canvas');
-            mediaFrame.width = cachedMediaW; mediaFrame.height = cachedMediaH;
-            mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
-            res();
-          };
-          img.onerror = res;
-          img.src = url;
-        });
-        await RemielDB.putPhoto('self', _obSelfMediaBlob).catch(() => {});
-      }
-    } catch (err) { console.warn('obSelfMedia save error', err); }
+    try { await applySelfMedia(_obSelfMediaBlob); }
+    catch (err) { console.warn('obSelfMedia save error', err); }
   }
 
   /* Persist each person the user added as a contact */
@@ -13911,8 +13937,14 @@ async function updateBlufContent() {
       const lbl = document.getElementById('contactPhotoBtnLabel');
       if (lbl) lbl.textContent = contactPhotos.has(selectedContact.id) ? I18n.t('photo.change') : I18n.t('photo.set');
     } else {
-      photoBtn.hidden = true; /* User's own sphere — use the configure overlay instead */
+      photoBtn.hidden = true; /* User's own sphere: the Your sphere block below */
     }
+  }
+  const _selfHost = document.getElementById('blufSelfSphere');
+  if (_selfHost) {
+    _selfHost.hidden = !!selectedContact;
+    if (!selectedContact && typeof SelfSphere !== 'undefined') SelfSphere.mount(_selfHost);
+    else _selfHost.innerHTML = '';
   }
 
   document.getElementById('blufHeadline').textContent = d.headline;
@@ -16276,7 +16308,7 @@ const SentinelViews = (() => {
     const body = document.getElementById('svBody');
     if (!body) return;
 
-    let h = '';
+    let h = '<div id="svSelfSphere"></div>';
 
     /* "All Contacts" option */
     h += '<div class="sv-card' + (_activeViewId === null ? ' active' : '') + '" onclick="SentinelViews.activateView(null)">';
@@ -16324,6 +16356,7 @@ const SentinelViews = (() => {
     h += '+ ' + _esc(_t('views.addContact', 'Add New Contact')) + '</button></div>';
 
     body.innerHTML = h;
+    if (typeof SelfSphere !== 'undefined') SelfSphere.mount(document.getElementById('svSelfSphere'));
   }
 
   function _esc(s) {
@@ -20029,6 +20062,7 @@ function openOverlay() {
   /* Restore saved name into the input field */
   const nameInput = document.getElementById('nameInput');
   if (nameInput && userSphereName) nameInput.value = userSphereName;
+  if (typeof SelfSphere !== 'undefined') SelfSphere.mount(document.getElementById('ovSelfSphere'));
 }
 
 function closeOverlay() {
@@ -20444,6 +20478,8 @@ let media = null;
 let mediaType = null;
 let mediaOX = 0, mediaOY = 0;
 let mediaZoom = 1;
+let mediaFitWhole = false; /* "Fit whole photo": contain instead of cover */
+let selfClipD = 1; /* self view photo circle diameter in canvas px (pan is stored as a fraction of it) */
 let cachedMediaW = 0, cachedMediaH = 0;
 let mediaFrame = null; // off-screen canvas caching last good video frame
 let mediaIsGif = false; // true when center sphere has an animated GIF
@@ -20464,9 +20500,7 @@ videoEl.style.pointerEvents = 'none';
 videoEl.style.top = '-9999px';
 document.body.appendChild(videoEl);
 
-function showPhotoControls() {
-  document.getElementById('photoControls').hidden = false;
-}
+function showPhotoControls() { /* the Your sphere block carries the fit controls */ }
 
 /* ── Add Person Modal: photo staging ── */
 var _cmPhotoBlob = null;   /* Staged file blob for the new contact */
@@ -20689,7 +20723,93 @@ const SharedClipPool = (function() {
   return { select: select, frameFor: frameFor, release: _release };
 })();
 
-function drawContactPhotoInSphere(ctx, photo, sx, sy, r) {
+/* ── PhotoFit: the one rule for placing a photo inside a circle. Used by the
+   self view, the network centre sphere, contact spheres, the person card mini
+   sphere, the Your sphere preview and every DOM avatar, so a photo looks the
+   same everywhere. Default: cover, crop anchored to the upper third (faces sit
+   high in portraits), never scaled past cover. A stored fit {z, x, y, whole}
+   adds the user's zoom (1 to 3), pan (fractions of the circle diameter) and
+   "Fit whole photo" (contain instead of cover). ── */
+const PhotoFit = (() => {
+  const _fits = new Map();
+  let _saveT = 0;
+  const _cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  function get(cid) { return _fits.get(String(cid)) || null; }
+  function selfFit() { return { z: mediaZoom, x: mediaOX, y: mediaOY, whole: !!mediaFitWhole }; }
+  /* Placement of an mW x mH source inside a circle of diameter D, relative to its box */
+  function rect(mW, mH, D, f) {
+    f = f || {};
+    const whole = !!f.whole;
+    const z = _cl(+f.z || 1, 1, 3);
+    const base = whole ? Math.min(D / mW, D / mH) : Math.max(D / mW, D / mH);
+    const w = mW * base * z, h = mH * base * z;
+    let x = (D - w) / 2 + (+f.x || 0) * D;
+    let y = (h > D ? (D - h) / 3 : (D - h) / 2) + (+f.y || 0) * D;
+    if (!whole) { x = _cl(x, D - w, 0); y = _cl(y, D - h, 0); }
+    return { x: x, y: y, w: w, h: h };
+  }
+  function draw(ctx, src, mW, mH, cx, cy, r, f) {
+    if (!src || !(mW > 0) || !(mH > 0)) return;
+    const q = rect(mW, mH, r * 2, f);
+    ctx.drawImage(src, cx - r + q.x, cy - r + q.y, q.w, q.h);
+  }
+  /* Clamp the live self pan so the photo always covers the circle */
+  function clampSelf() {
+    if (mediaFitWhole || !(cachedMediaW > 0)) return;
+    const b = rect(cachedMediaW, cachedMediaH, 1, { z: mediaZoom });
+    const bx = (1 - b.w) / 2, by = b.h > 1 ? (1 - b.h) / 3 : (1 - b.h) / 2;
+    mediaOX = _cl(mediaOX, (1 - b.w) - bx, -bx);
+    mediaOY = _cl(mediaOY, (1 - b.h) - by, -by);
+  }
+  async function loadSelf() {
+    try {
+      const f = await RemielDB.getSetting('photoFit_self');
+      if (f && typeof f === 'object') {
+        mediaZoom = _cl(+f.z || 1, 1, 3); mediaOX = +f.x || 0; mediaOY = +f.y || 0; mediaFitWhole = !!f.whole;
+      } else { mediaZoom = 1; mediaOX = 0; mediaOY = 0; mediaFitWhole = false; }
+      _fits.set('self', selfFit());
+      const zs = document.getElementById('zoomSlider'); if (zs) zs.value = mediaZoom;
+      if (typeof SelfSphere !== 'undefined') SelfSphere.syncControls();
+    } catch (e) {}
+  }
+  /* Persist the self fit (settings sync carries it to the user's other devices) */
+  function saveSelfSoon() {
+    clampSelf();
+    _fits.set('self', selfFit());
+    if (typeof SelfSphere !== 'undefined') SelfSphere.syncControls();
+    clearTimeout(_saveT);
+    _saveT = setTimeout(() => { RemielDB.putSetting('photoFit_self', selfFit()).catch(() => {}); }, 500);
+  }
+  function resetSelf() { mediaZoom = 1; mediaOX = 0; mediaOY = 0; mediaFitWhole = false; saveSelfSoon(); }
+  /* A circular avatar rendered with the same rule, for DOM lists */
+  const _av = new WeakMap();
+  function avatarUrl(photo, px, f) {
+    if (!photo || !photo.img || !(photo.w > 0)) return '';
+    const key = px + '|' + JSON.stringify(f || null);
+    let m = _av.get(photo.img);
+    if (m && m[key] && !photo.isVideo) return m[key];
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = px;
+      const x = c.getContext('2d');
+      x.beginPath(); x.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2); x.clip();
+      draw(x, photo.img, photo.w, photo.h, px / 2, px / 2, px / 2, f);
+      const u = c.toDataURL('image/jpeg', 0.85);
+      if (!m) { m = {}; _av.set(photo.img, m); }
+      m[key] = u;
+      return u;
+    } catch (e) { return ''; }
+  }
+  function avatarHtml(cid, cssPx, cls) {
+    const ph = (typeof contactPhotos !== 'undefined') ? contactPhotos.get(cid) : null;
+    const u = avatarUrl(ph, Math.round(cssPx * 3), get(cid));
+    if (!u) return '';
+    return '<img class="' + (cls || 'pf-av') + '" alt="" width="' + cssPx + '" height="' + cssPx + '" src="' + u + '">';
+  }
+  return { get: get, selfFit: selfFit, rect: rect, draw: draw, loadSelf: loadSelf, saveSelfSoon: saveSelfSoon,
+    resetSelf: resetSelf, clampSelf: clampSelf, avatarUrl: avatarUrl, avatarHtml: avatarHtml };
+})();
+
+function drawContactPhotoInSphere(ctx, photo, sx, sy, r, fit) {
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
   ctx.beginPath();
@@ -20697,15 +20817,8 @@ function drawContactPhotoInSphere(ctx, photo, sx, sy, r) {
   ctx.clip();
   ctx.globalAlpha = 1;
 
-  /* Cover-fill the circle */
-  const aspect = photo.w / photo.h;
-  const dim = r * 2;
-  let dw, dh;
-  if (aspect > 1) { dh = dim; dw = dh * aspect; }
-  else { dw = dim; dh = dw / aspect; }
-  const px = sx - dw / 2;
-  const py = sy - dh / 2;
-  ctx.drawImage(photo.img, px, py, dw, dh);
+  /* Same placement rule as every other photo circle */
+  PhotoFit.draw(ctx, photo.img, photo.w, photo.h, sx, sy, r, fit || (photo.cid ? PhotoFit.get(photo.cid) : null));
 
   /* Vignette — same soft-fade treatment as center sphere */
   const vig = ctx.createRadialGradient(sx, sy, r * 0.25, sx, sy, r * 0.92);
@@ -20719,71 +20832,306 @@ function drawContactPhotoInSphere(ctx, photo, sx, sy, r) {
   ctx.restore();
 }
 
-function handleMedia(e) {
-  const f = e.target.files[0];
-  if (!f) return;
-  const url = URL.createObjectURL(f);
-  mediaOX = 0; mediaOY = 0; mediaZoom = 1;
-  document.getElementById('zoomSlider').value = 1;
-
-  /* Persist self-sphere media to IndexedDB (images only; video too large for IDB) */
-  if (f.type.startsWith('image/')) {
-    RemielDB.putPhoto('self', f).catch(err =>
-      console.warn('RemielDB: self-photo save failed', err)
-    );
-  }
-
-  mediaIsGif = (f.type === 'image/gif' || f.name.toLowerCase().endsWith('.gif'));
-  if (f.type.startsWith('video/')) {
+/* ── Self sphere media: the one path used by the sphere setup overlay (press and
+   hold), the Circle Views "Your sphere" block and the own person card. Photos are
+   downscaled with downscalePhoto and stored under the 'self' key of the photos
+   store (RemielDB.putPhoto queues the photo sync). A short clip is stored as the
+   latest 'self' broadcast, which the startup restore already loads into the
+   sphere when no photo is set. ── */
+async function applySelfMedia(f) {
+  if (!f || !f.size) throw new Error('empty');
+  const isVideo = /^video\//.test(f.type || '');
+  mediaIsGif = !isVideo && (f.type === 'image/gif' || /\.gif$/i.test(f.name || ''));
+  if (isVideo) {
+    await RemielDB.deletePhoto('self').catch(() => {});
+    try {
+      await RemielDB.saveBroadcast('self', f, 0);
+      await RemielDB.putSetting('selfSphereClearedAt', null);
+    } catch (err) { console.warn('RemielDB: self clip save failed', err); }
+    const url = URL.createObjectURL(f);
     mediaType = 'video';
-    videoEl.src = url;
-    videoEl.load();
+    videoEl.src = url; videoEl.load();
     videoEl.play().catch(() => {});
-    videoEl.addEventListener('loadeddata', function onLoad() {
-      videoEl.removeEventListener('loadeddata', onLoad);
-      media = videoEl;
-      /* Immediately capture first frame to mediaFrame — survives Safari suspension */
-      const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
-      if (vw > 0 && vh > 0) {
-        cachedMediaW = vw; cachedMediaH = vh;
-        if (!mediaFrame) mediaFrame = document.createElement('canvas');
-        mediaFrame.width = vw; mediaFrame.height = vh;
-        mediaFrame.getContext('2d').drawImage(videoEl, 0, 0, vw, vh);
-      }
-      showPhotoControls();
-      document.getElementById('mediaHint').textContent =
-        'Drag to reposition · Pinch or scroll to zoom · Video loops';
-      setTimeout(closeOverlay, 700);
+    await new Promise((res, rej) => {
+      const to = setTimeout(res, 4000);
+      videoEl.addEventListener('loadeddata', function onLoad() {
+        videoEl.removeEventListener('loadeddata', onLoad);
+        clearTimeout(to);
+        media = videoEl;
+        const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+        if (vw > 0 && vh > 0) {
+          cachedMediaW = vw; cachedMediaH = vh;
+          if (!mediaFrame) mediaFrame = document.createElement('canvas');
+          mediaFrame.width = vw; mediaFrame.height = vh;
+          mediaFrame.getContext('2d').drawImage(videoEl, 0, 0, vw, vh);
+        }
+        PhotoFit.resetSelf();
+        res();
+      });
+      videoEl.addEventListener('error', function onErr() { videoEl.removeEventListener('error', onErr); clearTimeout(to); rej(new Error('video')); }, { once: true });
     });
-  } else {
-    mediaType = 'image';
-    videoEl.pause();
-    videoEl.removeAttribute('src');
-    const img = new Image();
-    img.onload = () => {
-      media = img;
-      /* Capture image to mediaFrame — guarantees network-mode always has a source */
-      cachedMediaW = img.naturalWidth || img.width; cachedMediaH = img.naturalHeight || img.height;
-      if (!mediaFrame) mediaFrame = document.createElement('canvas');
-      mediaFrame.width = cachedMediaW; mediaFrame.height = cachedMediaH;
-      mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
-      showPhotoControls();
-      document.getElementById('mediaHint').textContent =
-        mediaIsGif ? 'Drag to reposition · Pinch or scroll to zoom · GIF loops' : 'Drag to reposition · Pinch or scroll to zoom';
-      setTimeout(closeOverlay, 700);
-    };
-    img.src = url;
+    return 'video';
   }
+  const blob = await downscalePhoto(f, 1280);
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('image')); img.src = url; });
+  mediaType = 'image';
+  videoEl.pause();
+  videoEl.removeAttribute('src');
+  media = img;
+  cachedMediaW = img.naturalWidth || img.width; cachedMediaH = img.naturalHeight || img.height;
+  if (!mediaFrame) mediaFrame = document.createElement('canvas');
+  mediaFrame.width = cachedMediaW; mediaFrame.height = cachedMediaH;
+  mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
+  const ok = await RemielDB.putPhoto('self', blob);
+  if (ok === false) throw new Error('store');
+  await RemielDB.putSetting('selfSphereClearedAt', null).catch(() => {});
+  PhotoFit.resetSelf();
+  return 'image';
 }
 
-function resetPhoto() {
-  mediaOX = 0; mediaOY = 0; mediaZoom = 1;
-  document.getElementById('zoomSlider').value = 1;
+async function clearSelfMedia() {
+  media = null; mediaType = null; mediaFrame = null; mediaIsGif = false;
+  cachedMediaW = 0; cachedMediaH = 0;
+  PhotoFit.resetSelf();
+  try { videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); } catch (e) {}
+  await RemielDB.deletePhoto('self');
+  /* Older clips stay in the broadcasts store; this marks them as not the sphere image */
+  await RemielDB.putSetting('selfSphereClearedAt', Date.now());
 }
 
-document.getElementById('zoomSlider').addEventListener('input', e => {
-  mediaZoom = parseFloat(e.target.value);
-});
+/* SelfSphere: the "Your sphere" block (Circle Views panel and own person card) */
+const SelfSphere = (() => {
+  let _cam = null; /* { stream, overlay, recorder } */
+
+  const PV = 72; /* preview diameter, CSS px */
+  function _initials() {
+    return (userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0, 2) || 'ME';
+  }
+  /* Draw the preview exactly as the sphere draws the photo: same fit, same vignette */
+  function _drawPreview(cv) {
+    if (!cv) return;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const px = Math.round(PV * dpr);
+    if (cv.width !== px) { cv.width = px; cv.height = px; }
+    const x = cv.getContext('2d');
+    const r = px / 2;
+    x.clearRect(0, 0, px, px);
+    x.save();
+    x.beginPath(); x.arc(r, r, r, 0, Math.PI * 2); x.clip();
+    x.fillStyle = '#0b1220'; x.fillRect(0, 0, px, px);
+    if (mediaFrame && cachedMediaW > 0) {
+      PhotoFit.draw(x, mediaFrame, cachedMediaW, cachedMediaH, r, r, r, PhotoFit.selfFit());
+      const vig = x.createRadialGradient(r, r, r * 0.43, r, r, r * 1.02);
+      vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(0.5, 'rgba(4,2,10,0.05)');
+      vig.addColorStop(0.72, 'rgba(4,2,10,0.25)'); vig.addColorStop(1, 'rgba(4,2,10,0.8)');
+      x.fillStyle = vig; x.fillRect(0, 0, px, px);
+    } else {
+      x.fillStyle = 'rgba(56,189,248,0.18)'; x.fillRect(0, 0, px, px);
+      x.fillStyle = '#e0f2fe'; x.font = '700 ' + Math.round(r * 0.62) + 'px "Hanken Grotesk", system-ui, sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(_initials(), r, r + 1);
+    }
+    x.restore();
+  }
+  /* Keep every mounted block's controls in step with the live fit */
+  function syncControls() {
+    document.querySelectorAll('[data-ss-host] .ss-block').forEach(root => {
+      const z = root.querySelector('.ss-zoom'); if (z && document.activeElement !== z) z.value = mediaZoom;
+      const w = root.querySelector('.ss-whole'); if (w) w.checked = !!mediaFitWhole;
+      _drawPreview(root.querySelector('.ss-preview'));
+    });
+  }
+  /* Drag to pan, pinch or wheel to zoom, on the preview */
+  function _bindPreview(cv) {
+    const pts = new Map();
+    let last = null, dist = 0;
+    cv.addEventListener('pointerdown', e => {
+      if (!mediaFrame) return;
+      cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      last = { x: e.clientX, y: e.clientY }; dist = 0; e.preventDefault();
+    });
+    cv.addEventListener('pointermove', e => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size >= 2) {
+        const [a, b] = [...pts.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (dist > 0) mediaZoom = Math.max(1, Math.min(3, mediaZoom * d / dist));
+        dist = d;
+      } else if (last) {
+        mediaOX += (e.clientX - last.x) / PV; mediaOY += (e.clientY - last.y) / PV;
+        last = { x: e.clientX, y: e.clientY };
+      }
+      PhotoFit.saveSelfSoon();
+    });
+    const up = e => { pts.delete(e.pointerId); dist = 0; if (pts.size === 1) { const v = [...pts.values()][0]; last = { x: v.x, y: v.y }; } else if (!pts.size) last = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', e => {
+      if (!mediaFrame) return;
+      e.preventDefault();
+      mediaZoom = Math.max(1, Math.min(3, mediaZoom * Math.exp(-e.deltaY * 0.002)));
+      PhotoFit.saveSelfSoon();
+    }, { passive: false });
+  }
+
+  function blockHtml() {
+    const has = !!mediaFrame;
+    let h = '<div class="ss-block" data-adv-scope role="group" aria-label="' + _t('self.title', 'Your sphere') + '">';
+    h += '<div class="ss-head"><canvas class="ss-preview" role="img" aria-label="' + _t('self.previewAria', 'Preview of your sphere') + '" style="width:' + PV + 'px;height:' + PV + 'px"></canvas>';
+    h += '<div class="ss-head-text"><div class="ss-title">' + _t('self.title', 'Your sphere') + '</div>';
+    h += '<div class="ss-sub">' + (has ? _t('self.subHas', 'This image shows in the centre of your circle.') : _t('self.subNone', 'Add a photo or a short clip for the centre of your circle.')) + '</div></div></div>';
+    h += '<div class="ss-actions">';
+    h += '<button type="button" class="ss-btn btn-lit" data-ss="pick">' + _t('self.change', 'Change photo') + '</button>';
+    h += '<button type="button" class="ss-btn ss-sec" data-ss="take">' + _t('self.take', 'Take photo') + '</button>';
+    h += '<button type="button" class="ss-btn ss-sec" data-ss="clip">' + _t('self.clip', 'Record short clip') + '</button>';
+    if (has) h += '<button type="button" class="ss-btn ss-sec ss-danger" data-ss="remove">' + _t('self.remove', 'Remove photo') + '</button>';
+    h += '</div>';
+    if (has) {
+      h += '<div class="ss-fit"><label class="ss-fit-row"><span>' + _t('self.zoom', 'Zoom') + '</span>';
+      h += '<input type="range" class="ss-zoom" min="1" max="3" step="0.01" value="' + mediaZoom + '" aria-label="' + _t('self.zoom', 'Zoom') + '"></label>';
+      h += '<div class="ss-fit-row"><label class="ss-whole-lbl"><input type="checkbox" class="ss-whole"' + (mediaFitWhole ? ' checked' : '') + '> ' + _t('self.whole', 'Fit whole photo') + '</label>';
+      h += '<button type="button" class="ss-btn ss-sec ss-reset" data-ss="reset">' + _t('self.reset', 'Reset fit') + '</button></div>';
+      h += '<div class="ss-sub">' + _t('self.fitHint', 'Drag the preview to position, pinch or scroll to zoom.') + '</div></div>';
+    }
+    h += '<div class="ss-status" role="status" aria-live="polite"></div>';
+    h += '<input type="file" class="ss-file" accept="image/*,video/*" hidden>';
+    h += '<input type="file" class="ss-cam" accept="image/*" capture="user" hidden>';
+    h += '<input type="file" class="ss-camv" accept="video/*" capture="user" hidden>';
+    h += '</div>';
+    return h;
+  }
+
+  function _status(root, msg, isErr) {
+    const s = root.querySelector('.ss-status');
+    if (!s) return;
+    s.textContent = msg || '';
+    s.classList.toggle('err', !!isErr);
+  }
+
+  function _refreshAll(msg) {
+    document.querySelectorAll('[data-ss-host]').forEach(host => {
+      mount(host);
+      if (msg) _status(host.querySelector('.ss-block'), msg, false);
+    });
+  }
+
+  async function _apply(root, btn, f) {
+    if (!f) return;
+    const b = busy(btn, _t('self.saving', 'Saving'));
+    try {
+      await applySelfMedia(f);
+      unbusy(b);
+      _refreshAll(_t('self.updated', 'Photo updated'));
+    } catch (err) {
+      unbusy(b);
+      console.warn('[SelfSphere] update failed', err);
+      _status(root, _t('self.error', 'That file could not be used. Try another photo or clip.'), true);
+    }
+  }
+
+  function _closeCam() {
+    if (!_cam) return;
+    try { if (_cam.recorder && _cam.recorder.state !== 'inactive') _cam.recorder.stop(); } catch (e) {}
+    try { _cam.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    try { _cam.overlay.remove(); } catch (e) {}
+    _cam = null;
+  }
+
+  /* Live camera with getUserMedia; falls back to the native capture input */
+  async function _camera(root, btn, mode) {
+    const fallback = () => root.querySelector(mode === 'clip' ? '.ss-camv' : '.ss-cam').click();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || (mode === 'clip' && typeof MediaRecorder === 'undefined')) { fallback(); return; }
+    const b = busy(btn, _t('self.starting', 'Starting camera'));
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    } catch (err) {
+      unbusy(b);
+      if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) _status(root, _t('self.camDenied', 'Camera access was not allowed. You can choose a photo instead.'), true);
+      else fallback();
+      return;
+    }
+    unbusy(b);
+    const ov = document.createElement('div');
+    ov.className = 'ss-cam-overlay';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('data-adv-scope', '');
+    ov.innerHTML = '<div class="ss-cam-box"><video class="ss-cam-video" autoplay playsinline muted></video>' +
+      '<div class="ss-cam-row"><button type="button" class="ss-btn ss-sec" data-cam="cancel">' + _t('app.cancel', 'Cancel') + '</button>' +
+      '<button type="button" class="ss-btn btn-lit btn-advance" data-cam="go">' + (mode === 'clip' ? _t('self.recordGo', 'Record 5 seconds') : _t('self.snap', 'Capture')) + '</button></div></div>';
+    document.body.appendChild(ov);
+    const v = ov.querySelector('video'); v.srcObject = stream; v.play().catch(() => {});
+    _cam = { stream: stream, overlay: ov, recorder: null };
+    ov.querySelector('[data-cam="cancel"]').onclick = _closeCam;
+    const go = ov.querySelector('[data-cam="go"]');
+    go.onclick = async () => {
+      if (mode !== 'clip') {
+        const w = v.videoWidth || 640, h = v.videoHeight || 480;
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(v, 0, 0, w, h);
+        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+        _closeCam();
+        await _apply(root, btn, blob);
+        return;
+      }
+      const chunks = [];
+      let rec;
+      try {
+        const mt = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'].find(t => MediaRecorder.isTypeSupported(t));
+        rec = mt ? new MediaRecorder(stream, { mimeType: mt }) : new MediaRecorder(stream);
+      } catch (err) { _closeCam(); _status(root, _t('self.error', 'That file could not be used. Try another photo or clip.'), true); return; }
+      _cam.recorder = rec;
+      rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = async () => {
+        const blob = new Blob(chunks, { type: (rec.mimeType || 'video/webm').split(';')[0] });
+        _closeCam();
+        await _apply(root, btn, blob);
+      };
+      busy(go, _t('self.recording', 'Recording'));
+      rec.start();
+      setTimeout(() => { try { if (rec.state !== 'inactive') rec.stop(); } catch (e) {} }, 5000);
+    };
+  }
+
+  function mount(host) {
+    if (!host) return;
+    host.setAttribute('data-ss-host', '');
+    host.innerHTML = blockHtml();
+    const root = host.querySelector('.ss-block');
+    const q = s => root.querySelector(s);
+    q('[data-ss="pick"]').onclick = () => q('.ss-file').click();
+    q('.ss-file').onchange = e => { const f = e.target.files[0]; e.target.value = ''; _apply(root, q('[data-ss="pick"]'), f); };
+    q('.ss-cam').onchange = e => { const f = e.target.files[0]; e.target.value = ''; _apply(root, q('[data-ss="take"]'), f); };
+    q('.ss-camv').onchange = e => { const f = e.target.files[0]; e.target.value = ''; _apply(root, q('[data-ss="clip"]'), f); };
+    q('[data-ss="take"]').onclick = e => _camera(root, e.currentTarget, 'photo');
+    q('[data-ss="clip"]').onclick = e => _camera(root, e.currentTarget, 'clip');
+    const pv = q('.ss-preview'); _drawPreview(pv); _bindPreview(pv);
+    const zr = q('.ss-zoom');
+    if (zr) zr.oninput = () => { mediaZoom = parseFloat(zr.value) || 1; PhotoFit.saveSelfSoon(); };
+    const wh = q('.ss-whole');
+    if (wh) wh.onchange = () => { mediaFitWhole = wh.checked; if (!wh.checked) PhotoFit.clampSelf(); PhotoFit.saveSelfSoon(); _status(root, _t('self.updated', 'Photo updated'), false); };
+    const rs = q('[data-ss="reset"]');
+    if (rs) rs.onclick = () => { PhotoFit.resetSelf(); _status(root, _t('self.updated', 'Photo updated'), false); };
+    /* Video clips: keep the preview moving while the block is on screen */
+    if (mediaType === 'video' && !host._ssTick) {
+      host._ssTick = setInterval(() => { if (!host.isConnected) { clearInterval(host._ssTick); host._ssTick = 0; return; } _drawPreview(host.querySelector('.ss-preview')); }, 250);
+    }
+    const rm = q('[data-ss="remove"]');
+    if (rm) rm.onclick = async () => {
+      const b = busy(rm, _t('self.removing', 'Removing'));
+      try { await clearSelfMedia(); unbusy(b); _refreshAll(_t('self.removed', 'Photo removed')); }
+      catch (err) { unbusy(b); _status(root, _t('self.removeError', 'The photo could not be removed. Try again.'), true); }
+    };
+    /* The block's next action carries the advance rim */
+    const _rim = () => { try { if (root.isConnected) BtnSystem.rim(q('[data-ss="pick"]'), true); } catch (e) {} };
+    requestAnimationFrame(_rim); setTimeout(_rim, 350);
+  }
+
+  return { mount: mount, blockHtml: blockHtml, closeCamera: _closeCam, syncControls: syncControls };
+})();
+
+function resetPhoto() { PhotoFit.resetSelf(); }
 
 /* ── Drag to reposition (only active in overlay) ── */
 function toCanvasXY(e) {
@@ -20807,8 +21155,10 @@ function moveDrag(e) {
   if (!dragging) return;
   e.preventDefault();
   const p = toCanvasXY(e);
-  mediaOX = dragOXStart + (p.x - dragStartX);
-  mediaOY = dragOYStart + (p.y - dragStartY);
+  /* Pan is stored as a fraction of the photo circle so every circle size agrees */
+  mediaOX = dragOXStart + (p.x - dragStartX) / (selfClipD || 1);
+  mediaOY = dragOYStart + (p.y - dragStartY) / (selfClipD || 1);
+  PhotoFit.saveSelfSoon();
 }
 
 /* ── Unified gesture input: drag, tap, pinch, wheel ──
@@ -20838,9 +21188,8 @@ function _gPinchUpdate(a, b) {
       netZoom = Math.max(NET_ZOOM_MIN, Math.min(NET_ZOOM_MAX, netZoom * ratio));
       NET_DIST = NET_DIST_BASE / netZoom;
     } else if (media && appState !== 'network' || media && overlayOpen) {
-      mediaZoom = Math.max(0.3, Math.min(3, mediaZoom * ratio));
-      const zs = document.getElementById('zoomSlider');
-      if (zs) zs.value = mediaZoom;
+      mediaZoom = Math.max(1, Math.min(3, mediaZoom * ratio));
+      PhotoFit.saveSelfSoon();
     }
   }
   _gPinchDist = dist;
@@ -20990,9 +21339,8 @@ stage.addEventListener('wheel', e => {
   }
   if (!media) return;
   e.preventDefault();
-  mediaZoom = Math.max(0.3, Math.min(3, mediaZoom * Math.exp(-e.deltaY * 0.002)));
-  const zs = document.getElementById('zoomSlider');
-  if (zs) zs.value = mediaZoom;
+  mediaZoom = Math.max(1, Math.min(3, mediaZoom * Math.exp(-e.deltaY * 0.002)));
+  PhotoFit.saveSelfSoon();
 }, { passive: false });
 
 
@@ -21253,14 +21601,8 @@ function drawSphereView(t) {
       ctx.save();
       ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, 0, Math.PI * 2); ctx.clip();
       ctx.globalAlpha = 1.0;
-      const aspect = mW / mH;
-      const baseDim = R * 1.64;
-      let dw, dh;
-      if (aspect > 1) { dh = baseDim * mediaZoom; dw = dh * aspect; }
-      else { dw = baseDim * mediaZoom; dh = dw / aspect; }
-      const px = cx + mediaOX - dw / 2;
-      const py = cy + mediaOY - dh / 2;
-      ctx.drawImage(media, px, py, dw, dh);
+      selfClipD = R * 1.64;
+      PhotoFit.draw(ctx, media, mW, mH, cx, cy, R * 0.82, PhotoFit.selfFit());
       /* Capture video/GIF frame to off-screen canvas (survives Safari suspension) */
       if (mediaType === 'video' || mediaIsGif) {
         if (!mediaFrame) mediaFrame = document.createElement('canvas');
@@ -21979,17 +22321,7 @@ function drawNetworkView(t) {
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, cr * 0.82, 0, Math.PI * 2); ctx.clip();
     ctx.globalAlpha = 1.0;
-    const aspect = cachedMediaW / cachedMediaH;
-    const baseDim = cr * 1.64;
-    let dw, dh;
-    if (aspect > 1) { dh = baseDim * mediaZoom; dw = dh * aspect; }
-    else { dw = baseDim * mediaZoom; dh = dw / aspect; }
-    /* Scale user pan offsets from self-mode coords to center-sphere coords */
-    const selfR = Math.min(400, W * 0.88) * 0.44;
-    const offsetScale = cr / (selfR || cr);
-    const px = cx + mediaOX * offsetScale - dw / 2;
-    const py = cy + mediaOY * offsetScale - dh / 2;
-    ctx.drawImage(mediaFrame, px, py, dw, dh);
+    PhotoFit.draw(ctx, mediaFrame, cachedMediaW, cachedMediaH, cx, cy, cr * 0.82, PhotoFit.selfFit());
     /* Vignette — soft fade so photo blends into the network center sphere */
     const vig = ctx.createRadialGradient(cx, cy, cr * 0.35, cx, cy, cr * 0.84);
     vig.addColorStop(0, 'rgba(0,0,0,0)');
@@ -22270,7 +22602,7 @@ function frame(ts) {
       }
     }
     if (miniPhoto && miniPhoto.img) {
-      drawContactPhotoInSphere(miniCtx, miniPhoto, mCx, mCy, mR);
+      drawContactPhotoInSphere(miniCtx, miniPhoto, mCx, mCy, mR, selectedContact ? PhotoFit.get(selectedContact.id) : PhotoFit.selfFit());
     }
 
     /* Initials — only when no photo/media */
