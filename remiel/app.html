@@ -20466,109 +20466,183 @@ const SocialImport = (() => {
 
     function _$(id) { return document.getElementById(id); }
 
+    /* Local i18n shim: uses I18n.t when the key exists, else the fallback */
+    function _t(key, fallback) {
+      try {
+        if (typeof I18n !== 'undefined' && I18n && typeof I18n.t === 'function') {
+          var v = I18n.t(key);
+          if (v && v !== key) return v;
+        }
+      } catch (e) {}
+      return fallback;
+    }
+
+    function _esc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function _authed() {
+      try { return typeof SyncEngine !== 'undefined' && typeof SyncEngine.isAuthenticated === 'function' && SyncEngine.isAuthenticated(); }
+      catch (e) { return false; }
+    }
+
+    /* contactId -> { url, created_at } for the newest shared note; memory only */
+    var _latestByContact = {};
+
     function _timeAgo(ts) {
       var diff = Date.now() - ts;
-      if (diff < 60000) return 'just now';
+      if (diff < 60000) return _t('vn.justNow', 'just now');
       if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
       if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
       return Math.floor(diff / 86400000) + 'd ago';
     }
 
+    function _currentContactId() {
+      try { if (typeof selectedContact !== 'undefined' && selectedContact) return selectedContact.id; } catch (e) {}
+      return null;
+    }
+
+    /* Multipart request: must not carry a JSON Content-Type so the browser sets the boundary */
+    async function _postForm(path, form) {
+      if (typeof SyncEngine.apiUpload === 'function') return SyncEngine.apiUpload(path, form);
+      if (typeof SyncEngine.apiFetchRaw === 'function') return SyncEngine.apiFetchRaw(path, { method: 'POST', body: form });
+      return SyncEngine.apiFetch(path, { method: 'POST', body: form });
+    }
+
     async function uploadToCircle() {
       if (typeof bcLastBlob === 'undefined' || !bcLastBlob) {
         var st = _$('bcStatus');
-        if (st) st.textContent = 'No video to share — record or upload first.';
+        if (st) st.textContent = _t('vn.noVideo', 'No video to share. Record or upload first.');
         return;
       }
-      if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
+      if (!_authed()) {
         var st2 = _$('bcStatus');
-        if (st2) st2.textContent = 'Sign in to share with your Circle.';
+        if (st2) st2.textContent = _t('vn.signIn', 'Sign in to share with your Circle.');
         return;
       }
 
       var btn = _$('bcCircleShareBtn');
-      if (btn) btn.textContent = 'Uploading...';
+      if (btn) btn.textContent = _t('vn.uploading', 'Uploading...');
 
       try {
-        var mimeType = bcLastBlob.type || 'video/webm';
-        var resp = await SyncEngine.apiFetch('/storage/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': mimeType,
-            'x-blob-type': 'videonote',
-            'x-mime-type': mimeType,
-            'content-length': String(bcLastBlob.size),
-          },
-          body: bcLastBlob,
-        });
+        var mimeType = (bcLastBlob.type || 'video/webm').split(';')[0];
+        var ext = mimeType.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+        var form = new FormData();
+        form.append('file', bcLastBlob, 'videonote-' + Date.now() + '.' + ext);
+        form.append('blob_type', 'videonote');
+        var cid = _currentContactId();
+        if (cid) form.append('contact_id', String(cid));
+
+        var resp = await _postForm('/storage/upload', form);
 
         if (!resp.ok) {
           var err = await resp.json().catch(function() { return {}; });
-          throw new Error(err.detail || 'Upload failed');
+          throw new Error(err.detail || _t('vn.uploadFailed', 'Upload failed'));
         }
 
-        var data = await resp.json();
+        await resp.json().catch(function() { return {}; });
         var st3 = _$('bcStatus');
-        if (st3) st3.textContent = 'Shared with Circle!';
-        if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Shared!';
+        if (st3) st3.textContent = _t('vn.shared', 'Shared with your Circle');
+        if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ' + _esc(_t('vn.sharedShort', 'Shared'));
         setTimeout(function() {
-          if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 014-10z"/></svg> Share with Circle';
+          if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 014-10z"/></svg> ' + _esc(_t('vn.shareBtn', 'Share with Circle'));
         }, 3000);
       } catch (e) {
         var st4 = _$('bcStatus');
-        if (st4) st4.textContent = 'Circle share error: ' + e.message;
-        if (btn) btn.textContent = 'Share with Circle';
+        if (st4) st4.textContent = _t('vn.shareError', 'Circle share error') + ': ' + e.message;
+        if (btn) btn.textContent = _t('vn.shareBtn', 'Share with Circle');
       }
+    }
+
+    /* Match a shared note to a local contact by handle, then by full name */
+    function _matchContact(m) {
+      try {
+        var list = DEMO_CONTACTS || [];
+        var h = m.handle ? String(m.handle).replace(/^@/, '').toLowerCase() : '';
+        if (h) {
+          var byHandle = list.find(function(c) { return c.handle && String(c.handle).replace(/^@/, '').toLowerCase() === h; });
+          if (byHandle) return byHandle;
+        }
+        var dn = m.display_name ? String(m.display_name).trim().toLowerCase() : '';
+        if (dn) {
+          return list.find(function(c) { return ((c.first || '') + ' ' + (c.last || '')).trim().toLowerCase() === dn; }) || null;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    function _indexMedia(media) {
+      var next = {};
+      for (var i = 0; i < media.length; i++) {
+        var m = media[i];
+        if (!m || !m.url) continue;
+        var c = _matchContact(m);
+        if (!c) continue;
+        var prev = next[c.id];
+        if (!prev || (m.created_at || 0) > (prev.created_at || 0)) next[c.id] = { url: m.url, created_at: m.created_at || 0 };
+      }
+      _latestByContact = next;
     }
 
     async function loadShared() {
       var list = _$('sharedVideoNotesList');
-      if (!list) return;
-      if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
-        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Sign in to see shared notes</div>';
+      if (!_authed()) {
+        if (list) list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">' + _esc(_t('vn.signInToSee', 'Sign in to see shared notes')) + '</div>';
         return;
       }
       try {
         var resp = await SyncEngine.apiFetch('/storage/shared-media', {});
         if (!resp.ok) {
-          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Could not load shared notes</div>';
+          if (list) list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">' + _esc(_t('vn.loadFailed', 'Could not load shared notes')) + '</div>';
           return;
         }
         var data = await resp.json();
-        var media = data.media || [];
+        var media = (data && Array.isArray(data.media)) ? data.media : [];
+        _indexMedia(media);
+        if (!list) return;
         if (media.length === 0) {
-          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">No one in your Circle has shared a video note recently</div>';
+          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">' + _esc(_t('vn.none', 'No one in your Circle has shared a video note recently')) + '</div>';
           return;
         }
         var html = '';
         for (var i = 0; i < media.length; i++) {
           var m = media[i];
+          if (!m || !m.url) continue;
+          /* url already carries ?token= for this user, so <video src> loads directly */
+          var who = m.display_name || (m.handle ? '@' + m.handle : _t('vn.unknown', 'Unknown'));
           html += '<div class="shared-vn-item">' +
-            '<div class="vn-peer">' + (m.display_name || m.handle || 'Unknown') + '</div>' +
-            '<div class="vn-time">' + _timeAgo(m.created_at) + '</div>' +
-            '<video src="' + m.url + '" controls playsinline preload="metadata" style="width:100%;border-radius:6px;max-height:200px;background:#000;"></video>' +
+            '<div class="vn-peer">' + _esc(who) + '</div>' +
+            '<div class="vn-time">' + _esc(_timeAgo(m.created_at)) + '</div>' +
+            '<video src="' + _esc(m.url) + '" controls playsinline preload="metadata" style="width:100%;border-radius:6px;max-height:200px;background:#000;"></video>' +
           '</div>';
         }
         list.innerHTML = html;
       } catch (e) {
-        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Error: ' + e.message + '</div>';
+        if (list) list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">' + _esc(_t('vn.error', 'Error')) + ': ' + _esc(e.message) + '</div>';
       }
+    }
+
+    /* For the galaxy renderer: newest shared clip url for a contact, or null */
+    function getLatestSharedForContact(contactId) {
+      var e = _latestByContact[contactId];
+      return e ? e.url : null;
     }
 
     function updateVisibility() {
       var section = _$('sharedVideoNotesSection');
       if (!section) return;
-      var authed = typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated();
-      section.style.display = authed ? '' : 'none';
+      section.style.display = _authed() ? '' : 'none';
     }
 
     function init() {
       updateVisibility();
+      if (_authed()) loadShared().catch(function() {});
     }
 
     return {
       uploadToCircle: uploadToCircle,
       loadShared: loadShared,
+      getLatestSharedForContact: getLatestSharedForContact,
       updateVisibility: updateVisibility,
       init: init,
     };
