@@ -24030,13 +24030,16 @@ const A11y = (() => {
     { id: 'alertPanel',          close: () => AlertEngine.closePanel() },
     { id: 'settingsPanel',       close: () => SettingsPanel.close() },
     { id: 'blufOverlay',         close: () => closeBluf() },
-    { id: 'overlay',             close: () => closeOverlay() }
+    { id: 'overlay',             close: () => closeOverlay() },
+    /* The setup wizard is modal for the keyboard; Escape does not close it */
+    { id: 'onboarding',          close: () => {} }
   ];
   const OPEN_CLASSES = ['open', 'active', 'visible', 'show'];
   const _stack = []; /* [{ el, prevFocus, close }] topmost last */
 
   function _isShown(el) {
     if (!el || !el.isConnected || el.hidden) return false;
+    if (el.id === 'onboarding') return _visuallyShown(el);
     for (let i = 0; i < OPEN_CLASSES.length; i++) {
       if (el.classList.contains(OPEN_CLASSES[i])) return true;
     }
