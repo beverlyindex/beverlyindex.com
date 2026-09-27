@@ -5356,6 +5356,7 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
   visibility: visible;
   transition: opacity .3s, visibility 0s;
 }
+.settings-panel.above-ob { z-index: 8600; }
 .settings-panel { visibility: hidden; transition: opacity .3s, transform .3s, visibility 0s linear .3s; }
 .settings-panel.open { visibility: visible; transition: opacity .3s, transform .3s, visibility 0s; }
 .pulse-overlay { visibility: hidden; transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear .35s; }
@@ -5729,6 +5730,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
     <input class="ob-input" id="obUserName" type="text" placeholder="Your first name" data-i18n-placeholder="onboard.name.placeholder" autocomplete="off" maxlength="30" style="text-align:center; font-size:16px; margin-bottom:24px;">
     <button class="ob-btn ob-primary" id="obNameBtn" onclick="obNext(2)" data-i18n="onboard.continue">Continue</button>
     <button type="button" id="obSignInLink" onclick="obSignInExisting()" data-i18n="onboard.signinLink" style="display:block;margin:14px auto 0;background:none;border:0;color:#38bdf8;font-size:13px;text-decoration:underline;cursor:pointer;padding:6px 8px;">Already use Remiel Sentinel on another device? Sign in</button>
+    <button type="button" id="obRestoreLink" onclick="SettingsPanel.openRestore()" data-i18n="onboard.restoreLink" style="display:block;margin:4px auto 0;background:none;border:0;color:#38bdf8;font-size:12px;text-decoration:underline;cursor:pointer;padding:6px 8px;">Restore from backup</button>
   </div>
 
   <!-- Step 2: Welcome -->
@@ -6228,7 +6230,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   </div>
 
   <!-- Import -->
-  <div class="settings-section">
+  <div class="settings-section" id="importSection">
     <div class="settings-section-title" data-i18n="settings.import">Import Backup</div>
     <p class="settings-help" data-i18n="help.set.restore"></p>
     <div class="settings-card">
@@ -6266,7 +6268,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
     <div class="settings-section-title" data-i18n="settings.dangerZone">Danger Zone</div>
     <p class="settings-help" data-i18n="help.set.danger"></p>
     <div class="settings-card" style="border-color:rgba(224,82,82,0.15);">
-      <p data-i18n="danger.desc">Permanently delete all contacts, moods, interactions, and settings. This cannot be undone.</p>
+      <p data-i18n="danger.desc">Delete all contacts, moods, interactions, and settings from this device. Your server copy stays and returns when you sign in.</p>
       <button class="settings-action-btn danger" id="clearAllBtn" onclick="SettingsPanel.confirmClearAll()" data-i18n="settings.clear">Clear All Data</button>
       <div class="settings-status" id="clearStatus"></div>
     </div>
@@ -8557,6 +8559,25 @@ const RemielDB = (() => {
     return dump;
   }
 
+  /* Clear All Data: empties every local store and the sync queue on this device.
+     Nothing is pushed, so the server copy stays. Tokens, the id map and the
+     local-only flag go with the settings; the device id and secret, the API
+     base and the language stay, so the next identity or sign in pulls the
+     server copy back from version 0. */
+  async function wipeLocal() {
+    await open();
+    const KEEP = ['_sync_api_base', '_device_id', '_device_secret', 'locale'];
+    const kept = (await promisify(tx('settings', 'readonly').getAll())).filter(function(r) { return r && KEEP.indexOf(r.key) !== -1; });
+    const names = Array.from(_db.objectStoreNames);
+    for (const name of names) {
+      const t = _db.transaction(name, 'readwrite');
+      t.objectStore(name).clear();
+      if (name === 'settings') kept.forEach(function(r) { t.objectStore(name).put(r); });
+      await new Promise((res, rej) => { t.oncomplete = res; t.onerror = rej; });
+    }
+    try { localStorage.removeItem('rm:obDone'); } catch (e) {}
+  }
+
   async function importAll(dump) {
     await open();
     const stores = ['contacts', 'interactions', 'medications', 'moods', 'settings', 'broadcasts', 'profiles'];
@@ -8617,7 +8638,7 @@ const RemielDB = (() => {
   }
 
   return {
-    open, getAllContacts, getContact, putContact, deleteContact, seedContacts,
+    open, wipeLocal, getAllContacts, getContact, putContact, deleteContact, seedContacts,
     getPhoto, putPhoto, deletePhoto, getAllPhotos,
     saveBroadcast, getBroadcastsByContact, getLatestBroadcast,
     addInteraction, getInteractionsByContact,
@@ -8654,6 +8675,7 @@ const I18n = (function () {
       'onboard.name.title':       'Set up your sphere',
       'onboard.name.subtitle':    'Your name and image appear at the center of your galaxy.',
       'onboard.signinLink':       'Already use Remiel Sentinel on another device? Sign in',
+      'onboard.restoreLink':      'Restore from backup',
       'onboard.name.placeholder':  'Your first name',
       'onboard.continue':          'Continue',
 
@@ -9062,6 +9084,7 @@ const I18n = (function () {
       'onboard.name.title':       'Come ti chiamiamo?',
       'onboard.name.subtitle':    'Questo è il nome che appare sulla tua sfera.',
       'onboard.signinLink':       'Usi già Remiel Sentinel su un altro dispositivo? Accedi',
+      'onboard.restoreLink':      'Ripristina da un backup',
       'onboard.name.placeholder':  'Il tuo nome',
       'onboard.continue':          'Continua',
 
@@ -9510,7 +9533,7 @@ const I18n = (function () {
     'help.tour': "Take the tour",
     'help.reset': "Show tips again",
     'help.resetDone': "Tips will show again as you use the app",
-    'danger.desc': "Permanently delete all contacts, moods, interactions, and settings. This cannot be undone.",
+    'danger.desc': "Delete all contacts, moods, interactions, and settings from this device. Your server copy stays and returns when you sign in.",
     'location.shareNow': "Share My Location Now",
     'location.stopBtn': "Stop Sharing Location",
     'location.circleTitle': "Circle Locations",
@@ -9983,7 +10006,7 @@ const I18n = (function () {
     'help.tour': "Fai il giro guidato",
     'help.reset': "Mostra di nuovo i suggerimenti",
     'help.resetDone': "I suggerimenti torneranno a comparire mentre usi l’app",
-    'danger.desc': "Cancella per sempre contatti, umori, interazioni e impostazioni. Non si può annullare.",
+    'danger.desc': "Cancella da questo dispositivo contatti, umori, interazioni e impostazioni. La copia sul server resta e torna quando accedi.",
     'location.shareNow': "Condividi ora la mia posizione",
     'location.stopBtn': "Smetti di condividere la posizione",
     'location.circleTitle': "Posizioni della cerchia",
@@ -10642,7 +10665,7 @@ const I18n = (function () {
     "voice.differs.lively": "This recording sounded livelier than usual for this voice.",
     "voice.differs.other": "This recording sounded different from usual for this voice.",
     "clear.confirm": "Are you sure? Tap again to confirm",
-    "clear.warn": "All data will be permanently deleted.",
+    "clear.warn": "Clear everything on this device? Your server copy stays and returns when you sign in.",
     "clear.btn": "Clear All Data",
     "clear.clearing": "Clearing...",
     "clear.done": "All data cleared. Reloading...",
@@ -10887,7 +10910,7 @@ const I18n = (function () {
     "voice.differs.lively": "Questa registrazione è sembrata più vivace del solito per questa voce.",
     "voice.differs.other": "Questa registrazione è sembrata diversa dal solito per questa voce.",
     "clear.confirm": "Sei sicuro? Tocca di nuovo per confermare",
-    "clear.warn": "Tutti i dati verranno eliminati per sempre.",
+    "clear.warn": "Cancellare tutto su questo dispositivo? La copia sul server resta e torna quando accedi.",
     "clear.btn": "Cancella tutti i dati",
     "clear.clearing": "Cancellazione in corso...",
     "clear.done": "Dati cancellati. Ricarico...",
@@ -22393,7 +22416,7 @@ const SettingsPanel = (function () {
     if (clearConfirmStep === 0) {
       clearConfirmStep = 1;
       btn.textContent = _t('clear.confirm', 'Are you sure? Tap again to confirm');
-      status.textContent = _t('clear.warn', 'All data will be permanently deleted.');
+      status.textContent = _t('clear.warn', 'Clear everything on this device? Your server copy stays and returns when you sign in.');
       status.className = 'settings-status error';
       clearTimeout(_clearResetTimer);
       _clearResetTimer = setTimeout(() => { clearConfirmStep = 0; btn.textContent = _t('clear.btn', 'Clear All Data'); status.textContent = ''; }, 5000);
@@ -22409,8 +22432,9 @@ const SettingsPanel = (function () {
     const status = $('clearStatus');
     status.textContent = _t('clear.clearing', 'Clearing...');
     try {
-      const emptyDump = { contacts: [], interactions: [], medications: [], moods: [], settings: [], photos: [] };
-      await RemielDB.importAll(emptyDump);
+      /* Local wipe only: the server copy is kept and returns at the next sign in */
+      if (typeof SyncEngine !== 'undefined' && SyncEngine.forgetDevice) await SyncEngine.forgetDevice();
+      await RemielDB.wipeLocal();
       status.textContent = _t('clear.done', 'All data cleared. Reloading...');
       status.className = 'settings-status success';
       setTimeout(() => location.reload(), 1200);
@@ -22430,6 +22454,21 @@ const SettingsPanel = (function () {
 
   function closePanel() {
     $('settingsPanel').classList.remove('open');
+    setTimeout(() => { if (!$('settingsPanel').classList.contains('open')) $('settingsPanel').classList.remove('above-ob'); }, 350);
+  }
+
+  /* First-run restore: Import Backup opens above the setup wizard */
+  function openRestore() {
+    const panel = $('settingsPanel');
+    const ob = document.getElementById('onboarding');
+    if (ob && !ob.hidden) panel.classList.add('above-ob');
+    openPanel();
+    setTimeout(() => {
+      const sec = $('importSection');
+      if (sec) { try { sec.scrollIntoView({ block: 'start' }); } catch (e) { sec.scrollIntoView(); } }
+      const btn = sec && sec.querySelector('.settings-action-btn');
+      if (btn) { try { btn.focus({ preventScroll: true }); } catch (e) {} }
+    }, 120);
   }
 
   /* ── Backup Reminder ── */
@@ -22605,7 +22644,7 @@ const SettingsPanel = (function () {
   return {
     open: openPanel,
     syncTab: syncTab, doSyncAuth: doSyncAuth, doSyncNow: doSyncNow, doSyncLogout: doSyncLogout, updateSyncUI: updateSyncUI, close: closePanel,
-    doExport, onFileSelected, doDecrypt, doImport,
+    doExport, onFileSelected, doDecrypt, doImport, openRestore,
     confirmClearAll, refreshSummary
   };
 })();
@@ -25809,6 +25848,7 @@ const SyncEngine = (() => {
 
   /* Creates (or restores, idempotently) the device account. Never throws. */
   function ensureIdentity() {
+    if (_forgotten) return Promise.resolve(false);
     if (isAuthenticated()) return Promise.resolve(true);
     if (_identityPromise) return _identityPromise;
     _identityPromise = (async function() {
@@ -26706,6 +26746,19 @@ const SyncEngine = (() => {
     _emitStatus();
   }
 
+  /* Clear All Data: drop this device's session in memory without touching the
+     server (no logout call, no push). RemielDB.wipeLocal clears the stored copy. */
+  async function forgetDevice() {
+    stopAutoSync();
+    _accessToken = null; _refreshToken = null;
+    _userId = null; _displayName = null; _handle = null; _email = null; _claimed = false; _serverSentinelId = null;
+    _serverIdMap = {}; _lastSyncVersion = 0; _blobSyncVersion = 0; _pendingChanges = 0;
+    _localOnly = false; _lastSyncError = null;
+    _forgotten = true;
+    _emitStatus();
+  }
+  var _forgotten = false;
+
   /* Re-enable automatic device identity after an explicit sign out */
   async function useDeviceIdentity() {
     try { await RemielDB.putSetting(SIGNED_OUT_KEY, null); await RemielDB.putSetting(ID_FAIL_KEY, 0); } catch (e) {}
@@ -26882,7 +26935,7 @@ const SyncEngine = (() => {
   return {
     init: init, ready: ready, configure: configure,
     signup: signup, login: login, logout: logout, claim: claim,
-    ensureIdentity: ensureIdentity, getProfile: getProfile, updateProfile: updateProfile,
+    ensureIdentity: ensureIdentity, forgetDevice: forgetDevice, getProfile: getProfile, updateProfile: updateProfile,
     registerSentinelId: registerSentinelId, useDeviceIdentity: useDeviceIdentity,
     isAuthenticated: isAuthenticated, getUserId: getUserId, getDisplayName: getDisplayName,
     getApiBase: getApiBase, getAccessToken: getAccessToken,
