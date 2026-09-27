@@ -5498,6 +5498,128 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
 
 /* Pressed and busy feedback on every control */
 button:active:not(:disabled), [role="button"]:active, .btn:active { transform: scale(0.97); filter: brightness(1.15); }
+/* ═══ Button system: illumination, the advance rim, selection confirmation ═══
+   One control per screen carries .btn-advance (set by BtnSystem). Every
+   selectable control shares one selected look. Nothing a user must press is
+   ever dimmed: "not yet" is explained by a .field-hint line instead. */
+:root { --adv-rim: #38d4ff; --lit-fill: #38bdf8; --lit-ink: #04121c; }
+@keyframes btnAdvanceGlow {
+  0%, 100% { box-shadow: 0 0 0 2px var(--adv-rim), 0 0 10px 2px rgba(56,212,255,0.35); }
+  50%      { box-shadow: 0 0 0 2px var(--adv-rim), 0 0 22px 6px rgba(56,212,255,0.65); }
+}
+.btn-advance {
+  box-shadow: 0 0 0 2px var(--adv-rim), 0 0 14px 3px rgba(56,212,255,0.45) !important;
+  animation: btnAdvanceGlow 1.6s ease-in-out infinite;
+  outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-advance { animation: none !important; }
+}
+.field-hint {
+  display: block; margin: 6px 2px 0; font-size: 12px; line-height: 1.35;
+  color: #7dd3fc; font-family: 'Hanken Grotesk', system-ui, sans-serif; text-align: inherit;
+}
+.field-hint[hidden] { display: none; }
+
+/* Primary: one bright accent fill with dark text */
+.ob-primary, .contact-modal-save, .profile-save-btn, .ledger-send, .checkin-submit-btn,
+.sc-guest-join-btn, .si-btn.primary, .sv-editor-btn.save, .circle-invite-btn,
+.sentinel-msg-send, .pulse-add-btn, .st-nav .st-next, #spAuthBtn, #exportBtn, #syncAuthBtn,
+#importDecryptBtn, #syncNowBtn, .roster-import-btn:not(#gpImportBtn), .btn-lit {
+  background: var(--lit-fill) !important; color: var(--lit-ink) !important;
+  border: 1px solid var(--lit-fill) !important; opacity: 1 !important;
+}
+.ob-primary:hover, .contact-modal-save:hover, .profile-save-btn:hover, .ledger-send:hover,
+.checkin-submit-btn:hover, .sc-guest-join-btn:hover, .si-btn.primary:hover, .sv-editor-btn.save:hover,
+.circle-invite-btn:hover, .sentinel-msg-send:hover, .pulse-add-btn:hover, .st-nav .st-next:hover,
+#exportBtn:hover, #syncAuthBtn:hover, #importDecryptBtn:hover, #syncNowBtn:hover, .roster-import-btn:hover, .btn-lit:hover {
+  background: #7dd3fc !important; border-color: #7dd3fc !important;
+}
+.ob-primary:active, .contact-modal-save:active, .profile-save-btn:active, .ledger-send:active,
+.checkin-submit-btn:active, .sc-guest-join-btn:active, .si-btn.primary:active, .sv-editor-btn.save:active,
+.circle-invite-btn:active, .sentinel-msg-send:active, .pulse-add-btn:active, .st-nav .st-next:active,
+#exportBtn:active, #syncAuthBtn:active, #importDecryptBtn:active, #syncNowBtn:active, .roster-import-btn:active, .btn-lit:active {
+  background: #0ea5e9 !important; transform: scale(0.97);
+}
+/* Secondary: accent outline at full opacity */
+.settings-action-btn.secondary, .ob-add-btn, .contact-modal-cancel, .st-nav .st-back, .st-skip,
+.sv-editor-btn:not(.save):not(.danger), .si-btn:not(.primary), .ob-media-opt, .ob-contact-media-opt, #spSkipBtn {
+  border: 1px solid var(--lit-fill) !important; color: #7dd3fc !important; opacity: 1 !important;
+  background: rgba(56,189,248,0.08) !important;
+}
+.settings-action-btn.secondary:hover, .ob-add-btn:hover, .contact-modal-cancel:hover, .st-nav .st-back:hover,
+.st-skip:hover, .sv-editor-btn:not(.save):not(.danger):hover, .si-btn:not(.primary):hover {
+  background: rgba(56,189,248,0.2) !important; color: #e0f2fe !important;
+}
+.ob-add-btn.btn-advance { background: var(--lit-fill) !important; color: var(--lit-ink) !important; }
+/* Focus is always visible */
+button:focus-visible, [role=button]:focus-visible, [role=tab]:focus-visible, .chip:focus-visible,
+a.bluf-qa-btn:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid #7dd3fc !important; outline-offset: 2px;
+}
+/* A disabled control is only ever "cannot act here" (its label says why); never dimmed */
+button:disabled, button[disabled] { opacity: 1 !important; filter: none !important; cursor: default !important; }
+.btn-unavailable { background: transparent !important; color: #cbd5e1 !important; border: 1px dashed #94a3b8 !important; }
+input[type=checkbox] { accent-color: var(--lit-fill); }
+
+/* Selection confirmation: filled cyan, dark text, check glyph on chips */
+.ob-cat, .contact-modal-cat, .sync-prompt-tab, .ledger-type-chip, .pulse-sev-chip, .roster-tab,
+.lang-switcher__btn, .lang-overlay-switcher button, .btn[data-color], #syncLoginTab, #syncSignupTab {
+  opacity: 1 !important;
+}
+.ob-cat:not(.active), .contact-modal-cat:not(.active), .ledger-type-chip:not(.selected),
+.pulse-sev-chip:not(.active), .sync-prompt-tab:not(.active), .roster-tab:not(.active), .lang-switcher__btn:not(.active),
+.lang-overlay-switcher button:not(.active), #syncLoginTab:not(.active), #syncSignupTab:not(.active) {
+  background: transparent !important; color: #e0f2fe !important; border: 1px solid #7dd3fc !important;
+}
+.ob-cat.active, .contact-modal-cat.active, .ledger-type-chip.selected, .pulse-sev-chip.active,
+.sync-prompt-tab.active, .roster-tab.active, .lang-switcher__btn.active, .lang-overlay-switcher button.active,
+.checkin-mood-btn.selected, .mood-btn.mood-active, #syncLoginTab.active, #syncSignupTab.active,
+.bio-toggle-btn.on {
+  background: var(--lit-fill) !important; color: var(--lit-ink) !important;
+  border: 1px solid var(--lit-fill) !important; opacity: 1 !important;
+}
+.mood-btn.mood-active .mood-label, .checkin-mood-btn.selected span { color: var(--lit-ink) !important; }
+.ob-cat.active::before, .contact-modal-cat.active::before, .ledger-type-chip.selected::before,
+.pulse-sev-chip.active::before, .sync-prompt-tab.active::before, .roster-tab.active::before {
+  content: '\2713'; font-weight: 800; margin-right: 5px;
+}
+.roster-tab { border-radius: 10px 10px 0 0; }
+.pulse-sev-chip { display: inline-flex; align-items: center; gap: 5px; }
+.pulse-sev-chip .sev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip-c, #fff); display: inline-block; }
+.checkin-mood-btn:not(.selected), .mood-btn:not(.mood-active) { opacity: 1 !important; color: #e0f2fe; }
+.st-dot { background: transparent !important; border: 1.5px solid #7dd3fc; box-sizing: border-box; }
+.st-dot.active { background: var(--adv-rim) !important; border-color: var(--adv-rim); }
+.ob-dot-ind.active { background: var(--adv-rim) !important; }
+.sv-roster-item.selected, .gp-face.selected { box-shadow: 0 0 0 2px var(--lit-fill) inset; }
+.bio-toggle-btn:not(.on) { color: #e0f2fe !important; border: 1px solid #7dd3fc !important; }
+
+/* Quick actions with missing data: full brightness plus a small "add" badge */
+.bluf-qa-btn { position: relative; opacity: 1 !important; }
+.bluf-qa-btn[data-missing]:not([data-missing=""])::after {
+  content: attr(data-add-label); position: absolute; top: -7px; right: -4px;
+  font: 700 9px/1 'Hanken Grotesk', system-ui, sans-serif; letter-spacing: 0.03em;
+  padding: 3px 5px; border-radius: 8px; background: #fbbf24; color: #1c1300;
+}
+/* Roster chips (league, group filter): outlined at full brightness, filled when chosen */
+.rp-chip { opacity: 1 !important; color: #e0f2fe !important; border: 1px solid #7dd3fc !important; background: transparent !important; }
+.rp-chip.on { background: var(--lit-fill) !important; color: var(--lit-ink) !important; border-color: var(--lit-fill) !important; }
+.rp-chip.on::before { content: '\2713'; font-weight: 800; margin-right: 5px; }
+.gp-face-card.selected { box-shadow: 0 0 0 2px var(--lit-fill); }
+.gp-face-card.selected::after { content: '\2713'; position: absolute; top: 4px; right: 6px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--lit-fill); color: var(--lit-ink); font: 800 12px/18px system-ui, sans-serif; text-align: center; }
+.gp-face-card { position: relative; }
+.sv-card.active { box-shadow: 0 0 0 2px var(--lit-fill); border-color: var(--lit-fill) !important; }
+.bio-hr-btn.on { background: var(--lit-fill) !important; color: var(--lit-ink) !important; }
+.st-nav .st-back[aria-hidden="true"] { visibility: hidden; }
+.push-toggle input:disabled + .push-toggle-slider { opacity: 1 !important; filter: none; border: 1px dashed #94a3b8; }
+/* Ghost and icon controls: full brightness text, never below 4.5:1 */
+#exitBtn, #backBtn, #blufEditBtn, #pulseRefreshBtn, .pulse-close, .cm-photo-label, .checkin-nudge-close,
+.alert-clear-btn, #ddDismiss, #ledgerMicBtn { color: #aeb6c4 !important; opacity: 1 !important; }
+.settings-action-btn.danger, .sv-editor-btn.danger { color: #f87171 !important; border-color: #f87171 !important; opacity: 1 !important; }
+.btn-unavailable-note { display: block; margin-top: 6px; font-size: 12px; color: #cbd5e1; }
+.roster-drop-zone.btn-advance, .ob-media-upload.btn-advance, .rs-query.btn-advance, .roster-textarea.btn-advance,
+.ob-input.btn-advance { border-color: var(--adv-rim) !important; }
 .is-busy { cursor: progress !important; opacity: 0.85; }
 .busy-spin { display:inline-block; width:0.9em; height:0.9em; margin-right:0.45em; vertical-align:-0.12em;
   border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation: busySpin 0.7s linear infinite; }
