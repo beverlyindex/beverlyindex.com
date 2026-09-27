@@ -9679,6 +9679,7 @@ const I18n = (function () {
     'busy.decrypting': "Decrypting",
     'busy.encrypting': "Encrypting",
     'busy.loading': "Loading",
+    'busy.showing': "Showing",
     'busy.opening': "Opening",
     'busy.saving': "Saving",
     'confirm.ok': "Confirm",
@@ -10153,6 +10154,7 @@ const I18n = (function () {
     'busy.decrypting': "Decifratura",
     'busy.encrypting': "Cifratura",
     'busy.loading': "Caricamento",
+    'busy.showing': "Visualizzazione",
     'busy.opening': "Apertura",
     'busy.saving': "Salvataggio",
     'confirm.ok': "Conferma",
@@ -28478,7 +28480,20 @@ const SocialImport = (() => {
     }
 
     var _feedGen = 0;
-    async function _loadFeed() {
+    /* One feed load at a time: a request during a load marks it dirty and one
+       quiet rerun follows, so the Loading counter only ever counts up. */
+    var _feedP = null, _feedDirty = false;
+    function _loadFeed() {
+      if (_feedP) { _feedDirty = true; return _feedP; }
+      _feedP = (async function () {
+        var quiet = false;
+        do { _feedDirty = false; await _loadFeedOnce(quiet); quiet = true; } while (_feedDirty);
+      })();
+      _feedP.then(function () { _feedP = null; }, function () { _feedP = null; });
+      return _feedP;
+    }
+
+    async function _loadFeedOnce(quiet) {
       var _gen = ++_feedGen;
       var cardsEl = document.getElementById('pulseCards');
       var chipsEl = document.getElementById('pulseSevChips');
@@ -28503,11 +28518,12 @@ const SocialImport = (() => {
         var _prog = document.createElement('div');
         _prog.className = 'pulse-empty pulse-loading';
         _prog.innerHTML = '<span class="busy-spin" aria-hidden="true"></span><span></span>';
-        var _setProg = function (k) { _prog.lastChild.textContent = _t('busy.loading', 'Loading') + ' ' + k + ' / ' + contacts.length; };
+        /* Two stages, two words: Loading counts the scoring pass, Showing the cards */
+        var _setProg = function (k, showing) { _prog.lastChild.textContent = (showing ? _t('busy.showing', 'Showing') : _t('busy.loading', 'Loading')) + ' ' + k + ' / ' + contacts.length; };
         _setProg(0);
-        if (contacts.length > 8) { cardsEl.innerHTML = ''; cardsEl.appendChild(_prog); }
+        if (contacts.length > 8 && !quiet) { cardsEl.innerHTML = ''; cardsEl.appendChild(_prog); }
         for (var i = 0; i < contacts.length; i++) {
-          if (i && i % 8 === 0) { _setProg(i); await new Promise(function (res) { setTimeout(res, 0); }); if (_gen !== _feedGen) return; }
+          if (i && i % 8 === 0) { if (!quiet) _setProg(i); await new Promise(function (res) { setTimeout(res, 0); }); if (_gen !== _feedGen) return; }
           var c = contacts[i];
           var comp = null;
           try { comp = await computeSeverity(c.id); } catch (e) {}
@@ -28593,16 +28609,18 @@ const SocialImport = (() => {
             '<div class="pulse-card-body">' + bodyLines.join('<br>') + actionHtml + '</div>' +
           '</div>';
           /* Progressive render: show the first cards while the rest compute */
-          if (j === 11 && rows.length > 12) {
-            cardsEl.innerHTML = html; cardsEl.appendChild(_prog); _setProg(12);
+          if (quiet) {
+            /* quiet rerun: no counter, one render at the end */
+          } else if (j === 11 && rows.length > 12) {
+            cardsEl.innerHTML = html; cardsEl.appendChild(_prog); _setProg(12, true);
             await new Promise(function (res) { setTimeout(res, 0); });
             if (_gen !== _feedGen) return;
           } else if (j > 11 && j % 12 === 11) {
-            _prog.remove(); cardsEl.insertAdjacentHTML('beforeend', html.slice(_flushed)); cardsEl.appendChild(_prog); _setProg(j + 1);
+            _prog.remove(); cardsEl.insertAdjacentHTML('beforeend', html.slice(_flushed)); cardsEl.appendChild(_prog); _setProg(j + 1, true);
             await new Promise(function (res) { setTimeout(res, 0); });
             if (_gen !== _feedGen) return;
           }
-          if (j % 12 === 11) _flushed = html.length;
+          if (!quiet && j % 12 === 11) _flushed = html.length;
         }
         if (_flushed && cardsEl.contains(_prog)) { _prog.remove(); cardsEl.insertAdjacentHTML('beforeend', html.slice(_flushed)); }
         else cardsEl.innerHTML = html;
