@@ -4764,6 +4764,24 @@
 .roster-ocr-bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#C5A55A,#e8d48b); border-radius:3px; transition:width .3s; }
 .roster-ocr-status { font:12px/1 "Hanken Grotesk",system-ui,sans-serif; color:#999; margin-top:6px; text-align:center; }
 .roster-file-input { display:none; }
+.roster-ocr-thumb-wrap { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.roster-ocr-thumb { width:72px; height:72px; object-fit:cover; border-radius:8px; border:1px solid rgba(197,165,90,0.35); background:#111; flex:0 0 auto; }
+.roster-ocr-head { font:600 14px/1.3 "Hanken Grotesk",system-ui,sans-serif; color:#fff; }
+.roster-ocr-progress .roster-ocr-status { text-align:left; line-height:1.3; }
+.roster-status { margin:10px 0 0; padding:10px 12px; border-radius:10px; font:13px/1.4 "Hanken Grotesk",system-ui,sans-serif; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.roster-status[hidden] { display:none; }
+.roster-status .roster-status-msg { flex:1 1 180px; }
+.roster-status-info { background:rgba(255,255,255,0.05); color:#ccc; }
+.roster-status-ok { background:rgba(76,175,80,0.12); color:#8fd694; border:1px solid rgba(76,175,80,0.3); }
+.roster-status-warn { background:rgba(197,165,90,0.12); color:#e8d48b; border:1px solid rgba(197,165,90,0.35); }
+.roster-status-err { background:rgba(239,68,68,0.12); color:#fca5a5; border:1px solid rgba(239,68,68,0.45); }
+.roster-status-btn { padding:6px 14px; border-radius:8px; border:1px solid currentColor; background:transparent; color:inherit; font:600 13px "Hanken Grotesk",system-ui,sans-serif; cursor:pointer; }
+.roster-done-banner { position:fixed; top:calc(env(safe-area-inset-top,0px) + 14px); left:50%; transform:translateX(-50%); width:min(560px,calc(100% - 32px)); box-sizing:border-box; z-index:100002; background:rgba(12,14,22,0.94); border:1px solid rgba(76,175,80,0.5); color:#e8f5e9; border-radius:14px; padding:12px 44px 12px 14px; font:14px/1.45 "Hanken Grotesk",system-ui,sans-serif; box-shadow:0 8px 30px rgba(0,0,0,0.5); backdrop-filter:blur(12px); transition:opacity .3s; }
+.roster-done-banner strong { color:#8fd694; }
+.roster-done-banner small { display:block; color:rgba(255,255,255,0.6); margin-top:4px; font-size:12px; }
+.roster-done-banner button { position:absolute; top:6px; right:6px; width:32px; height:32px; border:none; background:transparent; color:rgba(255,255,255,0.7); font-size:20px; cursor:pointer; border-radius:8px; }
+.ob-roster-note { margin:8px 0 0; font:13px/1.4 "Hanken Grotesk",system-ui,sans-serif; color:#e8d48b; }
+.ob-roster-note:empty { display:none; }
 
 /* ── Location Sharing ── */
 .loc-share-section { margin-top: 10px; }
@@ -5551,6 +5569,7 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
       <p class="ob-roster-title" data-i18n="onboard.people.rosterTitle">Import a Roster</p>
       <p class="ob-roster-desc" data-i18n="onboard.people.rosterDesc">Screenshot, paste a list, or upload a file</p>
     </div>
+    <p class="ob-roster-note" id="obRosterNote" role="status"></p>
 
     <div class="ob-contacts" id="obContacts"></div>
 
@@ -7008,8 +7027,14 @@ function _loadTesseract() {
     if (window.Tesseract) { resolve(window.Tesseract); return; }
     var s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
-    s.onload = function() { resolve(window.Tesseract); };
-    s.onerror = function() { reject(new Error('Failed to load Tesseract.js')); };
+    var timer = setTimeout(function() { _tesseractReady = null; reject(new Error('Failed to load Tesseract.js (timed out)')); }, 30000);
+    s.onload = function() {
+      clearTimeout(timer);
+      if (window.Tesseract) resolve(window.Tesseract);
+      else { _tesseractReady = null; reject(new Error('Failed to load Tesseract.js')); }
+    };
+    /* Clear the cached promise so Retry can try the download again */
+    s.onerror = function() { clearTimeout(timer); _tesseractReady = null; s.remove(); reject(new Error('Failed to load Tesseract.js')); };
     document.head.appendChild(s);
   });
   return _tesseractReady;
@@ -10185,6 +10210,113 @@ const I18n = (function () {
     "qa.lblEmail": "Email",
   });
   /* WAVE-H KEYS END */
+  /* ROSTER FEEDBACK KEYS */
+  Object.assign(_strings.en, {
+    "roster.ocr.head": "Reading names from this image",
+    "roster.st.loadingFirst": "Loading the reader (first time only, about 10 MB)",
+    "roster.st.loading": "Loading the reader",
+    "roster.st.preparing": "Preparing image",
+    "roster.st.readingPct": "Reading text {pct}%",
+    "roster.st.finding": "Finding names",
+    "roster.st.found": "Found {n} names. Check the list, edit any, untick any you do not want, then tap Import Selected.",
+    "roster.st.foundOne": "Found 1 name. Check it, edit it if needed, then tap Import Selected.",
+    "roster.st.noNames": "No names found. Try a sharper photo, fill the frame, or use the Paste tab.",
+    "roster.st.tryAgain": "Try again",
+    "roster.st.retry": "Retry",
+    "roster.st.pasteEmpty": "Paste some names first, one person per line.",
+    "roster.st.pasteNone": "No names found in the pasted text. Put one person per line.",
+    "roster.st.fileReading": "Reading file",
+    "roster.st.fileRows": "Read {rows} rows. Found {n} names. Check the list, then tap Import Selected.",
+    "roster.st.fileNone": "Read {rows} rows but found no names. Check the file has one person per row, or use the Paste tab.",
+    "roster.err.load": "The name reader could not load. Check your internet connection, then tap Retry.",
+    "roster.err.tooLarge": "This image is too large (over 25 MB). Choose a smaller image or a screenshot.",
+    "roster.err.unsupported": "This file is not an image this browser can open. Use a JPG, PNG, or screenshot.",
+    "roster.err.ocr": "The name reader stopped with an error: {msg}",
+    "roster.err.fileRead": "This file could not be read. Try saving it again as .csv or .txt.",
+    "roster.err.fileTooLarge": "This file is too large (over 5 MB).",
+    "roster.err.import": "Import stopped with an error: {msg}",
+    "roster.pv.count": "{n} names found",
+    "roster.pv.countOne": "1 name found",
+    "roster.pv.ocrHint": "Names read from the image. Tap any name to correct it before importing.",
+    "roster.importN": "Import Selected ({n})",
+    "roster.importing": "Importing",
+    "roster.res.added": "{n} people added",
+    "roster.res.addedOne": "1 person added",
+    "roster.res.skipped": "{n} already in your circle, skipped",
+    "roster.res.skippedOne": "1 already in your circle, skipped",
+    "roster.res.noneSelected": "No one is selected. Tick at least one name to import.",
+    "roster.res.allDupes": "Nobody new to add: everyone selected is already in your list.",
+    "roster.banner.done": "{n} people added from your roster. Tap any sphere to open their card. Add more from The Pulse with + Add person.",
+    "roster.banner.doneOne": "1 person added from your roster. Tap any sphere to open their card. Add more from The Pulse with + Add person.",
+    "roster.banner.close": "Dismiss",
+    "roster.gp.loading": "Loading face detection (first time only, a few MB)",
+    "roster.gp.scanning": "Looking for faces",
+    "roster.gp.readingPct": "Reading names on the photo {pct}%",
+    "roster.gp.cropping": "Cropping {n} faces",
+    "roster.gp.croppingOne": "Cropping 1 face",
+    "roster.gp.found": "Found {n} faces. Name each person, untick any you do not want, then tap Import Selected.",
+    "roster.gp.foundOne": "Found 1 face. Name the person, then tap Import Selected.",
+    "roster.gp.none": "No faces found. Try a clearer, well lit photo where faces are visible, or use the Image tab.",
+    "roster.gp.err": "Face detection failed: {msg}",
+    "roster.gp.errLoad": "Face detection could not load. Check your internet connection, then tap Retry.",
+    "roster.gp.selCount": "{sel} of {n} selected",
+    "roster.gp.selectAll": "Select All",
+    "roster.gp.namePh": "Name",
+    "roster.gp.noneSel": "No faces selected. Tap faces to select them first.",
+  });
+  Object.assign(_strings.it, {
+    "roster.ocr.head": "Lettura dei nomi da questa immagine",
+    "roster.st.loadingFirst": "Caricamento del lettore (solo la prima volta, circa 10 MB)",
+    "roster.st.loading": "Caricamento del lettore",
+    "roster.st.preparing": "Preparazione dell’immagine",
+    "roster.st.readingPct": "Lettura del testo {pct}%",
+    "roster.st.finding": "Ricerca dei nomi",
+    "roster.st.found": "Trovati {n} nomi. Controlla l’elenco, correggi quelli sbagliati, togli la spunta a chi non vuoi, poi tocca Importa i selezionati.",
+    "roster.st.foundOne": "Trovato 1 nome. Controllalo, correggilo se serve, poi tocca Importa i selezionati.",
+    "roster.st.noNames": "Nessun nome trovato. Prova una foto più nitida, riempi l’inquadratura o usa la scheda Incolla.",
+    "roster.st.tryAgain": "Riprova",
+    "roster.st.retry": "Riprova",
+    "roster.st.pasteEmpty": "Incolla prima qualche nome, una persona per riga.",
+    "roster.st.pasteNone": "Nessun nome trovato nel testo incollato. Scrivi una persona per riga.",
+    "roster.st.fileReading": "Lettura del file",
+    "roster.st.fileRows": "Lette {rows} righe. Trovati {n} nomi. Controlla l’elenco, poi tocca Importa i selezionati.",
+    "roster.st.fileNone": "Lette {rows} righe ma nessun nome trovato. Verifica che il file abbia una persona per riga, oppure usa la scheda Incolla.",
+    "roster.err.load": "Non è stato possibile caricare il lettore dei nomi. Controlla la connessione a internet, poi tocca Riprova.",
+    "roster.err.tooLarge": "Questa immagine è troppo grande (oltre 25 MB). Scegli un’immagine più piccola o uno screenshot.",
+    "roster.err.unsupported": "Questo file non è un’immagine che il browser può aprire. Usa un JPG, un PNG o uno screenshot.",
+    "roster.err.ocr": "Il lettore dei nomi si è fermato con un errore: {msg}",
+    "roster.err.fileRead": "Non è stato possibile leggere questo file. Prova a salvarlo di nuovo come .csv o .txt.",
+    "roster.err.fileTooLarge": "Questo file è troppo grande (oltre 5 MB).",
+    "roster.err.import": "L’importazione si è fermata con un errore: {msg}",
+    "roster.pv.count": "{n} nomi trovati",
+    "roster.pv.countOne": "1 nome trovato",
+    "roster.pv.ocrHint": "Nomi letti dall’immagine. Tocca un nome per correggerlo prima di importare.",
+    "roster.importN": "Importa i selezionati ({n})",
+    "roster.importing": "Importazione in corso",
+    "roster.res.added": "{n} persone aggiunte",
+    "roster.res.addedOne": "1 persona aggiunta",
+    "roster.res.skipped": "{n} già nella tua cerchia, saltate",
+    "roster.res.skippedOne": "1 già nella tua cerchia, saltata",
+    "roster.res.noneSelected": "Nessuno è selezionato. Spunta almeno un nome da importare.",
+    "roster.res.allDupes": "Nessuno di nuovo da aggiungere: tutti i selezionati sono già nel tuo elenco.",
+    "roster.banner.done": "{n} persone aggiunte dal tuo elenco. Tocca una sfera per aprire la sua scheda. Aggiungine altre da The Pulse con + Aggiungi persona.",
+    "roster.banner.doneOne": "1 persona aggiunta dal tuo elenco. Tocca una sfera per aprire la sua scheda. Aggiungine altre da The Pulse con + Aggiungi persona.",
+    "roster.banner.close": "Chiudi",
+    "roster.gp.loading": "Caricamento del riconoscimento volti (solo la prima volta, pochi MB)",
+    "roster.gp.scanning": "Ricerca dei volti",
+    "roster.gp.readingPct": "Lettura dei nomi sulla foto {pct}%",
+    "roster.gp.cropping": "Ritaglio di {n} volti",
+    "roster.gp.croppingOne": "Ritaglio di 1 volto",
+    "roster.gp.found": "Trovati {n} volti. Dai un nome a ciascuno, togli la spunta a chi non vuoi, poi tocca Importa i selezionati.",
+    "roster.gp.foundOne": "Trovato 1 volto. Dai un nome alla persona, poi tocca Importa i selezionati.",
+    "roster.gp.none": "Nessun volto trovato. Prova una foto più chiara e ben illuminata con i volti visibili, oppure usa la scheda Immagine.",
+    "roster.gp.err": "Il riconoscimento volti non è riuscito: {msg}",
+    "roster.gp.errLoad": "Non è stato possibile caricare il riconoscimento volti. Controlla la connessione a internet, poi tocca Riprova.",
+    "roster.gp.selCount": "{sel} di {n} selezionati",
+    "roster.gp.selectAll": "Seleziona tutti",
+    "roster.gp.namePh": "Nome",
+    "roster.gp.noneSel": "Nessun volto selezionato. Tocca i volti per selezionarli.",
+  });
 
   function t(key, params) {
     var str = (_strings[_locale] && _strings[_locale][key])
@@ -15369,10 +15501,31 @@ var RosterImport = (function() {
     /* Restore header close button if hidden */
     var hdr = document.querySelector('.roster-modal .roster-header button');
     if (hdr) hdr.style.display = '';
+    /* Start every visit from a clean slate: no stale job, status, thumbnail or faces */
+    _cancelOcr();
+    _importing = false;
+    _parseDupes = 0;
+    _status(null);
+    _resetImageTab();
+    var ib = document.getElementById('rosterImportBtn');
+    if (ib) { ib.disabled = false; ib.textContent = _t('roster.importSelected'); }
+    var gpPrev = document.getElementById('gpFacePreview');
+    if (gpPrev) gpPrev.innerHTML = '';
+    var gpBtn = document.getElementById('gpImportBtn');
+    if (gpBtn) { gpBtn.style.display = 'none'; gpBtn.disabled = false; }
+    var gpProg = document.getElementById('gpProgress');
+    if (gpProg) gpProg.style.display = 'none';
+    var gpDz = document.getElementById('gpDropZone');
+    if (gpDz) gpDz.style.display = '';
+    _gpFaces = [];
+    var obNote = document.getElementById('obRosterNote');
+    if (obNote) obNote.textContent = '';
     switchTab('image');
   }
 
   function close() {
+    /* Closing mid read aborts the job: the worker is stopped and any late result is ignored */
+    _cancelOcr();
     document.getElementById('rosterOverlay').classList.remove('open');
     try { if (typeof ThePulse !== 'undefined' && ThePulse.isOpen()) ThePulse.refresh(); } catch (e) {}
   }
@@ -15418,10 +15571,10 @@ var RosterImport = (function() {
           ctx.putImageData(imageData, 0, 0);
           canvas.toBlob(function(blob) { resolve(blob || file); }, 'image/png');
         };
-        img.onerror = function() { resolve(file); };
+        img.onerror = function() { resolve(null); };
         img.src = e.target.result;
       };
-      reader.onerror = function() { resolve(file); };
+      reader.onerror = function() { resolve(null); };
       reader.readAsDataURL(file);
     });
   }
@@ -15456,81 +15609,261 @@ var RosterImport = (function() {
   }
 
   var _ocrSource = false; /* tracks whether current parse came from image OCR */
+  var _ocrJob = 0;        /* bumped on every run and on close, so stale results are ignored */
+  var _ocrWorker = null;  /* live Tesseract worker, terminated on cancel */
+  var _lastImgFile = null;
+  var _readerWarm = false; /* reader already downloaded once in this session */
+  var _parseDupes = 0;    /* names skipped by the parser because they are already in the circle */
+  var _importing = false;
+  var MAX_IMG_BYTES = 25 * 1024 * 1024;
+  var MAX_TEXT_BYTES = 5 * 1024 * 1024;
+
+  function _t(k, p) { return (typeof I18n !== 'undefined') ? I18n.t(k, p) : k; }
+  /* Plural helper: uses key + 'One' when n is 1 */
+  function _tn(k, n, extra) {
+    var p = { n: n };
+    if (extra) for (var x in extra) p[x] = extra[x];
+    if (n === 1 && typeof I18n !== 'undefined' && I18n.t(k + 'One') !== k + 'One') return I18n.t(k + 'One', p);
+    return _t(k, p);
+  }
+
+  /* One status line under the tabs, shared by every tab and by Import.
+     kind: info, ok, warn, err. action: { label, fn } adds a button. */
+  function _status(kind, msg, action) {
+    var el = document.getElementById('rosterStatusLine');
+    if (!el) return;
+    if (!msg) { el.hidden = true; el.innerHTML = ''; el.className = 'roster-status'; return; }
+    el.hidden = false;
+    el.className = 'roster-status roster-status-' + kind;
+    el.setAttribute('role', kind === 'err' ? 'alert' : 'status');
+    el.innerHTML = '<span class="roster-status-msg"></span>';
+    el.firstChild.textContent = msg;
+    if (action) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'roster-status-btn';
+      b.textContent = action.label;
+      b.onclick = function(e) { e.stopPropagation(); action.fn(); };
+      el.appendChild(b);
+    }
+  }
+
+  function _ocrUi(pct, text) {
+    var prog = document.getElementById('rosterOcrProgress');
+    var fill = document.getElementById('rosterOcrFill');
+    var bar = document.getElementById('rosterOcrBar');
+    var st = document.getElementById('rosterOcrStatus');
+    if (prog) prog.style.display = '';
+    if (pct != null) {
+      pct = Math.max(0, Math.min(100, Math.round(pct)));
+      if (fill) fill.style.width = pct + '%';
+      if (bar) bar.setAttribute('aria-valuenow', String(pct));
+    }
+    if (text != null && st) st.textContent = text;
+  }
+
+  function _cancelOcr() {
+    _ocrJob++;
+    var w = _ocrWorker;
+    _ocrWorker = null;
+    if (w && typeof w.terminate === 'function') {
+      try { var r = w.terminate(); if (r && r.catch) r.catch(function() {}); } catch (e) {}
+    }
+  }
+
+  function _pickImage() { var i = document.getElementById('rosterFileImg'); if (i) i.click(); }
+
+  function _resetImageTab() {
+    var prog = document.getElementById('rosterOcrProgress');
+    if (prog) prog.style.display = 'none';
+    var wrap = document.getElementById('rosterOcrThumbWrap');
+    if (wrap) wrap.hidden = true;
+    var th = document.getElementById('rosterOcrThumb');
+    if (th) { if (th.src && th.src.indexOf('blob:') === 0) { try { URL.revokeObjectURL(th.src); } catch (e) {} } th.removeAttribute('src'); }
+    var dz = document.getElementById('rosterDropZone');
+    if (dz) dz.style.display = '';
+  }
 
   function handleImageFile(input) {
     var file = input.files && input.files[0];
-    if (!file) return;
-    var prog = document.getElementById('rosterOcrProgress');
-    var fill = document.getElementById('rosterOcrFill');
-    var status = document.getElementById('rosterOcrStatus');
-    prog.style.display = '';
-    fill.style.width = '0%';
-    status.textContent = 'Preprocessing image...';
-
-    _preprocessImage(file).then(function(processed) {
-      fill.style.width = '10%';
-      status.textContent = 'Loading OCR engine...';
-      return _loadTesseract().then(function(Tesseract) {
-        status.textContent = 'Reading image...';
-        fill.style.width = '20%';
-        return Tesseract.recognize(processed, 'eng', {
-          logger: function(m) {
-            if (m.status === 'recognizing text') {
-              var pct = Math.round(20 + m.progress * 70);
-              fill.style.width = pct + '%';
-              status.textContent = 'Recognizing text... ' + Math.round(m.progress * 100) + '%';
-            }
-          }
-        });
-      });
-    }).then(function(result) {
-      fill.style.width = '95%';
-      status.textContent = 'Filtering results...';
-      var text = _buildCleanText(result.data);
-      if (!text.trim()) {
-        status.textContent = 'No text found in image. Try a clearer photo or use the Paste tab.';
-        return;
-      }
-      fill.style.width = '100%';
-      status.textContent = 'Done!';
-      _ocrSource = true;
-      _parsed = _parseRosterText(text);
-      _showPreview();
-      setTimeout(function() { prog.style.display = 'none'; }, 1500);
-    }).catch(function(err) {
-      status.textContent = 'OCR failed: ' + err.message;
-      fill.style.width = '0%';
-    });
     input.value = '';
+    if (!file) return;
+    _runImageOcr(file);
+  }
+
+  function retryImage() {
+    if (_lastImgFile) _runImageOcr(_lastImgFile);
+    else _pickImage();
+  }
+
+  function _imgFail(msg) {
+    var prog = document.getElementById('rosterOcrProgress');
+    if (prog) prog.style.display = 'none';
+    var dz = document.getElementById('rosterDropZone');
+    if (dz) dz.style.display = '';
+    _status('err', msg, { label: _t('roster.st.retry'), fn: retryImage });
+  }
+
+  function _tagged(kind, err) {
+    var e = (err instanceof Error) ? err : new Error(String(err || kind));
+    e.rosterKind = kind;
+    return e;
+  }
+
+  function _withTimeout(p, ms, kind) {
+    return new Promise(function(resolve, reject) {
+      var t = setTimeout(function() { reject(_tagged(kind, new Error('timed out'))); }, ms);
+      Promise.resolve(p).then(function(v) { clearTimeout(t); resolve(v); }, function(e) { clearTimeout(t); reject(e); });
+    });
+  }
+
+  /* Image tab: every stage is shown. Stages: loading the reader, preparing the
+     image, reading text, finding names. Errors always end on a red line with Retry. */
+  function _runImageOcr(file) {
+    _cancelOcr();
+    var job = _ocrJob;
+    var alive = function() { return job === _ocrJob; };
+    _lastImgFile = file;
+    _parsed = [];
+    var preview = document.getElementById('rosterPreview');
+    if (preview) preview.innerHTML = '';
+    var btn = document.getElementById('rosterImportBtn');
+    if (btn) btn.style.display = 'none';
+    _status(null);
+    _resetImageTab();
+
+    if (file.type && !/^image\//i.test(file.type)) { _imgFail(_t('roster.err.unsupported')); return; }
+    if (file.size > MAX_IMG_BYTES) { _imgFail(_t('roster.err.tooLarge')); return; }
+
+    /* Thumbnail and heading at once, before any work starts */
+    var wrap = document.getElementById('rosterOcrThumbWrap');
+    var th = document.getElementById('rosterOcrThumb');
+    var head = document.getElementById('rosterOcrHead');
+    try { if (th) th.src = URL.createObjectURL(file); } catch (e) {}
+    if (head) head.textContent = _t('roster.ocr.head');
+    if (wrap) wrap.hidden = false;
+    var dz = document.getElementById('rosterDropZone');
+    if (dz) dz.style.display = 'none';
+
+    var loadText = _readerWarm ? _t('roster.st.loading') : _t('roster.st.loadingFirst');
+    _ocrUi(0, loadText);
+
+    var logger = function(m) {
+      if (!alive() || !m) return;
+      var p = typeof m.progress === 'number' ? m.progress : 0;
+      var stg = String(m.status || '');
+      if (stg === 'recognizing text') {
+        _ocrUi(30 + p * 65, _t('roster.st.readingPct', { pct: Math.round(p * 100) }));
+      } else if (/load|initiali/i.test(stg)) {
+        _ocrUi(3 + p * 20, loadText);
+      }
+    };
+
+    var T = null, worker = null;
+    _withTimeout(_loadTesseract(), 35000, 'load').catch(function(e) { throw _tagged('load', e); })
+      .then(function(tess) {
+        if (!alive()) return null;
+        T = tess;
+        if (!T) throw _tagged('load', new Error('reader missing'));
+        if (typeof T.createWorker !== 'function') return null;
+        return _withTimeout(T.createWorker('eng', 1, { logger: logger }), 90000, 'load')
+          .catch(function(e) { throw (e && e.rosterKind) ? e : _tagged('load', e); });
+      })
+      .then(function(w) {
+        if (!alive()) { if (w && w.terminate) { try { w.terminate(); } catch (e) {} } return null; }
+        worker = w;
+        _ocrWorker = w;
+        _readerWarm = true;
+        _ocrUi(25, _t('roster.st.preparing'));
+        return _preprocessImage(file);
+      })
+      .then(function(processed) {
+        if (!alive()) return null;
+        if (!processed) throw _tagged('decode', new Error('decode'));
+        _ocrUi(30, _t('roster.st.readingPct', { pct: 0 }));
+        if (worker) return worker.recognize(processed);
+        return T.recognize(processed, 'eng', { logger: logger });
+      })
+      .then(function(result) {
+        if (worker) { if (_ocrWorker === worker) _ocrWorker = null; try { var r = worker.terminate(); if (r && r.catch) r.catch(function() {}); } catch (e) {} }
+        if (!alive() || !result) return;
+        _ocrUi(96, _t('roster.st.finding'));
+        var text = _buildCleanText(result.data || {});
+        _parsed = text.trim() ? _parseRosterText(text) : [];
+        _ocrUi(100, _t('roster.st.finding'));
+        var prog = document.getElementById('rosterOcrProgress');
+        if (prog) prog.style.display = 'none';
+        if (!_parsed.length) {
+          if (preview) preview.innerHTML = '';
+          _status('warn', _t('roster.st.noNames'), { label: _t('roster.st.tryAgain'), fn: _pickImage });
+          return;
+        }
+        if (head) head.textContent = _tn('roster.pv.count', _parsed.length);
+        _ocrSource = true;
+        _showPreview();
+        _status('ok', _tn('roster.st.found', _parsed.length));
+        _focusPreview();
+      })
+      .catch(function(err) {
+        if (worker) { if (_ocrWorker === worker) _ocrWorker = null; try { worker.terminate(); } catch (e) {} }
+        if (!alive()) return;
+        console.warn('Roster OCR failed:', err);
+        var kind = err && err.rosterKind;
+        var msg = kind === 'load' ? _t('roster.err.load')
+                : kind === 'decode' ? _t('roster.err.unsupported')
+                : _t('roster.err.ocr', { msg: (err && err.message) || String(err) });
+        _imgFail(msg);
+      });
+  }
+
+  function _focusPreview() {
+    var first = document.querySelector('#rosterPreview .roster-name-edit');
+    var pv = document.getElementById('rosterPreview');
+    if (pv) { try { pv.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} }
+    if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
   }
 
   function parseText() {
     var raw = document.getElementById('rosterPasteArea').value.trim();
-    if (!raw) return;
+    if (!raw) { _status('warn', _t('roster.st.pasteEmpty')); return; }
     if (raw.toUpperCase().indexOf('BEGIN:VCARD') >= 0) {
       _parsed = _parseVCard(raw);
     } else {
       _parsed = _parseRosterText(raw);
     }
     _showPreview();
+    if (_parsed.length) { _status('ok', _tn('roster.st.found', _parsed.length)); _focusPreview(); }
+    else _status('warn', _t('roster.st.pasteNone'));
   }
 
   function handleFile(input) {
     var file = input.files && input.files[0];
+    input.value = '';
     if (!file) return;
+    _parsed = [];
+    _showPreview(true);
+    if (file.size > MAX_TEXT_BYTES) { _status('err', _t('roster.err.fileTooLarge'), { label: _t('roster.st.retry'), fn: function() { document.getElementById('rosterFileCsv').click(); } }); return; }
+    _status('info', _t('roster.st.fileReading'));
     var reader = new FileReader();
     reader.onload = function(e) {
-      var text = e.target.result;
+      var text = String(e.target.result || '');
       var ext = file.name.split('.').pop().toLowerCase();
+      var rows;
       if (ext === 'vcf' || ext === 'vcard' || text.toUpperCase().indexOf('BEGIN:VCARD') >= 0) {
         _parsed = _parseVCard(text);
+        rows = (text.match(/BEGIN:VCARD/gi) || []).length;
       } else {
         _parsed = _parseRosterText(text);
+        rows = text.split(/\n/).filter(function(l) { return l.trim(); }).length;
       }
       _showPreview();
+      if (_parsed.length) { _status('ok', _t('roster.st.fileRows', { rows: rows, n: _parsed.length })); _focusPreview(); }
+      else _status('warn', _t('roster.st.fileNone', { rows: rows }), { label: _t('roster.st.tryAgain'), fn: function() { document.getElementById('rosterFileCsv').click(); } });
+    };
+    reader.onerror = function() {
+      _status('err', _t('roster.err.fileRead'), { label: _t('roster.st.retry'), fn: function() { document.getElementById('rosterFileCsv').click(); } });
     };
     reader.readAsText(file);
-    input.value = '';
   }
 
   function _detectDelimiter(line) {
@@ -15562,6 +15895,7 @@ var RosterImport = (function() {
 
   function _parseRosterText(text) {
     var results = [];
+    _parseDupes = 0;
     var lines = text.split(/\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 1; });
     if (!lines.length) return results;
 
@@ -15722,8 +16056,8 @@ var RosterImport = (function() {
       var fullCheck = (first + ' ' + last).toLowerCase().trim();
       if (/^(the|this|that|they|there|here|what|which|where|when|how|more|less|all|any|some|new|old|big|small|get|set|add|see|try|use|buy|sell|win|run|play|show|hide|open|close|back|home|page|view|edit|save|load|find|help)(\s|$)/i.test(fullCheck)) return;
 
-      /* Duplicate check */
-      if (existingNames[fullCheck]) return;
+      /* Duplicate check: counted so the result line can report skipped people */
+      if (existingNames[fullCheck]) { _parseDupes++; return; }
 
       if (first.length >= 2 && first.length < 30) {
         var entry = { first: first, last: last, phone: phone, email: email, checked: true };
@@ -15737,6 +16071,7 @@ var RosterImport = (function() {
 
   function _parseVCard(text) {
     var results = [];
+    _parseDupes = 0;
     var cards = text.split(/BEGIN:VCARD/i).filter(function(c) { return c.trim(); });
     var existingNames = {};
     DEMO_CONTACTS.forEach(function(c) {
@@ -15790,7 +16125,8 @@ var RosterImport = (function() {
 
       if (first) {
         var fullName = (first + ' ' + last).toLowerCase().trim();
-        if (!existingNames[fullName]) {
+        if (existingNames[fullName]) _parseDupes++;
+        else {
           results.push({ first: _titleCase(first), last: _titleCase(last), phone: phone, email: email, photo: photo, checked: true });
         }
       }
@@ -15799,15 +16135,21 @@ var RosterImport = (function() {
     return results;
   }
 
-  function _showPreview() {
+  function _importLabel() {
+    return _t('roster.importN', { n: _parsed.filter(function(p) { return p.checked; }).length });
+  }
+
+  /* quiet: clear the list without a message (the caller reports status) */
+  function _showPreview(quiet) {
     var container = document.getElementById('rosterPreview');
     var btn = document.getElementById('rosterImportBtn');
     if (!_parsed.length) {
-      container.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0">No contacts found. Try a different format.</p>';
+      container.innerHTML = '';
       btn.style.display = 'none';
+      _ocrSource = false;
       return;
     }
-    var countEl = '<div class="roster-preview-count">' + _parsed.length + ' contact' + (_parsed.length !== 1 ? 's' : '') + ' found</div>';
+    var countEl = '<div class="roster-preview-count">' + _esc(_tn('roster.pv.count', _parsed.length)) + '</div>';
     var items = _parsed.map(function(p, i) {
       var details = [];
       if (p.position) details.push(p.position);
@@ -15821,18 +16163,19 @@ var RosterImport = (function() {
         (details.length ? '<small>' + _esc(details.join(' · ')) + '</small>' : '') +
         '</div></div>';
     }).join('');
-    var hint = _ocrSource ? '<div class="roster-ocr-hint">Names parsed from image. Tap any name to correct it before importing.</div>' : '';
+    var hint = _ocrSource ? '<div class="roster-ocr-hint">' + _esc(_t('roster.pv.ocrHint')) + '</div>' : '';
     container.innerHTML = countEl + hint + items;
     _ocrSource = false;
     btn.style.display = '';
-    btn.textContent = 'Import ' + _parsed.filter(function(p) { return p.checked; }).length + ' Contacts';
+    btn.disabled = false;
+    btn.textContent = _importLabel();
   }
 
   function _toggle(idx, val) {
     if (_parsed[idx]) _parsed[idx].checked = val;
     var btn = document.getElementById('rosterImportBtn');
     var count = _parsed.filter(function(p) { return p.checked; }).length;
-    btn.textContent = 'Import ' + count + ' Contact' + (count !== 1 ? 's' : '');
+    btn.textContent = _importLabel();
     btn.disabled = count === 0;
   }
 
@@ -15849,77 +16192,97 @@ var RosterImport = (function() {
   var _gpFaces = [];      // detected face crops [{canvas, x, y, w, h, name}]
   var _gpOrigImg = null;  // original uploaded image element
 
+  var _gpLastFile = null;
+  function _gpPick() {
+    var dz = document.getElementById('gpDropZone');
+    if (dz) dz.style.display = '';
+    var i = document.getElementById('gpFileInput');
+    if (i) i.click();
+  }
+  function _gpRetry() { if (_gpLastFile) _runGroupPhoto(_gpLastFile); else _gpPick(); }
+
   function handleGroupPhoto(input) {
     var file = input.files && input.files[0];
+    input.value = '';
     if (!file) return;
+    _runGroupPhoto(file);
+  }
+
+  /* Group tab stages: loading face detection, looking for faces, reading names,
+     cropping. Every ending is shown on the status line. */
+  function _runGroupPhoto(file) {
+    _cancelOcr();
+    var job = _ocrJob;
+    var alive = function() { return job === _ocrJob; };
+    _gpLastFile = file;
     var prog = document.getElementById('gpProgress');
     var fill = document.getElementById('gpProgressFill');
     var status = document.getElementById('gpStatus');
     var preview = document.getElementById('gpFacePreview');
     var importBtn = document.getElementById('gpImportBtn');
     var dropZone = document.getElementById('gpDropZone');
+    var stage = function(pct, text) {
+      prog.style.display = '';
+      if (pct != null) fill.style.width = Math.round(pct) + '%';
+      if (text != null) status.textContent = text;
+    };
+    var fail = function(msg) {
+      prog.style.display = 'none';
+      if (dropZone) dropZone.style.display = '';
+      preview.innerHTML = '';
+      importBtn.style.display = 'none';
+      _status('err', msg, { label: _t('roster.st.retry'), fn: _gpRetry });
+    };
 
-    // Hide drop zone, show progress
-    if (dropZone) dropZone.style.display = 'none';
-    prog.style.display = '';
-    fill.style.width = '5%';
-    status.textContent = 'Loading face detection engine...';
+    _status(null);
     preview.innerHTML = '';
     importBtn.style.display = 'none';
     _gpFaces = [];
+    if (file.type && !/^image\//i.test(file.type)) { fail(_t('roster.err.unsupported')); return; }
+    if (file.size > MAX_IMG_BYTES) { fail(_t('roster.err.tooLarge')); return; }
 
-    // Keep file reference for retry
-    var _gpCurrentFile = file;
+    if (dropZone) dropZone.style.display = 'none';
+    stage(5, _t('roster.gp.loading'));
 
     var imgUrl = URL.createObjectURL(file);
     var img = new Image();
     img.onload = function() {
+      if (!alive()) return;
       _gpOrigImg = img;
-      fill.style.width = '15%';
-      status.textContent = 'Face detection engine loading...';
+      stage(15, _t('roster.gp.loading'));
 
-      // Run face detection and OCR in parallel
       Promise.all([
-        _loadFaceApi().then(function(faceapi) {
-          fill.style.width = '30%';
-          status.textContent = 'Scanning image for faces...';
+        _loadFaceApi().catch(function(e) { throw _tagged('load', e); }).then(function(faceapi) {
+          if (!alive()) return [];
+          stage(35, _t('roster.gp.scanning'));
           var opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.35 });
           return faceapi.detectAllFaces(img, opts);
         }),
+        /* Names printed on the photo are optional: a reader failure only means no names */
         _loadTesseract().then(function(Tesseract) {
           return Tesseract.recognize(file, 'eng', {
             logger: function(m) {
+              if (!alive() || !m) return;
               if (m.status === 'recognizing text') {
-                var pct = Math.round(50 + m.progress * 30);
-                fill.style.width = pct + '%';
-                status.textContent = 'Reading text from image... ' + Math.round(m.progress * 100) + '%';
+                stage(50 + m.progress * 30, _t('roster.gp.readingPct', { pct: Math.round(m.progress * 100) }));
               }
             }
           });
         }).catch(function() { return { data: { text: '' } }; })
       ]).then(function(results) {
+        if (!alive()) return;
         var detections = results[0];
         var ocrResult = results[1];
         var ocrText = (ocrResult && ocrResult.data && ocrResult.data.text) || '';
 
         if (!detections || detections.length === 0) {
-          fill.style.width = '100%';
           prog.style.display = 'none';
-          preview.innerHTML =
-            '<div class="gp-banner gp-banner-info">' +
-              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
-              '<div class="gp-banner-body">' +
-                '<p>No faces detected in this image.</p>' +
-                '<p style="font-weight:400;font-size:13px;opacity:0.8">Try a clearer photo where faces are visible and well-lit. Close-up group shots work best.</p>' +
-                '<button class="gp-retry-btn" onclick="document.getElementById(&apos;gpDropZone&apos;).style.display=&apos;&apos;;document.getElementById(&apos;gpFacePreview&apos;).innerHTML=&apos;&apos;;document.getElementById(&apos;gpFileInput&apos;).click()">Try Another Photo</button>' +
-                '<button class="gp-alt-btn" onclick="RosterImport.switchTab(&apos;image&apos;)" style="margin-left:8px">Use Image OCR Instead</button>' +
-              '</div>' +
-            '</div>';
+          if (dropZone) dropZone.style.display = '';
+          _status('warn', _t('roster.gp.none'), { label: _t('roster.st.tryAgain'), fn: _gpPick });
           return;
         }
 
-        fill.style.width = '85%';
-        status.textContent = 'Cropping ' + detections.length + ' faces...';
+        stage(85, _tn('roster.gp.cropping', detections.length));
 
         // Sort faces: top-to-bottom rows, then left-to-right within rows
         var sorted = detections.slice().sort(function(a, b) {
@@ -15955,39 +16318,21 @@ var RosterImport = (function() {
           };
         });
 
-        fill.style.width = '100%';
+        stage(100, null);
         prog.style.display = 'none';
         _showGroupPhotoPreview();
       }).catch(function(err) {
-        fill.style.width = '0%';
-        prog.style.display = 'none';
+        if (!alive()) return;
         console.error('Group photo error:', err);
-        preview.innerHTML =
-          '<div class="gp-banner gp-banner-error">' +
-            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
-            '<div class="gp-banner-body">' +
-              '<p>Face detection failed</p>' +
-              '<p style="font-weight:400;font-size:13px;opacity:0.8">' + (err.message || 'Could not load the face detection engine. Check your internet connection and try again.') + '</p>' +
-              '<button class="gp-retry-btn" onclick="document.getElementById(&apos;gpDropZone&apos;).style.display=&apos;&apos;;document.getElementById(&apos;gpFacePreview&apos;).innerHTML=&apos;&apos;;document.getElementById(&apos;gpFileInput&apos;).click()">Try Again</button>' +
-              '<button class="gp-alt-btn" onclick="RosterImport.switchTab(&apos;image&apos;)" style="margin-left:8px">Use Image OCR Instead</button>' +
-            '</div>' +
-          '</div>';
+        fail(err && err.rosterKind === 'load' ? _t('roster.gp.errLoad')
+             : _t('roster.gp.err', { msg: (err && err.message) || String(err) }));
       });
     };
     img.onerror = function() {
-      prog.style.display = 'none';
-      preview.innerHTML =
-        '<div class="gp-banner gp-banner-error">' +
-          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
-          '<div class="gp-banner-body">' +
-            '<p>Could not load this image</p>' +
-            '<p style="font-weight:400;font-size:13px;opacity:0.8">The file may be corrupted or in an unsupported format.</p>' +
-            '<button class="gp-retry-btn" onclick="document.getElementById(&apos;gpDropZone&apos;).style.display=&apos;&apos;;document.getElementById(&apos;gpFacePreview&apos;).innerHTML=&apos;&apos;;document.getElementById(&apos;gpFileInput&apos;).click()">Try Another Photo</button>' +
-          '</div>' +
-        '</div>';
+      if (!alive()) return;
+      fail(_t('roster.err.unsupported'));
     };
     img.src = imgUrl;
-    input.value = '';
   }
 
   function _extractNamesFromOCR(text) {
@@ -16035,17 +16380,16 @@ var RosterImport = (function() {
     var html = '<div class="gp-banner gp-banner-success">' +
       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.5 2.5L16 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
       '<div class="gp-banner-body">' +
-        '<p>' + _gpFaces.length + ' face' + (_gpFaces.length !== 1 ? 's' : '') + ' detected!</p>' +
-        '<p style="font-weight:400;font-size:13px;opacity:0.8">Name each person below, then tap <strong>Import Selected</strong> to add them to your constellation.</p>' +
+        '<p>' + _esc(_tn('roster.gp.found', _gpFaces.length)) + '</p>' +
       '</div>' +
     '</div>';
 
     // Select all toggle
     html += '<div style="margin:8px 0;display:flex;align-items:center;justify-content:space-between">' +
       '<label style="display:flex;align-items:center;gap:6px;color:#C5A55A;font-size:13px;cursor:pointer">' +
-        '<input type="checkbox" id="gpSelectAll" checked onchange="RosterImport.toggleAllFaces(this.checked)"> Select All' +
+        '<input type="checkbox" id="gpSelectAll" checked onchange="RosterImport.toggleAllFaces(this.checked)"> ' + _esc(_t('roster.gp.selectAll')) +
       '</label>' +
-      '<span style="font-size:12px;color:rgba(255,255,255,0.4)" id="gpSelCount">' + selCount + ' of ' + _gpFaces.length + ' selected</span>' +
+      '<span style="font-size:12px;color:rgba(255,255,255,0.4)" id="gpSelCount">' + _esc(_t('roster.gp.selCount', { sel: selCount, n: _gpFaces.length })) + '</span>' +
     '</div>';
 
     // Face grid
@@ -16056,7 +16400,7 @@ var RosterImport = (function() {
       html += '<div class="gp-face-card' + (face.selected ? ' selected' : '') + '" data-idx="' + i + '" onclick="RosterImport.toggleFace(' + i + ')">';
       html += '<img class="gp-face-img" src="' + dataUrl + '" alt="Face ' + (i + 1) + '">';
       html += '<div class="gp-face-name" onclick="event.stopPropagation()">';
-      html += '<input type="text" placeholder="Name" value="' + (face.name || '').replace(/"/g, '&quot;') + '" onchange="RosterImport.setFaceName(' + i + ',this.value)" onfocus="event.stopPropagation()">';
+      html += '<input type="text" placeholder="' + _esc(_t('roster.gp.namePh')) + '" value="' + (face.name || '').replace(/"/g, '&quot;') + '" onchange="RosterImport.setFaceName(' + i + ',this.value)" onfocus="event.stopPropagation()">';
       html += '</div>';
       html += '<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px">#' + (i + 1) + '</div>';
       html += '</div>';
@@ -16068,15 +16412,16 @@ var RosterImport = (function() {
     // Show prominent import button
     importBtn.style.display = '';
     importBtn.className = 'gp-next-step';
-    importBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg> Import ' + selCount + ' Contact' + (selCount !== 1 ? 's' : '') + ' to Constellation';
+    importBtn.disabled = selCount === 0;
+    importBtn.textContent = _t('roster.importN', { n: selCount });
   }
 
   function _updateGpSelCount() {
     var c = _gpFaces.filter(function(f) { return f.selected; }).length;
     var el = document.getElementById('gpSelCount');
-    if (el) el.textContent = c + ' of ' + _gpFaces.length + ' selected';
+    if (el) el.textContent = _t('roster.gp.selCount', { sel: c, n: _gpFaces.length });
     var btn = document.getElementById('gpImportBtn');
-    if (btn) btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg> Import ' + c + ' Contact' + (c !== 1 ? 's' : '') + ' to Constellation';
+    if (btn) { btn.textContent = _t('roster.importN', { n: c }); btn.disabled = c === 0; }
   }
 
   function toggleFace(idx) {
@@ -16101,92 +16446,68 @@ var RosterImport = (function() {
   }
 
   async function doGroupImport() {
+    if (_importing) return;
     var selected = _gpFaces.filter(function(f) { return f.selected; });
-    if (!selected.length) {
-      var preview = document.getElementById('gpFacePreview');
-      if (preview) {
-        var existing = preview.querySelector('.gp-banner-error');
-        if (existing) existing.remove();
-        preview.insertAdjacentHTML('afterbegin',
-          '<div class="gp-banner gp-banner-error">' +
-            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
-            '<div class="gp-banner-body"><p>No faces selected. Tap on faces to select them first.</p></div>' +
-          '</div>'
-        );
+    if (!selected.length) { _status('warn', _t('roster.gp.noneSel')); return; }
+
+    var btn = document.getElementById('gpImportBtn');
+    var cat = (document.getElementById('rosterCatSelect') || {}).value || 'other';
+    var inWizard = _obWizardActive();
+    var seen = _existingNameSet(inWizard);
+    var added = 0, skipped = 0;
+    _importing = true;
+    if (btn) { btn.disabled = true; btn.textContent = _t('roster.importing'); }
+    _status('info', _t('roster.importing'));
+
+    try {
+      for (var i = 0; i < selected.length; i++) {
+        var face = selected[i];
+        var nameParts = (face.name || ('Person ' + (i + 1))).split(/\s+/);
+        var first = nameParts[0] || 'Person';
+        var last = nameParts.slice(1).join(' ') || '';
+        var key = (first + ' ' + last).toLowerCase().trim();
+        if (face.name && seen[key]) { skipped++; continue; }
+        seen[key] = true;
+
+        if (inWizard) {
+          var faceBlob = null;
+          try { faceBlob = await new Promise(function(res) { face.canvas.toBlob(res, 'image/png'); }); } catch (e) {}
+          _obAddToWizard(first, last, cat, faceBlob);
+          added++;
+          continue;
+        }
+
+        var id = 'gp_' + Date.now() + '_' + i;
+        var contact = {
+          id: id,
+          first: first,
+          last: last,
+          cat: cat,
+          sev: 4, /* new: Quiet until something is logged */
+          phone: '',
+          email: '',
+          sentinelId: ''
+        };
+        DEMO_CONTACTS.push(contact);
+        try { await RemielDB.putContact(contact); } catch (e) {}
+
+        // Store face crop as contact photo
+        try {
+          var photoImg = new Image();
+          photoImg.src = face.canvas.toDataURL('image/png');
+          contactPhotos.set(id, { img: photoImg, w: 128, h: 128, isVideo: false, isGif: false });
+        } catch(e) {}
+
+        added++;
       }
+    } catch (err) {
+      _importing = false;
+      if (btn) { btn.disabled = false; btn.textContent = _t('roster.importN', { n: selected.length }); }
+      _status('err', _t('roster.err.import', { msg: (err && err.message) || String(err) }));
       return;
     }
-
-    var cat = (document.getElementById('rosterCatSelect') || {}).value || 'other';
-    var imported = 0;
-    var inWizard = _obWizardActive();
-
-    for (var i = 0; i < selected.length; i++) {
-      var face = selected[i];
-      var nameParts = (face.name || ('Person ' + (i + 1))).split(/\s+/);
-      var first = nameParts[0] || 'Person';
-      var last = nameParts.slice(1).join(' ') || '';
-
-      if (inWizard) {
-        var faceBlob = null;
-        try { faceBlob = await new Promise(function(res) { face.canvas.toBlob(res, 'image/png'); }); } catch (e) {}
-        _obAddToWizard(first, last, cat, faceBlob);
-        imported++;
-        continue;
-      }
-
-      var id = 'gp_' + Date.now() + '_' + i;
-      var contact = {
-        id: id,
-        first: first,
-        last: last,
-        cat: cat,
-        sev: 4, /* new: Quiet until something is logged */
-        phone: '',
-        email: '',
-        sentinelId: ''
-      };
-      DEMO_CONTACTS.push(contact);
-      try { await RemielDB.putContact(contact); } catch (e) {}
-
-      // Store face crop as contact photo
-      try {
-        var photoImg = new Image();
-        photoImg.src = face.canvas.toDataURL('image/png');
-        contactPhotos.set(id, { img: photoImg, w: 128, h: 128, isVideo: false, isGif: false });
-      } catch(e) {}
-
-      imported++;
-    }
-
-    if (inWizard) {
-      _obRefreshWizard();
-    } else {
-      buildNodes(false);
-      try { updateBlufContent(); } catch(e) {}
-    }
-
-    // Show success screen (matches existing doImport pattern)
-    var catLabel = cat === 'personal' ? 'Personal' : cat === 'professional' ? 'Professional' : cat === 'team' ? 'Team' : cat === 'family' ? 'Family' : 'circle';
-    var modalBody = document.querySelector('.roster-modal .roster-body');
-    var modalHeader = document.querySelector('.roster-modal .roster-header');
-    _captureBody();
-    if (modalBody) {
-      modalBody.innerHTML =
-        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px">' +
-          '<div style="width:64px;height:64px;border-radius:50%;background:rgba(76,175,80,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:16px">' +
-            '<svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-          '</div>' +
-          '<p style="color:#4CAF50;font:700 22px \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 8px">' + imported + ' Contact' + (imported !== 1 ? 's' : '') + ' Imported!</p>' +
-          '<p style="color:rgba(255,255,255,0.5);font:400 14px/1.4 \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 8px">Added to your ' + catLabel + ' circle from group photo</p>' +
-          '<p style="color:rgba(255,255,255,0.3);font:400 12px/1.4 \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 24px">Each face has been saved as a contact photo</p>' +
-          '<button onclick="RosterImport.close()" style="background:#C5A55A;color:#000;border:none;padding:12px 32px;border-radius:10px;font:600 15px \'Hanken Grotesk\',system-ui,sans-serif;cursor:pointer">Done</button>' +
-        '</div>';
-    }
-    if (modalHeader) {
-      var closeBtn = modalHeader.querySelector('button');
-      if (closeBtn) closeBtn.style.display = 'none';
-    }
+    _importing = false;
+    await _afterImport(added, skipped, inWizard, btn, function() { return _t('roster.importN', { n: selected.length }); });
   }
 
   /* During onboarding, imports belong to the wizard's own list (_obPeople);
@@ -16207,58 +16528,128 @@ var RosterImport = (function() {
     try { updateObCount(); } catch (e) {}
   }
 
-  async function doImport() {
-    var selected = _parsed.filter(function(p) { return p.checked; });
-    if (!selected.length) return;
-    var cat = document.getElementById('rosterCatSelect').value;
-    var imported = 0;
-    var inWizard = _obWizardActive();
+  /* Names already present where this import will land */
+  function _existingNameSet(inWizard) {
+    var seen = {};
+    var list = inWizard ? _obPeople : DEMO_CONTACTS;
+    list.forEach(function(c) { seen[((c.first || '') + ' ' + (c.last || '')).toLowerCase().trim()] = true; });
+    return seen;
+  }
 
-    for (var i = 0; i < selected.length; i++) {
-      var p = selected[i];
-      if (inWizard) { _obAddToWizard(p.first, p.last, cat, null); imported++; continue; }
-      var newId = Date.now() + i;
-      var newContact = {
-        id: newId,
-        first: p.first,
-        last: p.last || '',
-        cat: cat,
-        sev: 4, /* new: Quiet until something is logged */
-        phone: p.phone || '',
-        email: p.email || '',
-        sentinelId: ''
-      };
-      DEMO_CONTACTS.push(newContact);
-      try { await RemielDB.putContact(newContact); } catch (e) {}
-      imported++;
+  function _resultLine(added, skipped) {
+    var line = _tn('roster.res.added', added);
+    if (skipped > 0) line += '. ' + _tn('roster.res.skipped', skipped);
+    return line;
+  }
+
+  /* After a successful import the roster window closes and the user lands in
+     the network view with the new spheres. In onboarding this runs the same
+     completion path as Finish (_obSaveAndLaunch), which also saves anyone typed
+     by hand on step 3. */
+  async function _afterImport(added, skipped, inWizard, btn, labelFn) {
+    if (!added) {
+      var why = skipped ? _t('roster.res.allDupes') : _t('roster.res.noneSelected');
+      if (btn) { btn.disabled = false; btn.textContent = labelFn(); }
+      if (inWizard) {
+        close();
+        var note = document.getElementById('obRosterNote');
+        if (note) note.textContent = why;
+        _obRefreshWizard();
+      } else {
+        _status('warn', why);
+      }
+      return;
     }
+    var line = _resultLine(added, skipped);
+    if (btn) btn.textContent = line;
+    _status('ok', line);
 
     if (inWizard) {
       _obRefreshWizard();
+      close();
+      try { await _obSaveAndLaunch(); } catch (e) { console.warn('Roster import: onboarding launch failed', e); }
     } else {
-      buildNodes(false);
-      try { updateBlufContent(); } catch(e) {}
+      close();
+      try {
+        if (typeof appState !== 'undefined' && appState !== 'network') enterNetwork();
+        else buildNodes(false);
+      } catch (e) { console.warn('Roster import: network view', e); }
+      try { updateBlufContent(); } catch (e) {}
     }
+    _showDoneBanner(added, skipped);
+  }
 
-    /* Show success overlay inside the modal instead of just closing */
-    var modalBody = document.querySelector('.roster-modal .roster-body');
-    var modalHeader = document.querySelector('.roster-modal .roster-header');
-    _captureBody();
-    if (modalBody) {
-      modalBody.innerHTML =
-        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px">' +
-          '<div style="width:64px;height:64px;border-radius:50%;background:rgba(76,175,80,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:16px">' +
-            '<svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-          '</div>' +
-          '<p style="color:#4CAF50;font:700 22px \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 8px">' + imported + ' Contact' + (imported !== 1 ? 's' : '') + ' Imported!</p>' +
-          '<p style="color:rgba(255,255,255,0.5);font:400 14px/1.4 \'Hanken Grotesk\',system-ui,sans-serif;margin:0 0 24px">Added to your ' + (cat === 'personal' ? 'Personal' : cat === 'professional' ? 'Professional' : 'circle') + ' circle</p>' +
-          '<button onclick="RosterImport.close()" style="background:#C5A55A;color:#000;border:none;padding:12px 32px;border-radius:10px;font:600 15px \'Hanken Grotesk\',system-ui,sans-serif;cursor:pointer">Done</button>' +
-        '</div>';
+  function _showDoneBanner(added, skipped) {
+    var old = document.getElementById('rosterDoneBanner');
+    if (old) old.remove();
+    var b = document.createElement('div');
+    b.id = 'rosterDoneBanner';
+    b.className = 'roster-done-banner';
+    b.setAttribute('role', 'status');
+    var msg = document.createElement('div');
+    msg.textContent = _tn('roster.banner.done', added);
+    b.appendChild(msg);
+    if (skipped > 0) {
+      var sm = document.createElement('small');
+      sm.textContent = _tn('roster.res.skipped', skipped);
+      b.appendChild(sm);
     }
-    if (modalHeader) {
-      var closeBtn = modalHeader.querySelector('button');
-      if (closeBtn) closeBtn.style.display = 'none';
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.setAttribute('aria-label', _t('roster.banner.close'));
+    x.innerHTML = '&times;';
+    x.onclick = function() { b.remove(); };
+    b.appendChild(x);
+    document.body.appendChild(b);
+    try { if (typeof A11y !== 'undefined') A11y.announce(msg.textContent); } catch (e) {}
+    setTimeout(function() { if (b.parentNode) { b.style.opacity = '0'; setTimeout(function() { b.remove(); }, 350); } }, 12000);
+  }
+
+  async function doImport() {
+    if (_importing) return;
+    var selected = _parsed.filter(function(p) { return p.checked && String(p.first || '').trim(); });
+    if (!selected.length) { _status('warn', _t('roster.res.noneSelected')); return; }
+    var btn = document.getElementById('rosterImportBtn');
+    var cat = document.getElementById('rosterCatSelect').value;
+    var inWizard = _obWizardActive();
+    var seen = _existingNameSet(inWizard);
+    var added = 0, skipped = _parseDupes;
+    _importing = true;
+    btn.disabled = true;
+    btn.textContent = _t('roster.importing');
+    _status('info', _t('roster.importing'));
+
+    try {
+      for (var i = 0; i < selected.length; i++) {
+        var p = selected[i];
+        var key = (p.first + ' ' + (p.last || '')).toLowerCase().trim();
+        if (seen[key]) { skipped++; continue; }
+        seen[key] = true;
+        if (inWizard) { _obAddToWizard(p.first, p.last, cat, null); added++; continue; }
+        var newId = Date.now() + i;
+        var newContact = {
+          id: newId,
+          first: p.first,
+          last: p.last || '',
+          cat: cat,
+          sev: 4, /* new: Quiet until something is logged */
+          phone: p.phone || '',
+          email: p.email || '',
+          sentinelId: ''
+        };
+        DEMO_CONTACTS.push(newContact);
+        try { await RemielDB.putContact(newContact); } catch (e) {}
+        added++;
+      }
+    } catch (err) {
+      _importing = false;
+      btn.disabled = false;
+      btn.textContent = _importLabel();
+      _status('err', _t('roster.err.import', { msg: (err && err.message) || String(err) }));
+      return;
     }
+    _importing = false;
+    await _afterImport(added, skipped, inWizard, btn, _importLabel);
   }
 
   // Drag-and-drop support for image tab
@@ -16271,13 +16662,8 @@ var RosterImport = (function() {
         e.preventDefault();
         dz.classList.remove('dragover');
         var file = e.dataTransfer.files && e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) {
-          var dt = new DataTransfer();
-          dt.items.add(file);
-          var inp = document.getElementById('rosterFileImg');
-          inp.files = dt.files;
-          handleImageFile(inp);
-        }
+        /* Any dropped file goes through the same checks, so a wrong type gets a clear error */
+        if (file) _runImageOcr(file);
       });
     }
     var gpDz = document.getElementById('gpDropZone');
@@ -16305,7 +16691,7 @@ var RosterImport = (function() {
            parseText: parseText, handleFile: handleFile, doImport: doImport, _toggle: _toggle, _editName: _editName,
            handleGroupPhoto: handleGroupPhoto, toggleFace: toggleFace,
            toggleAllFaces: toggleAllFaces, setFaceName: setFaceName,
-           doGroupImport: doGroupImport };
+           doGroupImport: doGroupImport, retryImage: retryImage };
 })();
 
 function getContactHeadline(contact) {
@@ -28244,9 +28630,13 @@ try { _resolveAppScriptReady(); } catch (e) {}
             <p data-i18n-html="roster.imageHint"><strong>Tap to choose</strong> or drop an image<br>Screenshot of a roster, contact list, etc.</p>
           </div>
           <input type="file" class="roster-file-input" id="rosterFileImg" accept="image/*" onchange="RosterImport.handleImageFile(this)">
+          <div class="roster-ocr-thumb-wrap" id="rosterOcrThumbWrap" hidden>
+            <img class="roster-ocr-thumb" id="rosterOcrThumb" alt="">
+            <div class="roster-ocr-head" id="rosterOcrHead" data-i18n="roster.ocr.head">Reading names from this image</div>
+          </div>
           <div class="roster-ocr-progress" id="rosterOcrProgress" style="display:none">
-            <div class="roster-ocr-bar"><div class="roster-ocr-bar-fill" id="rosterOcrFill"></div></div>
-            <div class="roster-ocr-status" id="rosterOcrStatus">Initializing OCR...</div>
+            <div class="roster-ocr-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="rosterOcrBar"><div class="roster-ocr-bar-fill" id="rosterOcrFill"></div></div>
+            <div class="roster-ocr-status" id="rosterOcrStatus" aria-live="polite"></div>
           </div>
         </div>
         <div id="rosterTabPaste" style="display:none">
@@ -28268,7 +28658,7 @@ try { _resolveAppScriptReady(); } catch (e) {}
           <input type="file" class="roster-file-input" id="gpFileInput" accept="image/*" onchange="RosterImport.handleGroupPhoto(this)">
           <div class="gp-progress" id="gpProgress" style="display:none">
             <div class="roster-ocr-bar"><div class="roster-ocr-bar-fill" id="gpProgressFill"></div></div>
-            <div class="roster-ocr-status" id="gpStatus">Initializing...</div>
+            <div class="roster-ocr-status" id="gpStatus" aria-live="polite"></div>
           </div>
           <div id="gpFacePreview"></div>
           <button class="roster-import-btn" id="gpImportBtn" style="display:none;background:linear-gradient(135deg,#C5A55A,#8B7332);color:#000" onclick="RosterImport.doGroupImport()">Import Selected</button>
@@ -28283,8 +28673,9 @@ try { _resolveAppScriptReady(); } catch (e) {}
             <option value="other">Other</option>
           </select>
         </div>
+        <div class="roster-status" id="rosterStatusLine" hidden></div>
         <div class="roster-preview" id="rosterPreview"></div>
-        <button class="roster-import-btn" id="rosterImportBtn" style="display:none" onclick="RosterImport.doImport()" data-i18n="roster.importSelected">Import Selected</button>
+        <button class="roster-import-btn" id="rosterImportBtn" style="display:none" onclick="RosterImport.doImport()">Import Selected</button>
       </div>
     </div>
   </div>
