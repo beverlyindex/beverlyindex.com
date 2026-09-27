@@ -12592,23 +12592,28 @@ const SentinelViews = (() => {
     _updateBadge();
     closePanel();
     /* Guide user */
-    if (typeof SentinelGuide !== 'undefined') {
-      const view = getActiveView();
-      if (view) {
-        SentinelGuide.showBanner(TYPE_LABELS[view.type] + ' view "' + view.name + '" active — tap badge to change', 3000);
-      } else {
-        SentinelGuide.showBanner('Showing all contacts', 2000);
-      }
+    const view = getActiveView();
+    if (view) {
+      _svBanner('views-active', _t('views.bannerActive', '{type} view "{name}" active. Tap the badge to change.', { type: TYPE_LABELS[view.type], name: view.name }));
+    } else {
+      _svBanner('views-all', _t('views.bannerAll', 'Showing all contacts'));
     }
+  }
+
+  /* Safe banner: SentinelGuide may be missing or may throw. */
+  function _svBanner(id, text) {
+    try {
+      if (typeof SentinelGuide !== 'undefined' && SentinelGuide.showBanner) {
+        SentinelGuide.showBanner(id, text, { position: 'bottom' });
+      }
+    } catch (e) { console.warn('[SentinelViews] banner failed', e); }
   }
 
   function clearView() {
     _activeViewId = null;
     _applyFilter();
     _updateBadge();
-    if (typeof SentinelGuide !== 'undefined') {
-      SentinelGuide.showBanner('Showing all contacts', 2000);
-    }
+    _svBanner('views-all', _t('views.bannerAll', 'Showing all contacts'));
   }
 
   /* ── Editor ── */
@@ -12708,33 +12713,41 @@ const SentinelViews = (() => {
     }
   }
 
+  let _saving = false;
   function saveView() {
+    if (_saving) return;
     const nameInput = document.getElementById('svNameInput');
     const name = nameInput ? nameInput.value.trim() : '';
     if (!name || _selectedIds.size === 0) return;
 
     const contactIds = Array.from(_selectedIds);
+    const btn = document.getElementById('svSaveBtn');
+    _saving = true;
+    if (btn) btn.disabled = true;
+    const editingId = _editingViewId;
+    /* Clear the editing state first so a second save cannot create a duplicate. */
+    _editingViewId = null;
+    _selectedIds = new Set();
 
-    if (_editingViewId) {
-      /* Update existing */
-      updateView(_editingViewId, { name, contactIds });
-      if (typeof SentinelGuide !== 'undefined') {
-        SentinelGuide.showBanner('View "' + name + '" updated', 2500);
+    try {
+      if (editingId) {
+        /* Update existing */
+        updateView(editingId, { name, contactIds });
+        _svBanner('views-updated', _t('views.bannerUpdated', 'View "{name}" updated', { name: name }));
+      } else {
+        /* Create new */
+        const view = createView(name, _editorType, contactIds);
+        /* Auto-activate the new view */
+        _activeViewId = view.id;
+        _applyFilter();
+        _updateBadge();
+        _svBanner('views-created', _t('views.bannerCreated', 'View "{name}" created and now active', { name: name }));
       }
-    } else {
-      /* Create new */
-      const view = createView(name, _editorType, contactIds);
-      /* Auto-activate the new view */
-      _activeViewId = view.id;
-      _applyFilter();
-      _updateBadge();
-      if (typeof SentinelGuide !== 'undefined') {
-        SentinelGuide.showBanner('View "' + name + '" created — now active', 3000);
-      }
+    } finally {
+      try { closeEditor(); } catch (e) { console.warn('[SentinelViews] closeEditor failed', e); }
+      try { _renderPanel(); } catch (e) {}
+      _saving = false;
     }
-
-    closeEditor();
-    _renderPanel();
   }
 
   /* ── Delete confirmation ── */
@@ -12745,9 +12758,7 @@ const SentinelViews = (() => {
     if (confirm('Delete view "' + view.name + '"? This cannot be undone.')) {
       deleteView(id);
       _renderPanel();
-      if (typeof SentinelGuide !== 'undefined') {
-        SentinelGuide.showBanner('View deleted', 2000);
-      }
+      _svBanner('views-deleted', _t('views.bannerDeleted', 'View deleted'));
     }
   }
 
