@@ -1563,6 +1563,10 @@
     vertical-align: -1px;
   }
   .sentinel-guide { cursor: pointer; }
+  /* The Sentinel ID explainer: a wide card with its two choices on one row */
+  .sentinel-guide.guide-forced { width: min(92vw, 440px); max-width: 92vw; flex-wrap: wrap; text-align: left; justify-content: flex-start; gap: 8px; }
+  .sentinel-guide.guide-forced .guide-text { flex: 1 1 calc(100% - 40px); font-weight: 500; }
+  .sentinel-guide.guide-forced .guide-action { margin-left: 0; }
   .sentinel-guide .guide-action {
     margin-left: 10px;
     padding: 4px 10px;
@@ -11910,6 +11914,13 @@ const I18n = (function () {
     "magnet.discoverOn": "People who have your number or email can find you.",
     "magnet.discoverOff": "Finding is off. People need your Sentinel ID to reach you.",
     "magnet.saveFailed": "Could not save. Check your connection, then try again.",
+    "magnet.sidExplain": "A Sentinel ID is an 8 character code every Remiel Sentinel user has. Two ways to get {name}'s: ask them to read it from Settings, Sentinel Call, on their phone, then type it in their Profile; or, if their phone number or email is saved, Remiel Sentinel can find them for you.",
+    "magnet.findThem": "Find them",
+    "magnet.typeIt": "Type it",
+    "magnet.found": "{name} is on Remiel Sentinel. Video and Message now reach them with one tap.",
+    "magnet.notFound": "{name} was not found on Remiel Sentinel with the saved phone number or email. Ask for the Sentinel ID and type it in Person card, Edit, Sentinel ID.",
+    "magnet.noPhoneEmail": "To find {name}, save their phone number or email first: Person card, Edit, Phone number.",
+    "magnet.needSignIn": "Finding people needs this device connected: Settings, Account.",
   });
   /* Guide and Magnet strings (IT) */
   Object.assign(_strings.it, {
@@ -11951,6 +11962,13 @@ const I18n = (function () {
     "magnet.discoverOn": "Chi ha il tuo numero o la tua email può trovarti.",
     "magnet.discoverOff": "La ricerca è spenta. Per raggiungerti serve il tuo ID Sentinel.",
     "magnet.saveFailed": "Impossibile salvare. Controlla la connessione, poi riprova.",
+    "magnet.sidExplain": "Un ID Sentinel è un codice di 8 caratteri che ogni utente di Remiel Sentinel possiede. Due modi per avere quello di {name}: chiedigli di leggerlo sul suo telefono in Impostazioni, Chiamata Sentinel, poi scrivilo nel suo Profilo; oppure, se hai salvato il suo numero di telefono o la sua email, Remiel Sentinel può trovarlo per te.",
+    "magnet.findThem": "Trovalo",
+    "magnet.typeIt": "Scrivilo",
+    "magnet.found": "{name} è su Remiel Sentinel. Video e Messaggio ora lo raggiungono con un tocco.",
+    "magnet.notFound": "{name} non è stato trovato su Remiel Sentinel con il numero o l'email salvati. Chiedi l'ID Sentinel e scrivilo in Scheda della persona, Modifica, ID Sentinel.",
+    "magnet.noPhoneEmail": "Per trovare {name}, salva prima il suo numero di telefono o la sua email: Scheda della persona, Modifica, Numero di telefono.",
+    "magnet.needSignIn": "Per trovare le persone questo dispositivo deve essere collegato: Impostazioni, Account.",
   });
 
   function t(key, params) {
@@ -14925,7 +14943,7 @@ const SentinelGuide = (() => {
     if (_slots.top === id || _slots.bottom === id) return false;
     /* Hold banners while a modal or editor is open so they never cover a form's
        primary button; the watchdog shows them once it closes */
-    if (_holdBanners()) {
+    if (_holdBanners() && !opts.force) {
       if (!_queue.some(q => q.id === id)) _queue.push({ id: id, text: text, opts: opts });
       return false;
     }
@@ -14971,7 +14989,8 @@ const SentinelGuide = (() => {
       later.textContent = opts.laterLabel;
       later.addEventListener('click', (e) => {
         e.stopPropagation(); dismiss(id, slot);
-        if (typeof opts.onDismiss === 'function') { try { opts.onDismiss(); } catch (_) {} }
+        if (typeof opts.onLater === 'function') { try { opts.onLater(); } catch (_) {} }
+        else if (typeof opts.onDismiss === 'function') { try { opts.onDismiss(); } catch (_) {} }
       });
       el.appendChild(later);
     }
@@ -14993,6 +15012,8 @@ const SentinelGuide = (() => {
     };
     el.setAttribute('role', 'status');
     el.classList.add('visible');
+    /* A forced banner explains the thing the user just tapped: never held */
+    el.classList.toggle('guide-forced', !!opts.force);
     _slots[slot] = id;
     _syncHeld();
     _ctx[slot] = opts.sticky ? null : { at: Date.now() + 450, state: (typeof appState !== 'undefined' ? appState : null), dlg: undefined };
@@ -15036,6 +15057,8 @@ const SentinelGuide = (() => {
       queue: !!opts.queue,
       sticky: !!opts.sticky,
       onDismiss: opts.onDismiss,
+      onLater: opts.onLater,
+      force: !!opts.force,
       anchor: opts.anchor,
       persistent: !!opts.persistent,
       once: opts.once !== false,
@@ -15074,7 +15097,7 @@ const SentinelGuide = (() => {
     ['guideTop', 'guideBottom'].forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
-      const on = held && el.classList.contains('visible');
+      const on = held && el.classList.contains('visible') && !el.classList.contains('guide-forced');
       if (el.classList.contains('guide-held') !== on) {
         el.classList.toggle('guide-held', on);
         if (on) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden');
@@ -20713,6 +20736,8 @@ function explainMissingAction(kind, c) {
   var name = (c && c.first) || I18n.t('call.thisContact');
   var key = kind === 'email' ? 'qa.missingEmail' : (kind === 'sid' ? 'qa.missingSid' : 'qa.missingPhone');
   var target = kind === 'email' ? 'contact.email' : (kind === 'sid' ? 'contact.sentinelId' : 'contact.phone');
+  /* First missing Sentinel ID ever: the explainer banner instead of the toast */
+  if (kind === 'sid' && typeof Magnet !== 'undefined' && Magnet && Magnet.explainOnce(c)) return;
   showActionToast(I18n.t(key, { name: name }), [Guide.action(target, { contactId: c && c.id })], 9000);
 }
 
@@ -20730,6 +20755,7 @@ function startVideoWith(c) {
    person directly, so the app starts a new meeting in a new tab and helps the
    user send the link by text. The Sentinel ID remains the direct route. */
 function offerGoogleMeet(c) {
+  if (typeof Magnet !== 'undefined' && Magnet && Magnet.explainOnce(c)) return;
   var name = (c && c.first) || I18n.t('call.thisContact');
   var actions = [{ label: I18n.t('qa.meetStart'), run: function () {
     window.open('https://meet.google.com/new', '_blank', 'noopener');
@@ -30746,6 +30772,7 @@ const SentinelCall = (function() {
 
     const targetId = contact.sentinelId;
     if (!_isValidSid(targetId || '')) {
+      if (typeof Magnet !== 'undefined' && Magnet && Magnet.explainOnce(contact)) return;
       showActionToast(_t('call.noSid', 'No Sentinel ID for') + ' ' + (contact.first || _t('call.thisContact', 'this contact')) + '. ' + _t('call.addSidHint', 'Add it in Person card, Edit, Sentinel ID.'),
         [Guide.action('contact.sentinelId', { contactId: contact.id })], 9000);
       return;
