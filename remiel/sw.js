@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-sentinel-v25';
+const CACHE_NAME = 'remiel-sentinel-v26';
 
 const PRECACHE_URLS = [
   './',
