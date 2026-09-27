@@ -21438,12 +21438,75 @@ const SentinelCall = (function() {
     return id;
   }
 
+  /* Local i18n shim: uses I18n.t when the key exists, else the fallback */
+  function _t(key, fallback) {
+    try {
+      if (typeof I18n !== 'undefined' && I18n && typeof I18n.t === 'function') {
+        const v = I18n.t(key);
+        if (v && v !== key) return v;
+      }
+    } catch (e) {}
+    return fallback;
+  }
+
+  function _isValidSid(s) { return typeof s === 'string' && /^[A-Z0-9]{8}$/i.test(s.trim()); }
+
+  const _NO_ANSWER_MS = 45000;
+  let _noAnswerTimer = null;
+  let _incomingTimer = null;
+  let _activeShown = false;
+  let _guestPeer = null;
+
+  /* Fallback ICE list used only when GET /turn/credentials is unreachable or empty.
+     These are public STUN servers and the free Open Relay TURN service: a public
+     relay with shared credentials, not suitable for production traffic. The API
+     returns a bare RTCIceServer array; keep that shape. */
+  const FALLBACK_ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'turn:standard.relay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:standard.relay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:standard.relay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+  ];
+
+  function _apiBase() {
+    try {
+      if (typeof SyncEngine === 'undefined') return null;
+      if (typeof SyncEngine.getApiBase === 'function') return SyncEngine.getApiBase();
+      if (typeof SyncEngine.getStatus === 'function') return (SyncEngine.getStatus() || {}).apiBase || null;
+    } catch (e) {}
+    return null;
+  }
+
+  /* ── Fetch TURN/STUN ICE servers for NAT traversal ── */
+  async function _fetchIceServers() {
+    try {
+      const apiBase = _apiBase();
+      if (apiBase) {
+        const resp = await fetch(apiBase + '/turn/credentials');
+        if (resp.ok) {
+          const servers = await resp.json();
+          if (Array.isArray(servers) && servers.length > 0) {
+            console.log('SentinelCall: using', servers.length, 'ICE servers from API');
+            return servers;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('SentinelCall: TURN credential fetch failed, using fallback', e.message);
+    }
+    return FALLBACK_ICE_SERVERS.slice();
+  }
+
   /* ── Initialize ── */
   async function init() {
-    /* Get or create Sentinel ID */
+    /* Get or create Sentinel ID (older builds wrote the key sentinelId) */
     _myId = await RemielDB.getSetting('sentinelCallId');
-    if (!_myId) {
-      _myId = _generateId();
+    if (!_isValidSid(_myId || '')) {
+      let legacy = null;
+      try { legacy = await RemielDB.getSetting('sentinelId'); } catch (e) {}
+      _myId = _isValidSid(legacy || '') ? String(legacy).toUpperCase() : _generateId();
       await RemielDB.putSetting('sentinelCallId', _myId);
     }
 
@@ -21458,53 +21521,13 @@ const SentinelCall = (function() {
       return;
     }
 
-    /* ── Fetch TURN/STUN ICE servers for NAT traversal ── */
-    async function _fetchIceServers() {
-      /* Try Vercel API first (returns Metered.ca TURN credentials) */
-      try {
-        var apiBase = SyncEngine.getStatus ? SyncEngine.getStatus().apiBase : null;
-        if (apiBase) {
-          var resp = await fetch(apiBase + '/turn/credentials');
-          if (resp.ok) {
-            var servers = await resp.json();
-            if (Array.isArray(servers) && servers.length > 0) {
-              console.log('SentinelCall: using', servers.length, 'ICE servers from API');
-              return servers;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('SentinelCall: TURN credential fetch failed, using fallback', e.message);
-      }
+    await _initPeer();
+    updateSettingsDisplay();
+  }
 
-      /* Fallback: public STUN + Metered Open Relay static TURN */
-      return [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun.relay.metered.ca:80' },
-        {
-          urls: 'turn:standard.relay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:standard.relay.metered.ca:80?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:standard.relay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turns:standard.relay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
-      ];
-    }
-
-    /* Connect to PeerJS signaling server with ICE/TURN config */
+  /* ── Connect to PeerJS signaling with ICE/TURN config ── */
+  async function _initPeer() {
+    if (!window.Peer || !_myId) return;
     const iceServers = await _fetchIceServers();
     const peerId = 'sentinel-' + _myId.toLowerCase();
     _peer = new Peer(peerId, {
@@ -21520,7 +21543,10 @@ const SentinelCall = (function() {
 
     _peer.on('call', (call) => {
       console.log('SentinelCall: incoming call from', call.peer);
+      if (_currentCall || _incomingCall) { try { call.close(); } catch (e) {} return; }
       _incomingCall = call;
+      call.on('close', () => { if (_incomingCall === call) rejectIncoming(); });
+      call.on('error', () => { if (_incomingCall === call) rejectIncoming(); });
       _showIncoming(call);
     });
 
@@ -21532,15 +21558,10 @@ const SentinelCall = (function() {
     _peer.on('error', (err) => {
       console.warn('SentinelCall: error', err.type, err.message);
       if (err.type === 'peer-unavailable') {
-        _hideAllOverlays();
-        _stopLocalStream();
-        showToast('Could not reach that person — they may not be online');
+        endCall();
+        showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
       }
     });
-
-    /* Show Sentinel ID in settings if element exists */
-    const idEl = document.getElementById('scMyId');
-    if (idEl) idEl.textContent = _myId;
   }
 
   /* ── Get camera stream ── */
@@ -21551,58 +21572,92 @@ const SentinelCall = (function() {
     });
   }
 
+  /* ── Wire a PeerJS media call (outgoing, accepted, or guest) ── */
+  function _attachCall(call, onClosed) {
+    call.on('stream', (remoteStream) => {
+      if (_currentCall !== call) return;
+      const inc = document.getElementById('scIncomingOverlay');
+      if (inc) inc.classList.remove('active');
+      _showActive(remoteStream);
+    });
+    call.on('close', () => {
+      if (_currentCall === call) endCall();
+      if (onClosed) onClosed();
+    });
+    call.on('error', (err) => {
+      console.warn('SentinelCall: call error', err);
+      if (_currentCall === call) {
+        endCall();
+        showToast(_t('call.failed', 'Call failed') + ': ' + ((err && err.message) || _t('call.connectionLost', 'connection lost')));
+      }
+      if (onClosed) onClosed();
+    });
+  }
+
+  /* ── Outgoing no-answer timeout ── */
+  function _armNoAnswer(call, onTimeout) {
+    if (_noAnswerTimer) clearTimeout(_noAnswerTimer);
+    _noAnswerTimer = setTimeout(() => {
+      _noAnswerTimer = null;
+      if (_currentCall === call && !_activeShown) {
+        showToast(_t('call.noAnswer', 'No answer'));
+        try { call.close(); } catch (e) {}
+        endCall();
+        if (onTimeout) onTimeout();
+      }
+    }, _NO_ANSWER_MS);
+  }
+
   /* ── Call a contact by ID ── */
   async function callContact(contactId) {
+    if (_currentCall) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
     if (!_peer || _peer.destroyed) {
-      showToast('Video calling not ready — try again in a moment');
+      showToast(_t('call.notReady', 'Video calling not ready. Try again in a moment.'));
       return;
     }
 
     let contact;
     try { contact = await RemielDB.getContact(contactId); } catch(e) {}
-    if (!contact) { showToast('Contact not found'); return; }
+    if (!contact) { showToast(_t('call.contactNotFound', 'Contact not found')); return; }
 
     const targetId = contact.sentinelId;
-    if (!targetId) {
-      showToast('No Sentinel ID for ' + (contact.first || 'this contact') + ' — tap their sphere, then Edit to add it');
+    if (!_isValidSid(targetId || '')) {
+      showToast(_t('call.noSid', 'No Sentinel ID for') + ' ' + (contact.first || _t('call.thisContact', 'this contact')) + '. ' + _t('call.addSidHint', 'Tap their sphere, then Edit to add it.'));
       return;
     }
 
     try {
       _localStream = await _getStream();
     } catch (err) {
-      showToast('Camera/mic access denied');
+      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
       return;
     }
 
     /* Show outgoing UI */
-    const name = ((contact.first || '') + ' ' + (contact.last || '')).trim() || 'Contact';
-    const initials = (contact.first || '?')[0] + (contact.last || '')[0];
+    const name = ((contact.first || '') + ' ' + (contact.last || '')).trim() || _t('call.contact', 'Contact');
+    const initials = (contact.first || '?')[0] + ((contact.last || '')[0] || '');
     _showOutgoing(name, initials);
-
-    /* Place the call */
-    const remotePeerId = 'sentinel-' + targetId.toLowerCase();
-    _currentCall = _peer.call(remotePeerId, _localStream, {
-      metadata: { callerName: (await _getMyName()), callerId: _myId }
-    });
 
     /* Show local video */
     const localVid = document.getElementById('scLocalVideo');
     if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
 
-    _currentCall.on('stream', (remoteStream) => {
-      _showActive(remoteStream);
-    });
-
-    _currentCall.on('close', () => {
+    /* Place the call */
+    const remotePeerId = 'sentinel-' + targetId.trim().toLowerCase();
+    let call = null;
+    try {
+      call = _peer.call(remotePeerId, _localStream, {
+        metadata: { callerName: (await _getMyName()), callerId: _myId }
+      });
+    } catch (e) { call = null; }
+    if (!call) {
       endCall();
-    });
-
-    _currentCall.on('error', (err) => {
-      console.warn('SentinelCall: call error', err);
-      endCall();
-      showToast('Call failed — ' + (err.message || 'connection lost'));
-    });
+      showToast(_t('call.couldNotPlace', 'Could not place call'));
+      return;
+    }
+    _currentCall = call;
+    _attachCall(call);
+    _armNoAnswer(call);
   }
 
   /* ── Call from focused sphere (quick action) ── */
@@ -21612,62 +21667,84 @@ const SentinelCall = (function() {
     } else if (typeof selectedContact !== 'undefined' && selectedContact) {
       callContact(selectedContact.id);
     } else {
-      showToast('Select a contact first');
+      showToast(_t('call.selectFirst', 'Select a contact first'));
     }
   }
 
   /* ── Accept incoming call ── */
   async function acceptIncoming() {
     if (!_incomingCall) return;
+    const call = _incomingCall;
     _stopRingtone();
+    if (_incomingTimer) { clearTimeout(_incomingTimer); _incomingTimer = null; }
 
     try {
       _localStream = await _getStream();
     } catch(err) {
-      showToast('Camera/mic access denied');
+      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
       rejectIncoming();
       return;
     }
+    if (_incomingCall !== call) { _cleanupMedia(); return; } /* caller hung up meanwhile */
 
-    _incomingCall.answer(_localStream);
-    _currentCall = _incomingCall;
+    _currentCall = call;
     _incomingCall = null;
+    _attachCall(call);
+
+    try {
+      call.answer(_localStream);
+    } catch (e) {
+      console.warn('SentinelCall: answer failed', e);
+      endCall();
+      showToast(_t('call.failed', 'Call failed'));
+      return;
+    }
 
     /* Show local video */
     const localVid = document.getElementById('scLocalVideo');
     if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
-
-    _currentCall.on('stream', (remoteStream) => {
-      /* Hide incoming overlay, show active */
-      document.getElementById('scIncomingOverlay').classList.remove('active');
-      _showActive(remoteStream);
-    });
-
-    _currentCall.on('close', () => { endCall(); });
   }
 
   /* ── Reject incoming ── */
   function rejectIncoming() {
     _stopRingtone();
-    if (_incomingCall) { _incomingCall.close(); _incomingCall = null; }
-    document.getElementById('scIncomingOverlay').classList.remove('active');
+    if (_incomingTimer) { clearTimeout(_incomingTimer); _incomingTimer = null; }
+    const call = _incomingCall;
+    _incomingCall = null;
+    if (call) { try { call.close(); } catch (e) {} }
+    const inc = document.getElementById('scIncomingOverlay');
+    if (inc) inc.classList.remove('active');
   }
 
   /* ── Hang up ── */
   function hangUp() {
-    if (_currentCall) _currentCall.close();
+    const call = _currentCall;
+    _currentCall = null;
+    if (call) { try { call.close(); } catch (e) {} }
     endCall();
+  }
+
+  /* ── Release camera, mic, timers and ringtone: used by every exit path ── */
+  function _cleanupMedia() {
+    _stopRingtone();
+    _stopLocalStream();
+    if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+    if (_noAnswerTimer) { clearTimeout(_noAnswerTimer); _noAnswerTimer = null; }
+    if (_incomingTimer) { clearTimeout(_incomingTimer); _incomingTimer = null; }
+    _activeShown = false;
+    _callStartTime = null;
+    _audioMuted = false;
+    const btn = document.getElementById('scMuteBtn');
+    if (btn) btn.classList.remove('active');
   }
 
   /* ── End call cleanup ── */
   function endCall() {
-    _stopRingtone();
-    _stopLocalStream();
+    const call = _currentCall;
     _currentCall = null;
     _incomingCall = null;
-    _callStartTime = null;
-    _audioMuted = false;
-    if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+    if (call) { try { call.close(); } catch (e) {} }
+    _cleanupMedia();
     _hideAllOverlays();
   }
 
@@ -21683,29 +21760,40 @@ const SentinelCall = (function() {
     }
   }
 
-  /* ── Flip camera ── */
+  /* ── Flip camera: acquire the new camera first, then stop the old one ── */
   async function flipCamera() {
     if (!_localStream || !_currentCall) return;
+    const prevFacing = _facingMode;
     _facingMode = _facingMode === 'user' ? 'environment' : 'user';
+    let newStream;
     try {
-      _localStream.getVideoTracks().forEach(t => t.stop());
-      const newStream = await _getStream();
-      const newVideoTrack = newStream.getVideoTracks()[0];
-
-      /* Replace track in peer connection */
-      const sender = _currentCall.peerConnection
-        .getSenders().find(s => s.track && s.track.kind === 'video');
-      if (sender) await sender.replaceTrack(newVideoTrack);
-
-      /* Keep audio tracks */
-      const audioTrack = _localStream.getAudioTracks()[0];
-      _localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
-
-      const localVid = document.getElementById('scLocalVideo');
-      if (localVid) localVid.srcObject = _localStream;
+      newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: _facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      });
     } catch(err) {
+      _facingMode = prevFacing;
       console.warn('SentinelCall: flip failed', err);
+      return;
     }
+    const newVideoTrack = newStream.getVideoTracks()[0];
+    try {
+      const pc = _currentCall && _currentCall.peerConnection;
+      const sender = pc ? pc.getSenders().find(s => s.track && s.track.kind === 'video') : null;
+      if (sender) await sender.replaceTrack(newVideoTrack);
+    } catch (err) {
+      console.warn('SentinelCall: replaceTrack failed', err);
+      newStream.getTracks().forEach(t => t.stop());
+      _facingMode = prevFacing;
+      return;
+    }
+    if (!_localStream) { newStream.getTracks().forEach(t => t.stop()); return; } /* call ended meanwhile */
+    _localStream.getVideoTracks().forEach(t => t.stop());
+    const audioTrack = _localStream.getAudioTracks()[0];
+    _localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
+
+    const localVid = document.getElementById('scLocalVideo');
+    if (localVid) localVid.srcObject = _localStream;
   }
 
   /* ── UI helpers ── */
@@ -21743,12 +21831,22 @@ const SentinelCall = (function() {
     _playRingtone();
 
     /* Auto-timeout after 30s */
-    setTimeout(() => {
+    if (_incomingTimer) clearTimeout(_incomingTimer);
+    _incomingTimer = setTimeout(() => {
+      _incomingTimer = null;
       if (_incomingCall === call) rejectIncoming();
     }, 30000);
   }
 
   function _showActive(remoteStream) {
+    /* PeerJS can emit 'stream' once per track; only set up once */
+    if (_activeShown) {
+      const rv = document.getElementById('scRemoteVideo');
+      if (rv && remoteStream && rv.srcObject !== remoteStream) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
+      return;
+    }
+    _activeShown = true;
+    if (_noAnswerTimer) { clearTimeout(_noAnswerTimer); _noAnswerTimer = null; }
     const remoteVid = document.getElementById('scRemoteVideo');
     const status = document.getElementById('scStatus');
     const timer = document.getElementById('scCallTimer');
@@ -21764,6 +21862,7 @@ const SentinelCall = (function() {
 
     /* Start call timer */
     _callStartTime = Date.now();
+    if (_timerInterval) clearInterval(_timerInterval);
     _timerInterval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - _callStartTime) / 1000);
       const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
@@ -21868,8 +21967,9 @@ const SentinelCall = (function() {
   async function guestJoinCall() {
     const name = document.getElementById('scGuestName').value.trim();
     if (!name || !_guestTargetId) return;
+    if (_currentCall) return;
     const statusEl = document.getElementById('scGuestStatus');
-    statusEl.textContent = 'Connecting...';
+    statusEl.textContent = _t('call.connecting', 'Connecting...');
 
     /* Generate a temp guest Sentinel ID */
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -21882,75 +21982,65 @@ const SentinelCall = (function() {
     try {
       await _loadPeerJS();
     } catch(e) {
-      statusEl.textContent = 'Could not load video calling library';
+      statusEl.textContent = _t('call.libFailed', 'Could not load video calling library');
       return;
     }
 
+    if (_guestPeer) { try { _guestPeer.destroy(); } catch (e) {} _guestPeer = null; }
+    const iceServers = await _fetchIceServers();
     const guestPeerId = 'sentinel-' + guestId.toLowerCase();
-    const guestPeer = new Peer(guestPeerId, { debug: 0 });
+    const guestPeer = new Peer(guestPeerId, { debug: 0, config: { iceServers: iceServers } });
+    _guestPeer = guestPeer;
+    const destroyGuest = () => {
+      if (_guestPeer === guestPeer) _guestPeer = null;
+      try { guestPeer.destroy(); } catch (e) {}
+    };
 
-    guestPeer.on('open', async (id) => {
-      statusEl.textContent = 'Calling...';
+    guestPeer.on('open', async () => {
+      statusEl.textContent = _t('call.calling', 'Calling...');
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        _localStream = await _getStream();
+      } catch(err) {
+        statusEl.textContent = _t('call.mediaDenied', 'Camera/mic access denied');
+        destroyGuest();
+        return;
+      }
 
-        /* Hide guest overlay, show outgoing UI */
-        document.getElementById('scGuestOverlay').classList.add('hidden');
-        _localStream = stream;
+      /* Hide guest overlay, show outgoing UI */
+      document.getElementById('scGuestOverlay').classList.add('hidden');
+      const localVid = document.getElementById('scLocalVideo');
+      if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
+      _showOutgoing(_guestTargetId, '?');
 
-        const localVid = document.getElementById('scLocalVideo');
-        if (localVid) { localVid.srcObject = stream; localVid.play().catch(() => {}); }
-
-        /* Show outgoing call overlay */
-        _showOutgoing(_guestTargetId, '?');
-
-        /* Place the call */
-        const remotePeerId = 'sentinel-' + _guestTargetId.toLowerCase();
-        const call = guestPeer.call(remotePeerId, stream, {
+      /* Place the call */
+      const remotePeerId = 'sentinel-' + _guestTargetId.toLowerCase();
+      let call = null;
+      try {
+        call = guestPeer.call(remotePeerId, _localStream, {
           metadata: { callerName: name, callerId: guestId, isGuest: true }
         });
+      } catch (e) { call = null; }
 
-        if (!call) {
-          showToast('Could not place call');
-          _endCall();
-          return;
-        }
-
-        _currentCall = call;
-        _peer = guestPeer;
-
-        call.on('stream', (remoteStream) => {
-          _showActive(name);
-          const remoteVid = document.getElementById('scRemoteVideo');
-          if (remoteVid) { remoteVid.srcObject = remoteStream; remoteVid.play().catch(() => {}); }
-        });
-
-        call.on('close', () => { _endCall(); guestPeer.destroy(); });
-        call.on('error', (err) => {
-          console.warn('Guest call error:', err);
-          showToast('Call failed');
-          _endCall();
-          guestPeer.destroy();
-        });
-
-        /* Timeout if no answer in 30s */
-        setTimeout(() => {
-          if (_currentCall === call && !document.getElementById('scCallOverlay').classList.contains('active-state')) {
-            showToast('No answer');
-            call.close();
-            _endCall();
-            guestPeer.destroy();
-          }
-        }, 30000);
-
-      } catch(err) {
-        statusEl.textContent = 'Camera/mic access denied';
-        guestPeer.destroy();
+      if (!call) {
+        showToast(_t('call.couldNotPlace', 'Could not place call'));
+        endCall();
+        destroyGuest();
+        return;
       }
+
+      _currentCall = call;
+      _attachCall(call, destroyGuest);
+      _armNoAnswer(call, destroyGuest);
     });
 
     guestPeer.on('error', (err) => {
-      statusEl.textContent = 'Connection failed: ' + err.message;
+      console.warn('Guest call error:', err);
+      if (err && err.type === 'peer-unavailable') {
+        showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
+      }
+      statusEl.textContent = _t('call.connectFailed', 'Connection failed') + ': ' + ((err && err.message) || '');
+      endCall();
+      destroyGuest();
     });
   }
 
@@ -21994,31 +22084,39 @@ const SentinelCall = (function() {
   }
 
   async function regenerateId() {
-    if (!confirm('Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.')) return;
+    if (!confirm(_t('call.regenConfirm', 'Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.'))) return;
+    if (_currentCall) { showToast(_t('call.endFirst', 'End the current call first')); return; }
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let id = '';
     const arr = new Uint8Array(8);
     crypto.getRandomValues(arr);
     for (let i = 0; i < 8; i++) id += chars[arr[i] % chars.length];
     _myId = id;
-    /* Save to IndexedDB */
-    try {
-      const tx = _db.transaction('settings', 'readwrite');
-      tx.objectStore('settings').put({ key: 'sentinelId', value: id });
-    } catch(e) {}
+    try { await RemielDB.putSetting('sentinelCallId', id); } catch(e) {}
+
     /* Reconnect PeerJS with new ID */
-    if (_peer) { try { _peer.destroy(); } catch(e) {} }
-    _initPeer();
-    /* Update settings display */
-    const el = document.getElementById('settingsSentinelId');
-    if (el) el.textContent = id;
-    showToast('New Sentinel ID: ' + id);
+    if (_peer) { try { _peer.destroy(); } catch(e) {} _peer = null; }
+    try { await _initPeer(); } catch (e) { console.warn('SentinelCall: reconnect failed', e); }
+    updateSettingsDisplay();
+
+    /* Tell the server so messages and calls addressed to the new ID reach this account */
+    let serverNote = '';
+    try {
+      if (typeof SyncEngine !== 'undefined' && typeof SyncEngine.isAuthenticated === 'function' &&
+          SyncEngine.isAuthenticated() && typeof SyncEngine.apiFetch === 'function') {
+        const res = await SyncEngine.apiFetch('/profile', { method: 'PUT', body: JSON.stringify({ sentinel_id: id }) });
+        if (!res.ok) serverNote = ' ' + _t('call.regenServerFail', '(not yet saved to your account; try again later)');
+      }
+    } catch (e) { serverNote = ' ' + _t('call.regenServerFail', '(not yet saved to your account; try again later)'); }
+    showToast(_t('call.newId', 'New Sentinel ID') + ': ' + id + serverNote);
   }
 
   /* Update settings panel when it opens */
   function updateSettingsDisplay() {
     const el = document.getElementById('settingsSentinelId');
     if (el && _myId) el.textContent = _myId;
+    const el2 = document.getElementById('scMyId');
+    if (el2 && _myId) el2.textContent = _myId;
   }
 
   return {
