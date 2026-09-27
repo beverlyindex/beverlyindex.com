@@ -5429,6 +5429,7 @@ body:has(#sentinelMsgOverlay.open, .sv-overlay.open, .sentinel-call-overlay.acti
     <p class="ob-media-hint" id="obSelfMediaHint" data-i18n="onboard.name.mediaHint">Photo or short video required</p>
     <input class="ob-input" id="obUserName" type="text" placeholder="Your first name" data-i18n-placeholder="onboard.name.placeholder" autocomplete="off" maxlength="30" style="text-align:center; font-size:16px; margin-bottom:24px;">
     <button class="ob-btn ob-primary" id="obNameBtn" onclick="obNext(2)" disabled data-i18n="onboard.continue">Continue</button>
+    <button type="button" id="obSignInLink" onclick="obSignInExisting()" data-i18n="onboard.signinLink" style="display:block;margin:14px auto 0;background:none;border:0;color:#38bdf8;font-size:13px;text-decoration:underline;cursor:pointer;padding:6px 8px;">Already use Remiel Sentinel on another device? Sign in</button>
   </div>
 
   <!-- Step 2: Welcome -->
@@ -7878,6 +7879,7 @@ const I18n = (function () {
 
       'onboard.name.title':       'Set up your sphere',
       'onboard.name.subtitle':    'Your name and image appear at the center of your galaxy.',
+      'onboard.signinLink':       'Already use Remiel Sentinel on another device? Sign in',
       'onboard.name.placeholder':  'Your first name',
       'onboard.continue':          'Continue',
 
@@ -8285,6 +8287,7 @@ const I18n = (function () {
 
       'onboard.name.title':       'Come ti chiamiamo?',
       'onboard.name.subtitle':    'Questo è il nome che appare sulla tua sfera.',
+      'onboard.signinLink':       'Usi già Remiel Sentinel su un altro dispositivo? Accedi',
       'onboard.name.placeholder':  'Il tuo nome',
       'onboard.continue':          'Continua',
 
@@ -9638,6 +9641,78 @@ function showOnboarding() {
   el.hidden = false;
   renderA2hsInstructions();
 }
+
+/* M2: second device. Open the existing Settings sign-in form; when sync
+   reports an authenticated email login, close onboarding and open the
+   galaxy with the pulled data. Settings sits below onboarding, so the
+   wizard is hidden while the form is open and restored if the user backs out. */
+var _obSignIn = { armed: false, done: false, obs: null, uid: null };
+function _obSyncUid() {
+  try { return (typeof SyncEngine !== 'undefined' && typeof SyncEngine.getUserId === 'function') ? (SyncEngine.getUserId() || null) : null; } catch (e) { return null; }
+}
+function obSignInExisting() {
+  var ob = document.getElementById('onboarding');
+  var panel = document.getElementById('settingsPanel');
+  if (typeof SettingsPanel === 'undefined' || !panel) return;
+  _obSignIn.armed = true;
+  _obSignIn.done = false;
+  _obSignIn.uid = _obSyncUid(); /* a silent device account must not count as signing in */
+  if (ob) ob.hidden = true;
+  try { if (typeof SettingsPanel.syncTab === 'function') SettingsPanel.syncTab('login'); } catch (e) {}
+  try { if (typeof SettingsPanel.open === 'function') SettingsPanel.open(); else panel.classList.add('open'); } catch (e) { panel.classList.add('open'); }
+  setTimeout(function () {
+    var form = document.getElementById('syncAuthForm');
+    if (form && form.scrollIntoView) form.scrollIntoView({ block: 'center' });
+    var em = document.getElementById('syncEmail');
+    if (em) { try { em.focus({ preventScroll: true }); } catch (e) {} }
+  }, 150);
+  /* Backing out of Settings without signing in returns to the wizard. */
+  if (_obSignIn.obs) _obSignIn.obs.disconnect();
+  _obSignIn.obs = new MutationObserver(function () {
+    if (panel.classList.contains('open') || _obSignIn.done) return;
+    _obSignIn.obs.disconnect(); _obSignIn.obs = null;
+    setTimeout(function () {
+      if (_obSignIn.done) return;
+      _obSignIn.armed = false;
+      var stage = document.getElementById('stage');
+      if (ob && (!stage || stage.style.display === 'none')) ob.hidden = false;
+    }, 300);
+  });
+  _obSignIn.obs.observe(panel, { attributes: true, attributeFilter: ['class'] });
+}
+
+async function _obFinishAfterSignIn() {
+  if (_obSignIn.done) return;
+  _obSignIn.done = true;
+  _obSignIn.armed = false;
+  if (_obSignIn.obs) { _obSignIn.obs.disconnect(); _obSignIn.obs = null; }
+  /* Give the first pull a moment to land (contacts, photos). */
+  var contacts = [];
+  for (var i = 0; i < 20; i++) {
+    try { contacts = await RemielDB.getAllContacts(); } catch (e) { contacts = []; }
+    var st = null;
+    try { st = (typeof SyncEngine !== 'undefined' && SyncEngine.getStatus) ? SyncEngine.getStatus() : null; } catch (e) {}
+    if (contacts.length > 0 && (!st || st.state !== 'syncing')) break;
+    await new Promise(function (r) { setTimeout(r, 400); });
+  }
+  try { await RemielDB.putSetting('onboardingComplete', true); } catch (e) {}
+  try { localStorage.setItem('rm:obDone', '1'); } catch (e) {}
+  var ob = document.getElementById('onboarding');
+  if (ob) ob.hidden = true;
+  try { if (typeof SettingsPanel !== 'undefined' && SettingsPanel.close) SettingsPanel.close(); } catch (e) {}
+  var stage = document.getElementById('stage');
+  if (!stage || stage.style.display === 'none') {
+    try { await launchGalaxy(contacts.length ? contacts : null); } catch (e) { console.warn('launchGalaxy after sign in failed', e); }
+  }
+}
+
+window.addEventListener('sentinel:syncstatus', function (ev) {
+  var d = (ev && ev.detail) || {};
+  if (!_obSignIn.armed || _obSignIn.done || !d.authenticated) return;
+  var uid = _obSyncUid();
+  if (_obSignIn.uid && uid === _obSignIn.uid) return;
+  _obFinishAfterSignIn();
+});
 
 /* ── Onboarding media handlers ── */
 var _obSelfMediaBlob = null;
