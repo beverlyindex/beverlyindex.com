@@ -362,7 +362,8 @@
   /* ── Network hint (persistent, shown in network state) ── */
   .network-hint {
     position: absolute;
-    bottom: 16px;
+    /* Above the floating List view button (bottom 20px, 48px tall) */
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
     left: 50%;
     transform: translateX(-50%);
     font-size: 10px;
@@ -21525,6 +21526,11 @@ function drawNetworkView(t) {
       return _cRects.some(q => _ovR(a, q));
     };
     const _byFront = projected.slice().sort((a, b) => b.p.z - a.p.z);
+    const _small = projected.length <= SMALL_CIRCLE_MAX;
+    const _pad = 6;
+    const _lay = [];
+    /* Pass 1: names (nearest first). Pass 2: headlines, which never cover a
+       name, the centre captions or another headline, and stay on screen. */
     for (const { node, p } of _byFront) {
       const _s = p.scale;
       const _isF = focusedContactId === node.contact.id;
@@ -21533,15 +21539,28 @@ function drawNetworkView(t) {
       const _hfs = Math.max(8, Math.min(12, Math.round(10 * _s)));
       const _nw = Math.max(30, String(node.contact.first || '').length * _nfs * 0.6);
       const _nameR = { x: p.sx - _nw / 2, y: p.sy + _r + 2 * _s, w: _nw, h: _nfs + 2 };
-      const _hlR = { x: p.sx - 60 * _s, y: p.sy - _r - 8 * _s - _hfs - 2, w: 120 * _s, h: _hfs + 4 };
+      let _hw = 120 * _s;
+      try {
+        const _hlTxt = getContactHeadline(node.contact) || '';
+        ctx.font = '700 ' + _hfs + 'px "Hanken Grotesk", system-ui, sans-serif';
+        _hw = _hlTxt ? ctx.measureText(_hlTxt).width + 4 : 0;
+      } catch (e) {}
+      /* Keep the headline inside the viewport: clamp its centre */
+      let _hx = p.sx;
+      if (_hw) _hx = Math.max(_pad + _hw / 2, Math.min(W - _pad - _hw / 2, p.sx));
+      node._hlX = _hx;
+      const _hlR = { x: _hx - _hw / 2, y: p.sy - _r - 8 * _s - _hfs - 2, w: _hw, h: _hfs + 4 };
       if (_isF) { node._lblName = 1; node._lblHl = true; _placed.push(_nameR, _hlR); continue; }
       /* Small circles are laid out clear of the centre, so names stay readable. */
-      const _nameOk = projected.length <= SMALL_CIRCLE_MAX || (!_ov(_nameR, _cHit) && !_placed.some(q => _ov(q, _nameR)));
+      const _nameOk = _small || (!_ov(_nameR, _cHit) && !_placed.some(q => _ov(q, _nameR)));
       node._lblName = _nameOk ? 1 : 0.28;
       if (_nameOk) _placed.push(_nameR);
-      const _hlOk = _nameOk && !_ov(_hlR, _cHit) && !_placed.some(q => _ov(q, _hlR));
-      node._lblHl = _hlOk;
-      if (_hlOk) _placed.push(_hlR);
+      _lay.push({ node: node, hlR: _hlR, nameOk: _nameOk, hw: _hw });
+    }
+    for (const L of _lay) {
+      const _hlOk = L.nameOk && L.hw > 0 && !_ov(L.hlR, _cHit) && !_placed.some(q => _ov(q, L.hlR));
+      L.node._lblHl = _hlOk;
+      if (_hlOk) _placed.push(L.hlR);
     }
   }
 
@@ -21830,7 +21849,7 @@ function drawNetworkView(t) {
           ctx.fillStyle = '#ffd24d';
           ctx.globalAlpha = 0.92 * (alphaOverride || 1);
           ctx.textAlign = 'center';
-          ctx.fillText(_hl, sx, _hlY);
+          ctx.fillText(_hl, (node._hlX != null ? node._hlX : sx), _hlY);
           ctx.globalAlpha = 1;
         }
       }
@@ -21842,7 +21861,9 @@ function drawNetworkView(t) {
       ctx.globalAlpha = 0.95 * (alphaOverride || 1) * (node._lblName === undefined ? 1 : node._lblName);
       const _nfs = Math.max(9, Math.min(14, Math.round(12 * s)));
       ctx.font = `600 ${_nfs}px "Hanken Grotesk", system-ui, sans-serif`;
-      ctx.fillText(node.contact.first, sx, sy + r + 12 * s);
+      const _nmW = ctx.measureText(node.contact.first || '').width;
+      const _nmX = Math.max(6 + _nmW / 2, Math.min(W - 6 - _nmW / 2, sx));
+      ctx.fillText(node.contact.first, _nmX, sy + r + 12 * s);
     }
 
     /* Urgency label for sev 0 or 1 */
