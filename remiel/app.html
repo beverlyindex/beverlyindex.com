@@ -20527,6 +20527,7 @@ const SocialImport = (() => {
       var overlay = document.getElementById('pulseOverlay');
       if (overlay) {
         overlay.classList.add('open');
+        _setupChrome(overlay);
         _loadFeed();
       }
     }
@@ -20550,16 +20551,86 @@ const SocialImport = (() => {
       return Math.floor(diff / 86400000) + 'd ago';
     }
 
-    function _suggestAction(contact, lastInt, lastMood) {
-      var sev = contact.sev != null ? contact.sev : 3;
-      var daysSinceInt = lastInt ? Math.floor((Date.now() - (lastInt.timestamp || lastInt.updatedAt || 0)) / 86400000) : 999;
+    function _esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
 
-      if (sev <= 1 && daysSinceInt > 1) return 'Reach out today';
-      if (sev <= 1) return 'Follow up soon';
-      if (daysSinceInt > 14) return 'Reconnect — it has been ' + daysSinceInt + ' days';
-      if (daysSinceInt > 7) return 'Check in this week';
-      if (sev === 2) return 'Monitor';
-      return null;
+    /* Recommended next action from computeSeverity output */
+    function _suggestAction(sevLevel, comp) {
+      var days = (comp && typeof comp.daysSinceContact === 'number') ? Math.floor(comp.daysSinceContact) : null;
+      if (sevLevel <= 1 && (days === null || days > 1)) return _t('pulse.act.reachToday', 'Reach out today');
+      if (sevLevel <= 1) return _t('pulse.act.followUp', 'Follow up soon');
+      if (comp && comp.missedDoses > 0) return _t('pulse.act.meds', 'Check in about medication');
+      if (days === null) return _t('pulse.act.firstContact', 'Log your first interaction');
+      if (days > 14) return _t('pulse.act.reconnect', 'Reconnect: it has been {count} days', { count: days });
+      if (days > 7) return _t('pulse.act.thisWeek', 'Check in this week');
+      if (sevLevel === 2) return _t('pulse.act.monitor', 'Keep an eye on things');
+      return _t('pulse.act.none', 'Nothing needed right now');
+    }
+
+    /* One-time chrome: refresh button, pull-to-refresh, first-use banner */
+    var _chromeReady = false;
+    function _setupChrome(overlay) {
+      if (_chromeReady) return;
+      _chromeReady = true;
+      var header = overlay.querySelector('.pulse-header');
+      var closeBtn = header ? header.querySelector('.pulse-close') : null;
+      if (header) {
+        var rb = document.createElement('button');
+        rb.className = 'pulse-close';
+        rb.id = 'pulseRefreshBtn';
+        rb.setAttribute('aria-label', _t('pulse.refresh', 'Refresh'));
+        rb.title = _t('pulse.refresh', 'Refresh');
+        rb.style.cssText = 'font-size:16px;margin-left:auto;margin-right:4px;';
+        rb.innerHTML = '&#x21bb;';
+        rb.onclick = function() { _loadFeed(); };
+        header.insertBefore(rb, closeBtn);
+      }
+      var ind = document.createElement('div');
+      ind.id = 'pulsePullIndicator';
+      ind.style.cssText = 'height:0;overflow:hidden;text-align:center;font-size:11px;color:var(--text-dim,#999);transition:height 0.15s;';
+      var chips = document.getElementById('pulseSevChips');
+      if (chips) overlay.insertBefore(ind, chips);
+
+      var startY = null, pulled = 0;
+      overlay.addEventListener('touchstart', function(e) {
+        startY = (overlay.scrollTop <= 0 && e.touches.length === 1) ? e.touches[0].clientY : null;
+        pulled = 0;
+      }, { passive: true });
+      overlay.addEventListener('touchmove', function(e) {
+        if (startY === null) return;
+        pulled = Math.max(0, e.touches[0].clientY - startY);
+        ind.style.height = Math.min(40, pulled / 2) + 'px';
+        ind.textContent = pulled > 70 ? _t('pulse.release', 'Release to refresh') : _t('pulse.pull', 'Pull to refresh');
+      }, { passive: true });
+      overlay.addEventListener('touchend', function() {
+        if (startY !== null && pulled > 70) {
+          ind.textContent = _t('pulse.refreshing', 'Refreshing…');
+          _loadFeed().then(function() { ind.style.height = '0'; });
+        } else {
+          ind.style.height = '0';
+        }
+        startY = null; pulled = 0;
+      }, { passive: true });
+
+      (async function() {
+        var seen = false;
+        try { seen = await RemielDB.getSetting('pulseFirstUseSeen'); } catch (e) {}
+        if (seen) return;
+        var b = document.createElement('div');
+        b.id = 'pulseFirstUse';
+        b.style.cssText = 'margin:10px 16px 0;padding:10px 12px;border-radius:10px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);font-size:12px;color:var(--text-primary,#fff);line-height:1.5;';
+        b.innerHTML = _esc(_t('pulse.firstUse', 'The Pulse lists everyone in your circle, most in need first. Each card shows the latest headline, how recently you connected, and a suggested next step. It uses only what you have logged on this device. Pull down or tap refresh to update.')) +
+          ' <button style="margin-left:6px;background:none;border:none;color:#38bdf8;cursor:pointer;font-size:12px;text-decoration:underline;">' + _esc(_t('pulse.gotIt', 'Got it')) + '</button>';
+        b.querySelector('button').onclick = function() {
+          b.remove();
+          try { RemielDB.putSetting('pulseFirstUseSeen', true); } catch (e) {}
+        };
+        var ch = document.getElementById('pulseSevChips');
+        if (ch) overlay.insertBefore(b, ch);
+      })();
     }
 
     async function _loadFeed() {
@@ -20568,29 +20639,33 @@ const SocialImport = (() => {
       if (!cardsEl || !chipsEl) return;
 
       if (typeof RemielDB === 'undefined') {
-        cardsEl.innerHTML = '<div class="pulse-empty">Database not ready</div>';
+        cardsEl.innerHTML = '<div class="pulse-empty">' + _esc(_t('pulse.dbNotReady', 'Database not ready')) + '</div>';
         return;
       }
 
       try {
         var contacts = await RemielDB.getAllContacts();
         if (!contacts || contacts.length === 0) {
-          cardsEl.innerHTML = '<div class="pulse-empty">No contacts yet. Add people to your galaxy to see The Pulse.</div>';
+          cardsEl.innerHTML = '<div class="pulse-empty">' + _esc(_t('pulse.noContacts', 'No contacts yet. Add people to your galaxy to see The Pulse.')) + '</div>';
           chipsEl.innerHTML = '';
           return;
         }
 
-        // Build severity counts
-        var sevCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+        /* Severity from the single engine (computeSeverity) for every card */
+        var rows = [];
         for (var i = 0; i < contacts.length; i++) {
-          var s = contacts[i].sev != null ? contacts[i].sev : 3;
-          if (s < 0) s = 0;
-          if (s > 4) s = 4;
-          sevCounts[s]++;
+          var c = contacts[i];
+          var comp = null;
+          try { comp = await computeSeverity(c.id); } catch (e) {}
+          var sev = comp ? comp.sevLevel : (c.sev != null ? c.sev : 3);
+          sev = Math.max(0, Math.min(4, sev));
+          rows.push({ c: c, comp: comp, sev: sev });
         }
 
-        // Render severity chips
-        var chipHtml = '<button class="pulse-sev-chip' + (_filter === null ? ' active' : '') + '" style="background:rgba(255,255,255,0.15);" onclick="ThePulse._setFilter(null)">All (' + contacts.length + ')</button>';
+        var sevCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+        rows.forEach(function(r) { sevCounts[r.sev]++; });
+
+        var chipHtml = '<button class="pulse-sev-chip' + (_filter === null ? ' active' : '') + '" style="background:rgba(255,255,255,0.15);" onclick="ThePulse._setFilter(null)">' + _esc(_t('pulse.all', 'All')) + ' (' + rows.length + ')</button>';
         for (var sv = 0; sv <= 4; sv++) {
           if (sevCounts[sv] > 0) {
             chipHtml += '<button class="pulse-sev-chip' + (_filter === sv ? ' active' : '') + '" style="background:' + SEV_COLORS[sv] + ';" onclick="ThePulse._setFilter(' + sv + ')">' + SEV_LABELS[sv] + ' (' + sevCounts[sv] + ')</button>';
@@ -20598,68 +20673,64 @@ const SocialImport = (() => {
         }
         chipsEl.innerHTML = chipHtml;
 
-        // Sort by severity (ascending = most urgent first), then by name
-        contacts.sort(function(a, b) {
-          var sa = a.sev != null ? a.sev : 3;
-          var sb = b.sev != null ? b.sev : 3;
-          if (sa !== sb) return sa - sb;
-          var na = ((a.first || '') + ' ' + (a.last || '')).trim().toLowerCase();
-          var nb = ((b.first || '') + ' ' + (b.last || '')).trim().toLowerCase();
+        rows.sort(function(a, b) {
+          if (a.sev !== b.sev) return a.sev - b.sev;
+          var na = ((a.c.first || '') + ' ' + (a.c.last || '')).trim().toLowerCase();
+          var nb = ((b.c.first || '') + ' ' + (b.c.last || '')).trim().toLowerCase();
           return na < nb ? -1 : na > nb ? 1 : 0;
         });
 
-        // Filter by severity if set
-        if (_filter !== null) {
-          contacts = contacts.filter(function(c) {
-            var sv2 = c.sev != null ? c.sev : 3;
-            return sv2 === _filter;
-          });
-        }
+        if (_filter !== null) rows = rows.filter(function(r) { return r.sev === _filter; });
 
-        if (contacts.length === 0) {
-          cardsEl.innerHTML = '<div class="pulse-empty">No contacts at this severity level</div>';
+        if (rows.length === 0) {
+          cardsEl.innerHTML = '<div class="pulse-empty">' + _esc(_t('pulse.noneAtLevel', 'No contacts at this severity level')) + '</div>';
           return;
         }
 
-        // Build cards with async data
         var html = '';
-        for (var j = 0; j < contacts.length; j++) {
-          var c = contacts[j];
-          var name = ((c.first || '') + ' ' + (c.last || '')).trim() || 'Unknown';
-          var sev = c.sev != null ? c.sev : 3;
-          if (sev < 0) sev = 0;
-          if (sev > 4) sev = 4;
-          var cat = c.cat || '';
+        for (var j = 0; j < rows.length; j++) {
+          var r = rows[j];
+          var c2 = r.c;
+          var name = ((c2.first || '') + ' ' + (c2.last || '')).trim() || 'Unknown';
 
+          /* Newest interaction and mood by timestamp, never insertion order.
+             Moods use the main logger shape {level 1..5, ts}. */
+          var ints = (r.comp && r.comp.interactions) || [];
           var lastInt = null;
+          ints.forEach(function(e) { if (!lastInt || (e.timestamp || e.ts || 0) > (lastInt.timestamp || lastInt.ts || 0)) lastInt = e; });
           var lastMood = null;
           try {
-            var ints = await RemielDB.getInteractionsByContact(c.id);
-            if (ints && ints.length > 0) lastInt = ints[ints.length - 1];
-          } catch(e) {}
+            var moods = await RemielDB.getMoodsByContact(c2.id);
+            (moods || []).forEach(function(m) { if (typeof m.level === 'number' && (!lastMood || (m.ts || 0) > (lastMood.ts || 0))) lastMood = m; });
+          } catch (e) {}
+
+          var headline = '';
           try {
-            var moods = await RemielDB.getMoodsByContact(c.id);
-            if (moods && moods.length > 0) lastMood = moods[moods.length - 1];
-          } catch(e) {}
+            if (typeof SentinelHeadlines !== 'undefined') {
+              var hr = await SentinelHeadlines.computeHeadline(c2);
+              headline = (hr && hr.headline) || '';
+            }
+          } catch (e) {}
 
           var bodyLines = [];
-          if (lastInt) {
-            bodyLines.push('<strong>Last contact:</strong> ' + (lastInt.type || 'interaction') + ' ' + _timeAgo(lastInt.timestamp || lastInt.updatedAt));
-          } else {
-            bodyLines.push('<strong>Last contact:</strong> none recorded');
-          }
+          if (headline) bodyLines.push('<div style="font-weight:600;color:var(--text-primary,#fff);letter-spacing:0.3px;">' + _esc(headline) + '</div>');
+          bodyLines.push('<strong>' + _esc(_t('pulse.lastContact', 'Last interaction:')) + '</strong> ' + (lastInt
+            ? _esc(lastInt.type || 'interaction') + ' ' + _timeAgo(lastInt.timestamp || lastInt.ts)
+            : _esc(_t('pulse.noneRecorded', 'none recorded'))));
           if (lastMood) {
-            bodyLines.push('<strong>Last mood:</strong> ' + (lastMood.label || (lastMood.value != null ? lastMood.value + '/10' : '')) + ' ' + _timeAgo(lastMood.timestamp || lastMood.updatedAt));
+            var ml = (typeof MOOD_LABELS !== 'undefined' && MOOD_LABELS[lastMood.level]) || lastMood.label || '';
+            bodyLines.push('<strong>' + _esc(_t('pulse.lastMood', 'Last mood:')) + '</strong> ' + _esc(ml) + ' ' + _timeAgo(lastMood.ts));
           }
+          var action = _suggestAction(r.sev, r.comp);
+          var actionHtml = '<div class="pulse-card-action"><strong>' + _esc(_t('pulse.next', 'Next:')) + '</strong> ' + _esc(action) + '</div>';
+          var chip = '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;color:#fff;background:' + SEV_COLORS[r.sev] + ';">' + SEV_LABELS[r.sev] + '</span>';
 
-          var action = _suggestAction(c, lastInt, lastMood);
-          var actionHtml = action ? '<div class="pulse-card-action">' + action + '</div>' : '';
-
-          html += '<div class="pulse-card" onclick="ThePulse.close(); if(typeof focusContact===\'function\') focusContact(\'' + String(c.id || '').replace(/'/g, '') + '\')">' +
+          html += '<div class="pulse-card" onclick="ThePulse.close(); if(typeof focusContact===\'function\') focusContact(\'' + String(c2.id || '').replace(/'/g, '') + '\')">' +
             '<div class="pulse-card-top">' +
-              '<div class="pulse-card-sev" style="background:' + SEV_COLORS[sev] + ';"></div>' +
-              '<div class="pulse-card-name">' + name + '</div>' +
-              '<div class="pulse-card-cat">' + cat + '</div>' +
+              '<div class="pulse-card-sev" style="background:' + SEV_COLORS[r.sev] + ';"></div>' +
+              '<div class="pulse-card-name">' + _esc(name) + '</div>' +
+              chip +
+              '<div class="pulse-card-cat">' + _esc(c2.cat || '') + '</div>' +
             '</div>' +
             '<div class="pulse-card-body">' + bodyLines.join('<br>') + actionHtml + '</div>' +
           '</div>';
@@ -20667,7 +20738,7 @@ const SocialImport = (() => {
         cardsEl.innerHTML = html;
 
       } catch (e) {
-        cardsEl.innerHTML = '<div class="pulse-empty">Error loading feed: ' + e.message + '</div>';
+        cardsEl.innerHTML = '<div class="pulse-empty">' + _esc(_t('pulse.error', 'Could not load the feed: ') + e.message) + '</div>';
       }
     }
 
@@ -20675,6 +20746,7 @@ const SocialImport = (() => {
       open: open,
       close: close,
       _setFilter: _setFilter,
+      refresh: _loadFeed,
     };
   })();
 
