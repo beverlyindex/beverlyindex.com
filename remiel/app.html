@@ -5657,6 +5657,7 @@ body:has(#sentinelMsgOverlay.open, .sv-overlay.open, .sentinel-call-overlay.acti
           <p style="font-size:11px;color:var(--text-dim);margin:0 0 8px;">Attach an email and password to this account. Then sign in with them on your other device to see the same data.</p>
           <input class="settings-input" type="email" id="acctClaimEmail" placeholder="Email" autocomplete="email" style="margin-bottom:8px;">
           <input class="settings-input" type="password" id="acctClaimPassword" placeholder="Password (8+ characters)" data-i18n-placeholder="acct.passPh" autocomplete="new-password" style="margin-bottom:8px;">
+          <input class="settings-input" type="text" id="acctClaimCode" placeholder="Invite code" data-i18n-placeholder="acct.codePh" autocomplete="off" style="margin-bottom:8px;display:none;">
           <div style="display:flex;gap:8px;">
             <button class="settings-action-btn" onclick="AccountPanel.doClaim()" style="flex:1;" data-i18n="acct.attach">Attach email</button>
             <button class="settings-action-btn secondary" onclick="AccountPanel.show('main')" style="flex:1;">Cancel</button>
@@ -8916,6 +8917,8 @@ const I18n = (function () {
     'qa.missingPhone': "No phone number saved for {name}.",
     'qa.missingEmail': "No email saved for {name}.",
     'qa.missingSid': "Add {name}'s Sentinel ID to video call in Remiel Sentinel.",
+    'acct.codePh': "Invite code",
+    'acct.codeNeeded': "This server asks for an invite code. Enter it and try again.",
     'qa.meetOffer': "{name} has no Sentinel ID yet. Start a Google Meet instead, or add their ID for calls inside Remiel Sentinel.",
     'qa.meetStart': "Google Meet",
     'qa.addSid': "Add Sentinel ID",
@@ -9346,6 +9349,8 @@ const I18n = (function () {
     'qa.missingPhone': "Nessun numero di telefono salvato per {name}.",
     'qa.missingEmail': "Nessuna email salvata per {name}.",
     'qa.missingSid': "Aggiungi l'ID Sentinel di {name} per videochiamare in Remiel Sentinel.",
+    'acct.codePh': "Codice invito",
+    'acct.codeNeeded': "Questo server richiede un codice invito. Inseriscilo e riprova.",
     'qa.meetOffer': "{name} non ha ancora un ID Sentinel. Avvia una Google Meet, oppure aggiungi il suo ID per chiamare dentro Remiel Sentinel.",
     'qa.meetStart': "Google Meet",
     'qa.addSid': "Aggiungi ID Sentinel",
@@ -26439,8 +26444,20 @@ const AccountPanel = (function() {
     if (!email || pw.length < 8) { _msg('acctClaimStatus', _t('acct.claimNeed', 'Enter an email and a password of at least 8 characters.'), true); return; }
     _msg('acctClaimStatus', '...');
     try {
-      var code = null; try { code = localStorage.getItem('rm:access'); } catch (e) {}
-      await SyncEngine.claim(email, pw, code);
+      /* Only a code the user typed is sent. If the server wants one, the
+         field is revealed and the user is asked for it. */
+      var codeEl = _$('acctClaimCode');
+      var code = (codeEl && codeEl.value || '').trim() || null;
+      try {
+        await SyncEngine.claim(email, pw, code);
+      } catch (err) {
+        if (codeEl && /invite code/i.test(String(err && err.message))) {
+          codeEl.style.display = '';
+          _msg('acctClaimStatus', _t('acct.codeNeeded', 'This server asks for an invite code. Enter it and try again.'), true);
+          return;
+        }
+        throw err;
+      }
       _$('acctClaimPassword').value = '';
       _view = 'main';
       render();
