@@ -18944,11 +18944,175 @@ const A11y = (() => {
   return { init, announce, trapFocus, releaseFocus, prefersReducedMotion, reducedMotion: prefersReducedMotion, FOCUSABLE };
 })();
 
+/* ═══════════════════════════════════════════════════════════
+   ContactListView: accessible list alternative to the galaxy canvas.
+   A "List view" button (network mode) opens a scrollable, keyboard
+   navigable list with Open, Call, Message and Video for each contact.
+   The canvas is aria-hidden while the list is open.
+   ═══════════════════════════════════════════════════════════ */
+const ContactListView = (() => {
+  'use strict';
+  let _built = false;
+
+  function _el(tag, attrs, text) {
+    const e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(k => {
+      if (k === 'style') e.style.cssText = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    });
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function _build() {
+    if (_built) return;
+    _built = true;
+    const css = document.createElement('style');
+    css.textContent =
+      '.clv-toggle{position:fixed;bottom:20px;right:80px;z-index:8000;height:48px;padding:0 16px;border-radius:24px;border:1px solid rgba(255,255,255,0.18);' +
+      'background:rgba(19,26,39,0.92);color:#e5e7eb;font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;display:none;}' +
+      'body.network-active .clv-toggle{display:block;}' +
+      '.clv-toggle:focus-visible,.clv-btn:focus-visible,.clv-close:focus-visible{outline:2px solid #C5A55A;outline-offset:2px;}' +
+      '.clv-overlay{position:fixed;inset:0;z-index:9500;background:rgba(3,4,8,0.72);display:none;align-items:flex-end;justify-content:center;}' +
+      '.clv-overlay.open{display:flex;}' +
+      '.clv-panel{width:min(560px,100%);max-height:85vh;display:flex;flex-direction:column;background:#0e1219;color:#e5e7eb;border-radius:16px 16px 0 0;' +
+      'border:1px solid rgba(255,255,255,0.1);padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));box-sizing:border-box;}' +
+      '.clv-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}' +
+      '.clv-title{font:700 17px "Hanken Grotesk",system-ui,sans-serif;margin:0;}' +
+      '.clv-close{background:none;border:0;color:#9ca3af;font-size:24px;cursor:pointer;min-width:44px;min-height:44px;}' +
+      '.clv-list{list-style:none;margin:0;padding:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}' +
+      '.clv-item{padding:12px 4px;border-top:1px solid rgba(255,255,255,0.07);}' +
+      '.clv-name{font:600 15px "Hanken Grotesk",system-ui,sans-serif;margin:0 0 2px;}' +
+      '.clv-meta{font:400 12px "Hanken Grotesk",system-ui,sans-serif;color:#9ca3af;margin:0 0 8px;}' +
+      '.clv-actions{display:flex;flex-wrap:wrap;gap:8px;}' +
+      '.clv-btn{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:#e5e7eb;' +
+      'font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;}' +
+      '.clv-btn.primary{background:#C5A55A;color:#000;border-color:#C5A55A;}' +
+      '.clv-empty{padding:16px 4px;color:#9ca3af;font:400 14px "Hanken Grotesk",system-ui,sans-serif;}';
+    document.head.appendChild(css);
+
+    const btn = _el('button', { type: 'button', id: 'clvToggle', class: 'clv-toggle', 'aria-haspopup': 'dialog', 'aria-controls': 'contactListView' },
+      _t('a11y.listView', 'List view'));
+    btn.addEventListener('click', open);
+    document.body.appendChild(btn);
+
+    const ov = _el('div', { id: 'contactListView', class: 'clv-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'clvTitle' });
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    const panel = _el('div', { class: 'clv-panel' });
+    const head = _el('div', { class: 'clv-head' });
+    head.appendChild(_el('h2', { id: 'clvTitle', class: 'clv-title' }, _t('a11y.listTitle', 'Your circle')));
+    const x = _el('button', { type: 'button', class: 'clv-close', 'aria-label': _t('a11y.closeList', 'Close list') }, '×');
+    x.addEventListener('click', close);
+    head.appendChild(x);
+    panel.appendChild(head);
+    panel.appendChild(_el('ul', { id: 'clvList', class: 'clv-list', 'aria-labelledby': 'clvTitle' }));
+    ov.appendChild(panel);
+    document.body.appendChild(ov);
+  }
+
+  function _catLabel(cat) {
+    const map = { family: _t('cat.family', 'Family'), professional: _t('cat.professional', 'Professional'),
+      friend: _t('cat.friend', 'Friend'), other: (typeof otherLabel !== 'undefined' && otherLabel) ? otherLabel : _t('cat.other', 'Other') };
+    return map[cat] || cat || map.other;
+  }
+  function _lastLabel(days) {
+    if (days == null) return _t('a11y.lastNever', 'No contact logged');
+    const d = Math.round(days);
+    if (d <= 0) return _t('a11y.lastToday', 'Last contact today');
+    if (d === 1) return _t('a11y.lastYesterday', 'Last contact yesterday');
+    return _t('a11y.lastDays', 'Last contact {n} days ago', { n: d });
+  }
+
+  function _contacts() {
+    let list = (typeof DEMO_CONTACTS !== 'undefined') ? DEMO_CONTACTS.slice() : [];
+    try {
+      if (typeof SentinelViews !== 'undefined' && SentinelViews.getActiveView && SentinelViews.getActiveView()) {
+        const f = SentinelViews.getFilteredContacts && SentinelViews.getFilteredContacts();
+        if (Array.isArray(f) && f.length) list = f.slice();
+      }
+    } catch (e) {}
+    return list.sort((a, b) => (a.sev - b.sev) || String(a.first || '').localeCompare(String(b.first || '')));
+  }
+
+  function _action(label, cls, fn) {
+    const b = _el('button', { type: 'button', class: 'clv-btn' + (cls ? ' ' + cls : '') }, label);
+    b.addEventListener('click', fn);
+    return b;
+  }
+
+  function _render() {
+    const ul = document.getElementById('clvList');
+    if (!ul) return;
+    ul.textContent = '';
+    const list = _contacts();
+    if (!list.length) {
+      ul.appendChild(_el('li', { class: 'clv-empty' }, _t('a11y.listEmpty', 'No contacts yet.')));
+      return;
+    }
+    list.forEach(c => {
+      const name = [c.first, c.last].filter(Boolean).join(' ') || _t('a11y.unnamed', 'Unnamed');
+      const sevLabel = (typeof SEVS !== 'undefined' && SEVS[c.sev]) ? SEVS[c.sev].label : '';
+      const li = _el('li', { class: 'clv-item' });
+      li.appendChild(_el('p', { class: 'clv-name' }, name));
+      const meta = _el('p', { class: 'clv-meta' }, _catLabel(c.cat) + ' \u00b7 ' + sevLabel);
+      li.appendChild(meta);
+      const acts = _el('div', { class: 'clv-actions', role: 'group', 'aria-label': name });
+      acts.appendChild(_action(_t('a11y.open', 'Open'), 'primary', () => {
+        close();
+        if (typeof enterDetail === 'function') enterDetail(c, Math.round(window.innerHeight * 0.35));
+      }));
+      acts.appendChild(_action(_t('a11y.call', 'Call'), '', () => { close(); runContactQuickAction('phone', c); }));
+      acts.appendChild(_action(_t('a11y.message', 'Message'), '', () => { close(); runContactQuickAction('sms', c); }));
+      acts.appendChild(_action(_t('a11y.video', 'Video'), '', () => { close(); runContactQuickAction('video', c); }));
+      li.appendChild(acts);
+      ul.appendChild(li);
+      /* Last contact is async: fill in when known */
+      if (typeof computeSeverity === 'function') {
+        computeSeverity(c.id).then(sv => {
+          meta.textContent = _catLabel(c.cat) + ' \u00b7 ' + sevLabel + ' \u00b7 ' + _lastLabel(sv ? sv.daysSinceContact : null);
+        }).catch(() => {});
+      }
+    });
+  }
+
+  function _setCanvasHidden(on) {
+    const cv = document.getElementById('sphere');
+    const st = document.getElementById('stage');
+    [cv, st].forEach(el => {
+      if (!el) return;
+      if (on) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden');
+    });
+  }
+
+  function open() {
+    _build();
+    _render();
+    const ov = document.getElementById('contactListView');
+    ov.classList.add('open');
+    _setCanvasHidden(true);
+    const t = document.getElementById('clvToggle');
+    if (t) t.setAttribute('aria-expanded', 'true');
+    A11y.trapFocus(ov);
+  }
+  function close() {
+    const ov = document.getElementById('contactListView');
+    if (!ov || !ov.classList.contains('open')) return;
+    ov.classList.remove('open');
+    _setCanvasHidden(false);
+    const t = document.getElementById('clvToggle');
+    if (t) { t.setAttribute('aria-expanded', 'false'); try { t.focus(); } catch (e) {} }
+    A11y.releaseFocus();
+  }
+  function init() { _build(); }
+  return { init, open, close };
+})();
+
 /* Start accessibility engine early */
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => A11y.init());
+  document.addEventListener('DOMContentLoaded', () => { A11y.init(); ContactListView.init(); });
 } else {
   A11y.init();
+  ContactListView.init();
 }
 
 /* ═══════════════════════════════════════════════════════════
