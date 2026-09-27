@@ -9263,6 +9263,11 @@ const CATS = {
 };
 let curCat = 'family';
 let pulseOn = true;
+/* prefers-reduced-motion: live media query; the draw loop reads this to stop
+   auto-spin, pulsing and rest mode. Exposed as A11y.reducedMotion(). */
+let _rmMQ = null;
+try { _rmMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null; } catch (e) {}
+function _reducedMotionNow() { return !!(_rmMQ && _rmMQ.matches); }
 let otherLabel = 'Other';
 let sphereName = '';
 
@@ -11223,6 +11228,7 @@ function _exitRestMode() {
 
 function _enterRestMode() {
   if (_restModeActive) return;
+  if (_reducedMotionNow()) return; /* rest mode auto-cycles focus: off under reduced motion */
   if (blufOpen || appState !== 'network') return;
   _restModeActive = true;
   _cycleDreamContact();
@@ -14727,6 +14733,35 @@ function handleOverlayClick(e) {
   if (e.target === document.getElementById('overlay')) closeOverlay();
 }
 
+/* Quick action for a contact (galaxy icons and the accessible list view).
+   type: 'video' | 'phone' | 'sms' | 'email' */
+function runContactQuickAction(type, c) {
+  if (!c) return;
+  if (type === 'video' && c.phone) {
+    window.location.href = 'facetime:' + normalizePhone(c.phone);
+  } else if (type === 'video' && !c.phone) {
+    openQuickDial('video', c.first, c.id);
+  } else if (type === 'phone' && c.phone) {
+    window.location.href = 'tel:' + normalizePhone(c.phone);
+  } else if (type === 'sms') {
+    /* RSM: open in-app messaging instead of native SMS */
+    SentinelMessaging.openFor(c.id);
+  } else if (type === 'email' && c.email) {
+    window.location.href = 'mailto:' + c.email;
+  } else {
+    /* No contact info: open quick-dial overlay */
+    if (type === 'email' && c) {
+      openQuickDial('email', c.first, c.id);
+    } else if (type === 'phone' && c) {
+      openQuickDial('call', c.first, c.id);
+    } else if (type === 'video' && c) {
+      openQuickDial('video', c.first, c.id);
+    } else {
+      showToast('No contact info on file');
+    }
+  }
+}
+
 function onPressStart(e) {
   if (overlayOpen || blufOpen) return;
   if (dragging) return;
@@ -14844,7 +14879,7 @@ function onPressEnd(e) {
           const _qaP = projectNode(_qaNode);
           const _qaS = _qaP.scale;
           const _qaMul = FOCUS_SCALE;
-          const _qaCb = pulseOn ? (1 + (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseAmp * Math.sin(performance.now() * (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseSpd + _qaNode.tx)) : 1;
+          const _qaCb = (pulseOn && !_reducedMotionNow()) ? (1 + (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseAmp * Math.sin(performance.now() * (SEVS[_qaNode.contact.sev] || SEVS[4]).pulseSpd + _qaNode.tx)) : 1;
           const _qaR = Math.max(2, _qaNode.r * _qaS * _qaMul * _qaCb);
           const _qaSx = _qaP.sx, _qaSy = _qaP.sy;
           /* Hit-test text labels on right (or left) side of sphere */
@@ -14873,29 +14908,7 @@ function onPressEnd(e) {
               /* Fresh lookup from DEMO_CONTACTS to pick up edits */
               const _qcBase = _qaNode.contact;
               const _qc = DEMO_CONTACTS.find(c => c.id === _qcBase.id) || _qcBase;
-              if (_qi.type === 'video' && _qc.phone) {
-                window.location.href = 'facetime:' + normalizePhone(_qc.phone);
-              } else if (_qi.type === 'video' && !_qc.phone) {
-                openQuickDial('video', _qc.first, _qc.id);
-              } else if (_qi.type === 'phone' && _qc.phone) {
-                window.location.href = 'tel:' + normalizePhone(_qc.phone);
-              } else if (_qi.type === 'sms') {
-                /* RSM — open in-app messaging instead of native SMS */
-                SentinelMessaging.openFor(_qc.id);
-              } else if (_qi.type === 'email' && _qc.email) {
-                window.location.href = 'mailto:' + _qc.email;
-              } else {
-                /* No contact info — open quick-dial overlay */
-                if (_qi.type === 'email' && _qc) {
-                  openQuickDial('email', _qc.first, _qc.id);
-                } else if (_qi.type === 'phone' && _qc) {
-                  openQuickDial('call', _qc.first, _qc.id);
-                } else if (_qi.type === 'video' && _qc) {
-                  openQuickDial('video', _qc.first, _qc.id);
-                } else {
-                  showToast('No contact info on file');
-                }
-              }
+              runContactQuickAction(_qi.type, _qc);
               pressStarted = false;
               netDragging = false;
               stage.classList.remove('pressing');
@@ -15780,7 +15793,7 @@ let lastW = CV.width;
 function drawSphereView(t) {
   const w=CV.width, h=CV.height, cx=w/2, cy=h/2;
   const baseR = Math.min(w,h)/2*0.78;
-  const pf = pulseOn ? 1+0.02*Math.sin(t*0.003) : 1;
+  const pf = (pulseOn && !_reducedMotionNow()) ? 1+0.02*Math.sin(t*0.003) : 1;
   const R = baseR * pf;
   const c = CATS[curCat];
 
@@ -15916,7 +15929,7 @@ function drawSphereView(t) {
   /* NOUS STATUS RING (outer) */
   const sv = SEVS[curSev];
   const outerR = R * 1.15;
-  const sevPulse = pulseOn ? 1 + sv.pulseAmp * Math.sin(t * sv.pulseSpd) : 1;
+  const sevPulse = (pulseOn && !_reducedMotionNow()) ? 1 + sv.pulseAmp * Math.sin(t * sv.pulseSpd) : 1;
   const oR = outerR * sevPulse;
 
   ctx.lineWidth = 7 * DPR;
@@ -16087,7 +16100,7 @@ function drawNetworkView(t) {
   }
 
   /* Auto-spin */
-  if (netSpin && !netDragging) netYaw += 0.0022;
+  if (netSpin && !netDragging && !_reducedMotionNow()) netYaw += 0.0022;
 
   /* Project and depth-sort (back to front) */
   const projected = NODES.map(node => ({ node, p: projectNode(node) }));
@@ -16142,7 +16155,7 @@ function drawNetworkView(t) {
     const isFocused = focusedContactId === node.contact.id;
     const focusMul = isFocused ? FOCUS_SCALE : 1;
     /* Breathing — gentle scale pulse per-sphere, gated by pulseOn */
-    const _cb = pulseOn ? (1 + (SEVS[node.contact.sev] || SEVS[4]).pulseAmp * Math.sin(t * (SEVS[node.contact.sev] || SEVS[4]).pulseSpd + node.tx)) : 1;
+    const _cb = (pulseOn && !_reducedMotionNow()) ? (1 + (SEVS[node.contact.sev] || SEVS[4]).pulseAmp * Math.sin(t * (SEVS[node.contact.sev] || SEVS[4]).pulseSpd + node.tx)) : 1;
     const r = Math.max(2, node.r * s * focusMul * _cb);
     const sx = p.sx, sy = p.sy;
     const isUrgent = node.contact.sev <= 1;
@@ -16155,7 +16168,7 @@ function drawNetworkView(t) {
     let haloMul = 4.2;
     let pulseA = 0;
     if (isUrgent) {
-      pulseA = 0.5 + 0.5 * Math.sin(t * 7 + node.tx);
+      pulseA = _reducedMotionNow() ? 0.5 : 0.5 + 0.5 * Math.sin(t * 7 + node.tx);
       haloMul = 4.6 + pulseA * 1.8;
     }
     const halo = r * haloMul;
@@ -16464,7 +16477,7 @@ function drawNetworkView(t) {
   const selfStageW = Math.min(400, W * 0.88);
   const centerFactor = W < 500 ? 0.22 : 0.26;
   const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
-  const breathe = pulseOn ? (1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd)) : 1;
+  const breathe = (pulseOn && !_reducedMotionNow()) ? (1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd)) : 1;
   const cr = centerR * breathe;
 
   /* Outer glow (additive) — category color */
@@ -17098,9 +17111,7 @@ const SettingsPanel = (function () {
   function init() {
     const pwInput = $('exportPassphrase');
     if (pwInput) pwInput.addEventListener('input', updateStrength);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && $('settingsPanel').classList.contains('open')) closePanel();
-    });
+    /* Escape is handled once, centrally, by A11y (topmost dialog closes). */
     checkBackupReminder();
   }
 
@@ -18532,7 +18543,7 @@ const AlertEngine = (() => {
       });
     }
 
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
+    /* Escape handled centrally by A11y. */
   }
 
   /* ── Service worker registration ── */
@@ -18644,89 +18655,151 @@ const A11y = (() => {
     requestAnimationFrame(() => { el.textContent = msg; });
   }
 
-  /* ── Focus trap for modal dialogs ── */
+  /* ── Modal registry: known dialogs and how to close each ──
+     Visibility is read from the open/active/visible classes these modules use. */
+  const MODALS = [
+    { id: 'contactListView',     close: () => ContactListView.close() },
+    { id: 'swUpdateBanner',      close: null, skip: true },
+    { id: 'medImgOverlay',       close: () => MedImageReader.close() },
+    { id: 'scIncomingOverlay',   close: () => SentinelCall.rejectIncoming() },
+    { id: 'scOverlay',           close: () => SentinelCall.hangUp() },
+    { id: 'syncPromptOverlay',   close: () => SyncPrompt.dismiss() },
+    { id: 'rosterOverlay',       close: () => RosterImport.close() },
+    { id: 'socialImportModal',   close: () => SocialImport.close() },
+    { id: 'contactModalOverlay', close: () => closeContactModal() },
+    { id: 'quickDialOverlay',    close: () => closeQuickDial() },
+    { id: 'contactsPopupOverlay',close: () => closeContactsPopup() },
+    { id: 'svEditor',            close: () => SentinelViews.closeEditor() },
+    { id: 'svOverlay',           close: () => SentinelViews.closePanel() },
+    { id: 'pulseOverlay',        close: () => ThePulse.close() },
+    { id: 'sentinelMsgOverlay',  close: () => SentinelMessaging.close() },
+    { id: 'checkinNudge',        close: () => SelfCheckIn.dismiss() },
+    { id: 'alertPanel',          close: () => AlertEngine.closePanel() },
+    { id: 'settingsPanel',       close: () => SettingsPanel.close() },
+    { id: 'blufOverlay',         close: () => closeBluf() },
+    { id: 'overlay',             close: () => closeOverlay() }
+  ];
+  const OPEN_CLASSES = ['open', 'active', 'visible', 'show'];
+  const _stack = []; /* [{ el, prevFocus, close }] topmost last */
+
+  function _isShown(el) {
+    if (!el || !el.isConnected || el.hidden) return false;
+    for (let i = 0; i < OPEN_CLASSES.length; i++) {
+      if (el.classList.contains(OPEN_CLASSES[i])) return true;
+    }
+    return false;
+  }
+  function _entryFor(el) { return _stack.find(x => x.el === el) || null; }
+  function _closerFor(el) {
+    const m = MODALS.find(x => x.id === el.id);
+    if (m && m.close) return m.close;
+    return function () {
+      /* Generic: press a close button inside, else drop the open class */
+      const btn = el.querySelector('[aria-label="Close"], [aria-label="close"], .close, [class*="close"]');
+      if (btn && typeof btn.click === 'function') { btn.click(); return; }
+      OPEN_CLASSES.forEach(c => el.classList.remove(c));
+    };
+  }
+  function _focusables(container) {
+    return Array.from(container.querySelectorAll(FOCUSABLE)).filter(n => n.offsetParent !== null || n === document.activeElement);
+  }
+  function _push(el) {
+    if (!el || _entryFor(el)) return;
+    const m = MODALS.find(x => x.id === el.id);
+    if (m && m.skip) return;
+    if (!el.getAttribute('role')) el.setAttribute('role', 'dialog');
+    if (!el.hasAttribute('aria-modal')) el.setAttribute('aria-modal', 'true');
+    _stack.push({ el: el, prevFocus: document.activeElement, close: _closerFor(el) });
+    setTimeout(() => {
+      if (!_isShown(el) || el.contains(document.activeElement)) return;
+      const f = _focusables(el);
+      try {
+        if (f.length) f[0].focus();
+        else { el.setAttribute('tabindex', '-1'); el.focus(); }
+      } catch (e) {}
+    }, 60);
+  }
+  function _pop(el) {
+    const i = _stack.findIndex(x => x.el === el);
+    if (i < 0) return;
+    const entry = _stack.splice(i, 1)[0];
+    /* Restore focus only if it was inside the dialog that closed */
+    if (!document.activeElement || document.activeElement === document.body || el.contains(document.activeElement)) {
+      const pf = entry.prevFocus;
+      if (pf && pf.isConnected && typeof pf.focus === 'function') { try { pf.focus(); } catch (e) {} }
+    }
+  }
+  function _sync() {
+    MODALS.forEach(m => {
+      const el = document.getElementById(m.id);
+      if (!el) return;
+      if (_isShown(el)) _push(el); else if (_entryFor(el)) _pop(el);
+    });
+    /* Generic dialogs not in the registry */
+    document.querySelectorAll('[role="dialog"]').forEach(el => {
+      if (MODALS.some(m => m.id === el.id)) return;
+      if (el.parentElement && el.parentElement.closest('[role="dialog"], ' + MODALS.map(m => '#' + m.id).join(','))) return;
+      if (_isShown(el)) _push(el); else if (_entryFor(el)) _pop(el);
+    });
+    for (let i = _stack.length - 1; i >= 0; i--) {
+      if (!_isShown(_stack[i].el)) _pop(_stack[i].el);
+    }
+  }
+
+  /* Public API kept for existing callers: now stack based */
   function trapFocus(container) {
     if (!container) return;
-    _prevFocus = document.activeElement;
-    _trapEl = container;
-
-    const focusables = container.querySelectorAll(FOCUSABLE);
-    if (focusables.length === 0) {
-      container.setAttribute('tabindex', '-1');
-      container.focus();
-      return;
-    }
-
-    _trapHandler = function (e) {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(container.querySelectorAll(FOCUSABLE));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    container.addEventListener('keydown', _trapHandler);
-
-    // Focus first focusable element
-    setTimeout(() => { focusables[0].focus(); }, 50);
+    _push(container);
   }
-
   function releaseFocus() {
-    if (_trapEl && _trapHandler) {
-      _trapEl.removeEventListener('keydown', _trapHandler);
-    }
-    _trapEl = null;
-    _trapHandler = null;
-    if (_prevFocus && typeof _prevFocus.focus === 'function') {
-      try { _prevFocus.focus(); } catch (e) {}
-    }
-    _prevFocus = null;
+    setTimeout(_sync, 0);
   }
 
-  /* ── Keyboard: Escape to close overlays ── */
+  /* Single Tab trap for the topmost dialog */
+  function _onTab(e) {
+    if (e.key !== 'Tab' || !_stack.length) return;
+    const top = _stack[_stack.length - 1].el;
+    const f = _focusables(top);
+    if (!f.length) { e.preventDefault(); return; }
+    const first = f[0], last = f[f.length - 1];
+    if (!top.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; }
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  function _observe() {
+    let pending = false;
+    const mo = new MutationObserver(muts => {
+      let relevant = false;
+      for (let i = 0; i < muts.length && !relevant; i++) {
+        const t = muts[i].target;
+        if (t.nodeType !== 1) continue;
+        if (t.id && MODALS.some(m => m.id === t.id)) relevant = true;
+        else if (t.getAttribute && t.getAttribute('role') === 'dialog') relevant = true;
+      }
+      if (!relevant || pending) return;
+      pending = true;
+      requestAnimationFrame(() => { pending = false; _sync(); });
+    });
+    mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+  }
+
+  /* ── Keyboard: Escape closes the topmost dialog, once ── */
   function setupEscapeHandlers() {
+    document.addEventListener('keydown', _onTab, true);
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
-
-      /* Settings panel */
-      const settings = document.getElementById('settingsPanel');
-      if (settings && settings.classList.contains('open')) {
-        if (typeof SettingsPanel !== 'undefined') SettingsPanel.close();
-        releaseFocus();
-        e.stopPropagation();
-        return;
+      _sync();
+      /* Let text inputs inside a combobox or IME keep Escape */
+      if (e.isComposing) return;
+      const top = _stack[_stack.length - 1];
+      if (!top) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try { top.close(); } catch (err) {
+        OPEN_CLASSES.forEach(c => top.el.classList.remove(c));
       }
-
-      /* Alert panel */
-      const alertPanel = document.getElementById('alertPanel');
-      if (alertPanel && alertPanel.classList.contains('open')) {
-        if (typeof AlertEngine !== 'undefined') AlertEngine.closePanel();
-        releaseFocus();
-        e.stopPropagation();
-        return;
-      }
-
-      /* BLUF overlay */
-      const bluf = document.getElementById('blufOverlay');
-      if (bluf && bluf.classList.contains('open')) {
-        if (typeof closeBluf === 'function') closeBluf();
-        releaseFocus();
-        e.stopPropagation();
-        return;
-      }
-
-      /* Overlay panel (sphere config) */
-      const overlay = document.getElementById('overlayPanel');
-      if (overlay && overlay.style.display !== 'none' && !overlay.hidden) {
-        if (typeof closeOverlay === 'function') closeOverlay();
-        releaseFocus();
-        e.stopPropagation();
-        return;
-      }
+      setTimeout(_sync, 0);
     });
   }
 
@@ -18745,7 +18818,26 @@ const A11y = (() => {
 
   /* ── Reduced motion detection ── */
   function prefersReducedMotion() {
-    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return (typeof _reducedMotionNow === 'function') ? _reducedMotionNow()
+      : !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  function _watchReducedMotion() {
+    const apply = () => {
+      const on = prefersReducedMotion();
+      document.documentElement.classList.toggle('reduce-motion', on);
+      if (on) {
+        try { if (typeof _restModeActive !== 'undefined' && _restModeActive) _exitRestMode(); } catch (e) {}
+        try {
+          const iv = document.getElementById('introVideo');
+          if (iv) { iv.autoplay = false; iv.removeAttribute('autoplay'); }
+        } catch (e) {}
+      }
+    };
+    apply();
+    try {
+      if (_rmMQ && _rmMQ.addEventListener) _rmMQ.addEventListener('change', apply);
+      else if (_rmMQ && _rmMQ.addListener) _rmMQ.addListener(apply);
+    } catch (e) {}
   }
 
   /* ── Hook into BLUF open/close for focus management ── */
@@ -18791,11 +18883,11 @@ const A11y = (() => {
           VideoNoteShare.updateVisibility();
           VideoNoteShare.loadShared();
         }
-      }
-    if (typeof PushNotify !== 'undefined') {
-      PushNotify.updateVisibility();
-      PushNotify.checkStatus();
-    };
+        if (typeof PushNotify !== 'undefined') {
+          PushNotify.updateVisibility();
+          PushNotify.checkStatus();
+        }
+      };
     }
     if (typeof _origClose === 'function') {
       SettingsPanel.close = function () {
@@ -18841,12 +18933,15 @@ const A11y = (() => {
     hookBlufFocus();
     hookSettingsFocus();
     enhancePullHeaders();
+    _watchReducedMotion();
+    _observe();
+    _sync();
 
     /* Announce page load for screen readers */
     announce('Remiel Sentinel loaded');
   }
 
-  return { init, announce, trapFocus, releaseFocus, prefersReducedMotion, FOCUSABLE };
+  return { init, announce, trapFocus, releaseFocus, prefersReducedMotion, reducedMotion: prefersReducedMotion, FOCUSABLE };
 })();
 
 /* Start accessibility engine early */
@@ -24472,7 +24567,7 @@ function updateFabVisibility() {
     bRow.innerHTML =
       '<span class="setting-label">Breathing effects</span>' +
       '<label class="setting-toggle"><input type="checkbox" id="breatheToggle" ' +
-      (pulseOn ? 'checked' : '') + '><span class="toggle-track"><span class="toggle-thumb"></span></span></label>';
+      ((pulseOn && !_reducedMotionNow()) ? 'checked' : '') + '><span class="toggle-track"><span class="toggle-thumb"></span></span></label>';
     lastRow.parentNode.insertBefore(bRow, lastRow.nextSibling);
     document.getElementById('breatheToggle').addEventListener('change', function() {
       pulseOn = this.checked;
