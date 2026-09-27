@@ -6664,6 +6664,18 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
               <span class="bluf-lc-key" data-i18n="lc.wellbeing">Wellbeing</span>
               <span class="bluf-lc-val" id="blufLcHealth">—</span>
             </div>
+            <div style="margin-top:10px;">
+              <div class="bluf-loc-label" id="moodRowLabel" data-i18n="mood.logFor">How are they doing?</div>
+              <div class="mood-row" id="moodRow" role="group" aria-labelledby="moodRowLabel">
+                <button type="button" class="mood-btn" data-level="1" aria-pressed="false" onclick="logMood(1, this)"><span class="mood-face" aria-hidden="true">😣</span><span class="mood-label" data-i18n="mood.struggling">Struggling</span></button>
+                <button type="button" class="mood-btn" data-level="2" aria-pressed="false" onclick="logMood(2, this)"><span class="mood-face" aria-hidden="true">😟</span><span class="mood-label" data-i18n="mood.low">Low</span></button>
+                <button type="button" class="mood-btn" data-level="3" aria-pressed="false" onclick="logMood(3, this)"><span class="mood-face" aria-hidden="true">😐</span><span class="mood-label" data-i18n="mood.okay">Okay</span></button>
+                <button type="button" class="mood-btn" data-level="4" aria-pressed="false" onclick="logMood(4, this)"><span class="mood-face" aria-hidden="true">🙂</span><span class="mood-label" data-i18n="mood.good">Good</span></button>
+                <button type="button" class="mood-btn" data-level="5" aria-pressed="false" onclick="logMood(5, this)"><span class="mood-face" aria-hidden="true">😊</span><span class="mood-label" data-i18n="mood.thriving">Thriving</span></button>
+              </div>
+              <div id="moodConfirm" aria-live="polite"></div>
+              <div id="moodHistory"></div>
+            </div>
             <div style="margin-top:8px;">
               <div class="bluf-loc-label" data-i18n="pull.nextSteps">Next Steps</div>
               <div id="blufLcNextSteps" style="font-size:13px;color:var(--nous-ink);line-height:1.45;margin-top:4px;">—</div>
@@ -8771,6 +8783,7 @@ const I18n = (function () {
       'mood.recentTitle':         'Recent Mood',
       'mood.noData':              'No mood data yet',
       'mood.logged':              'Mood logged',
+      'mood.logFor':              'How are they doing?',
 
       'ledger.placeholder':       'What happened?',
       'ledger.log':               'Log',
@@ -9180,6 +9193,7 @@ const I18n = (function () {
       'mood.recentTitle':         'Umore Recente',
       'mood.noData':              'Nessun dato sull’umore',
       'mood.logged':              'Umore registrato',
+      'mood.logFor':              'Come sta?',
 
       'ledger.placeholder':       'Cos’è successo?',
       'ledger.log':               'Registra',
@@ -11948,8 +11962,8 @@ async function logMood(level, btnEl) {
     ? selectedContact.id : 'self';
 
   /* Highlight the tapped button */
-  document.querySelectorAll('#moodRow .mood-btn').forEach(b => b.classList.remove('mood-active'));
-  if (btnEl) btnEl.classList.add('mood-active');
+  document.querySelectorAll('#moodRow .mood-btn').forEach(b => { b.classList.remove('mood-active'); b.setAttribute('aria-pressed', 'false'); });
+  if (btnEl) { btnEl.classList.add('mood-active'); btnEl.setAttribute('aria-pressed', 'true'); }
 
   /* Write to IndexedDB */
   try {
@@ -12056,7 +12070,7 @@ async function loadMoodForBluf() {
   }
 
   /* Clear any active state from previous view */
-  document.querySelectorAll('#moodRow .mood-btn').forEach(b => b.classList.remove('mood-active'));
+  document.querySelectorAll('#moodRow .mood-btn').forEach(b => { b.classList.remove('mood-active'); b.setAttribute('aria-pressed', 'false'); });
   const mc = document.getElementById('moodConfirm'); if (mc) mc.innerHTML = '';
 
   /* Load history */
