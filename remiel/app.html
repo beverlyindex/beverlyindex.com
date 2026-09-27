@@ -61,6 +61,7 @@
     flex-direction: column;
     align-items: center;
     min-height: 100vh;
+    min-height: 100dvh;
     padding-inline: 16px;
     padding-block: 24px 32px;
     margin: 0;
@@ -72,8 +73,12 @@
 
   .sphere-stage {
     position: relative;
-    width: min(400px, 88vw);
-    height: calc(min(400px, 88vw) + 56px);
+    /* Sphere side: width bound, and height bound by the visible viewport minus the
+       fixed header, the label strip and room for the summary card or buttons below */
+    --sph: min(400px, 88vw, calc(var(--vvh, 100svh) - max(12px, env(safe-area-inset-top, 0px)) - env(safe-area-inset-bottom, 0px) - 250px));
+    width: var(--sph);
+    height: calc(var(--sph) + 56px);
+    margin-top: calc(max(12px, env(safe-area-inset-top, 0px)) + 26px);
     flex-shrink: 0;
     cursor: default;
     touch-action: none;
@@ -85,6 +90,7 @@
   .sphere-stage.network-mode {
     position: fixed;
     inset: 0;
+    margin-top: 0;
     width: 100%;
     height: 100%;
     z-index: 50;
@@ -3886,7 +3892,7 @@
 
   /* ═══ Daily Summary Digest Card ═══ */
   .daily-digest {
-    width: min(420px, 90vw); margin: 0 auto;
+    width: min(420px, 90vw); margin: 20px auto 0;
     box-sizing: border-box; /* padding inside the width: no sideways scroll at 390px */
     background: var(--nous-panel, rgba(16,18,28,0.55));
     border: 1px solid rgba(255,255,255,0.08);
@@ -5489,6 +5495,27 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
   font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 4px;
 }
 
+
+/* Pressed and busy feedback on every control */
+button:active:not(:disabled), [role="button"]:active, .btn:active { transform: scale(0.97); filter: brightness(1.15); }
+.is-busy { cursor: progress !important; opacity: 0.85; }
+.busy-spin { display:inline-block; width:0.9em; height:0.9em; margin-right:0.45em; vertical-align:-0.12em;
+  border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation: busySpin 0.7s linear infinite; }
+@keyframes busySpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .busy-spin { animation-duration: 2s; } }
+.busy-cancel { margin-left:8px; background:transparent; color:#fda4af; border:1px solid rgba(253,164,175,0.5); border-radius:8px; padding:4px 10px; font-size:12px; }
+.lib-progress { font-size:12px; color:#94a3b8; margin:6px 0; }
+.lib-progress button { margin-left:8px; font-size:12px; }
+.ui-confirm-overlay { position:fixed; inset:0; z-index:100002; background:rgba(2,6,23,0.72); display:flex; align-items:center; justify-content:center; padding:16px; }
+.ui-confirm-box { background:#0f172a; color:#e2e8f0; border:1px solid rgba(56,189,248,0.3); border-radius:14px; padding:20px; max-width:360px; width:100%; }
+.ui-confirm-msg { margin:0 0 16px; font-size:15px; line-height:1.45; }
+.ui-confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
+.ui-confirm-actions button { min-height:44px; padding:0 18px; border-radius:10px; border:1px solid rgba(148,163,184,0.4); background:transparent; color:#e2e8f0; font-size:14px; }
+.ui-confirm-actions .ui-confirm-yes { background:#38bdf8; color:#0f172a; border-color:#38bdf8; font-weight:600; }
+.lib-pill { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(96px + env(safe-area-inset-bottom, 0px)); z-index:100001;
+  max-width:calc(100vw - 32px); display:flex; flex-wrap:wrap; align-items:center; gap:6px; background:rgba(15,23,42,0.94); color:#e2e8f0;
+  border:1px solid rgba(56,189,248,0.35); border-radius:14px; padding:8px 14px; font-size:12px; }
+.lib-pill button { background:transparent; color:#38bdf8; border:1px solid rgba(56,189,248,0.5); border-radius:8px; padding:4px 10px; font-size:12px; min-height:32px; }
 </style>
 
 
@@ -7042,6 +7069,131 @@ function showToast(msg) {
   setTimeout(function() { toast.remove(); }, 2500);
 }
 
+/* ── Busy feedback: immediate pressed state for any control doing slow work ── */
+function busy(el, label) {
+  if (!el || !el.classList) return el;
+  if (el.classList.contains('is-busy')) return el;
+  el.classList.add('is-busy');
+  el.setAttribute('aria-busy', 'true');
+  el._busySince = Date.now();
+  if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') { el._busyWasDisabled = el.disabled; el.disabled = true; }
+  if (label && el.tagName === 'BUTTON') {
+    el._busyHtml = el.innerHTML;
+    el.innerHTML = '<span class="busy-spin" aria-hidden="true"></span><span class="busy-word"></span>';
+    el.lastChild.textContent = label;
+  }
+  _busyWatch();
+  return el;
+}
+function unbusy(el) {
+  if (!el || !el.classList || !el.classList.contains('is-busy')) return;
+  el.classList.remove('is-busy');
+  el.removeAttribute('aria-busy');
+  if (el._busyHtml != null) { el.innerHTML = el._busyHtml; el._busyHtml = null; }
+  if (el._busyWasDisabled != null) { el.disabled = el._busyWasDisabled; el._busyWasDisabled = null; }
+  el._busyToasted = el._busyCancelShown = false;
+  if (el._busyCancel) { try { el._busyCancel.remove(); } catch (e) {} el._busyCancel = null; }
+}
+/* Global safety: a control busy over 8s gets a reassurance toast; over 20s a Cancel where possible */
+var _busyTimer = null;
+function _busyWatch() {
+  if (_busyTimer) return;
+  _busyTimer = setInterval(function () {
+    var list = document.querySelectorAll('.is-busy');
+    if (!list.length) { clearInterval(_busyTimer); _busyTimer = null; return; }
+    var now = Date.now();
+    list.forEach(function (el) {
+      var age = now - (el._busySince || now);
+      if (age > 8000 && !el._busyToasted) {
+        el._busyToasted = true;
+        showToast(typeof I18n !== 'undefined' ? I18n.t('busy.still') : 'Still working on it');
+      }
+      if (age > 20000 && !el._busyCancelShown && typeof el._onBusyCancel === 'function') {
+        el._busyCancelShown = true;
+        var c = document.createElement('button');
+        c.type = 'button';
+        c.className = 'busy-cancel';
+        c.textContent = typeof I18n !== 'undefined' ? I18n.t('busy.cancel') : 'Cancel';
+        c.addEventListener('click', function () { try { el._onBusyCancel(); } catch (e) {} unbusy(el); });
+        el.insertAdjacentElement('afterend', c);
+        el._busyCancel = c;
+      }
+    });
+  }, 1000);
+}
+/* Busy state for the control that triggered the current event, if any */
+function busyFromEvent(label) {
+  try {
+    var e = window.event;
+    var t = e && e.target && e.target.closest && e.target.closest('button,[role="button"],.btn');
+    if (t) return busy(t, label);
+  } catch (x) {}
+  return null;
+}
+
+/* In-app confirmation, replacing native confirm() (which feels like a hang on Android) */
+function uiConfirm(message, okLabel) {
+  return new Promise(function (resolve) {
+    var ov = document.createElement('div');
+    ov.className = 'ui-confirm-overlay';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = '<div class="ui-confirm-box"><p class="ui-confirm-msg"></p>' +
+      '<div class="ui-confirm-actions"><button type="button" class="ui-confirm-no"></button>' +
+      '<button type="button" class="ui-confirm-yes"></button></div></div>';
+    ov.querySelector('.ui-confirm-msg').textContent = message;
+    var tt = function (k, d) { try { var v = I18n.t(k); return v && v !== k ? v : d; } catch (e) { return d; } };
+    ov.querySelector('.ui-confirm-no').textContent = tt('busy.cancel', 'Cancel');
+    ov.querySelector('.ui-confirm-yes').textContent = okLabel || tt('confirm.ok', 'Confirm');
+    var done = function (v) {
+      document.removeEventListener('keydown', onKey, true);
+      try { if (typeof A11y !== 'undefined') A11y.releaseFocus(ov); } catch (e) {}
+      ov.remove();
+      resolve(v);
+    };
+    var onKey = function (e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+    ov.querySelector('.ui-confirm-no').onclick = function () { done(false); };
+    ov.querySelector('.ui-confirm-yes').onclick = function () { done(true); };
+    ov.addEventListener('click', function (e) { if (e.target === ov) done(false); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(ov);
+    try { if (typeof A11y !== 'undefined') A11y.trapFocus(ov); } catch (e) {}
+    ov.querySelector('.ui-confirm-yes').focus();
+  });
+}
+
+/* Downscale a large photo off the tap: createImageBitmap with resize options where
+   available (decoded off the main thread), else a canvas pass after the UI updates. */
+async function downscalePhoto(blob, maxEdge) {
+  maxEdge = maxEdge || 1280;
+  try {
+    if (!blob || !/^image\//.test(blob.type || '') || /gif|svg/.test(blob.type)) return blob;
+    var im = new Image();
+    var u = URL.createObjectURL(blob);
+    im.src = u;
+    try { await im.decode(); } catch (e) { URL.revokeObjectURL(u); return blob; }
+    var w = im.naturalWidth, h = im.naturalHeight;
+    URL.revokeObjectURL(u);
+    if (!w || !h || Math.max(w, h) <= maxEdge) return blob;
+    var sc = maxEdge / Math.max(w, h), cw = Math.round(w * sc), ch = Math.round(h * sc);
+    var src = null;
+    if (typeof createImageBitmap === 'function') {
+      try { src = await createImageBitmap(blob, { resizeWidth: cw, resizeHeight: ch, resizeQuality: 'high' }); } catch (e) { src = null; }
+    }
+    await nextPaint();
+    var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    c.getContext('2d').drawImage(src || im, 0, 0, cw, ch);
+    if (src && src.close) { try { src.close(); } catch (e) {} }
+    var out = await new Promise(function (r) { c.toBlob(r, 'image/jpeg', 0.88); });
+    return out && out.size ? out : blob;
+  } catch (e) { return blob; }
+}
+
+/* Yield so the browser can paint feedback before heavy synchronous work */
+function nextPaint() {
+  return new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 0); }); });
+}
+
 /* ═══════════════════════════════════════════════════════════
    Gate Screen / Video Intro / App Reveal
    ═══════════════════════════════════════════════════════════ */
@@ -7089,23 +7241,58 @@ const VALID_HASHES = new Set([
 ]);
 
 /* ── Tesseract OCR lazy loader ── */
+/* Library loader with a visible progress pill; after 20s it offers Retry,
+   which injects a fresh script tag. The promise is reset on failure. */
+function _libPill(labelKey, fallback) {
+  var el = document.createElement('div');
+  el.className = 'lib-pill';
+  el.setAttribute('role', 'status');
+  el.innerHTML = '<span class="busy-spin" aria-hidden="true"></span><span class="lib-pill-t"></span>';
+  el.querySelector('.lib-pill-t').textContent = _t(labelKey, fallback);
+  document.body.appendChild(el);
+  return el;
+}
+function _loadScriptWithProgress(src, labelKey, fallback, isReady) {
+  return new Promise(function (resolve, reject) {
+    if (isReady()) { resolve(); return; }
+    var pill = _libPill(labelKey, fallback), settled = false, slowT = null, tag = null;
+    function finish(ok, err) {
+      if (settled) return; settled = true; clearTimeout(slowT);
+      try { pill.remove(); } catch (e) {}
+      if (ok) resolve(); else reject(err);
+    }
+    function inject() {
+      if (tag) { try { tag.remove(); } catch (e) {} }
+      tag = document.createElement('script');
+      tag.src = src;
+      tag.onload = function () { if (isReady()) finish(true); };
+      tag.onerror = function () { showSlow(true); };
+      document.head.appendChild(tag);
+      clearTimeout(slowT);
+      slowT = setTimeout(function () { showSlow(false); }, 20000);
+    }
+    function showSlow(failed) {
+      if (settled || pill.querySelector('button')) return;
+      var t = pill.querySelector('.lib-pill-t');
+      t.textContent = _t(labelKey, fallback) + '. ' + _t('lib.slow', 'This is taking longer than usual.');
+      var r = document.createElement('button'); r.type = 'button'; r.textContent = _t('lib.retry', 'Retry');
+      r.onclick = function () { r.remove(); t.textContent = _t(labelKey, fallback); inject(); };
+      var c = document.createElement('button'); c.type = 'button'; c.textContent = _t('busy.cancel', 'Cancel');
+      c.onclick = function () { finish(false, new Error('Loading cancelled')); };
+      pill.appendChild(r); pill.appendChild(c);
+    }
+    inject();
+  });
+}
+
 var _tesseractReady = null;
 function _loadTesseract() {
   if (_tesseractReady) return _tesseractReady;
-  _tesseractReady = new Promise(function(resolve, reject) {
-    if (window.Tesseract) { resolve(window.Tesseract); return; }
-    var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
-    var timer = setTimeout(function() { _tesseractReady = null; reject(new Error('Failed to load Tesseract.js (timed out)')); }, 30000);
-    s.onload = function() {
-      clearTimeout(timer);
-      if (window.Tesseract) resolve(window.Tesseract);
-      else { _tesseractReady = null; reject(new Error('Failed to load Tesseract.js')); }
-    };
-    /* Clear the cached promise so Retry can try the download again */
-    s.onerror = function() { clearTimeout(timer); _tesseractReady = null; s.remove(); reject(new Error('Failed to load Tesseract.js')); };
-    document.head.appendChild(s);
-  });
+  _tesseractReady = _loadScriptWithProgress(
+    'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js',
+    'lib.tesseract', 'Loading text reader (about 10 MB, first time only)',
+    function () { return !!window.Tesseract; }
+  ).then(function () { return window.Tesseract; }, function (e) { _tesseractReady = null; throw e; });
   return _tesseractReady;
 }
 
@@ -7114,29 +7301,18 @@ var _faceApiReady = null;
 var _faceApiModelsLoaded = false;
 function _loadFaceApi() {
   if (_faceApiReady) return _faceApiReady;
-  _faceApiReady = new Promise(function(resolve, reject) {
-    if (window.faceapi) {
-      if (!_faceApiModelsLoaded) {
-        _faceApiModelsLoaded = true;
-        faceapi.nets.tinyFaceDetector.loadFromUri(
-          'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights'
-        ).then(function() { resolve(window.faceapi); })
-         .catch(reject);
-      } else { resolve(window.faceapi); }
-      return;
-    }
-    var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js';
-    s.onload = function() {
-      _faceApiModelsLoaded = true;
-      faceapi.nets.tinyFaceDetector.loadFromUri(
-        'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights'
-      ).then(function() { resolve(window.faceapi); })
-       .catch(reject);
-    };
-    s.onerror = function() { reject(new Error('Failed to load face-api.js')); };
-    document.head.appendChild(s);
-  });
+  var W = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+  _faceApiReady = _loadScriptWithProgress(
+    'https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js',
+    'lib.faceapi', 'Loading face finder (first time only)',
+    function () { return !!window.faceapi; }
+  ).then(function () {
+    if (_faceApiModelsLoaded) return window.faceapi;
+    var pill = _libPill('lib.faceapi', 'Loading face finder (first time only)');
+    return faceapi.nets.tinyFaceDetector.loadFromUri(W).then(function () {
+      _faceApiModelsLoaded = true; pill.remove(); return window.faceapi;
+    }, function (e) { pill.remove(); throw e; });
+  }).catch(function (e) { _faceApiReady = null; throw e; });
   return _faceApiReady;
 }
 
@@ -7253,37 +7429,27 @@ function beginVideoIntro() {
   try { _reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
   if (_reduce) { setTimeout(function () { revealApp(); }, 0); return; }
 
-  /* Returning users get a short splash (1.5s); first launch keeps 4s. */
+  /* Returning users skip straight in; first launch holds the splash up to 3s. */
   var _returning = false;
   try { _returning = localStorage.getItem('rm:obDone') === '1'; } catch (e) {}
-  var _splashMs = _returning ? 1500 : 4000;
+  if (_returning) { setTimeout(function () { revealApp(); }, 0); return; }
+  var _splashMs = 1200;
 
-  /* Phase 2: Beverly Index company splash, full screen hold */
+  /* Phase 2: Beverly Index company splash paints first; the video never delays it */
   biSplash.classList.add('active');
-
-  /* Preload the video WHILE the splash is showing so it is ready to play */
-  const vidSrc = pickNextVideo();
-  videoEl.src = vidSrc;
-  videoEl.muted = true;
-  videoEl.currentTime = 0;
-  videoEl.load();
 
   var _videoReady = false;
   var _splashDone = false;
-
   var _crossfaded = false;
   function _tryCrossfade() {
     if (!_videoReady || !_splashDone) return;
     /* Never re-show the intro once the app is revealed (late canplay). */
     if (appRevealed || _crossfaded) return;
     _crossfaded = true;
-    /* Video is loaded AND splash timer elapsed — crossfade now.
-       Activate video intro FIRST (underneath), then fade out splash on top. */
     introEl.classList.add('active');
     videoEl.play().catch(function() { revealApp(); });
     videoEl.addEventListener('ended', function() { revealApp(); }, { once: true });
-
-    /* Brief delay so video frame renders before splash fades */
+    videoEl.addEventListener('stalled', function() { revealApp(); }, { once: true });
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
         biSplash.classList.remove('active');
@@ -7291,21 +7457,26 @@ function beginVideoIntro() {
     });
   }
 
-  videoEl.addEventListener('canplay', function _onReady() {
-    videoEl.removeEventListener('canplay', _onReady);
-    _videoReady = true;
-    _tryCrossfade();
-  }, { once: true });
-
-  /* Safety: if video fails to load within 6s, skip straight to app */
-  var _loadTimeout = setTimeout(function() {
-    if (!_videoReady) {
+  /* Start loading the video only after the splash has painted */
+  requestAnimationFrame(function () { setTimeout(function () {
+    if (appRevealed) return;
+    videoEl.src = pickNextVideo();
+    videoEl.muted = true;
+    videoEl.preload = 'auto';
+    videoEl.addEventListener('canplaythrough', function () {
       _videoReady = true;
-      _splashDone = true;
-      biSplash.classList.remove('active');
-      setTimeout(function() { revealApp(); }, 800);
-    }
-  }, _splashMs + 2000);
+      _tryCrossfade();
+    }, { once: true });
+    videoEl.load();
+  }, 0); });
+
+  /* Auto skip: if the video cannot play through within 3s, go straight in */
+  setTimeout(function() {
+    if (_crossfaded || appRevealed) return;
+    _crossfaded = true;
+    biSplash.classList.remove('active');
+    revealApp();
+  }, 3000);
 
   setTimeout(function() {
     _splashDone = true;
@@ -9056,6 +9227,22 @@ const I18n = (function () {
     'confirm.deleteView': "Delete view \"{name}\"? This cannot be undone.",
     'confirm.signOut': "Sign out? Your local data stays on this device.",
     'confirm.removePerson': "Remove this person? This cannot be undone.",
+    'backup.deriving': "Securing with your passphrase",
+    'lib.retry': "Retry",
+    'lib.slow': "This is taking longer than usual.",
+    'lib.peer': "Connecting to calling service",
+    'lib.faceapi': "Loading face finder (first time only)",
+    'lib.tesseract': "Loading text reader (about 10 MB, first time only)",
+    'busy.decrypting': "Decrypting",
+    'busy.encrypting': "Encrypting",
+    'busy.loading': "Loading",
+    'busy.opening': "Opening",
+    'busy.saving': "Saving",
+    'confirm.ok': "Confirm",
+    'busy.cancel': "Cancel",
+    'busy.still': "Still working on it",
+    'busy.connecting': "Connecting",
+    'bc.starting': "Starting camera",
     'dd.attention': "{count} people need your attention.",
     'dd.attentionOne': "1 person needs your attention.",
     'toast.pickerUnsupported': "This browser cannot open your phone contacts. Use Chrome on Android, or paste your contacts.",
@@ -9491,6 +9678,22 @@ const I18n = (function () {
     'confirm.deleteView': "Eliminare la vista \"{name}\"? Non si può annullare.",
     'confirm.signOut': "Vuoi uscire? I tuoi dati restano su questo dispositivo.",
     'confirm.removePerson': "Rimuovere questa persona? Non si può annullare.",
+    'backup.deriving': "Protezione con la passphrase",
+    'lib.retry': "Riprova",
+    'lib.slow': "Ci vuole più del solito.",
+    'lib.peer': "Connessione al servizio di chiamata",
+    'lib.faceapi': "Caricamento riconoscimento volti (solo la prima volta)",
+    'lib.tesseract': "Caricamento lettore di testo (circa 10 MB, solo la prima volta)",
+    'busy.decrypting': "Decifratura",
+    'busy.encrypting': "Cifratura",
+    'busy.loading': "Caricamento",
+    'busy.opening': "Apertura",
+    'busy.saving': "Salvataggio",
+    'confirm.ok': "Conferma",
+    'busy.cancel': "Annulla",
+    'busy.still': "Ci stiamo ancora lavorando",
+    'busy.connecting': "Connessione",
+    'bc.starting': "Avvio fotocamera",
     'dd.attention': "{count} persone hanno bisogno di te.",
     'dd.attentionOne': "1 persona ha bisogno di te.",
     'toast.pickerUnsupported': "Questo browser non può aprire la rubrica. Usa Chrome su Android oppure incolla i contatti.",
@@ -11051,11 +11254,15 @@ async function triggerA2hs() {
 }
 
 async function obFinish() {
-  await _obSaveAndLaunch();
+  const b = busyFromEvent(_t('busy.saving', 'Saving'));
+  await nextPaint();
+  try { await _obSaveAndLaunch(); } finally { unbusy(b); }
 }
 
 async function obSkipA2hs() {
-  await _obSaveAndLaunch();
+  const b = busyFromEvent(_t('busy.saving', 'Saving'));
+  await nextPaint();
+  try { await _obSaveAndLaunch(); } finally { unbusy(b); }
 }
 
 async function _obSaveAndLaunch() {
@@ -11092,6 +11299,7 @@ async function _obSaveAndLaunch() {
         });
         videoEl.play().catch(() => {});
       } else {
+        _obSelfMediaBlob = await downscalePhoto(_obSelfMediaBlob, 1280);
         const url = URL.createObjectURL(_obSelfMediaBlob);
         const img = new Image();
         await new Promise((res) => {
@@ -11128,6 +11336,7 @@ async function _obSaveAndLaunch() {
     }, p.extra || {})); /* roster imports carry phone, email and details */
     if (p.photoBlob) {
       try {
+        p.photoBlob = await downscalePhoto(p.photoBlob, 1280);
         await RemielDB.putPhoto(cid, p.photoBlob);
         /* Also load into contactPhotos Map immediately */
         const _obUrl = URL.createObjectURL(p.photoBlob);
@@ -11359,8 +11568,9 @@ let NODES = [];
 
 function resize() {
   if (appState === 'network') {
-    /* CareCircle approach: canvas = full window */
-    const w = innerWidth, h = innerHeight;
+    /* CareCircle approach: canvas = full visible viewport (Android chrome aware) */
+    const vv = window.visualViewport;
+    const w = Math.round(vv ? vv.width : innerWidth), h = Math.round(vv ? vv.height : innerHeight);
     CV.width  = w * DPR;
     CV.height = h * DPR;
     CV.style.width  = w + 'px';
@@ -11377,6 +11587,12 @@ function resize() {
 }
 resize();
 window.addEventListener('resize', () => { resize(); initFX(); });
+/* Android Chrome: the URL bar shows and hides without a window resize */
+function _syncVvh() {
+  try { var vv = window.visualViewport; document.documentElement.style.setProperty('--vvh', Math.round(vv ? vv.height : innerHeight) + 'px'); } catch (e) {}
+}
+_syncVvh();
+if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { _syncVvh(); resize(); initFX(); });
 
 /* ── Categories ── */
 const CATS = {
@@ -12101,10 +12317,17 @@ let networkExpanded = false;
    is invariant under auto-spin (yaw), so each person alternates above and below
    the centre while the angles around the vertical axis are spread evenly. */
 const SMALL_CIRCLE_MAX = 6;
+/* Network view centre sphere radius: a fraction of the stage width, capped by
+   the stage height so short or chrome heavy Android viewports still frame it */
+function netCenterR(W, H) {
+  if (H == null) H = CV.height / DPR;
+  const byW = Math.min(400, W * 0.88) * (W < 500 ? 0.22 : 0.26);
+  return Math.max(38, Math.round(Math.min(byW, H * 0.12)));
+}
 function _smallRingTarget(i, N) {
   if (N > SMALL_CIRCLE_MAX || N < 1) return null;
   const W = CV.width / DPR;
-  const cR = Math.max(38, Math.round((Math.min(400, W * 0.88)) * (W < 500 ? 0.22 : 0.26)));
+  const cR = netCenterR(W);
   const s0 = NET_FOV / (NET_FOV + NET_DIST);
   const rh = Math.min(1.9 * cR, W / 2 - 40) / s0;
   const back = NET_FOV / (NET_FOV + NET_DIST + rh);
@@ -12231,9 +12454,7 @@ function hitTestNetwork(clientX, clientY) {
   const cx = CV.width / DPR / 2, cy = CV.height / DPR / 2;
   // Center sphere (user) — matches render size (CSS px)
   const W = CV.width / DPR;
-  const selfStageW = Math.min(400, W * 0.88);
-  const centerFactor = W < 500 ? 0.22 : 0.26;
-  const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
+  const centerR = netCenterR(W);
   if (Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
   // Contact nodes — find front-most hit
   let closest = null;
@@ -13541,6 +13762,12 @@ const SentinelGuide = (() => {
     if (once && _seen[id]) return false;
     try { if (id !== 'tour-offer' && SentinelTour.active) return false; } catch (_) {}
     if (_slots.top === id || _slots.bottom === id) return false;
+    /* Hold banners while a modal or editor is open so they never cover a form's
+       primary button; the watchdog shows them once it closes */
+    if (_holdBanners()) {
+      if (!_queue.some(q => q.id === id)) _queue.push({ id: id, text: text, opts: opts });
+      return false;
+    }
     let slot = pos;
     /* Never more than two banners: use the other slot if free, otherwise
        queue it (when asked) or drop it */
@@ -13671,6 +13898,12 @@ const SentinelGuide = (() => {
     });
   }
 
+  function _holdBanners() {
+    if (_topDialog()) return true;
+    try { if (document.body.classList.contains('rs-overlay-open')) return true; } catch (_) {}
+    return !!document.querySelector('.ui-confirm-overlay');
+  }
+
   /* Topmost open dialog according to the A11y stack (null when none) */
   function _topDialog() {
     try { if (typeof A11y !== 'undefined' && A11y.topDialog) return A11y.topDialog(); } catch (_) {}
@@ -13688,7 +13921,7 @@ const SentinelGuide = (() => {
       const st = (typeof appState !== 'undefined' ? appState : null);
       if (st !== c.state || top !== c.dlg) hide(slot);
     });
-    if (_queue.length && (!_slots.top || !_slots.bottom)) {
+    if (_queue.length && (!_slots.top || !_slots.bottom) && !_holdBanners()) {
       const q = _queue.shift();
       _render(q.id, q.text, Object.assign({}, q.opts, { queue: false }));
     }
@@ -15692,11 +15925,11 @@ const SentinelViews = (() => {
   }
 
   /* ── Delete confirmation ── */
-  function confirmDelete(id) {
+  async function confirmDelete(id) {
     const view = _views.find(v => v.id === id);
     if (!view) return;
-    /* Simple confirm — inline */
-    if (confirm(I18n.t('confirm.deleteView', { name: view.name }))) {
+    /* In-app confirm */
+    if (await uiConfirm(I18n.t('confirm.deleteView', { name: view.name }))) {
       deleteView(id);
       _renderPanel();
       _svBanner('views-deleted', _t('views.bannerDeleted', 'View deleted'));
@@ -18933,14 +19166,18 @@ function toggleBcCamera() {
 async function startBcStream() {
   const liveVideo = document.getElementById('bcLiveVideo');
   const placeholder = document.getElementById('bcPlaceholder');
+  const _bcBtn = busy(document.getElementById('bcCameraBtn'), _t('bc.starting', 'Starting camera'));
+  document.getElementById('bcStatus').textContent = _t('bc.starting', 'Starting camera') + '...';
   try {
     bcStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    unbusy(_bcBtn);
     liveVideo.srcObject = bcStream;
     liveVideo.hidden = false;
     placeholder.hidden = true;
     bcStream.getAudioTracks().forEach(t => { t.enabled = !bcMuted; });
     document.getElementById('bcStatus').textContent = _t('bc.active', 'Camera active');
   } catch (err) {
+    unbusy(_bcBtn);
     console.warn('[Broadcast] Camera access denied:', err);
     document.getElementById('bcStatus').textContent = _t('bc.unavailable', 'Camera not available');
     placeholder.hidden = false;
@@ -20628,7 +20865,7 @@ function drawNetworkView(t) {
   /* ── Connector lines — CareCircle curved links from center edge to each sphere ── */
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
-  const _cR = Math.max(38, Math.round((Math.min(400, W * 0.88)) * (W < 500 ? 0.22 : 0.26)));
+  const _cR = netCenterR(W, H);
   const _cEdge = _cR * 1.15; /* start just outside the center sphere rim */
   for (const { node, p } of projected) {
     const cat = CATS[node.contact.cat] || CATS.other;
@@ -21033,9 +21270,7 @@ function drawNetworkView(t) {
   const uc = CATS[userCat] || CATS.family;
   const usv = SEVS[userSev] || SEVS[4];
   /* Match the self-mode sphere visual size — derived from stage width min(400, 88vw) * 0.44 */
-  const selfStageW = Math.min(400, W * 0.88);
-  const centerFactor = W < 500 ? 0.22 : 0.26;
-  const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
+  const centerR = netCenterR(W);
   const breathe = (pulseOn && !_reducedMotionNow()) ? (1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd)) : 1;
   const cr = centerR * breathe;
 
@@ -21299,6 +21534,9 @@ function drawNetworkView(t) {
 
 function frame(ts) {
   requestAnimationFrame(frame);
+  /* An opaque full screen overlay (The Pulse) hides the stage: skip drawing so
+     the main thread stays free for the overlay's own work */
+  if (window._stagePaused) return;
   const t = ts || 0;
   if (CV.width !== lastW) { lastW = CV.width; initFX(); }
 
@@ -21439,7 +21677,32 @@ const SettingsPanel = (function () {
   }
 
   /* ── Crypto ── */
+  /* PBKDF2 runs in an inline Web Worker so the tap never freezes the UI */
+  let _kdfWorkerUrl = null;
+  function _kdfBitsInWorker(passphrase, salt) {
+    return new Promise(function (resolve, reject) {
+      let w;
+      try {
+        if (!_kdfWorkerUrl) {
+          const src = 'self.onmessage=async function(e){try{var d=e.data;' +
+            'var km=await crypto.subtle.importKey("raw",new TextEncoder().encode(d.pw),{name:"PBKDF2"},false,["deriveBits"]);' +
+            'var b=await crypto.subtle.deriveBits({name:"PBKDF2",salt:d.salt,iterations:d.it,hash:"SHA-256"},km,256);' +
+            'self.postMessage({ok:true,bits:b},[b]);}catch(x){self.postMessage({ok:false,err:String(x&&x.message||x)});}};';
+          _kdfWorkerUrl = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+        }
+        w = new Worker(_kdfWorkerUrl);
+      } catch (e) { reject(e); return; }
+      w.onmessage = function (e) { w.terminate(); if (e.data && e.data.ok) resolve(e.data.bits); else reject(new Error(e.data && e.data.err || 'kdf')); };
+      w.onerror = function (e) { w.terminate(); reject(new Error(e.message || 'kdf worker')); };
+      w.postMessage({ pw: passphrase, salt: salt, it: PBKDF2_ITERATIONS });
+    });
+  }
   async function deriveKey(passphrase, salt) {
+    let bits = null;
+    try { bits = await _kdfBitsInWorker(passphrase, salt); } catch (e) { bits = null; }
+    if (bits) {
+      return crypto.subtle.importKey('raw', bits, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    }
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       'raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
@@ -21507,8 +21770,10 @@ const SettingsPanel = (function () {
     const pw = $('exportPassphrase').value;
     if (!pw || strengthScore(pw) < 2) return;
     const status = $('exportStatus');
-    status.textContent = 'Exporting...';
+    const _btn = busy($('exportBtn'), _t('busy.encrypting', 'Encrypting'));
+    status.textContent = _t('backup.deriving', 'Securing with your passphrase') + '...';
     status.className = 'settings-status';
+    await nextPaint();
     try {
       const dump = await RemielDB.exportAll();
       dump._remielBackup = true;
@@ -21535,6 +21800,7 @@ const SettingsPanel = (function () {
       status.textContent = 'Export failed: ' + (e.message || e);
       status.className = 'settings-status error';
     }
+    unbusy(_btn);
   }
 
   /* ── Import ── */
@@ -21560,8 +21826,10 @@ const SettingsPanel = (function () {
     const pw = $('importPassphrase').value;
     if (!pw || !importFileData) return;
     const status = $('importStatus');
-    status.textContent = 'Decrypting...';
+    const _btn = busy($('importDecryptBtn'), _t('busy.decrypting', 'Decrypting'));
+    status.textContent = _t('backup.deriving', 'Securing with your passphrase') + '...';
     status.className = 'settings-status';
+    await nextPaint();
     try {
       const json = await decrypt(importFileData, pw);
       const dump = JSON.parse(json);
@@ -21583,13 +21851,16 @@ const SettingsPanel = (function () {
       status.className = 'settings-status error';
       decryptedDump = null;
     }
+    unbusy(_btn);
   }
 
   async function doImport() {
     if (!decryptedDump) return;
     const status = $('importStatus');
+    busy($('importConfirmBtn'), _t('busy.saving', 'Saving'));
     status.textContent = 'Importing...';
     status.className = 'settings-status';
+    await nextPaint();
     try {
       await RemielDB.importAll(decryptedDump);
       status.textContent = 'Data restored successfully. Reloading...';
@@ -21600,6 +21871,7 @@ const SettingsPanel = (function () {
     } catch (e) {
       status.textContent = 'Import failed: ' + (e.message || e);
       status.className = 'settings-status error';
+      unbusy($('importConfirmBtn'));
     }
   }
 
@@ -21721,6 +21993,7 @@ const SettingsPanel = (function () {
 
     statusEl.textContent = '...';
     statusEl.style.color = 'var(--text-dim)';
+    var _ab = busy($('syncAuthBtn'), _t('busy.connecting', 'Connecting'));
 
     try {
       // Configure API base if not set
@@ -21745,6 +22018,7 @@ const SettingsPanel = (function () {
       statusEl.textContent = err.message || 'Authentication failed';
       statusEl.style.color = '#f87171';
     }
+    unbusy(_ab);
   }
 
   async function doSyncNow() {
@@ -21777,7 +22051,7 @@ const SettingsPanel = (function () {
   }
 
   async function doSyncLogout() {
-    if (!confirm(I18n.t('confirm.signOut'))) return;
+    if (!(await uiConfirm(I18n.t('confirm.signOut')))) return;
     await SyncEngine.logout();
     updateSyncUI();
   }
@@ -22290,8 +22564,9 @@ const VoiceCheckin = (function () {
     lastBlob = null;
     lastDuration = 0;
 
+    const _vb = busy($('voiceRecordBtn'));
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).finally(() => unbusy(_vb));
       const mimeType = pickMimeType();
       audioChunks = [];
       const opts = mimeType ? { mimeType } : {};
@@ -24501,7 +24776,7 @@ const MedicationTracker = (() => {
   async function confirmDelete(medId) {
     const t = typeof I18n !== 'undefined' ? I18n : null;
     const msg = t ? t.t('med.confirmDelete') : 'Remove this medication?';
-    if (!confirm(msg)) return;
+    if (!(await uiConfirm(msg))) return;
     await RemielDB.deleteMedication(medId);
     await loadMeds();
     showToast(t ? t.t('med.deleted') : 'Medication removed');
@@ -26320,8 +26595,8 @@ const CircleManager = (() => {
       rm.className = 'circle-btn decline';
       rm.style.cssText = 'align-self:flex-start;margin-top:4px;';
       rm.textContent = _t('circle.remove', 'Remove');
-      rm.addEventListener('click', function() {
-        if (confirm(_t('circle.removeConfirm', 'Remove this connection? All sharing with them stops.'))) removeConnection(conn.id);
+      rm.addEventListener('click', async function() {
+        if (await uiConfirm(_t('circle.removeConfirm', 'Remove this connection? All sharing with them stops.'))) removeConnection(conn.id);
       });
       box.appendChild(rm);
     } else if (conn.direction === 'sent') {
@@ -27401,6 +27676,7 @@ const SocialImport = (() => {
       if (overlay) {
         overlay.classList.add('open');
         _setupChrome(overlay);
+        setTimeout(function () { if (overlay.classList.contains('open')) window._stagePaused = true; }, 400);
         _loadFeed();
       }
     }
@@ -27408,6 +27684,7 @@ const SocialImport = (() => {
     function close() {
       var overlay = document.getElementById('pulseOverlay');
       if (overlay) overlay.classList.remove('open');
+      window._stagePaused = false;
     }
 
     function _setFilter(sev) {
@@ -27537,7 +27814,9 @@ const SocialImport = (() => {
       })();
     }
 
+    var _feedGen = 0;
     async function _loadFeed() {
+      var _gen = ++_feedGen;
       var cardsEl = document.getElementById('pulseCards');
       var chipsEl = document.getElementById('pulseSevChips');
       if (!cardsEl || !chipsEl) return;
@@ -27555,9 +27834,17 @@ const SocialImport = (() => {
           return;
         }
 
-        /* Severity from the single engine (computeSeverity) for every card */
+        /* Severity from the single engine (computeSeverity) for every card,
+           in chunks so the overlay paints at once and shows progress */
         var rows = [];
+        var _prog = document.createElement('div');
+        _prog.className = 'pulse-empty pulse-loading';
+        _prog.innerHTML = '<span class="busy-spin" aria-hidden="true"></span><span></span>';
+        var _setProg = function (k) { _prog.lastChild.textContent = _t('busy.loading', 'Loading') + ' ' + k + ' / ' + contacts.length; };
+        _setProg(0);
+        if (contacts.length > 8) { cardsEl.innerHTML = ''; cardsEl.appendChild(_prog); }
         for (var i = 0; i < contacts.length; i++) {
+          if (i && i % 8 === 0) { _setProg(i); await new Promise(function (res) { setTimeout(res, 0); }); if (_gen !== _feedGen) return; }
           var c = contacts[i];
           var comp = null;
           try { comp = await computeSeverity(c.id); } catch (e) {}
@@ -27592,6 +27879,7 @@ const SocialImport = (() => {
         }
 
         var html = _addHtml();
+        var _flushed = 0;
         for (var j = 0; j < rows.length; j++) {
           var r = rows[j];
           var c2 = r.c;
@@ -27641,8 +27929,20 @@ const SocialImport = (() => {
             '</div>' +
             '<div class="pulse-card-body">' + bodyLines.join('<br>') + actionHtml + '</div>' +
           '</div>';
+          /* Progressive render: show the first cards while the rest compute */
+          if (j === 11 && rows.length > 12) {
+            cardsEl.innerHTML = html; cardsEl.appendChild(_prog); _setProg(12);
+            await new Promise(function (res) { setTimeout(res, 0); });
+            if (_gen !== _feedGen) return;
+          } else if (j > 11 && j % 12 === 11) {
+            _prog.remove(); cardsEl.insertAdjacentHTML('beforeend', html.slice(_flushed)); cardsEl.appendChild(_prog); _setProg(j + 1);
+            await new Promise(function (res) { setTimeout(res, 0); });
+            if (_gen !== _feedGen) return;
+          }
+          if (j % 12 === 11) _flushed = html.length;
         }
-        cardsEl.innerHTML = html;
+        if (_flushed && cardsEl.contains(_prog)) { _prog.remove(); cardsEl.insertAdjacentHTML('beforeend', html.slice(_flushed)); }
+        else cardsEl.innerHTML = html;
 
       } catch (e) {
         cardsEl.innerHTML = _addHtml() + '<div class="pulse-empty">' + _esc(_t('pulse.error', 'Could not load the feed: ') + e.message) + '</div>';
@@ -28267,6 +28567,7 @@ const SyncPrompt = (function() {
   function _blocked() {
     var ob = document.getElementById('onboarding');
     if (ob && !ob.hidden && ob.offsetParent !== null) return true;
+    try { if (typeof A11y !== 'undefined' && A11y.topDialog && A11y.topDialog()) return true; } catch (e) {}
     var tour = document.querySelector('.st-tour');
     return !!(tour && tour.offsetParent !== null);
   }
@@ -28333,6 +28634,7 @@ const SyncPrompt = (function() {
 
     statusEl.textContent = '...';
     statusEl.style.color = 'var(--text-dim)';
+    var _ab = busy(document.getElementById('spAuthBtn'), _t('busy.connecting', 'Connecting'));
 
     try {
       if (!SyncEngine.getStatus().apiBase) {
@@ -28361,6 +28663,7 @@ const SyncPrompt = (function() {
       statusEl.textContent = err.message || _t('sp.failed', 'Could not sign in or create the account.');
       statusEl.style.color = '#f87171';
     }
+    unbusy(_ab);
   }
 
   function dismiss() {
@@ -29302,7 +29605,8 @@ const SentinelCall = (function() {
       if (window.Peer) { resolve(); return; }
       if (navigator.onLine === false) { reject(new Error('offline')); return; }
       let done = false;
-      const finish = (ok) => { if (done) return; done = true; clearTimeout(t); ok && window.Peer ? resolve() : reject(new Error('PeerJS load failed')); };
+      const pill = (typeof _libPill === 'function') ? _libPill('lib.peer', 'Connecting to calling service') : null;
+      const finish = (ok) => { if (done) return; done = true; clearTimeout(t); if (pill) pill.remove(); ok && window.Peer ? resolve() : reject(new Error('PeerJS load failed')); };
       const t = setTimeout(() => finish(false), 8000);
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
@@ -29340,7 +29644,7 @@ const SentinelCall = (function() {
   }
 
   async function regenerateId() {
-    if (!confirm(_t('call.regenConfirm', 'Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.'))) return;
+    if (!(await uiConfirm(_t('call.regenConfirm', 'Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.')))) return;
     if (_currentCall) { showToast(_t('call.endFirst', 'End the current call first')); return; }
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let id = '';
