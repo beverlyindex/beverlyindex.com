@@ -5595,6 +5595,8 @@ button:active:not(:disabled), [role="button"]:active, .btn:active { transform: s
 .magnet-accept { background: var(--lit-fill); color: var(--lit-ink); border: none; }
 .magnet-later { background: transparent; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.2); }
 .sentinel-msg-bubble.sent.awaiting { opacity: 0.85; border-style: dashed; }
+.sc-avatar.has-photo { padding: 0; overflow: hidden; }
+.sc-avatar .sc-avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 .guide-link:focus-visible { outline: 2px solid var(--adv-rim); outline-offset: 2px; }
 
 /* Primary: one bright accent fill with dark text */
@@ -11940,6 +11942,8 @@ const I18n = (function () {
     "magnet.acceptFailed": "Could not accept right now. The request stays here; try again in a moment.",
     "magnet.requestSent": "Asked {name} to connect on Remiel Sentinel. Your message goes out as soon as they accept.",
     "magnet.awaiting": "Waiting for {name} to accept",
+    "magnet.offline": "{name} is not online right now. Leave a message instead? It reaches them the moment they open Remiel Sentinel.",
+    "magnet.leaveMsg": "Leave a message",
   });
   /* Guide and Magnet strings (IT) */
   Object.assign(_strings.it, {
@@ -11995,6 +11999,8 @@ const I18n = (function () {
     "magnet.acceptFailed": "Impossibile accettare adesso. La richiesta resta qui; riprova tra poco.",
     "magnet.requestSent": "Hai chiesto a {name} di collegarsi su Remiel Sentinel. Il tuo messaggio parte appena accetta.",
     "magnet.awaiting": "In attesa che {name} accetti",
+    "magnet.offline": "{name} non è online adesso. Vuoi lasciare un messaggio? Gli arriva appena apre Remiel Sentinel.",
+    "magnet.leaveMsg": "Lascia un messaggio",
   });
 
   function t(key, params) {
@@ -30592,16 +30598,9 @@ const AccountPanel = (function() {
   return { render: render, renderStatus: renderStatus, show: show, doClaim: doClaim, doEdit: doEdit, doSetup: doSetup, setLocalOnly: setLocalOnly };
 })();
 
-/* Load PeerJS dynamically */
-(function loadPeerJS() {
-  if (window.Peer) return;
-  const s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
-  s.crossOrigin = 'anonymous';
-  s.onload = () => console.log('PeerJS loaded');
-  s.onerror = () => console.warn('PeerJS failed to load. Video calling unavailable');
-  document.head.appendChild(s);
-})();
+/* PeerJS is no longer fetched while the page loads: SentinelCall.warm()
+   loads it after first paint when this device is signed in, and a call
+   placed before that loads it on demand (_ensurePeer). */
 
 const SentinelCall = (function() {
   'use strict';
@@ -30698,19 +30697,37 @@ const SentinelCall = (function() {
       await RemielDB.putSetting('sentinelCallId', _myId);
     }
 
-    /* Wait for PeerJS to load */
-    let retries = 0;
-    while (!window.Peer && retries < 50) {
-      await new Promise(r => setTimeout(r, 200));
-      retries++;
-    }
-    if (!window.Peer) {
-      console.warn('SentinelCall: PeerJS not available');
-      return;
-    }
-
-    await _initPeer();
     updateSettingsDisplay();
+    /* Fast connect: the library and the peer are ready before the first call */
+    if (window.Peer) { await _initPeer(); return; }
+    _scheduleWarm();
+  }
+
+  function _signedIn() {
+    try { return typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated() && !SyncEngine.isLocalOnly(); } catch (e) { return false; }
+  }
+  let _warming = null;
+  let _warmFailedAt = 0;
+  let _warmScheduled = false;
+  function _scheduleWarm() {
+    const idle = window.requestIdleCallback ? (f) => window.requestIdleCallback(f, { timeout: 4000 }) : (f) => setTimeout(f, 1200);
+    const run = () => { if (!_warmScheduled) { _warmScheduled = true; idle(() => { _warmScheduled = false; warm(); }); } };
+    if (document.readyState === 'complete') run(); else window.addEventListener('load', run, { once: true });
+    window.addEventListener('sentinel:syncstatus', () => { if ((!_peer || _peer.destroyed) && _signedIn()) run(); });
+  }
+  /* Load PeerJS quietly and create the peer, when signed in. Never throws. */
+  function warm() {
+    if (_peer && !_peer.destroyed) return Promise.resolve(true);
+    if (_warming) return _warming;
+    if (!_signedIn() || Date.now() - _warmFailedAt < 60000) return Promise.resolve(false);
+    _warming = (async () => {
+      try { await _loadPeerJS(true); } catch (e) { _warmFailedAt = Date.now(); return false; }
+      if (!_myId) { try { _myId = await RemielDB.getSetting('sentinelCallId'); } catch (e) {} }
+      if (!_peer || _peer.destroyed) { try { await _initPeer(); } catch (e) {} }
+      updateSettingsDisplay();
+      return !!(_peer && !_peer.destroyed);
+    })().finally(() => { _warming = null; });
+    return _warming;
   }
 
   /* ── Connect to PeerJS signaling with ICE/TURN config ── */
@@ -30746,6 +30763,12 @@ const SentinelCall = (function() {
     _peer.on('error', (err) => {
       console.warn('SentinelCall: error', err.type, err.message);
       if (err.type === 'peer-unavailable') {
+        if (_callCtx && _callCtx.leaveMsg && _currentCall && !_activeShown) {
+          /* Not connected right now: ring out the short window, then offer a message */
+          const left = Math.max(0, _OFFLINE_RING_MS - (Date.now() - _callCtx.started));
+          _armNoAnswer(_currentCall, _callCtx.onTimeout, left, true);
+          return;
+        }
         endCall();
         showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
       }
@@ -30783,17 +30806,28 @@ const SentinelCall = (function() {
   }
 
   /* ── Outgoing no-answer timeout ── */
-  function _armNoAnswer(call, onTimeout) {
+  function _armNoAnswer(call, onTimeout, ms, quiet) {
     if (_noAnswerTimer) clearTimeout(_noAnswerTimer);
     _noAnswerTimer = setTimeout(() => {
       _noAnswerTimer = null;
       if (_currentCall === call && !_activeShown) {
-        showToast(_t('call.noAnswer', 'No answer'));
+        if (!quiet) showToast(_t('call.noAnswer', 'No answer'));
         try { call.close(); } catch (e) {}
         endCall();
         if (onTimeout) onTimeout();
       }
-    }, _NO_ANSWER_MS);
+    }, ms == null ? _NO_ANSWER_MS : ms);
+  }
+
+  /* Magnet: an offline linked person rings for 10 s, then Leave a message */
+  const _OFFLINE_RING_MS = 10000;
+  let _callCtx = null;
+  function _offerMessage(contact) {
+    const name = contact.first || _t('call.thisContact', 'this contact');
+    showActionToast(_t('magnet.offline', '{name} is not online right now.').replace('{name}', name), [{
+      label: _t('magnet.leaveMsg', 'Leave a message'),
+      run: () => { try { SentinelMessaging.openFor(contact.id); } catch (e) {} }
+    }], 12000);
   }
 
   /* ── Call a contact by ID ── */
@@ -30855,7 +30889,7 @@ const SentinelCall = (function() {
     /* Show outgoing UI */
     const name = ((contact.first || '') + ' ' + (contact.last || '')).trim() || _t('call.contact', 'Contact');
     const initials = (contact.first || '?')[0] + ((contact.last || '')[0] || '');
-    _showOutgoing(name, initials);
+    _showOutgoing(name, initials, contact.id);
 
     /* Show local video */
     const localVid = document.getElementById('scLocalVideo');
@@ -30877,7 +30911,11 @@ const SentinelCall = (function() {
     }
     _currentCall = call;
     _attachCall(call);
-    _armNoAnswer(call);
+    const _mg = (typeof Magnet !== 'undefined' && Magnet) ? Magnet : null;
+    const leaveMsg = !!(_mg && _mg.isOnRs(contact));
+    const offline = !!(_mg && _mg.isOnline(targetId) === false);
+    _callCtx = { contact: contact, started: Date.now(), leaveMsg: leaveMsg, onTimeout: leaveMsg ? () => _offerMessage(contact) : null };
+    _armNoAnswer(call, _callCtx.onTimeout, offline ? _OFFLINE_RING_MS : _NO_ANSWER_MS, leaveMsg);
   }
 
   /* ── Call from focused sphere (quick action) ── */
@@ -31017,7 +31055,15 @@ const SentinelCall = (function() {
   }
 
   /* ── UI helpers ── */
-  function _showOutgoing(name, initials) {
+  function _avatarFor(el, contactId, initials) {
+    if (!el) return;
+    let html = '';
+    try { if (contactId != null && typeof PhotoFit !== 'undefined') html = PhotoFit.avatarHtml(contactId, 100, 'sc-avatar-img'); } catch (e) {}
+    if (html) { el.innerHTML = html; el.classList.add('has-photo'); }
+    else { el.textContent = initials || '?'; el.classList.remove('has-photo'); }
+  }
+
+  function _showOutgoing(name, initials, contactId) {
     const overlay = document.getElementById('scOverlay');
     const status = document.getElementById('scStatus');
     const callerName = document.getElementById('scCallerName');
@@ -31029,7 +31075,7 @@ const SentinelCall = (function() {
     if (remoteVid) remoteVid.srcObject = null;
     if (status) status.style.display = '';
     if (callerName) callerName.textContent = name;
-    if (avatar) avatar.textContent = initials || '?';
+    _avatarFor(avatar, contactId, initials);
     if (label) label.innerHTML = '<span class="sc-connecting-dots">' + _t('call.callingLabel', 'Calling') + '</span>';
     if (timer) timer.hidden = true;
     if (overlay) overlay.classList.add('active');
@@ -31038,7 +31084,10 @@ const SentinelCall = (function() {
 
   function _showIncoming(call) {
     const meta = call.metadata || {};
-    const name = meta.callerName || call.peer.replace('sentinel-', '').toUpperCase();
+    const sid = String(meta.callerId || call.peer.replace('sentinel-', '')).toUpperCase();
+    let known = null;
+    try { known = DEMO_CONTACTS.find(c => c.sentinelId && String(c.sentinelId).toUpperCase() === sid) || null; } catch (e) {}
+    const name = (known && ((known.first || '') + ' ' + (known.last || '')).trim()) || meta.callerName || sid;
     const initials = name.substring(0, 2).toUpperCase();
 
     const overlay = document.getElementById('scIncomingOverlay');
@@ -31046,8 +31095,11 @@ const SentinelCall = (function() {
     const avatar = document.getElementById('scInAvatar');
 
     if (callerName) callerName.textContent = name;
-    if (avatar) avatar.textContent = initials;
+    _avatarFor(avatar, known ? known.id : null, initials);
     if (overlay) overlay.classList.add('active');
+    /* One tap to answer: Accept carries the advance rim and focus */
+    const acc = overlay ? overlay.querySelector('.sc-btn-accept') : null;
+    if (acc) { acc.classList.add('btn-advance'); setTimeout(() => { try { acc.focus({ preventScroll: true }); } catch (e) {} }, 50); }
     rsOverlayFlag('call', true);
 
     _playRingtone();
@@ -31305,12 +31357,12 @@ const SentinelCall = (function() {
 
   /* Helper to load PeerJS if not loaded */
   /* Resolves when window.Peer exists; rejects on error, offline, or after 8 s. */
-  function _loadPeerJS() {
+  function _loadPeerJS(silent) {
     return new Promise((resolve, reject) => {
       if (window.Peer) { resolve(); return; }
       if (navigator.onLine === false) { reject(new Error('offline')); return; }
       let done = false;
-      const pill = (typeof _libPill === 'function') ? _libPill('lib.peer', 'Connecting to calling service') : null;
+      const pill = (!silent && typeof _libPill === 'function') ? _libPill('lib.peer', 'Connecting to calling service') : null;
       const finish = (ok) => { if (done) return; done = true; clearTimeout(t); if (pill) pill.remove(); ok && window.Peer ? resolve() : reject(new Error('PeerJS load failed')); };
       const t = setTimeout(() => finish(false), 8000);
       const s = document.createElement('script');
@@ -31385,7 +31437,7 @@ const SentinelCall = (function() {
   }
 
   return {
-    init, callContact, callFocused, ensurePeer: _ensurePeer,
+    init, callContact, callFocused, ensurePeer: _ensurePeer, warm,
     acceptIncoming, rejectIncoming, hangUp, endCall,
     toggleMute, flipCamera,
     getMyId, isInCall,
