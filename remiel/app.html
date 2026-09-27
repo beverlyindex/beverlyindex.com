@@ -6815,14 +6815,18 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 /* Auto-authenticate: set the primary code and submit the gate automatically */
-(async function autoGateEntry() {
+/* The gate is retired (26 Sep 2026): Remiel Sentinel opens straight to the
+   video intro. No access code is ever requested. The gate HTML, the hash
+   list and submitGateCode stay in the file, inert, for reference only.
+   The previous auto-enter typed a code whose hash was not in VALID_HASHES,
+   which left every user on the gate screen with "Invalid access code". */
+(function autoGateEntry() {
   try {
-    var input = document.getElementById('gateInput');
-    if (input) { input.value = 'BEVR'; }
-    await submitGateCode();
-  } catch(e) {
-    /* Fallback: skip gate directly */
+    try { localStorage.setItem('rm:access', 'open'); } catch (e) {}
     beginVideoIntro();
+  } catch (e) {
+    var g = document.getElementById('gateScreen');
+    if (g) g.style.display = 'none';
   }
 })();
 
