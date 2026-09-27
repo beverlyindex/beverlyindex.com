@@ -4316,6 +4316,7 @@
     transition: background 0.2s;
   }
   .contact-modal-delete:hover { background: rgba(224,82,82,0.15); }
+  .contact-modal-delete.hidden { display: none; }
 
   /* ═══ BLUF Edit Button ═══ */
   .bluf-edit-btn {
@@ -4809,6 +4810,12 @@
 .pulse-card-body strong { color: var(--text-primary, #fff); font-weight: 500; }
 .pulse-card-action { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; background: rgba(0,212,255,0.1); color: var(--accent, #00d4ff); font-size: 11px; font-weight: 500; border: none; cursor: pointer; transition: transform 0.1s, background 0.15s; }
 .pulse-card-action:active { transform: scale(0.93); background: rgba(0,212,255,0.2); }
+.pulse-add-row { display: flex; justify-content: center; padding: 4px 0 12px; }
+.pulse-add-btn { background: rgba(56,189,248,0.14); border: 1px solid rgba(56,189,248,0.45); color: #7dd3fc; font: 600 14px/1 "Hanken Grotesk", system-ui, sans-serif; padding: 12px 22px; border-radius: 22px; cursor: pointer; min-height: 44px; }
+.pulse-add-btn:active { transform: scale(0.97); }
+.cm-pulse-options { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.cm-pulse-options[hidden] { display: none; }
+.cm-pulse-options button { flex: 1 1 0; min-height: 40px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: inherit; border-radius: 10px; font: 600 13px/1.2 "Hanken Grotesk", system-ui, sans-serif; cursor: pointer; padding: 8px 10px; }
 .pulse-empty { text-align: center; padding: 40px 16px; color: var(--text-dim, #999); font-size: 13px; }
 .pulse-btn { position: fixed; bottom: 20px; right: 20px; z-index: 8000; width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #00d4ff, #7b61ff); border: none; color: #fff; font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
 .pulse-btn:hover { transform: scale(1.1); }
@@ -6816,6 +6823,10 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
 <div class="contact-modal-overlay" id="contactModalOverlay" onclick="if(event.target===this)closeContactModal()">
   <div class="contact-modal" id="contactModal">
     <div class="contact-modal-hdr"><h3 class="contact-modal-title" id="contactModalTitle" data-i18n="cm.addTitle">Add Person</h3><button class="contact-modal-x" onclick="closeContactModal()" aria-label="Close">&times;</button></div>
+    <div class="cm-pulse-options" id="cmPulseOptions" hidden>
+      <button type="button" id="cmPulseFromContacts" onclick="closeContactModal(); openImportContacts();" data-i18n="pulse.fromContacts">From my contacts</button>
+      <button type="button" id="cmPulseRoster" onclick="closeContactModal(); RosterImport.open();" data-i18n="pulse.importRoster">Import a roster</button>
+    </div>
     <div class="cm-photo-area">
       <div class="cm-photo-circle" id="cmPhotoCircle" onclick="document.getElementById('cmPhotoFileInput').click()" title="Add photo, GIF, or video">
         <span class="cm-photo-icon" id="cmPhotoIcon">&#128247;</span>
@@ -9137,6 +9148,9 @@ const I18n = (function () {
     'pulse.gotIt': "Got it",
     'pulse.dbNotReady': "Database not ready",
     'pulse.noContacts': "No contacts yet. Add people to your galaxy to see The Pulse.",
+    'pulse.addPerson': "+ Add person",
+    'pulse.fromContacts': "From my contacts",
+    'pulse.importRoster': "Import a roster",
     'pulse.all': "All",
     'pulse.noneAtLevel': "No contacts at this severity level",
     'pulse.lastContact': "Last interaction:",
@@ -9569,6 +9583,9 @@ const I18n = (function () {
     'pulse.gotIt': "Ho capito",
     'pulse.dbNotReady': "Database non pronto",
     'pulse.noContacts': "Ancora nessun contatto. Aggiungi persone alla tua galassia per vedere Il Polso.",
+    'pulse.addPerson': "+ Aggiungi persona",
+    'pulse.fromContacts': "Dai miei contatti",
+    'pulse.importRoster': "Importa un elenco",
     'pulse.all': "Tutti",
     'pulse.noneAtLevel': "Nessun contatto a questo livello",
     'pulse.lastContact': "Ultimo contatto:",
@@ -15357,6 +15374,7 @@ var RosterImport = (function() {
 
   function close() {
     document.getElementById('rosterOverlay').classList.remove('open');
+    try { if (typeof ThePulse !== 'undefined' && ThePulse.isOpen()) ThePulse.refresh(); } catch (e) {}
   }
 
   function switchTab(tab) {
@@ -24623,6 +24641,7 @@ const SocialImport = (() => {
     _$('socialImportModal').classList.remove('active');
     _currentPlatform = null;
     _parsedContacts = [];
+    try { if (typeof ThePulse !== 'undefined' && ThePulse.isOpen()) ThePulse.refresh(); } catch (e) {}
   }
 
   function _parseLine(line, cfg) {
@@ -25480,6 +25499,31 @@ const SocialImport = (() => {
       _loadFeed();
     }
 
+    /* Persistent "+ Add person" action at the top of the feed */
+    function _addHtml() {
+      return '<div class="pulse-add-row"><button type="button" class="pulse-add-btn" id="pulseAddBtn" onclick="ThePulse.addPerson()">' +
+        _esc(_t('pulse.addPerson', '+ Add person')) + '</button></div>';
+    }
+
+    function addPerson() {
+      if (typeof openContactModal !== 'function') return;
+      openContactModal('add');
+      /* The editor sits above the Pulse while it was opened from here */
+      var ov = document.getElementById('contactModalOverlay');
+      if (ov) { ov.style.zIndex = '9100'; ov.dataset.fromPulse = '1'; }
+      var opts = document.getElementById('cmPulseOptions');
+      if (opts) {
+        var fromC = document.getElementById('cmPulseFromContacts');
+        if (fromC) fromC.hidden = !('contacts' in navigator && 'ContactsManager' in window);
+        opts.hidden = false;
+      }
+    }
+
+    function isOpen() {
+      var o = document.getElementById('pulseOverlay');
+      return !!(o && o.classList.contains('open'));
+    }
+
     function _timeAgo(ts) {
       if (!ts) return _t('time.never', 'never');
       var diff = Date.now() - ts;
@@ -25590,7 +25634,7 @@ const SocialImport = (() => {
       try {
         var contacts = await RemielDB.getAllContacts();
         if (!contacts || contacts.length === 0) {
-          cardsEl.innerHTML = '<div class="pulse-empty">' + _esc(_t('pulse.noContacts', 'No contacts yet. Add people to your galaxy to see The Pulse.')) + '</div>';
+          cardsEl.innerHTML = _addHtml() + '<div class="pulse-empty">' + _esc(_t('pulse.noContacts', 'No contacts yet. Add people to your galaxy to see The Pulse.')) + '</div>';
           chipsEl.innerHTML = '';
           return;
         }
@@ -25627,11 +25671,11 @@ const SocialImport = (() => {
         if (_filter !== null) rows = rows.filter(function(r) { return r.sev === _filter; });
 
         if (rows.length === 0) {
-          cardsEl.innerHTML = '<div class="pulse-empty">' + _esc(_t('pulse.noneAtLevel', 'No contacts at this severity level')) + '</div>';
+          cardsEl.innerHTML = _addHtml() + '<div class="pulse-empty">' + _esc(_t('pulse.noneAtLevel', 'No contacts at this severity level')) + '</div>';
           return;
         }
 
-        var html = '';
+        var html = _addHtml();
         for (var j = 0; j < rows.length; j++) {
           var r = rows[j];
           var c2 = r.c;
@@ -25658,7 +25702,9 @@ const SocialImport = (() => {
 
           var bodyLines = [];
           if (headline) bodyLines.push('<div style="font-weight:600;color:var(--text-primary,#fff);letter-spacing:0.3px;">' + _esc(headline) + '</div>');
-          bodyLines.push('<strong>' + _esc(_t('pulse.lastContact', 'Last interaction:')) + '</strong> ' + (lastInt
+          var _noData = !!(r.comp && r.comp.noData);
+          if (_noData && !lastInt && !lastMood) { if (!headline) bodyLines.push(_esc(_t('bluf.nothingLogged', 'Nothing logged yet'))); }
+          else bodyLines.push('<strong>' + _esc(_t('pulse.lastContact', 'Last interaction:')) + '</strong> ' + (lastInt
             ? _esc(_ixTypeLabel(lastInt.type)) + ' ' + _timeAgo(lastInt.timestamp || lastInt.ts)
             : _esc(_t('pulse.noneRecorded', 'none recorded'))));
           if (lastMood) {
@@ -25667,7 +25713,7 @@ const SocialImport = (() => {
           }
           var action = _suggestAction(r.sev, r.comp);
           var actionHtml = '<div class="pulse-card-action"><strong>' + _esc(_t('pulse.next', 'Next:')) + '</strong> ' + _esc(action) + '</div>';
-          var _chipLbl = (r.comp && r.comp.noData) ? _t('sev.new', 'New') : SEV_LABELS[r.sev];
+          var _chipLbl = SEV_LABELS[r.sev];
           var chip = '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;color:#fff;background:' + SEV_COLORS[r.sev] + ';">' + _esc(_chipLbl) + '</span>';
 
           html += '<div class="pulse-card" onclick="ThePulse.close(); if(typeof focusContact===\'function\') focusContact(\'' + String(c2.id || '').replace(/'/g, '') + '\')">' +
@@ -25683,7 +25729,7 @@ const SocialImport = (() => {
         cardsEl.innerHTML = html;
 
       } catch (e) {
-        cardsEl.innerHTML = '<div class="pulse-empty">' + _esc(_t('pulse.error', 'Could not load the feed: ') + e.message) + '</div>';
+        cardsEl.innerHTML = _addHtml() + '<div class="pulse-empty">' + _esc(_t('pulse.error', 'Could not load the feed: ') + e.message) + '</div>';
       }
     }
 
@@ -25692,6 +25738,8 @@ const SocialImport = (() => {
       close: close,
       _setFilter: _setFilter,
       refresh: _loadFeed,
+      addPerson: addPerson,
+      isOpen: isOpen,
     };
   })();
 
@@ -27690,8 +27738,17 @@ function execQuickDial() {
 }
 
 function closeContactModal() {
-  document.getElementById('contactModalOverlay').classList.remove('open');
+  const _cmOv = document.getElementById('contactModalOverlay');
+  _cmOv.classList.remove('open');
   rsOverlayFlag('contactEditor', false);
+  /* Opened from The Pulse: restore stacking, hide the Pulse options, refresh the feed */
+  if (_cmOv.dataset.fromPulse) {
+    delete _cmOv.dataset.fromPulse;
+    setTimeout(function() { if (!_cmOv.classList.contains('open')) _cmOv.style.zIndex = ''; }, 300);
+    try { if (typeof ThePulse !== 'undefined' && ThePulse.isOpen()) ThePulse.refresh(); } catch (e) {}
+  }
+  const _cmOpts = document.getElementById('cmPulseOptions');
+  if (_cmOpts) _cmOpts.hidden = true;
   const fab = document.getElementById('addPersonFab');
   if (fab) fab.classList.remove('fab-open');
   _resetCmPhoto();
