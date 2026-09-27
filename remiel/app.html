@@ -15525,11 +15525,21 @@ var RosterImport = (function() {
     return null;
   }
 
+  /* Title-case each word on its own. The old regex treated letters inside a
+     word as prefixes, turning "Alice" into "AlIce". Mixed-case input is kept
+     as typed; only all-lower or all-upper words are recased. Mc and O' get an
+     inner capital; roman numerals stay upper case. */
   function _titleCase(s) {
-    return s.replace(/\b(mc|mac|de|di|van|von|la|le|el|al|ben|bin|o')?(\w)/gi, function(m, prefix, ch) {
-      if (prefix) return prefix.charAt(0).toUpperCase() + prefix.slice(1) + ch.toUpperCase();
-      return ch.toUpperCase();
-    }).replace(/\b(Iii|Iv|Vi|Vii|Viii|Ii)\b/g, function(m) { return m.toUpperCase(); });
+    return String(s || '').split(/(\s+|-)/).map(function(w) {
+      if (!w || /^(\s+|-)$/.test(w)) return w;
+      if (/^(i|ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(w)) return w.toUpperCase();
+      if (w !== w.toLowerCase() && w !== w.toUpperCase()) return w;
+      var low = w.toLowerCase();
+      var out = low.charAt(0).toUpperCase() + low.slice(1);
+      var m = /^(mc|o')([a-z])(.*)$/.exec(low);
+      if (m && low.length > m[1].length + 1) out = m[1].charAt(0).toUpperCase() + m[1].slice(1) + m[2].toUpperCase() + m[3];
+      return out;
+    }).join('');
   }
 
   function _parseRosterText(text) {
@@ -16091,12 +16101,21 @@ var RosterImport = (function() {
 
     var cat = (document.getElementById('rosterCatSelect') || {}).value || 'other';
     var imported = 0;
+    var inWizard = _obWizardActive();
 
     for (var i = 0; i < selected.length; i++) {
       var face = selected[i];
       var nameParts = (face.name || ('Person ' + (i + 1))).split(/\s+/);
       var first = nameParts[0] || 'Person';
       var last = nameParts.slice(1).join(' ') || '';
+
+      if (inWizard) {
+        var faceBlob = null;
+        try { faceBlob = await new Promise(function(res) { face.canvas.toBlob(res, 'image/png'); }); } catch (e) {}
+        _obAddToWizard(first, last, cat, faceBlob);
+        imported++;
+        continue;
+      }
 
       var id = 'gp_' + Date.now() + '_' + i;
       var contact = {
@@ -16122,19 +16141,12 @@ var RosterImport = (function() {
       imported++;
     }
 
-    // Rebuild constellation
-    buildNodes(false);
-    try { updateBlufContent(); } catch(e) {}
-
-    // Update onboarding
-    try {
-      var obContacts = document.getElementById('obContacts');
-      if (obContacts) { typeof renderObContacts === 'function' && renderObContacts(); }
-      var obCount = document.getElementById('obCount');
-      if (obCount) obCount.textContent = DEMO_CONTACTS.length + ' people added';
-      var obNextBtn = document.getElementById('obNextBtn');
-      if (obNextBtn && DEMO_CONTACTS.length > 0) obNextBtn.disabled = false;
-    } catch(e) {}
+    if (inWizard) {
+      _obRefreshWizard();
+    } else {
+      buildNodes(false);
+      try { updateBlufContent(); } catch(e) {}
+    }
 
     // Show success screen (matches existing doImport pattern)
     var catLabel = cat === 'personal' ? 'Personal' : cat === 'professional' ? 'Professional' : cat === 'team' ? 'Team' : cat === 'family' ? 'Family' : 'circle';
@@ -16159,14 +16171,34 @@ var RosterImport = (function() {
     }
   }
 
+  /* During onboarding, imports belong to the wizard's own list (_obPeople);
+     they are saved with the rest when the wizard finishes. */
+  function _obWizardActive() {
+    var ob = document.getElementById('onboarding');
+    return !!(ob && !ob.hidden && typeof _obPeople !== 'undefined');
+  }
+  function _obCatFor(cat) {
+    return ({ family: 1, friend: 1, professional: 1, other: 1 })[cat] ? cat : 'other';
+  }
+  function _obAddToWizard(first, last, cat, photoBlob) {
+    _obPeople.push({ first: first, last: last || '', cat: _obCatFor(cat), photoBlob: photoBlob || null,
+      photoUrl: photoBlob ? URL.createObjectURL(photoBlob) : null });
+  }
+  function _obRefreshWizard() {
+    try { renderObContacts(); } catch (e) {}
+    try { updateObCount(); } catch (e) {}
+  }
+
   async function doImport() {
     var selected = _parsed.filter(function(p) { return p.checked; });
     if (!selected.length) return;
     var cat = document.getElementById('rosterCatSelect').value;
     var imported = 0;
+    var inWizard = _obWizardActive();
 
     for (var i = 0; i < selected.length; i++) {
       var p = selected[i];
+      if (inWizard) { _obAddToWizard(p.first, p.last, cat, null); imported++; continue; }
       var newId = Date.now() + i;
       var newContact = {
         id: newId,
@@ -16183,24 +16215,12 @@ var RosterImport = (function() {
       imported++;
     }
 
-    buildNodes(false);
-    try { updateBlufContent(); } catch(e) {}
-
-    /* Update onboarding contact list if in onboarding */
-    try {
-      var obContacts = document.getElementById('obContacts');
-      if (obContacts) {
-        typeof renderObContacts === 'function' && renderObContacts();
-      }
-      var obCount = document.getElementById('obCount');
-      if (obCount) {
-        obCount.textContent = DEMO_CONTACTS.length + ' people added';
-      }
-      var obNextBtn = document.getElementById('obNextBtn');
-      if (obNextBtn && DEMO_CONTACTS.length > 0) {
-        obNextBtn.disabled = false;
-      }
-    } catch(e) {}
+    if (inWizard) {
+      _obRefreshWizard();
+    } else {
+      buildNodes(false);
+      try { updateBlufContent(); } catch(e) {}
+    }
 
     /* Show success overlay inside the modal instead of just closing */
     var modalBody = document.querySelector('.roster-modal .roster-body');
