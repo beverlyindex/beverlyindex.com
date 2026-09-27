@@ -21779,7 +21779,12 @@ const ContactListView = (() => {
     A11y.releaseFocus();
   }
   function init() { _build(); }
-  return { init, open, close };
+  /* Re-render in place when the contact list changes while the view is open */
+  function refresh() {
+    const ov = document.getElementById('contactListView');
+    if (ov && ov.classList.contains('open')) _render();
+  }
+  return { init, open, close, refresh };
 })();
 
 /* Start accessibility engine early */
@@ -23600,6 +23605,17 @@ const SyncEngine = (() => {
     return idx;
   }
 
+  /* Set when a pull changes the live contact list, so the spheres and the
+     list view are rebuilt once after the pull finishes. */
+  var _contactsTouched = false;
+  function _refreshLiveViews() {
+    try {
+      if (typeof appState !== 'undefined' && appState === 'network' && typeof buildNodes === 'function') buildNodes(false);
+    } catch (e) { console.warn('sync: rebuild spheres failed', e); }
+    try { if (typeof updateBlufContent === 'function') updateBlufContent(); } catch (e) {}
+    try { if (typeof ContactListView !== 'undefined' && ContactListView.refresh) ContactListView.refresh(); } catch (e) {}
+  }
+
   function _liveContacts() { return (typeof DEMO_CONTACTS !== 'undefined' && Array.isArray(DEMO_CONTACTS)) ? DEMO_CONTACTS : null; }
 
   async function _applyEntity(type, item, pending) {
@@ -23614,7 +23630,7 @@ const SyncEngine = (() => {
         delete _serverIdMap[prefix + localId];
         if (type === 'contact') {
           var live = _liveContacts();
-          if (live) { var ix = live.findIndex(function(c) { return c.id === localId; }); if (ix !== -1) live.splice(ix, 1); }
+          if (live) { var ix = live.findIndex(function(c) { return c.id === localId; }); if (ix !== -1) { live.splice(ix, 1); _contactsTouched = true; } }
         }
       }
       return;
@@ -23676,6 +23692,7 @@ const SyncEngine = (() => {
         var at = liveList.findIndex(function(c) { return c.id === newId; });
         if (at === -1) liveList.push(rec);
         else Object.assign(liveList[at], rec);
+        _contactsTouched = true;
       }
     }
   }
@@ -23744,12 +23761,14 @@ const SyncEngine = (() => {
   /* Pages through /sync/pull (limit PULL_LIMIT) while the server reports has_more */
   async function _pullInner() {
     var changed = 0, pages = 0;
+    _contactsTouched = false;
     for (;;) {
       var r = await _pullPage();
       changed += r.applied;
       pages++;
       if (!r.hasMore || pages >= 200) break;
     }
+    if (_contactsTouched) _refreshLiveViews();
     if (changed) {
       try { window.dispatchEvent(new CustomEvent('sentinel:datachanged', { detail: { source: 'sync', count: changed } })); } catch (e) {}
     }
