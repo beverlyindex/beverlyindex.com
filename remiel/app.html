@@ -61,6 +61,7 @@
     flex-direction: column;
     align-items: center;
     min-height: 100vh;
+    min-height: 100dvh;
     padding-inline: 16px;
     padding-block: 24px 32px;
     margin: 0;
@@ -72,8 +73,12 @@
 
   .sphere-stage {
     position: relative;
-    width: min(400px, 88vw);
-    height: calc(min(400px, 88vw) + 56px);
+    /* Sphere side: width bound, and height bound by the visible viewport minus the
+       fixed header, the label strip and room for the summary card or buttons below */
+    --sph: min(400px, 88vw, calc(var(--vvh, 100svh) - max(12px, env(safe-area-inset-top, 0px)) - env(safe-area-inset-bottom, 0px) - 250px));
+    width: var(--sph);
+    height: calc(var(--sph) + 56px);
+    margin-top: calc(max(12px, env(safe-area-inset-top, 0px)) + 26px);
     flex-shrink: 0;
     cursor: default;
     touch-action: none;
@@ -85,6 +90,7 @@
   .sphere-stage.network-mode {
     position: fixed;
     inset: 0;
+    margin-top: 0;
     width: 100%;
     height: 100%;
     z-index: 50;
@@ -3886,7 +3892,7 @@
 
   /* ═══ Daily Summary Digest Card ═══ */
   .daily-digest {
-    width: min(420px, 90vw); margin: 0 auto;
+    width: min(420px, 90vw); margin: 20px auto 0;
     box-sizing: border-box; /* padding inside the width: no sideways scroll at 390px */
     background: var(--nous-panel, rgba(16,18,28,0.55));
     border: 1px solid rgba(255,255,255,0.08);
@@ -11170,8 +11176,9 @@ let NODES = [];
 
 function resize() {
   if (appState === 'network') {
-    /* CareCircle approach: canvas = full window */
-    const w = innerWidth, h = innerHeight;
+    /* CareCircle approach: canvas = full visible viewport (Android chrome aware) */
+    const vv = window.visualViewport;
+    const w = Math.round(vv ? vv.width : innerWidth), h = Math.round(vv ? vv.height : innerHeight);
     CV.width  = w * DPR;
     CV.height = h * DPR;
     CV.style.width  = w + 'px';
@@ -11188,6 +11195,12 @@ function resize() {
 }
 resize();
 window.addEventListener('resize', () => { resize(); initFX(); });
+/* Android Chrome: the URL bar shows and hides without a window resize */
+function _syncVvh() {
+  try { var vv = window.visualViewport; document.documentElement.style.setProperty('--vvh', Math.round(vv ? vv.height : innerHeight) + 'px'); } catch (e) {}
+}
+_syncVvh();
+if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { _syncVvh(); resize(); initFX(); });
 
 /* ── Categories ── */
 const CATS = {
@@ -11912,10 +11925,17 @@ let networkExpanded = false;
    is invariant under auto-spin (yaw), so each person alternates above and below
    the centre while the angles around the vertical axis are spread evenly. */
 const SMALL_CIRCLE_MAX = 6;
+/* Network view centre sphere radius: a fraction of the stage width, capped by
+   the stage height so short or chrome heavy Android viewports still frame it */
+function netCenterR(W, H) {
+  if (H == null) H = CV.height / DPR;
+  const byW = Math.min(400, W * 0.88) * (W < 500 ? 0.22 : 0.26);
+  return Math.max(38, Math.round(Math.min(byW, H * 0.12)));
+}
 function _smallRingTarget(i, N) {
   if (N > SMALL_CIRCLE_MAX || N < 1) return null;
   const W = CV.width / DPR;
-  const cR = Math.max(38, Math.round((Math.min(400, W * 0.88)) * (W < 500 ? 0.22 : 0.26)));
+  const cR = netCenterR(W);
   const s0 = NET_FOV / (NET_FOV + NET_DIST);
   const rh = Math.min(1.9 * cR, W / 2 - 40) / s0;
   const back = NET_FOV / (NET_FOV + NET_DIST + rh);
@@ -12042,9 +12062,7 @@ function hitTestNetwork(clientX, clientY) {
   const cx = CV.width / DPR / 2, cy = CV.height / DPR / 2;
   // Center sphere (user) — matches render size (CSS px)
   const W = CV.width / DPR;
-  const selfStageW = Math.min(400, W * 0.88);
-  const centerFactor = W < 500 ? 0.22 : 0.26;
-  const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
+  const centerR = netCenterR(W);
   if (Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
   // Contact nodes — find front-most hit
   let closest = null;
@@ -18919,7 +18937,7 @@ function drawNetworkView(t) {
   /* ── Connector lines — CareCircle curved links from center edge to each sphere ── */
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
-  const _cR = Math.max(38, Math.round((Math.min(400, W * 0.88)) * (W < 500 ? 0.22 : 0.26)));
+  const _cR = netCenterR(W, H);
   const _cEdge = _cR * 1.15; /* start just outside the center sphere rim */
   for (const { node, p } of projected) {
     const cat = CATS[node.contact.cat] || CATS.other;
@@ -19324,9 +19342,7 @@ function drawNetworkView(t) {
   const uc = CATS[userCat] || CATS.family;
   const usv = SEVS[userSev] || SEVS[4];
   /* Match the self-mode sphere visual size — derived from stage width min(400, 88vw) * 0.44 */
-  const selfStageW = Math.min(400, W * 0.88);
-  const centerFactor = W < 500 ? 0.22 : 0.26;
-  const centerR = Math.max(38, Math.round(selfStageW * centerFactor));
+  const centerR = netCenterR(W);
   const breathe = (pulseOn && !_reducedMotionNow()) ? (1 + usv.pulseAmp * Math.sin(t * usv.pulseSpd)) : 1;
   const cr = centerR * breathe;
 
