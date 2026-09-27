@@ -7148,8 +7148,10 @@ document.getElementById('stage').style.display = 'none';
 
 const RemielDB = (() => {
   const DB_NAME = 'remiel-sentinel';
-  const DB_VERSION = 4;
+  const DB_VERSION = 5;
   let _db = null;
+  /* Settings keys that sync across devices (and enter the offline queue) */
+  const SYNC_SETTING_KEYS = ['userCat', 'userSev', 'userSphereName', 'otherLabel', 'locale', 'onboardingComplete'];
 
   function open() {
     if (_db) return Promise.resolve(_db);
@@ -7209,7 +7211,14 @@ const RemielDB = (() => {
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
         }
+
+        /* ── syncQueue (v5): offline change log drained by SyncEngine.push ── */
+        if (!db.objectStoreNames.contains('syncQueue')) {
+          const sq = db.createObjectStore('syncQueue', { keyPath: 'qid', autoIncrement: true });
+          sq.createIndex('type', 'type', { unique: false });
+        }
       };
+      req.onblocked = () => { console.warn('RemielDB: upgrade blocked by another open tab'); };
       req.onsuccess = () => {
         _db = req.result;
         _db.onversionchange = () => { _db.close(); _db = null; };
@@ -7230,6 +7239,69 @@ const RemielDB = (() => {
     });
   }
 
+  /* ── Sync queue (P1.3): every local write appends {type, op, client_id, ts} ── */
+  function _hasQueue() { return !!(_db && _db.objectStoreNames.contains('syncQueue')); }
+
+  async function enqueue(type, op, clientId) {
+    try {
+      await open();
+      if (_hasQueue() && clientId !== undefined && clientId !== null) {
+        await promisify(tx('syncQueue', 'readwrite').add({ type: type, op: op, client_id: clientId, payload: null, ts: Date.now() }));
+      }
+    } catch (e) { /* queue is best effort; the full snapshot path still covers it */ }
+    try { if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty(); } catch (e) {}
+  }
+
+  async function queueGetAll() {
+    await open();
+    if (!_hasQueue()) return [];
+    return promisify(tx('syncQueue', 'readonly').getAll());
+  }
+
+  async function queueCount() {
+    await open();
+    if (!_hasQueue()) return 0;
+    return promisify(tx('syncQueue', 'readonly').count());
+  }
+
+  async function queueRemove(qids) {
+    await open();
+    if (!_hasQueue() || !qids || !qids.length) return;
+    const store = _db.transaction('syncQueue', 'readwrite').objectStore('syncQueue');
+    qids.forEach(function(q) { store.delete(q); });
+    await new Promise((res, rej) => {
+      store.transaction.oncomplete = res;
+      store.transaction.onerror = () => rej(store.transaction.error);
+    });
+  }
+
+  async function queueClear() {
+    await open();
+    if (!_hasQueue()) return;
+    await promisify(tx('syncQueue', 'readwrite').clear());
+  }
+
+  /* ── Raw writes for applying remote data: no queue entry, no dirty mark ── */
+  async function rawPut(store, record) {
+    await open();
+    return promisify(tx(store, 'readwrite').put(record));
+  }
+
+  async function rawDelete(store, key) {
+    await open();
+    return promisify(tx(store, 'readwrite').delete(key));
+  }
+
+  async function rawGetAll(store) {
+    await open();
+    return promisify(tx(store, 'readonly').getAll());
+  }
+
+  async function rawGet(store, key) {
+    await open();
+    return promisify(tx(store, 'readonly').get(key));
+  }
+
   /* ── Contacts CRUD ── */
   async function getAllContacts() {
     await open();
@@ -7246,14 +7318,14 @@ const RemielDB = (() => {
     if (!contact.createdAt) contact.createdAt = Date.now();
     contact.updatedAt = Date.now();
     var result = await promisify(tx('contacts', 'readwrite').put(contact));
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    await enqueue('contact', 'put', result);
     return result;
   }
 
   async function deleteContact(id) {
     await open();
     var result = await promisify(tx('contacts', 'readwrite').delete(id));
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    await enqueue('contact', 'delete', id);
     return result;
   }
 
@@ -7331,13 +7403,15 @@ const RemielDB = (() => {
     } catch(ve) { console.warn('RemielDB.putPhoto: verify read failed', ve); }
     /* Clear synced flag so next sync pushes this photo */
     try { await putSetting('_photoSynced_' + contactId, null); } catch(e) {}
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    await enqueue('photo', 'put', contactId);
     return result;
   }
 
   async function deletePhoto(contactId) {
     await open();
-    return promisify(tx('photos', 'readwrite').delete(contactId));
+    var result = await promisify(tx('photos', 'readwrite').delete(contactId));
+    await enqueue('photo', 'delete', contactId);
+    return result;
   }
 
   async function getAllPhotos() {
@@ -7349,7 +7423,9 @@ const RemielDB = (() => {
   async function saveBroadcast(contactId, blob, duration) {
     await open();
     const entry = { contactId, blob, duration, timestamp: Date.now(), mimeType: blob.type || 'video/webm' };
-    return promisify(tx('broadcasts', 'readwrite').add(entry));
+    var result = await promisify(tx('broadcasts', 'readwrite').add(entry));
+    await enqueue('broadcast', 'put', result);
+    return result;
   }
   async function getBroadcastsByContact(cid) {
     await open();
@@ -7366,7 +7442,7 @@ const RemielDB = (() => {
     await open();
     if (!entry.timestamp) entry.timestamp = Date.now();
     var result = await promisify(tx('interactions', 'readwrite').add(entry));
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    await enqueue('interaction', 'put', result);
     return result;
   }
 
@@ -7381,7 +7457,7 @@ const RemielDB = (() => {
     await open();
     if (!entry.timestamp) entry.timestamp = Date.now();
     var result = await promisify(tx('moods', 'readwrite').add(entry));
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    await enqueue('mood', 'put', result);
     return result;
   }
 
@@ -7397,7 +7473,7 @@ const RemielDB = (() => {
     if (!med.createdAt) med.createdAt = Date.now();
     med.updatedAt = Date.now();
     var result = await promisify(tx('medications', 'readwrite').add(med));
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    await enqueue('medication', 'put', result);
     return result;
   }
 
@@ -7411,14 +7487,14 @@ const RemielDB = (() => {
     await open();
     med.updatedAt = Date.now();
     var result = await promisify(tx('medications', 'readwrite').put(med));
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    await enqueue('medication', 'put', result);
     return result;
   }
 
   async function deleteMedication(id) {
     await open();
     var result = await promisify(tx('medications', 'readwrite').delete(id));
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
+    await enqueue('medication', 'delete', id);
     return result;
   }
 
@@ -7449,7 +7525,20 @@ const RemielDB = (() => {
 
   async function putSetting(key, value) {
     await open();
-    return promisify(tx('settings', 'readwrite').put({ key, value, updatedAt: Date.now() }));
+    var result = await promisify(tx('settings', 'readwrite').put({ key, value, updatedAt: Date.now() }));
+    if (SYNC_SETTING_KEYS.indexOf(key) !== -1) await enqueue('setting', 'put', key);
+    /* Identity hooks (P1.1): a name or finished onboarding can create the device account;
+       a new Sentinel ID is registered with the profile. */
+    if (typeof SyncEngine !== 'undefined') {
+      try {
+        if ((key === 'onboardingComplete' || key === 'userSphereName') && SyncEngine.ensureIdentity) {
+          setTimeout(function() { SyncEngine.ensureIdentity(); }, 500);
+        } else if (key === 'sentinelCallId' && SyncEngine.registerSentinelId) {
+          setTimeout(function() { SyncEngine.registerSentinelId(); }, 500);
+        }
+      } catch (e) {}
+    }
+    return result;
   }
 
   /* ── Export / Import (full database snapshot) ── */
@@ -7464,11 +7553,14 @@ const RemielDB = (() => {
     const photos = await promisify(tx('photos', 'readonly').getAll());
     dump.photos = [];
     for (const p of photos) {
-      if (p.blob instanceof Blob) {
-        const buf = await p.blob.arrayBuffer();
-        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-        dump.photos.push({ contactId: p.contactId, mimeType: p.blob.type, base64: b64 });
-      }
+      let buf = null, mt = p.mimeType || 'image/png';
+      if (p.buffer instanceof ArrayBuffer) buf = p.buffer;
+      else if (p.blob instanceof Blob) { buf = await p.blob.arrayBuffer(); mt = p.blob.type || mt; }
+      if (!buf) continue;
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      dump.photos.push({ contactId: p.contactId, mimeType: mt, base64: btoa(bin) });
     }
     return dump;
   }
@@ -7492,14 +7584,16 @@ const RemielDB = (() => {
       ps.clear();
       for (const p of dump.photos) {
         const bytes = Uint8Array.from(atob(p.base64), c => c.charCodeAt(0));
-        const blob = new Blob([bytes], { type: p.mimeType || 'image/png' });
-        ps.put({ contactId: p.contactId, blob, updatedAt: Date.now() });
+        ps.put({ contactId: p.contactId, buffer: bytes.buffer, mimeType: p.mimeType || 'image/png', updatedAt: Date.now() });
       }
       await new Promise((res, rej) => {
         ps.transaction.oncomplete = res;
         ps.transaction.onerror = rej;
       });
     }
+    /* An imported snapshot is pushed in full on the next sync */
+    try { await promisify(tx('settings', 'readwrite').put({ key: '_sync_full_done', value: null, updatedAt: Date.now() })); } catch (e) {}
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
   }
 
   return {
@@ -7511,7 +7605,10 @@ const RemielDB = (() => {
     addMedication, getMedicationsByContact, updateMedication, deleteMedication, getAllMedications,
     getProfile, putProfile,
     getSetting, putSetting,
-    exportAll, importAll
+    exportAll, importAll,
+    enqueue, queueGetAll, queueCount, queueRemove, queueClear,
+    rawPut, rawDelete, rawGet, rawGetAll,
+    SYNC_SETTING_KEYS
   };
 })();
 
