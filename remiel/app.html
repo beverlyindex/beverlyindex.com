@@ -5240,8 +5240,29 @@
 /* QA3 #2: the floating List view and Pulse buttons (z-index 8000) must never
    cover the message input, Send, or any full-screen overlay. */
 body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none !important; }
-body:has(#sentinelMsgOverlay.open, .sv-overlay.open, .sentinel-call-overlay.active, #quickDialOverlay.open, #contactModalOverlay.open) .clv-toggle,
-body:has(#sentinelMsgOverlay.open, .sv-overlay.open, .sentinel-call-overlay.active, #quickDialOverlay.open, #contactModalOverlay.open) #pulseBtn { display: none !important; }
+/* Scroll performance: closed full-screen overlays are taken out of rendering
+   (visibility hidden after the fade) so their backdrop blur is not composited
+   under the onboarding wizard, and infinite animations are paused while hidden. */
+.med-img-overlay, .quick-dial-overlay, .bi-splash, .video-intro, .roster-modal-overlay,
+.sentinel-call-overlay, .overlay, .bluf-overlay, .contact-modal-overlay, .sv-overlay,
+.sv-editor, .sentinel-msg-overlay {
+  visibility: hidden;
+  transition: opacity .3s, visibility 0s linear .3s;
+}
+.med-img-overlay.active, .quick-dial-overlay.open, .bi-splash.active, .video-intro.active,
+.roster-modal-overlay.open, .sentinel-call-overlay.active, .overlay.open, .bluf-overlay.open,
+.contact-modal-overlay.open, .sv-overlay.open, .sv-editor.open, .sentinel-msg-overlay.open {
+  visibility: visible;
+  transition: opacity .3s, visibility 0s;
+}
+.settings-panel { visibility: hidden; transition: opacity .3s, transform .3s, visibility 0s linear .3s; }
+.settings-panel.open { visibility: visible; transition: opacity .3s, transform .3s, visibility 0s; }
+.pulse-overlay { visibility: hidden; transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear .35s; }
+.pulse-overlay.open { visibility: visible; transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s; }
+.gate-screen.hidden { display: none; }
+.sentinel-call-overlay:not(.active) *, .bluf-overlay:not(.open) *, .gate-screen.hidden *,
+.overlay:not(.open) *, .pulse-overlay:not(.open) *,
+.sentinel-call-overlay:not(.active) *::after, .sentinel-call-overlay:not(.active) *::before { animation-play-state: paused !important; }
 .sentinel-msg-unknown { padding: 8px 12px; border-bottom: 1px solid rgba(56,189,248,0.12); display: flex; flex-direction: column; gap: 6px; }
 .sentinel-msg-unknown[hidden] { display: none; }
 .sentinel-msg-unknown-title { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,0.6); }
@@ -14989,11 +15010,13 @@ const SentinelViews = (() => {
     if (!overlay) return;
     _renderPanel();
     overlay.classList.add('open');
+    rsOverlayFlag('circleViews', true);
   }
 
   function closePanel() {
     const overlay = document.getElementById('svOverlay');
     if (overlay) overlay.classList.remove('open');
+    rsOverlayFlag('circleViews', false);
   }
 
   function _renderPanel() {
@@ -15117,6 +15140,7 @@ const SentinelViews = (() => {
     _renderRoster();
     _updateSaveBtn();
     editor.classList.add('open');
+    rsOverlayFlag('circleEditor', true);
     /* Focus name input */
     setTimeout(() => {
       const nameInput = document.getElementById('svNameInput');
@@ -15130,6 +15154,7 @@ const SentinelViews = (() => {
   function closeEditor() {
     const editor = document.getElementById('svEditor');
     if (editor) editor.classList.remove('open');
+    rsOverlayFlag('circleEditor', false);
   }
 
   function _renderRoster() {
@@ -27423,6 +27448,7 @@ function openContactModal(mode, contact) {
   }
 
   overlay.classList.add('open');
+  rsOverlayFlag('contactEditor', true);
   var _fab = document.getElementById('addPersonFab');
   if (_fab) _fab.classList.add('fab-open');
   setTimeout(() => firstInput.focus(), 200);
@@ -27592,6 +27618,7 @@ function execQuickDial() {
 
 function closeContactModal() {
   document.getElementById('contactModalOverlay').classList.remove('open');
+  rsOverlayFlag('contactEditor', false);
   const fab = document.getElementById('addPersonFab');
   if (fab) fab.classList.remove('fab-open');
   _resetCmPhoto();
