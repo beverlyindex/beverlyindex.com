@@ -5234,6 +5234,18 @@
   color: rgba(255,255,255,0.2); font-size: 13px; text-align: center;
   padding: 20px;
 }
+.sentinel-msg-bubble.pending { opacity: 0.55; filter: grayscale(0.8); }
+.sentinel-msg-bubble.failed { border: 1px solid rgba(248,113,113,0.6); }
+.sentinel-msg-bubble.local { opacity: 0.8; }
+.sentinel-msg-retry {
+  margin-left: 6px; padding: 1px 8px; font-size: 10px; border-radius: 8px;
+  background: rgba(248,113,113,0.18); color: #fca5a5; border: 1px solid rgba(248,113,113,0.4);
+  cursor: pointer;
+}
+.sentinel-msg-note {
+  font-size: 11px; color: rgba(255,255,255,0.45); text-align: center;
+  padding: 6px 12px;
+}
 /* BLUF latest message section */
 .bluf-msg-latest {
   padding: 10px 14px;
@@ -6068,7 +6080,7 @@
       <button class="sentinel-msg-close" onclick="SentinelMessaging.close()" aria-label="Close messages">&times;</button>
     </div>
     <div class="sentinel-msg-thread" id="sentinelMsgThread">
-      <div class="sentinel-msg-empty">Send a message to check in</div>
+      <div class="sentinel-msg-empty">Messages are delivered through Remiel Sentinel when both of you have Sentinel IDs</div>
     </div>
     <div class="sentinel-msg-compose">
       <textarea class="sentinel-msg-input" id="sentinelMsgInput" placeholder="Type a message..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();SentinelMessaging.send();}"></textarea>
@@ -6121,7 +6133,7 @@
       <!-- ═══ PULLS (accordion) ═══ -->
 
       <!-- Pull 1: Video Note -->
-      <div class="bluf-pull" id="pull_broadcast">
+      <div class="bluf-pull" id="pull_videonote">
         <div class="bluf-pull-header" onclick="togglePull('videonote')">
           <div class="bluf-section-label">Video Note</div>
           <span class="bluf-pull-preview">Describe how you are feeling right now</span>
@@ -11659,17 +11671,61 @@ const SentinelMessaging = (() => {
   'use strict';
 
   const _DB_PREFIX = 'sentinelMsg_';
+  const _CURSOR_KEY = '_msg_cursor';
+  const _PEER_MAP_KEY = '_peer_user_ids';
+  const _POLL_MS = 20000;
   let _activeContactId = null;
-  let _tickerCache = {};  /* contactId → { text, scrollX, color, ts } */
+  let _tickerCache = {};  /* contactId -> { text, scrollX, color, ts } */
+  let _pollTimer = null;
+  let _polling = false;
+  let _unknownNames = {};  /* 'unknown:<sid>' -> display label (memory only) */
   const TICKER_COLOR_SENT = '#38bdf8';     /* cyan for sent */
   const TICKER_COLOR_RECEIVED = '#4ade80'; /* green for received */
   const TICKER_SPEED = 0.6;               /* pixels per frame */
+
+  /* Local i18n shim: uses I18n.t when the key exists, else the fallback */
+  function _t(key, fallback) {
+    try {
+      if (typeof I18n !== 'undefined' && I18n && typeof I18n.t === 'function') {
+        const v = I18n.t(key);
+        if (v && v !== key) return v;
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  function _isValidSid(s) { return typeof s === 'string' && /^[A-Z0-9]{8}$/i.test(s.trim()); }
+
+  function _sync() {
+    try { return (typeof SyncEngine !== 'undefined') ? SyncEngine : null; } catch (_) { return null; }
+  }
+  function _authed() {
+    const se = _sync();
+    try { return !!(se && typeof se.apiFetch === 'function' && typeof se.isAuthenticated === 'function' && se.isAuthenticated()); }
+    catch (_) { return false; }
+  }
+
+  function _findContact(contactId) {
+    try { return DEMO_CONTACTS.find(c => c.id === contactId) || null; } catch (_) { return null; }
+  }
+  function _findContactBySid(sid) {
+    if (!sid) return null;
+    const up = String(sid).toUpperCase();
+    try { return DEMO_CONTACTS.find(c => c.sentinelId && String(c.sentinelId).toUpperCase() === up) || null; }
+    catch (_) { return null; }
+  }
+  function _contactLabel(contactId) {
+    const c = _findContact(contactId);
+    if (c) return c.first || _t('msg.contact', 'Contact');
+    return _unknownNames[contactId] || String(contactId).replace(/^unknown:/, '');
+  }
 
   /* ── Persistence via RemielDB settings store ── */
   async function _loadThread(contactId) {
     try {
       const data = await RemielDB.getSetting(_DB_PREFIX + contactId);
-      return (data && data.value) ? data.value : [];
+      if (Array.isArray(data)) return data;
+      return (data && Array.isArray(data.value)) ? data.value : [];
     } catch (_) { return []; }
   }
 
@@ -11679,20 +11735,48 @@ const SentinelMessaging = (() => {
     } catch (_) {}
   }
 
+  async function _getPeerMap() {
+    try { const m = await RemielDB.getSetting(_PEER_MAP_KEY); return (m && typeof m === 'object') ? m : {}; }
+    catch (_) { return {}; }
+  }
+  async function _learnPeer(sid, userId) {
+    if (!_isValidSid(sid) || !userId) return;
+    const m = await _getPeerMap();
+    const k = sid.toUpperCase();
+    if (m[k] === userId) return;
+    m[k] = userId;
+    try { await RemielDB.putSetting(_PEER_MAP_KEY, m); } catch (_) {}
+  }
+
+  async function _updateMsg(contactId, msgId, patch) {
+    const thread = await _loadThread(contactId);
+    const m = thread.find(x => x.id === msgId);
+    if (!m) return null;
+    Object.assign(m, patch);
+    await _saveThread(contactId, thread);
+    return m;
+  }
+
   /* ── Open messaging panel for a contact ── */
   async function openFor(contactId) {
-    const contact = DEMO_CONTACTS.find(c => c.id === contactId);
-    if (!contact) return;
+    const contact = _findContact(contactId);
+    if (!contact && String(contactId).indexOf('unknown:') !== 0) return;
     _activeContactId = contactId;
 
     /* Update header */
     const nameEl = document.getElementById('sentinelMsgName');
     const avatarEl = document.getElementById('sentinelMsgAvatar');
-    if (nameEl) nameEl.textContent = contact.first + ' ' + contact.last;
-    if (avatarEl) {
-      const cat = CATS[contact.cat] || CATS.other;
-      avatarEl.style.background = 'rgb(' + cat.r + ',' + cat.g + ',' + cat.b + ')';
-      avatarEl.textContent = (contact.first[0] || '') + (contact.last[0] || '');
+    if (contact) {
+      if (nameEl) nameEl.textContent = contact.first + ' ' + contact.last;
+      if (avatarEl) {
+        const cat = CATS[contact.cat] || CATS.other;
+        avatarEl.style.background = 'rgb(' + cat.r + ',' + cat.g + ',' + cat.b + ')';
+        avatarEl.textContent = (contact.first[0] || '') + (contact.last[0] || '');
+      }
+    } else {
+      const label = _contactLabel(contactId);
+      if (nameEl) nameEl.textContent = label;
+      if (avatarEl) { avatarEl.style.background = '#475569'; avatarEl.textContent = (label[0] || '?').toUpperCase(); }
     }
 
     /* Render thread */
@@ -11708,11 +11792,21 @@ const SentinelMessaging = (() => {
         if (inp) inp.focus();
       }, 350);
     }
+
+    /* Poll while open */
+    _stopOpenPoll();
+    poll().catch(() => {});
+    _pollTimer = setInterval(() => { poll().catch(() => {}); }, _POLL_MS);
+  }
+
+  function _stopOpenPoll() {
+    if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
   }
 
   /* ── Close panel ── */
   function close() {
     _activeContactId = null;
+    _stopOpenPoll();
     const overlay = document.getElementById('sentinelMsgOverlay');
     if (overlay) overlay.classList.remove('open');
   }
@@ -11727,48 +11821,103 @@ const SentinelMessaging = (() => {
     inp.value = '';
     inp.style.height = 'auto';
 
+    const contactId = _activeContactId;
+    const contact = _findContact(contactId);
+    const canDeliver = _authed() && (
+      (contact && _isValidSid(contact.sentinelId)) || String(contactId).indexOf('unknown:') === 0
+    );
+
     const msg = {
-      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       from: 'center',
       text: text,
-      ts: Date.now()
-    };
-
-    const thread = await _loadThread(_activeContactId);
-    thread.push(msg);
-    await _saveThread(_activeContactId, thread);
-
-    /* Update ticker for this contact — sent messages show in cyan */
-    _tickerCache[_activeContactId] = {
-      text: text,
-      scrollX: 0,
-      color: TICKER_COLOR_SENT,
       ts: Date.now(),
-      from: 'center'
-    };
-
-    await _renderThread(_activeContactId);
-
-    /* Also broadcast via sync if available */
-    _broadcastMessage(_activeContactId, msg);
-  }
-
-  /* ── Receive / simulate response from contact ── */
-  async function receiveResponse(contactId, text) {
-    if (!contactId || !text) return;
-
-    const msg = {
-      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-      from: contactId,
-      text: text,
-      ts: Date.now()
+      state: canDeliver ? 'pending' : 'local'
     };
 
     const thread = await _loadThread(contactId);
     thread.push(msg);
     await _saveThread(contactId, thread);
+    await _renderThread(contactId);
 
-    /* Update ticker — received messages show in green */
+    if (canDeliver) await _deliver(contactId, msg.id);
+  }
+
+  /* ── Deliver one stored message through the relay ── */
+  async function _deliver(contactId, msgId) {
+    const thread = await _loadThread(contactId);
+    const msg = thread.find(x => x.id === msgId);
+    if (!msg) return;
+
+    const contact = _findContact(contactId);
+    let sid = contact && _isValidSid(contact.sentinelId) ? contact.sentinelId.toUpperCase() : null;
+    if (!sid && String(contactId).indexOf('unknown:') === 0) {
+      const k = String(contactId).slice(8);
+      if (_isValidSid(k)) sid = k.toUpperCase();
+    }
+    const peerMap = await _getPeerMap();
+    const body = { client_msg_id: msg.id, text: msg.text, ts: msg.ts };
+    if (sid && peerMap[sid]) body.to_user_id = peerMap[sid];
+    else if (sid) body.to_sentinel_id = sid;
+    else { await _updateMsg(contactId, msgId, { state: 'local' }); return _refresh(contactId); }
+
+    await _updateMsg(contactId, msgId, { state: 'pending' });
+    await _refresh(contactId);
+
+    let ok = false;
+    try {
+      const res = await SyncEngine.apiFetch('/messages', { method: 'POST', body: JSON.stringify(body) });
+      if (res && res.ok) {
+        const data = await res.json().catch(() => ({}));
+        await _updateMsg(contactId, msgId, { state: 'delivered', serverId: data.id != null ? String(data.id) : undefined, ts: data.ts || msg.ts });
+        if (sid && data.delivered_to_user_id) await _learnPeer(sid, data.delivered_to_user_id);
+        ok = true;
+      }
+    } catch (_) {}
+
+    if (!ok) {
+      await _updateMsg(contactId, msgId, { state: 'failed' });
+    } else {
+      _tickerCache[contactId] = { text: msg.text, scrollX: 0, color: TICKER_COLOR_SENT, ts: Date.now(), from: 'center' };
+    }
+    await _refresh(contactId);
+  }
+
+  async function _refresh(contactId) {
+    if (_activeContactId === contactId) await _renderThread(contactId);
+    try {
+      if (selectedContact && selectedContact.id === contactId) _updateBlufLatestMessage(contactId);
+    } catch (_) {}
+  }
+
+  /* ── Retry a failed message ── */
+  async function retry(contactId, msgId) {
+    if (!_authed()) { showToast(_t('msg.signInToDeliver', 'Sign in to deliver messages')); return; }
+    await _deliver(contactId, msgId);
+  }
+
+  /* ── Receive a message from a contact (relay poll path) ── */
+  async function receiveResponse(contactId, text, opts) {
+    if (!contactId || !text) return;
+    opts = opts || {};
+
+    const thread = await _loadThread(contactId);
+    if (opts.serverId && thread.some(m => m.serverId === opts.serverId)) return;
+
+    const msg = {
+      id: opts.serverId ? 's' + opts.serverId : Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      serverId: opts.serverId || undefined,
+      from: contactId,
+      text: text,
+      ts: opts.ts || Date.now(),
+      state: 'delivered'
+    };
+
+    thread.push(msg);
+    thread.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    await _saveThread(contactId, thread);
+
+    /* Update ticker: received messages show in green */
     _tickerCache[contactId] = {
       text: text,
       scrollX: 0,
@@ -11777,28 +11926,95 @@ const SentinelMessaging = (() => {
       from: contactId
     };
 
-    /* If panel is open for this contact, refresh */
-    if (_activeContactId === contactId) {
-      await _renderThread(contactId);
-    }
+    await _refresh(contactId);
+  }
 
-    /* Update BLUF if this contact is currently selected */
-    if (selectedContact && selectedContact.id === contactId) {
-      _updateBlufLatestMessage(contactId);
+  /* ── Poll the relay: GET /messages?since=cursor ── */
+  async function poll() {
+    if (_polling || !_authed()) return;
+    _polling = true;
+    try {
+      let cursor = 0;
+      try { cursor = (await RemielDB.getSetting(_CURSOR_KEY)) || 0; } catch (_) {}
+      const res = await SyncEngine.apiFetch('/messages?since=' + encodeURIComponent(cursor), { method: 'GET' });
+      if (!res || !res.ok) return;
+      const data = await res.json().catch(() => null);
+      if (!data || !Array.isArray(data.messages)) return;
+
+      let myUserId = null;
+      try { myUserId = typeof SyncEngine.getUserId === 'function' ? SyncEngine.getUserId() : null; } catch (_) {}
+      const peerMap = await _getPeerMap();
+      const sidByUser = {};
+      Object.keys(peerMap).forEach(k => { sidByUser[peerMap[k]] = k; });
+
+      for (const m of data.messages) {
+        if (!m || !m.text) continue;
+        const serverId = m.id != null ? String(m.id) : null;
+
+        /* Sent from this account (possibly another device) */
+        if (myUserId && m.from_user_id === myUserId) {
+          const sid = sidByUser[m.to_user_id];
+          const c = sid ? _findContactBySid(sid) : null;
+          if (!c) continue;
+          const thread = await _loadThread(c.id);
+          if (thread.some(x => (serverId && x.serverId === serverId) || (m.client_msg_id && x.id === m.client_msg_id))) continue;
+          thread.push({ id: m.client_msg_id || ('s' + serverId), serverId: serverId || undefined, from: 'center', text: m.text, ts: m.ts || Date.now(), state: 'delivered' });
+          thread.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+          await _saveThread(c.id, thread);
+          await _refresh(c.id);
+          continue;
+        }
+
+        const fromSid = m.from_sentinel_id ? String(m.from_sentinel_id).toUpperCase() : null;
+        if (fromSid && m.from_user_id) { await _learnPeer(fromSid, m.from_user_id); sidByUser[m.from_user_id] = fromSid; }
+        const contact = _findContactBySid(fromSid || sidByUser[m.from_user_id]);
+        let key;
+        if (contact) {
+          key = contact.id;
+        } else {
+          key = 'unknown:' + (fromSid || m.from_user_id || 'sender');
+          const who = m.from_handle ? '@' + m.from_handle : (m.from_display_name || fromSid || _t('msg.someone', 'someone'));
+          _unknownNames[key] = m.from_display_name || who;
+          showToast(_t('msg.newFrom', 'New message from') + ' ' + who + ': ' + _t('msg.addToReply', 'add them as a contact to reply'));
+        }
+        await receiveResponse(key, m.text, { serverId: serverId, ts: m.ts });
+      }
+
+      if (data.cursor != null) {
+        try { await RemielDB.putSetting(_CURSOR_KEY, data.cursor); } catch (_) {}
+      }
+    } catch (e) {
+      console.warn('[SentinelMessaging] poll failed:', e && e.message);
+    } finally {
+      _polling = false;
     }
   }
 
   /* ── Render thread in panel ── */
+  function _stateLabel(state) {
+    if (state === 'pending') return _t('msg.state.pending', 'Sending');
+    if (state === 'failed') return _t('msg.state.failed', 'Not delivered');
+    if (state === 'local') return _t('msg.state.local', 'Saved on this device');
+    return _t('msg.state.delivered', 'Delivered');
+  }
+
   async function _renderThread(contactId) {
     const threadEl = document.getElementById('sentinelMsgThread');
     if (!threadEl) return;
 
     const messages = await _loadThread(contactId);
-    const contact = DEMO_CONTACTS.find(c => c.id === contactId);
-    const contactName = contact ? contact.first : 'Contact';
+    const contact = _findContact(contactId);
+    const contactName = _escHtml(_contactLabel(contactId));
+    const isUnknown = String(contactId).indexOf('unknown:') === 0;
+    const noSid = !isUnknown && !(contact && _isValidSid(contact.sentinelId));
+
+    let note = '';
+    if (noSid) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.noSidNote', 'Saved on this device. Add their Sentinel ID to deliver.')) + '</div>';
+    else if (!_authed()) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.signInNote', 'Saved on this device. Sign in to Remiel Sentinel to deliver.')) + '</div>';
+    else if (isUnknown) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.unknownNote', 'Not in your contacts. Add them as a contact to keep this thread.')) + '</div>';
 
     if (messages.length === 0) {
-      threadEl.innerHTML = '<div class="sentinel-msg-empty">Send a message to check in with ' + contactName + '</div>';
+      threadEl.innerHTML = '<div class="sentinel-msg-empty">' + _escHtml(_t('msg.empty', 'Messages are delivered through Remiel Sentinel when both of you have Sentinel IDs')) + '</div>' + note;
       return;
     }
 
@@ -11807,14 +12023,20 @@ const SentinelMessaging = (() => {
     let html = '';
     for (const m of recent) {
       const isSent = m.from === 'center';
-      const cls = isSent ? 'sent' : 'received';
+      const state = m.state || 'delivered';
+      const cls = isSent ? 'sent ' + state : 'received';
       const timeStr = _formatTime(m.ts);
+      let meta = (isSent ? _escHtml(_t('msg.you', 'You')) : contactName) + ' · ' + timeStr;
+      if (isSent) meta += ' · ' + _escHtml(_stateLabel(state));
+      if (isSent && state === 'failed') {
+        meta += '<button class="sentinel-msg-retry" onclick="SentinelMessaging.retry(\'' + _escAttrJs(contactId) + '\',\'' + _escAttrJs(m.id) + '\')">' + _escHtml(_t('msg.retry', 'Retry')) + '</button>';
+      }
       html += '<div class="sentinel-msg-bubble ' + cls + '">'
             + _escHtml(m.text)
-            + '<div class="sentinel-msg-time">' + (isSent ? 'You' : contactName) + ' · ' + timeStr + '</div>'
+            + '<div class="sentinel-msg-time">' + meta + '</div>'
             + '</div>';
     }
-    threadEl.innerHTML = html;
+    threadEl.innerHTML = html + note;
 
     /* Scroll to bottom */
     requestAnimationFrame(() => { threadEl.scrollTop = threadEl.scrollHeight; });
@@ -11831,12 +12053,11 @@ const SentinelMessaging = (() => {
     }
     const last = messages[messages.length - 1];
     const isSent = last.from === 'center';
-    const contact = DEMO_CONTACTS.find(c => c.id === contactId);
-    const who = isSent ? 'You' : (contact ? contact.first : 'Contact');
+    const who = isSent ? _t('msg.you', 'You') : _contactLabel(contactId);
 
     el.hidden = false;
-    el.innerHTML = '<div class="bluf-msg-latest-label">Latest Message</div>'
-      + '<div class="bluf-msg-latest-text">' + who + ': ' + _escHtml(last.text) + '</div>'
+    el.innerHTML = '<div class="bluf-msg-latest-label">' + _escHtml(_t('msg.latest', 'Latest Message')) + '</div>'
+      + '<div class="bluf-msg-latest-text">' + _escHtml(who) + ': ' + _escHtml(last.text) + '</div>'
       + '<div class="bluf-msg-latest-time">' + _formatTime(last.ts) + '</div>';
   }
 
@@ -11852,7 +12073,7 @@ const SentinelMessaging = (() => {
 
   /* ── Get latest message for BLUF headline override ── */
   async function getLatestMessageText(contactId) {
-    const messages = await _loadThread(contactId);
+    const messages = (await _loadThread(contactId)).filter(m => m.from !== 'center' || !m.state || m.state === 'delivered');
     if (messages.length === 0) return null;
     const last = messages[messages.length - 1];
     /* Only show messages less than 1 hour old in headline */
@@ -11864,21 +12085,12 @@ const SentinelMessaging = (() => {
     };
   }
 
-  /* ── Broadcast via SyncEngine if available ── */
-  function _broadcastMessage(contactId, msg) {
-    try {
-      if (typeof SyncEngine !== 'undefined' && SyncEngine.isActive && SyncEngine.isActive()) {
-        SyncEngine.broadcast({ type: 'sentinel-message', contactId, msg });
-      }
-    } catch (_) {}
-  }
-
   /* ── Helpers ── */
   function _formatTime(ts) {
     const d = new Date(ts);
     const now = new Date();
     const diffMs = now - d;
-    if (diffMs < 60000) return 'Just now';
+    if (diffMs < 60000) return _t('msg.justNow', 'Just now');
     if (diffMs < 3600000) return Math.floor(diffMs / 60000) + 'm ago';
     if (d.toDateString() === now.toDateString()) {
       return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -11889,6 +12101,9 @@ const SentinelMessaging = (() => {
 
   function _escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function _escAttrJs(s) {
+    return _escHtml(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
   }
 
   /* ── Auto-textarea resize ── */
@@ -11902,15 +12117,26 @@ const SentinelMessaging = (() => {
     }
   }
 
+  /* ── Register the relay poller with SyncEngine after each sync ── */
+  let _hookTries = 0;
+  function _registerSyncHook() {
+    const se = _sync();
+    if (se && Array.isArray(se.onSyncHooks)) {
+      if (se.onSyncHooks.indexOf(poll) === -1) se.onSyncHooks.push(poll);
+      return;
+    }
+    if (++_hookTries < 20) setTimeout(_registerSyncHook, 1500);
+  }
+
   /* Init on DOM ready */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _initAutoResize);
+    document.addEventListener('DOMContentLoaded', () => { _initAutoResize(); _registerSyncHook(); });
   } else {
-    setTimeout(_initAutoResize, 100);
+    setTimeout(() => { _initAutoResize(); _registerSyncHook(); }, 100);
   }
 
   return {
-    openFor, close, send, receiveResponse,
+    openFor, close, send, retry, receiveResponse, poll,
     getTickerData, getLatestMessageText,
     loadBlufSection,
     get activeContactId() { return _activeContactId; },
@@ -13087,7 +13313,7 @@ var RosterImport = (function() {
         sev: 2,
         phone: '',
         email: '',
-        sentinelId: 'sentinel_' + id + '_' + Math.random().toString(36).substr(2, 6)
+        sentinelId: ''
       };
       DEMO_CONTACTS.push(contact);
       try { await RemielDB.putContact(contact); } catch (e) {}
@@ -13155,7 +13381,7 @@ var RosterImport = (function() {
         sev: 2,
         phone: p.phone || '',
         email: p.email || '',
-        sentinelId: 'sentinel_' + newId + '_' + Math.random().toString(36).substr(2, 6)
+        sentinelId: ''
       };
       DEMO_CONTACTS.push(newContact);
       try { await RemielDB.putContact(newContact); } catch (e) {}
@@ -20985,109 +21211,183 @@ const SocialImport = (() => {
 
     function _$(id) { return document.getElementById(id); }
 
+    /* Local i18n shim: uses I18n.t when the key exists, else the fallback */
+    function _t(key, fallback) {
+      try {
+        if (typeof I18n !== 'undefined' && I18n && typeof I18n.t === 'function') {
+          var v = I18n.t(key);
+          if (v && v !== key) return v;
+        }
+      } catch (e) {}
+      return fallback;
+    }
+
+    function _esc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function _authed() {
+      try { return typeof SyncEngine !== 'undefined' && typeof SyncEngine.isAuthenticated === 'function' && SyncEngine.isAuthenticated(); }
+      catch (e) { return false; }
+    }
+
+    /* contactId -> { url, created_at } for the newest shared note; memory only */
+    var _latestByContact = {};
+
     function _timeAgo(ts) {
       var diff = Date.now() - ts;
-      if (diff < 60000) return 'just now';
+      if (diff < 60000) return _t('vn.justNow', 'just now');
       if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
       if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
       return Math.floor(diff / 86400000) + 'd ago';
     }
 
+    function _currentContactId() {
+      try { if (typeof selectedContact !== 'undefined' && selectedContact) return selectedContact.id; } catch (e) {}
+      return null;
+    }
+
+    /* Multipart request: must not carry a JSON Content-Type so the browser sets the boundary */
+    async function _postForm(path, form) {
+      if (typeof SyncEngine.apiUpload === 'function') return SyncEngine.apiUpload(path, form);
+      if (typeof SyncEngine.apiFetchRaw === 'function') return SyncEngine.apiFetchRaw(path, { method: 'POST', body: form });
+      return SyncEngine.apiFetch(path, { method: 'POST', body: form });
+    }
+
     async function uploadToCircle() {
       if (typeof bcLastBlob === 'undefined' || !bcLastBlob) {
         var st = _$('bcStatus');
-        if (st) st.textContent = 'No video to share — record or upload first.';
+        if (st) st.textContent = _t('vn.noVideo', 'No video to share. Record or upload first.');
         return;
       }
-      if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
+      if (!_authed()) {
         var st2 = _$('bcStatus');
-        if (st2) st2.textContent = 'Sign in to share with your Circle.';
+        if (st2) st2.textContent = _t('vn.signIn', 'Sign in to share with your Circle.');
         return;
       }
 
       var btn = _$('bcCircleShareBtn');
-      if (btn) btn.textContent = 'Uploading...';
+      if (btn) btn.textContent = _t('vn.uploading', 'Uploading...');
 
       try {
-        var mimeType = bcLastBlob.type || 'video/webm';
-        var resp = await SyncEngine.apiFetch('/storage/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': mimeType,
-            'x-blob-type': 'videonote',
-            'x-mime-type': mimeType,
-            'content-length': String(bcLastBlob.size),
-          },
-          body: bcLastBlob,
-        });
+        var mimeType = (bcLastBlob.type || 'video/webm').split(';')[0];
+        var ext = mimeType.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+        var form = new FormData();
+        form.append('file', bcLastBlob, 'videonote-' + Date.now() + '.' + ext);
+        form.append('blob_type', 'videonote');
+        var cid = _currentContactId();
+        if (cid) form.append('contact_id', String(cid));
+
+        var resp = await _postForm('/storage/upload', form);
 
         if (!resp.ok) {
           var err = await resp.json().catch(function() { return {}; });
-          throw new Error(err.detail || 'Upload failed');
+          throw new Error(err.detail || _t('vn.uploadFailed', 'Upload failed'));
         }
 
-        var data = await resp.json();
+        await resp.json().catch(function() { return {}; });
         var st3 = _$('bcStatus');
-        if (st3) st3.textContent = 'Shared with Circle!';
-        if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Shared!';
+        if (st3) st3.textContent = _t('vn.shared', 'Shared with your Circle');
+        if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ' + _esc(_t('vn.sharedShort', 'Shared'));
         setTimeout(function() {
-          if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 014-10z"/></svg> Share with Circle';
+          if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 014-10z"/></svg> ' + _esc(_t('vn.shareBtn', 'Share with Circle'));
         }, 3000);
       } catch (e) {
         var st4 = _$('bcStatus');
-        if (st4) st4.textContent = 'Circle share error: ' + e.message;
-        if (btn) btn.textContent = 'Share with Circle';
+        if (st4) st4.textContent = _t('vn.shareError', 'Circle share error') + ': ' + e.message;
+        if (btn) btn.textContent = _t('vn.shareBtn', 'Share with Circle');
       }
+    }
+
+    /* Match a shared note to a local contact by handle, then by full name */
+    function _matchContact(m) {
+      try {
+        var list = DEMO_CONTACTS || [];
+        var h = m.handle ? String(m.handle).replace(/^@/, '').toLowerCase() : '';
+        if (h) {
+          var byHandle = list.find(function(c) { return c.handle && String(c.handle).replace(/^@/, '').toLowerCase() === h; });
+          if (byHandle) return byHandle;
+        }
+        var dn = m.display_name ? String(m.display_name).trim().toLowerCase() : '';
+        if (dn) {
+          return list.find(function(c) { return ((c.first || '') + ' ' + (c.last || '')).trim().toLowerCase() === dn; }) || null;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    function _indexMedia(media) {
+      var next = {};
+      for (var i = 0; i < media.length; i++) {
+        var m = media[i];
+        if (!m || !m.url) continue;
+        var c = _matchContact(m);
+        if (!c) continue;
+        var prev = next[c.id];
+        if (!prev || (m.created_at || 0) > (prev.created_at || 0)) next[c.id] = { url: m.url, created_at: m.created_at || 0 };
+      }
+      _latestByContact = next;
     }
 
     async function loadShared() {
       var list = _$('sharedVideoNotesList');
-      if (!list) return;
-      if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
-        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Sign in to see shared notes</div>';
+      if (!_authed()) {
+        if (list) list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">' + _esc(_t('vn.signInToSee', 'Sign in to see shared notes')) + '</div>';
         return;
       }
       try {
         var resp = await SyncEngine.apiFetch('/storage/shared-media', {});
         if (!resp.ok) {
-          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Could not load shared notes</div>';
+          if (list) list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">' + _esc(_t('vn.loadFailed', 'Could not load shared notes')) + '</div>';
           return;
         }
         var data = await resp.json();
-        var media = data.media || [];
+        var media = (data && Array.isArray(data.media)) ? data.media : [];
+        _indexMedia(media);
+        if (!list) return;
         if (media.length === 0) {
-          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">No one in your Circle has shared a video note recently</div>';
+          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">' + _esc(_t('vn.none', 'No one in your Circle has shared a video note recently')) + '</div>';
           return;
         }
         var html = '';
         for (var i = 0; i < media.length; i++) {
           var m = media[i];
+          if (!m || !m.url) continue;
+          /* url already carries ?token= for this user, so <video src> loads directly */
+          var who = m.display_name || (m.handle ? '@' + m.handle : _t('vn.unknown', 'Unknown'));
           html += '<div class="shared-vn-item">' +
-            '<div class="vn-peer">' + (m.display_name || m.handle || 'Unknown') + '</div>' +
-            '<div class="vn-time">' + _timeAgo(m.created_at) + '</div>' +
-            '<video src="' + m.url + '" controls playsinline preload="metadata" style="width:100%;border-radius:6px;max-height:200px;background:#000;"></video>' +
+            '<div class="vn-peer">' + _esc(who) + '</div>' +
+            '<div class="vn-time">' + _esc(_timeAgo(m.created_at)) + '</div>' +
+            '<video src="' + _esc(m.url) + '" controls playsinline preload="metadata" style="width:100%;border-radius:6px;max-height:200px;background:#000;"></video>' +
           '</div>';
         }
         list.innerHTML = html;
       } catch (e) {
-        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Error: ' + e.message + '</div>';
+        if (list) list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">' + _esc(_t('vn.error', 'Error')) + ': ' + _esc(e.message) + '</div>';
       }
+    }
+
+    /* For the galaxy renderer: newest shared clip url for a contact, or null */
+    function getLatestSharedForContact(contactId) {
+      var e = _latestByContact[contactId];
+      return e ? e.url : null;
     }
 
     function updateVisibility() {
       var section = _$('sharedVideoNotesSection');
       if (!section) return;
-      var authed = typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated();
-      section.style.display = authed ? '' : 'none';
+      section.style.display = _authed() ? '' : 'none';
     }
 
     function init() {
       updateVisibility();
+      if (_authed()) loadShared().catch(function() {});
     }
 
     return {
       uploadToCircle: uploadToCircle,
       loadShared: loadShared,
+      getLatestSharedForContact: getLatestSharedForContact,
       updateVisibility: updateVisibility,
       init: init,
     };
@@ -22139,12 +22439,75 @@ const SentinelCall = (function() {
     return id;
   }
 
+  /* Local i18n shim: uses I18n.t when the key exists, else the fallback */
+  function _t(key, fallback) {
+    try {
+      if (typeof I18n !== 'undefined' && I18n && typeof I18n.t === 'function') {
+        const v = I18n.t(key);
+        if (v && v !== key) return v;
+      }
+    } catch (e) {}
+    return fallback;
+  }
+
+  function _isValidSid(s) { return typeof s === 'string' && /^[A-Z0-9]{8}$/i.test(s.trim()); }
+
+  const _NO_ANSWER_MS = 45000;
+  let _noAnswerTimer = null;
+  let _incomingTimer = null;
+  let _activeShown = false;
+  let _guestPeer = null;
+
+  /* Fallback ICE list used only when GET /turn/credentials is unreachable or empty.
+     These are public STUN servers and the free Open Relay TURN service: a public
+     relay with shared credentials, not suitable for production traffic. The API
+     returns a bare RTCIceServer array; keep that shape. */
+  const FALLBACK_ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'turn:standard.relay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:standard.relay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:standard.relay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+  ];
+
+  function _apiBase() {
+    try {
+      if (typeof SyncEngine === 'undefined') return null;
+      if (typeof SyncEngine.getApiBase === 'function') return SyncEngine.getApiBase();
+      if (typeof SyncEngine.getStatus === 'function') return (SyncEngine.getStatus() || {}).apiBase || null;
+    } catch (e) {}
+    return null;
+  }
+
+  /* ── Fetch TURN/STUN ICE servers for NAT traversal ── */
+  async function _fetchIceServers() {
+    try {
+      const apiBase = _apiBase();
+      if (apiBase) {
+        const resp = await fetch(apiBase + '/turn/credentials');
+        if (resp.ok) {
+          const servers = await resp.json();
+          if (Array.isArray(servers) && servers.length > 0) {
+            console.log('SentinelCall: using', servers.length, 'ICE servers from API');
+            return servers;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('SentinelCall: TURN credential fetch failed, using fallback', e.message);
+    }
+    return FALLBACK_ICE_SERVERS.slice();
+  }
+
   /* ── Initialize ── */
   async function init() {
-    /* Get or create Sentinel ID */
+    /* Get or create Sentinel ID (older builds wrote the key sentinelId) */
     _myId = await RemielDB.getSetting('sentinelCallId');
-    if (!_myId) {
-      _myId = _generateId();
+    if (!_isValidSid(_myId || '')) {
+      let legacy = null;
+      try { legacy = await RemielDB.getSetting('sentinelId'); } catch (e) {}
+      _myId = _isValidSid(legacy || '') ? String(legacy).toUpperCase() : _generateId();
       await RemielDB.putSetting('sentinelCallId', _myId);
     }
 
@@ -22159,53 +22522,13 @@ const SentinelCall = (function() {
       return;
     }
 
-    /* ── Fetch TURN/STUN ICE servers for NAT traversal ── */
-    async function _fetchIceServers() {
-      /* Try Vercel API first (returns Metered.ca TURN credentials) */
-      try {
-        var apiBase = SyncEngine.getStatus ? SyncEngine.getStatus().apiBase : null;
-        if (apiBase) {
-          var resp = await fetch(apiBase + '/turn/credentials');
-          if (resp.ok) {
-            var servers = await resp.json();
-            if (Array.isArray(servers) && servers.length > 0) {
-              console.log('SentinelCall: using', servers.length, 'ICE servers from API');
-              return servers;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('SentinelCall: TURN credential fetch failed, using fallback', e.message);
-      }
+    await _initPeer();
+    updateSettingsDisplay();
+  }
 
-      /* Fallback: public STUN + Metered Open Relay static TURN */
-      return [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun.relay.metered.ca:80' },
-        {
-          urls: 'turn:standard.relay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:standard.relay.metered.ca:80?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:standard.relay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turns:standard.relay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
-      ];
-    }
-
-    /* Connect to PeerJS signaling server with ICE/TURN config */
+  /* ── Connect to PeerJS signaling with ICE/TURN config ── */
+  async function _initPeer() {
+    if (!window.Peer || !_myId) return;
     const iceServers = await _fetchIceServers();
     const peerId = 'sentinel-' + _myId.toLowerCase();
     _peer = new Peer(peerId, {
@@ -22221,7 +22544,10 @@ const SentinelCall = (function() {
 
     _peer.on('call', (call) => {
       console.log('SentinelCall: incoming call from', call.peer);
+      if (_currentCall || _incomingCall) { try { call.close(); } catch (e) {} return; }
       _incomingCall = call;
+      call.on('close', () => { if (_incomingCall === call) rejectIncoming(); });
+      call.on('error', () => { if (_incomingCall === call) rejectIncoming(); });
       _showIncoming(call);
     });
 
@@ -22233,15 +22559,10 @@ const SentinelCall = (function() {
     _peer.on('error', (err) => {
       console.warn('SentinelCall: error', err.type, err.message);
       if (err.type === 'peer-unavailable') {
-        _hideAllOverlays();
-        _stopLocalStream();
-        showToast('Could not reach that person — they may not be online');
+        endCall();
+        showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
       }
     });
-
-    /* Show Sentinel ID in settings if element exists */
-    const idEl = document.getElementById('scMyId');
-    if (idEl) idEl.textContent = _myId;
   }
 
   /* ── Get camera stream ── */
@@ -22252,58 +22573,92 @@ const SentinelCall = (function() {
     });
   }
 
+  /* ── Wire a PeerJS media call (outgoing, accepted, or guest) ── */
+  function _attachCall(call, onClosed) {
+    call.on('stream', (remoteStream) => {
+      if (_currentCall !== call) return;
+      const inc = document.getElementById('scIncomingOverlay');
+      if (inc) inc.classList.remove('active');
+      _showActive(remoteStream);
+    });
+    call.on('close', () => {
+      if (_currentCall === call) endCall();
+      if (onClosed) onClosed();
+    });
+    call.on('error', (err) => {
+      console.warn('SentinelCall: call error', err);
+      if (_currentCall === call) {
+        endCall();
+        showToast(_t('call.failed', 'Call failed') + ': ' + ((err && err.message) || _t('call.connectionLost', 'connection lost')));
+      }
+      if (onClosed) onClosed();
+    });
+  }
+
+  /* ── Outgoing no-answer timeout ── */
+  function _armNoAnswer(call, onTimeout) {
+    if (_noAnswerTimer) clearTimeout(_noAnswerTimer);
+    _noAnswerTimer = setTimeout(() => {
+      _noAnswerTimer = null;
+      if (_currentCall === call && !_activeShown) {
+        showToast(_t('call.noAnswer', 'No answer'));
+        try { call.close(); } catch (e) {}
+        endCall();
+        if (onTimeout) onTimeout();
+      }
+    }, _NO_ANSWER_MS);
+  }
+
   /* ── Call a contact by ID ── */
   async function callContact(contactId) {
+    if (_currentCall) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
     if (!_peer || _peer.destroyed) {
-      showToast('Video calling not ready — try again in a moment');
+      showToast(_t('call.notReady', 'Video calling not ready. Try again in a moment.'));
       return;
     }
 
     let contact;
     try { contact = await RemielDB.getContact(contactId); } catch(e) {}
-    if (!contact) { showToast('Contact not found'); return; }
+    if (!contact) { showToast(_t('call.contactNotFound', 'Contact not found')); return; }
 
     const targetId = contact.sentinelId;
-    if (!targetId) {
-      showToast('No Sentinel ID for ' + (contact.first || 'this contact') + ' — tap their sphere, then Edit to add it');
+    if (!_isValidSid(targetId || '')) {
+      showToast(_t('call.noSid', 'No Sentinel ID for') + ' ' + (contact.first || _t('call.thisContact', 'this contact')) + '. ' + _t('call.addSidHint', 'Tap their sphere, then Edit to add it.'));
       return;
     }
 
     try {
       _localStream = await _getStream();
     } catch (err) {
-      showToast('Camera/mic access denied');
+      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
       return;
     }
 
     /* Show outgoing UI */
-    const name = ((contact.first || '') + ' ' + (contact.last || '')).trim() || 'Contact';
-    const initials = (contact.first || '?')[0] + (contact.last || '')[0];
+    const name = ((contact.first || '') + ' ' + (contact.last || '')).trim() || _t('call.contact', 'Contact');
+    const initials = (contact.first || '?')[0] + ((contact.last || '')[0] || '');
     _showOutgoing(name, initials);
-
-    /* Place the call */
-    const remotePeerId = 'sentinel-' + targetId.toLowerCase();
-    _currentCall = _peer.call(remotePeerId, _localStream, {
-      metadata: { callerName: (await _getMyName()), callerId: _myId }
-    });
 
     /* Show local video */
     const localVid = document.getElementById('scLocalVideo');
     if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
 
-    _currentCall.on('stream', (remoteStream) => {
-      _showActive(remoteStream);
-    });
-
-    _currentCall.on('close', () => {
+    /* Place the call */
+    const remotePeerId = 'sentinel-' + targetId.trim().toLowerCase();
+    let call = null;
+    try {
+      call = _peer.call(remotePeerId, _localStream, {
+        metadata: { callerName: (await _getMyName()), callerId: _myId }
+      });
+    } catch (e) { call = null; }
+    if (!call) {
       endCall();
-    });
-
-    _currentCall.on('error', (err) => {
-      console.warn('SentinelCall: call error', err);
-      endCall();
-      showToast('Call failed — ' + (err.message || 'connection lost'));
-    });
+      showToast(_t('call.couldNotPlace', 'Could not place call'));
+      return;
+    }
+    _currentCall = call;
+    _attachCall(call);
+    _armNoAnswer(call);
   }
 
   /* ── Call from focused sphere (quick action) ── */
@@ -22313,62 +22668,84 @@ const SentinelCall = (function() {
     } else if (typeof selectedContact !== 'undefined' && selectedContact) {
       callContact(selectedContact.id);
     } else {
-      showToast('Select a contact first');
+      showToast(_t('call.selectFirst', 'Select a contact first'));
     }
   }
 
   /* ── Accept incoming call ── */
   async function acceptIncoming() {
     if (!_incomingCall) return;
+    const call = _incomingCall;
     _stopRingtone();
+    if (_incomingTimer) { clearTimeout(_incomingTimer); _incomingTimer = null; }
 
     try {
       _localStream = await _getStream();
     } catch(err) {
-      showToast('Camera/mic access denied');
+      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
       rejectIncoming();
       return;
     }
+    if (_incomingCall !== call) { _cleanupMedia(); return; } /* caller hung up meanwhile */
 
-    _incomingCall.answer(_localStream);
-    _currentCall = _incomingCall;
+    _currentCall = call;
     _incomingCall = null;
+    _attachCall(call);
+
+    try {
+      call.answer(_localStream);
+    } catch (e) {
+      console.warn('SentinelCall: answer failed', e);
+      endCall();
+      showToast(_t('call.failed', 'Call failed'));
+      return;
+    }
 
     /* Show local video */
     const localVid = document.getElementById('scLocalVideo');
     if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
-
-    _currentCall.on('stream', (remoteStream) => {
-      /* Hide incoming overlay, show active */
-      document.getElementById('scIncomingOverlay').classList.remove('active');
-      _showActive(remoteStream);
-    });
-
-    _currentCall.on('close', () => { endCall(); });
   }
 
   /* ── Reject incoming ── */
   function rejectIncoming() {
     _stopRingtone();
-    if (_incomingCall) { _incomingCall.close(); _incomingCall = null; }
-    document.getElementById('scIncomingOverlay').classList.remove('active');
+    if (_incomingTimer) { clearTimeout(_incomingTimer); _incomingTimer = null; }
+    const call = _incomingCall;
+    _incomingCall = null;
+    if (call) { try { call.close(); } catch (e) {} }
+    const inc = document.getElementById('scIncomingOverlay');
+    if (inc) inc.classList.remove('active');
   }
 
   /* ── Hang up ── */
   function hangUp() {
-    if (_currentCall) _currentCall.close();
+    const call = _currentCall;
+    _currentCall = null;
+    if (call) { try { call.close(); } catch (e) {} }
     endCall();
+  }
+
+  /* ── Release camera, mic, timers and ringtone: used by every exit path ── */
+  function _cleanupMedia() {
+    _stopRingtone();
+    _stopLocalStream();
+    if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+    if (_noAnswerTimer) { clearTimeout(_noAnswerTimer); _noAnswerTimer = null; }
+    if (_incomingTimer) { clearTimeout(_incomingTimer); _incomingTimer = null; }
+    _activeShown = false;
+    _callStartTime = null;
+    _audioMuted = false;
+    const btn = document.getElementById('scMuteBtn');
+    if (btn) btn.classList.remove('active');
   }
 
   /* ── End call cleanup ── */
   function endCall() {
-    _stopRingtone();
-    _stopLocalStream();
+    const call = _currentCall;
     _currentCall = null;
     _incomingCall = null;
-    _callStartTime = null;
-    _audioMuted = false;
-    if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+    if (call) { try { call.close(); } catch (e) {} }
+    _cleanupMedia();
     _hideAllOverlays();
   }
 
@@ -22384,29 +22761,40 @@ const SentinelCall = (function() {
     }
   }
 
-  /* ── Flip camera ── */
+  /* ── Flip camera: acquire the new camera first, then stop the old one ── */
   async function flipCamera() {
     if (!_localStream || !_currentCall) return;
+    const prevFacing = _facingMode;
     _facingMode = _facingMode === 'user' ? 'environment' : 'user';
+    let newStream;
     try {
-      _localStream.getVideoTracks().forEach(t => t.stop());
-      const newStream = await _getStream();
-      const newVideoTrack = newStream.getVideoTracks()[0];
-
-      /* Replace track in peer connection */
-      const sender = _currentCall.peerConnection
-        .getSenders().find(s => s.track && s.track.kind === 'video');
-      if (sender) await sender.replaceTrack(newVideoTrack);
-
-      /* Keep audio tracks */
-      const audioTrack = _localStream.getAudioTracks()[0];
-      _localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
-
-      const localVid = document.getElementById('scLocalVideo');
-      if (localVid) localVid.srcObject = _localStream;
+      newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: _facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      });
     } catch(err) {
+      _facingMode = prevFacing;
       console.warn('SentinelCall: flip failed', err);
+      return;
     }
+    const newVideoTrack = newStream.getVideoTracks()[0];
+    try {
+      const pc = _currentCall && _currentCall.peerConnection;
+      const sender = pc ? pc.getSenders().find(s => s.track && s.track.kind === 'video') : null;
+      if (sender) await sender.replaceTrack(newVideoTrack);
+    } catch (err) {
+      console.warn('SentinelCall: replaceTrack failed', err);
+      newStream.getTracks().forEach(t => t.stop());
+      _facingMode = prevFacing;
+      return;
+    }
+    if (!_localStream) { newStream.getTracks().forEach(t => t.stop()); return; } /* call ended meanwhile */
+    _localStream.getVideoTracks().forEach(t => t.stop());
+    const audioTrack = _localStream.getAudioTracks()[0];
+    _localStream = new MediaStream([newVideoTrack, audioTrack].filter(Boolean));
+
+    const localVid = document.getElementById('scLocalVideo');
+    if (localVid) localVid.srcObject = _localStream;
   }
 
   /* ── UI helpers ── */
@@ -22444,12 +22832,22 @@ const SentinelCall = (function() {
     _playRingtone();
 
     /* Auto-timeout after 30s */
-    setTimeout(() => {
+    if (_incomingTimer) clearTimeout(_incomingTimer);
+    _incomingTimer = setTimeout(() => {
+      _incomingTimer = null;
       if (_incomingCall === call) rejectIncoming();
     }, 30000);
   }
 
   function _showActive(remoteStream) {
+    /* PeerJS can emit 'stream' once per track; only set up once */
+    if (_activeShown) {
+      const rv = document.getElementById('scRemoteVideo');
+      if (rv && remoteStream && rv.srcObject !== remoteStream) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
+      return;
+    }
+    _activeShown = true;
+    if (_noAnswerTimer) { clearTimeout(_noAnswerTimer); _noAnswerTimer = null; }
     const remoteVid = document.getElementById('scRemoteVideo');
     const status = document.getElementById('scStatus');
     const timer = document.getElementById('scCallTimer');
@@ -22465,6 +22863,7 @@ const SentinelCall = (function() {
 
     /* Start call timer */
     _callStartTime = Date.now();
+    if (_timerInterval) clearInterval(_timerInterval);
     _timerInterval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - _callStartTime) / 1000);
       const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
@@ -22569,8 +22968,9 @@ const SentinelCall = (function() {
   async function guestJoinCall() {
     const name = document.getElementById('scGuestName').value.trim();
     if (!name || !_guestTargetId) return;
+    if (_currentCall) return;
     const statusEl = document.getElementById('scGuestStatus');
-    statusEl.textContent = 'Connecting...';
+    statusEl.textContent = _t('call.connecting', 'Connecting...');
 
     /* Generate a temp guest Sentinel ID */
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22583,75 +22983,65 @@ const SentinelCall = (function() {
     try {
       await _loadPeerJS();
     } catch(e) {
-      statusEl.textContent = 'Could not load video calling library';
+      statusEl.textContent = _t('call.libFailed', 'Could not load video calling library');
       return;
     }
 
+    if (_guestPeer) { try { _guestPeer.destroy(); } catch (e) {} _guestPeer = null; }
+    const iceServers = await _fetchIceServers();
     const guestPeerId = 'sentinel-' + guestId.toLowerCase();
-    const guestPeer = new Peer(guestPeerId, { debug: 0 });
+    const guestPeer = new Peer(guestPeerId, { debug: 0, config: { iceServers: iceServers } });
+    _guestPeer = guestPeer;
+    const destroyGuest = () => {
+      if (_guestPeer === guestPeer) _guestPeer = null;
+      try { guestPeer.destroy(); } catch (e) {}
+    };
 
-    guestPeer.on('open', async (id) => {
-      statusEl.textContent = 'Calling...';
+    guestPeer.on('open', async () => {
+      statusEl.textContent = _t('call.calling', 'Calling...');
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        _localStream = await _getStream();
+      } catch(err) {
+        statusEl.textContent = _t('call.mediaDenied', 'Camera/mic access denied');
+        destroyGuest();
+        return;
+      }
 
-        /* Hide guest overlay, show outgoing UI */
-        document.getElementById('scGuestOverlay').classList.add('hidden');
-        _localStream = stream;
+      /* Hide guest overlay, show outgoing UI */
+      document.getElementById('scGuestOverlay').classList.add('hidden');
+      const localVid = document.getElementById('scLocalVideo');
+      if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
+      _showOutgoing(_guestTargetId, '?');
 
-        const localVid = document.getElementById('scLocalVideo');
-        if (localVid) { localVid.srcObject = stream; localVid.play().catch(() => {}); }
-
-        /* Show outgoing call overlay */
-        _showOutgoing(_guestTargetId, '?');
-
-        /* Place the call */
-        const remotePeerId = 'sentinel-' + _guestTargetId.toLowerCase();
-        const call = guestPeer.call(remotePeerId, stream, {
+      /* Place the call */
+      const remotePeerId = 'sentinel-' + _guestTargetId.toLowerCase();
+      let call = null;
+      try {
+        call = guestPeer.call(remotePeerId, _localStream, {
           metadata: { callerName: name, callerId: guestId, isGuest: true }
         });
+      } catch (e) { call = null; }
 
-        if (!call) {
-          showToast('Could not place call');
-          _endCall();
-          return;
-        }
-
-        _currentCall = call;
-        _peer = guestPeer;
-
-        call.on('stream', (remoteStream) => {
-          _showActive(name);
-          const remoteVid = document.getElementById('scRemoteVideo');
-          if (remoteVid) { remoteVid.srcObject = remoteStream; remoteVid.play().catch(() => {}); }
-        });
-
-        call.on('close', () => { _endCall(); guestPeer.destroy(); });
-        call.on('error', (err) => {
-          console.warn('Guest call error:', err);
-          showToast('Call failed');
-          _endCall();
-          guestPeer.destroy();
-        });
-
-        /* Timeout if no answer in 30s */
-        setTimeout(() => {
-          if (_currentCall === call && !document.getElementById('scCallOverlay').classList.contains('active-state')) {
-            showToast('No answer');
-            call.close();
-            _endCall();
-            guestPeer.destroy();
-          }
-        }, 30000);
-
-      } catch(err) {
-        statusEl.textContent = 'Camera/mic access denied';
-        guestPeer.destroy();
+      if (!call) {
+        showToast(_t('call.couldNotPlace', 'Could not place call'));
+        endCall();
+        destroyGuest();
+        return;
       }
+
+      _currentCall = call;
+      _attachCall(call, destroyGuest);
+      _armNoAnswer(call, destroyGuest);
     });
 
     guestPeer.on('error', (err) => {
-      statusEl.textContent = 'Connection failed: ' + err.message;
+      console.warn('Guest call error:', err);
+      if (err && err.type === 'peer-unavailable') {
+        showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
+      }
+      statusEl.textContent = _t('call.connectFailed', 'Connection failed') + ': ' + ((err && err.message) || '');
+      endCall();
+      destroyGuest();
     });
   }
 
@@ -22695,31 +23085,39 @@ const SentinelCall = (function() {
   }
 
   async function regenerateId() {
-    if (!confirm('Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.')) return;
+    if (!confirm(_t('call.regenConfirm', 'Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.'))) return;
+    if (_currentCall) { showToast(_t('call.endFirst', 'End the current call first')); return; }
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let id = '';
     const arr = new Uint8Array(8);
     crypto.getRandomValues(arr);
     for (let i = 0; i < 8; i++) id += chars[arr[i] % chars.length];
     _myId = id;
-    /* Save to IndexedDB */
-    try {
-      const tx = _db.transaction('settings', 'readwrite');
-      tx.objectStore('settings').put({ key: 'sentinelId', value: id });
-    } catch(e) {}
+    try { await RemielDB.putSetting('sentinelCallId', id); } catch(e) {}
+
     /* Reconnect PeerJS with new ID */
-    if (_peer) { try { _peer.destroy(); } catch(e) {} }
-    _initPeer();
-    /* Update settings display */
-    const el = document.getElementById('settingsSentinelId');
-    if (el) el.textContent = id;
-    showToast('New Sentinel ID: ' + id);
+    if (_peer) { try { _peer.destroy(); } catch(e) {} _peer = null; }
+    try { await _initPeer(); } catch (e) { console.warn('SentinelCall: reconnect failed', e); }
+    updateSettingsDisplay();
+
+    /* Tell the server so messages and calls addressed to the new ID reach this account */
+    let serverNote = '';
+    try {
+      if (typeof SyncEngine !== 'undefined' && typeof SyncEngine.isAuthenticated === 'function' &&
+          SyncEngine.isAuthenticated() && typeof SyncEngine.apiFetch === 'function') {
+        const res = await SyncEngine.apiFetch('/profile', { method: 'PUT', body: JSON.stringify({ sentinel_id: id }) });
+        if (!res.ok) serverNote = ' ' + _t('call.regenServerFail', '(not yet saved to your account; try again later)');
+      }
+    } catch (e) { serverNote = ' ' + _t('call.regenServerFail', '(not yet saved to your account; try again later)'); }
+    showToast(_t('call.newId', 'New Sentinel ID') + ': ' + id + serverNote);
   }
 
   /* Update settings panel when it opens */
   function updateSettingsDisplay() {
     const el = document.getElementById('settingsSentinelId');
     if (el && _myId) el.textContent = _myId;
+    const el2 = document.getElementById('scMyId');
+    if (el2 && _myId) el2.textContent = _myId;
   }
 
   return {
