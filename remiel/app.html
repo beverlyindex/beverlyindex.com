@@ -5182,6 +5182,7 @@ span.rp-thumb { cursor:default; }
 .ss-fit-row input[type=range] { flex: 1 1 140px; min-width: 0; }
 .ss-whole-lbl { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 auto; cursor: pointer; }
 .ss-reset { min-height: 36px; }
+.contacts-popup-avatar img, #cmPhotoCircle img, #cmPhotoCircle video, .ob-person-thumb, .gp-face-img { object-position: 50% 33.333%; }
 .pf-av { border-radius: 50%; display: inline-block; vertical-align: middle; flex: none; }
 .ss-thumb { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; display: block; flex: none; }
 .ss-initials { display: flex; align-items: center; justify-content: center; background: rgba(56,189,248,0.18); color: #e0f2fe; font-weight: 700; font-size: 20px; }
@@ -21994,7 +21995,7 @@ function drawNetworkView(t) {
     const cPhoto = _sharedFrame || contactPhotos.get(node.contact.id);
     if (cPhoto && cPhoto.img && r > 4) {
       if (alphaOverride) { ctx.globalAlpha = alphaOverride; }
-      drawContactPhotoInSphere(ctx, cPhoto, sx, sy, r);
+      drawContactPhotoInSphere(ctx, cPhoto, sx, sy, r, PhotoFit.get(node.contact.id));
     }
 
     /* ── Inner energy ring (category-colored) ── */
@@ -24944,7 +24945,10 @@ const ContactListView = (() => {
       const name = [c.first, c.last].filter(Boolean).join(' ') || _t('a11y.unnamed', 'Unnamed');
       const _svl = (typeof c.sev === 'number') ? sevLabel(c.sev) : '';
       const li = _el('li', { class: 'clv-item' });
-      li.appendChild(_el('p', { class: 'clv-name' }, name));
+      const _nm = _el('p', { class: 'clv-name' }, name);
+      const _av = PhotoFit.avatarHtml(c.id, 28);
+      if (_av) { _nm.insertAdjacentHTML('afterbegin', _av); _nm.firstChild.style.marginRight = '8px'; }
+      li.appendChild(_nm);
       const meta = _el('p', { class: 'clv-meta' }, _catLabel(c.cat) + ' \u00b7 ' + _svl);
       li.appendChild(meta);
       const acts = _el('div', { class: 'clv-actions', role: 'group', 'aria-label': name });
@@ -28962,6 +28966,7 @@ const SocialImport = (() => {
           html += '<div class="pulse-card" onclick="ThePulse.close(); if(typeof focusContact===\'function\') focusContact(\'' + String(c2.id || '').replace(/'/g, '') + '\')">' +
             '<div class="pulse-card-top">' +
               '<div class="pulse-card-sev" style="background:' + SEV_COLORS[r.sev] + ';"></div>' +
+              PhotoFit.avatarHtml(c2.id, 28) +
               '<div class="pulse-card-name">' + _esc(name) + '</div>' +
               chip +
               '<div class="pulse-card-cat">' + _esc(c2.cat ? _t('category.' + c2.cat, c2.cat) : '') + '</div>' +
@@ -30928,11 +30933,9 @@ function openContactsPopup() {
       var avatar = document.createElement('div');
       avatar.className = 'contacts-popup-avatar';
       /* Try to show contact photo */
-      var photo = contactPhotos.get(c.id);
-      if (photo && photo.img && photo.img.src) {
-        var img = document.createElement('img');
-        img.src = photo.img.src;
-        avatar.appendChild(img);
+      var _avHtml = PhotoFit.avatarHtml(c.id, 36, 'pf-av');
+      if (_avHtml) {
+        avatar.innerHTML = _avHtml;
       } else {
         avatar.textContent = initials;
       }
