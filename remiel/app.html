@@ -21027,10 +21027,11 @@ function handleContactPhoto(e) {
   const contactId = selectedContact.id;
   SphereMedia.prepare(f).then(async function(prep) {
     await RemielDB.putPhoto(contactId, prep.blob, prep.kind);
-    await SphereMedia.show(contactId, prep.blob, prep.kind);
+    const shown = await SphereMedia.show(contactId, prep.blob, prep.kind);
     const lbl = document.getElementById('contactPhotoBtnLabel');
     if (lbl) lbl.textContent = I18n.t('photo.change');
-    if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
+    if (shown && shown.failed) showToast(SphereMedia.cannotPlayNotice());
+    else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
   }).catch(function(err) {
     console.error('RemielDB: photo save FAILED for', contactId, err);
     showToast(_t('self.error', 'That file could not be used. Try another photo or clip.'));
@@ -31533,8 +31534,9 @@ async function saveContactModal() {
         try {
           const prep = await SphereMedia.prepare(_cmPhotoBlob);
           await RemielDB.putPhoto(_cmEditId, prep.blob, prep.kind);
-          await SphereMedia.show(_cmEditId, prep.blob, prep.kind);
-          if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
+          const shown = await SphereMedia.show(_cmEditId, prep.blob, prep.kind);
+          if (shown && shown.failed) showToast(SphereMedia.cannotPlayNotice());
+          else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
         } catch (e) { console.error('Modal photo save FAILED', _cmEditId, e); }
       }
 
@@ -31569,8 +31571,9 @@ async function saveContactModal() {
       try {
         const prep = await SphereMedia.prepare(_cmPhotoBlob);
         await RemielDB.putPhoto(newId, prep.blob, prep.kind);
-        await SphereMedia.show(newId, prep.blob, prep.kind);
-        if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
+        const shown = await SphereMedia.show(newId, prep.blob, prep.kind);
+        if (shown && shown.failed) showToast(SphereMedia.cannotPlayNotice());
+        else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
       } catch(e) { console.error('Modal photo save FAILED', newId, e); }
     }
 
