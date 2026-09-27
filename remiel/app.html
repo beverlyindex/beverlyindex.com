@@ -8539,13 +8539,19 @@ const I18n = (function () {
     return t(useKey, { count: count });
   }
 
+  /* Explicit user choice: always persisted, even when it matches the current locale,
+     so an auto-detected language never overrides it on the next launch */
   function setLocale(loc) {
-    if (!_strings[loc] || loc === _locale) return;
+    if (!_strings[loc]) return;
+    var changed = loc !== _locale;
     _locale = loc;
     if (typeof RemielDB !== 'undefined' && RemielDB.putSetting) {
-      try { RemielDB.putSetting('locale', loc); } catch (e) { /* silent */ }
+      try {
+        var p = RemielDB.putSetting('locale', loc);
+        if (p && p.catch) p.catch(function () {});
+      } catch (e) { /* silent */ }
     }
-    applyAll();
+    if (changed) applyAll();
   }
 
   function applyAll() {
@@ -8590,16 +8596,18 @@ const I18n = (function () {
   }
 
   async function init() {
+    var hasSaved = false;
     try {
       if (typeof RemielDB !== 'undefined' && RemielDB.getSetting) {
         var saved = await RemielDB.getSetting('locale');
         if (saved && _strings[saved]) {
           _locale = saved;
+          hasSaved = true;
         }
       }
     } catch (e) { /* default stays en */ }
-    /* Auto-detect from browser if no saved preference */
-    if (_locale === 'en') {
+    /* Auto-detect from the browser only when the user has never chosen a language */
+    if (!hasSaved) {
       try {
         var nav = (navigator.language || '').split('-')[0].toLowerCase();
         if (nav && nav !== 'en' && _strings[nav]) {
