@@ -12793,7 +12793,24 @@ var RosterImport = (function() {
     'pitcher','catcher','shortstop','outfielder','infielder','designated','utility',
     'guard','tackle','end','safety','corner','linebacker','receiver','back','kicker','punter']);
 
+  var _origBodyHTML = null;
+  function _captureBody() {
+    var mb = document.querySelector('.roster-modal .roster-body');
+    if (mb && _origBodyHTML === null && document.getElementById('rosterPreview')) _origBodyHTML = mb.innerHTML;
+  }
+  /* Rebuild the modal body if the success screen replaced it. */
+  function _restoreBody() {
+    var mb = document.querySelector('.roster-modal .roster-body');
+    if (!mb) return;
+    if (!document.getElementById('rosterPreview') && _origBodyHTML !== null) {
+      mb.innerHTML = _origBodyHTML;
+      _bindDropZones();
+    }
+  }
+
   function open() {
+    _captureBody();
+    _restoreBody();
     document.getElementById('rosterOverlay').classList.add('open');
     _parsed = [];
     document.getElementById('rosterPreview').innerHTML = '';
@@ -12803,16 +12820,6 @@ var RosterImport = (function() {
     /* Reset paste area */
     var pa = document.getElementById('rosterPasteArea');
     if (pa) pa.value = '';
-    /* Restore modal body if it was replaced by success screen */
-    var mb = document.querySelector('.roster-modal .roster-body');
-    if (mb && mb.querySelector('.roster-import-btn') === null) {
-      /* Success screen is showing — need to rebuild the body. Just close and reopen overlay */
-      document.getElementById('rosterOverlay').classList.remove('open');
-      setTimeout(function() {
-        location.reload();
-      }, 100);
-      return;
-    }
     /* Restore header close button if hidden */
     var hdr = document.querySelector('.roster-modal .roster-header button');
     if (hdr) hdr.style.display = '';
@@ -13603,6 +13610,7 @@ var RosterImport = (function() {
     var catLabel = cat === 'personal' ? 'Personal' : cat === 'professional' ? 'Professional' : cat === 'team' ? 'Team' : cat === 'family' ? 'Family' : 'circle';
     var modalBody = document.querySelector('.roster-modal .roster-body');
     var modalHeader = document.querySelector('.roster-modal .roster-header');
+    _captureBody();
     if (modalBody) {
       modalBody.innerHTML =
         '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px">' +
@@ -13667,6 +13675,7 @@ var RosterImport = (function() {
     /* Show success overlay inside the modal instead of just closing */
     var modalBody = document.querySelector('.roster-modal .roster-body');
     var modalHeader = document.querySelector('.roster-modal .roster-header');
+    _captureBody();
     if (modalBody) {
       modalBody.innerHTML =
         '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:200px">' +
@@ -13685,7 +13694,7 @@ var RosterImport = (function() {
   }
 
   // Drag-and-drop support for image tab
-  setTimeout(function() {
+  function _bindDropZones() {
     var dz = document.getElementById('rosterDropZone');
     if (dz) {
       dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
@@ -13703,10 +13712,6 @@ var RosterImport = (function() {
         }
       });
     }
-  }, 500);
-
-  // Drag-and-drop support for group photo tab
-  setTimeout(function() {
     var gpDz = document.getElementById('gpDropZone');
     if (gpDz) {
       gpDz.addEventListener('dragover', function(e) { e.preventDefault(); gpDz.classList.add('dragover'); });
@@ -13725,7 +13730,8 @@ var RosterImport = (function() {
         }
       });
     }
-  }, 500);
+  }
+  setTimeout(function() { _captureBody(); _bindDropZones(); }, 500);
 
   return { open: open, close: close, switchTab: switchTab, handleImageFile: handleImageFile,
            parseText: parseText, handleFile: handleFile, doImport: doImport, _toggle: _toggle, _editName: _editName,
