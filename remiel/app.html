@@ -8858,7 +8858,7 @@ const I18n = (function () {
     'tour.network.title': "Your network",
     'tour.network.body': "Everyone you added orbits around you. Drag to turn it, pinch to zoom, and use the arrow to go back.",
     'tour.tap.title': "Tap a sphere",
-    'tour.tap.body': "One tap brings a person forward and shows quick buttons: Video, Phone, Text and Email. Two taps open their card.",
+    'tour.tap.body': "One tap brings a person forward and shows quick buttons: Video, Phone, Message and Email. Two taps open their card.",
     'tour.bluf.title': "The person card",
     'tour.bluf.body': "The top line tells you the most important thing first. Below are sections you open one at a time: last contact, next steps, medications, the ledger and more.",
     'tour.pulse.title': "The Pulse",
@@ -9579,6 +9579,7 @@ const I18n = (function () {
     "time.yesterday": "Yesterday",
     "time.never": "never",
     "pulse.interaction": "interaction",
+    "tour.circle.bodySignedOut": "The Circle appears in Settings once this device is signed in, here in Account. Then you can invite people who use Remiel Sentinel. Nothing is shared until you turn on a switch for that person.",
   });
   Object.assign(_strings.it, {
     "sev.0": "Urgente",
@@ -9698,6 +9699,7 @@ const I18n = (function () {
     "time.yesterday": "Ieri",
     "time.never": "mai",
     "pulse.interaction": "contatto",
+    "tour.circle.bodySignedOut": "La cerchia compare nelle Impostazioni quando questo dispositivo ha effettuato l’accesso, qui in Account. Poi puoi invitare chi usa Remiel Sentinel. Niente viene condiviso finché non attivi un interruttore per quella persona.",
   });
   /* WAVE-H KEYS END */
 
@@ -12886,17 +12888,39 @@ const SentinelTour = (() => {
       { k: 'tap', needsContact: true, target: () => _canvasCenter(0.6) },
       { k: 'bluf', needsContact: true,
         before: () => { try { if (!blufOpen && _hasContacts() && typeof enterDetail === 'function') enterDetail(DEMO_CONTACTS[0]); } catch (_) {} },
-        target: () => _q('#blufCard') },
-      { k: 'pulse', before: () => { _closeBlufIfOpen(); }, target: () => _q('#pulseBtn') },
-      { k: 'checkin', target: () => _q('#ddCheckInBtn') },
+        /* The headline, status tags and tiles: the top region of the card */
+        target: () => {
+          const c = _q('#blufCard');
+          if (!c) return null;
+          const strip = _q('#bevStrip') || _q('#blufTags') || _q('#blufDesc');
+          const bottom = strip ? strip.bottom : c.top + 240;
+          const top = Math.max(c.top, 8);
+          return { left: c.left, top: top, width: c.width, height: Math.max(80, Math.min(bottom, innerHeight * 0.5) - top) };
+        } },
+      { k: 'pulse', before: () => { _closeBlufIfOpen(); _closeSettings(); }, target: () => _q('#pulseBtn') },
+      /* The daily summary button when it is on screen, else Settings, Your Data */
+      { k: 'checkin',
+        before: () => {
+          try { if (appState !== 'self' && typeof enterSelf === 'function') enterSelf(); } catch (_) {}
+          setTimeout(() => { if (!_q('#ddCheckInBtn')) _openSettingsAt('#settingsCheckInBtn'); }, 300);
+        },
+        target: () => _q('#ddCheckInBtn') || _q('#settingsCheckInBtn') },
       { k: 'meds', needsContact: true,
-        before: () => { try { if (!blufOpen && _hasContacts() && typeof enterDetail === 'function') enterDetail(DEMO_CONTACTS[0]); } catch (_) {}
+        before: () => { _closeSettings(); try { if (!blufOpen && _hasContacts() && typeof enterDetail === 'function') enterDetail(DEMO_CONTACTS[0]); } catch (_) {}
                         setTimeout(() => { const m = document.getElementById('pull_medication'); if (m && m.scrollIntoView) m.scrollIntoView({ block: 'center' }); }, 350); },
         target: () => _q('#pull_medication') },
       { k: 'call', before: () => { _closeBlufIfOpen(); _openSettingsAt('#settingsSentinelId'); },
         target: () => { const el = document.getElementById('settingsSentinelId'); return el ? _q('#settingsSentinelId') && el.closest('.settings-section').getBoundingClientRect() : null; } },
-      { k: 'circle', before: () => { _openSettingsAt('#circleSection'); },
-        target: () => _q('#circleSection') },
+      /* The Circle section appears once signed in; before that, point at the
+         Account section where signing in happens, and say so */
+      { k: 'circle', before: () => { _openSettingsAt(_q('#circleSection') ? '#circleSection' : '#acctIdentity'); },
+        bodyKey: () => (_q('#circleSection') ? 'tour.circle.body' : 'tour.circle.bodySignedOut'),
+        target: () => {
+          if (_q('#circleSection')) return _q('#circleSection');
+          const a = document.getElementById('acctIdentity');
+          const sec = a && a.closest('.settings-section');
+          return sec && _q('#acctIdentity') ? sec.getBoundingClientRect() : null;
+        } },
       { k: 'backup', before: () => { _openSettingsAt('#exportBtn'); },
         target: () => { const el = document.getElementById('exportBtn'); return el && _q('#exportBtn') ? el.closest('.settings-section').getBoundingClientRect() : null; } },
     ];
@@ -12952,12 +12976,19 @@ const SentinelTour = (() => {
     const card = _root.querySelector('.st-card');
     let r = null;
     try { r = step.target ? step.target() : null; } catch (_) { r = null; }
+    /* A target taller than about half the screen is clipped to its top part,
+       so the spotlight always fits and the card has room */
+    if (r && r.height > innerHeight * 0.42) {
+      r = { left: r.left, top: Math.max(8, r.top), width: r.width, height: innerHeight * 0.4, round: r.round };
+    }
     if (r && r.width > 1) {
       const pad = 8;
       spot.style.display = '';
-      spot.style.left = (r.left - pad) + 'px';
+      const _sl = Math.max(2, r.left - pad);
+      const _sr = Math.min(innerWidth - 2, r.left + r.width + pad);
+      spot.style.left = _sl + 'px';
       spot.style.top = (r.top - pad) + 'px';
-      spot.style.width = (r.width + pad * 2) + 'px';
+      spot.style.width = Math.max(10, _sr - _sl) + 'px';
       spot.style.height = (r.height + pad * 2) + 'px';
       spot.style.borderRadius = r.round ? '50%' : '14px';
       _root.classList.remove('st-nospot');
@@ -12980,7 +13011,9 @@ const SentinelTour = (() => {
     const noContact = step.needsContact && !_hasContacts();
     _root.querySelector('.st-count').textContent = _tr('tour.stepOf').replace('{n}', _i + 1).replace('{total}', n);
     _root.querySelector('.st-title').textContent = _tr('tour.' + step.k + '.title');
-    _root.querySelector('.st-body').textContent = noContact ? _tr('tour.needsContact') : _tr('tour.' + step.k + '.body');
+    let _bk = 'tour.' + step.k + '.body';
+    try { if (step.bodyKey) _bk = step.bodyKey(); } catch (_) {}
+    _root.querySelector('.st-body').textContent = noContact ? _tr('tour.needsContact') : _tr(_bk);
     const dots = _root.querySelector('.st-dots');
     dots.innerHTML = '';
     for (let d = 0; d < n; d++) {
@@ -12996,7 +13029,19 @@ const SentinelTour = (() => {
     _root.setAttribute('aria-label', _tr('tour.label'));
     _place();
     setTimeout(_place, 400);
-    setTimeout(() => { const b = _root.querySelector('.st-next'); if (b) b.focus(); }, 50);
+    setTimeout(_place, 900);
+    /* Keep focus in the tour card, also after a step opens a panel that
+       moves focus (the person card, Settings) */
+    [50, 250, 600, 1000].forEach((ms) => setTimeout(() => {
+      if (!_active) return;
+      const card = _root.querySelector('.st-card');
+      if (card && !card.contains(document.activeElement)) { const b = _root.querySelector('.st-next'); if (b) b.focus(); }
+    }, ms));
+    /* Body text can depend on what the step opened */
+    setTimeout(() => {
+      if (!_active || !step.bodyKey || noContact) return;
+      try { _root.querySelector('.st-body').textContent = _tr(step.bodyKey()); } catch (_) {}
+    }, 700);
   }
 
   function _runStep() {
@@ -20555,8 +20600,11 @@ const A11y = (() => {
 
   /* Single Tab trap for the topmost dialog */
   function _onTab(e) {
-    if (e.key !== 'Tab' || !_stack.length) return;
-    const top = _stack[_stack.length - 1].el;
+    if (e.key !== 'Tab') return;
+    /* The guided tour sits above every panel it opens: trap Tab in its card */
+    const tourCard = document.querySelector('.st-tour.open .st-card');
+    const top = tourCard || (_stack.length ? _stack[_stack.length - 1].el : null);
+    if (!top) return;
     const f = _focusables(top);
     if (!f.length) { e.preventDefault(); return; }
     const first = f[0], last = f[f.length - 1];
