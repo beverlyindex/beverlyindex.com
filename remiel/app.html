@@ -9153,6 +9153,7 @@ const I18n = (function () {
     'confirm.ok': "Confirm",
     'busy.cancel': "Cancel",
     'busy.still': "Still working on it",
+    'bc.starting': "Starting camera",
     'dd.attention': "{count} people need your attention.",
     'dd.attentionOne': "1 person needs your attention.",
     'toast.pickerUnsupported': "This browser cannot open your phone contacts. Use Chrome on Android, or paste your contacts.",
@@ -9602,6 +9603,7 @@ const I18n = (function () {
     'confirm.ok': "Conferma",
     'busy.cancel': "Annulla",
     'busy.still': "Ci stiamo ancora lavorando",
+    'bc.starting': "Avvio fotocamera",
     'dd.attention': "{count} persone hanno bisogno di te.",
     'dd.attentionOne': "1 persona ha bisogno di te.",
     'toast.pickerUnsupported': "Questo browser non può aprire la rubrica. Usa Chrome su Android oppure incolla i contatti.",
@@ -17254,14 +17256,18 @@ function toggleBcCamera() {
 async function startBcStream() {
   const liveVideo = document.getElementById('bcLiveVideo');
   const placeholder = document.getElementById('bcPlaceholder');
+  const _bcBtn = busy(document.getElementById('bcCameraBtn'), _t('bc.starting', 'Starting camera'));
+  document.getElementById('bcStatus').textContent = _t('bc.starting', 'Starting camera') + '...';
   try {
     bcStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    unbusy(_bcBtn);
     liveVideo.srcObject = bcStream;
     liveVideo.hidden = false;
     placeholder.hidden = true;
     bcStream.getAudioTracks().forEach(t => { t.enabled = !bcMuted; });
     document.getElementById('bcStatus').textContent = _t('bc.active', 'Camera active');
   } catch (err) {
+    unbusy(_bcBtn);
     console.warn('[Broadcast] Camera access denied:', err);
     document.getElementById('bcStatus').textContent = _t('bc.unavailable', 'Camera not available');
     placeholder.hidden = false;
@@ -20646,8 +20652,9 @@ const VoiceCheckin = (function () {
     lastBlob = null;
     lastDuration = 0;
 
+    const _vb = busy($('voiceRecordBtn'));
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).finally(() => unbusy(_vb));
       const mimeType = pickMimeType();
       audioChunks = [];
       const opts = mimeType ? { mimeType } : {};
