@@ -7159,37 +7159,27 @@ function beginVideoIntro() {
   try { _reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
   if (_reduce) { setTimeout(function () { revealApp(); }, 0); return; }
 
-  /* Returning users get a short splash (1.5s); first launch keeps 4s. */
+  /* Returning users skip straight in; first launch holds the splash up to 3s. */
   var _returning = false;
   try { _returning = localStorage.getItem('rm:obDone') === '1'; } catch (e) {}
-  var _splashMs = _returning ? 1500 : 4000;
+  if (_returning) { setTimeout(function () { revealApp(); }, 0); return; }
+  var _splashMs = 1200;
 
-  /* Phase 2: Beverly Index company splash, full screen hold */
+  /* Phase 2: Beverly Index company splash paints first; the video never delays it */
   biSplash.classList.add('active');
-
-  /* Preload the video WHILE the splash is showing so it is ready to play */
-  const vidSrc = pickNextVideo();
-  videoEl.src = vidSrc;
-  videoEl.muted = true;
-  videoEl.currentTime = 0;
-  videoEl.load();
 
   var _videoReady = false;
   var _splashDone = false;
-
   var _crossfaded = false;
   function _tryCrossfade() {
     if (!_videoReady || !_splashDone) return;
     /* Never re-show the intro once the app is revealed (late canplay). */
     if (appRevealed || _crossfaded) return;
     _crossfaded = true;
-    /* Video is loaded AND splash timer elapsed — crossfade now.
-       Activate video intro FIRST (underneath), then fade out splash on top. */
     introEl.classList.add('active');
     videoEl.play().catch(function() { revealApp(); });
     videoEl.addEventListener('ended', function() { revealApp(); }, { once: true });
-
-    /* Brief delay so video frame renders before splash fades */
+    videoEl.addEventListener('stalled', function() { revealApp(); }, { once: true });
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
         biSplash.classList.remove('active');
@@ -7197,21 +7187,26 @@ function beginVideoIntro() {
     });
   }
 
-  videoEl.addEventListener('canplay', function _onReady() {
-    videoEl.removeEventListener('canplay', _onReady);
-    _videoReady = true;
-    _tryCrossfade();
-  }, { once: true });
-
-  /* Safety: if video fails to load within 6s, skip straight to app */
-  var _loadTimeout = setTimeout(function() {
-    if (!_videoReady) {
+  /* Start loading the video only after the splash has painted */
+  requestAnimationFrame(function () { setTimeout(function () {
+    if (appRevealed) return;
+    videoEl.src = pickNextVideo();
+    videoEl.muted = true;
+    videoEl.preload = 'auto';
+    videoEl.addEventListener('canplaythrough', function () {
       _videoReady = true;
-      _splashDone = true;
-      biSplash.classList.remove('active');
-      setTimeout(function() { revealApp(); }, 800);
-    }
-  }, _splashMs + 2000);
+      _tryCrossfade();
+    }, { once: true });
+    videoEl.load();
+  }, 0); });
+
+  /* Auto skip: if the video cannot play through within 3s, go straight in */
+  setTimeout(function() {
+    if (_crossfaded || appRevealed) return;
+    _crossfaded = true;
+    biSplash.classList.remove('active');
+    revealApp();
+  }, 3000);
 
   setTimeout(function() {
     _splashDone = true;
