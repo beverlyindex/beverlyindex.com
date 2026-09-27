@@ -1403,7 +1403,7 @@
     height: 100dvh;
     object-fit: cover;
   }
-  .video-intro .skip-btn {
+  .video-intro .skip-btn, .bi-splash .skip-btn {
     position: absolute;
     bottom: max(32px, env(safe-area-inset-bottom, 0px));
     right: max(24px, env(safe-area-inset-right, 0px));
@@ -1421,7 +1421,7 @@
     transition: background 0.2s, color 0.2s;
     z-index: 2;
   }
-  .video-intro .skip-btn:hover {
+  .video-intro .skip-btn:hover, .bi-splash .skip-btn:hover {
     background: rgba(255,255,255,0.15);
     color: rgba(255,255,255,0.85);
   }
@@ -5375,6 +5375,7 @@
 <!-- ═══ Beverly Index Splash ═══ -->
 <div class="bi-splash" id="biSplash" aria-label="Beverly Index">
   <img src="beverly-index-logo.png" alt="Beverly Index" draggable="false">
+  <button class="skip-btn" onclick="skipIntro()" aria-label="Skip intro">Skip</button>
 </div>
 
 <!-- ═══ Video Intro ═══ -->
@@ -6852,7 +6853,7 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
     'background:rgba(56,189,248,0.2);color:#38bdf8;padding:8px 20px;border-radius:20px;' +
-    'font-size:12px;font-weight:600;z-index:9999;backdrop-filter:blur(12px);' +
+    'font-size:12px;font-weight:600;z-index:100001;backdrop-filter:blur(12px);' +
     'border:1px solid rgba(56,189,248,0.3);pointer-events:none;';
   document.body.appendChild(toast);
   setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
@@ -6985,6 +6986,16 @@ function trackCodeUsage(codeHash) {
 }
 
 let appRevealed = false;
+/* M4: a ?call= guest link never shows onboarding. Read before
+   SentinelCall.checkCallInvite cleans the URL. */
+let _guestCallMode = false;
+try { _guestCallMode = !!new URLSearchParams(window.location.search).get('call'); } catch (e) {}
+/* B1: revealApp needs RemielDB, I18n and the modules declared further down
+   this script. _appScriptReady resolves at the very end of the script block,
+   so a reveal requested early (reduced motion, fast skip) waits instead of
+   hitting the temporal dead zone. */
+let _resolveAppScriptReady;
+const _appScriptReady = new Promise(function (res) { _resolveAppScriptReady = res; });
 let animRunning = false;
 
 /* ── PWA Add-to-Home-Screen prompt capture ── */
@@ -7052,7 +7063,7 @@ function beginVideoIntro() {
   /* Reduced motion: no splash hold, no video. Go straight to the app. */
   var _reduce = false;
   try { _reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
-  if (_reduce) { revealApp(); return; }
+  if (_reduce) { setTimeout(function () { revealApp(); }, 0); return; }
 
   /* Returning users get a short splash (1.5s); first launch keeps 4s. */
   var _returning = false;
@@ -7145,6 +7156,9 @@ async function revealApp() {
   _stopIntroMedia();
   if (gateEl) gateEl.classList.add('hidden');
 
+  /* Wait until the whole script has evaluated (B1: TDZ on RemielDB). */
+  try { await _appScriptReady; } catch (e) {}
+
   /* ── Open IndexedDB and decide: onboarding or galaxy ── */
   try {
     await RemielDB.open();
@@ -7161,14 +7175,18 @@ async function revealApp() {
       /* Upgrade path: existing contacts from before onboarding existed */
       await RemielDB.putSetting('onboardingComplete', true);
       await launchGalaxy(saved);
+    } else if (_guestCallMode) {
+      /* Guest call link: the join overlay is the only screen. */
     } else {
       /* First launch — show onboarding wizard */
       showOnboarding();
     }
   } catch(e) {
     console.warn('RemielDB: open failed, launching with defaults', e);
-    await RemielDB.seedContacts(DEMO_CONTACTS);
-    await launchGalaxy(null);
+    try {
+      if (typeof RemielDB !== 'undefined') await RemielDB.seedContacts(DEMO_CONTACTS);
+    } catch (e2) { console.warn('RemielDB: seed failed', e2); }
+    try { await launchGalaxy(null); } catch (e3) { console.warn('launchGalaxy failed', e3); }
   }
 }
 
@@ -9017,6 +9035,7 @@ const I18n = (function () {
     'call.couldNotPlace': "Could not place call",
     'call.selectFirst': "Select a contact first",
     'call.libFailed': "Could not load video calling library",
+    'call.unavailable': "Video calling is not available right now",
     'call.calling': "Calling...",
     'call.connectFailed': "Connection failed",
     'call.regenConfirm': "Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.",
@@ -9410,6 +9429,7 @@ const I18n = (function () {
     'call.couldNotPlace': "Impossibile avviare la chiamata",
     'call.selectFirst': "Prima scegli un contatto",
     'call.libFailed': "Impossibile caricare la libreria per le videochiamate",
+    'call.unavailable': "Le videochiamate non sono disponibili in questo momento",
     'call.calling': "Chiamata in corso...",
     'call.connectFailed': "Connessione non riuscita",
     'call.regenConfirm': "Creare un nuovo ID Sentinel? Chi ha il tuo vecchio ID o link di chiamata non potrà più raggiungerti.",
@@ -25067,13 +25087,37 @@ const SentinelCall = (function() {
   }
 
   /* ── Call a contact by ID ── */
-  async function callContact(contactId) {
-    if (typeof SentinelGuide !== 'undefined') SentinelGuide.onCall();
-    if (_currentCall) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
+  let _callBusy = false;
+  async function callContact(contactOrId) {
+    if (_callBusy) return;
+    _callBusy = true;
+    try { await _callContact(contactOrId); }
+    finally { _callBusy = false; }
+  }
+
+  /* Make sure the PeerJS library is loaded and our peer exists. One toast on failure. */
+  async function _ensurePeer() {
+    if (_peer && !_peer.destroyed) return true;
+    try { await _loadPeerJS(); }
+    catch (e) {
+      showToast(_t('call.unavailable', 'Video calling is not available right now'));
+      return false;
+    }
+    try {
+      if (!_myId) _myId = await RemielDB.getSetting('sentinelCallId');
+      if (!_peer || _peer.destroyed) await _initPeer();
+    } catch (e) { console.warn('SentinelCall: peer init failed', e); }
     if (!_peer || _peer.destroyed) {
       showToast(_t('call.notReady', 'Video calling not ready. Try again in a moment.'));
-      return;
+      return false;
     }
+    return true;
+  }
+
+  async function _callContact(contactOrId) {
+    if (typeof SentinelGuide !== 'undefined') { try { SentinelGuide.onCall(); } catch (e) {} }
+    if (_currentCall) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
+    const contactId = (contactOrId && typeof contactOrId === 'object') ? contactOrId.id : contactOrId;
 
     let contact;
     try { contact = await RemielDB.getContact(contactId); } catch(e) {}
@@ -25084,6 +25128,10 @@ const SentinelCall = (function() {
       showToast(_t('call.noSid', 'No Sentinel ID for') + ' ' + (contact.first || _t('call.thisContact', 'this contact')) + '. ' + _t('call.addSidHint', 'Tap their sphere, then Edit to add it.'));
       return;
     }
+
+    /* Library and signalling first: never open the camera or an overlay
+       when calling cannot work (CDN blocked, offline). */
+    if (!(await _ensurePeer())) return;
 
     try {
       _localStream = await _getStream();
@@ -25105,8 +25153,9 @@ const SentinelCall = (function() {
     const remotePeerId = 'sentinel-' + targetId.trim().toLowerCase();
     let call = null;
     try {
+      const callerName = await _getMyName();
       call = _peer.call(remotePeerId, _localStream, {
-        metadata: { callerName: (await _getMyName()), callerId: _myId }
+        metadata: { callerName: callerName, callerId: _myId }
       });
     } catch (e) { call = null; }
     if (!call) {
@@ -25402,8 +25451,13 @@ const SentinelCall = (function() {
     const callTarget = params.get('call');
     if (!callTarget) return false;
     _guestTargetId = callTarget.toUpperCase();
-    /* Show guest overlay instead of gate */
-    document.getElementById('scGuestOverlay').classList.remove('hidden');
+    /* Show guest overlay instead of gate. It is authored inside the Settings
+       panel, so move it to <body> to escape that stacking context (M4). */
+    const _gOv = document.getElementById('scGuestOverlay');
+    if (_gOv && _gOv.parentNode !== document.body) document.body.appendChild(_gOv);
+    _gOv.classList.remove('hidden');
+    const _ob = document.getElementById('onboarding');
+    if (_ob) _ob.hidden = true;
     /* Hide the gate so only the guest overlay is visible */
     var _gateEl = document.getElementById('gateScreen');
     if (_gateEl) _gateEl.style.display = 'none';
@@ -25423,12 +25477,38 @@ const SentinelCall = (function() {
     return true;
   }
 
+  function _guestBackToJoin(msg) {
+    const ov = document.getElementById('scGuestOverlay');
+    if (ov) ov.classList.remove('hidden');
+    const st = document.getElementById('scGuestStatus');
+    if (st) st.textContent = msg || '';
+    const btn = document.getElementById('scGuestJoinBtn');
+    const inp = document.getElementById('scGuestName');
+    if (btn && inp) btn.disabled = inp.value.trim().length < 1;
+  }
+
+  let _guestJoining = false;
   async function guestJoinCall() {
     const name = document.getElementById('scGuestName').value.trim();
     if (!name || !_guestTargetId) return;
-    if (_currentCall) return;
+    if (_currentCall || _guestJoining) return;
+    _guestJoining = true;
+    try { await _guestJoin(name); }
+    catch (e) {
+      console.warn('SentinelCall: guest join failed', e);
+      endCall();
+      if (_guestPeer) { try { _guestPeer.destroy(); } catch (e2) {} _guestPeer = null; }
+      showToast(_t('call.unavailable', 'Video calling is not available right now'));
+      _guestBackToJoin('');
+    }
+    finally { _guestJoining = false; }
+  }
+
+  async function _guestJoin(name) {
     const statusEl = document.getElementById('scGuestStatus');
+    const joinBtn = document.getElementById('scGuestJoinBtn');
     statusEl.textContent = _t('call.connecting', 'Connecting...');
+    if (joinBtn) joinBtn.disabled = true;
 
     /* Generate a temp guest Sentinel ID */
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -25441,7 +25521,8 @@ const SentinelCall = (function() {
     try {
       await _loadPeerJS();
     } catch(e) {
-      statusEl.textContent = _t('call.libFailed', 'Could not load video calling library');
+      showToast(_t('call.unavailable', 'Video calling is not available right now'));
+      _guestBackToJoin('');
       return;
     }
 
@@ -25450,9 +25531,13 @@ const SentinelCall = (function() {
     const guestPeerId = 'sentinel-' + guestId.toLowerCase();
     const guestPeer = new Peer(guestPeerId, { debug: 0, config: { iceServers: iceServers } });
     _guestPeer = guestPeer;
+    /* Leaving (hang up, no answer, error) releases the camera and returns
+       the guest to the join screen. */
     const destroyGuest = () => {
       if (_guestPeer === guestPeer) _guestPeer = null;
       try { guestPeer.destroy(); } catch (e) {}
+      _cleanupMedia();
+      _guestBackToJoin(document.getElementById('scGuestStatus').textContent);
     };
 
     guestPeer.on('open', async () => {
@@ -25497,21 +25582,26 @@ const SentinelCall = (function() {
       if (err && err.type === 'peer-unavailable') {
         showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
       }
-      statusEl.textContent = _t('call.connectFailed', 'Connection failed') + ': ' + ((err && err.message) || '');
+      statusEl.textContent = _t('call.connectFailed', 'Connection failed');
       endCall();
       destroyGuest();
     });
   }
 
   /* Helper to load PeerJS if not loaded */
+  /* Resolves when window.Peer exists; rejects on error, offline, or after 8 s. */
   function _loadPeerJS() {
     return new Promise((resolve, reject) => {
       if (window.Peer) { resolve(); return; }
+      if (navigator.onLine === false) { reject(new Error('offline')); return; }
+      let done = false;
+      const finish = (ok) => { if (done) return; done = true; clearTimeout(t); ok && window.Peer ? resolve() : reject(new Error('PeerJS load failed')); };
+      const t = setTimeout(() => finish(false), 8000);
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
       s.crossOrigin = 'anonymous';
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('PeerJS load failed'));
+      s.onload = () => finish(true);
+      s.onerror = () => { try { s.remove(); } catch (e) {} finish(false); };
       document.head.appendChild(s);
     });
   }
@@ -25579,7 +25669,7 @@ const SentinelCall = (function() {
   }
 
   return {
-    init, callContact, callFocused,
+    init, callContact, callFocused, ensurePeer: _ensurePeer,
     acceptIncoming, rejectIncoming, hangUp, endCall,
     toggleMute, flipCamera,
     getMyId, isInCall,
@@ -26335,6 +26425,8 @@ const MedImageReader = (() => {
   else setTimeout(fill, 800);
 })();
 
+/* B1: every declaration above is now initialised; release any queued reveal. */
+try { _resolveAppScriptReady(); } catch (e) {}
 </script>
 
   <!-- Roster Import Modal -->
