@@ -13369,6 +13369,12 @@ const SentinelGuide = (() => {
     if (once && _seen[id]) return false;
     try { if (id !== 'tour-offer' && SentinelTour.active) return false; } catch (_) {}
     if (_slots.top === id || _slots.bottom === id) return false;
+    /* Hold banners while a modal or editor is open so they never cover a form's
+       primary button; the watchdog shows them once it closes */
+    if (_holdBanners()) {
+      if (!_queue.some(q => q.id === id)) _queue.push({ id: id, text: text, opts: opts });
+      return false;
+    }
     let slot = pos;
     /* Never more than two banners: use the other slot if free, otherwise
        queue it (when asked) or drop it */
@@ -13499,6 +13505,12 @@ const SentinelGuide = (() => {
     });
   }
 
+  function _holdBanners() {
+    if (_topDialog()) return true;
+    try { if (document.body.classList.contains('rs-overlay-open')) return true; } catch (_) {}
+    return !!document.querySelector('.ui-confirm-overlay');
+  }
+
   /* Topmost open dialog according to the A11y stack (null when none) */
   function _topDialog() {
     try { if (typeof A11y !== 'undefined' && A11y.topDialog) return A11y.topDialog(); } catch (_) {}
@@ -13516,7 +13528,7 @@ const SentinelGuide = (() => {
       const st = (typeof appState !== 'undefined' ? appState : null);
       if (st !== c.state || top !== c.dlg) hide(slot);
     });
-    if (_queue.length && (!_slots.top || !_slots.bottom)) {
+    if (_queue.length && (!_slots.top || !_slots.bottom) && !_holdBanners()) {
       const q = _queue.shift();
       _render(q.id, q.text, Object.assign({}, q.opts, { queue: false }));
     }
