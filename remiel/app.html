@@ -7930,6 +7930,7 @@ const RemielDB = (() => {
       st.put({ key: '_sync_blob_version', value: '0', updatedAt: now });
       st.put({ key: '_sync_last_version', value: '0', updatedAt: now });
       st.put({ key: '_sync_full_done', value: false, updatedAt: now });
+      st.put({ key: '_sync_replace_all', value: true, updatedAt: now });
       const kr = st.getAllKeys();
       kr.onsuccess = function() {
         (kr.result || []).forEach(function(k) { if (/^_photo(Synced|Ref)_/.test(String(k))) st.delete(k); });
@@ -22550,6 +22551,7 @@ const SyncEngine = (() => {
   const SERVER_SID_KEY = '_sync_sentinel_id';
   const BLOB_VERSION_KEY = '_sync_blob_version';
   const FULL_DONE_KEY = '_sync_full_done';
+  const REPLACE_ALL_KEY = '_sync_replace_all';
   const SIGNED_OUT_KEY = '_sync_signed_out';
   const DEVICE_ID_KEY = '_device_id';
   const DEVICE_SECRET_KEY = '_device_secret';
@@ -23394,10 +23396,18 @@ const SyncEngine = (() => {
     var chunks = _chunkPayload(payload);
     var errors = [];
     var version = null;
+    /* After a backup import the snapshot is the whole truth: the last chunk
+       asks the server to tombstone every row not written since the first */
+    var replaceAll = full && (await RemielDB.getSetting(REPLACE_ALL_KEY)) === true;
+    var firstVersion = null;
     for (var c = 0; c < chunks.length; c++) {
       var chunk = chunks[c];
       _refreshChunkIds(chunk);
       chunk.device_id = deviceId;
+      if (replaceAll && c === chunks.length - 1) {
+        chunk.replace_all = true;
+        if (firstVersion) chunk.replace_keep_since = firstVersion;
+      }
       var res = await _fetch('/sync/push', { method: 'POST', body: JSON.stringify(chunk) });
       if (!res.ok) {
         /* Keep what earlier chunks mapped; the retry sends those with server ids */
@@ -23408,7 +23418,9 @@ const SyncEngine = (() => {
       _applyMaps(result, chunk);
       if (result.errors && result.errors.length) errors = errors.concat(result.errors);
       version = result.current_version;
+      if (firstVersion === null) firstVersion = version;
     }
+    if (replaceAll) { try { await RemielDB.putSetting(REPLACE_ALL_KEY, null); } catch (e) {} }
     /* _lastSyncVersion is advanced by pull only, so other devices' writes are never skipped */
     await _saveConfig();
     await _settleQueue(rows, _errorKeys(errors), full);
@@ -23820,21 +23832,14 @@ const SyncEngine = (() => {
   }
 
   /* Called by RemielDB.importAll: the id map and versions no longer match local ids */
-  /* After a backup import the imported records are the whole truth. Do not
-     pull older server rows back in: keep the server version cursor where it
-     is (so nothing old is re-applied) and mark every imported record for a
-     full push, which the server matches by client id. */
+  /* After a backup import the imported records are the whole truth. The next
+     push is a full snapshot flagged replace_all, so the server tombstones
+     every row the backup does not contain; the pull that follows then only
+     brings back tombstones, never old rows. */
   async function resetAfterImport() {
     _serverIdMap = {}; _blobSyncVersion = 0; _photoTooLarge = 0;
     _pendingChanges = 0;
-    try {
-      var cur = null;
-      if (_apiBase && _accessToken) {
-        var r = await apiFetch('/sync/pull?since_version=999999999&limit=1');
-        if (r && r.ok) { var j = await r.json(); cur = _num(j.current_version); }
-      }
-      if (cur !== null && !isNaN(cur)) { _lastSyncVersion = cur; await RemielDB.putSetting(LAST_VERSION_KEY, cur); }
-    } catch (e) {}
+    _lastSyncVersion = 0;
     _emitStatus();
   }
 
