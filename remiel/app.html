@@ -7064,6 +7064,33 @@ function uiConfirm(message, okLabel) {
   });
 }
 
+/* Downscale a large photo off the tap: createImageBitmap with resize options where
+   available (decoded off the main thread), else a canvas pass after the UI updates. */
+async function downscalePhoto(blob, maxEdge) {
+  maxEdge = maxEdge || 1280;
+  try {
+    if (!blob || !/^image\//.test(blob.type || '') || /gif|svg/.test(blob.type)) return blob;
+    var im = new Image();
+    var u = URL.createObjectURL(blob);
+    im.src = u;
+    try { await im.decode(); } catch (e) { URL.revokeObjectURL(u); return blob; }
+    var w = im.naturalWidth, h = im.naturalHeight;
+    URL.revokeObjectURL(u);
+    if (!w || !h || Math.max(w, h) <= maxEdge) return blob;
+    var sc = maxEdge / Math.max(w, h), cw = Math.round(w * sc), ch = Math.round(h * sc);
+    var src = null;
+    if (typeof createImageBitmap === 'function') {
+      try { src = await createImageBitmap(blob, { resizeWidth: cw, resizeHeight: ch, resizeQuality: 'high' }); } catch (e) { src = null; }
+    }
+    await nextPaint();
+    var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    c.getContext('2d').drawImage(src || im, 0, 0, cw, ch);
+    if (src && src.close) { try { src.close(); } catch (e) {} }
+    var out = await new Promise(function (r) { c.toBlob(r, 'image/jpeg', 0.88); });
+    return out && out.size ? out : blob;
+  } catch (e) { return blob; }
+}
+
 /* Yield so the browser can paint feedback before heavy synchronous work */
 function nextPaint() {
   return new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 0); }); });
@@ -10795,11 +10822,15 @@ async function triggerA2hs() {
 }
 
 async function obFinish() {
-  await _obSaveAndLaunch();
+  const b = busyFromEvent(_t('busy.saving', 'Saving'));
+  await nextPaint();
+  try { await _obSaveAndLaunch(); } finally { unbusy(b); }
 }
 
 async function obSkipA2hs() {
-  await _obSaveAndLaunch();
+  const b = busyFromEvent(_t('busy.saving', 'Saving'));
+  await nextPaint();
+  try { await _obSaveAndLaunch(); } finally { unbusy(b); }
 }
 
 async function _obSaveAndLaunch() {
@@ -10836,6 +10867,7 @@ async function _obSaveAndLaunch() {
         });
         videoEl.play().catch(() => {});
       } else {
+        _obSelfMediaBlob = await downscalePhoto(_obSelfMediaBlob, 1280);
         const url = URL.createObjectURL(_obSelfMediaBlob);
         const img = new Image();
         await new Promise((res) => {
@@ -10872,6 +10904,7 @@ async function _obSaveAndLaunch() {
     });
     if (p.photoBlob) {
       try {
+        p.photoBlob = await downscalePhoto(p.photoBlob, 1280);
         await RemielDB.putPhoto(cid, p.photoBlob);
         /* Also load into contactPhotos Map immediately */
         const _obUrl = URL.createObjectURL(p.photoBlob);
