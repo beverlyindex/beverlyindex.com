@@ -7749,6 +7749,16 @@ const RemielDB = (() => {
   }
 
   /* ── Export / Import (full database snapshot) ── */
+  /* Settings that belong to this device and this sync session: credentials,
+     device identity, id maps, cursors and the NOUS key. They are never written
+     to a backup file and never overwritten by an import. The syncQueue store
+     is never exported. */
+  const DEVICE_ONLY_PREFIXES = ['_sync_', '_device_', '_msg_cursor', '_peer_user_ids', 'nous_api_key', 'nous_retry', '_photoSynced_', '_photoRef_', '_identity_failures'];
+  function isDeviceOnlySetting(key) {
+    const k = String(key || '');
+    return DEVICE_ONLY_PREFIXES.some(function(p) { return k.indexOf(p) === 0; });
+  }
+
   async function exportAll() {
     await open();
     const stores = ['contacts', 'interactions', 'medications', 'moods', 'settings', 'broadcasts', 'profiles'];
@@ -7756,6 +7766,7 @@ const RemielDB = (() => {
     for (const name of stores) {
       dump[name] = await promisify(tx(name, 'readonly').getAll());
     }
+    dump.settings = (dump.settings || []).filter(function(r) { return r && !isDeviceOnlySetting(r.key); });
     /* Photos exported as base64 */
     const photos = await promisify(tx('photos', 'readonly').getAll());
     dump.photos = [];
@@ -7775,11 +7786,18 @@ const RemielDB = (() => {
   async function importAll(dump) {
     await open();
     const stores = ['contacts', 'interactions', 'medications', 'moods', 'settings', 'broadcasts', 'profiles'];
+    /* Keep this device's own credentials and identity; ignore any in the file */
+    const keepSettings = dump.settings
+      ? (await promisify(tx('settings', 'readonly').getAll())).filter(function(r) { return r && isDeviceOnlySetting(r.key); })
+      : [];
     for (const name of stores) {
       if (!dump[name]) continue;
       const store = _db.transaction(name, 'readwrite').objectStore(name);
       store.clear();
-      for (const row of dump[name]) store.put(row);
+      const rows = name === 'settings'
+        ? dump[name].filter(function(r) { return r && !isDeviceOnlySetting(r.key); }).concat(keepSettings)
+        : dump[name];
+      for (const row of rows) store.put(row);
       await new Promise((res, rej) => {
         store.transaction.oncomplete = res;
         store.transaction.onerror = rej;
@@ -7798,8 +7816,28 @@ const RemielDB = (() => {
         ps.transaction.onerror = rej;
       });
     }
-    /* An imported snapshot is pushed in full on the next sync */
-    try { await promisify(tx('settings', 'readwrite').put({ key: '_sync_full_done', value: null, updatedAt: Date.now() })); } catch (e) {}
+    /* Local ids now belong to the imported records, so the old id map, versions,
+       photo markers and queue are void. The next sync pushes everything in full
+       with no server ids; the server matches rows by client_id and device, so
+       re-imported rows update instead of duplicating, then a pull from version
+       0 re-pairs the rest. */
+    try {
+      const st = _db.transaction('settings', 'readwrite').objectStore('settings');
+      const now = Date.now();
+      st.put({ key: '_sync_id_map', value: '{}', updatedAt: now });
+      st.put({ key: '_sync_blob_version', value: '0', updatedAt: now });
+      st.put({ key: '_sync_last_version', value: '0', updatedAt: now });
+      st.put({ key: '_sync_full_done', value: false, updatedAt: now });
+      const kr = st.getAllKeys();
+      kr.onsuccess = function() {
+        (kr.result || []).forEach(function(k) { if (/^_photo(Synced|Ref)_/.test(String(k))) st.delete(k); });
+      };
+      await new Promise((res, rej) => { st.transaction.oncomplete = res; st.transaction.onerror = rej; });
+    } catch (e) {}
+    try { await queueClear(); } catch (e) {}
+    if (typeof SyncEngine !== 'undefined' && SyncEngine.resetAfterImport) {
+      try { await SyncEngine.resetAfterImport(); } catch (e) {}
+    }
     if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty();
   }
 
@@ -7812,7 +7850,7 @@ const RemielDB = (() => {
     addMedication, getMedicationsByContact, updateMedication, deleteMedication, getAllMedications,
     getProfile, putProfile,
     getSetting, putSetting,
-    exportAll, importAll,
+    exportAll, importAll, isDeviceOnlySetting,
     enqueue, queueGetAll, queueCount, queueRemove, queueClear,
     rawPut, rawDelete, rawGet, rawGetAll,
     SYNC_SETTING_KEYS
