@@ -6660,7 +6660,7 @@
 <div class="sync-prompt-overlay" id="syncPromptOverlay">
   <div class="sync-prompt-card">
     <h3 id="syncPromptTitle">Create Your Account</h3>
-    <p>Sync your contacts and data across devices. Your gate code is your invite.</p>
+    <p>Automatic sync setup did not work. You can create an account or sign in, or keep using Remiel Sentinel on this device only.</p>
     <div class="sync-prompt-tabs">
       <button class="sync-prompt-tab active" id="spSignupTab" onclick="SyncPrompt.tab('signup')" data-i18n="auth.signup">Sign Up</button>
       <button class="sync-prompt-tab" id="spLoginTab" onclick="SyncPrompt.tab('login')">Sign In</button>
@@ -6672,7 +6672,7 @@
     </div>
     <div class="sync-prompt-status" id="spStatus"></div>
     <button class="sync-prompt-btn primary" id="spAuthBtn" onclick="SyncPrompt.submit()">Create Account</button>
-    <button class="sync-prompt-btn secondary" onclick="SyncPrompt.dismiss()">Skip for now</button>
+    <button class="sync-prompt-btn secondary" id="spSkipBtn" onclick="SyncPrompt.dismiss()">Skip for now</button>
   </div>
 </div>
 
@@ -24871,26 +24871,61 @@ const SyncPrompt = (function() {
   let _gateCode = null;
   let _shown = false;
 
+  function _t(key, fallback) {
+    try {
+      if (typeof I18n !== 'undefined' && I18n.t) { var v = I18n.t(key); if (v && v !== key) return v; }
+    } catch (e) {}
+    return fallback;
+  }
+
+  function _set(id, prop, key, fallback) {
+    var el = document.getElementById(id);
+    if (el) el[prop] = _t(key, fallback);
+  }
+
+  function _localize() {
+    _set('spSignupTab', 'textContent', 'sp.signup', 'Sign up');
+    _set('spLoginTab', 'textContent', 'sp.signin', 'Sign in');
+    _set('spEmail', 'placeholder', 'sp.email', 'Email');
+    _set('spPassword', 'placeholder', 'sp.password', 'Password');
+    _set('spDisplayName', 'placeholder', 'sp.displayName', 'Display name (optional)');
+    _set('spSkipBtn', 'textContent', 'sp.skip', 'Skip for now');
+    var p = document.querySelector('#syncPromptOverlay .sync-prompt-card p');
+    if (p) p.textContent = _t('sp.body', 'Automatic sync setup did not work. You can create an account or sign in, or keep using Remiel Sentinel on this device only.');
+    tab(_mode);
+  }
+
+  /* Never over onboarding or the tour: wait until neither is on screen */
+  function _blocked() {
+    var ob = document.getElementById('onboarding');
+    if (ob && !ob.hidden && ob.offsetParent !== null) return true;
+    var tour = document.querySelector('.st-tour');
+    return !!(tour && tour.offsetParent !== null);
+  }
+
+  function _reveal() {
+    if (typeof SyncEngine !== 'undefined') {
+      try { if (SyncEngine.isAuthenticated() || (SyncEngine.isLocalOnly && SyncEngine.isLocalOnly())) { _shown = false; return; } } catch (e) {}
+    }
+    if (_blocked()) { setTimeout(_reveal, 2000); return; }
+    _localize();
+    var overlay = document.getElementById('syncPromptOverlay');
+    if (overlay) overlay.classList.add('active');
+  }
+
   /* P1.1: shown only when automatic device identity failed twice (called by SyncEngine) */
   function show(inviteCode) {
     if (_shown) return;
     if (typeof SyncEngine !== 'undefined') {
       try { if (SyncEngine.isAuthenticated()) return; } catch(e) {}
+      try { if (SyncEngine.isLocalOnly && SyncEngine.isLocalOnly()) return; } catch(e) {}
     }
     try { if (localStorage.getItem('rm:syncPromptDismissed')) return; } catch(e) {}
     _gateCode = inviteCode || null;
     if (!_gateCode) { try { _gateCode = localStorage.getItem('rm:access'); } catch(e) {} }
     _shown = true;
-    try {
-      var p = document.querySelector('#syncPromptOverlay .sync-prompt-card p');
-      if (p) p.textContent = 'Automatic sync setup did not work. You can create an account or sign in, or keep using Remiel Sentinel on this device only.';
-    } catch(e) {}
-
     /* Delay so user sees the galaxy first */
-    setTimeout(function() {
-      var overlay = document.getElementById('syncPromptOverlay');
-      if (overlay) overlay.classList.add('active');
-    }, 2500);
+    setTimeout(_reveal, 2500);
   }
 
   function tab(mode) {
@@ -24905,14 +24940,14 @@ const SyncPrompt = (function() {
       signupTab.classList.add('active');
       loginTab.classList.remove('active');
       signupFields.style.display = 'block';
-      authBtn.textContent = 'Create Account';
-      title.textContent = 'Create Your Account';
+      authBtn.textContent = _t('sp.createBtn', 'Create account');
+      title.textContent = _t('sp.titleSignup', 'Create your account');
     } else {
       loginTab.classList.add('active');
       signupTab.classList.remove('active');
       signupFields.style.display = 'none';
-      authBtn.textContent = 'Sign In';
-      title.textContent = 'Welcome Back';
+      authBtn.textContent = _t('sp.signin', 'Sign in');
+      title.textContent = _t('sp.titleLogin', 'Welcome back');
     }
     document.getElementById('spStatus').textContent = '';
   }
@@ -24923,7 +24958,7 @@ const SyncPrompt = (function() {
     var statusEl = document.getElementById('spStatus');
 
     if (!email || !password) {
-      statusEl.textContent = 'Email and password required';
+      statusEl.textContent = _t('sp.need', 'Enter your email and password.');
       statusEl.style.color = '#f87171';
       return;
     }
@@ -24955,7 +24990,7 @@ const SyncPrompt = (function() {
         SettingsPanel.updateSyncUI();
       }
     } catch (err) {
-      statusEl.textContent = err.message || 'Authentication failed';
+      statusEl.textContent = err.message || _t('sp.failed', 'Could not sign in or create the account.');
       statusEl.style.color = '#f87171';
     }
   }
