@@ -5566,7 +5566,7 @@
     <div class="settings-section" id="locationShareSection" style="display:none;">
       <div class="settings-section-title" data-i18n="location.title">Location Sharing</div>
       <div class="settings-card">
-        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;">Share your current location with your Circle on demand. Not continuous — only when you choose.</p>
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;">Sends your current position once, only to Circle members you have turned Location on for; nothing is tracked in the background, and Stop removes it from the server.</p>
         <div class="loc-share-section">
           <button class="loc-share-btn" onclick="LocationShare.shareNow()">
             <span class="loc-icon">📍</span>
@@ -5607,11 +5607,11 @@
     <div class="settings-section push-section" id="pushNotifySection" style="display:none;">
       <div class="settings-section-title" data-i18n="settings.push">Push Notifications</div>
       <div class="settings-card">
-        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;">Get notified when a contact's severity changes or a check-in is overdue, even when the app is closed.</p>
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;">Lets the Remiel Sentinel server notify this device, even when the app is closed; turning it off removes this device from the list.</p>
         <div class="push-toggle-row">
           <div>
             <div class="push-toggle-label">Enable Push Notifications</div>
-            <div class="push-toggle-sub">Severity alerts, missed check-ins, medication reminders</div>
+            <div class="push-toggle-sub">New messages, Circle invitations, accepted invitations, shared video notes, a daily digest</div>
           </div>
           <label class="push-toggle">
             <input type="checkbox" id="pushToggle" onchange="PushNotify.toggle(this.checked)">
@@ -5698,11 +5698,11 @@
   <div class="settings-section" id="circleSection" style="display:none;">
     <div class="settings-section-title" data-i18n="circle.title">The Circle</div>
     <div class="settings-card">
-      <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">Connect with people you care about. Share moods, check-ins, and stay in touch across devices.</p>
+      <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">Connect with people you care about. Nothing is shared until you turn on a switch for that person, and each switch stops sharing when turned off.</p>
 
       <!-- Invite form -->
       <div class="circle-invite-form">
-        <input class="circle-invite-input" id="circleInviteInput" type="text" placeholder="Handle or email" autocomplete="off">
+        <input class="circle-invite-input" id="circleInviteInput" type="text" placeholder="Email, @handle, or Sentinel ID" autocomplete="off" autocapitalize="off">
         <button class="circle-invite-btn" onclick="CircleManager.sendInvite()">Invite</button>
       </div>
       <div class="circle-invite-status" id="circleInviteStatus"></div>
@@ -5717,7 +5717,7 @@
       <div id="circleConnectedSection" style="margin-top:16px;">
         <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Connected</div>
         <ul class="circle-list" id="circleConnectedList"></ul>
-        <div class="circle-empty" id="circleEmpty">No connections yet. Invite someone above!</div>
+        <div class="circle-empty" id="circleEmpty">No connections yet. Invite someone above.</div>
       </div>
     </div>
   </div>
@@ -19937,6 +19937,32 @@ const CircleManager = (() => {
 
   function _$(id) { return document.getElementById(id); }
 
+  function _t(key, fallback) {
+    try {
+      if (typeof I18n !== 'undefined' && I18n.t) { var v = I18n.t(key); if (v && v !== key) return v; }
+    } catch (e) {}
+    return fallback;
+  }
+
+  /* Invite target by shape: email, @handle, or an 8-char Sentinel ID (uppercase, as SentinelCall issues it) */
+  function _inviteBody(value) {
+    var v = value.trim();
+    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return { email: v };
+    if (/^[A-HJ-NP-Z2-9]{8}$/.test(v)) return { sentinel_id: v };
+    var h = v.replace(/^@/, '').toLowerCase();
+    if (/^[a-z0-9_]{3,24}$/.test(h)) return { handle: h };
+    return null;
+  }
+
+  /* One honest sentence per sharing toggle */
+  var SHARE_COPY = {
+    share_contacts: ['Contacts', 'Shares your contact list with this person until you turn it off.'],
+    share_moods: ['Moods', 'Shares your mood check-ins with this person until you turn it off.'],
+    share_location: ['Location', 'Lets this person see the location you choose to share, only when you tap Share; stops when off.'],
+    share_media: ['Video notes', 'Lets this person watch video notes you share; stops when you turn it off.'],
+    share_bio: ['Biometrics', 'Shares your motion and heart rate readings with this person until you turn it off.'],
+  };
+
   async function _apiFetch(path, opts) {
     if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
       throw new Error('Not authenticated');
@@ -19967,13 +19993,12 @@ const CircleManager = (() => {
     var input = _$('circleInviteInput');
     if (!input) return;
     var value = input.value.trim();
-    if (!value) { _setStatus('Enter a handle or email', true); return; }
+    if (!value) { _setStatus(_t('circle.enterTarget', 'Enter an email, @handle, or Sentinel ID'), true); return; }
+    var body = _inviteBody(value);
+    if (!body) { _setStatus(_t('circle.badTarget', 'That does not look like an email, @handle, or Sentinel ID'), true); return; }
 
-    _setStatus('Sending invitation...', false);
+    _setStatus(_t('circle.sending', 'Sending invitation...'), false);
     try {
-      var body = {};
-      if (value.indexOf('@') !== -1) { body.email = value; }
-      else { body.handle = value.replace(/^@/, ''); }
 
       var res = await _apiFetch('/connections/invite', {
         method: 'POST',
@@ -19983,11 +20008,15 @@ const CircleManager = (() => {
       if (res.ok) {
         var data = await res.json();
         input.value = '';
-        _setStatus('Invitation sent to ' + (data.connection.to_user ? data.connection.to_user.display_name : value), false);
+        var to = data && data.connection && data.connection.to_user;
+        _setStatus(_t('circle.sentTo', 'Invitation sent to') + ' ' + ((to && (to.display_name || to.handle)) || value), false);
         await loadConnections();
       } else {
-        var err = await res.json().catch(function() { return { detail: 'Failed to send' }; });
-        _setStatus(err.detail || 'Failed to send invitation', true);
+        var err = await res.json().catch(function() { return {}; });
+        var msg = res.status === 404 ? _t('circle.noUser', 'No Remiel Sentinel user found for that') :
+                  res.status === 409 ? _t('circle.already', 'Already connected or invited') :
+                  (err.detail || _t('circle.sendFailed', 'Could not send the invitation'));
+        _setStatus(msg, true);
       }
     } catch (e) {
       _setStatus(e.message || 'Network error', true);
@@ -19997,7 +20026,7 @@ const CircleManager = (() => {
   /* ── Accept / Decline ── */
   async function acceptInvite(id) {
     try {
-      var res = await _apiFetch('/connections/' + id + '/accept', { method: 'PUT' });
+      var res = await _apiFetch('/connections/' + encodeURIComponent(id) + '/accept', { method: 'PUT' });
       if (res.ok) {
         _setStatus('Connection accepted', false);
         await loadConnections();
@@ -20010,7 +20039,7 @@ const CircleManager = (() => {
 
   async function declineInvite(id) {
     try {
-      var res = await _apiFetch('/connections/' + id + '/decline', { method: 'PUT' });
+      var res = await _apiFetch('/connections/' + encodeURIComponent(id) + '/decline', { method: 'PUT' });
       if (res.ok) {
         _setStatus('Invitation declined', false);
         await loadConnections();
@@ -20023,7 +20052,7 @@ const CircleManager = (() => {
 
   async function removeConnection(id) {
     try {
-      var res = await _apiFetch('/connections/' + id, { method: 'DELETE' });
+      var res = await _apiFetch('/connections/' + encodeURIComponent(id), { method: 'DELETE' });
       if (res.ok) {
         _setStatus('Connection removed', false);
         await loadConnections();
@@ -20034,34 +20063,39 @@ const CircleManager = (() => {
   }
 
   /* ── Sharing toggles ── */
-  async function updateSharing(id, key, value) {
+  async function updateSharing(id, key, value, checkbox) {
+    var ok = false;
     try {
       var body = {};
       body[key] = value ? 1 : 0;
-      var res = await _apiFetch('/connections/' + id + '/sharing', {
+      var res = await _apiFetch('/connections/' + encodeURIComponent(id) + '/sharing', {
         method: 'PUT',
         body: JSON.stringify(body),
       });
-      if (!res.ok) {
-        _setStatus('Failed to update sharing', true);
-      }
-    } catch (e) { console.warn('CircleManager: sharing update failed', e); }
+      ok = res.ok;
+    } catch (e) { ok = false; }
+    if (!ok) {
+      _setStatus(_t('circle.shareFailed', 'Could not update sharing. Nothing changed.'), true);
+      if (checkbox) checkbox.checked = !value;
+    }
+    return ok;
   }
 
   /* ── Render helpers ── */
   function _renderPendingItem(inv) {
+    var from = inv.from || {};
     var li = document.createElement('li');
     li.className = 'circle-item';
     li.innerHTML =
-      '<div class="circle-avatar">' + _initials(inv.from.display_name) + '</div>' +
+      '<div class="circle-avatar">' + _esc(_initials(from.display_name || from.handle)) + '</div>' +
       '<div class="circle-info">' +
-        '<div class="circle-name">' + _esc(inv.from.display_name || 'Unknown') + '</div>' +
-        '<div class="circle-handle">' + (inv.from.handle ? '@' + _esc(inv.from.handle) : '') + '</div>' +
+        '<div class="circle-name">' + _esc(from.display_name || from.handle || 'Unknown') + '</div>' +
+        '<div class="circle-handle">' + (from.handle ? '@' + _esc(from.handle) : '') + '</div>' +
         (inv.message ? '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">' + _esc(inv.message) + '</div>' : '') +
       '</div>' +
       '<div class="circle-actions">' +
-        '<button class="circle-btn accept" data-id="' + inv.id + '">Accept</button>' +
-        '<button class="circle-btn decline" data-id="' + inv.id + '">Decline</button>' +
+        '<button class="circle-btn accept">' + _esc(_t('circle.accept', 'Accept')) + '</button>' +
+        '<button class="circle-btn decline">' + _esc(_t('circle.decline', 'Decline')) + '</button>' +
       '</div>';
     li.querySelector('.circle-btn.accept').addEventListener('click', function() { acceptInvite(inv.id); });
     li.querySelector('.circle-btn.decline').addEventListener('click', function() { declineInvite(inv.id); });
@@ -20069,53 +20103,81 @@ const CircleManager = (() => {
   }
 
   function _renderConnectionItem(conn) {
+    var peer = conn.peer || {};
+    var sharing = conn.sharing || {};
     var li = document.createElement('li');
     li.className = 'circle-item';
     var statusClass = conn.status === 'accepted' ? 'accepted' : 'pending';
-    var statusLabel = conn.status === 'accepted' ? 'Connected' :
-                      (conn.direction === 'sent' ? 'Sent' : 'Pending');
-
-    var sharingHtml = '';
-    if (conn.status === 'accepted') {
-      sharingHtml =
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
-          _sharingToggle(conn.id, 'share_contacts', 'Contacts', conn.sharing.contacts) +
-          _sharingToggle(conn.id, 'share_moods', 'Moods', conn.sharing.moods) +
-          _sharingToggle(conn.id, 'share_location', 'Location', conn.sharing.location) +
-          _sharingToggle(conn.id, 'share_media', 'Media', conn.sharing.media) +
-          _sharingToggle(conn.id, 'share_bio', 'Biometrics', conn.sharing && conn.sharing.bio) +
-        '</div>';
-    }
+    var statusLabel = conn.status === 'accepted' ? _t('circle.connected', 'Connected') :
+                      (conn.direction === 'sent' ? _t('circle.sent', 'Sent') : _t('circle.pending', 'Pending'));
+    var sub = [];
+    if (peer.handle) sub.push('@' + _esc(peer.handle));
+    if (peer.sentinel_id) sub.push('ID ' + _esc(peer.sentinel_id));
 
     li.innerHTML =
-      '<div class="circle-avatar">' + _initials(conn.peer.display_name) + '</div>' +
+      '<div class="circle-avatar">' + _esc(_initials(peer.display_name || peer.handle)) + '</div>' +
       '<div class="circle-info">' +
-        '<div class="circle-name">' + _esc(conn.peer.display_name || 'Unknown') + '</div>' +
-        '<div class="circle-handle">' + (conn.peer.handle ? '@' + _esc(conn.peer.handle) : '') + '</div>' +
-        sharingHtml +
+        '<div class="circle-name">' + _esc(peer.display_name || peer.handle || 'Unknown') + '</div>' +
+        '<div class="circle-handle">' + sub.join(' \u00b7 ') + '</div>' +
+        '<div class="circle-sharing"></div>' +
       '</div>' +
-      '<span class="circle-status ' + statusClass + '">' + statusLabel + '</span>';
+      '<span class="circle-status ' + statusClass + '">' + _esc(statusLabel) + '</span>';
+
+    if (conn.status === 'accepted') {
+      var box = li.querySelector('.circle-sharing');
+      box.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-top:6px;';
+      [['share_contacts', 'contacts'], ['share_moods', 'moods'], ['share_location', 'location'],
+       ['share_media', 'media'], ['share_bio', 'bio']].forEach(function(pair) {
+        box.appendChild(_sharingToggle(conn.id, pair[0], !!sharing[pair[1]]));
+      });
+      var rm = document.createElement('button');
+      rm.className = 'circle-btn decline';
+      rm.style.cssText = 'align-self:flex-start;margin-top:4px;';
+      rm.textContent = _t('circle.remove', 'Remove');
+      rm.addEventListener('click', function() {
+        if (confirm(_t('circle.removeConfirm', 'Remove this connection? All sharing with them stops.'))) removeConnection(conn.id);
+      });
+      box.appendChild(rm);
+    } else if (conn.direction === 'sent') {
+      var box2 = li.querySelector('.circle-sharing');
+      var cancel = document.createElement('button');
+      cancel.className = 'circle-btn decline';
+      cancel.style.marginTop = '6px';
+      cancel.textContent = _t('circle.cancelInvite', 'Cancel invitation');
+      cancel.addEventListener('click', function() { removeConnection(conn.id); });
+      box2.appendChild(cancel);
+    }
     return li;
   }
 
-  function _sharingToggle(connId, key, label, isOn) {
-    var id = 'share_' + connId + '_' + key;
-    return '<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);cursor:pointer;">' +
-      '<input type="checkbox" id="' + id + '" ' + (isOn ? 'checked' : '') +
-      ' onchange="CircleManager.updateSharing(\'' + connId + '\',\'' + key + '\',this.checked)"' +
-      ' style="accent-color:var(--accent,#6c5ce7);width:14px;height:14px;">' +
-      label + '</label>';
+  function _sharingToggle(connId, key, isOn) {
+    var copy = SHARE_COPY[key] || [key, ''];
+    var label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:flex-start;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer;';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!isOn;
+    cb.style.cssText = 'accent-color:var(--accent,#6c5ce7);width:14px;height:14px;margin-top:1px;flex-shrink:0;';
+    cb.addEventListener('change', function() { updateSharing(connId, key, cb.checked, cb); });
+    var text = document.createElement('span');
+    var strong = document.createElement('strong');
+    strong.textContent = _t('circle.share.' + key, copy[0]);
+    text.appendChild(strong);
+    text.appendChild(document.createTextNode(': ' + _t('circle.consent.' + key, copy[1])));
+    label.appendChild(cb);
+    label.appendChild(text);
+    return label;
   }
 
   function _esc(str) {
     var el = document.createElement('span');
-    el.textContent = str;
+    el.textContent = str == null ? '' : String(str);
     return el.innerHTML;
   }
 
   /* ── Load all connections ── */
   async function loadConnections() {
-    if (!SyncEngine.isAuthenticated()) return;
+    if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated() || !navigator.onLine) return;
 
     try {
       /* Load pending invitations */
@@ -20168,17 +20230,24 @@ const CircleManager = (() => {
     if (!section) return;
     var isAuth = typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated();
     section.style.display = isAuth ? 'block' : 'none';
+    if (isAuth && !_listed) { _listed = true; loadConnections(); }
   }
+  var _listed = false;
 
   /* ── Init ── */
-  function init() {
+  async function init() {
     if (_loaded) return;
     _loaded = true;
+    /* Wait for SyncEngine config so auth state is known (startup race fix) */
+    try {
+      if (typeof SyncEngine !== 'undefined') {
+        SyncEngine.init();
+        await SyncEngine.ready();
+      }
+    } catch (e) {}
     updateVisibility();
-    /* If authenticated, load connections */
-    if (typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated()) {
-      loadConnections();
-    }
+    var inp = _$('circleInviteInput');
+    if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); sendInvite(); } });
   }
 
   return {
@@ -20752,6 +20821,23 @@ const SocialImport = (() => {
 
     function _$(id) { return document.getElementById(id); }
 
+    function _t(key, fallback) {
+      try {
+        if (typeof I18n !== 'undefined' && I18n.t) { var v = I18n.t(key); if (v && v !== key) return v; }
+      } catch (e) {}
+      return fallback;
+    }
+
+    function _esc(str) {
+      var el = document.createElement('span');
+      el.textContent = str == null ? '' : String(str);
+      return el.innerHTML;
+    }
+
+    function _note(text) {
+      return '<div style="font-size:11px;color:var(--text-dim);">' + _esc(text) + '</div>';
+    }
+
     async function _apiFetch(path, opts) {
       if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) {
         throw new Error('Not authenticated');
@@ -20760,6 +20846,7 @@ const SocialImport = (() => {
     }
 
     function _timeAgo(ts) {
+      ts = Number(ts) || 0;
       var diff = Date.now() - ts;
       if (diff < 60000) return 'just now';
       if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
@@ -20771,10 +20858,14 @@ const SocialImport = (() => {
       var status = _$('locShareStatus');
       if (!status) return;
       if (!navigator.geolocation) {
-        status.textContent = 'Geolocation is not supported by your browser.';
+        status.textContent = _t('location.unsupported', 'Location is not available in this browser.');
         return;
       }
-      status.textContent = 'Getting your location...';
+      if (!navigator.onLine) {
+        status.textContent = _t('location.offline', 'You are offline. Nothing was shared.');
+        return;
+      }
+      status.textContent = _t('location.getting', 'Getting your location...');
 
       navigator.geolocation.getCurrentPosition(
         async function(pos) {
@@ -20790,15 +20881,15 @@ const SocialImport = (() => {
             });
             if (!resp.ok) {
               var err = await resp.json().catch(function() { return {}; });
-              status.textContent = 'Error: ' + (err.detail || 'Failed to share');
+              status.textContent = _t('location.shareFailed', 'Could not share:') + ' ' + (err.detail || resp.status);
               return;
             }
-            status.textContent = 'Location shared at ' + new Date().toLocaleTimeString() +
+            status.textContent = _t('location.sharedAt', 'Shared with your Circle at') + ' ' + new Date().toLocaleTimeString() +
               ' (' + pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4) + ')';
             var stopBtn = _$('locStopBtn');
             if (stopBtn) stopBtn.style.display = '';
           } catch (e) {
-            status.textContent = 'Error: ' + e.message;
+            status.textContent = _t('location.shareFailed', 'Could not share:') + ' ' + (e.message || 'network error');
           }
         },
         function(err) {
@@ -20818,14 +20909,14 @@ const SocialImport = (() => {
       try {
         var resp = await _apiFetch('/location', { method: 'DELETE' });
         if (resp.ok) {
-          if (status) status.textContent = 'Location sharing stopped.';
+          if (status) status.textContent = _t('location.stopped', 'Your shared location was removed from the server.');
           var stopBtn = _$('locStopBtn');
           if (stopBtn) stopBtn.style.display = 'none';
         } else {
-          if (status) status.textContent = 'Failed to stop sharing.';
+          if (status) status.textContent = _t('location.stopFailed', 'Could not remove your location. Try again.');
         }
       } catch (e) {
-        if (status) status.textContent = 'Error: ' + e.message;
+        if (status) status.textContent = _t('location.stopFailed', 'Could not remove your location. Try again.');
       }
     }
 
@@ -20835,13 +20926,13 @@ const SocialImport = (() => {
       try {
         var resp = await _apiFetch('/location/shared', {});
         if (!resp.ok) {
-          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Could not load shared locations</div>';
+          list.innerHTML = _note(_t('location.loadFailed', 'Could not load shared locations'));
           return;
         }
         var data = await resp.json();
         var locs = data.locations || [];
         if (locs.length === 0) {
-          list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">No one in your Circle is sharing their location right now</div>';
+          list.innerHTML = _note(_t('location.none', 'No one in your Circle is sharing their location right now'));
           return;
         }
         var html = '';
@@ -20849,15 +20940,16 @@ const SocialImport = (() => {
           var l = locs[i];
           html += '<div class="loc-shared-item">' +
             '<div>' +
-              '<div class="loc-peer-name">' + (l.display_name || l.handle || 'Unknown') + '</div>' +
-              '<div class="loc-peer-coords">' + Number(l.latitude).toFixed(4) + ', ' + Number(l.longitude).toFixed(4) + '</div>' +
-              '<div class="loc-peer-time">' + _timeAgo(l.timestamp) + '</div>' +
+              '<div class="loc-peer-name">' + _esc(l.display_name || (l.handle ? '@' + l.handle : 'Unknown')) + '</div>' +
+              '<div class="loc-peer-coords">' + _esc(Number(l.latitude).toFixed(4) + ', ' + Number(l.longitude).toFixed(4)) +
+                (l.accuracy ? ' \u00b1' + _esc(Math.round(Number(l.accuracy))) + 'm' : '') + '</div>' +
+              '<div class="loc-peer-time">' + _esc(_timeAgo(l.timestamp)) + '</div>' +
             '</div>' +
           '</div>';
         }
         list.innerHTML = html;
       } catch (e) {
-        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);">Error: ' + e.message + '</div>';
+        list.innerHTML = _note(_t('location.loadFailed', 'Could not load shared locations'));
       }
     }
 
@@ -20868,9 +20960,12 @@ const SocialImport = (() => {
       section.style.display = authed ? '' : 'none';
     }
 
-    function init() {
+    async function init() {
+      try {
+        if (typeof SyncEngine !== 'undefined') { SyncEngine.init(); await SyncEngine.ready(); }
+      } catch (e) {}
       updateVisibility();
-      if (typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated()) {
+      if (typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated() && navigator.onLine) {
         loadShared();
       }
     }
@@ -21172,27 +21267,27 @@ const SocialImport = (() => {
   const PushNotify = (() => {
     'use strict';
 
-    const API_BASE = (typeof SyncEngine !== 'undefined' && SyncEngine._apiBase)
-      ? SyncEngine._apiBase
-      : 'https://remiel-sentinel-api.vercel.app';
     let _subscribed = false;
+    let _configured = null; /* null unknown, false when the server has no VAPID keys */
 
-    function _getToken() {
-      if (typeof SyncEngine !== 'undefined' && SyncEngine._token) return SyncEngine._token;
-      try { return localStorage.getItem('remiel_access_token'); } catch (e) { return null; }
+    function _t(key, fallback) {
+      try {
+        if (typeof I18n !== 'undefined' && I18n.t) { var v = I18n.t(key); if (v && v !== key) return v; }
+      } catch (e) {}
+      return fallback;
+    }
+
+    function _authed() {
+      return typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated && SyncEngine.isAuthenticated();
     }
 
     async function _apiFetch(path, opts) {
-      if (typeof SyncEngine !== 'undefined' && typeof SyncEngine._fetch === 'function') {
-        return SyncEngine._fetch(path, opts);
-      }
-      var token = _getToken();
-      var headers = Object.assign({}, opts && opts.headers, {
-        'Content-Type': 'application/json',
-      });
-      if (token) headers['Authorization'] = 'Bearer ' + token;
-      var resp = await fetch(API_BASE + path, Object.assign({}, opts, { headers: headers }));
-      return resp;
+      if (!_authed()) throw new Error('Not signed in');
+      return SyncEngine.apiFetch(path, opts || {});
+    }
+
+    function _supported() {
+      return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
     }
 
     function _urlBase64ToUint8Array(base64String) {
@@ -21206,56 +21301,63 @@ const SocialImport = (() => {
       return outputArray;
     }
 
+    function _notConfigured() {
+      _configured = false;
+      _setStatus(_t('push.notConfigured', 'Push is not enabled on the server yet'));
+      _updateToggle(false, true);
+    }
+
     async function subscribe() {
       try {
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-          _setStatus('Push notifications not supported in this browser.');
-          return false;
-        }
-
-        var permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          _setStatus('Notification permission denied. Enable in browser settings.');
+        if (!_supported()) {
+          _setStatus(_t('push.unsupported', 'Push notifications are not supported in this browser.'));
           _updateToggle(false);
           return false;
         }
-
         var keyResp = await _apiFetch('/push/vapid-key', { method: 'GET' });
+        if (keyResp.status === 503) { _notConfigured(); return false; }
         if (!keyResp.ok) {
-          _setStatus('Push service unavailable.');
+          _setStatus(_t('push.unavailable', 'Push service unavailable. Try again later.'));
           _updateToggle(false);
           return false;
         }
         var keyData = await keyResp.json();
+        if (!keyData || !keyData.publicKey) { _notConfigured(); return false; }
+
+        var permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          _setStatus(_t('push.denied', 'Notification permission denied. Enable it in browser settings.'));
+          _updateToggle(false);
+          return false;
+        }
 
         var reg = await navigator.serviceWorker.ready;
-        var subscription = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: _urlBase64ToUint8Array(keyData.publicKey),
-        });
+        var subscription = await reg.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: _urlBase64ToUint8Array(keyData.publicKey),
+          });
+        }
 
         var subJson = subscription.toJSON();
         var resp = await _apiFetch('/push/subscribe', {
           method: 'POST',
-          body: JSON.stringify({
-            endpoint: subJson.endpoint,
-            keys: subJson.keys,
-          }),
+          body: JSON.stringify({ endpoint: subJson.endpoint, keys: subJson.keys }),
         });
 
         if (resp.ok) {
           _subscribed = true;
-          _setStatus('Push notifications enabled.');
+          _setStatus(_t('push.enabled', 'Push notifications are on for this device.'));
           _updateToggle(true);
           return true;
-        } else {
-          _setStatus('Failed to register subscription.');
-          _updateToggle(false);
-          return false;
         }
+        if (resp.status === 503) { _notConfigured(); return false; }
+        _setStatus(_t('push.registerFailed', 'Could not register this device for push.'));
+        _updateToggle(false);
+        return false;
       } catch (err) {
-        console.error('PushNotify subscribe error:', err);
-        _setStatus('Error enabling push notifications.');
+        _setStatus(_t('push.enableFailed', 'Could not turn on push notifications.'));
         _updateToggle(false);
         return false;
       }
@@ -21263,67 +21365,63 @@ const SocialImport = (() => {
 
     async function unsubscribe() {
       try {
-        var reg = await navigator.serviceWorker.ready;
-        var subscription = await reg.pushManager.getSubscription();
-
-        if (subscription) {
-          var subJson = subscription.toJSON();
-          await _apiFetch('/push/subscribe', {
-            method: 'DELETE',
-            body: JSON.stringify({ endpoint: subJson.endpoint }),
-          });
-          await subscription.unsubscribe();
+        if (_supported()) {
+          var reg = await navigator.serviceWorker.ready;
+          var subscription = await reg.pushManager.getSubscription();
+          if (subscription) {
+            var subJson = subscription.toJSON();
+            try {
+              await _apiFetch('/push/subscribe', {
+                method: 'DELETE',
+                body: JSON.stringify({ endpoint: subJson.endpoint }),
+              });
+            } catch (e) { /* offline: the browser subscription is still removed */ }
+            await subscription.unsubscribe();
+          }
         }
-
         _subscribed = false;
-        _setStatus('Push notifications disabled.');
+        _setStatus(_t('push.disabled', 'Push notifications are off for this device.'));
         _updateToggle(false);
       } catch (err) {
-        console.error('PushNotify unsubscribe error:', err);
-        _setStatus('Error disabling push notifications.');
+        _setStatus(_t('push.disableFailed', 'Could not turn off push notifications.'));
       }
     }
 
     async function toggle(enabled) {
-      if (enabled) {
-        await subscribe();
-      } else {
-        await unsubscribe();
-      }
+      if (enabled) await subscribe();
+      else await unsubscribe();
     }
 
     async function checkStatus() {
       try {
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-          _setStatus('Push not supported.');
-          _updateToggle(false);
+        if (!_supported()) {
+          _setStatus(_t('push.unsupported', 'Push notifications are not supported in this browser.'));
+          _updateToggle(false, true);
           return;
         }
-
+        if (!navigator.onLine) {
+          _setStatus(_t('push.offline', 'Offline. Push status unknown.'));
+          return;
+        }
+        var resp = await _apiFetch('/push/status', { method: 'GET' });
+        if (resp.status === 503) { _notConfigured(); return; }
+        if (!resp.ok) {
+          _setStatus(_t('push.statusFailed', 'Could not check push status.'));
+          return;
+        }
+        var data = await resp.json();
+        if (data.configured === false) { _notConfigured(); return; }
+        _configured = true;
         var reg = await navigator.serviceWorker.ready;
         var subscription = await reg.pushManager.getSubscription();
-
-        if (subscription) {
-          var resp = await _apiFetch('/push/status', { method: 'GET' });
-          if (resp.ok) {
-            var data = await resp.json();
-            _subscribed = data.subscribed;
-            _updateToggle(_subscribed);
-            _setStatus(_subscribed ? 'Push notifications active.' : 'Push notifications inactive.');
-          } else {
-            _subscribed = false;
-            _updateToggle(false);
-            _setStatus('Could not verify push status.');
-          }
-        } else {
-          _subscribed = false;
-          _updateToggle(false);
-          _setStatus('Push notifications inactive.');
-        }
+        _subscribed = !!(data.subscribed && subscription);
+        _updateToggle(_subscribed);
+        _setStatus(_subscribed ? _t('push.enabled', 'Push notifications are on for this device.')
+                               : _t('push.inactive', 'Push notifications are off.'));
       } catch (err) {
         _subscribed = false;
         _updateToggle(false);
-        _setStatus('Push notifications inactive.');
+        _setStatus(_t('push.inactive', 'Push notifications are off.'));
       }
     }
 
@@ -21332,22 +21430,26 @@ const SocialImport = (() => {
       if (el) el.textContent = text;
     }
 
-    function _updateToggle(on) {
+    function _updateToggle(on, disabled) {
       var el = document.getElementById('pushToggle');
-      if (el) el.checked = on;
+      if (!el) return;
+      el.checked = !!on;
+      el.disabled = !!disabled;
     }
 
     function updateVisibility() {
       var section = document.getElementById('pushNotifySection');
       if (!section) return;
-      var token = _getToken();
-      section.style.display = token ? '' : 'none';
+      var authed = _authed();
+      section.style.display = authed ? '' : 'none';
+      if (authed && _configured === null) checkStatus();
     }
 
-    function init() {
+    async function init() {
+      try {
+        if (typeof SyncEngine !== 'undefined') { SyncEngine.init(); await SyncEngine.ready(); }
+      } catch (e) {}
       updateVisibility();
-      var token = _getToken();
-      if (token) checkStatus();
     }
 
     return {
