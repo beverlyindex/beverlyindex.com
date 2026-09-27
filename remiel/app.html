@@ -5749,8 +5749,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         <span data-i18n="onboard.name.addPhoto">Add photo</span>
       </div>
     </div>
-    <input type="file" id="obSelfFileInput" accept="image/*,video/*" hidden>
-    <input type="file" id="obSelfCameraInput" accept="image/*,video/*" capture="user" hidden>
+    <input type="file" id="obSelfFileInput" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime" hidden>
+    <input type="file" id="obSelfCameraInput" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime" capture="user" hidden>
     <div class="ob-media-options">
       <button class="ob-media-opt" onclick="document.getElementById('obSelfFileInput').click()" data-i18n="onboard.name.upload">Upload</button>
       <button class="ob-media-opt" onclick="_obOpenCamera('self')" data-i18n="onboard.name.camera">Take Photo/Video</button>
@@ -5784,8 +5784,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
           <button class="ob-contact-media-opt" onclick="_obOpenCamera('contact')" data-i18n="onboard.people.takePhoto">Take photo</button>
         </div>
       </div>
-      <input type="file" id="obContactFileInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" hidden>
-      <input type="file" id="obContactCameraInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" capture="environment" hidden>
+      <input type="file" id="obContactFileInput" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime" hidden>
+      <input type="file" id="obContactCameraInput" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime" capture="environment" hidden>
       <input class="ob-input" id="obFirst" type="text" placeholder="First name" data-i18n-placeholder="onboard.people.firstName" autocomplete="off" maxlength="30">
       <input class="ob-input" id="obLast" type="text" placeholder="Last name" data-i18n-placeholder="onboard.people.lastName" autocomplete="off" maxlength="30">
       <div class="ob-cat-row" id="obCatRow">
@@ -6420,7 +6420,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 </div>
 
 <!-- Hidden file input for contact photo uploads -->
-<input type="file" id="contactPhotoInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" hidden onchange="handleContactPhoto(event)">
+<input type="file" id="contactPhotoInput" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime" hidden onchange="handleContactPhoto(event)">
 
 <!-- Daily Summary Digest — morning card, SELF mode only -->
 <div class="daily-digest hidden" id="dailyDigest" role="region" aria-label="Daily summary">
@@ -7102,7 +7102,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         <span class="cm-photo-icon" id="cmPhotoIcon">&#128247;</span>
       </div>
       <span class="cm-photo-label" onclick="document.getElementById('cmPhotoFileInput').click()" data-i18n="cm.photo">Add photo or video (optional)</span>
-      <input type="file" id="cmPhotoFileInput" accept="image/*,video/mp4,video/webm,video/quicktime,.gif" hidden onchange="handleCmPhoto(event)">
+      <input type="file" id="cmPhotoFileInput" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime" hidden onchange="handleCmPhoto(event)">
     </div>
     <div id="cmImportRow" style="text-align:center;margin:-2px 0 6px;">
       <button onclick="closeContactModal(); setTimeout(function(){ var sp = document.getElementById('settingsPanel'); if(!sp.classList.contains('open')) SettingsPanel.open(); var sec = document.getElementById('socialImportSection'); if(sec) sec.scrollIntoView({behavior:'smooth',block:'center'}); }, 300);" style="background:none;border:none;color:#4CAF50;font-size:12px;cursor:pointer;padding:4px 8px;text-decoration:underline;font-family:inherit;">
@@ -7597,6 +7597,103 @@ async function downscalePhoto(blob, maxEdge) {
 function nextPaint() {
   return new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 0); }); });
 }
+
+/* ── SphereMedia: the media model for every sphere (self and contacts). A record
+   in the photos store is { contactId, buffer, mimeType, kind, updatedAt } where
+   kind is 'photo', 'gif' (animated, more than one frame) or 'video'. Photos keep
+   the downscale; GIF and video originals are stored as they are. Files over the
+   4 MB sync limit stay on this device and still play. ── */
+var SphereMedia = (function () {
+  var SYNC_MAX = 4 * 1024 * 1024;
+  var ACCEPT = 'image/*,image/gif,video/mp4,video/webm,video/quicktime';
+
+  function kindFromMime(mt) {
+    mt = String(mt || '').toLowerCase();
+    if (mt.indexOf('video/') === 0) return 'video';
+    if (mt === 'image/gif') return 'gif';
+    return 'photo';
+  }
+  function _str(u8, a, b) { var s = ''; for (var i = a; i < b && i < u8.length; i++) s += String.fromCharCode(u8[i]); return s; }
+
+  /* GIF block walk without decoding pixels; returns the number of image frames */
+  function gifFrameCount(u8, stopAt) {
+    try {
+      if (!/^GIF8[79]a$/.test(_str(u8, 0, 6))) return 0;
+      var p = 13, pf = u8[10], n = 0;
+      if (pf & 0x80) p += 3 * (1 << ((pf & 7) + 1));
+      while (p < u8.length) {
+        var b = u8[p++];
+        if (b === 0x3B) break;
+        if (b === 0x21) {
+          p++;
+          while (p < u8.length) { var sz = u8[p++]; if (!sz) break; p += sz; }
+        } else if (b === 0x2C) {
+          var fpf = u8[p + 8]; p += 9;
+          if (fpf & 0x80) p += 3 * (1 << ((fpf & 7) + 1));
+          p++;
+          while (p < u8.length) { var s2 = u8[p++]; if (!s2) break; p += s2; }
+          n++;
+          if (stopAt && n >= stopAt) return n;
+        } else break;
+      }
+      return n;
+    } catch (e) { return 0; }
+  }
+
+  /* Detection by magic bytes, then MIME, then file name */
+  async function sniff(blob) {
+    var head;
+    try { head = new Uint8Array(await blob.slice(0, 32).arrayBuffer()); } catch (e) { head = new Uint8Array(0); }
+    var mt = String(blob.type || '').split(';')[0].toLowerCase();
+    var nm = String(blob.name || '').toLowerCase();
+    if (/^GIF8[79]a$/.test(_str(head, 0, 6))) {
+      var all = new Uint8Array(await blob.arrayBuffer());
+      return { kind: gifFrameCount(all, 2) > 1 ? 'gif' : 'photo', mime: 'image/gif' };
+    }
+    if (_str(head, 4, 8) === 'ftyp') {
+      var brand = _str(head, 8, 12);
+      return { kind: 'video', mime: brand === 'qt  ' ? 'video/quicktime' : (/^video\//.test(mt) ? mt : 'video/mp4') };
+    }
+    if (head[0] === 0x1A && head[1] === 0x45 && head[2] === 0xDF && head[3] === 0xA3) return { kind: 'video', mime: 'video/webm' };
+    if (/^video\//.test(mt)) return { kind: 'video', mime: mt };
+    if (/\.(mp4|m4v)$/.test(nm)) return { kind: 'video', mime: 'video/mp4' };
+    if (/\.webm$/.test(nm)) return { kind: 'video', mime: 'video/webm' };
+    if (/\.mov$/.test(nm)) return { kind: 'video', mime: 'video/quicktime' };
+    return { kind: 'photo', mime: mt || 'image/jpeg' };
+  }
+
+  /* One file from any entry point to the blob that is stored. Photos go through
+     downscalePhoto; animated GIFs and videos are kept byte for byte. */
+  async function prepare(file) {
+    if (!file || !file.size) throw new Error('empty');
+    var s = await sniff(file);
+    var blob = file;
+    if (s.kind === 'photo') {
+      if (s.mime === 'image/gif') blob = file.type === 'image/gif' ? file : new Blob([file], { type: 'image/gif' });
+      else blob = await downscalePhoto(file, 1280);
+    } else if (String(file.type || '').split(';')[0].toLowerCase() !== s.mime) {
+      blob = new Blob([file], { type: s.mime });
+    }
+    return { blob: blob, kind: s.kind, mime: s.mime, localOnly: s.kind !== 'photo' && blob.size > SYNC_MAX };
+  }
+
+  function localOnlyNotice() { return _t('media.localOnly', 'Kept on this device only (over 4 MB)'); }
+
+  /* Load stored media into a contact sphere */
+  function show(cid, blob, kind) {
+    kind = kind || kindFromMime(blob && blob.type);
+    if (kind === 'video') { loadBroadcastIntoSphere(cid, blob); return Promise.resolve(); }
+    return new Promise(function (res) {
+      var img = new Image();
+      img.onload = function () { contactPhotos.set(cid, { img: img, w: img.naturalWidth, h: img.naturalHeight }); res(); };
+      img.onerror = function () { res(); };
+      img.src = URL.createObjectURL(blob);
+    });
+  }
+
+  return { SYNC_MAX: SYNC_MAX, ACCEPT: ACCEPT, kindFromMime: kindFromMime, gifFrameCount: gifFrameCount,
+    sniff: sniff, prepare: prepare, localOnlyNotice: localOnlyNotice, show: show };
+})();
 
 /* ═══════════════════════════════════════════════════════════
    Gate Screen / Video Intro / App Reveal
@@ -8400,7 +8497,7 @@ const RemielDB = (() => {
     return promisify(tx('photos', 'readonly').get(contactId));
   }
 
-  async function putPhoto(contactId, blob) {
+  async function putPhoto(contactId, blob, kind) {
     await open();
     /* Convert any input (File, Blob, ArrayBuffer) to ArrayBuffer + type for Safari IDB compat */
     var mimeType = 'image/png';
@@ -8429,6 +8526,7 @@ const RemielDB = (() => {
       contactId: contactId,
       buffer: arrayBuf,
       mimeType: mimeType,
+      kind: kind || SphereMedia.kindFromMime(mimeType),
       updatedAt: Date.now()
     }));
     /* Verify the write succeeded by reading it back */
@@ -10699,6 +10797,7 @@ const I18n = (function () {
     "self.reset": "Reset fit",
     "self.fitHint": "Drag the preview to position, pinch or scroll to zoom.",
     "self.previewAria": "Preview of your sphere",
+    "media.localOnly": "Kept on this device only (over 4 MB)",
     "views.newTitle": "New {type} view",
     "views.editTitle": "Edit {type} view",
     "views.title": "Circle Views",
@@ -10967,6 +11066,7 @@ const I18n = (function () {
     "self.reset": "Ripristina",
     "self.fitHint": "Trascina l’anteprima per posizionarla, pizzica o scorri per lo zoom.",
     "self.previewAria": "Anteprima della tua sfera",
+    "media.localOnly": "Conservato solo su questo dispositivo (oltre 4 MB)",
     "views.newTitle": "Nuova vista {type}",
     "views.editTitle": "Modifica vista {type}",
     "views.title": "Viste della cerchia",
@@ -11632,9 +11732,18 @@ function _obHandleContactMedia(f) {
   if (prev) prev.remove();
   var svgEl = circle.querySelector('svg');
   if (svgEl) svgEl.style.display = 'none';
-  var img = document.createElement('img');
-  img.src = URL.createObjectURL(f);
-  circle.appendChild(img);
+  var prevV = circle.querySelector('video');
+  if (prevV) prevV.remove();
+  var el;
+  if (/^video\//.test(f.type || '') || /\.(mp4|m4v|webm|mov)$/i.test(f.name || '')) {
+    el = document.createElement('video');
+    el.muted = true; el.loop = true; el.autoplay = true; el.playsInline = true;
+    el.setAttribute('playsinline', '');
+  } else {
+    el = document.createElement('img');
+  }
+  el.src = URL.createObjectURL(f);
+  circle.appendChild(el);
   circle.classList.add('has-media');
 }
 
@@ -11905,19 +12014,9 @@ async function _obSaveAndLaunch() {
     }, p.extra || {})); /* roster imports carry phone, email and details */
     if (p.photoBlob) {
       try {
-        p.photoBlob = await downscalePhoto(p.photoBlob, 1280);
-        await RemielDB.putPhoto(cid, p.photoBlob);
-        /* Also load into contactPhotos Map immediately */
-        const _obUrl = URL.createObjectURL(p.photoBlob);
-        const _obImg = new Image();
-        await new Promise((_res) => {
-          _obImg.onload = _res;
-          _obImg.onerror = () => { console.warn('obPhoto: failed to load for', cid); _res(); };
-          _obImg.src = _obUrl;
-        });
-        if (_obImg.naturalWidth > 0) {
-          contactPhotos.set(cid, { img: _obImg, w: _obImg.naturalWidth, h: _obImg.naturalHeight });
-        }
+        const prep = await SphereMedia.prepare(p.photoBlob);
+        await RemielDB.putPhoto(cid, prep.blob, prep.kind);
+        await SphereMedia.show(cid, prep.blob, prep.kind);
       } catch (err) { console.warn('obContactPhoto save error', err); }
     }
   }
@@ -20565,60 +20664,19 @@ const contactPhotos = new Map(); // contactId → { img, w, h }
 
 function handleContactPhoto(e) {
   const f = e.target.files[0];
+  e.target.value = '';
   if (!f || !selectedContact) return;
   const contactId = selectedContact.id;
-  const url = URL.createObjectURL(f);
-
-  /* Persist to IndexedDB FIRST, then load into memory */
-  RemielDB.putPhoto(contactId, f).then(function() {
-    console.log('Photo saved to DB for', contactId, ': now loading into sphere');
+  SphereMedia.prepare(f).then(async function(prep) {
+    await RemielDB.putPhoto(contactId, prep.blob, prep.kind);
+    await SphereMedia.show(contactId, prep.blob, prep.kind);
+    const lbl = document.getElementById('contactPhotoBtnLabel');
+    if (lbl) lbl.textContent = I18n.t('photo.change');
+    if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
   }).catch(function(err) {
     console.error('RemielDB: photo save FAILED for', contactId, err);
+    showToast(_t('self.error', 'That file could not be used. Try another photo or clip.'));
   });
-
-  if (f.type.startsWith('video/')) {
-    /* Video file — load as looping video element for sphere playback */
-    const video = document.createElement('video');
-    video.src = url;
-    video.loop = true; video.muted = true; video.playsInline = true;
-    video.setAttribute('playsinline', '');
-    video.addEventListener('ended', () => { video.currentTime = 0; video.play().catch(() => {}); });
-    video.addEventListener('loadedmetadata', () => {
-      video.play().catch(() => {});
-      contactPhotos.set(contactId, { img: video, w: video.videoWidth, h: video.videoHeight, isVideo: true });
-      const lbl = document.getElementById('contactPhotoBtnLabel');
-      if (lbl) lbl.textContent = 'Change Photo';
-    });
-  } else {
-    /* Image or GIF — load as Image element */
-    const isGif = f.type === 'image/gif' || (f.name && f.name.toLowerCase().endsWith('.gif'));
-    const img = new Image();
-    img.onload = () => {
-      contactPhotos.set(contactId, {
-        img: img,
-        w: img.naturalWidth,
-        h: img.naturalHeight,
-        isGif: isGif
-      });
-      /* For GIFs, append to hidden DOM host so browser keeps animating frames */
-      if (isGif) {
-        img.id = 'gif_contact_' + contactId;
-        img.style.cssText = 'position:absolute;width:1px;height:1px';
-        var host = document.getElementById('gifAnimationHost');
-        if (host) {
-          /* Remove old GIF for this contact if any */
-          var old = document.getElementById('gif_contact_' + contactId);
-          if (old) old.remove();
-          host.appendChild(img);
-        }
-      }
-      const lbl = document.getElementById('contactPhotoBtnLabel');
-      if (lbl) lbl.textContent = 'Change Photo';
-    };
-    img.onerror = () => { console.warn('Failed to load contact photo'); };
-    img.src = url;
-  }
-  e.target.value = '';
 }
 
 /* Remove a contact's photo */
@@ -20864,16 +20922,17 @@ function drawContactPhotoInSphere(ctx, photo, sx, sy, r, fit) {
    store (RemielDB.putPhoto queues the photo sync). A short clip is stored as the
    latest 'self' broadcast, which the startup restore already loads into the
    sphere when no photo is set. ── */
-async function applySelfMedia(f) {
-  if (!f || !f.size) throw new Error('empty');
-  const isVideo = /^video\//.test(f.type || '');
-  mediaIsGif = !isVideo && (f.type === 'image/gif' || /\.gif$/i.test(f.name || ''));
+async function applySelfMedia(file) {
+  const prep = await SphereMedia.prepare(file);
+  const f = prep.blob;
+  const isVideo = prep.kind === 'video';
+  mediaIsGif = prep.kind === 'gif';
+  applySelfMedia.localOnly = prep.localOnly;
   if (isVideo) {
-    await RemielDB.deletePhoto('self').catch(() => {});
-    try {
-      await RemielDB.saveBroadcast('self', f, 0);
-      await RemielDB.putSetting('selfSphereClearedAt', null);
-    } catch (err) { console.warn('RemielDB: self clip save failed', err); }
+    /* The clip is the sphere media record itself, so it syncs like a photo */
+    const okV = await RemielDB.putPhoto('self', f, 'video');
+    if (okV === false) throw new Error('store');
+    await RemielDB.putSetting('selfSphereClearedAt', null).catch(() => {});
     const url = URL.createObjectURL(f);
     mediaType = 'video';
     videoEl.src = url; videoEl.load();
@@ -20898,7 +20957,7 @@ async function applySelfMedia(f) {
     });
     return 'video';
   }
-  const blob = await downscalePhoto(f, 1280);
+  const blob = f;
   const url = URL.createObjectURL(blob);
   const img = new Image();
   await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('image')); img.src = url; });
@@ -20910,7 +20969,7 @@ async function applySelfMedia(f) {
   if (!mediaFrame) mediaFrame = document.createElement('canvas');
   mediaFrame.width = cachedMediaW; mediaFrame.height = cachedMediaH;
   mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
-  const ok = await RemielDB.putPhoto('self', blob);
+  const ok = await RemielDB.putPhoto('self', blob, prep.kind);
   if (ok === false) throw new Error('store');
   await RemielDB.putSetting('selfSphereClearedAt', null).catch(() => {});
   PhotoFit.resetSelf();
@@ -21021,7 +21080,7 @@ const SelfSphere = (() => {
       h += '<div class="ss-sub">' + _t('self.fitHint', 'Drag the preview to position, pinch or scroll to zoom.') + '</div></div>';
     }
     h += '<div class="ss-status" role="status" aria-live="polite"></div>';
-    h += '<input type="file" class="ss-file" accept="image/*,video/*" hidden>';
+    h += '<input type="file" class="ss-file" accept="' + SphereMedia.ACCEPT + '" hidden>';
     h += '<input type="file" class="ss-cam" accept="image/*" capture="user" hidden>';
     h += '<input type="file" class="ss-camv" accept="video/*" capture="user" hidden>';
     h += '</div>';
@@ -21048,7 +21107,7 @@ const SelfSphere = (() => {
     try {
       await applySelfMedia(f);
       unbusy(b);
-      _refreshAll(_t('self.updated', 'Photo updated'));
+      _refreshAll(applySelfMedia.localOnly ? SphereMedia.localOnlyNotice() : _t('self.updated', 'Photo updated'));
     } catch (err) {
       unbusy(b);
       console.warn('[SelfSphere] update failed', err);
@@ -31110,6 +31169,16 @@ async function saveContactModal() {
         selectedContact.details = DEMO_CONTACTS[idx].details;
       }
 
+      // A photo, GIF or clip staged in the editor replaces the sphere media
+      if (_cmPhotoBlob) {
+        try {
+          const prep = await SphereMedia.prepare(_cmPhotoBlob);
+          await RemielDB.putPhoto(_cmEditId, prep.blob, prep.kind);
+          await SphereMedia.show(_cmEditId, prep.blob, prep.kind);
+          if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
+        } catch (e) { console.error('Modal photo save FAILED', _cmEditId, e); }
+      }
+
       // Rebuild constellation nodes and refresh BLUF
       buildNodes(false);
       updateBlufContent().catch(() => {});
@@ -31136,28 +31205,13 @@ async function saveContactModal() {
       await RemielDB.putContact(newContact);
     } catch (e) { console.warn('Contact add failed', e); }
 
-    // Save staged photo/video from the modal — AWAIT the DB write
+    // Save staged photo, GIF or clip from the modal (await the DB write)
     if (_cmPhotoBlob) {
       try {
-        console.log('Saving modal photo for new contact', newId, 'type:', _cmPhotoBlob.type, 'size:', _cmPhotoBlob.size);
-        await RemielDB.putPhoto(newId, _cmPhotoBlob);
-        console.log('Modal photo persisted for', newId);
-        if (_cmPhotoIsVideo) {
-          loadBroadcastIntoSphere(newId, _cmPhotoBlob);
-        } else {
-          (function(cId, blob) {
-            var _url = URL.createObjectURL(blob);
-            var _img = new Image();
-            _img.onload = function() {
-              contactPhotos.set(cId, { img: _img, w: _img.naturalWidth, h: _img.naturalHeight });
-              console.log('Modal photo loaded into sphere for', cId);
-            };
-            _img.onerror = function() {
-              console.error('Modal photo Image load FAILED for', cId);
-            };
-            _img.src = _url;
-          })(newId, _cmPhotoBlob);
-        }
+        const prep = await SphereMedia.prepare(_cmPhotoBlob);
+        await RemielDB.putPhoto(newId, prep.blob, prep.kind);
+        await SphereMedia.show(newId, prep.blob, prep.kind);
+        if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
       } catch(e) { console.error('Modal photo save FAILED', newId, e); }
     }
 
