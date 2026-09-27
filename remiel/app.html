@@ -4801,6 +4801,8 @@
 .roster-header { flex-shrink:0; }
 .roster-tabs::-webkit-scrollbar { display:none; }
 .roster-tab { flex:1 0 auto; padding:12px 8px; min-height:44px; white-space:nowrap; }
+/* phone width: the five tabs wrap onto two rows instead of hiding one in a sideways scroll */
+@media (max-width: 420px) { .roster-tabs { flex-wrap:wrap; overflow:visible; gap:4px; padding:6px 10px; } .roster-tab { flex:1 1 30%; padding:10px 4px; border-radius:10px; } }
 .rs-row { display:flex; gap:8px; }
 .rs-query { flex:1; min-width:0; min-height:44px; box-sizing:border-box; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:10px; color:#fff; font:15px "Hanken Grotesk",system-ui,sans-serif; padding:10px 12px; }
 .rs-query:focus { border-color:#C5A55A; outline:none; }
@@ -6397,7 +6399,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <input type="text" id="nameInput" placeholder="Enter name..." data-i18n-placeholder="cfg.namePh"
         maxlength="30"
         style="
-          width:100%; max-width:280px; background:var(--surface); border:1px solid rgba(255,255,255,0.1);
+          width:100%; max-width:280px; box-sizing:border-box; background:var(--surface); border:1px solid rgba(255,255,255,0.1);
           color:var(--text); font-family:inherit; font-size:12px; padding:8px 14px;
           border-radius:18px; outline:none; text-align:center; letter-spacing:0.02em;
         "
@@ -13816,9 +13818,12 @@ function openBluf(sphereScreenY) {
     /* Cap at 18% viewport so the card always has room to render fully */
     const gap = 12;
     const maxTop = Math.round(window.innerHeight * 0.18);
-    const topPx = typeof sphereScreenY === 'number'
+    /* never start under the fixed app logo and header buttons */
+    let headerClear = 8;
+    try { const _lg = document.querySelector('.app-logo'); if (_lg) headerClear = Math.round(_lg.getBoundingClientRect().bottom) + 8; } catch (e) {}
+    const topPx = Math.max(headerClear, typeof sphereScreenY === 'number'
       ? Math.min(maxTop, Math.max(8, Math.round(sphereScreenY + gap)))
-      : 12;
+      : 12);
     overlay.style.paddingTop = topPx + 'px';
     overlay.style.justifyContent = 'flex-start';
   } else {
@@ -13828,11 +13833,12 @@ function openBluf(sphereScreenY) {
 
   overlay.classList.add('open');
 
-  /* Ensure card is fully visible — scroll into view after animation starts */
+  /* Start at the top of the card. scrollIntoView pushed the card up under the
+     fixed app header, so the overlay itself is scrolled to 0 instead. */
   const card = document.getElementById('blufCard');
   if (card) {
     setTimeout(() => {
-      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try { overlay.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { overlay.scrollTop = 0; }
     }, 180);
   }
 }
@@ -20058,6 +20064,7 @@ const MOVE_THRESHOLD = 10;
 function openOverlay() {
   overlayOpen = true;
   document.getElementById('overlay').classList.add('open');
+  rsOverlayFlag('configureSphere', true); /* the floating Pulse button would sit over Continue */
   const hint = document.getElementById('holdHint');
   if (hint) hint.style.display = 'none';
   /* Restore saved name into the input field */
@@ -20069,6 +20076,7 @@ function openOverlay() {
 function closeOverlay() {
   overlayOpen = false;
   document.getElementById('overlay').classList.remove('open');
+  rsOverlayFlag('configureSphere', false);
   stage.classList.remove('pressing');
 
   /* Persist user sphere settings to IndexedDB */
@@ -22917,6 +22925,7 @@ const SettingsPanel = (function () {
   /* ── Panel Open / Close ── */
   function openPanel() {
     $('settingsPanel').classList.add('open');
+    rsOverlayFlag('settings', true); /* hides the floating List view and Pulse buttons */
     if (typeof SentinelGuide !== 'undefined') SentinelGuide.onOpenSettings();
     updateSyncUI();
     refreshSummary();
@@ -22924,6 +22933,7 @@ const SettingsPanel = (function () {
 
   function closePanel() {
     $('settingsPanel').classList.remove('open');
+    rsOverlayFlag('settings', false);
     setTimeout(() => { if (!$('settingsPanel').classList.contains('open')) $('settingsPanel').classList.remove('above-ob'); }, 350);
   }
 
