@@ -5613,6 +5613,38 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
 .bluf-posts-done { display: flex; justify-content: center; padding: 12px 0 6px; }
 .bluf-posts-done .posts-btn { min-height: 40px; padding: 8px 16px; font-size: 13px; }
 
+/* Communication: merged rows shared by the dream strip and the card block */
+.comm-list { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.comm-row {
+  display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: 8px; min-width: 0; cursor: pointer;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: var(--nous-ink, #e8ecf4);
+  font-family: var(--nous-font, system-ui, sans-serif); text-align: left; box-sizing: border-box;
+}
+.comm-row:hover, .comm-row:focus-visible { background: rgba(56,189,248,0.10); outline: none; }
+.comm-row .posts-glyph { margin-top: 1px; }
+.comm-row.is-latest { padding: 9px 10px; border-color: rgba(56,212,255,0.55); background: rgba(56,189,248,0.08); }
+.comm-row.is-latest .comm-text { font-size: 14px; }
+.comm-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.comm-text { font-size: 13px; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.comm-when { font-size: 11px; line-height: 1.3; color: var(--nous-dim, #8b94a8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comm-empty { font-size: 12px; line-height: 1.45; color: var(--text-secondary, #a8b8d0); }
+.comm-section-title { font-family: var(--nous-mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #7dd3fc; margin: 2px 0 6px; }
+.bluf-posts-latest { padding: 2px 0 10px; }
+.bluf-posts-preview .comm-row { margin-bottom: 4px; }
+.bluf-posts-empty { margin-top: 8px; }
+/* Dream strip: sits under the Interaction Memory circle on the network stage */
+.dream-comm {
+  position: absolute; z-index: 6; box-sizing: border-box; padding: 10px 10px 8px; border-radius: 12px;
+  background: rgba(10,12,20,0.72); border: 1px solid rgba(56,189,248,0.22); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  color: var(--nous-ink, #e8ecf4); font-family: var(--nous-font, system-ui, sans-serif);
+  max-height: 38vh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+  pointer-events: auto;
+}
+.dream-comm[hidden] { display: none; }
+.dream-comm-label { font-family: var(--nous-mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(240,238,245,0.75); }
+.dream-comm-name { font-size: 13px; font-weight: 700; margin: 2px 0 8px; color: #f0eef5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dream-comm .comm-row { background: rgba(255,255,255,0.04); }
+
 
 /* Pressed and busy feedback on every control */
 button:active:not(:disabled), [role="button"]:active, .btn:active { transform: scale(0.97); filter: brightness(1.15); }
@@ -6480,6 +6512,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   </div>
   <div class="hold-hint" id="holdHint" data-i18n="app.hint.tapOpen">tap to open your network</div>
   <div class="network-hint" id="networkHint" hidden data-i18n="app.hint.tapSphere">tap any sphere &middot; drag to rotate</div>
+  <!-- Communication strip under the Interaction Memory circle (positioned by Comm.frame) -->
+  <div class="dream-comm" id="dreamComm" hidden data-adv-scope aria-label="Communication"></div>
 
   <!-- Contextual guidance banners -->
   <div class="sentinel-guide top" id="guideTop"></div>
@@ -12109,7 +12143,7 @@ const I18n = (function () {
     "cd.f.snapchat": "Snapchat",
     "cd.f.youtube": "YouTube",
     "cd.f.linkedin": "LinkedIn",
-    "posts.title": "Public posts",
+    "posts.title": "Communication",
     "posts.active": "Active 24h",
     "posts.close": "Close public posts",
     "posts.tapToExpand": "Tap to see the posts",
@@ -12136,8 +12170,36 @@ const I18n = (function () {
     "posts.agoHour": "{n} h ago",
     "posts.agoDay": "{n} d ago",
     "posts.addedAgo": "added {when}",
-    "guide.posts": "Public posts shows what this person shares publicly. Add handles with the pencil, then Social.",
-    "guide.h.posts": "Tap this block to see the posts. Add handles with the pencil at the top of the card, then Social.",
+    "guide.posts": "Communication shows this person's latest messages, video notes, calls and public posts. Add handles with the pencil, then Social.",
+    "guide.h.posts": "Tap this block to see the communication. Add handles with the pencil at the top of the card, then Social.",
+  });
+  /* Communication feed (EN) */
+  Object.assign(_strings.en, {
+    "comm.label": "COMMUNICATION",
+    "comm.latest": "Latest",
+    "comm.empty": "No communication yet. Messages, video notes, calls and posts from {first} appear here.",
+    "comm.ch.message": "Messages",
+    "comm.ch.videoNote": "Video note",
+    "comm.ch.videoCall": "Video call",
+    "comm.ch.voice": "Voice check-in",
+    "comm.videoNoteShared": "Video note shared with you",
+    "comm.videoCallWith": "Video call with you",
+    "comm.callWith": "Call with you",
+    "comm.voiceCheckin": "Voice check-in",
+    "comm.minutes": "{n} min",
+    "comm.postOn": "Post on {platform}",
+    "comm.part.morning": "morning",
+    "comm.part.afternoon": "afternoon",
+    "comm.part.evening": "evening",
+    "comm.part.night": "night",
+    "comm.today.morning": "This morning",
+    "comm.today.afternoon": "This afternoon",
+    "comm.today.evening": "This evening",
+    "comm.today.night": "Tonight",
+    "comm.yesterday": "Yesterday {part}",
+    "comm.weekday": "{day} {part}",
+    "comm.line": "{when}, {time} on {channel}",
+    "comm.a11y.strip": "Communication from {first}",
   });
   /* Public posts and social handles (IT) */
   Object.assign(_strings.it, {
@@ -12150,7 +12212,7 @@ const I18n = (function () {
     "cd.f.snapchat": "Snapchat",
     "cd.f.youtube": "YouTube",
     "cd.f.linkedin": "LinkedIn",
-    "posts.title": "Post pubblici",
+    "posts.title": "Comunicazione",
     "posts.active": "Attivo 24h",
     "posts.close": "Chiudi i post pubblici",
     "posts.tapToExpand": "Tocca per vedere i post",
@@ -12177,8 +12239,36 @@ const I18n = (function () {
     "posts.agoHour": "{n} h fa",
     "posts.agoDay": "{n} g fa",
     "posts.addedAgo": "aggiunto {when}",
-    "guide.posts": "Post pubblici mostra ciò che questa persona condivide pubblicamente. Aggiungi i profili con la matita, poi Social.",
-    "guide.h.posts": "Tocca questo blocco per vedere i post. Aggiungi i profili con la matita in alto nella scheda, poi Social.",
+    "guide.posts": "Comunicazione mostra gli ultimi messaggi, note video, chiamate e post pubblici di questa persona. Aggiungi i profili con la matita, poi Social.",
+    "guide.h.posts": "Tocca questo blocco per vedere la comunicazione. Aggiungi i profili con la matita in alto nella scheda, poi Social.",
+  });
+  /* Communication feed (IT) */
+  Object.assign(_strings.it, {
+    "comm.label": "COMUNICAZIONE",
+    "comm.latest": "Ultime",
+    "comm.empty": "Nessuna comunicazione ancora. Messaggi, note video, chiamate e post di {first} compaiono qui.",
+    "comm.ch.message": "Messaggi",
+    "comm.ch.videoNote": "Nota video",
+    "comm.ch.videoCall": "Videochiamata",
+    "comm.ch.voice": "Check-in vocale",
+    "comm.videoNoteShared": "Nota video condivisa con te",
+    "comm.videoCallWith": "Videochiamata con te",
+    "comm.callWith": "Chiamata con te",
+    "comm.voiceCheckin": "Check-in vocale",
+    "comm.minutes": "{n} min",
+    "comm.postOn": "Post su {platform}",
+    "comm.part.morning": "mattina",
+    "comm.part.afternoon": "pomeriggio",
+    "comm.part.evening": "sera",
+    "comm.part.night": "notte",
+    "comm.today.morning": "Stamattina",
+    "comm.today.afternoon": "Questo pomeriggio",
+    "comm.today.evening": "Stasera",
+    "comm.today.night": "Stanotte",
+    "comm.yesterday": "Ieri {part}",
+    "comm.weekday": "{day} {part}",
+    "comm.line": "{when} alle {time} su {channel}",
+    "comm.a11y.strip": "Comunicazione da {first}",
   });
 
   function t(key, params) {
@@ -15002,7 +15092,9 @@ var _REST_CYCLE_MS = 12000;     /* cycle dream image every 12 seconds */
   document.addEventListener(evt, _markInteraction, { passive: true, capture: true });
 });
 
-function _markInteraction() {
+function _markInteraction(e) {
+  /* Reading or scrolling the Communication strip under the dream is not a wake-up */
+  try { if (e && e.target && e.target.closest && e.target.closest('#dreamComm')) return; } catch (err) {}
   _lastInteractionTime = Date.now();
   if (_restModeActive) _exitRestMode();
 }
@@ -15095,7 +15187,7 @@ const SentinelGuide = (() => {
     'alerts-bell':    ['guide.alertsBell',    'tap the alerts bell',         'bottom', true],
     'rest-mode':      ['guide.restMode',      'rest mode starts',            'bottom', true],
     'backup-export':  ['guide.backupExport',  'tap Export Backup',           'top',    true],
-    'posts-first':    ['guide.posts',         'first Public posts expand',   'top',    true],
+    'posts-first':    ['guide.posts',         'first Communication expand',  'top',    true],
   };
 
   /* Help text shown under each BLUF pull header until that pull is opened once */
@@ -16741,6 +16833,7 @@ const SentinelMessaging = (() => {
     try {
       if (selectedContact && selectedContact.id === contactId) _updateBlufLatestMessage(contactId);
     } catch (_) {}
+    try { Comm.refresh(); } catch (_) {}
   }
 
   /* ── Retry a failed message ── */
@@ -17842,6 +17935,31 @@ const Social = (() => {
     if (ts && isFinite(ts)) post.ts = ts;
   }
 
+  /* What the live feed cache already holds for this contact's YouTube and X handles; no fetch */
+  function cachedItems(c) {
+    const d = (c && c.details) || {};
+    const out = [];
+    ['youtube', 'x'].forEach(p => {
+      if (!d[p]) return;
+      const cached = _feeds.get(_feedKey(p, d[p]));
+      if (!cached || cached.pending || !Array.isArray(cached.items)) return;
+      cached.items.forEach(it => out.push({ platform: p, url: it.url, title: it.title, thumb: it.thumb, ts: it.ts }));
+    });
+    return out;
+  }
+  /* Fill the feed cache for this contact's YouTube and X handles; resolves when every load settled */
+  function loadFeeds(c) {
+    const d = (c && c.details) || {};
+    const jobs = [];
+    ['youtube', 'x'].forEach(p => {
+      if (!d[p]) return;
+      const cached = _feeds.get(_feedKey(p, d[p]));
+      if (cached && !cached.pending) return;
+      jobs.push(_loadFeed(c, p, d[p]).catch(() => null));
+    });
+    return Promise.all(jobs).then(() => jobs.length > 0);
+  }
+
   /* ── Persistence: details sync through the contact record ── */
   async function _persist(c) {
     if (!c) return;
@@ -17882,6 +18000,7 @@ const Social = (() => {
     }
     c.details = Object.assign({}, c.details || {}, { posts: list });
     await _persist(c);
+    try { Comm.refresh(); } catch (e) {}
     return note;
   }
 
@@ -17900,13 +18019,20 @@ const Social = (() => {
     const handles = _handles(c), posts = _posts(c);
     const active = isActive24h(c);
     const head = '<div class="bluf-posts-head">' +
-      '<span class="bluf-posts-title">' + _esc(_t('posts.title', 'Public posts')) + '</span>' +
+      '<span class="bluf-posts-title">' + _esc(_t('posts.title', 'Communication')) + '</span>' +
       (active ? '<span class="posts-active-chip" id="postsActiveChip">' + _esc(_t('posts.active', 'Active 24h')) + '</span>' : '') +
       (_expanded ? '<button type="button" class="card-x" id="postsCloseBtn" aria-label="' + _esc(_t('posts.close', 'Close public posts')) + '" title="' + _esc(_t('posts.close', 'Close public posts')) + '">&times;</button>' : '') +
       '</div>';
+    /* Merged communication rows come from Comm's cache; a fresh load re-renders once when it changes */
+    let commPreview = '', commList = '';
+    try { commPreview = Comm.cardHtml(c, 'preview'); commList = Comm.cardHtml(c, 'list'); Comm.warm(c.id, () => _rerenderAny(c)); } catch (e) {}
+    const emptyLine = '<div class="bluf-posts-empty">' + _esc(_t('posts.empty', 'No public handles yet. Tap the pencil at the top of this card, then Social, to add them.')) + '</div>';
     if (!handles.length && !posts.length) {
       el.setAttribute('data-state', 'empty');
-      el.innerHTML = head + '<div class="bluf-posts-empty">' + _esc(_t('posts.empty', 'No public handles yet. Tap the pencil at the top of this card, then Social, to add them.')) + '</div>';
+      el.removeAttribute('role');
+      el.removeAttribute('tabindex');
+      el.removeAttribute('aria-expanded');
+      el.innerHTML = head + commPreview + emptyLine;
       return;
     }
     if (!_expanded) {
@@ -17916,17 +18042,27 @@ const Social = (() => {
       el.setAttribute('aria-expanded', 'false');
       const d = c.details || {};
       const shown = PLATFORMS.filter(p => d[p] || posts.some(x => x.platform === p));
-      el.innerHTML = head + '<div class="bluf-posts-preview">' + shown.map(p =>
+      el.innerHTML = head + '<div class="bluf-posts-preview">' + commPreview + shown.map(p =>
         '<div class="bluf-posts-row">' + glyph(p) + '<span class="posts-handle">' + (d[p] ? '@' + _esc(d[p]) : _esc(NAMES[p])) + '</span><span class="posts-arrow" aria-hidden="true">&#8250;</span></div>'
-      ).join('') + '</div><div class="bluf-posts-hint">' + _esc(_t('posts.tapToExpand', 'Tap to see the posts')) + '</div>';
+      ).join('') + '</div>' + (handles.length ? '' : emptyLine) + '<div class="bluf-posts-hint">' + _esc(_t('posts.tapToExpand', 'Tap to see the posts')) + '</div>';
       return;
     }
     el.setAttribute('data-state', 'open');
     el.removeAttribute('role');
     el.removeAttribute('tabindex');
     el.setAttribute('aria-expanded', 'true');
-    el.innerHTML = head + '<div class="bluf-posts-panel" id="blufPostsPanel">' + _panelHtml(c) + '</div>';
+    el.innerHTML = head + '<div class="bluf-posts-panel" id="blufPostsPanel">' +
+      '<div class="bluf-posts-latest"><div class="comm-section-title">' + _esc(_t('comm.latest', 'Latest')) + '</div>' + commList + '</div>' +
+      _panelHtml(c) + (handles.length ? '' : emptyLine) + '</div>';
     _afterPanel(c);
+  }
+  /* Re-render the block for this contact in whatever state it is in, keeping the panel scroll */
+  function _rerenderAny(c) {
+    const cur = _current();
+    if (!cur || cur.id !== c.id) return;
+    if (_expanded) { _rerenderIfOpen(c); return; }
+    const el = $('blufPosts');
+    if (el && !el.hidden) renderBluf(cur);
   }
   function _postCard(p) {
     const when = p.ts ? _relTime(p.ts) : _t('posts.addedAgo', 'added {when}', { when: _relTime(p.added || Date.now()) });
@@ -18042,6 +18178,8 @@ const Social = (() => {
     el.setAttribute('data-social-bound', '1');
     el.addEventListener('click', async (e) => {
       e.stopPropagation();
+      const row = e.target.closest('.comm-row');
+      if (row) { e.preventDefault(); try { Comm.openRow(row); } catch (err) {} return; }
       const t = e.target.closest('button, a, input');
       if (!_expanded) {
         if (el.getAttribute('data-state') === 'preview') { e.preventDefault(); expand(); }
@@ -18064,7 +18202,10 @@ const Social = (() => {
       renderBluf(_current());
     });
     el.addEventListener('keydown', (e) => {
-      if (e.target !== el) return;
+      if (e.target !== el) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('comm-row')) { e.preventDefault(); e.stopPropagation(); try { Comm.openRow(e.target); } catch (err) {} }
+        return;
+      }
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); expand(); }
     });
     el.addEventListener('pointerenter', (e) => {
@@ -18087,7 +18228,362 @@ const Social = (() => {
 
   return { PLATFORMS: PLATFORMS, NAMES: NAMES, renderBluf: renderBluf, isActive24h: isActive24h, addPostLink: addPostLink,
            expand: expand, collapse: collapse, profileUrl: profileUrl, detectPlatform: detectPlatform, glyph: glyph,
-           chipHtml: chipHtml, drawRing: drawRing, isExpanded: () => _expanded };
+           chipHtml: chipHtml, drawRing: drawRing, isExpanded: () => _expanded, cachedItems: cachedItems, loadFeeds: loadFeeds };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   Communication feed: one merged, newest-first list per member.
+   Sources: public posts and the live feed cache (Social), Sentinel
+   messages, video notes shared with the circle, and calls from the
+   interactions store. Shown under the Interaction Memory circle
+   (#dreamComm) and at the head of the card's Communication block.
+   ═══════════════════════════════════════════════════════════════ */
+const Comm = (() => {
+  'use strict';
+  const DAY_MS = 24 * 3600 * 1000;
+  const CALL_TYPES = { video: 1, called: 1, voice_checkin: 1 };
+  const _cache = new Map();      /* contactId -> { items, sig, at } */
+  const _loading = new Map();    /* contactId -> Promise */
+  let _dreamFor = null;          /* contact id the strip is rendered for */
+  let _dreamItems = [];          /* items behind the strip rows, by index */
+  let _cardItems = [];           /* items behind the card rows, by index */
+  let _feedsAsked = new Map();   /* contactId -> true once the live feeds were requested for the strip */
+  let _tickTimer = null;
+  let _bound = false;
+
+  function _t(key, fallback, params) {
+    let str = fallback;
+    try {
+      if (typeof I18n !== 'undefined' && I18n.t) {
+        const v = I18n.t(key, params);
+        if (v && v !== key) return v;
+      }
+    } catch (e) {}
+    if (params && typeof str === 'string') str = str.replace(/\{(\w+)\}/g, (m, k) => params[k] !== undefined ? params[k] : m);
+    return str;
+  }
+  function _esc(s) { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+  function $(id) { return document.getElementById(id); }
+  function _num(x) { const n = Number(x); return (isFinite(n) && n > 0) ? n : 0; }
+  function _it() { try { return (typeof I18n !== 'undefined' && I18n.locale === 'it'); } catch (e) { return false; } }
+  function _contact(id) { try { return DEMO_CONTACTS.find(c => c.id === id || String(c.id) === String(id)) || null; } catch (e) { return null; } }
+  function _first(c) { return (c && c.first) ? c.first : _t('msg.contact', 'Contact'); }
+
+  /* ── Channel labels and glyphs ── */
+  function channelLabel(ch) {
+    switch (ch) {
+      case 'message': return _t('comm.ch.message', 'Messages');
+      case 'video note': return _t('comm.ch.videoNote', 'Video note');
+      case 'video call': return _t('comm.ch.videoCall', 'Video call');
+      case 'voice': return _t('comm.ch.voice', 'Voice check-in');
+    }
+    try { if (Social.NAMES[ch]) return Social.NAMES[ch]; } catch (e) {}
+    return ch || '';
+  }
+  const LETTERS = { 'message': 'M', 'video note': 'V', 'video call': 'C', 'voice': 'S' };
+  function glyph(ch) {
+    try { if (Social.NAMES[ch]) return Social.glyph(ch); } catch (e) {}
+    return '<svg class="posts-glyph" viewBox="0 0 20 20" aria-hidden="true" focusable="false">' +
+      '<rect x="1" y="1" width="18" height="18" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="1.5"/>' +
+      '<text x="10" y="14.2" text-anchor="middle" font-size="11" font-weight="700" font-family="system-ui, sans-serif" fill="currentColor">' + (LETTERS[ch] || '?') + '</text></svg>';
+  }
+
+  /* ── Lonely timestamps ── */
+  function _daypart(h) {
+    if (h >= 5 && h <= 11) return 'morning';
+    if (h >= 12 && h <= 16) return 'afternoon';
+    if (h >= 17 && h <= 20) return 'evening';
+    return 'night';
+  }
+  function _clock(d) {
+    const h = d.getHours(), m = d.getMinutes();
+    const mm = m ? ':' + String(m).padStart(2, '0') : '';
+    if (_it()) return String(h) + mm;
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return h12 + mm + (h < 12 ? 'am' : 'pm');
+  }
+  function _dayStart(d) { const x = new Date(d.getTime()); x.setHours(0, 0, 0, 0); return x.getTime(); }
+  function lonelyTime(ts, channel) {
+    const d = new Date(_num(ts) || Date.now());
+    const now = new Date();
+    const part = _daypart(d.getHours());
+    const partWord = _t('comm.part.' + part, part);
+    const dayDiff = Math.round((_dayStart(now) - _dayStart(d)) / DAY_MS);
+    const loc = _it() ? 'it-IT' : 'en-GB';
+    let when;
+    if (dayDiff <= 0) when = _t('comm.today.' + part, part === 'night' ? 'Tonight' : 'This ' + part);
+    else if (dayDiff === 1) when = _t('comm.yesterday', 'Yesterday {part}', { part: partWord });
+    else if (dayDiff <= 6) {
+      let day = '';
+      try { day = d.toLocaleDateString(loc, { weekday: 'long' }); } catch (e) { day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()]; }
+      if (day) day = day.charAt(0).toUpperCase() + day.slice(1);
+      when = _t('comm.weekday', '{day} {part}', { day: day, part: partWord });
+    } else {
+      let date = '';
+      try { date = d.toLocaleDateString(loc, { day: 'numeric', month: 'long' }); } catch (e) { date = d.getDate() + ' ' + (d.getMonth() + 1); }
+      when = date;
+    }
+    const label = (channel && typeof channel === 'string' && !/^[a-z ]+$/.test(channel)) ? channel : channelLabel(channel);
+    return _t('comm.line', '{when}, {time} on {channel}', { when: when, time: _clock(d), channel: label });
+  }
+
+  /* ── Sources ── */
+  function _minutesSuffix(ms) {
+    const n = Math.round(_num(ms) / 60000);
+    return n >= 1 ? ', ' + _t('comm.minutes', '{n} min', { n: n }) : '';
+  }
+  function _postText(p, platform) {
+    return p.title || (p.author ? '@' + p.author : _t('comm.postOn', 'Post on {platform}', { platform: channelLabel(platform) }));
+  }
+  async function _collect(contactId) {
+    const c = _contact(contactId);
+    const items = [];
+    const seen = new Set();
+    /* 1. Public posts kept on the contact, then the live feed cache */
+    if (c) {
+      const d = c.details || {};
+      (Array.isArray(d.posts) ? d.posts : []).forEach(p => {
+        if (!p || !p.url || seen.has(p.url)) return;
+        seen.add(p.url);
+        items.push({ ts: _num(p.ts) || _num(p.added), channel: p.platform, kind: 'post', text: _postText(p, p.platform), url: p.url, thumb: p.thumb || null, dir: 'in' });
+      });
+      let cached = [];
+      try { cached = Social.cachedItems(c); } catch (e) {}
+      cached.forEach(it => {
+        if (!it.url || seen.has(it.url) || !_num(it.ts)) return;
+        seen.add(it.url);
+        items.push({ ts: _num(it.ts), channel: it.platform, kind: 'post', text: it.title || _postText(it, it.platform), url: it.url, thumb: it.thumb || null, dir: 'in' });
+      });
+    }
+    /* 2. Sentinel messages */
+    try {
+      let thread = await RemielDB.getSetting('sentinelMsg_' + contactId);
+      if (thread && !Array.isArray(thread) && Array.isArray(thread.value)) thread = thread.value;
+      (Array.isArray(thread) ? thread : []).forEach(m => {
+        if (!m || !m.text) return;
+        items.push({ ts: _num(m.ts), channel: 'message', kind: 'message', text: String(m.text), url: null, thumb: null, dir: m.from === 'center' ? 'out' : 'in' });
+      });
+    } catch (e) {}
+    /* 3. The newest video note shared with the circle */
+    try {
+      if (typeof VideoNoteShare !== 'undefined' && VideoNoteShare.getLatestSharedEntryForContact) {
+        const e = VideoNoteShare.getLatestSharedEntryForContact(contactId);
+        if (e && e.url) {
+          let ts = e.created_at;
+          if (typeof ts === 'string') ts = Date.parse(ts);
+          ts = _num(ts);
+          if (ts && ts < 1e11) ts = ts * 1000;
+          items.push({ ts: ts, channel: 'video note', kind: 'note', text: _t('comm.videoNoteShared', 'Video note shared with you'), url: e.url, thumb: null, dir: 'in' });
+        }
+      }
+    } catch (e) {}
+    /* 4. Calls from the interactions store */
+    try {
+      const ints = await RemielDB.getInteractionsByContact(contactId);
+      (Array.isArray(ints) ? ints : []).forEach(r => {
+        if (!r || !CALL_TYPES[r.type]) return;
+        const ts = _num(r.timestamp) || _num(r.ts);
+        let channel, text;
+        if (r.type === 'video') { channel = 'video call'; text = _t('comm.videoCallWith', 'Video call with you') + _minutesSuffix(r.duration); }
+        else if (r.type === 'called') { channel = 'voice'; text = _t('comm.callWith', 'Call with you') + _minutesSuffix(r.duration); }
+        else { channel = 'voice'; text = _t('comm.voiceCheckin', 'Voice check-in') + _minutesSuffix(_num(r.duration) * 1000); }
+        items.push({ ts: ts, channel: channel, kind: 'call', text: text, url: null, thumb: null, dir: r.type === 'voice_checkin' ? 'in' : 'out' });
+      });
+    } catch (e) {}
+    items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    return items;
+  }
+  /* Newest first; the first item always, then everything from the last 24 hours */
+  function select(items) {
+    if (!items || !items.length) return [];
+    const cut = Date.now() - DAY_MS;
+    return items.filter((it, i) => i === 0 || (it.ts || 0) >= cut);
+  }
+  function _sig(items) { return items.map(it => it.kind + '|' + it.channel + '|' + (it.ts || 0) + '|' + (it.url || '') + '|' + it.text).join('\n'); }
+  function itemsFor(contactId) {
+    if (_loading.has(contactId)) return _loading.get(contactId);
+    const p = _collect(contactId).then(all => {
+      const items = select(all);
+      _cache.set(contactId, { items: items, sig: _sig(items), at: Date.now() });
+      return items;
+    }).catch(() => []).then(items => { _loading.delete(contactId); return items; });
+    _loading.set(contactId, p);
+    return p;
+  }
+  function cached(contactId) { const e = _cache.get(contactId); return e ? e.items : null; }
+  /* Load once more and call back only when the list changed */
+  function warm(contactId, cb) {
+    const before = _cache.get(contactId);
+    itemsFor(contactId).then(() => {
+      const after = _cache.get(contactId);
+      if (!after) return;
+      if (!before || before.sig !== after.sig) { try { cb && cb(); } catch (e) {} }
+    });
+  }
+
+  /* ── Rows ── */
+  function _rowHtml(it, i, latest) {
+    return '<div class="comm-row' + (latest ? ' is-latest btn-advance' : '') + '" role="button" tabindex="0" data-i="' + i + '" data-kind="' + _esc(it.kind) + '">' +
+      glyph(it.channel) + '<div class="comm-body"><div class="comm-text">' + _esc(it.text) + '</div>' +
+      '<div class="comm-when">' + _esc(lonelyTime(it.ts, it.channel)) + '</div></div></div>';
+  }
+  function _emptyHtml(c) {
+    return '<div class="comm-empty">' + _esc(_t('comm.empty', 'No communication yet. Messages, video notes, calls and posts from {first} appear here.', { first: _first(c) })) + '</div>';
+  }
+  function _listHtml(items, c, previewOnly) {
+    if (!items || !items.length) return _emptyHtml(c);
+    const rows = previewOnly ? items.slice(0, 1) : items;
+    return '<div class="comm-list">' + rows.map((it, i) => _rowHtml(it, i, i === 0)).join('') + '</div>';
+  }
+  /* Card block: 'preview' gives the latest row only, 'list' the whole selection */
+  function cardHtml(c, mode) {
+    if (!c) return '';
+    const items = cached(c.id) || [];
+    if (!items.length && !_cache.has(c.id)) { itemsFor(c.id); }
+    _cardItems = items;
+    return '<div class="comm-card" data-comm-scope="card">' + _listHtml(items, c, mode === 'preview') + '</div>';
+  }
+  function renderCard(c) {
+    if (!c) return;
+    try { Social.renderBluf(c); } catch (e) {}
+  }
+
+  /* ── Row actions ── */
+  function _openCardFor(c) {
+    if (!c) return false;
+    let open = false;
+    try { open = !!(typeof blufOpen !== 'undefined' && blufOpen && typeof selectedContact !== 'undefined' && selectedContact && selectedContact.id === c.id); } catch (e) {}
+    if (!open) { try { enterDetail(c, Math.round(window.innerHeight * 0.18)); } catch (e) { return false; } }
+    return true;
+  }
+  function openItem(it, c) {
+    if (!it) return;
+    if (it.kind === 'post') { if (it.url) { try { window.open(it.url, '_blank', 'noopener,noreferrer'); } catch (e) {} } return; }
+    if (!_openCardFor(c)) return;
+    if (it.kind === 'message') { setTimeout(() => { try { SentinelMessaging.openFor(c.id); } catch (e) {} }, 60); return; }
+    if (it.kind === 'note') {
+      setTimeout(() => { try { const el = $('pull_videonote'); if (el && !el.classList.contains('open')) togglePull('videonote'); } catch (e) {} }, 260);
+    }
+  }
+  function openRow(row) {
+    if (!row) return;
+    const i = parseInt(row.getAttribute('data-i'), 10);
+    const inDream = !!row.closest('#dreamComm');
+    const items = inDream ? _dreamItems : _cardItems;
+    const it = items[i];
+    let c = null;
+    if (inDream) c = _contact(_dreamFor);
+    else { try { c = (typeof selectedContact !== 'undefined') ? selectedContact : null; } catch (e) {} }
+    openItem(it, c);
+  }
+
+  /* ── Dream strip ── */
+  function _bind() {
+    if (_bound) return;
+    const el = $('dreamComm');
+    if (!el) return;
+    _bound = true;
+    /* A pointer on the strip is not an interaction with the stage: keep Rest Mode and the galaxy taps untouched */
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'touchstart', 'touchmove', 'touchend', 'wheel'].forEach(evt => {
+      el.addEventListener(evt, e => { e.stopPropagation(); }, { passive: true });
+    });
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const row = e.target.closest('.comm-row');
+      if (row) { e.preventDefault(); openRow(row); }
+    });
+    el.addEventListener('keydown', e => {
+      const row = e.target.closest('.comm-row');
+      if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); openRow(row); }
+    });
+    window.addEventListener('localeChanged', () => { _dreamFor = null; refresh(); });
+    if (!_tickTimer) _tickTimer = setInterval(() => { if (_dreamFor) _paint(); try { if (typeof blufOpen !== 'undefined' && blufOpen && selectedContact) Social.renderBluf(selectedContact); } catch (e) {} }, 60000);
+  }
+  function _paint() {
+    const el = $('dreamComm');
+    const c = _contact(_dreamFor);
+    if (!el || !c) return;
+    const items = cached(c.id) || [];
+    _dreamItems = items;
+    el.setAttribute('aria-label', _t('comm.a11y.strip', 'Communication from {first}', { first: _first(c) }));
+    el.innerHTML = '<div class="dream-comm-label">' + _esc(_t('comm.label', 'COMMUNICATION')) + '</div>' +
+      '<div class="dream-comm-name">' + _esc(_first(c)) + '</div>' + _listHtml(items, c, false);
+  }
+  function renderDream() {
+    _bind();
+    const id = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
+    const c = _contact(id);
+    if (!c) { _dreamFor = null; return; }
+    _dreamFor = c.id;
+    _paint();
+    itemsFor(c.id).then(() => { if (_dreamFor === c.id) _paint(); });
+    /* Fill the live feed cache once per member, then paint once more */
+    if (!_feedsAsked.get(c.id)) {
+      _feedsAsked.set(c.id, true);
+      try {
+        Social.loadFeeds(c).then(loaded => { if (loaded) { _cache.delete(c.id); itemsFor(c.id).then(() => { if (_dreamFor === c.id) _paint(); }); } });
+      } catch (e) {}
+    }
+  }
+  /* Called every frame from the render loop: visibility and position follow the canvas dream circle */
+  function frame() {
+    const el = $('dreamComm');
+    if (!el) return;
+    let show = false;
+    try {
+      show = !!(focusedContactId && appState === 'network' && window._dreamRect &&
+                !(blufOpen && window.innerWidth < 700));
+    } catch (e) { show = false; }
+    if (!show) {
+      if (!el.hidden) { el.hidden = true; }
+      if (!focusedContactId || appState !== 'network') _dreamFor = null;
+      return;
+    }
+    if (_dreamFor !== focusedContactId) renderDream();
+    if (el.hidden) el.hidden = false;
+    const r = window._dreamRect;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left, width;
+    if (vw <= 480) { left = 12; width = vw - 24; }
+    else {
+      width = Math.max(220, 2 * r.r);
+      left = r.cx - r.r;
+      if (left + width > vw - 12) left = vw - 12 - width;
+      if (left < 12) { left = 12; width = Math.min(width, vw - 24); }
+    }
+    const top = r.cy + r.r + 8;
+    const maxH = Math.max(120, Math.min(vh * 0.38, vh - top - 12));
+    el.style.left = Math.round(left) + 'px';
+    el.style.top = Math.round(top) + 'px';
+    el.style.width = Math.round(width) + 'px';
+    el.style.maxHeight = Math.round(maxH) + 'px';
+    const latest = el.querySelector('.comm-row.is-latest');
+    if (latest && !latest.classList.contains('btn-advance')) latest.classList.add('btn-advance');
+  }
+
+  /* ── Calls ── */
+  async function logCall(contactId, ms) {
+    const id = (contactId == null || contactId === '') ? 'unknown' : contactId;
+    const entry = { contactId: id, type: 'video', text: 'Video call', duration: Math.max(0, Math.round(_num(ms))), timestamp: Date.now() };
+    try { await RemielDB.addInteraction(entry); } catch (e) {}
+    refresh();
+    return entry;
+  }
+
+  /* Drop every cache and repaint whatever is on screen */
+  function refresh() {
+    _cache.clear();
+    if (_dreamFor) { const id = _dreamFor; itemsFor(id).then(() => { if (_dreamFor === id) _paint(); }); }
+    try {
+      if (typeof blufOpen !== 'undefined' && blufOpen && typeof selectedContact !== 'undefined' && selectedContact) {
+        const c = selectedContact;
+        itemsFor(c.id).then(() => { try { if (blufOpen && selectedContact === c) Social.renderBluf(c); } catch (e) {} });
+      }
+    } catch (e) {}
+  }
+
+  return { itemsFor: itemsFor, lonelyTime: lonelyTime, renderDream: renderDream, renderCard: renderCard, logCall: logCall, refresh: refresh,
+           frame: frame, cardHtml: cardHtml, warm: warm, openRow: openRow, openItem: openItem, select: select, channelLabel: channelLabel, glyph: glyph };
 })();
 
 /* ══════════════════════════════════════════════════════════════
@@ -23209,6 +23705,10 @@ function drawNetworkView(t) {
     ctx.fillStyle = _drVig;
     ctx.fillRect(_drCx - _drR, _drCy - _drR, _drR * 2, _drR * 2);
     ctx.restore();
+    /* The Communication strip reads the same circle numbers (CSS px) */
+    window._dreamRect = { cx: _drCx, cy: _drCy, r: _drR };
+  } else {
+    window._dreamRect = null;
   }
 
   /* Physics */
@@ -23922,6 +24422,7 @@ function frame(ts) {
     // 'self' — pulsating sphere view
     drawSphereView(t);
   }
+  try { Comm.frame(); } catch (e) {}
 
   /* Mini sphere — draw individual contact sphere, NOT the galaxy */
   if (blufOpen && miniCtx) {
@@ -30088,6 +30589,7 @@ const SocialImport = (() => {
         if (!prev || (m.created_at || 0) > (prev.created_at || 0)) next[c.id] = { url: m.url, created_at: m.created_at || 0 };
       }
       _latestByContact = next;
+      try { Comm.refresh(); } catch (e) {}
     }
 
     async function loadShared() {
@@ -30133,6 +30635,11 @@ const SocialImport = (() => {
       var e = _latestByContact[contactId];
       return e ? e.url : null;
     }
+    /* For the Communication feed: { url, created_at } of the newest shared clip, or null */
+    function getLatestSharedEntryForContact(contactId) {
+      var e = _latestByContact[contactId];
+      return e ? { url: e.url, created_at: e.created_at } : null;
+    }
 
     function updateVisibility() {
       var section = _$('sharedVideoNotesSection');
@@ -30149,6 +30656,7 @@ const SocialImport = (() => {
       uploadToCircle: uploadToCircle,
       loadShared: loadShared,
       getLatestSharedForContact: getLatestSharedForContact,
+      getLatestSharedEntryForContact: getLatestSharedEntryForContact,
       updateVisibility: updateVisibility,
       init: init,
     };
@@ -31420,6 +31928,7 @@ const SentinelCall = (function() {
   let _currentCall = null;
   let _incomingCall = null;
   let _callStartTime = null;
+  let _callContactId = null;   /* contact id of the other side, when it resolves */
   let _timerInterval = null;
   let _audioMuted = false;
   let _facingMode = 'user';
@@ -31675,6 +32184,7 @@ const SentinelCall = (function() {
     let contact;
     try { contact = await RemielDB.getContact(contactId); } catch(e) {}
     if (!contact) { showToast(_t('call.contactNotFound', 'Contact not found')); return; }
+    _callContactId = contact.id;
 
     const targetId = contact.sentinelId;
     if (!_isValidSid(targetId || '')) {
@@ -31799,7 +32309,14 @@ const SentinelCall = (function() {
     if (_noAnswerTimer) { clearTimeout(_noAnswerTimer); _noAnswerTimer = null; }
     if (_incomingTimer) { clearTimeout(_incomingTimer); _incomingTimer = null; }
     _activeShown = false;
-    _callStartTime = null;
+    /* One Communication entry per connected call: only when the timer ran */
+    if (_callStartTime) {
+      const _ms = Date.now() - _callStartTime;
+      const _cid = _callContactId;
+      _callStartTime = null;
+      try { Comm.logCall(_cid == null ? 'unknown' : _cid, _ms); } catch (e) {}
+    }
+    _callContactId = null;
     _audioMuted = false;
     const btn = document.getElementById('scMuteBtn');
     if (btn) btn.classList.remove('active');
@@ -31896,6 +32413,7 @@ const SentinelCall = (function() {
     const sid = String(meta.callerId || call.peer.replace('sentinel-', '')).toUpperCase();
     let known = null;
     try { known = DEMO_CONTACTS.find(c => c.sentinelId && String(c.sentinelId).toUpperCase() === sid) || null; } catch (e) {}
+    _callContactId = known ? known.id : null;
     const name = (known && ((known.first || '') + ' ' + (known.last || '')).trim()) || meta.callerName || sid;
     const initials = name.substring(0, 2).toUpperCase();
 
