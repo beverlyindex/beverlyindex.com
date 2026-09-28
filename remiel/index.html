@@ -63,10 +63,20 @@ function t(ev,extra){
 }
 (function(){var s=sessionStorage.getItem('rm:sid');if(!s){s=Math.random().toString(36).slice(2)+Date.now().toString(36);sessionStorage.setItem('rm:sid',s);}})();
 
+/* Same code list as the app gate (28 Sep 2026). Expiring codes carry an epoch ms. */
 const KEYS={
-  'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6':'primary',
-  '2dfff49a919dda77992069e38094e3e2e8a699a3ac8e080d45664465d1700ffb':'tester',
-  '02c9549ac193f3287f532293c5df0264965ccba60e79bd712919e7bd12bba5f9':'architect'
+  '02c9549ac193f3287f532293c5df0264965ccba60e79bd712919e7bd12bba5f9':'architect',
+  'a3fe4af273bc66ef078dd5b61f6a39d4e8d61ad5642c36136131d5d972c2a17b':'qa1',
+  '1217d2bbb98144178898c681aeb42c444fc1c76a0b56534ae477a6e6198ef2fd':'qa2',
+  'b943f277d7aeb73f9da98d6a3cc78fcbef17aa12feba4f99abaa57190d067c96':'qa3',
+  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd':'qa4',
+  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483':'qa5',
+  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1':'qa6'
+};
+const KEY_EXPIRY={
+  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd':1790686954000,
+  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483':1790686954000,
+  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1':1790686954000
 };
 async function hashCode(c){
   const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('carecircle:'+c));
@@ -77,10 +87,19 @@ async function attempt(){
   const code=el.value.trim().toUpperCase();
   if(!code) return;
   if(!(window.crypto&&crypto.subtle)){ err.textContent='This gate requires a secure (https) connection.'; return; }
-  const who=KEYS[await hashCode(code)];
+  const h=await hashCode(code);
+  const who=KEYS[h];
+  if(who && KEY_EXPIRY[h] && Date.now()>KEY_EXPIRY[h]){
+    t('gate_fail',{code:'expired'});
+    err.textContent='This access code has expired. Ask Beverly Index for a current one.';
+    el.value=''; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); el.focus();
+    return;
+  }
   if(who){
     sessionStorage.setItem('rm:access', code);
     sessionStorage.setItem('rm:who', who);
+    /* The app gate reads the same code from localStorage: one entry, not two */
+    try{ localStorage.setItem('rm:access', code); }catch(e){}
     t('gate_success',{code:who});
     notifyAccess(who);
     setTimeout(()=>location.replace('app.html'), 250);
