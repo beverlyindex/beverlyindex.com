@@ -4473,6 +4473,55 @@
     box-shadow: 0 0 12px rgba(255,210,77,0.35);
   }
   .sc-invite-btn:active { background: rgba(255,210,77,0.3); }
+  /* Group call: one tile per remote participant, local preview stays in its corner */
+  .sc-group {
+    position: absolute; inset: 0; z-index: 100001;
+    display: flex; flex-direction: column; align-items: center;
+    padding: calc(env(safe-area-inset-top, 12px) + 12px) 12px 130px;
+    box-sizing: border-box; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    color: #fff;
+  }
+  .sc-group[hidden] { display: none; }
+  .sc-group-head {
+    font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.9);
+    padding: 6px 140px 10px 6px; align-self: stretch; text-align: left;
+    overflow-wrap: anywhere; min-height: 40px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline;
+  }
+  .sc-group-timer { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.65); font-variant-numeric: tabular-nums; }
+  .sc-group-timer[hidden] { display: none; }
+  .sentinel-call-overlay.group .sc-call-timer { display: none; }
+  .sc-grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px; width: 100%; max-width: 960px; align-self: stretch; margin: 0 auto;
+  }
+  @media (min-width: 700px) { .sc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: min(960px, calc(100% - 150px)); margin: 0 150px 0 0; } }
+  .sc-tile {
+    position: relative; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden;
+    background: #111; border: 1px solid rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center; min-width: 0;
+  }
+  .sc-tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .sc-tile-name {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 5px 8px;
+    font-size: 12px; font-weight: 600; color: #fff; background: rgba(0,0,0,0.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+  }
+  .sc-tile-state {
+    position: relative; z-index: 1; font-size: 13px; color: rgba(255,255,255,0.75);
+    text-align: center; padding: 0 10px;
+  }
+  .sc-tile.live .sc-tile-state { display: none; }
+  .sc-tile.gone { opacity: 0.45; }
+  .sc-group .sc-invite-line { margin: 14px auto 10px; }
+  .sc-group .sc-invite-actions { margin-bottom: 8px; }
+  .sv-badge-call {
+    background: none; border: 1px solid rgba(56,189,248,0.4); color: #38bdf8; cursor: pointer;
+    width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; margin-left: 2px;
+  }
+  .sv-badge-call[hidden] { display: none; }
+  .sv-badge-call:hover { background: rgba(56,189,248,0.15); }
+  .sv-card-btn.call:hover { color: #38bdf8; }
   .sc-pulse-ring {
     width: 120px; height: 120px; border-radius: 50%;
     border: 3px solid rgba(255,210,77,0.3);
@@ -6698,6 +6747,9 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 <!-- ═══ SentinelViews — Active view badge ═══ -->
 <div class="sv-badge" id="svBadge" onclick="SentinelViews.openPanel()">
   <span id="svBadgeLabel">—</span>
+  <button class="sv-badge-call" id="svBadgeCall" onclick="event.stopPropagation();SentinelViews.callActive()" aria-label="Video call this view" title="Video call this view" data-i18n-aria="group.callView" data-i18n-title="group.callView" hidden>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+  </button>
   <button class="sv-badge-x" onclick="event.stopPropagation();SentinelViews.clearView()" aria-label="Clear view" data-i18n-aria="views.clear">&times;</button>
 </div>
 <!-- ═══ /SentinelViews HTML ═══ -->
@@ -7198,6 +7250,12 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <video class="sc-remote-video" id="scRemoteVideo" autoplay playsinline></video>
   <video class="sc-local-video" id="scLocalVideo" autoplay playsinline muted></video>
   <div class="sc-call-timer" id="scCallTimer" hidden>00:00</div>
+  <div class="sc-group" id="scGroup" hidden>
+    <div class="sc-group-head"><span id="scGroupHead" aria-live="polite"></span><span class="sc-group-timer" id="scGroupTimer" hidden>00:00</span></div>
+    <div class="sc-grid" id="scGrid"></div>
+    <div class="sc-invite-line" id="scGroupInviteLine" hidden></div>
+    <div class="sc-invite-actions" id="scGroupInviteActions" hidden></div>
+  </div>
   <div class="sc-status" id="scStatus">
     <div class="sc-pulse-ring" id="scPulseRing">
       <div class="sc-avatar" id="scAvatar">?</div>
@@ -7221,7 +7279,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <div class="sc-avatar" id="scInAvatar">?</div>
     </div>
     <div class="sc-caller-name" id="scInCallerName">Incoming Call</div>
-    <div class="sc-call-label">Sentinel Call</div>
+    <div class="sc-call-label" id="scInLabel">Sentinel Call</div>
   </div>
   <div class="sc-controls">
     <button class="sc-btn sc-btn-reject" onclick="SentinelCall.rejectIncoming()" title="Decline">✕</button>
@@ -10323,6 +10381,33 @@ const I18n = (function () {
     'call.noAnswerYet': "No answer yet. The link keeps working: {first} can tap it any time and you will be rung.",
     'call.inviteSms': "{me} is calling you on Remiel Sentinel. Tap to answer: {link}",
     'call.inviteShareTitle': "Video call on Remiel Sentinel",
+    'call.sendingInviteAny': "Sending {first} the link.",
+    'call.emailSent': "Email sent to {email}. Waiting for {first} to tap the link.",
+    'call.emailLink': "Email the link",
+    'call.inviteSubject': "{me} is calling you on Remiel Sentinel",
+    'call.mailOpens': "Mail opens with the message ready; send it and come back. This screen waits.",
+    'call.inviteEmailBody': "{me} is calling you now on Remiel Sentinel. Tap to answer:\n{link}\n\nNot on Remiel Sentinel yet? Get it so calls ring on your phone next time: https://beverly-index.com/remiel/ . On iPhone: open that link in Safari, tap Share, then Add to Home Screen. On Android: open it in Chrome, tap the menu, then Add to Home screen.",
+    'group.callView': "Video call this view",
+    'group.callBtn': "Video call",
+    'group.tooMany': "Group calls hold up to 6 people. Make a smaller Unit view for this call: tap your centre sphere, then + Unit.",
+    'group.noMembers': "This view has no people in it yet. Tap Edit on the view card to add some.",
+    'group.head': "{view}: {n} of {total} joined",
+    'group.incoming': "{host} is calling the {view}",
+    'group.calling': "Calling",
+    'group.invited': "Link sent",
+    'group.waitingTap': "Waiting for the tap",
+    'group.noAnswer': "No answer",
+    'group.noReach': "No phone or email saved",
+    'group.left': "Left",
+    'group.you': "You",
+    'group.member': "Member",
+    'group.sendYourself': "Send the link yourself to: {names}. This screen waits.",
+    'group.textTo': "Text {first}",
+    'group.emailTo': "Email {first}",
+    'group.inviteSms': "{me} is calling the {view} on Remiel Sentinel. Tap to join: {link}",
+    'group.inviteEmailBody': "{me} is calling the {view} on Remiel Sentinel. Tap to join:\n{link}\n\nNot on Remiel Sentinel yet? Get it so calls ring on your phone next time: https://beverly-index.com/remiel/ . On iPhone: open that link in Safari, tap Share, then Add to Home Screen. On Android: open it in Chrome, tap the menu, then Add to Home screen.",
+    'group.hostLeft': "{host} left the call. You are still connected to the others.",
+    'guide.h.groupCall': "Tap the camera on a Unit or Team card to video call everyone in it, up to 6 people.",
     'qa.edit': "Edit",
     'confirm.deleteView': "Delete view \"{name}\"? This cannot be undone.",
     'confirm.signOut': "Sign out? Your local data stays on this device.",
@@ -10805,6 +10890,33 @@ const I18n = (function () {
     'call.noAnswerYet': "Ancora nessuna risposta. Il link resta valido: {first} può toccarlo in qualsiasi momento e riceverai la chiamata.",
     'call.inviteSms': "{me} ti sta chiamando su Remiel Sentinel. Tocca per rispondere: {link}",
     'call.inviteShareTitle': "Videochiamata su Remiel Sentinel",
+    'call.sendingInviteAny': "Invio del link a {first}.",
+    'call.emailSent': "Email inviata a {email}. In attesa che {first} tocchi il link.",
+    'call.emailLink': "Invia il link via email",
+    'call.inviteSubject': "{me} ti sta chiamando su Remiel Sentinel",
+    'call.mailOpens': "Mail si apre con il messaggio pronto; invialo e torna qui. Questa schermata aspetta.",
+    'call.inviteEmailBody': "{me} ti sta chiamando ora su Remiel Sentinel. Tocca per rispondere:\n{link}\n\nNon hai ancora Remiel Sentinel? Installalo così la prossima volta le chiamate squillano sul tuo telefono: https://beverly-index.com/remiel/ . Su iPhone: apri quel link in Safari, tocca Condividi, poi Aggiungi alla schermata Home. Su Android: aprilo in Chrome, tocca il menu, poi Aggiungi a schermata Home.",
+    'group.callView': "Videochiama questa vista",
+    'group.callBtn': "Videochiamata",
+    'group.tooMany': "Le chiamate di gruppo contengono fino a 6 persone. Crea una vista Unità più piccola per questa chiamata: tocca la tua sfera centrale, poi + Unità.",
+    'group.noMembers': "Questa vista non ha ancora persone. Tocca Modifica sulla scheda della vista per aggiungerne.",
+    'group.head': "{view}: {n} di {total} presenti",
+    'group.incoming': "{host} sta chiamando {view}",
+    'group.calling': "Chiamata in corso",
+    'group.invited': "Link inviato",
+    'group.waitingTap': "In attesa del tocco",
+    'group.noAnswer': "Nessuna risposta",
+    'group.noReach': "Nessun telefono o email salvati",
+    'group.left': "Uscito",
+    'group.you': "Tu",
+    'group.member': "Membro",
+    'group.sendYourself': "Invia tu il link a: {names}. Questa schermata aspetta.",
+    'group.textTo': "SMS a {first}",
+    'group.emailTo': "Email a {first}",
+    'group.inviteSms': "{me} sta chiamando {view} su Remiel Sentinel. Tocca per entrare: {link}",
+    'group.inviteEmailBody': "{me} sta chiamando {view} su Remiel Sentinel. Tocca per entrare:\n{link}\n\nNon hai ancora Remiel Sentinel? Installalo così la prossima volta le chiamate squillano sul tuo telefono: https://beverly-index.com/remiel/ . Su iPhone: apri quel link in Safari, tocca Condividi, poi Aggiungi alla schermata Home. Su Android: aprilo in Chrome, tocca il menu, poi Aggiungi a schermata Home.",
+    'group.hostLeft': "{host} ha lasciato la chiamata. Sei ancora collegato agli altri.",
+    'guide.h.groupCall': "Tocca la videocamera su una scheda Unità o Team per videochiamare tutti i suoi membri, fino a 6 persone.",
     'qa.edit': "Modifica",
     'confirm.deleteView': "Eliminare la vista \"{name}\"? Non si può annullare.",
     'confirm.signOut': "Vuoi uscire? I tuoi dati restano su questo dispositivo.",
@@ -17266,12 +17378,28 @@ const SentinelViews = (() => {
     const label = document.getElementById('svBadgeLabel');
     if (!badge || !label) return;
     const view = getActiveView();
+    const callBtn = document.getElementById('svBadgeCall');
     if (view) {
       label.textContent = TYPE_LABELS[view.type] + ': ' + view.name;
       badge.classList.add('visible');
+      if (callBtn) callBtn.hidden = view.type === 'one-on-one';
     } else {
       badge.classList.remove('visible');
+      if (callBtn) callBtn.hidden = true;
     }
+  }
+
+  /* ── Group video call for a Unit or Team view ── */
+  function callView(id) {
+    const view = _views.find(v => v.id === id);
+    if (!view || view.type === 'one-on-one') return;
+    if (typeof SentinelCall === 'undefined' || typeof SentinelCall.callGroup !== 'function') return;
+    closePanel();
+    SentinelCall.callGroup(view);
+  }
+  function callActive() {
+    const view = getActiveView();
+    if (view) callView(view.id);
   }
 
   /* ── Panel: views picker ── */
@@ -17315,6 +17443,11 @@ const SentinelViews = (() => {
           h += '<div class="sv-card-info"><div class="sv-card-name">' + _esc(v.name) + '</div>';
           h += '<div class="sv-card-meta">' + _esc(v.contactIds.length === 1 ? _t('views.countOne', '1 contact') : _t('views.count', '{n} contacts', { n: v.contactIds.length })) + '</div></div>';
           h += '<div class="sv-card-actions">';
+          if (type !== 'one-on-one') {
+            h += '<button class="sv-card-btn call" data-sv-call="' + v.id + '" onclick="event.stopPropagation();SentinelViews.callView(\'' + v.id + '\')" title="' + _esc(_t('group.callBtn', 'Video call')) + '" aria-label="' + _esc(_t('group.callBtn', 'Video call')) + '">';
+            h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+            h += '</button>';
+          }
           h += '<button class="sv-card-btn" onclick="event.stopPropagation();SentinelViews.editView(\'' + v.id + '\')" title="' + _esc(_t('views.edit', 'Edit view')) + '" aria-label="' + _esc(_t('views.edit', 'Edit view')) + '">';
           h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
           h += '</button>';
@@ -17568,6 +17701,7 @@ const SentinelViews = (() => {
     getActiveView,
     getFilteredContacts,
     get views() { return _views; },
+    callView, callActive,
     get activeViewId() { return _activeViewId; }
   };
 })();
@@ -32268,7 +32402,8 @@ const SentinelCall = (function() {
 
     _peer.on('call', (call) => {
       console.log('SentinelCall: incoming call from', call.peer);
-      if (_currentCall || _incomingCall) { try { call.close(); } catch (e) {} return; }
+      if (_onGroupCall(call)) return;
+      if (_currentCall || _incomingCall || _group) { try { call.close(); } catch (e) {} return; }
       _incomingCall = call;
       call.on('close', () => { if (_incomingCall === call) rejectIncoming(); });
       call.on('error', () => { if (_incomingCall === call) rejectIncoming(); });
@@ -32281,6 +32416,8 @@ const SentinelCall = (function() {
       }
       _showIncoming(call);
     });
+
+    _peer.on('connection', (conn) => { _onGroupConnection(conn); });
 
     _peer.on('disconnected', () => {
       console.log('SentinelCall: disconnected, reconnecting...');
@@ -32473,6 +32610,15 @@ const SentinelCall = (function() {
     }
     if (_incomingCall !== call) { _cleanupMedia(); return; } /* caller hung up meanwhile */
 
+    const meta = call.metadata || {};
+    if (meta.kind === 'group' && meta.room) {
+      _incomingCall = null;
+      const inc = document.getElementById('scIncomingOverlay');
+      if (inc) inc.classList.remove('active');
+      _joinGroupAsMember(call, meta);
+      return;
+    }
+
     _currentCall = call;
     _incomingCall = null;
     _attachCall(call);
@@ -32505,6 +32651,7 @@ const SentinelCall = (function() {
   /* ── Hang up ── */
   function hangUp() {
     _clearAwaitGuest();
+    if (_group) { endCall(); return; }
     const call = _currentCall;
     _currentCall = null;
     if (call) { try { call.close(); } catch (e) {} }
@@ -32539,6 +32686,7 @@ const SentinelCall = (function() {
     _currentCall = null;
     _incomingCall = null;
     if (call) { try { call.close(); } catch (e) {} }
+    _leaveGroup();
     _cleanupMedia();
     _hideAllOverlays();
     _setInviteLine(null);
@@ -32561,8 +32709,8 @@ const SentinelCall = (function() {
     if (_awaitGuestTimer) { clearTimeout(_awaitGuestTimer); _awaitGuestTimer = null; }
   }
   function _setInviteLine(text, buttons) {
-    const line = document.getElementById('scInviteLine');
-    const acts = document.getElementById('scInviteActions');
+    const line = document.getElementById(_group ? 'scGroupInviteLine' : 'scInviteLine');
+    const acts = document.getElementById(_group ? 'scGroupInviteActions' : 'scInviteActions');
     if (line) { line.textContent = text || ''; line.hidden = !text; }
     if (acts) {
       acts.innerHTML = '';
@@ -32580,16 +32728,29 @@ const SentinelCall = (function() {
   function _guestLink() {
     return window.location.origin + window.location.pathname + '?call=' + _myId;
   }
+  /* The signed-in user's own email, for the Reply-To of an emailed invite */
+  function _myEmail() {
+    try {
+      const st = (typeof SyncEngine !== 'undefined' && typeof SyncEngine.getStatus === 'function') ? SyncEngine.getStatus() : null;
+      const e = st && st.email ? String(st.email).trim() : '';
+      return (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && !/@remiel\.local$/.test(e)) ? e : '';
+    } catch (e) { return ''; }
+  }
   async function _sendInviteText(contact, link, myName) {
     if (typeof SyncEngine === 'undefined' || typeof SyncEngine.apiFetch !== 'function') return { ok: false };
     if (!contact.phone && !contact.email) return { ok: false };
-    const body = { link: link, from_name: String(myName || '').slice(0, 60), contact_name: contact.first || '' };
+    const body = { link: link, from_name: String(myName || '').slice(0, 60), contact_name: contact.first || '', receiver_on_rs: false };
     if (contact.phone) body.to_phone = normalizePhone(contact.phone);
-    else body.to_email = contact.email;
+    if (contact.email) body.to_email = String(contact.email).trim();
+    const fromEmail = _myEmail();
+    if (fromEmail) body.from_email = fromEmail;
     const res = await SyncEngine.apiFetch('/calls/invite', { method: 'POST', body: JSON.stringify(body) });
     let j = null;
     try { j = await res.json(); } catch (e) {}
     return (res.ok && j && j.ok) ? j : { ok: false, status: res.status };
+  }
+  function _mailtoLink(email, subject, body) {
+    return 'mailto:' + encodeURIComponent(String(email).trim()) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
   }
   function _offerManualInvite(contact, link, myName, first) {
     const sms = _tp('call.inviteSms', '{me} is calling you on Remiel Sentinel. Tap to answer: {link}', { me: myName, link: link });
@@ -32598,6 +32759,14 @@ const SentinelCall = (function() {
       buttons.push({ label: _t('call.textLink', 'Text the link'), run: () => {
         _setInviteLine(_t('call.messagesOpens', 'Messages opens with the text ready; send it and come back. This screen waits.'), buttons);
         window.location.href = 'sms:' + normalizePhone(contact.phone) + '?&body=' + encodeURIComponent(sms);
+      } });
+    }
+    if (contact.email) {
+      buttons.push({ label: _t('call.emailLink', 'Email the link'), run: () => {
+        _setInviteLine(_t('call.mailOpens', 'Mail opens with the message ready; send it and come back. This screen waits.'), buttons);
+        const subject = _tp('call.inviteSubject', '{me} is calling you on Remiel Sentinel', { me: myName });
+        const body = _tp('call.inviteEmailBody', '{me} is calling you now on Remiel Sentinel. Tap to answer:\n{link}', { me: myName, link: link });
+        window.location.href = _mailtoLink(contact.email, subject, body);
       } });
     }
     buttons.push({ label: _t('call.copyLink', 'Copy link'), run: () => {
@@ -32649,15 +32818,450 @@ const SentinelCall = (function() {
     const link = _guestLink();
     const myName = await _getMyName();
     if (_awaitGuestFor === null) return; /* hung up while the name loaded */
-    _setInviteLine(_tp('call.sendingInvite', 'Sending {first} a text with the link.', { first: first }));
+    _setInviteLine(contact.phone
+      ? _tp('call.sendingInvite', 'Sending {first} a text with the link.', { first: first })
+      : _tp('call.sendingInviteAny', 'Sending {first} the link.', { first: first }));
     let sent = { ok: false };
     try { sent = await _sendInviteText(contact, link, myName); } catch (e) { sent = { ok: false }; }
     if (_awaitGuestFor === null) return;
-    if (sent.ok) {
+    if (sent.ok && sent.channel === 'email') {
+      _setInviteLine(_tp('call.emailSent', 'Email sent to {email}. Waiting for {first} to tap the link.', { email: contact.email, first: first }));
+    } else if (sent.ok) {
       _setInviteLine(_tp('call.textSent', 'Text sent to {phone}. Waiting for {first} to tap it.', { phone: contact.phone, first: first }));
     } else {
       _offerManualInvite(contact, link, myName, first);
     }
+  }
+
+  /* ═══ Group video calls for Units and Teams ═══
+     A full mesh over PeerJS: every participant holds one media call to every
+     other participant, so the room holds at most GROUP_MAX people (host
+     included). The host creates the room id, calls each member who has a
+     Sentinel ID (data connection plus media call) and sends the guest link
+     to members who only have a phone or an email. Whenever someone joins or
+     leaves, the host sends the roster over its data connections and each
+     participant calls the members it is not yet connected to. Hanging up
+     leaves the room for you only. */
+  const GROUP_MAX = 6;
+  let _group = null;               /* { room, hostPeer, isHost, viewName, total, myName, peers: Map, hostConn, onLeave } */
+  const _groupInvites = {};        /* room -> data connection from the host, received before Accept */
+
+  function _activePeer() { return _guestPeer || _peer; }
+  function _myPeerId() {
+    const p = _activePeer();
+    return (p && p.id) || (_myId ? 'sentinel-' + _myId.toLowerCase() : '');
+  }
+  function _shortRandom() {
+    const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    let out = '';
+    const arr = new Uint8Array(6);
+    try { crypto.getRandomValues(arr); } catch (e) { for (let i = 0; i < 6; i++) arr[i] = Math.floor(Math.random() * 256); }
+    for (let i = 0; i < 6; i++) out += chars[arr[i] % chars.length];
+    return out;
+  }
+  function _contactName(c) {
+    return ((c && c.first) || '').concat(' ', (c && c.last) || '').trim() || _t('group.member', 'Member');
+  }
+
+  /* Header: "{view}: {n} of {total} joined". n counts you plus every live tile. */
+  function _renderGroupHead() {
+    if (!_group) return;
+    const head = document.getElementById('scGroupHead');
+    if (!head) return;
+    let live = 1;
+    _group.peers.forEach(p => { if (p.live) live++; });
+    const total = Math.max(_group.total || 0, live);
+    head.textContent = _tp('group.head', '{view}: {n} of {total} joined', { view: _group.viewName || _t('views.type.unit', 'Unit'), n: live, total: total });
+  }
+
+  function _showGroupScreen() {
+    const overlay = document.getElementById('scOverlay');
+    const status = document.getElementById('scStatus');
+    const grp = document.getElementById('scGroup');
+    const remoteVid = document.getElementById('scRemoteVideo');
+    if (remoteVid) remoteVid.srcObject = null;
+    if (status) status.style.display = 'none';
+    if (grp) grp.hidden = false;
+    const localVid = document.getElementById('scLocalVideo');
+    if (localVid && _localStream) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
+    if (overlay) { overlay.classList.add('active'); overlay.classList.add('group'); }
+    rsOverlayFlag('call', true);
+    _renderGroupHead();
+  }
+
+  function _tileFor(peerId, name, contactId) {
+    const grid = document.getElementById('scGrid');
+    if (!grid) return null;
+    let tile = grid.querySelector('[data-peer="' + peerId + '"]');
+    if (tile) return tile;
+    tile = document.createElement('div');
+    tile.className = 'sc-tile';
+    tile.dataset.peer = peerId;
+    const vid = document.createElement('video');
+    vid.autoplay = true; vid.playsInline = true; vid.setAttribute('playsinline', '');
+    const state = document.createElement('div');
+    state.className = 'sc-tile-state';
+    state.textContent = _t('group.calling', 'Calling');
+    const nm = document.createElement('div');
+    nm.className = 'sc-tile-name';
+    nm.textContent = name || _t('group.member', 'Member');
+    tile.appendChild(vid); tile.appendChild(state); tile.appendChild(nm);
+    grid.appendChild(tile);
+    return tile;
+  }
+  function _tileState(peerId, text) {
+    const grid = document.getElementById('scGrid');
+    const tile = grid ? grid.querySelector('[data-peer="' + peerId + '"]') : null;
+    if (!tile) return;
+    const st = tile.querySelector('.sc-tile-state');
+    if (st) st.textContent = text;
+  }
+  function _removeTile(peerId, afterMs) {
+    const grid = document.getElementById('scGrid');
+    const tile = grid ? grid.querySelector('[data-peer="' + peerId + '"]') : null;
+    if (!tile) return;
+    tile.classList.add('gone');
+    setTimeout(() => { try { tile.remove(); } catch (e) {} }, afterMs || 0);
+  }
+
+  function _startGroup(opts) {
+    _group = {
+      room: opts.room, hostPeer: opts.hostPeer, isHost: !!opts.isHost,
+      viewName: opts.viewName || '', total: opts.total || 0, myName: opts.myName || '',
+      peers: new Map(), hostConn: null, onLeave: opts.onLeave || null, invited: {}
+    };
+    _showGroupScreen();
+  }
+
+  /* Register a participant: its media call (outgoing or answered) and tile */
+  function _addGroupPeer(peerId, call, name, contactId) {
+    if (!_group) return null;
+    let entry = _group.peers.get(peerId);
+    if (!entry) {
+      entry = { call: null, conn: null, name: name || '', contactId: contactId == null ? null : contactId, live: false, timer: null };
+      _group.peers.set(peerId, entry);
+    }
+    if (name && !entry.name) entry.name = name;
+    if (contactId != null && entry.contactId == null) entry.contactId = contactId;
+    _tileFor(peerId, entry.name, entry.contactId);
+    if (call && entry.call !== call) {
+      entry.call = call;
+      call.on('stream', (remoteStream) => {
+        if (!_group || _group.peers.get(peerId) !== entry) return;
+        const tile = _tileFor(peerId, entry.name, entry.contactId);
+        const vid = tile ? tile.querySelector('video') : null;
+        if (vid && vid.srcObject !== remoteStream) { vid.srcObject = remoteStream; vid.play().catch(() => {}); }
+        if (tile) tile.classList.add('live');
+        if (entry.timer) { clearTimeout(entry.timer); entry.timer = null; }
+        const wasLive = entry.live;
+        entry.live = true;
+        _startTimer();
+        _renderGroupHead();
+        if (!wasLive && _group.isHost) _broadcastRoster();
+      });
+      const gone = () => {
+        if (!_group || _group.peers.get(peerId) !== entry) return;
+        _dropGroupPeer(peerId, _t('group.left', 'Left'));
+      };
+      call.on('close', gone);
+      call.on('error', gone);
+    }
+    _renderGroupHead();
+    return entry;
+  }
+
+  function _dropGroupPeer(peerId, stateText) {
+    if (!_group) return;
+    const entry = _group.peers.get(peerId);
+    if (!entry) return;
+    _group.peers.delete(peerId);
+    if (entry.timer) { clearTimeout(entry.timer); entry.timer = null; }
+    try { if (entry.call) entry.call.close(); } catch (e) {}
+    try { if (entry.conn) entry.conn.close(); } catch (e) {}
+    _tileState(peerId, stateText || _t('group.left', 'Left'));
+    _removeTile(peerId, 1500);
+    if (peerId === _group.hostPeer && !_group.isHost && entry.live) {
+      showToast(_tp('group.hostLeft', '{host} left the call. You are still connected to the others.', { host: entry.name || _t('group.member', 'Member') }));
+    }
+    _renderGroupHead();
+    if (_group.isHost) _broadcastRoster();
+  }
+
+  /* A member who never answers: "No answer" on the tile, then the tile goes */
+  function _armGroupNoAnswer(peerId) {
+    if (!_group) return;
+    const entry = _group.peers.get(peerId);
+    if (!entry) return;
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => {
+      entry.timer = null;
+      if (!_group || _group.peers.get(peerId) !== entry || entry.live) return;
+      _dropGroupPeer(peerId, _t('group.noAnswer', 'No answer'));
+    }, _NO_ANSWER_MS);
+  }
+
+  /* Host: the roster goes to every participant with an open data connection */
+  function _rosterMessage() {
+    const members = [];
+    _group.peers.forEach((p, id) => { if (p.live) members.push({ peer: id, name: p.name || '' }); });
+    return { type: 'roster', room: _group.room, viewName: _group.viewName, total: _group.total, hostName: _group.myName, members: members };
+  }
+  function _broadcastRoster() {
+    if (!_group || !_group.isHost) return;
+    const msg = _rosterMessage();
+    _group.peers.forEach(p => {
+      if (!p.conn || !p.live) return;
+      try { if (p.conn.open) p.conn.send(msg); } catch (e) {}
+    });
+  }
+
+  /* Participant: call every listed member this device is not yet connected to.
+     Of any two participants, the one with the greater peer id places the call,
+     so each pair connects exactly once. */
+  function _onRoster(msg) {
+    if (!_group || !msg || msg.room !== _group.room) return;
+    if (msg.viewName && !_group.viewName) _group.viewName = msg.viewName;
+    if (msg.total) _group.total = msg.total;
+    if (msg.hostName) {
+      const h = _group.peers.get(_group.hostPeer);
+      if (h && !h.name) { h.name = msg.hostName; const t = _tileFor(_group.hostPeer, h.name, null); const nm = t && t.querySelector('.sc-tile-name'); if (nm) nm.textContent = h.name; }
+    }
+    const me = _myPeerId();
+    const peer = _activePeer();
+    (msg.members || []).forEach(m => {
+      if (!m || !m.peer || m.peer === me) return;
+      const existing = _group.peers.get(m.peer);
+      if (existing) { if (m.name && !existing.name) existing.name = m.name; return; }
+      if (!(me > m.peer)) { _addGroupPeer(m.peer, null, m.name, null); return; }
+      let call = null;
+      try {
+        call = peer.call(m.peer, _localStream, { metadata: { room: _group.room, kind: 'group', callerName: _group.myName, callerId: _myId, viewName: _group.viewName } });
+      } catch (e) { call = null; }
+      if (!call) return;
+      _addGroupPeer(m.peer, call, m.name, null);
+      _armGroupNoAnswer(m.peer);
+    });
+    _renderGroupHead();
+  }
+
+  function _bindHostConn(conn) {
+    if (!_group) return;
+    _group.hostConn = conn;
+    const h = _group.peers.get(_group.hostPeer);
+    if (h) h.conn = conn;
+    conn.on('data', (d) => { if (d && d.type === 'roster') _onRoster(d); });
+    conn.on('error', () => {});
+  }
+
+  /* Any peer: an incoming media call that belongs to a room */
+  function _onGroupCall(call) {
+    const meta = call.metadata || {};
+    if (meta.kind !== 'group' || !meta.room) return false;
+    if (_group && meta.room === _group.room) {
+      /* A participant of my room calling to complete the mesh: answer at once */
+      if (!_group.peers.has(call.peer) && _group.peers.size + 1 >= GROUP_MAX) { try { call.close(); } catch (e) {} return true; }
+      try { call.answer(_localStream); } catch (e) { try { call.close(); } catch (e2) {} return true; }
+      _addGroupPeer(call.peer, call, meta.callerName || '', null);
+      _claimPlaceholder(call.peer, meta.member);
+      return true;
+    }
+    if (_group || _currentCall || _incomingCall) { try { call.close(); } catch (e) {} return true; }
+    /* Not in a room yet: ring, with the host name and the view name */
+    _incomingCall = call;
+    call.on('close', () => { if (_incomingCall === call) rejectIncoming(); });
+    call.on('error', () => { if (_incomingCall === call) rejectIncoming(); });
+    _showIncoming(call);
+    return true;
+  }
+
+  /* Host: a guest who tapped a member link takes that member's placeholder
+     tile, name and contact */
+  function _claimPlaceholder(peerId, member) {
+    if (!_group || !_group.isHost || member == null) return;
+    const key = 'invite-' + String(member);
+    const ph = _group.invited && _group.invited[key];
+    if (!ph) return;
+    delete _group.invited[key];
+    _removeTile(key, 0);
+    const entry = _group.peers.get(peerId);
+    if (entry) {
+      if (ph.name) entry.name = ph.name;
+      if (ph.contactId != null) entry.contactId = ph.contactId;
+      const tile = _tileFor(peerId, entry.name, entry.contactId);
+      const nm = tile ? tile.querySelector('.sc-tile-name') : null;
+      if (nm) nm.textContent = entry.name;
+    }
+  }
+
+  /* Any peer: a data connection. From the host before Accept it is kept by
+     room; from a guest joining by link the host keeps it as that member's. */
+  function _onGroupConnection(conn) {
+    const meta = conn.metadata || {};
+    if (!meta.room) { try { conn.close(); } catch (e) {} return; }
+    if (meta.kind === 'group-invite') {
+      _groupInvites[meta.room] = conn;
+      conn.on('close', () => { if (_groupInvites[meta.room] === conn) delete _groupInvites[meta.room]; });
+      if (_group && _group.room === meta.room && !_group.hostConn) _bindHostConn(conn);
+      return;
+    }
+    if (meta.kind === 'group-join' && _group && _group.isHost && _group.room === meta.room) {
+      const entry = _addGroupPeer(conn.peer, null, meta.name || '', null);
+      _claimPlaceholder(conn.peer, meta.member);
+      if (entry) {
+        entry.conn = conn;
+        const send = () => { try { conn.send(_rosterMessage()); } catch (e) {} };
+        if (conn.open) send(); else conn.on('open', send);
+      }
+      return;
+    }
+    try { conn.close(); } catch (e) {}
+  }
+
+  /* Callee: Accept on a group call joins the room through the host */
+  async function _joinGroupAsMember(call, meta) {
+    const hostPeer = call.peer;
+    const sid = String(meta.callerId || hostPeer.replace('sentinel-', '')).toUpperCase();
+    let known = null;
+    try { known = DEMO_CONTACTS.find(c => c.sentinelId && String(c.sentinelId).toUpperCase() === sid) || null; } catch (e) {}
+    const hostName = known ? _contactName(known) : (meta.callerName || sid);
+    const myName = await _getMyName();
+    if (_group || _currentCall) return;
+    _startGroup({ room: meta.room, hostPeer: hostPeer, isHost: false, viewName: meta.viewName || '', total: meta.total || 0, myName: myName });
+    try { call.answer(_localStream); } catch (e) { endCall(); showToast(_t('call.failed', 'Call failed')); return; }
+    _addGroupPeer(hostPeer, call, hostName, known ? known.id : null);
+    const conn = _groupInvites[meta.room];
+    if (conn) { delete _groupInvites[meta.room]; _bindHostConn(conn); }
+    else {
+      let c = null;
+      try { c = _peer.connect(hostPeer, { metadata: { room: meta.room, kind: 'group-join', name: myName } }); } catch (e) { c = null; }
+      if (c) _bindHostConn(c);
+    }
+    _callContactId = known ? known.id : null;
+  }
+
+  function _leaveGroup() {
+    if (!_group) return;
+    const g = _group;
+    _group = null;
+    g.peers.forEach(p => {
+      if (p.timer) clearTimeout(p.timer);
+      try { if (p.call) p.call.close(); } catch (e) {}
+      try { if (p.conn) p.conn.close(); } catch (e) {}
+    });
+    try { if (g.hostConn) g.hostConn.close(); } catch (e) {}
+    const grid = document.getElementById('scGrid');
+    if (grid) grid.innerHTML = '';
+    if (g.onLeave) { try { g.onLeave(); } catch (e) {} }
+  }
+
+  /* Host: video call everyone in a Unit or Team view */
+  async function callGroup(view) {
+    if (!view || !Array.isArray(view.contactIds)) return;
+    if (typeof SentinelGuide !== 'undefined') { try { SentinelGuide.onCall(); } catch (e) {} }
+    if (_currentCall || _group || _awaitGuestFor !== null) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
+    if (view.contactIds.length === 0) { showToast(_t('group.noMembers', 'This view has no people in it yet. Tap Edit on the view card to add some.')); return; }
+    if (view.contactIds.length + 1 > GROUP_MAX) {
+      showToast(_t('group.tooMany', 'Group calls hold up to 6 people. Make a smaller Unit view for this call: tap your centre sphere, then + Unit.'));
+      return;
+    }
+    if (_callBusy) return;
+    _callBusy = true;
+    try { await _callGroup(view); } finally { _callBusy = false; }
+  }
+
+  async function _callGroup(view) {
+    const members = [];
+    for (const id of view.contactIds) {
+      let c = null;
+      try { c = await RemielDB.getContact(id); } catch (e) {}
+      if (!c) { try { c = DEMO_CONTACTS.find(x => x.id === id || String(x.id) === String(id)) || null; } catch (e) {} }
+      if (c) members.push(c);
+    }
+    if (!members.length) { showToast(_t('call.contactNotFound', 'Contact not found')); return; }
+    if (!(await _ensurePeer())) return;
+    if (!_myId) { showToast(_t('toast.sidNotReady', 'Sentinel ID not ready yet')); return; }
+    try {
+      if (!_localStream || !_localStream.active) _localStream = await _getStream();
+    } catch (err) {
+      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
+      return;
+    }
+    const myName = await _getMyName();
+    const room = _myId + '-' + _shortRandom();
+    const viewName = view.name || _t('views.type.unit', 'Unit');
+    _startGroup({ room: room, hostPeer: _myPeerId(), isHost: true, viewName: viewName, total: members.length + 1, myName: myName });
+    const link = _guestLink() + '&room=' + encodeURIComponent(room);
+    const memberLink = (c) => link + (c.id == null ? '' : '&m=' + encodeURIComponent(String(c.id)));
+    const pending = [];   /* members without a Sentinel ID whose link this device must send */
+
+    for (const c of members) {
+      if (!_group) return; /* hung up while a name loaded */
+      const name = _contactName(c);
+      if (_isValidSid(c.sentinelId || '')) {
+        const target = 'sentinel-' + c.sentinelId.trim().toLowerCase();
+        let conn = null, call = null;
+        try { conn = _peer.connect(target, { metadata: { room: room, host: _myId, kind: 'group-invite', hostName: myName, viewName: viewName } }); } catch (e) { conn = null; }
+        try { call = _peer.call(target, _localStream, { metadata: { room: room, kind: 'group', callerName: myName, callerId: _myId, viewName: viewName, total: members.length + 1 } }); } catch (e) { call = null; }
+        const entry = _addGroupPeer(target, call, name, c.id);
+        if (entry && conn) { entry.conn = conn; conn.on('error', () => {}); }
+        if (!call) { _tileState(target, _t('call.couldNotPlace', 'Could not place call')); _removeTile(target, 4000); _group.peers.delete(target); continue; }
+        _armGroupNoAnswer(target);
+        continue;
+      }
+      const key = 'invite-' + String(c.id == null ? name : c.id);
+      _tileFor(key, name, c.id);
+      _group.invited[key] = { name: name, contactId: c.id == null ? null : c.id };
+      if (!c.phone && !c.email) {
+        _tileState(key, _t('group.noReach', 'No phone or email saved'));
+        _removeTile(key, 6000);
+        continue;
+      }
+      _tileState(key, _tp('call.sendingInviteAny', 'Sending {first} the link.', { first: c.first || name }));
+      let sent = { ok: false };
+      try { sent = await _sendInviteText(c, memberLink(c), myName); } catch (e) { sent = { ok: false }; }
+      if (!_group) return;
+      if (sent.ok) { _tileState(key, _t('group.invited', 'Link sent') + '. ' + _t('group.waitingTap', 'Waiting for the tap')); }
+      else { _tileState(key, _t('group.waitingTap', 'Waiting for the tap')); pending.push(c); }
+      /* A guest who never taps: the placeholder tile goes after the invite window */
+      setTimeout(() => { if (_group && _group.room === room && _group.invited[key]) { delete _group.invited[key]; _tileState(key, _t('group.noAnswer', 'No answer')); _removeTile(key, 1500); } }, _AWAIT_GUEST_MS);
+    }
+    if (pending.length && _group) _offerGroupManualInvite(pending, link, memberLink, myName, viewName);
+  }
+
+  function _offerGroupManualInvite(pending, link, memberLink, myName, viewName) {
+    const smsFor = (l) => _tp('group.inviteSms', '{me} is calling the {view} on Remiel Sentinel. Tap to join: {link}', { me: myName, view: viewName, link: l });
+    const subject = _tp('call.inviteSubject', '{me} is calling you on Remiel Sentinel', { me: myName });
+    const mailFor = (l) => _tp('group.inviteEmailBody', '{me} is calling the {view} on Remiel Sentinel. Tap to join:\n{link}', { me: myName, view: viewName, link: l });
+    const smsText = smsFor(link);
+    const buttons = [];
+    const names = pending.map(c => c.first || _contactName(c));
+    const line = _tp('group.sendYourself', 'Send the link yourself to: {names}. This screen waits.', { names: names.join(', ') });
+    pending.forEach(c => {
+      const first = c.first || _contactName(c);
+      if (c.phone) {
+        buttons.push({ label: _tp('group.textTo', 'Text {first}', { first: first }), run: () => {
+          _setInviteLine(_t('call.messagesOpens', 'Messages opens with the text ready; send it and come back. This screen waits.'), buttons);
+          window.location.href = 'sms:' + normalizePhone(c.phone) + '?&body=' + encodeURIComponent(smsFor(memberLink(c)));
+        } });
+      }
+      if (c.email) {
+        buttons.push({ label: _tp('group.emailTo', 'Email {first}', { first: first }), run: () => {
+          _setInviteLine(_t('call.mailOpens', 'Mail opens with the message ready; send it and come back. This screen waits.'), buttons);
+          window.location.href = _mailtoLink(c.email, subject, mailFor(memberLink(c)));
+        } });
+      }
+    });
+    buttons.push({ label: _t('call.copyLink', 'Copy link'), run: () => {
+      const done = () => _setInviteLine(_tp('call.linkCopied', 'Link copied. Send it to {first} in any app; this screen waits.', { first: names.join(', ') }), buttons);
+      try { navigator.clipboard.writeText(link).then(done, () => _setInviteLine(link, buttons)); }
+      catch (e) { _setInviteLine(link, buttons); }
+    } });
+    if (navigator.share) {
+      buttons.push({ label: _t('call.share', 'Share'), run: () => {
+        navigator.share({ title: _t('call.inviteShareTitle', 'Video call on Remiel Sentinel'), text: smsText, url: link }).catch(() => {});
+      } });
+    }
+    _setInviteLine(line, buttons);
   }
 
   /* ── Mute toggle ── */
@@ -32674,7 +33278,7 @@ const SentinelCall = (function() {
 
   /* ── Flip camera: acquire the new camera first, then stop the old one ── */
   async function flipCamera() {
-    if (!_localStream || !_currentCall) return;
+    if (!_localStream || (!_currentCall && !_group)) return;
     const prevFacing = _facingMode;
     _facingMode = _facingMode === 'user' ? 'environment' : 'user';
     let newStream;
@@ -32690,9 +33294,13 @@ const SentinelCall = (function() {
     }
     const newVideoTrack = newStream.getVideoTracks()[0];
     try {
-      const pc = _currentCall && _currentCall.peerConnection;
-      const sender = pc ? pc.getSenders().find(s => s.track && s.track.kind === 'video') : null;
-      if (sender) await sender.replaceTrack(newVideoTrack);
+      const pcs = [];
+      if (_currentCall && _currentCall.peerConnection) pcs.push(_currentCall.peerConnection);
+      if (_group) _group.peers.forEach(p => { if (p.call && p.call.peerConnection) pcs.push(p.call.peerConnection); });
+      for (const pc of pcs) {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) await sender.replaceTrack(newVideoTrack);
+      }
     } catch (err) {
       console.warn('SentinelCall: replaceTrack failed', err);
       newStream.getTracks().forEach(t => t.stop());
@@ -32751,6 +33359,13 @@ const SentinelCall = (function() {
 
     if (callerName) callerName.textContent = name;
     _avatarFor(avatar, known ? known.id : null, initials);
+    const inLabel = document.getElementById('scInLabel');
+    if (inLabel) {
+      if (!inLabel.dataset.def) inLabel.dataset.def = inLabel.textContent;
+      inLabel.textContent = (meta.kind === 'group' && meta.room)
+        ? _tp('group.incoming', '{host} is calling the {view}', { host: name, view: meta.viewName || _t('views.type.unit', 'Unit') })
+        : inLabel.dataset.def;
+    }
     if (overlay) overlay.classList.add('active');
     /* One tap to answer: Accept carries the advance rim and focus */
     const acc = overlay ? overlay.querySelector('.sc-btn-accept') : null;
@@ -32789,7 +33404,15 @@ const SentinelCall = (function() {
     if (timer) timer.hidden = false;
     if (overlay) overlay.classList.add('active');
 
-    /* Start call timer */
+    _startTimer();
+  }
+
+  function _startTimer() {
+    const timer = document.getElementById('scCallTimer');
+    const gTimer = document.getElementById('scGroupTimer');
+    if (timer) timer.hidden = false;
+    if (gTimer) gTimer.hidden = false;
+    if (_callStartTime) return;
     _callStartTime = Date.now();
     if (_timerInterval) clearInterval(_timerInterval);
     _timerInterval = setInterval(() => {
@@ -32797,6 +33420,7 @@ const SentinelCall = (function() {
       const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
       const ss = String(elapsed % 60).padStart(2, '0');
       if (timer) timer.textContent = mm + ':' + ss;
+      if (gTimer) gTimer.textContent = mm + ':' + ss;
     }, 1000);
   }
 
@@ -32813,6 +33437,17 @@ const SentinelCall = (function() {
     if (localVid) localVid.srcObject = null;
     if (remoteVid) remoteVid.srcObject = null;
     if (timer) timer.hidden = true;
+    const grp = document.getElementById('scGroup');
+    const grid = document.getElementById('scGrid');
+    const gTimer = document.getElementById('scGroupTimer');
+    if (grid) grid.innerHTML = '';
+    if (grp) grp.hidden = true;
+    if (gTimer) { gTimer.hidden = true; gTimer.textContent = '00:00'; }
+    if (overlay) overlay.classList.remove('group');
+    const status = document.getElementById('scStatus');
+    if (status) status.style.display = '';
+    const inLabel = document.getElementById('scInLabel');
+    if (inLabel && inLabel.dataset.def) inLabel.textContent = inLabel.dataset.def;
   }
 
   function _stopLocalStream() {
@@ -32862,17 +33497,23 @@ const SentinelCall = (function() {
 
   /* ── Public getters ── */
   function getMyId() { return _myId; }
-  function isInCall() { return !!_currentCall; }
+  function isInCall() { return !!(_currentCall || _group); }
 
 
   /* ── Guest / Open Invite call logic ── */
   let _guestTargetId = null;
+  let _guestRoom = null;
+  let _guestMember = null;   /* which member of the host's view this guest is, from the link */
 
   function checkCallInvite() {
     const params = new URLSearchParams(window.location.search);
     const callTarget = params.get('call');
     if (!callTarget) return false;
     _guestTargetId = callTarget.toUpperCase();
+    const room = params.get('room');
+    _guestRoom = (room && /^[A-Za-z0-9-]{4,40}$/.test(room)) ? room : null;
+    const m = params.get('m');
+    _guestMember = (m && /^[A-Za-z0-9_-]{1,40}$/.test(m)) ? m : null;
     /* Show guest overlay instead of gate. It is authored inside the Settings
        panel, so move it to <body> to escape that stacking context (M4). */
     const _gOv = document.getElementById('scGuestOverlay');
@@ -32981,16 +33622,29 @@ const SentinelCall = (function() {
       /* Place the call */
       const remotePeerId = 'sentinel-' + _guestTargetId.toLowerCase();
       let call = null;
+      const meta = { callerName: name, callerId: guestId, isGuest: true };
+      if (_guestRoom) { meta.kind = 'group'; meta.room = _guestRoom; if (_guestMember) meta.member = _guestMember; }
       try {
-        call = guestPeer.call(remotePeerId, _localStream, {
-          metadata: { callerName: name, callerId: guestId, isGuest: true }
-        });
+        call = guestPeer.call(remotePeerId, _localStream, { metadata: meta });
       } catch (e) { call = null; }
 
       if (!call) {
         showToast(_t('call.couldNotPlace', 'Could not place call'));
         endCall();
         destroyGuest();
+        return;
+      }
+
+      if (_guestRoom) {
+        /* Group room: the host answers, sends the roster, and this guest
+           calls the other participants itself. */
+        guestPeer.on('call', (c) => { if (!_onGroupCall(c)) { try { c.close(); } catch (e) {} } });
+        _startGroup({ room: _guestRoom, hostPeer: remotePeerId, isHost: false, viewName: '', total: 0, myName: name, onLeave: destroyGuest });
+        _addGroupPeer(remotePeerId, call, _guestTargetId, null);
+        let conn = null;
+        try { conn = guestPeer.connect(remotePeerId, { metadata: { room: _guestRoom, kind: 'group-join', name: name, member: _guestMember || undefined } }); } catch (e) { conn = null; }
+        if (conn) _bindHostConn(conn);
+        _armGroupNoAnswer(remotePeerId);
         return;
       }
 
@@ -33098,7 +33752,9 @@ const SentinelCall = (function() {
     getMyId, isInCall,
     copyMyId, shareCallLink, regenerateId, updateSettingsDisplay,
     checkCallInvite, guestJoinCall, waitForGuest,
-    isAwaitingGuest: () => _awaitGuestFor !== null
+    callGroup, GROUP_MAX,
+    isAwaitingGuest: () => _awaitGuestFor !== null,
+    isInGroup: () => !!_group
   };
 })();
 
@@ -33227,7 +33883,10 @@ var Guide = (function () {
     'roster.search': [function () { if (!_isOpen('rosterOverlay')) RosterImport.open(); RosterImport.switchTab('search'); }, function () { return $('rsQuery'); }, 'guide.h.search', 'rosterOverlay'],
     'roster.paste': [function () { if (!_isOpen('rosterOverlay')) RosterImport.open(); RosterImport.switchTab('paste'); }, function () { return $('rosterPasteArea'); }, 'guide.h.paste', 'rosterOverlay'],
     'medimg.upload': [function () {}, function () { var i = $('medImgFileInput'); return i ? i.closest('label') : null; }, 'guide.h.upload', 'medImgOverlay'],
-    'posts': [_openPosts, function () { return $('blufPosts'); }, 'guide.h.posts', 'blufOverlay']
+    'posts': [_openPosts, function () { return $('blufPosts'); }, 'guide.h.posts', 'blufOverlay'],
+    'groupCall': [function () { try { SentinelViews.openPanel(); } catch (e) {} }, function () {
+      return document.querySelector('#svBody [data-sv-call]') || document.querySelector('#svBody [onclick*="newView(\'unit\')"]');
+    }, 'guide.h.groupCall', 'svOverlay']
   };
   var ACCOUNT_HINTS = { discover: 'guide.h.discover', phone: 'guide.h.myPhone', code: 'guide.h.code' };
 
