@@ -8466,14 +8466,28 @@ async function sha256(str) {
    retained for backward compatibility with existing codes.
    Note: index.html uppercases input before hashing; we do the same.
    To add a code: sha256('carecircle:' + CODE_UPPERCASED) and add the hex here. */
+/* Access codes, stored as SHA-256 of 'carecircle:' + code. A code with an
+   expiry stops working at that moment (epoch ms, UTC). Issued 28 Sep 2026. */
 const VALID_HASHES = new Set([
-  'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6',  /* BEVR — primary */
-  '2dfff49a919dda77992069e38094e3e2e8a699a3ac8e080d45664465d1700ffb',  /* tester  */
-  '02c9549ac193f3287f532293c5df0264965ccba60e79bd712919e7bd12bba5f9',  /* architect */
-  '696d20537f0205b818a6c83938ae3421dde94e626f5a286a6288ea37ad1644d5',  /* RSTX — tester-2 */
-  '1d86a55e665006e5ebf3e19a208b77fcc11478075acb3190f993ff2c06f077e2',  /* NXLP — tester-3 */
-  '7104ff5be2a110f3d94588986fb06741ca958a732324444c399449c58e319afa'   /* WQKZ — tester-4 */
+  '02c9549ac193f3287f532293c5df0264965ccba60e79bd712919e7bd12bba5f9',  /* primary */
+  'a3fe4af273bc66ef078dd5b61f6a39d4e8d61ad5642c36136131d5d972c2a17b',  /* RS 1 */
+  '1217d2bbb98144178898c681aeb42c444fc1c76a0b56534ae477a6e6198ef2fd',  /* RS 2 */
+  'b943f277d7aeb73f9da98d6a3cc78fcbef17aa12feba4f99abaa57190d067c96',  /* RS 3 */
+  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd',  /* RS 4, 24 h */
+  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483',  /* RS 5, 24 h */
+  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1'   /* RS 6, 24 h */
 ]);
+const CODE_EXPIRY = {
+  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd': 1790686954000,
+  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483': 1790686954000,
+  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1': 1790686954000
+};
+function codeState(hash) {
+  if (!VALID_HASHES.has(hash)) return 'invalid';
+  const exp = CODE_EXPIRY[hash];
+  if (exp && Date.now() > exp) return 'expired';
+  return 'ok';
+}
 
 /* ── Tesseract OCR lazy loader ── */
 /* Library loader with a visible progress pill; after 20s it offers Retry,
@@ -8626,21 +8640,31 @@ window.addEventListener('beforeinstallprompt', (e) => {
   deferredA2hsPrompt = e;
 });
 
-/* Auto-authenticate: set the primary code and submit the gate automatically */
-/* The gate is retired (26 Sep 2026): Remiel Sentinel opens straight to the
-   video intro. No access code is ever requested. The gate HTML, the hash
-   list and submitGateCode stay in the file, inert, for reference only.
-   The previous auto-enter typed a code whose hash was not in VALID_HASHES,
-   which left every user on the gate screen with "Invalid access code". */
+/* The build is locked (28 Sep 2026): an access code opens it, once per
+   device, and stays valid until that code expires. A guest opening a call
+   link (?call=) is let through to the join screen without a code. Nothing is
+   typed on the user's behalf: a stored code is re-checked against the list
+   and, if it is missing or expired, the gate is shown. */
 (function autoGateEntry() {
   try {
-    try { localStorage.setItem('rm:access', 'open'); } catch (e) {}
-    beginVideoIntro();
-  } catch (e) {
-    var g = document.getElementById('gateScreen');
-    if (g) g.style.display = 'none';
-  }
+    if (_guestCallMode) { beginVideoIntro(); return; }
+    var stored = '';
+    try { stored = localStorage.getItem('rm:access') || ''; } catch (e) {}
+    if (!stored || stored === 'open') { showGate(); return; }
+    sha256('carecircle:' + stored.toUpperCase()).then(function (h) {
+      if (codeState(h) === 'ok') beginVideoIntro(); else { try { localStorage.removeItem('rm:access'); } catch (e) {} showGate(); }
+    }).catch(function () { showGate(); });
+  } catch (e) { showGate(); }
 })();
+
+function showGate() {
+  var g = document.getElementById('gateScreen');
+  if (!g) return;
+  g.style.display = '';
+  g.style.opacity = '1';
+  g.style.zIndex = '';
+  setTimeout(function () { var i = document.getElementById('gateInput'); if (i) { try { i.focus(); } catch (e) {} } }, 200);
+}
 
 async function submitGateCode() {
   const input = document.getElementById('gateInput');
@@ -8649,7 +8673,8 @@ async function submitGateCode() {
   if (!code) { flashGateError(I18n.t('gate.error.empty'), input); return; }
 
   const hash = await sha256('carecircle:' + code);
-  if (VALID_HASHES.has(hash)) {
+  const state = codeState(hash);
+  if (state === 'ok') {
     errEl.innerHTML = '&nbsp;';
     /* Store for session continuity */
     try { localStorage.setItem('rm:access', code);
@@ -8657,6 +8682,8 @@ async function submitGateCode() {
     /* P1.1: no account prompt after the gate. A device account is created
        silently by SyncEngine.ensureIdentity once the user has a name. */
     beginVideoIntro();
+  } else if (state === 'expired') {
+    flashGateError(I18n.t('gate.error.expired'), input);
   } else {
     flashGateError(I18n.t('gate.error.invalid'), input);
   }
@@ -9565,6 +9592,7 @@ const I18n = (function () {
       'gate.placeholder':         'Access Code',
       'gate.enter':               'Enter',
       'gate.error.invalid':       'Invalid access code',
+      'gate.error.expired':       'This access code has expired. Ask Beverly Index for a current one.',
       'gate.error.empty':         'Enter an access code',
 
       'onboard.name.title':       'Set up your sphere',
@@ -9975,6 +10003,7 @@ const I18n = (function () {
       'gate.placeholder':         'Codice di Accesso',
       'gate.enter':               'Entra',
       'gate.error.invalid':       'Codice di accesso non valido',
+      'gate.error.expired':       'Questo codice di accesso è scaduto. Chiedi a Beverly Index un codice attuale.',
       'gate.error.empty':         'Inserisci un codice di accesso',
 
       'onboard.name.title':       'Come ti chiamiamo?',
