@@ -8481,15 +8481,33 @@ const VALID_HASHES = new Set([
   '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483',  /* RS 5, 24 h */
   'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1'   /* RS 6, 24 h */
 ]);
-const CODE_EXPIRY = {
-  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd': 1790686954000,
-  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483': 1790686954000,
-  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1': 1790686954000
+/* Codes that stop working a fixed time after their FIRST use, anywhere. The
+   first use is recorded by the API (POST /gate/use) so a code passed between
+   devices shares one clock; when the API cannot be reached, this device's own
+   record of the first use is used instead. */
+const CODE_TTL_MS = {
+  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd': 24 * 3600 * 1000,
+  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483': 24 * 3600 * 1000,
+  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1': 24 * 3600 * 1000
 };
-function codeState(hash) {
+const GATE_API = 'https://remiel-sentinel-api.vercel.app';
+async function _firstUse(hash) {
+  const key = 'rm:firstUse:' + hash.slice(0, 16);
+  let local = 0;
+  try { local = Number(localStorage.getItem(key)) || 0; } catch (e) {}
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(GATE_API + '/gate/use', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash: hash }), signal: ctl.signal });
+    clearTimeout(t);
+    if (r.ok) { const j = await r.json(); if (j && j.first_used_at) { try { localStorage.setItem(key, String(j.first_used_at)); } catch (e) {} return j.first_used_at; } }
+  } catch (e) {}
+  if (!local) { local = Date.now(); try { localStorage.setItem(key, String(local)); } catch (e) {} }
+  return local;
+}
+async function codeState(hash) {
   if (!VALID_HASHES.has(hash)) return 'invalid';
-  const exp = CODE_EXPIRY[hash];
-  if (exp && Date.now() > exp) return 'expired';
+  const ttl = CODE_TTL_MS[hash];
+  if (ttl) { const first = await _firstUse(hash); if (Date.now() > first + ttl) return 'expired'; }
   return 'ok';
 }
 
@@ -8655,8 +8673,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
     var stored = '';
     try { stored = localStorage.getItem('rm:access') || ''; } catch (e) {}
     if (!stored || stored === 'open') { showGate(); return; }
-    sha256('carecircle:' + stored.toUpperCase()).then(function (h) {
-      if (codeState(h) === 'ok') beginVideoIntro(); else { try { localStorage.removeItem('rm:access'); } catch (e) {} showGate(); }
+    sha256('carecircle:' + stored.toUpperCase()).then(function (h) { return codeState(h); }).then(function (st) {
+      if (st === 'ok') beginVideoIntro(); else { try { localStorage.removeItem('rm:access'); } catch (e) {} showGate(); }
     }).catch(function () { showGate(); });
   } catch (e) { showGate(); }
 })();
@@ -8677,7 +8695,7 @@ async function submitGateCode() {
   if (!code) { flashGateError(I18n.t('gate.error.empty'), input); return; }
 
   const hash = await sha256('carecircle:' + code);
-  const state = codeState(hash);
+  const state = await codeState(hash);
   if (state === 'ok') {
     errEl.innerHTML = '&nbsp;';
     /* Store for session continuity */

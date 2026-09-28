@@ -73,11 +73,26 @@ const KEYS={
   '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483':'qa5',
   'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1':'qa6'
 };
-const KEY_EXPIRY={
-  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd':1790686954000,
-  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483':1790686954000,
-  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1':1790686954000
+/* These stop working 24 hours after their first use anywhere (the API records
+   the first use; this device's own record is the fallback). */
+const KEY_TTL={
+  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd':86400000,
+  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483':86400000,
+  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1':86400000
 };
+const GATE_API='https://remiel-sentinel-api.vercel.app';
+async function firstUse(h){
+  const key='rm:firstUse:'+h.slice(0,16); let local=0;
+  try{ local=Number(localStorage.getItem(key))||0; }catch(e){}
+  try{
+    const ctl=new AbortController(); const tm=setTimeout(()=>ctl.abort(),6000);
+    const r=await fetch(GATE_API+'/gate/use',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hash:h}),signal:ctl.signal});
+    clearTimeout(tm);
+    if(r.ok){ const j=await r.json(); if(j&&j.first_used_at){ try{localStorage.setItem(key,String(j.first_used_at));}catch(e){} return j.first_used_at; } }
+  }catch(e){}
+  if(!local){ local=Date.now(); try{localStorage.setItem(key,String(local));}catch(e){} }
+  return local;
+}
 async function hashCode(c){
   const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('carecircle:'+c));
   return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -89,7 +104,7 @@ async function attempt(){
   if(!(window.crypto&&crypto.subtle)){ err.textContent='This gate requires a secure (https) connection.'; return; }
   const h=await hashCode(code);
   const who=KEYS[h];
-  if(who && KEY_EXPIRY[h] && Date.now()>KEY_EXPIRY[h]){
+  if(who && KEY_TTL[h] && Date.now()>(await firstUse(h))+KEY_TTL[h]){
     t('gate_fail',{code:'expired'});
     err.textContent='This access code has expired. Ask Beverly Index for a current one.';
     el.value=''; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); el.focus();
