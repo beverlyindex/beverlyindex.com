@@ -11233,6 +11233,12 @@ const I18n = (function () {
     "bc.done": "Done: back to your Circle",
     "views.importName": "Roster {date}",
     "comm.tapHint": "Tap to open all",
+    "posts.sample": "See an example post",
+    "posts.tapToAdd": "Tap to add a post link or see an example",
+    "posts.sampleRemove": "Remove the example",
+    "posts.sampleText": "Example post: Game day tomorrow. Locked in.",
+    "posts.sampleAdded": "Example added. Close this card and watch the dream state: it appears beside {first} within a few seconds. Tap Remove the example when you are done.",
+    "posts.sampleRemoved": "Example removed.",
     "comm.emptyShort": "No communication in the last 24 hours",
     "comm.back": "Back to the dream state",
     "comm.opened": "Communication opened. Tap the X to return to the dream state.",
@@ -11511,6 +11517,12 @@ const I18n = (function () {
     "bc.done": "Fatto: torna alla tua Cerchia",
     "views.importName": "Elenco {date}",
     "comm.tapHint": "Tocca per aprire tutto",
+    "posts.sample": "Vedi un post di esempio",
+    "posts.tapToAdd": "Tocca per aggiungere il link di un post o vedere un esempio",
+    "posts.sampleRemove": "Rimuovi l'esempio",
+    "posts.sampleText": "Post di esempio: Domani si gioca. Concentrati.",
+    "posts.sampleAdded": "Esempio aggiunto. Chiudi questa scheda e guarda lo stato di sogno: appare accanto a {first} entro pochi secondi. Tocca Rimuovi l'esempio quando hai finito.",
+    "posts.sampleRemoved": "Esempio rimosso.",
     "comm.emptyShort": "Nessuna comunicazione nelle ultime 24 ore",
     "comm.back": "Torna allo stato di sogno",
     "comm.opened": "Comunicazione aperta. Tocca la X per tornare allo stato di sogno.",
@@ -17635,9 +17647,9 @@ var ContactDetails = (function() {
     if (!platform) return null;
     var num = function(x) { var n = Number(x); return (isFinite(n) && n > 0) ? Math.round(n) : null; };
     var str = function(x, n) { return (typeof x === 'string' && x.trim()) ? x.trim().slice(0, n) : null; };
-    var thumb = str(p.thumb, 500);
-    if (thumb && !/^https:\/\//i.test(thumb)) thumb = null;
-    return { url: url, platform: platform, added: num(p.added) || Date.now(), ts: num(p.ts), title: str(p.title, 300), author: str(p.author, 120), thumb: thumb };
+    var thumb = (p.sample && typeof p.thumb === 'string' && /^data:image\/(jpeg|png);base64,/.test(p.thumb)) ? p.thumb.slice(0, 200000) : str(p.thumb, 500);
+    if (thumb && !/^https:\/\//i.test(thumb) && !(p.sample && /^data:image\//.test(thumb))) thumb = null;
+    return Object.assign({ url: url, platform: platform, added: num(p.added) || Date.now(), ts: num(p.ts), title: str(p.title, 300), author: str(p.author, 120), thumb: thumb }, p.sample ? { sample: true } : {});
   }
   function cleanPosts(list) {
     if (!Array.isArray(list)) return [];
@@ -18008,6 +18020,45 @@ const Social = (() => {
     return note;
   }
 
+  /* ── Example post: shows how a real post looks in the dream state and the
+     list. Clearly marked as an example; removed with one tap, and never sent
+     anywhere. The picture is drawn here, not taken from any platform. ── */
+  function _first(c) { return (c && c.first) ? c.first : ''; }
+  function _sampleImage() {
+    const cv = document.createElement('canvas'); cv.width = 640; cv.height = 640;
+    const x = cv.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 0, 640); g.addColorStop(0, '#0b1a3a'); g.addColorStop(0.55, '#1f3b73'); g.addColorStop(1, '#0a0f1c');
+    x.fillStyle = g; x.fillRect(0, 0, 640, 640);
+    /* stadium lights */
+    for (let i = 0; i < 4; i++) { const lx = 120 + i * 133; const rg = x.createRadialGradient(lx, 150, 0, lx, 150, 110); rg.addColorStop(0, 'rgba(255,244,200,0.95)'); rg.addColorStop(0.2, 'rgba(255,230,150,0.55)'); rg.addColorStop(1, 'rgba(255,230,150,0)'); x.fillStyle = rg; x.fillRect(lx - 110, 40, 220, 220); }
+    /* field */
+    x.fillStyle = '#1d6b3a'; x.fillRect(0, 400, 640, 240);
+    x.strokeStyle = 'rgba(255,255,255,0.75)'; x.lineWidth = 3;
+    for (let y = 420; y < 640; y += 40) { x.beginPath(); x.moveTo(0, y); x.lineTo(640, y); x.stroke(); }
+    /* silhouette */
+    x.fillStyle = '#05070c'; x.beginPath(); x.arc(320, 352, 34, 0, Math.PI * 2); x.fill();
+    x.fillRect(285, 386, 70, 120); x.fillRect(260, 396, 30, 90); x.fillRect(350, 396, 30, 90);
+    return cv.toDataURL('image/jpeg', 0.82);
+  }
+  async function addSample(c) {
+    if (!c) return null;
+    const list = _posts(c).filter(p => !p.sample);
+    list.unshift({ url: 'https://www.instagram.com/p/example/', platform: 'instagram', added: Date.now() - 35 * 60000, ts: Date.now() - 35 * 60000,
+      title: _t('posts.sampleText', 'Example post: Game day tomorrow. Locked in.'), author: _first(c), thumb: _sampleImage(), sample: true });
+    c.details = Object.assign({}, c.details || {}, { posts: list });
+    await _persist(c);
+    try { Comm.refresh(); } catch (e) {}
+    return { text: _t('posts.sampleAdded', 'Example added. Close this card and watch the dream state: it appears beside {first} within a few seconds. Tap Remove the example when you are done.', { first: _first(c) }) };
+  }
+  async function removeSample(c) {
+    if (!c) return null;
+    const list = _posts(c).filter(p => !p.sample);
+    c.details = Object.assign({}, c.details || {}, { posts: list });
+    await _persist(c);
+    try { Comm.refresh(); } catch (e) {}
+    return { text: _t('posts.sampleRemoved', 'Example removed.') };
+  }
+
   /* ── Rendering ── */
   function _current() {
     try { return (typeof selectedContact !== 'undefined') ? selectedContact : null; } catch (e) { return null; }
@@ -18031,12 +18082,13 @@ const Social = (() => {
     let commPreview = '', commList = '';
     try { commPreview = Comm.cardHtml(c, 'preview'); commList = Comm.cardHtml(c, 'list'); Comm.warm(c.id, () => _rerenderAny(c)); } catch (e) {}
     const emptyLine = '<div class="bluf-posts-empty">' + _esc(_t('posts.empty', 'No public handles yet. Tap the pencil at the top of this card, then Social, to add them.')) + '</div>';
-    if (!handles.length && !posts.length) {
-      el.setAttribute('data-state', 'empty');
-      el.removeAttribute('role');
-      el.removeAttribute('tabindex');
-      el.removeAttribute('aria-expanded');
-      el.innerHTML = head + commPreview + emptyLine;
+    if (!handles.length && !posts.length && !_expanded) {
+      /* Nothing yet: the block still opens, so a link or an example can be added */
+      el.setAttribute('data-state', 'preview');
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-expanded', 'false');
+      el.innerHTML = head + commPreview + emptyLine + '<div class="bluf-posts-hint">' + _esc(_t('posts.tapToAdd', 'Tap to add a post link or see an example')) + '</div>';
       return;
     }
     if (!_expanded) {
@@ -18106,7 +18158,9 @@ const Social = (() => {
     html += '<div class="bluf-posts-add" id="blufPostsAdd">' + (_formOpen
       ? '<form class="bluf-posts-add-form" id="postsAddForm"><input type="url" id="postsLinkInput" inputmode="url" autocomplete="off" placeholder="' + _esc(_t('posts.linkPh', 'Paste the post link here')) + '" aria-label="' + _esc(_t('posts.linkPh', 'Paste the post link here')) + '">' +
         '<button type="submit" class="posts-btn posts-btn-lit" id="postsAddBtn">' + _esc(_t('posts.add', 'Add')) + '</button></form>'
-      : '<button type="button" class="posts-btn" id="postsAddLinkBtn">' + _esc(_t('posts.addLink', 'Add a post link')) + '</button>') +
+      : '<button type="button" class="posts-btn" id="postsAddLinkBtn">' + _esc(_t('posts.addLink', 'Add a post link')) + '</button>' +
+        (posts.some(x => x.sample) ? '<button type="button" class="posts-btn" id="postsSampleRemoveBtn">' + _esc(_t('posts.sampleRemove', 'Remove the example')) + '</button>'
+                                   : '<button type="button" class="posts-btn" id="postsSampleBtn">' + _esc(_t('posts.sample', 'See an example post')) + '</button>')) +
       (_note ? '<div class="bluf-posts-note' + (_note.err ? ' is-err' : '') + '" role="status">' + _esc(_note.text) + '</div>' : '') +
       '</div><div class="bluf-posts-done" id="postsDoneWrap" hidden><button type="button" class="posts-btn posts-btn-lit btn-advance" id="postsDoneBtn">' + _esc(_t('posts.done', 'Done: back to monitoring')) + '</button></div>';
     return html;
@@ -18159,7 +18213,7 @@ const Social = (() => {
 
   function expand() {
     const c = _current();
-    if (!c || (!_handles(c).length && !_posts(c).length)) return false;
+    if (!c) return false;
     if (_expanded) return true;
     _expanded = true;
     renderBluf(c);
@@ -18192,6 +18246,8 @@ const Social = (() => {
       if (!t) return;
       if (t.id === 'postsCloseBtn' || t.id === 'postsDoneBtn') { e.preventDefault(); collapse(); return; }
       if (t.id === 'postsAddLinkBtn') { e.preventDefault(); _formOpen = true; _note = null; renderBluf(_current()); return; }
+      if (t.id === 'postsSampleBtn') { e.preventDefault(); addSample(_current()).then(n => { _note = n; renderBluf(_current()); }); return; }
+      if (t.id === 'postsSampleRemoveBtn') { e.preventDefault(); removeSample(_current()).then(n => { _note = n; renderBluf(_current()); }); return; }
     });
     el.addEventListener('submit', async (e) => {
       if (!e.target || e.target.id !== 'postsAddForm') return;
