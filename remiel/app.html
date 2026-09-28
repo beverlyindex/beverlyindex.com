@@ -2647,6 +2647,7 @@
     display: inline-flex; align-items: center; justify-content: center;
   }
   .card-x:hover { background: rgba(255,255,255,0.18); }
+  .clv-role { font-family: var(--nous-mono, 'JetBrains Mono', monospace); font-size: 10px; color: #9fd8ff; letter-spacing: 0.4px; margin-left: 6px; }
   .bluf-x { position: absolute; top: 10px; right: 10px; z-index: 5; }
   .alert-panel-title {
     font-family: var(--nous-serif, 'Instrument Serif', serif);
@@ -6730,7 +6731,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <!-- Bev-tile data grid -->
       <div class="bev-strip" id="bevStrip"></div>
       <!-- Latest Message -->
-      <div class="bluf-msg-latest" id="blufMsgLatest" hidden></div>
+      <div class="bluf-msg-latest" id="blufMsgLatest" hidden aria-hidden="true"></div>
       <!-- Public posts: handles and pasted post links, beneath the interaction memory (Social module) -->
       <section class="bluf-posts" id="blufPosts" data-state="preview" aria-label="Public posts" hidden></section>
 
@@ -6961,7 +6962,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <!-- Pull 6: Medication Tracking -->
       <div class="bluf-pull" id="pull_medication">
         <div class="bluf-pull-header" onclick="togglePull('medication')">
-          <div class="bluf-section-label" data-i18n="pull.medication">Medications</div>
+          <div class="bluf-section-label" data-i18n="pull.medication">Treatment &amp; Medications</div>
           <span class="bluf-pull-preview" id="pullPrev_medication" data-i18n="pull.preview.medication">Track medications &amp; refills</span>
           <span class="bluf-pull-chevron">&#9660;</span>
         </div>
@@ -9477,7 +9478,7 @@ const I18n = (function () {
       'badge.newEntry':           'NEW ENTRY',
       'badge.needsAttention':     'NEEDS ATTENTION',
 
-      'pull.medication':           'Medications',
+      'pull.medication':           'Treatment & Medications',
       'pull.preview.medication':  'Track medications & refills',
       'med.searchPlaceholder':    'Search or enter medication name…',
       'med.dosePlaceholder':      'Dose (e.g. 10mg)',
@@ -9887,7 +9888,7 @@ const I18n = (function () {
       'badge.newEntry':           'NUOVA VOCE',
       'badge.needsAttention':     'RICHIEDE ATTENZIONE',
 
-      'pull.medication':           'Farmaci',
+      'pull.medication':           'Terapie e farmaci',
       'pull.preview.medication':  'Traccia farmaci e ricariche',
       'med.searchPlaceholder':    'Cerca o inserisci nome del farmaco…',
       'med.dosePlaceholder':      'Dose (es. 10mg)',
@@ -13821,6 +13822,16 @@ function rebuildNodeTargets() {
   });
 }
 
+/* The role shown under a sphere's name: position (sports), MOS or rank
+   (service), specialty or role (medical). Empty when nothing is recorded. */
+function contactRole(c) {
+  var d = c && c.details;
+  if (!d || typeof d !== 'object') return '';
+  var v = d.position || d.mos || d.specialty || d.role || d.rank || d.department || d.credential || '';
+  v = String(v).trim();
+  return v.length > 22 ? v.slice(0, 21) + '\u2026' : v;
+}
+
 function buildNodes(fresh) {
   /* ── SentinelViews filter: only show contacts in active view ── */
   var _viewFilter = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
@@ -16997,6 +17008,9 @@ const SentinelMessaging = (() => {
 
   /* ── Update BLUF latest message section ── */
   async function _updateBlufLatestMessage(contactId) {
+    /* Retired: the latest message now shows in the Communication block. */
+    try { var _el0 = document.getElementById('blufMsgLatest'); if (_el0) _el0.hidden = true; } catch (e) {}
+    return;
     const el = document.getElementById('blufMsgLatest');
     if (!el) return;
     const messages = await _loadThread(contactId);
@@ -17398,7 +17412,7 @@ const SentinelViews = (() => {
       h += '<div class="sv-roster-item' + (sel ? ' selected' : '') + '" data-id="' + _esc(String(c.id)) + '" onclick="SentinelViews.toggleContactEl(this)">';
       h += '<div class="sv-roster-check"><span class="sv-roster-check-mark">\u2713</span></div>';
       h += '<div class="sv-roster-name">' + _esc(c.first + ' ' + c.last) + '</div>';
-      h += '<div class="sv-roster-cat">' + (c.cat || '') + '</div>';
+      h += '<div class="sv-roster-cat">' + _esc([contactRole(c), (c.cat || '')].filter(Boolean).join(' \u00b7 ')) + '</div>';
       h += '</div>';
     });
 
@@ -23797,8 +23811,9 @@ function drawNetworkView(t) {
       const _r = Math.max(2, node.r * _s * (_isF ? FOCUS_SCALE : 1));
       const _nfs = Math.max(9, Math.min(14, Math.round(12 * _s)));
       const _hfs = Math.max(8, Math.min(12, Math.round(10 * _s)));
-      const _nw = Math.max(30, String(node.contact.first || '').length * _nfs * 0.6);
-      const _nameR = { x: p.sx - _nw / 2, y: p.sy + _r + 2 * _s, w: _nw, h: _nfs + 2 };
+      const _roleL = contactRole(node.contact);
+      const _nw = Math.max(30, Math.max(String(node.contact.first || '').length, _roleL.length * 0.85) * _nfs * 0.6);
+      const _nameR = { x: p.sx - _nw / 2, y: p.sy + _r + 2 * _s, w: _nw, h: _nfs + 2 + (_roleL ? 15 : 0) };
       let _hw = 120 * _s;
       try {
         const _hlTxt = getContactHeadline(node.contact) || '';
@@ -24130,12 +24145,25 @@ function drawNetworkView(t) {
       const _nmX = Math.max(6 + _nmW / 2, Math.min(W - 6 - _nmW / 2, sx));
       ctx.fillText(node.contact.first, _nmX, sy + r + 12 * s);
     }
+    var _roleTxt = (s > 0.38) ? contactRole(node.contact) : '';
+    var _roleY = 0;
+    if (_roleTxt) {
+      ctx.globalAlpha = 0.8 * (alphaOverride || 1) * (node._lblName === undefined ? 1 : node._lblName);
+      const _rfs = Math.max(9, Math.min(11, Math.round(9.5 * s)));
+      _roleY = sy + r + 12 * s + Math.max(9, Math.min(14, Math.round(12 * s))) + 3;
+      ctx.font = `600 ${_rfs}px "JetBrains Mono", "SF Mono", monospace`;
+      ctx.fillStyle = '#9fd8ff';
+      const _rW = ctx.measureText(_roleTxt).width;
+      const _rX = Math.max(6 + _rW / 2, Math.min(W - 6 - _rW / 2, sx));
+      ctx.fillText(_roleTxt, _rX, _roleY);
+      ctx.fillStyle = col;
+    }
 
     /* Urgency label for sev 0 or 1 */
     if (isUrgent && s > 0.38 && node._lblName !== 0.28) {
       ctx.globalAlpha = (0.55 + 0.35 * pulseA) * (alphaOverride || 1);
       ctx.font = `600 ${Math.round(9 * s)}px "Hanken Grotesk", system-ui, sans-serif`;
-      ctx.fillText(sevLabel(node.contact.sev).toLowerCase(), sx, sy + r + 24 * s);
+      ctx.fillText(sevLabel(node.contact.sev).toLowerCase(), sx, _roleTxt ? _roleY + 12 : sy + r + 24 * s);
     }
 
     /* ── Quick-action icons beneath focused/enlarged sphere ── */
@@ -26837,6 +26865,7 @@ const ContactListView = (() => {
       const _svl = (typeof c.sev === 'number') ? sevLabel(c.sev) : '';
       const li = _el('li', { class: 'clv-item' });
       const _nm = _el('p', { class: 'clv-name' }, name);
+      try { const _rl = contactRole(c); if (_rl) _nm.appendChild(_el('span', { class: 'clv-role' }, ' ' + _rl)); } catch (e) {}
       const _av = PhotoFit.avatarHtml(c.id, 28);
       if (_av) { _nm.insertAdjacentHTML('afterbegin', _av); _nm.firstChild.style.marginRight = '8px'; }
       li.appendChild(_nm);
