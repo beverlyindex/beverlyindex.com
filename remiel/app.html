@@ -2647,6 +2647,10 @@
     display: inline-flex; align-items: center; justify-content: center;
   }
   .card-x:hover { background: rgba(255,255,255,0.18); }
+  .sv-roster-tools { display:flex; align-items:center; gap:8px; margin:0 0 8px; }
+  .sv-roster-count { flex:1; font-size:12px; color:#94a3b8; }
+  .sv-tool-btn { background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.5); color:#7dd3fc; border-radius:8px; padding:6px 12px; font:600 12px 'Hanken Grotesk',system-ui,sans-serif; cursor:pointer; }
+  .sv-editor-note { padding:6px 16px; font-size:13px; color:#fca5a5; }
   .clv-role { font-family: var(--nous-mono, 'JetBrains Mono', monospace); font-size: 10px; color: #9fd8ff; letter-spacing: 0.4px; margin-left: 6px; }
   .bluf-x { position: absolute; top: 10px; right: 10px; z-index: 5; }
   .alert-panel-title {
@@ -11574,6 +11578,13 @@ const I18n = (function () {
     "a11y.call": "Call",
     "a11y.message": "Message",
     "a11y.video": "Video",
+    "a11y.remove": "Remove",
+    "confirm.removeNamed": "Remove {name} from your circle? Their notes and history on this device go with them.",
+    "list.removed": "{name} removed",
+    "views.selectAll": "Select all",
+    "views.clearAll": "Clear",
+    "views.selectedN": "{n} selected",
+    "views.saveFailed": "The view could not be saved: {err}",
     "a11y.skip": "Skip to main content",
     "bc.cameraOffState": "Camera off",
     "bc.vol": "Vol",
@@ -11858,6 +11869,13 @@ const I18n = (function () {
     "a11y.call": "Chiama",
     "a11y.message": "Messaggio",
     "a11y.video": "Video",
+    "a11y.remove": "Rimuovi",
+    "confirm.removeNamed": "Rimuovere {name} dalla tua cerchia? Le note e la cronologia su questo dispositivo vanno via con la persona.",
+    "list.removed": "{name} rimosso",
+    "views.selectAll": "Seleziona tutti",
+    "views.clearAll": "Azzera",
+    "views.selectedN": "{n} selezionati",
+    "views.saveFailed": "La vista non è stata salvata: {err}",
     "a11y.skip": "Vai al contenuto principale",
     "bc.cameraOffState": "Fotocamera spenta",
     "bc.vol": "Vol",
@@ -18015,6 +18033,8 @@ const SentinelViews = (() => {
     const titleEl = document.getElementById('svEditorTitle');
     if (!editor) return;
     if (titleEl) titleEl.textContent = title;
+    const sb = document.getElementById('svSaveBtn'); if (sb) sb.disabled = false;
+    const note = document.getElementById('svEditorNote'); if (note) note.textContent = '';
     _renderRoster();
     _updateSaveBtn();
     editor.classList.add('open');
@@ -18035,11 +18055,24 @@ const SentinelViews = (() => {
     rsOverlayFlag('circleEditor', false);
   }
 
+  function selectAll(on) {
+    if (TYPE_LIMITS[_editorType] === 1) return;
+    _selectedIds = new Set();
+    if (on) DEMO_CONTACTS.forEach(c => _selectedIds.add(c.id));
+    _renderRoster();
+    _updateSaveBtn();
+  }
   function _renderRoster() {
     const roster = document.getElementById('svRoster');
     if (!roster || typeof DEMO_CONTACTS === 'undefined') return;
 
     let h = '';
+    /* Select all and Clear for Unit and Team views; a One-on-One holds one person */
+    if (TYPE_LIMITS[_editorType] !== 1 && DEMO_CONTACTS.length > 1) {
+      h += '<div class="sv-roster-tools"><span class="sv-roster-count">' + _esc(_t('views.count', '{n} contacts', { n: DEMO_CONTACTS.length })) + (_selectedIds.size ? ' \u00b7 ' + _esc(_t('views.selectedN', '{n} selected', { n: _selectedIds.size })) : '') + '</span>' +
+        '<button type="button" class="sv-tool-btn" onclick="SentinelViews.selectAll(true)">' + _esc(_t('views.selectAll', 'Select all')) + '</button>' +
+        '<button type="button" class="sv-tool-btn" onclick="SentinelViews.selectAll(false)">' + _esc(_t('views.clearAll', 'Clear')) + '</button></div>';
+    }
     /* Sort alphabetically */
     const sorted = DEMO_CONTACTS.slice().sort((a, b) =>
       (a.first + ' ' + a.last).localeCompare(b.first + ' ' + b.last)
@@ -18115,7 +18148,8 @@ const SentinelViews = (() => {
     if (_saving) return;
     const nameInput = document.getElementById('svNameInput');
     const name = nameInput ? nameInput.value.trim() : '';
-    if (!name || _selectedIds.size === 0) return;
+    if (!name) { _editorNote(_t('hint.viewName', 'Give the view a name first')); try { nameInput && nameInput.focus(); } catch (e) {} return; }
+    if (_selectedIds.size === 0) { _editorNote(_t('hint.viewPick', 'Pick at least one person first')); return; }
 
     const contactIds = Array.from(_selectedIds);
     const btn = document.getElementById('svSaveBtn');
@@ -18140,11 +18174,26 @@ const SentinelViews = (() => {
         _updateBadge();
         _svBanner('views-created', _t('views.bannerCreated', 'View "{name}" created and now active', { name: name }));
       }
+    } catch (e) {
+      console.warn('[SentinelViews] save failed', e);
+      _editorNote(_t('views.saveFailed', 'The view could not be saved: {err}', { err: (e && e.message) || String(e) }));
     } finally {
+      /* The button must come back for the next view: it stayed disabled after the first save */
+      if (btn) btn.disabled = false;
       try { closeEditor(); } catch (e) { console.warn('[SentinelViews] closeEditor failed', e); }
       try { _renderPanel(); } catch (e) {}
       _saving = false;
     }
+  }
+  function _editorNote(text) {
+    let el = document.getElementById('svEditorNote');
+    if (!el) {
+      const foot = document.querySelector('#svEditor .sv-editor-footer');
+      if (!foot) { showToast(text); return; }
+      el = document.createElement('div'); el.id = 'svEditorNote'; el.className = 'sv-editor-note'; el.setAttribute('role', 'status');
+      foot.parentNode.insertBefore(el, foot);
+    }
+    el.textContent = text;
   }
 
   /* ── Delete confirmation ── */
@@ -18169,8 +18218,8 @@ const SentinelViews = (() => {
     init,
     openPanel, closePanel,
     newView, editView, closeEditor,
-    toggleContact, toggleContactEl, saveView,
-    activateView, clearView, adoptImport, createView,
+    toggleContact, toggleContactEl, selectAll, saveView,
+    activateView, clearView, adoptImport, createView, updateView,
     confirmDelete,
     getActiveView,
     getFilteredContacts,
@@ -28746,6 +28795,7 @@ const ContactListView = (() => {
       '.clv-btn{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:#e5e7eb;' +
       'font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;}' +
       '.clv-btn.primary{background:#C5A55A;color:#000;border-color:#C5A55A;}' +
+      '.clv-btn.danger{border-color:rgba(239,68,68,0.6);color:#fca5a5;}' +
       '.clv-empty{padding:16px 4px;color:#9ca3af;font:400 14px "Hanken Grotesk",system-ui,sans-serif;}';
     document.head.appendChild(css);
 
@@ -28829,6 +28879,12 @@ const ContactListView = (() => {
       acts.appendChild(_action(_t('a11y.call', 'Call'), '', () => { close(); runContactQuickAction('phone', c); }));
       acts.appendChild(_action(_t('a11y.message', 'Message'), '', () => { close(); runContactQuickAction('sms', c); }));
       acts.appendChild(_action(_t('a11y.video', 'Video'), '', () => { close(); runContactQuickAction('video', c); }));
+      acts.appendChild(_action(_t('a11y.remove', 'Remove'), 'danger', async () => {
+        if (!(await uiConfirm(_t('confirm.removeNamed', 'Remove {name} from your circle? Their notes and history on this device go with them.', { name: name })))) return;
+        try { await removeContactFromCircle(c.id); } catch (e) { console.warn('remove failed', e); }
+        _render();
+        showToast(_t('list.removed', '{name} removed', { name: name }));
+      }));
       li.appendChild(acts);
       ul.appendChild(li);
       /* Last contact is async: fill in when known */
@@ -36740,25 +36796,31 @@ async function saveContactModal() {
   closeContactModal();
 }
 
+/* Remove a person everywhere: the live list, the database (synced as a
+   tombstone), every Circle View that named them, and the galaxy. */
+async function removeContactFromCircle(id) {
+  const idx = DEMO_CONTACTS.findIndex(c => String(c.id) === String(id));
+  if (idx !== -1) DEMO_CONTACTS.splice(idx, 1);
+  try { await RemielDB.deleteContact(id); } catch (e) { console.warn('Contact delete failed', e); }
+  try {
+    if (typeof SentinelViews !== 'undefined') SentinelViews.views.forEach(v => {
+      if (v.contactIds.some(x => String(x) === String(id))) SentinelViews.updateView(v.id, { contactIds: v.contactIds.filter(x => String(x) !== String(id)) });
+    });
+  } catch (e) {}
+  try { contactPhotos.delete(id); } catch (e) {}
+  if (selectedContact && String(selectedContact.id) === String(id)) { selectedContact = null; if (blufOpen) closeBluf(); }
+  if (focusedContactId != null && String(focusedContactId) === String(id)) focusedContactId = null;
+  try { if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty(); } catch (e) {}
+  buildNodes(false);
+}
+
 async function deleteContactFromModal() {
   if (_cmEditId == null) return;
 
   // Confirmation
   if (!(await uiConfirm(I18n.t('confirm.removePerson')))) return;
 
-  // Remove from DEMO_CONTACTS
-  const idx = DEMO_CONTACTS.findIndex(c => c.id === _cmEditId);
-  if (idx !== -1) {
-    DEMO_CONTACTS.splice(idx, 1);
-  }
-
-  // Remove from IndexedDB
-  try {
-    await RemielDB.deleteContact(_cmEditId);
-  } catch (e) { console.warn('Contact delete failed', e); }
-
-  // Rebuild nodes
-  buildNodes(false);
+  await removeContactFromCircle(_cmEditId);
 
   // Close modal and BLUF
   closeContactModal();
