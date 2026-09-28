@@ -4562,6 +4562,39 @@
     font-variant-numeric: tabular-nums; z-index: 100002;
     padding-top: 16px;
   }
+  .sc-safety {
+    position: absolute; top: calc(env(safe-area-inset-top, 12px) + 40px); left: 16px; right: 148px;
+    text-align: left; color: rgba(255,255,255,0.85); font-size: 13px; z-index: 100002; line-height: 1.4;
+  }
+  .sentinel-call-overlay.group .sc-safety { display: none; }
+  .sc-safety[hidden] { display: none; }
+  .sc-safety-words { font-weight: 600; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .sc-safety-help {
+    display: inline-flex; align-items: center; justify-content: center; margin-left: 6px;
+    width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.5);
+    background: rgba(0,0,0,0.35); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; padding: 0; vertical-align: middle;
+  }
+  .sc-safety-explain {
+    margin: 8px auto 0; max-width: 340px; font-size: 13px; line-height: 1.45; color: rgba(255,255,255,0.9);
+    background: rgba(0,0,0,0.55); border-radius: 10px; padding: 8px 12px; text-align: left;
+  }
+  .sc-safety-explain[hidden] { display: none; }
+  .sc-group-safety-hint { font-size: 12px; color: rgba(255,255,255,0.65); flex-basis: 100%; }
+  .sc-group-safety-hint[hidden] { display: none; }
+  .sc-tile.live { cursor: pointer; }
+  .sc-safety-pop {
+    position: absolute; left: 16px; right: 16px; top: 50%; transform: translateY(-50%);
+    max-width: 360px; margin: 0 auto; z-index: 100004;
+    background: #14142b; color: #fff; border: 1px solid rgba(255,255,255,0.18); border-radius: 14px;
+    padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-size: 14px; line-height: 1.45;
+  }
+  .sc-safety-pop[hidden] { display: none; }
+  .sc-safety-pop .sc-safety-title { font-weight: 600; margin-bottom: 6px; }
+  .sc-safety-pop .sc-safety-words { display: block; font-size: 17px; margin: 4px 0 8px; }
+  .sc-safety-pop .sc-safety-close {
+    display: block; margin: 10px 0 0 auto; background: rgba(255,255,255,0.12); color: #fff; border: none;
+    border-radius: 8px; padding: 8px 14px; font-size: 14px; cursor: pointer;
+  }
   .sc-connecting-dots::after {
     content: ''; animation: scDots 1.5s infinite;
   }
@@ -7250,9 +7283,19 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <video class="sc-remote-video" id="scRemoteVideo" autoplay playsinline></video>
   <video class="sc-local-video" id="scLocalVideo" autoplay playsinline muted></video>
   <div class="sc-call-timer" id="scCallTimer" hidden>00:00</div>
+  <div class="sc-safety" id="scSafety" hidden>
+    <span id="scSafetyLabel">Safety words</span>: <span class="sc-safety-words" id="scSafetyWords"></span><button type="button" class="sc-safety-help" id="scSafetyHelp" onclick="SentinelCall.toggleSafetyExplain()" aria-label="What are safety words?">?</button>
+    <div class="sc-safety-explain" id="scSafetyExplain" hidden></div>
+  </div>
   <div class="sc-group" id="scGroup" hidden>
-    <div class="sc-group-head"><span id="scGroupHead" aria-live="polite"></span><span class="sc-group-timer" id="scGroupTimer" hidden>00:00</span></div>
+    <div class="sc-group-head"><span id="scGroupHead" aria-live="polite"></span><span class="sc-group-timer" id="scGroupTimer" hidden>00:00</span><span class="sc-group-safety-hint" id="scGroupSafetyHint" hidden></span></div>
     <div class="sc-grid" id="scGrid"></div>
+    <div class="sc-safety-pop" id="scSafetyPop" hidden role="dialog">
+      <div class="sc-safety-title" id="scSafetyPopTitle"></div>
+      <span class="sc-safety-words" id="scSafetyPopWords"></span>
+      <div id="scSafetyPopExplain"></div>
+      <button type="button" class="sc-safety-close" id="scSafetyPopClose" onclick="SentinelCall.hideTileSafety()">OK</button>
+    </div>
     <div class="sc-invite-line" id="scGroupInviteLine" hidden></div>
     <div class="sc-invite-actions" id="scGroupInviteActions" hidden></div>
   </div>
@@ -10693,6 +10736,12 @@ const I18n = (function () {
     'call.unavailable': "Video calling is not available right now",
     'call.calling': "Calling...",
     'call.connectFailed': "Connection failed",
+    'call.serverUnreachable': "Call server unreachable. Try again in a moment.",
+    'call.safetyWords': "Safety words",
+    'call.safetyExplain': "Read these four words to each other. They must match on both screens. If they differ, hang up: someone may be between you.",
+    'call.safetyTapTile': "Tap a person's tile to see the safety words for you and them.",
+    'call.safetyPending': "Safety words appear once the video connects.",
+    'call.safetyWith': "Safety words with {name}",
     'call.regenConfirm': "Generate a new Sentinel ID? Anyone with your old ID or call link will no longer be able to reach you.",
     'call.endFirst': "End the current call first",
     'call.regenServerFail': "(not yet saved to your account; try again later)",
@@ -11202,6 +11251,12 @@ const I18n = (function () {
     'call.unavailable': "Le videochiamate non sono disponibili in questo momento",
     'call.calling': "Chiamata in corso...",
     'call.connectFailed': "Connessione non riuscita",
+    'call.serverUnreachable': "Server delle chiamate non raggiungibile. Riprova tra un momento.",
+    'call.safetyWords': "Parole di sicurezza",
+    'call.safetyExplain': "Leggetevi queste quattro parole a vicenda. Devono coincidere su entrambi gli schermi. Se sono diverse, riattaccate: qualcuno potrebbe essere in mezzo.",
+    'call.safetyTapTile': "Tocca il riquadro di una persona per vedere le parole di sicurezza tra te e lei.",
+    'call.safetyPending': "Le parole di sicurezza compaiono quando il video si collega.",
+    'call.safetyWith': "Parole di sicurezza con {name}",
     'call.regenConfirm': "Creare un nuovo ID Sentinel? Chi ha il tuo vecchio ID o link di chiamata non potrà più raggiungerti.",
     'call.endFirst': "Prima chiudi la chiamata in corso",
     'call.regenServerFail': "(non ancora salvato nel tuo account; riprova più tardi)",
@@ -32251,6 +32306,11 @@ const AccountPanel = (function() {
    loads it after first paint when this device is signed in, and a call
    placed before that loads it on demand (_ensurePeer). */
 
+/* BIP-0039 English word list (2048 words, public domain). Used only to turn
+   a hash of the two DTLS fingerprints of a call into four words that both
+   sides can read to each other. */
+const SC_SAFETY_WORDS = 'abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual adapt add addict address adjust admit adult advance advice aerobic affair afford afraid again age agent agree ahead aim air airport aisle alarm album alcohol alert alien all alley allow almost alone alpha already also alter always amateur amazing among amount amused analyst anchor ancient anger angle angry animal ankle announce annual another answer antenna antique anxiety any apart apology appear apple approve april arch arctic area arena argue arm armed armor army around arrange arrest arrive arrow art artefact artist artwork ask aspect assault asset assist assume asthma athlete atom attack attend attitude attract auction audit august aunt author auto autumn average avocado avoid awake aware away awesome awful awkward axis baby bachelor bacon badge bag balance balcony ball bamboo banana banner bar barely bargain barrel base basic basket battle beach bean beauty because become beef before begin behave behind believe below belt bench benefit best betray better between beyond bicycle bid bike bind biology bird birth bitter black blade blame blanket blast bleak bless blind blood blossom blouse blue blur blush board boat body boil bomb bone bonus book boost border boring borrow boss bottom bounce box boy bracket brain brand brass brave bread breeze brick bridge brief bright bring brisk broccoli broken bronze broom brother brown brush bubble buddy budget buffalo build bulb bulk bullet bundle bunker burden burger burst bus business busy butter buyer buzz cabbage cabin cable cactus cage cake call calm camera camp can canal cancel candy cannon canoe canvas canyon capable capital captain car carbon card cargo carpet carry cart case cash casino castle casual cat catalog catch category cattle caught cause caution cave ceiling celery cement census century cereal certain chair chalk champion change chaos chapter charge chase chat cheap check cheese chef cherry chest chicken chief child chimney choice choose chronic chuckle chunk churn cigar cinnamon circle citizen city civil claim clap clarify claw clay clean clerk clever click client cliff climb clinic clip clock clog close cloth cloud clown club clump cluster clutch coach coast coconut code coffee coil coin collect color column combine come comfort comic common company concert conduct confirm congress connect consider control convince cook cool copper copy coral core corn correct cost cotton couch country couple course cousin cover coyote crack cradle craft cram crane crash crater crawl crazy cream credit creek crew cricket crime crisp critic crop cross crouch crowd crucial cruel cruise crumble crunch crush cry crystal cube culture cup cupboard curious current curtain curve cushion custom cute cycle dad damage damp dance danger daring dash daughter dawn day deal debate debris decade december decide decline decorate decrease deer defense define defy degree delay deliver demand demise denial dentist deny depart depend deposit depth deputy derive describe desert design desk despair destroy detail detect develop device devote diagram dial diamond diary dice diesel diet differ digital dignity dilemma dinner dinosaur direct dirt disagree discover disease dish dismiss disorder display distance divert divide divorce dizzy doctor document dog doll dolphin domain donate donkey donor door dose double dove draft dragon drama drastic draw dream dress drift drill drink drip drive drop drum dry duck dumb dune during dust dutch duty dwarf dynamic eager eagle early earn earth easily east easy echo ecology economy edge edit educate effort egg eight either elbow elder electric elegant element elephant elevator elite else embark embody embrace emerge emotion employ empower empty enable enact end endless endorse enemy energy enforce engage engine enhance enjoy enlist enough enrich enroll ensure enter entire entry envelope episode equal equip era erase erode erosion error erupt escape essay essence estate eternal ethics evidence evil evoke evolve exact example excess exchange excite exclude excuse execute exercise exhaust exhibit exile exist exit exotic expand expect expire explain expose express extend extra eye eyebrow fabric face faculty fade faint faith fall false fame family famous fan fancy fantasy farm fashion fat fatal father fatigue fault favorite feature february federal fee feed feel female fence festival fetch fever few fiber fiction field figure file film filter final find fine finger finish fire firm first fiscal fish fit fitness fix flag flame flash flat flavor flee flight flip float flock floor flower fluid flush fly foam focus fog foil fold follow food foot force forest forget fork fortune forum forward fossil foster found fox fragile frame frequent fresh friend fringe frog front frost frown frozen fruit fuel fun funny furnace fury future gadget gain galaxy gallery game gap garage garbage garden garlic garment gas gasp gate gather gauge gaze general genius genre gentle genuine gesture ghost giant gift giggle ginger giraffe girl give glad glance glare glass glide glimpse globe gloom glory glove glow glue goat goddess gold good goose gorilla gospel gossip govern gown grab grace grain grant grape grass gravity great green grid grief grit grocery group grow grunt guard guess guide guilt guitar gun gym habit hair half hammer hamster hand happy harbor hard harsh harvest hat have hawk hazard head health heart heavy hedgehog height hello helmet help hen hero hidden high hill hint hip hire history hobby hockey hold hole holiday hollow home honey hood hope horn horror horse hospital host hotel hour hover hub huge human humble humor hundred hungry hunt hurdle hurry hurt husband hybrid ice icon idea identify idle ignore ill illegal illness image imitate immense immune impact impose improve impulse inch include income increase index indicate indoor industry infant inflict inform inhale inherit initial inject injury inmate inner innocent input inquiry insane insect inside inspire install intact interest into invest invite involve iron island isolate issue item ivory jacket jaguar jar jazz jealous jeans jelly jewel job join joke journey joy judge juice jump jungle junior junk just kangaroo keen keep ketchup key kick kid kidney kind kingdom kiss kit kitchen kite kitten kiwi knee knife knock know lab label labor ladder lady lake lamp language laptop large later latin laugh laundry lava law lawn lawsuit layer lazy leader leaf learn leave lecture left leg legal legend leisure lemon lend length lens leopard lesson letter level liar liberty library license life lift light like limb limit link lion liquid list little live lizard load loan lobster local lock logic lonely long loop lottery loud lounge love loyal lucky luggage lumber lunar lunch luxury lyrics machine mad magic magnet maid mail main major make mammal man manage mandate mango mansion manual maple marble march margin marine market marriage mask mass master match material math matrix matter maximum maze meadow mean measure meat mechanic medal media melody melt member memory mention menu mercy merge merit merry mesh message metal method middle midnight milk million mimic mind minimum minor minute miracle mirror misery miss mistake mix mixed mixture mobile model modify mom moment monitor monkey monster month moon moral more morning mosquito mother motion motor mountain mouse move movie much muffin mule multiply muscle museum mushroom music must mutual myself mystery myth naive name napkin narrow nasty nation nature near neck need negative neglect neither nephew nerve nest net network neutral never news next nice night noble noise nominee noodle normal north nose notable note nothing notice novel now nuclear number nurse nut oak obey object oblige obscure observe obtain obvious occur ocean october odor off offer office often oil okay old olive olympic omit once one onion online only open opera opinion oppose option orange orbit orchard order ordinary organ orient original orphan ostrich other outdoor outer output outside oval oven over own owner oxygen oyster ozone pact paddle page pair palace palm panda panel panic panther paper parade parent park parrot party pass patch path patient patrol pattern pause pave payment peace peanut pear peasant pelican pen penalty pencil people pepper perfect permit person pet phone photo phrase physical piano picnic picture piece pig pigeon pill pilot pink pioneer pipe pistol pitch pizza place planet plastic plate play please pledge pluck plug plunge poem poet point polar pole police pond pony pool popular portion position possible post potato pottery poverty powder power practice praise predict prefer prepare present pretty prevent price pride primary print priority prison private prize problem process produce profit program project promote proof property prosper protect proud provide public pudding pull pulp pulse pumpkin punch pupil puppy purchase purity purpose purse push put puzzle pyramid quality quantum quarter question quick quit quiz quote rabbit raccoon race rack radar radio rail rain raise rally ramp ranch random range rapid rare rate rather raven raw razor ready real reason rebel rebuild recall receive recipe record recycle reduce reflect reform refuse region regret regular reject relax release relief rely remain remember remind remove render renew rent reopen repair repeat replace report require rescue resemble resist resource response result retire retreat return reunion reveal review reward rhythm rib ribbon rice rich ride ridge rifle right rigid ring riot ripple risk ritual rival river road roast robot robust rocket romance roof rookie room rose rotate rough round route royal rubber rude rug rule run runway rural sad saddle sadness safe sail salad salmon salon salt salute same sample sand satisfy satoshi sauce sausage save say scale scan scare scatter scene scheme school science scissors scorpion scout scrap screen script scrub sea search season seat second secret section security seed seek segment select sell seminar senior sense sentence series service session settle setup seven shadow shaft shallow share shed shell sheriff shield shift shine ship shiver shock shoe shoot shop short shoulder shove shrimp shrug shuffle shy sibling sick side siege sight sign silent silk silly silver similar simple since sing siren sister situate six size skate sketch ski skill skin skirt skull slab slam sleep slender slice slide slight slim slogan slot slow slush small smart smile smoke smooth snack snake snap sniff snow soap soccer social sock soda soft solar soldier solid solution solve someone song soon sorry sort soul sound soup source south space spare spatial spawn speak special speed spell spend sphere spice spider spike spin spirit split spoil sponsor spoon sport spot spray spread spring spy square squeeze squirrel stable stadium staff stage stairs stamp stand start state stay steak steel stem step stereo stick still sting stock stomach stone stool story stove strategy street strike strong struggle student stuff stumble style subject submit subway success such sudden suffer sugar suggest suit summer sun sunny sunset super supply supreme sure surface surge surprise surround survey suspect sustain swallow swamp swap swarm swear sweet swift swim swing switch sword symbol symptom syrup system table tackle tag tail talent talk tank tape target task taste tattoo taxi teach team tell ten tenant tennis tent term test text thank that theme then theory there they thing this thought three thrive throw thumb thunder ticket tide tiger tilt timber time tiny tip tired tissue title toast tobacco today toddler toe together toilet token tomato tomorrow tone tongue tonight tool tooth top topic topple torch tornado tortoise toss total tourist toward tower town toy track trade traffic tragic train transfer trap trash travel tray treat tree trend trial tribe trick trigger trim trip trophy trouble truck true truly trumpet trust truth try tube tuition tumble tuna tunnel turkey turn turtle twelve twenty twice twin twist two type typical ugly umbrella unable unaware uncle uncover under undo unfair unfold unhappy uniform unique unit universe unknown unlock until unusual unveil update upgrade uphold upon upper upset urban urge usage use used useful useless usual utility vacant vacuum vague valid valley valve van vanish vapor various vast vault vehicle velvet vendor venture venue verb verify version very vessel veteran viable vibrant vicious victory video view village vintage violin virtual virus visa visit visual vital vivid vocal voice void volcano volume vote voyage wage wagon wait walk wall walnut want warfare warm warrior wash wasp waste water wave way wealth weapon wear weasel weather web wedding weekend weird welcome west wet whale what wheat wheel when where whip whisper wide width wife wild will win window wine wing wink winner winter wire wisdom wise wish witness wolf woman wonder wood wool word work world worry worth wrap wreck wrestle wrist write wrong yard year yellow you young youth zebra zero zone zoo'.split(' ');
+
 const SentinelCall = (function() {
   'use strict';
 
@@ -32340,6 +32400,89 @@ const SentinelCall = (function() {
     return FALLBACK_ICE_SERVERS.slice();
   }
 
+  /* ── Call configuration: which signalling server and which ICE servers ──
+     GET /call/config answers { peer: {host, port, path, secure} | null, ice }.
+     A configured peer host means the self-hosted Remiel Sentinel call server;
+     null means the public PeerJS cloud. The answer is cached for ten minutes
+     so the host and every guest of a call land on the same server. The two
+     are never mixed: when the self-hosted server is configured and cannot be
+     reached, the app retries it and then stops, rather than switching to the
+     cloud where the other person would not be. */
+  const _CFG_TTL_MS = 600000;
+  const _OPEN_WAIT_MS = 8000;
+  const _RETRY_DELAYS_MS = [2000, 5000];
+  let _cfgCache = null;
+  let _cfgAt = 0;
+  async function _fetchCallConfig() {
+    if (_cfgCache && Date.now() - _cfgAt < _CFG_TTL_MS) return _cfgCache;
+    try {
+      const apiBase = _apiBase();
+      if (apiBase) {
+        const resp = await fetch(apiBase + '/call/config');
+        if (resp.ok) {
+          const data = await resp.json();
+          const p = data && data.peer;
+          const peer = (p && typeof p.host === 'string' && p.host) ? {
+            host: p.host,
+            port: Number.isFinite(Number(p.port)) ? Number(p.port) : 443,
+            path: (typeof p.path === 'string' && p.path) ? p.path : '/peerjs',
+            secure: p.secure !== false
+          } : null;
+          const ice = (Array.isArray(data.ice) && data.ice.length) ? data.ice : await _fetchIceServers();
+          _cfgCache = { peer: peer, ice: ice };
+          _cfgAt = Date.now();
+          console.log('SentinelCall: call server', peer ? peer.host : 'shared PeerJS cloud');
+          return _cfgCache;
+        }
+      }
+    } catch (e) {
+      console.warn('SentinelCall: call config fetch failed', e.message);
+    }
+    /* No answer from the API: not cached, so the next attempt asks again */
+    return { peer: null, ice: await _fetchIceServers() };
+  }
+  function _peerOptions(cfg) {
+    const opts = { debug: 0, config: { iceServers: cfg.ice } };
+    if (cfg.peer) {
+      opts.host = cfg.peer.host;
+      opts.port = cfg.peer.port;
+      opts.path = cfg.peer.path;
+      opts.secure = cfg.peer.secure;
+      opts.key = 'remiel';
+    }
+    return opts;
+  }
+  /* Resolves true when the peer opens, false on a server or network error
+     or when nothing happens within _OPEN_WAIT_MS. */
+  function _waitOpen(peer) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (ok) => { if (!done) { done = true; clearTimeout(t); resolve(ok); } };
+      const t = setTimeout(() => finish(false), _OPEN_WAIT_MS);
+      peer.on('open', () => finish(true));
+      peer.on('error', (err) => {
+        const type = err && err.type;
+        if (type === 'server-error' || type === 'network' || type === 'socket-error' || type === 'socket-closed' || type === 'browser-incompatible') finish(false);
+      });
+    });
+  }
+  /* Creates the peer and waits for it to open. Self-hosted: three attempts
+     (at once, after 2 s, after 5 s), then the toast and null. Cloud: one
+     attempt. Never switches server. */
+  async function _connectPeer(peerId, cfg, quiet) {
+    const attempts = cfg.peer ? _RETRY_DELAYS_MS.length + 1 : 1;
+    for (let i = 0; i < attempts; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, _RETRY_DELAYS_MS[i - 1]));
+      let p = null;
+      try { p = new Peer(peerId, _peerOptions(cfg)); } catch (e) { p = null; }
+      if (p && await _waitOpen(p)) return p;
+      if (p) { try { p.destroy(); } catch (e) {} }
+      if (cfg.peer) console.warn('SentinelCall: call server ' + cfg.peer.host + ' not reachable, attempt ' + (i + 1) + ' of ' + attempts);
+    }
+    if (cfg.peer && !quiet) showToast(_t('call.serverUnreachable', 'Call server unreachable. Try again in a moment.'));
+    return null;
+  }
+
   /* ── Initialize ── */
   async function init() {
     /* Get or create Sentinel ID (older builds wrote the key sentinelId) */
@@ -32377,28 +32520,24 @@ const SentinelCall = (function() {
     _warming = (async () => {
       try { await _loadPeerJS(true); } catch (e) { _warmFailedAt = Date.now(); return false; }
       if (!_myId) { try { _myId = await RemielDB.getSetting('sentinelCallId'); } catch (e) {} }
-      if (!_peer || _peer.destroyed) { try { await _initPeer(); } catch (e) {} }
+      if (!_peer || _peer.destroyed) { try { await _initPeer(true); } catch (e) {} }
       updateSettingsDisplay();
       return !!(_peer && !_peer.destroyed);
     })().finally(() => { _warming = null; });
     return _warming;
   }
 
-  /* ── Connect to PeerJS signaling with ICE/TURN config ── */
-  async function _initPeer() {
-    if (!window.Peer || !_myId) return;
-    const iceServers = await _fetchIceServers();
+  /* ── Connect to PeerJS signalling with the call config ──
+     Returns true when the peer is open, false when the configured call
+     server could not be reached (the toast was shown unless quiet). */
+  async function _initPeer(quiet) {
+    if (!window.Peer || !_myId) return false;
+    const cfg = await _fetchCallConfig();
     const peerId = 'sentinel-' + _myId.toLowerCase();
-    _peer = new Peer(peerId, {
-      debug: 0,
-      config: {
-        iceServers: iceServers
-      }
-    });
-
-    _peer.on('open', (id) => {
-      console.log('SentinelCall: online, peerId=' + id + ', sentinelId=' + _myId);
-    });
+    const p = await _connectPeer(peerId, cfg, quiet);
+    if (!p) return false;
+    _peer = p;
+    console.log('SentinelCall: online, peerId=' + p.id + ', sentinelId=' + _myId);
 
     _peer.on('call', (call) => {
       console.log('SentinelCall: incoming call from', call.peer);
@@ -32447,6 +32586,84 @@ const SentinelCall = (function() {
     });
   }
 
+  /* ── Safety words ──
+     Once a call's RTCPeerConnection is connected, both sides hash the pair of
+     DTLS fingerprints (their own and the other side's, sorted so the order is
+     the same on both screens) and turn the first 44 bits into four words.
+     A person in the middle would have to present a different certificate to
+     at least one side, so the words would differ. The app only shows the
+     words; the two people compare them by reading them aloud. */
+  function _fingerprintOf(desc) {
+    const sdp = desc && desc.sdp;
+    if (!sdp) return null;
+    const m = /a=fingerprint:sha-256\s+([0-9A-Fa-f:]+)/.exec(sdp);
+    return m ? m[1].toUpperCase() : null;
+  }
+  async function _safetyWordsFor(fpA, fpB) {
+    const norm = (f) => String(f || '').trim().toUpperCase();
+    const pair = [norm(fpA), norm(fpB)].sort().join('|');
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pair)));
+    const out = [];
+    for (let w = 0; w < 4; w++) {
+      let idx = 0;
+      for (let k = 0; k < 11; k++) {
+        const bit = w * 11 + k;
+        idx = (idx << 1) | ((digest[bit >> 3] >> (7 - (bit & 7))) & 1);
+      }
+      out.push(SC_SAFETY_WORDS[idx]);
+    }
+    return out;
+  }
+  function _pcConnected(pc) {
+    return pc.connectionState === 'connected' || pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed';
+  }
+  /* Calls onWords(words) once, when the connection is up and both
+     fingerprints are readable. */
+  function _watchSafety(call, onWords) {
+    let done = false;
+    const check = () => {
+      if (done) return;
+      const pc = call && call.peerConnection;
+      if (!pc) return;
+      if (!pc._scSafetyBound) {
+        pc._scSafetyBound = true;
+        try { pc.addEventListener('connectionstatechange', check); pc.addEventListener('iceconnectionstatechange', check); } catch (e) {}
+      }
+      if (!_pcConnected(pc)) return;
+      const local = _fingerprintOf(pc.currentLocalDescription || pc.localDescription);
+      const remote = _fingerprintOf(pc.currentRemoteDescription || pc.remoteDescription);
+      if (!local || !remote) return;
+      done = true;
+      _safetyWordsFor(local, remote).then(onWords).catch((e) => console.warn('SentinelCall: safety words', e));
+    };
+    call.on('stream', check);
+    check();
+  }
+  function _showSafetyLine(words) {
+    const box = document.getElementById('scSafety');
+    const lbl = document.getElementById('scSafetyLabel');
+    const el = document.getElementById('scSafetyWords');
+    const ex = document.getElementById('scSafetyExplain');
+    if (lbl) lbl.textContent = _t('call.safetyWords', 'Safety words');
+    if (el) el.textContent = words.join(' ');
+    if (ex) { ex.textContent = _t('call.safetyExplain', 'Read these four words to each other. They must match on both screens. If they differ, hang up: someone may be between you.'); ex.hidden = true; }
+    if (box) box.hidden = false;
+  }
+  function _hideSafetyLine() {
+    const box = document.getElementById('scSafety');
+    const el = document.getElementById('scSafetyWords');
+    const ex = document.getElementById('scSafetyExplain');
+    if (el) el.textContent = '';
+    if (ex) ex.hidden = true;
+    if (box) box.hidden = true;
+  }
+  function toggleSafetyExplain() {
+    const ex = document.getElementById('scSafetyExplain');
+    if (!ex) return;
+    ex.textContent = _t('call.safetyExplain', 'Read these four words to each other. They must match on both screens. If they differ, hang up: someone may be between you.');
+    ex.hidden = !ex.hidden;
+  }
+
   /* ── Wire a PeerJS media call (outgoing, accepted, or guest) ── */
   function _attachCall(call, onClosed) {
     call.on('stream', (remoteStream) => {
@@ -32455,6 +32672,7 @@ const SentinelCall = (function() {
       if (inc) inc.classList.remove('active');
       _showActive(remoteStream);
     });
+    _watchSafety(call, (words) => { if (_currentCall === call) _showSafetyLine(words); });
     call.on('close', () => {
       if (_currentCall === call) endCall();
       if (onClosed) onClosed();
@@ -32511,12 +32729,13 @@ const SentinelCall = (function() {
       showToast(_t('call.unavailable', 'Video calling is not available right now'));
       return false;
     }
+    let gaveUp = false;
     try {
       if (!_myId) _myId = await RemielDB.getSetting('sentinelCallId');
-      if (!_peer || _peer.destroyed) await _initPeer();
+      if (!_peer || _peer.destroyed) gaveUp = (await _initPeer(false)) === false;
     } catch (e) { console.warn('SentinelCall: peer init failed', e); }
     if (!_peer || _peer.destroyed) {
-      showToast(_t('call.notReady', 'Video calling not ready. Try again in a moment.'));
+      if (!gaveUp) showToast(_t('call.notReady', 'Video calling not ready. Try again in a moment.'));
       return false;
     }
     return true;
@@ -32906,8 +33125,40 @@ const SentinelCall = (function() {
     nm.className = 'sc-tile-name';
     nm.textContent = name || _t('group.member', 'Member');
     tile.appendChild(vid); tile.appendChild(state); tile.appendChild(nm);
+    tile.addEventListener('click', () => showTileSafety(peerId));
     grid.appendChild(tile);
     return tile;
+  }
+  /* Group: the safety words for one pair (this device and that person) */
+  function _renderGroupSafetyHint() {
+    const hint = document.getElementById('scGroupSafetyHint');
+    if (!hint || !_group) return;
+    let live = false;
+    _group.peers.forEach(p => { if (p.live) live = true; });
+    hint.textContent = _t('call.safetyTapTile', "Tap a person's tile to see the safety words for you and them.");
+    hint.hidden = !live;
+  }
+  function showTileSafety(peerId) {
+    if (!_group) return;
+    const entry = _group.peers.get(peerId);
+    if (!entry) return;
+    const pop = document.getElementById('scSafetyPop');
+    const title = document.getElementById('scSafetyPopTitle');
+    const wordsEl = document.getElementById('scSafetyPopWords');
+    const ex = document.getElementById('scSafetyPopExplain');
+    const close = document.getElementById('scSafetyPopClose');
+    if (!pop) return;
+    if (pop.dataset.peer === peerId && !pop.hidden) { hideTileSafety(); return; }
+    pop.dataset.peer = peerId;
+    if (title) title.textContent = _tp('call.safetyWith', 'Safety words with {name}', { name: entry.name || _t('group.member', 'Member') });
+    if (wordsEl) wordsEl.textContent = entry.safety ? entry.safety.join(' ') : _t('call.safetyPending', 'Safety words appear once the video connects.');
+    if (ex) ex.textContent = entry.safety ? _t('call.safetyExplain', 'Read these four words to each other. They must match on both screens. If they differ, hang up: someone may be between you.') : '';
+    if (close) close.textContent = 'OK';
+    pop.hidden = false;
+  }
+  function hideTileSafety() {
+    const pop = document.getElementById('scSafetyPop');
+    if (pop) { pop.hidden = true; pop.dataset.peer = ''; }
   }
   function _tileState(peerId, text) {
     const grid = document.getElementById('scGrid');
@@ -32957,6 +33208,7 @@ const SentinelCall = (function() {
         entry.live = true;
         _startTimer();
         _renderGroupHead();
+        _renderGroupSafetyHint();
         if (!wasLive && _group.isHost) _broadcastRoster();
       });
       const gone = () => {
@@ -32965,6 +33217,13 @@ const SentinelCall = (function() {
       };
       call.on('close', gone);
       call.on('error', gone);
+      _watchSafety(call, (words) => {
+        if (!_group || _group.peers.get(peerId) !== entry) return;
+        entry.safety = words;
+        _renderGroupSafetyHint();
+        const pop = document.getElementById('scSafetyPop');
+        if (pop && !pop.hidden && pop.dataset.peer === peerId) showTileSafety(peerId);
+      });
     }
     _renderGroupHead();
     return entry;
@@ -33443,6 +33702,10 @@ const SentinelCall = (function() {
     if (grid) grid.innerHTML = '';
     if (grp) grp.hidden = true;
     if (gTimer) { gTimer.hidden = true; gTimer.textContent = '00:00'; }
+    _hideSafetyLine();
+    hideTileSafety();
+    const gHint = document.getElementById('scGroupSafetyHint');
+    if (gHint) gHint.hidden = true;
     if (overlay) overlay.classList.remove('group');
     const status = document.getElementById('scStatus');
     if (status) status.style.display = '';
@@ -33590,9 +33853,16 @@ const SentinelCall = (function() {
     }
 
     if (_guestPeer) { try { _guestPeer.destroy(); } catch (e) {} _guestPeer = null; }
-    const iceServers = await _fetchIceServers();
+    const cfg = await _fetchCallConfig();
     const guestPeerId = 'sentinel-' + guestId.toLowerCase();
-    const guestPeer = new Peer(guestPeerId, { debug: 0, config: { iceServers: iceServers } });
+    /* Same server as the host, or no call: the config decides for both */
+    const guestPeer = await _connectPeer(guestPeerId, cfg, true);
+    if (!guestPeer) {
+      const why = cfg.peer ? _t('call.serverUnreachable', 'Call server unreachable. Try again in a moment.') : _t('call.connectFailed', 'Connection failed');
+      showToast(why);
+      _guestBackToJoin(why);
+      return;
+    }
     _guestPeer = guestPeer;
     /* Leaving (hang up, no answer, error) releases the camera and returns
        the guest to the join screen. */
@@ -33603,7 +33873,7 @@ const SentinelCall = (function() {
       _guestBackToJoin(document.getElementById('scGuestStatus').textContent);
     };
 
-    guestPeer.on('open', async () => {
+    const onOpen = async () => {
       statusEl.textContent = _t('call.calling', 'Calling...');
       try {
         _localStream = await _getStream();
@@ -33651,7 +33921,7 @@ const SentinelCall = (function() {
       _currentCall = call;
       _attachCall(call, destroyGuest);
       _armNoAnswer(call, destroyGuest);
-    });
+    };
 
     guestPeer.on('error', (err) => {
       console.warn('Guest call error:', err);
@@ -33662,6 +33932,7 @@ const SentinelCall = (function() {
       endCall();
       destroyGuest();
     });
+    await onOpen();
   }
 
   /* Helper to load PeerJS if not loaded */
@@ -33753,8 +34024,11 @@ const SentinelCall = (function() {
     copyMyId, shareCallLink, regenerateId, updateSettingsDisplay,
     checkCallInvite, guestJoinCall, waitForGuest,
     callGroup, GROUP_MAX,
+    toggleSafetyExplain, showTileSafety, hideTileSafety,
     isAwaitingGuest: () => _awaitGuestFor !== null,
-    isInGroup: () => !!_group
+    isInGroup: () => !!_group,
+    _safetyWordsFor: _safetyWordsFor,
+    _fetchCallConfig: _fetchCallConfig
   };
 })();
 
