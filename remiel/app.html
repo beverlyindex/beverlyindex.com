@@ -11225,6 +11225,8 @@ const I18n = (function () {
     "bc.share": "Share Video Note",
     "bc.save": "Save to Sphere",
     "bc.done": "Done: back to your Circle",
+    "views.importName": "Roster {date}",
+    "views.bannerImport": "Team view \"{name}\" created and showing. To see everyone, or switch teams, tap your centre sphere and choose a view.",
     "bc.circle": "Share with Circle",
     "bc.active": "Camera active",
     "bc.unavailable": "Camera not available",
@@ -11497,6 +11499,8 @@ const I18n = (function () {
     "bc.share": "Condividi videonota",
     "bc.save": "Salva nella sfera",
     "bc.done": "Fatto: torna alla tua Cerchia",
+    "views.importName": "Elenco {date}",
+    "views.bannerImport": "Vista Squadra \"{name}\" creata e attiva. Per vedere tutti, o cambiare squadra, tocca la tua sfera centrale e scegli una vista.",
     "bc.circle": "Condividi con la cerchia",
     "bc.active": "Fotocamera attiva",
     "bc.unavailable": "Fotocamera non disponibile",
@@ -17012,6 +17016,7 @@ const SentinelViews = (() => {
   'use strict';
 
   const _DB_KEY = 'sentinelViews';
+  const _ACTIVE_KEY = 'sentinelActiveView';
   const VIEW_TYPES = ['one-on-one', 'unit', 'team'];
   const TYPE_LABELS = {
     get 'one-on-one'() { return _t('views.type.one', 'One-on-One'); },
@@ -17035,6 +17040,9 @@ const SentinelViews = (() => {
         if (Array.isArray(stored)) {
           _views = stored;
         }
+        /* The chosen view survives a reload; a view that no longer exists is dropped */
+        const act = await RemielDB.getSetting(_ACTIVE_KEY);
+        _activeViewId = (act && _views.some(v => v.id === act)) ? act : null;
       }
     } catch (e) {
       console.warn('[SentinelViews] load error:', e);
@@ -17104,6 +17112,7 @@ const SentinelViews = (() => {
 
   /* ── Apply filter to galaxy ── */
   function _applyFilter() {
+    try { if (typeof RemielDB !== 'undefined') RemielDB.putSetting(_ACTIVE_KEY, _activeViewId).catch(() => {}); } catch (e) {}
     if (typeof buildNodes === 'function') {
       buildNodes(false);
     }
@@ -17293,7 +17302,7 @@ const SentinelViews = (() => {
 
     sorted.forEach(c => {
       const sel = _selectedIds.has(c.id);
-      h += '<div class="sv-roster-item' + (sel ? ' selected' : '') + '" onclick="SentinelViews.toggleContact(' + c.id + ')">';
+      h += '<div class="sv-roster-item' + (sel ? ' selected' : '') + '" data-id="' + _esc(String(c.id)) + '" onclick="SentinelViews.toggleContactEl(this)">';
       h += '<div class="sv-roster-check"><span class="sv-roster-check-mark">\u2713</span></div>';
       h += '<div class="sv-roster-name">' + _esc(c.first + ' ' + c.last) + '</div>';
       h += '<div class="sv-roster-cat">' + (c.cat || '') + '</div>';
@@ -17301,6 +17310,28 @@ const SentinelViews = (() => {
     });
 
     roster.innerHTML = h;
+  }
+
+  function toggleContactEl(el) {
+    const raw = el && el.getAttribute('data-id');
+    const c = (typeof DEMO_CONTACTS !== 'undefined') ? DEMO_CONTACTS.find(x => String(x.id) === raw) : null;
+    if (c) toggleContact(c.id);
+  }
+
+  /* A roster import becomes its own Team view at once, and that view is the
+     one showing, so a large roster never floods the circle. */
+  function adoptImport(name, ids) {
+    const clean = (ids || []).filter(id => id !== undefined && id !== null);
+    if (!clean.length) return null;
+    let base = String(name || '').trim() || _t('views.importName', 'Roster {date}', { date: new Date().toLocaleDateString() });
+    let nm = base, k = 2;
+    while (_views.some(v => v.name.toLowerCase() === nm.toLowerCase())) nm = base + ' ' + (k++);
+    const view = createView(nm, 'team', clean);
+    _activeViewId = view.id;
+    _applyFilter();
+    _updateBadge();
+    _svBanner('views-import', _t('views.bannerImport', 'Team view "{name}" created and showing. To see everyone, or switch teams, tap your centre sphere and choose a view.', { name: nm }));
+    return view;
   }
 
   function toggleContact(contactId) {
@@ -17393,8 +17424,8 @@ const SentinelViews = (() => {
     init,
     openPanel, closePanel,
     newView, editView, closeEditor,
-    toggleContact, saveView,
-    activateView, clearView,
+    toggleContact, toggleContactEl, saveView,
+    activateView, clearView, adoptImport, createView,
     confirmDelete,
     getActiveView,
     getFilteredContacts,
@@ -18773,6 +18804,8 @@ var RosterImport = (function() {
   var _parseDupes = 0;    /* names skipped by the parser because they are already in the circle */
   var _importing = false;
   var _source = null;      /* {kind, ref} stored on each imported contact */
+  var _importedIds = [];   /* ids created by the current import, for the Team view */
+  var _importTeamName = '';
   var _filter = { q: '', group: '' };
   var _ocrTable = false;  /* last image read found a table header */
   var _lastId = 0;
@@ -19911,6 +19944,7 @@ var RosterImport = (function() {
     var cat = (document.getElementById('rosterCatSelect') || {}).value || 'other';
     var inWizard = _obWizardActive();
     var seen = _existingNameSet(inWizard);
+    _importedIds = []; _importTeamName = '';
     var added = 0, skipped = 0;
     _importing = true;
     _importBusy(btn, 0, selected.length);
@@ -19948,6 +19982,7 @@ var RosterImport = (function() {
           details: { source: { kind: 'group', ref: null } }
         };
         DEMO_CONTACTS.push(contact);
+        _importedIds.push(id);
         try { await RemielDB.putContact(contact); } catch (e) {}
 
         // Store face crop as contact photo
@@ -20044,6 +20079,15 @@ var RosterImport = (function() {
         if (typeof appState !== 'undefined' && appState !== 'network') enterNetwork();
         else buildNodes(false);
       } catch (e) { console.warn('Roster import: network view', e); }
+      /* Two or more people from one import: give them their own Team view */
+      try {
+        if (_importedIds.length >= 2 && typeof SentinelViews !== 'undefined' && SentinelViews.adoptImport) {
+          var srcRef = _source && _source.ref ? String(_source.ref) : '';
+          var nm = _importTeamName || (srcRef && _source.kind === 'search' ? '' : srcRef.replace(/\.[a-z0-9]+$/i, ''));
+          SentinelViews.adoptImport(nm, _importedIds);
+        }
+      } catch (e) { console.warn('Roster import: team view', e); }
+      _importedIds = []; _importTeamName = '';
       try { updateBlufContent(); } catch (e) {}
     }
     try { if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty(); } catch (e) {}
@@ -20148,6 +20192,7 @@ var RosterImport = (function() {
     var seen = _existingNameSet(inWizard);
     var added = 0, skipped = _parseDupes, jobs = [];
     var src = _source || { kind: 'paste', ref: null };
+    _importedIds = []; _importTeamName = '';
     _importing = true;
     _importBusy(btn, 0, selected.length);
     _status('info', _t('roster.importingN', { k: 0, n: selected.length }));
@@ -20180,6 +20225,8 @@ var RosterImport = (function() {
             details: details
           };
           DEMO_CONTACTS.push(newContact);
+          _importedIds.push(newContact.id);
+          if (!_importTeamName && details && details.team) _importTeamName = String(details.team);
           try { await RemielDB.putContact(newContact); } catch (e) {}
           if (blob) {
             try {
