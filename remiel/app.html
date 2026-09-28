@@ -508,6 +508,7 @@
     padding: 28px 32px;
     overflow: visible;
     margin-bottom: 80px;
+    position: relative;
     transform: translateY(18px);
     opacity: 0;
     transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease;
@@ -1084,6 +1085,12 @@
     border-color: var(--accent-purple, #7c5cbf);
   }
   .bluf-bc-btn.primary:active { opacity: 0.8; }
+  /* The action that just succeeded stays lit with its check */
+  .bluf-bc-btn.is-selected {
+    background: var(--lit-fill, #38bdf8) !important; color: var(--lit-ink, #04121c) !important;
+    border-color: var(--lit-fill, #38bdf8) !important;
+  }
+  #bcDoneBtn { background: var(--lit-fill, #38bdf8); color: var(--lit-ink, #04121c); border-color: var(--lit-fill, #38bdf8); }
 
   .bluf-bc-status {
     font-family: var(--nous-font);
@@ -2626,9 +2633,21 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     padding: 14px 16px 10px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
   }
+  .alert-panel-header .alert-panel-title { flex: 1; }
+  /* Shared close control for any card or panel: always visible, always in the
+     same corner, so a user never has to guess how to leave. */
+  .card-x {
+    flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08);
+    color: #fff; font-size: 20px; line-height: 1; cursor: pointer; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .card-x:hover { background: rgba(255,255,255,0.18); }
+  .bluf-x { position: absolute; top: 10px; right: 10px; z-index: 5; }
   .alert-panel-title {
     font-family: var(--nous-serif, 'Instrument Serif', serif);
     font-size: 17px;
@@ -4673,7 +4692,9 @@
 .social-import-btn .si-label { font-size: 12px; font-weight: 500; color: var(--text-primary, #fff); }
 .social-import-modal { position: fixed; inset: 0; z-index: 10001; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); padding: 16px; }
 .social-import-modal.active { display: flex; }
-.social-import-panel { background: var(--card-bg, #1a1a2e); border-radius: 12px; padding: 20px; max-width: 400px; width: 100%; max-height: 80vh; overflow-y: auto; }
+.social-import-panel { position: relative; background: var(--card-bg, #1a1a2e); border-radius: 12px; padding: 20px 44px 20px 20px; max-width: 400px; width: 100%; max-height: 80vh; overflow-y: auto; }
+.social-import-panel .si-close { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
+.social-import-panel .si-close:hover { background: rgba(255,255,255,0.18); }
 .social-import-panel h3 { margin: 0 0 6px; font-size: 16px; color: var(--text-primary, #fff); }
 .social-import-panel .si-sub { font-size: 12px; color: var(--text-dim, #999); margin: 0 0 14px; }
 .social-import-panel textarea { width: 100%; min-height: 120px; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: var(--text-primary, #fff); font-size: 13px; font-family: inherit; resize: vertical; box-sizing: border-box; }
@@ -6264,7 +6285,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 
   <!-- Social Import Modal -->
   <div class="social-import-modal" id="socialImportModal" onclick="if(event.target===this)SocialImport.close()">
-    <div class="social-import-panel">
+    <div class="social-import-panel" role="dialog" aria-labelledby="siTitle">
+      <button type="button" class="si-close" onclick="SocialImport.close()" aria-label="Close" title="Close">&times;</button>
       <h3 id="siTitle">Import Contacts</h3>
       <p class="si-sub" id="siSubtitle" data-i18n="social.sub">Paste contact info below</p>
       <textarea id="siTextarea" placeholder="Paste contacts here..."></textarea>
@@ -6272,9 +6294,10 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <div class="social-import-preview" id="siPreview" style="display:none;"></div>
       <div class="social-import-result" id="siResult" style="display:none;"></div>
       <div class="si-actions">
-        <button class="si-btn secondary" onclick="SocialImport.close()" data-i18n="app.cancel">Cancel</button>
+        <button class="si-btn secondary" id="siCancelBtn" onclick="SocialImport.close()" data-i18n="app.cancel">Cancel</button>
         <button class="si-btn primary" id="siParseBtn" onclick="SocialImport.parse()" data-i18n="social.preview">Preview</button>
         <button class="si-btn primary" id="siImportBtn" onclick="SocialImport.doImport()" style="display:none;" data-i18n="roster.importSelected">Import Selected</button>
+        <button class="si-btn primary" id="siDoneBtn" onclick="SocialImport.done()" style="display:none;" data-i18n="social.done">Done: see them in your Circle</button>
       </div>
     </div>
   </div>
@@ -6382,6 +6405,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <div class="alert-panel-header">
     <h3 class="alert-panel-title" data-i18n="notif.title">Notifications</h3>
     <button class="alert-clear-btn" id="alertClearAll" data-i18n="notif.clear">Clear All</button>
+    <button type="button" class="card-x" onclick="AlertEngine.closePanel()" aria-label="Close" title="Close">&times;</button>
   </div>
   <div class="alert-list" id="alertList">
     <div class="alert-empty">
@@ -6579,6 +6603,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 
 <div class="bluf-overlay" id="blufOverlay" data-adv-scope onclick="handleBlufOverlayClick(event)" role="dialog" aria-modal="true" aria-label="Contact details">
   <div class="bluf-card" id="blufCard">
+      <button type="button" class="card-x bluf-x" onclick="closeBluf()" aria-label="Close contact card" title="Close">&times;</button>
 
       <!-- Hero: Sphere + Headline -->
       <div class="bluf-hero">
@@ -6673,6 +6698,10 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
                 <button class="bluf-bc-btn circle-share-btn" id="bcCircleShareBtn" onclick="VideoNoteShare.uploadToCircle()">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
                   <span data-i18n="bc.circle">Share with Circle</span>
+                </button>
+                <button class="bluf-bc-btn" id="bcDoneBtn" onclick="bcDone()" hidden>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span data-i18n="bc.done">Done: back to your Circle</span>
                 </button>
               </div>
             </div>
@@ -10117,6 +10146,7 @@ const I18n = (function () {
     'social.manual': "Paste or Type Contacts",
     'social.sub': "Paste contact info below",
     'social.preview': "Preview",
+    'social.done': "Done: see them in your Circle",
     'roster.btn': "Import Roster (Image, Paste, or File)",
     'roster.title': "Import Roster",
     'roster.tab.image': "Image",
@@ -10592,6 +10622,7 @@ const I18n = (function () {
     'social.manual': "Incolla o scrivi i contatti",
     'social.sub': "Incolla qui sotto i contatti",
     'social.preview': "Anteprima",
+    'social.done': "Fatto: vedili nella tua Cerchia",
     'roster.btn': "Importa elenco (immagine, testo o file)",
     'roster.title': "Importa elenco",
     'roster.tab.image': "Immagine",
@@ -11135,6 +11166,7 @@ const I18n = (function () {
     "bc.vol": "Vol",
     "bc.share": "Share Video Note",
     "bc.save": "Save to Sphere",
+    "bc.done": "Done: back to your Circle",
     "bc.circle": "Share with Circle",
     "bc.active": "Camera active",
     "bc.unavailable": "Camera not available",
@@ -11406,6 +11438,7 @@ const I18n = (function () {
     "bc.vol": "Vol",
     "bc.share": "Condividi videonota",
     "bc.save": "Salva nella sfera",
+    "bc.done": "Fatto: torna alla tua Cerchia",
     "bc.circle": "Condividi con la cerchia",
     "bc.active": "Fotocamera attiva",
     "bc.unavailable": "Fotocamera non disponibile",
@@ -20586,6 +20619,36 @@ function handleBcUpload(event) {
 
 let bcLastBlob = null; /* Most recent broadcast blob for share/save */
 
+/* After share or save succeeds: the pressed button shows a check and stays
+   lit (visual confirmation of what was chosen), the status line says what
+   happened, and a rimmed Done button appears so the user knows the next step. */
+function bcConfirm(btnId, statusText) {
+  const st = document.getElementById('bcStatus');
+  if (st) st.textContent = statusText;
+  const b = document.getElementById(btnId);
+  if (b) { b.classList.add('is-selected'); b.setAttribute('aria-pressed', 'true'); }
+  const d = document.getElementById('bcDoneBtn');
+  if (d) {
+    d.hidden = false;
+    document.querySelectorAll('#bcShareRow .btn-advance').forEach(x => x.classList.remove('btn-advance'));
+    d.classList.add('btn-advance');
+    setTimeout(() => { try { d.focus({ preventScroll: true }); } catch (e) {} }, 50);
+  }
+}
+function bcResetConfirm() {
+  const d = document.getElementById('bcDoneBtn');
+  if (d) { d.hidden = true; d.classList.remove('btn-advance'); }
+  document.querySelectorAll('#bcShareRow .is-selected').forEach(x => { x.classList.remove('is-selected'); x.removeAttribute('aria-pressed'); });
+}
+function bcDone() {
+  bcResetConfirm();
+  const row = document.getElementById('bcShareRow');
+  if (row) row.hidden = true;
+  const st = document.getElementById('bcStatus');
+  if (st) st.textContent = '';
+  try { closeBluf(); } catch (e) {}
+}
+
 function showBcPlayback(blob) {
   bcLastBlob = blob;
   const playback = document.getElementById('bcPlayback');
@@ -20600,7 +20663,8 @@ function showBcPlayback(blob) {
   playback.muted = bcMuted;
   playback.volume = document.getElementById('bcVolume').value / 100;
   playback.play().catch(() => {});
-  /* Show share/save buttons */
+  /* Show share/save buttons; a fresh clip starts with nothing confirmed yet */
+  bcResetConfirm();
   const shareRow = document.getElementById('bcShareRow');
   if (shareRow) shareRow.hidden = false;
 }
@@ -20613,7 +20677,7 @@ async function shareBroadcast() {
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: 'Video Note', text: 'Shared from Remiel Sentinel' });
-      document.getElementById('bcStatus').textContent = 'Video note shared';
+      bcConfirm('bcShareBtn', 'Video note shared');
     } catch (err) {
       if (err.name !== 'AbortError') {
         document.getElementById('bcStatus').textContent = 'Share cancelled or not supported';
@@ -20626,7 +20690,7 @@ async function shareBroadcast() {
     a.download = 'broadcast.' + ext;
     a.click();
     URL.revokeObjectURL(a.href);
-    document.getElementById('bcStatus').textContent = 'Downloaded (share not supported on this device)';
+    bcConfirm('bcShareBtn', 'Downloaded to this device (sharing is not supported here)');
   }
 }
 
@@ -20647,7 +20711,7 @@ async function saveBroadcastToSphere() {
 
   /* Load broadcast video into the sphere */
   loadBroadcastIntoSphere(contactId, bcLastBlob);
-  document.getElementById('bcStatus').textContent = 'Video note saved to sphere';
+  bcConfirm('bcSaveBtn', 'Video note saved to sphere');
 }
 
 /* Load a broadcast video blob into a contact's sphere for playback */
@@ -28533,6 +28597,9 @@ const SocialImport = (() => {
     _$('siResult').style.display = 'none';
     _$('siParseBtn').style.display = '';
     _$('siImportBtn').style.display = 'none';
+    _$('siDoneBtn').style.display = 'none';
+    _$('siDoneBtn').classList.remove('btn-advance');
+    _$('siCancelBtn').style.display = '';
 
     _$('siTextarea').style.display = '';
     _$('siHint').style.display = '';
@@ -28546,6 +28613,33 @@ const SocialImport = (() => {
     _currentPlatform = null;
     _parsedContacts = [];
     try { if (typeof ThePulse !== 'undefined' && ThePulse.isOpen()) ThePulse.refresh(); } catch (e) {}
+  }
+
+  /* After a successful import: the card shows what happened and exactly one
+     next step. Cancel is gone (there is nothing left to cancel), Done carries
+     the rim, and pressing it closes the card and lands the user in their Circle
+     where the new spheres are. */
+  function _finished(msg) {
+    _showResult(msg, false);
+    _$('siImportBtn').style.display = 'none';
+    _$('siParseBtn').style.display = 'none';
+    _$('siCancelBtn').style.display = 'none';
+    var d = _$('siDoneBtn');
+    d.style.display = '';
+    d.classList.add('btn-advance');
+    setTimeout(function() { try { d.focus(); } catch (e) {} }, 50);
+  }
+
+  function done() {
+    close();
+    try {
+      if (typeof SettingsPanel !== 'undefined' && SettingsPanel.close) SettingsPanel.close();
+    } catch (e) {}
+    try {
+      if (typeof appState !== 'undefined' && appState !== 'network' && typeof enterNetwork === 'function') enterNetwork();
+      else if (typeof buildNodes === 'function') buildNodes(false);
+    } catch (e) { console.warn('SocialImport: circle view', e); }
+    try { if (typeof updateBlufContent === 'function') updateBlufContent(); } catch (e) {}
   }
 
   function _parseLine(line, cfg) {
@@ -28699,9 +28793,12 @@ const SocialImport = (() => {
       }
     }
 
-    _showResult('Imported ' + imported + ' contact' + (imported !== 1 ? 's' : '') +
-      (skipped > 0 ? ' (' + skipped + ' skipped as duplicates)' : '') + '.', false);
-    _$('siImportBtn').style.display = 'none';
+    if (imported === 0) {
+      _showResult(skipped > 0 ? 'Nothing new: ' + skipped + ' already in your Circle.' : 'Nothing was imported.', true);
+      return;
+    }
+    _finished('Imported ' + imported + ' contact' + (imported !== 1 ? 's' : '') +
+      (skipped > 0 ? ' (' + skipped + ' skipped as duplicates)' : '') + '.');
 
     /* Refresh the galaxy if possible */
     if (typeof loadAndRender === 'function') {
@@ -28975,8 +29072,8 @@ const SocialImport = (() => {
     if (skipped > 0) msg += ' (' + skipped + ' skipped as duplicates)';
     msg += '.';
 
-    _showResult(msg, false);
-    _$('siImportBtn').style.display = 'none';
+    if (imported === 0) _showResult(skipped > 0 ? 'Nothing new: ' + skipped + ' already in your Circle.' : 'Nothing was imported.', true);
+    else _finished(msg);
     _$('siImportBtn').disabled = false;
     _$('siImportBtn').textContent = 'Import Selected';
 
@@ -29006,6 +29103,7 @@ const SocialImport = (() => {
   return {
     open: open,
     close: close,
+    done: done,
     parse: parse,
     toggleItem: toggleItem,
     doImport: doImport,
@@ -29265,8 +29363,8 @@ const SocialImport = (() => {
         }
 
         await resp.json().catch(function() { return {}; });
-        var st3 = _$('bcStatus');
-        if (st3) st3.textContent = _t('vn.shared', 'Shared with your Circle');
+        if (typeof bcConfirm === 'function') bcConfirm('bcCircleShareBtn', _t('vn.shared', 'Shared with your Circle'));
+        else { var st3 = _$('bcStatus'); if (st3) st3.textContent = _t('vn.shared', 'Shared with your Circle'); }
         if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ' + _esc(_t('vn.sharedShort', 'Shared'));
         setTimeout(function() {
           if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 014-10z"/></svg> ' + _esc(_t('vn.shareBtn', 'Share with Circle'));
