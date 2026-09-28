@@ -6476,7 +6476,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <canvas id="sphere" aria-label="Interactive status sphere" role="img"></canvas>
   <div class="sphere-labels" id="sphereLabels">
     <div class="status-label" id="statusLabel">Quiet</div>
-    <div class="demo-cycler" id="demoCycler" onclick="cycleSev()">&#9656; cycle status (demo)</div>
+    <div class="demo-cycler" id="demoCycler" hidden></div>
   </div>
   <div class="hold-hint" id="holdHint" data-i18n="app.hint.tapOpen">tap to open your network</div>
   <div class="network-hint" id="networkHint" hidden data-i18n="app.hint.tapSphere">tap any sphere &middot; drag to rotate</div>
@@ -12823,7 +12823,7 @@ async function logMood(level, btnEl) {
   await renderMoodHistory(contactId);
 
   /* Recalculate severity after mood change */
-  if (contactId !== 'self' && typeof recomputeSeverity === 'function') {
+  if (typeof recomputeSeverity === 'function') {
     try { await recomputeSeverity(contactId); } catch(e) {}
   }
 }
@@ -13861,7 +13861,6 @@ function enterSelf() {
   document.getElementById('backBtn').hidden = true;
   document.getElementById('networkHint').hidden = true;
   if (sphereLabelsEl) sphereLabelsEl.style.display = '';
-  document.getElementById('demoCycler').style.display = '';
   // Re-init effects for new canvas size — next frame so DOM class removal is applied
   requestAnimationFrame(() => { resize(); initFX(); });
   /* Show contextual guidance */
@@ -13885,7 +13884,6 @@ function enterNetwork() {
   document.getElementById('backBtn').hidden = false;
   document.getElementById('networkHint').hidden = false;
   if (sphereLabelsEl) sphereLabelsEl.style.display = 'none';
-  document.getElementById('demoCycler').style.display = 'none';
   // Hide self-state hold hint
   const holdHint = document.getElementById('holdHint');
   if (holdHint) holdHint.style.display = 'none';
@@ -13960,9 +13958,8 @@ function checkNameAlternation(t) {
 
 /* ── Demo severity cycler (no user-selectable severity in production) ── */
 function cycleSev() {
-  curSev = curSev <= 0 ? 4 : curSev - 1;
-  if (appState === 'self') userSev = curSev;
-  updateStatusLabel();
+  /* Retired: status is computed from logged data, never set by hand. */
+  if (typeof recomputeSelfSeverity === 'function') recomputeSelfSeverity();
 }
 
 function setCat(btn) {
@@ -20668,9 +20665,26 @@ function startNextActionTimer() {
 
 let _sevTimer = null;
 
+/* The centre sphere: its ring must show the same tier the own card computes.
+   computeSeverity('self') is the single source; the result is written to
+   curSev and userSev (what the ring and status word read) and persisted. */
+async function recomputeSelfSeverity() {
+  let comp;
+  try { comp = await computeSeverity('self'); } catch (e) { return curSev; }
+  const sev = comp.noData ? 4 : comp.sevLevel;
+  if (sev !== userSev || sev !== curSev) {
+    userSev = sev;
+    curSev = sev;
+    try { updateStatusLabel(); } catch (e) {}
+    try { await RemielDB.putSetting('userSev', sev); } catch (e) {}
+  }
+  return sev;
+}
+
 async function recomputeSeverity(contactId) {
   /* Delegates to computeSeverity (the single source) and persists its tier
      unchanged, so contact.sev always equals what openBluf computes. */
+  if (contactId === 'self' || contactId === undefined || contactId === null) return recomputeSelfSeverity();
   const contact = DEMO_CONTACTS.find(c => String(c.id) === String(contactId));
   if (!contact) return -1;
   let comp;
@@ -20698,6 +20712,7 @@ async function recomputeAllSeverities() {
       console.warn('[Severity] recompute failed for contact', DEMO_CONTACTS[i].id, e);
     }
   }
+  try { await recomputeSelfSeverity(); } catch (e) {}
 }
 
 function startSeverityTimer() {
@@ -20820,7 +20835,7 @@ async function sendLedgerEntry(type) {
   await renderLedger(contactId);
 
   /* Recalculate severity after new interaction */
-  if (contactId !== 'self' && typeof recomputeSeverity === 'function') {
+  if (typeof recomputeSeverity === 'function') {
     try { await recomputeSeverity(contactId); } catch(e) {}
   }
 }
@@ -27112,7 +27127,7 @@ const MedicationTracker = (() => {
 
     /* Recalculate severity after dose logged */
     var _cid = med.contactId;
-    if (_cid && _cid !== 'self' && typeof recomputeSeverity === 'function') {
+    if (_cid && typeof recomputeSeverity === 'function') {
       try { await recomputeSeverity(_cid); } catch(e) {}
     }
   }
