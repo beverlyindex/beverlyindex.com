@@ -15824,6 +15824,11 @@ function _cycleDreamContact() {
   try { if (typeof WhereIs !== 'undefined' && WhereIs.panelOpen) return; } catch (e) {}
   /* Only show contacts that have a photo (imported contacts bring photos) */
   var pool = DEMO_CONTACTS.filter(function(c) { return contactPhotos.has(c.id); });
+  /* Only the members of the active view (Unit, Team, One-on-One): the dream state follows the circle on screen */
+  try {
+    var vf = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
+    if (vf) pool = pool.filter(function(c) { return vf.has(c.id) || vf.has(String(c.id)); });
+  } catch (e) {}
   if (pool.length === 0) { _exitRestMode(); return; }
   /* Avoid showing the same contact twice in a row */
   var pick;
@@ -17916,6 +17921,11 @@ const SentinelViews = (() => {
     if (typeof buildNodes === 'function') {
       buildNodes(false);
     }
+    /* A member outside the view must not stay in front, or in the dream state */
+    try {
+      const f = getFilteredContacts();
+      if (f && typeof focusedContactId !== 'undefined' && focusedContactId && !f.has(focusedContactId) && !f.has(String(focusedContactId))) focusedContactId = null;
+    } catch (e) {}
     /* Force circle aggregate recompute */
     if (typeof _circleAggregate !== 'undefined') {
       _circleAggregate.lastComputed = 0;
