@@ -4456,6 +4456,23 @@
   .sc-call-label {
     font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 32px;
   }
+  .sc-invite-line {
+    font-size: 15px; line-height: 1.45; color: rgba(255,255,255,0.85);
+    max-width: 320px; margin: -16px auto 16px; padding: 0 8px;
+    overflow-wrap: anywhere;
+  }
+  .sc-invite-line[hidden], .sc-invite-actions[hidden] { display: none; }
+  .sc-invite-actions {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+    max-width: 320px; margin: 0 auto 24px;
+  }
+  .sc-invite-btn {
+    min-height: 44px; padding: 10px 18px; border-radius: 22px;
+    border: 1px solid rgba(255,210,77,0.7); background: rgba(255,210,77,0.16);
+    color: #ffd24d; font-size: 15px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 0 12px rgba(255,210,77,0.35);
+  }
+  .sc-invite-btn:active { background: rgba(255,210,77,0.3); }
   .sc-pulse-ring {
     width: 120px; height: 120px; border-radius: 50%;
     border: 3px solid rgba(255,210,77,0.3);
@@ -7145,7 +7162,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 
       <!-- Quick Action Bar -->
       <div class="bluf-quick-actions" id="blufQuickActions">
-        <a class="bluf-qa-btn sc-video-btn" id="qaVideoBtn" href="facetime:" onclick="event.stopPropagation()">Video</a>
+        <a class="bluf-qa-btn sc-video-btn" id="qaVideoBtn" href="#" onclick="event.stopPropagation()">Video</a>
         <a class="bluf-qa-btn" id="qaCallBtn" href="tel:" onclick="event.stopPropagation()">Phone</a>
         <a class="bluf-qa-btn" id="qaTextBtn" href="sms:" onclick="event.stopPropagation()">Text</a>
         <a class="bluf-qa-btn" id="qaEmailBtn" href="mailto:" onclick="event.stopPropagation()">Email</a>
@@ -7187,6 +7204,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
     </div>
     <div class="sc-caller-name" id="scCallerName"></div>
     <div class="sc-call-label" id="scCallLabel"><span class="sc-connecting-dots">Connecting</span></div>
+    <div class="sc-invite-line" id="scInviteLine" hidden></div>
+    <div class="sc-invite-actions" id="scInviteActions" hidden></div>
   </div>
   <div class="sc-controls" id="scControls">
     <button class="sc-btn sc-btn-mute" id="scMuteBtn" onclick="SentinelCall.toggleMute()" title="Mute">🎤</button>
@@ -10291,13 +10310,19 @@ const I18n = (function () {
     'qa.missingSid': "Add {name}'s Sentinel ID to video call in Remiel Sentinel: Person card, Edit, Sentinel ID.",
     'acct.codePh': "Invite code",
     'acct.codeNeeded': "This server asks for an invite code. Type it in the Invite code field above, then tap Attach email.",
-    'qa.meetOffer': "{name} has no Sentinel ID yet. Start a Google Meet instead, or add their ID for calls inside Remiel Sentinel: Person card, Edit, Sentinel ID.",
-    'qa.meetStart': "Google Meet",
     'qa.addSid': "Add Sentinel ID",
-    'qa.meetShare': "Copy the meeting link from Google Meet and send it to {name}.",
-    'qa.meetText': "Text {name}",
-    'qa.meetMessage': "Message in app",
-    'qa.meetSmsBody': "Hi {name}, join my video call on Google Meet: ",
+    'call.inviting': "Inviting {first}",
+    'call.sendingInvite': "Sending {first} a text with the link.",
+    'call.textSent': "Text sent to {phone}. Waiting for {first} to tap it.",
+    'call.sendItYourself': "Send {first} the link yourself. This screen waits.",
+    'call.textLink': "Text the link",
+    'call.copyLink': "Copy link",
+    'call.share': "Share",
+    'call.linkCopied': "Link copied. Send it to {first} in any app; this screen waits.",
+    'call.messagesOpens': "Messages opens with the text ready; send it and come back. This screen waits.",
+    'call.noAnswerYet': "No answer yet. The link keeps working: {first} can tap it any time and you will be rung.",
+    'call.inviteSms': "{me} is calling you on Remiel Sentinel. Tap to answer: {link}",
+    'call.inviteShareTitle': "Video call on Remiel Sentinel",
     'qa.edit': "Edit",
     'confirm.deleteView': "Delete view \"{name}\"? This cannot be undone.",
     'confirm.signOut': "Sign out? Your local data stays on this device.",
@@ -10353,7 +10378,7 @@ const I18n = (function () {
     'guide.bioMotion': "Your phone motion now changes how your ring glows. Tap again to turn it off.",
     'guide.bioHr': "Choose your Bluetooth heart rate strap from the list. This works in Chrome only.",
     'guide.bioGroup': "Pick a monitor, then link it to a person so their ring shows their heart rate.",
-    'guide.callFirst': "Video calls work when both of you use Remiel Sentinel and you saved their Sentinel ID",
+    'guide.callFirst': "Video calls happen inside Remiel Sentinel. If the person is not on Remiel Sentinel yet, a link is sent and this screen waits for them.",
     'guide.callId': "Send your ID or link to someone you trust. Tap New ID if you want old links to stop working.",
     'guide.msgFirst': "Messages are delivered only when you are signed in and both of you have Sentinel IDs. Otherwise they are saved on this device.",
     'guide.views': "A view shows only some of your people, for example just family. Tap the badge to switch back.",
@@ -10767,13 +10792,19 @@ const I18n = (function () {
     'qa.missingSid': "Aggiungi l'ID Sentinel di {name} per videochiamare in Remiel Sentinel: Scheda della persona, Modifica, ID Sentinel.",
     'acct.codePh': "Codice invito",
     'acct.codeNeeded': "Questo server richiede un codice invito. Scrivilo nel campo Codice invito qui sopra, poi tocca Collega l’email.",
-    'qa.meetOffer': "{name} non ha ancora un ID Sentinel. Avvia una Google Meet, oppure aggiungi il suo ID per chiamare dentro Remiel Sentinel: Scheda della persona, Modifica, ID Sentinel.",
-    'qa.meetStart': "Google Meet",
     'qa.addSid': "Aggiungi ID Sentinel",
-    'qa.meetShare': "Copia il link della riunione da Google Meet e invialo a {name}.",
-    'qa.meetText': "Scrivi a {name}",
-    'qa.meetMessage': "Messaggio nell'app",
-    'qa.meetSmsBody': "Ciao {name}, unisciti alla mia videochiamata su Google Meet: ",
+    'call.inviting': "Invito a {first}",
+    'call.sendingInvite': "Invio a {first} un SMS con il link.",
+    'call.textSent': "SMS inviato a {phone}. In attesa che {first} lo tocchi.",
+    'call.sendItYourself': "Invia tu il link a {first}. Questa schermata aspetta.",
+    'call.textLink': "Invia il link via SMS",
+    'call.copyLink': "Copia il link",
+    'call.share': "Condividi",
+    'call.linkCopied': "Link copiato. Invialo a {first} con qualsiasi app; questa schermata aspetta.",
+    'call.messagesOpens': "Messaggi si apre con il testo pronto; invialo e torna qui. Questa schermata aspetta.",
+    'call.noAnswerYet': "Ancora nessuna risposta. Il link resta valido: {first} può toccarlo in qualsiasi momento e riceverai la chiamata.",
+    'call.inviteSms': "{me} ti sta chiamando su Remiel Sentinel. Tocca per rispondere: {link}",
+    'call.inviteShareTitle': "Videochiamata su Remiel Sentinel",
     'qa.edit': "Modifica",
     'confirm.deleteView': "Eliminare la vista \"{name}\"? Non si può annullare.",
     'confirm.signOut': "Vuoi uscire? I tuoi dati restano su questo dispositivo.",
@@ -10829,7 +10860,7 @@ const I18n = (function () {
     'guide.bioMotion': "Ora il movimento del telefono cambia la luce del tuo anello. Tocca di nuovo per spegnerlo.",
     'guide.bioHr': "Scegli dalla lista la tua fascia cardio Bluetooth. Funziona solo in Chrome.",
     'guide.bioGroup': "Scegli un monitor, poi abbinalo a una persona così il suo anello mostra il battito.",
-    'guide.callFirst': "Le videochiamate funzionano se entrambi usate Remiel Sentinel e hai salvato il suo ID Sentinel",
+    'guide.callFirst': "Le videochiamate avvengono dentro Remiel Sentinel. Se la persona non è ancora su Remiel Sentinel, viene inviato un link e questa schermata la aspetta.",
     'guide.callId': "Manda il tuo ID o il link a una persona di fiducia. Tocca Nuovo ID se vuoi che i vecchi link smettano di funzionare.",
     'guide.msgFirst': "I messaggi arrivano solo se hai fatto l’accesso ed entrambi avete un ID Sentinel. Altrimenti restano salvati su questo dispositivo.",
     'guide.views': "Una vista mostra solo alcune delle tue persone, per esempio solo la famiglia. Tocca il badge per tornare a tutti.",
@@ -15028,18 +15059,16 @@ async function updateBlufContent() {
       _qaEmail.title = _email ? I18n.t('qa.email', { name: selectedContact.first }) : I18n.t('qa.noEmail');
     }
     if (_qaVideo) {
-      /* QA3 #4: Video uses Sentinel Call when the contact has a Sentinel ID;
-         facetime: only as the Apple fallback. */
-      const _canVideo = _rsHasSid(selectedContact) || (_rsIsApple() && !!_phone);
+      /* Video is always one tap: Sentinel Call when the contact has a Sentinel
+         ID, otherwise a guest call that waits inside the app. */
       _qaVideo.href = '#';
       _qaVideo.style.opacity = '1';
       _qaVideo.dataset.addLabel = I18n.t('btn.addBadge');
       _qaVideo.style.pointerEvents = 'auto';
-      _qaVideo.dataset.missing = _canVideo ? '' : 'sid';
-      _qaVideo.title = _canVideo ? I18n.t('qa.video', { name: selectedContact.first }) : I18n.t('qa.missingSid', { name: selectedContact.first });
+      _qaVideo.dataset.missing = '';
+      _qaVideo.title = I18n.t('qa.video', { name: selectedContact.first });
       _qaVideo.onclick = function(e) {
         e.preventDefault(); e.stopPropagation();
-        if (this.dataset.missing) return; /* the capture listener shows the hint */
         startVideoWith(selectedContact);
       };
     }
@@ -22213,45 +22242,23 @@ function explainMissingAction(kind, c) {
   showActionToast(I18n.t(key, { name: name }), [Guide.action(target, { contactId: c && c.id })], 9000);
 }
 
-/* Video: Sentinel Call when the contact has a Sentinel ID; FaceTime on
-   Apple devices with a phone number; otherwise ask for the Sentinel ID. */
+/* Video: one tap, always inside Remiel Sentinel. Sentinel Call when the
+   contact has a Sentinel ID; otherwise a guest call that sends the link and
+   waits on this screen for the person to tap it. */
 async function startVideoWith(c) {
   if (!c) return;
-  /* Magnet: one tap. A person with a saved phone or email is looked up first. */
-  if (!_rsHasSid(c) && typeof Magnet !== 'undefined' && Magnet && Magnet.canFind(c)) {
+  if (typeof SentinelCall === 'undefined') return;
+  if (_rsHasSid(c)) { SentinelCall.callContact(c); return; }
+  /* Magnet: a person with a saved phone or email is looked up first. */
+  if (typeof Magnet !== 'undefined' && Magnet && Magnet.canFind(c)) {
     try { await Magnet.matchOne(c); } catch (e) {}
-  }
-  if (_rsHasSid(c) && typeof SentinelCall !== 'undefined') {
-    if (typeof Magnet !== 'undefined' && Magnet && Magnet.needsLink(c)) Magnet.requestLink(c).catch(function () {});
-    SentinelCall.callContact(c);
-    return;
-  }
-  if (_rsIsApple() && c.phone) { window.location.href = 'facetime:' + normalizePhone(c.phone); return; }
-  if (!_rsIsApple()) { offerGoogleMeet(c); return; }
-  explainMissingAction('sid', c);
-}
-
-/* Android, Windows and other non-Apple devices: Google Meet cannot dial a
-   person directly, so the app starts a new meeting in a new tab and helps the
-   user send the link by text. The Sentinel ID remains the direct route. */
-function offerGoogleMeet(c) {
-  if (typeof Magnet !== 'undefined' && Magnet && Magnet.explainOnce(c)) return;
-  var name = (c && c.first) || I18n.t('call.thisContact');
-  var actions = [{ label: I18n.t('qa.meetStart'), run: function () {
-    window.open('https://meet.google.com/new', '_blank', 'noopener');
-    var follow = [];
-    if (c.phone) {
-      follow.push({ label: I18n.t('qa.meetText', { name: name }), run: function () {
-        var body = encodeURIComponent(I18n.t('qa.meetSmsBody', { name: name }));
-        window.location.href = 'sms:' + normalizePhone(c.phone) + '?body=' + body;
-      } });
+    if (_rsHasSid(c)) {
+      if (Magnet.needsLink(c)) Magnet.requestLink(c).catch(function () {});
+      SentinelCall.callContact(c);
+      return;
     }
-    follow.push({ label: I18n.t('qa.meetMessage'), run: function () {
-      if (typeof SentinelMessaging !== 'undefined') SentinelMessaging.openFor(c.id);
-    } });
-    showActionToast(I18n.t('qa.meetShare', { name: name }), follow, 12000);
-  } }, Guide.action('contact.sentinelId', { contactId: c && c.id }, 'qa.addSid')];
-  showActionToast(I18n.t('qa.meetOffer', { name: name }), actions, 10000);
+  }
+  SentinelCall.waitForGuest(c);
 }
 
 function runContactQuickAction(type, c) {
@@ -32149,6 +32156,10 @@ const SentinelCall = (function() {
 
   const _NO_ANSWER_MS = 45000;
   let _noAnswerTimer = null;
+  /* Guest invite: the contact we are waiting for and until when */
+  let _awaitGuestFor = null;
+  let _awaitGuestUntil = 0;
+  let _awaitGuestTimer = null;
   let _incomingTimer = null;
   let _activeShown = false;
   let _guestPeer = null;
@@ -32261,6 +32272,13 @@ const SentinelCall = (function() {
       _incomingCall = call;
       call.on('close', () => { if (_incomingCall === call) rejectIncoming(); });
       call.on('error', () => { if (_incomingCall === call) rejectIncoming(); });
+      /* Waiting for an invited guest: answer at once, no incoming screen */
+      if (_awaitGuestFor !== null && Date.now() < _awaitGuestUntil) {
+        const forId = _awaitGuestFor;
+        _clearAwaitGuest();
+        acceptIncoming().then(() => { if (_currentCall === call) _callContactId = forId || null; });
+        return;
+      }
       _showIncoming(call);
     });
 
@@ -32447,7 +32465,7 @@ const SentinelCall = (function() {
     if (_incomingTimer) { clearTimeout(_incomingTimer); _incomingTimer = null; }
 
     try {
-      _localStream = await _getStream();
+      if (!_localStream || !_localStream.active) _localStream = await _getStream();
     } catch(err) {
       showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
       rejectIncoming();
@@ -32486,6 +32504,7 @@ const SentinelCall = (function() {
 
   /* ── Hang up ── */
   function hangUp() {
+    _clearAwaitGuest();
     const call = _currentCall;
     _currentCall = null;
     if (call) { try { call.close(); } catch (e) {} }
@@ -32515,12 +32534,130 @@ const SentinelCall = (function() {
 
   /* ── End call cleanup ── */
   function endCall() {
+    _clearAwaitGuest();
     const call = _currentCall;
     _currentCall = null;
     _incomingCall = null;
     if (call) { try { call.close(); } catch (e) {} }
     _cleanupMedia();
     _hideAllOverlays();
+    _setInviteLine(null);
+  }
+
+  /* ── Guest invite: video with a person who is not on Remiel Sentinel ──
+     The camera opens, the outgoing screen shows, the guest link is sent
+     (by this server's text service when connected, otherwise by the user
+     from this screen) and the screen waits up to three minutes. When the
+     guest taps the link and joins, the call is answered here at once. */
+  const _AWAIT_GUEST_MS = 180000;
+  function _tp(key, fallback, params) {
+    let v = _t(key, fallback);
+    Object.keys(params || {}).forEach(k => { v = v.split('{' + k + '}').join(params[k]); });
+    return v;
+  }
+  function _clearAwaitGuest() {
+    _awaitGuestFor = null;
+    _awaitGuestUntil = 0;
+    if (_awaitGuestTimer) { clearTimeout(_awaitGuestTimer); _awaitGuestTimer = null; }
+  }
+  function _setInviteLine(text, buttons) {
+    const line = document.getElementById('scInviteLine');
+    const acts = document.getElementById('scInviteActions');
+    if (line) { line.textContent = text || ''; line.hidden = !text; }
+    if (acts) {
+      acts.innerHTML = '';
+      (buttons || []).forEach(b => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sc-invite-btn';
+        btn.textContent = b.label;
+        btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); try { b.run(); } catch (err) {} };
+        acts.appendChild(btn);
+      });
+      acts.hidden = !(buttons && buttons.length);
+    }
+  }
+  function _guestLink() {
+    return window.location.origin + window.location.pathname + '?call=' + _myId;
+  }
+  async function _sendInviteText(contact, link, myName) {
+    if (typeof SyncEngine === 'undefined' || typeof SyncEngine.apiFetch !== 'function') return { ok: false };
+    if (!contact.phone && !contact.email) return { ok: false };
+    const body = { link: link, from_name: String(myName || '').slice(0, 60), contact_name: contact.first || '' };
+    if (contact.phone) body.to_phone = normalizePhone(contact.phone);
+    else body.to_email = contact.email;
+    const res = await SyncEngine.apiFetch('/calls/invite', { method: 'POST', body: JSON.stringify(body) });
+    let j = null;
+    try { j = await res.json(); } catch (e) {}
+    return (res.ok && j && j.ok) ? j : { ok: false, status: res.status };
+  }
+  function _offerManualInvite(contact, link, myName, first) {
+    const sms = _tp('call.inviteSms', '{me} is calling you on Remiel Sentinel. Tap to answer: {link}', { me: myName, link: link });
+    const buttons = [];
+    if (contact.phone) {
+      buttons.push({ label: _t('call.textLink', 'Text the link'), run: () => {
+        _setInviteLine(_t('call.messagesOpens', 'Messages opens with the text ready; send it and come back. This screen waits.'), buttons);
+        window.location.href = 'sms:' + normalizePhone(contact.phone) + '?&body=' + encodeURIComponent(sms);
+      } });
+    }
+    buttons.push({ label: _t('call.copyLink', 'Copy link'), run: () => {
+      const done = () => _setInviteLine(_tp('call.linkCopied', 'Link copied. Send it to {first} in any app; this screen waits.', { first: first }), buttons);
+      try { navigator.clipboard.writeText(link).then(done, () => _setInviteLine(link, buttons)); }
+      catch (e) { _setInviteLine(link, buttons); }
+    } });
+    if (navigator.share) {
+      buttons.push({ label: _t('call.share', 'Share'), run: () => {
+        navigator.share({ title: _t('call.inviteShareTitle', 'Video call on Remiel Sentinel'), text: sms, url: link }).catch(() => {});
+      } });
+    }
+    _setInviteLine(_tp('call.sendItYourself', 'Send {first} the link yourself. This screen waits.', { first: first }), buttons);
+  }
+  async function waitForGuest(contact) {
+    if (!contact) return;
+    if (typeof SentinelGuide !== 'undefined') { try { SentinelGuide.onCall(); } catch (e) {} }
+    if (_currentCall) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
+    if (_awaitGuestFor !== null) { showToast(_t('call.alreadyInCall', 'Already in a call')); return; }
+    if (!(await _ensurePeer())) return;
+    if (!_myId) { showToast(_t('toast.sidNotReady', 'Sentinel ID not ready yet')); return; }
+    try {
+      if (!_localStream || !_localStream.active) _localStream = await _getStream();
+    } catch (err) {
+      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
+      return;
+    }
+    const first = contact.first || _t('call.thisContact', 'this contact');
+    const name = ((contact.first || '') + ' ' + (contact.last || '')).trim() || _t('call.contact', 'Contact');
+    const initials = (contact.first || '?')[0] + ((contact.last || '')[0] || '');
+    _showOutgoing(name, initials, contact.id);
+    const label = document.getElementById('scCallLabel');
+    if (label) label.innerHTML = '<span class="sc-connecting-dots">' + _tp('call.inviting', 'Inviting {first}', { first: first }) + '</span>';
+    const localVid = document.getElementById('scLocalVideo');
+    if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
+
+    _awaitGuestFor = contact.id == null ? '' : contact.id;
+    _awaitGuestUntil = Date.now() + _AWAIT_GUEST_MS;
+    if (_awaitGuestTimer) clearTimeout(_awaitGuestTimer);
+    _awaitGuestTimer = setTimeout(() => {
+      _awaitGuestTimer = null;
+      if (_awaitGuestFor === null || _currentCall) return;
+      const msg = _tp('call.noAnswerYet', 'No answer yet. The link keeps working: {first} can tap it any time and you will be rung.', { first: first });
+      _setInviteLine(msg);
+      endCall();
+      showToast(msg);
+    }, _AWAIT_GUEST_MS);
+
+    const link = _guestLink();
+    const myName = await _getMyName();
+    if (_awaitGuestFor === null) return; /* hung up while the name loaded */
+    _setInviteLine(_tp('call.sendingInvite', 'Sending {first} a text with the link.', { first: first }));
+    let sent = { ok: false };
+    try { sent = await _sendInviteText(contact, link, myName); } catch (e) { sent = { ok: false }; }
+    if (_awaitGuestFor === null) return;
+    if (sent.ok) {
+      _setInviteLine(_tp('call.textSent', 'Text sent to {phone}. Waiting for {first} to tap it.', { phone: contact.phone, first: first }));
+    } else {
+      _offerManualInvite(contact, link, myName, first);
+    }
   }
 
   /* ── Mute toggle ── */
@@ -32960,7 +33097,8 @@ const SentinelCall = (function() {
     toggleMute, flipCamera,
     getMyId, isInCall,
     copyMyId, shareCallLink, regenerateId, updateSettingsDisplay,
-    checkCallInvite, guestJoinCall
+    checkCallInvite, guestJoinCall, waitForGuest,
+    isAwaitingGuest: () => _awaitGuestFor !== null
   };
 })();
 
@@ -33769,7 +33907,7 @@ function openContactModal(mode, contact) {
 
 
 
-/* ── Phone number normalization for tel:/sms:/facetime: URLs ── */
+/* ── Phone number normalization for tel:/sms: URLs ── */
 function normalizePhone(raw) {
   if (!raw) return '';
   var s = raw.replace(/[\s\-\(\)\.]/g, '');
@@ -33921,7 +34059,9 @@ function execQuickDial() {
   } else if (_qdMode === 'sms') {
     window.location.href = 'sms:' + normalizePhone(val);
   } else if (_qdMode === 'video') {
-    window.location.href = 'facetime:' + normalizePhone(val);
+    var _vc = _qdContactId ? DEMO_CONTACTS.find(function(c) { return c.id === _qdContactId; }) : null;
+    if (_vc) startVideoWith(_vc);
+    else if (typeof SentinelCall !== 'undefined') SentinelCall.waitForGuest({ id: null, first: '', last: '', phone: val });
   } else {
     window.location.href = 'tel:' + normalizePhone(val);
   }
