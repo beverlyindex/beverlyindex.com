@@ -15729,9 +15729,15 @@ function _markInteraction(e) {
       var _hits = [window._dreamCommHit, window._dreamToggleHit, window._dreamWhereHit, window._dreamMicroHit];
       var _cv = document.getElementById('sphere'); var _rc = _cv.getBoundingClientRect();
       var _x = e.clientX - _rc.left, _y = e.clientY - _rc.top;
-      for (var _hi = 0; _hi < _hits.length; _hi++) {
+      /* A sphere under the finger always wins over any drawn region */
+      var _onSphere = false;
+      try { _onSphere = !!(typeof hitTestNetwork === 'function' && hitTestNetwork(e.clientX, e.clientY)); } catch (err2) {}
+      if (!_onSphere) for (var _hi = 0; _hi < _hits.length; _hi++) {
         var _h = _hits[_hi];
-        if (_h && _x >= _h.x && _x <= _h.x + _h.w && _y >= _h.y && _y <= _h.y + _h.h) return;
+        if (!_h) continue;
+        var _inside = (_h.r != null) ? ((_x - _h.cx) * (_x - _h.cx) + (_y - _h.cy) * (_y - _h.cy) <= _h.r * _h.r)
+                                     : (_x >= _h.x && _x <= _h.x + _h.w && _y >= _h.y && _y <= _h.y + _h.h);
+        if (_inside) return;
       }
     }
   } catch (err) {}
@@ -19242,8 +19248,10 @@ const Comm = (() => {
   let _ix = 0;              /* which communication the dream state is showing */
   let _slideAt = 0;         /* when the current one appeared */
   const SLIDE_MS = 4000;
+  let _lastCommCircle = null;
   function activate() {
     _active = true; _slideAt = 0;
+    try { const h = window._dreamCommHit; if (h && h.r != null) _lastCommCircle = { cx: h.cx, cy: h.cy, r: h.r }; } catch (e) {}
     try { if (!_dreamFor && typeof focusedContactId !== 'undefined') _dreamFor = focusedContactId; } catch (e) {}
     const el = $('dreamComm'); if (el) { el.classList.remove('is-dream'); el.classList.add('is-active'); el.style.opacity = ''; }
     _paint();
@@ -19266,7 +19274,11 @@ const Comm = (() => {
       const inHit = e => {
         const h = window._dreamCommHit; if (!h || _active || !cv) return false;
         const rct = cv.getBoundingClientRect(); const x = e.clientX - rct.left, y = e.clientY - rct.top;
-        return x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
+        /* Inside the drawn circle itself, and only where no sphere sits: a sphere always wins */
+        if (h.r != null) { const dx = x - h.cx, dy = y - h.cy; if (dx * dx + dy * dy > h.r * h.r) return false; }
+        else if (!(x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h)) return false;
+        try { if (typeof hitTestNetwork === 'function' && hitTestNetwork(e.clientX, e.clientY)) return false; } catch (err) {}
+        return true;
       };
       let _downHit = false;
       if (st) {
@@ -19401,16 +19413,24 @@ const Comm = (() => {
     if (!_active) { if (!el.hidden) el.hidden = true; return; }
     if (el.hidden) el.hidden = false;
     const r = window._dreamRect;
+    const hc = _lastCommCircle || null;
     const vw = window.innerWidth, vh = window.innerHeight;
-    let left, width;
-    if (vw <= 480) { left = 12; width = vw - 24; }
-    else {
+    let left, width, top;
+    if (vw <= 480) { left = 12; width = vw - 24; top = hc ? Math.max(8, hc.cy - hc.r) : r.cy + r.r + 8; }
+    else if (hc) {
+      /* The opened list sits on the circle it came from */
+      width = Math.max(300, 2 * hc.r);
+      left = hc.cx - width / 2;
+      top = Math.max(8, hc.cy - hc.r);
+      if (left + width > vw - 12) left = vw - 12 - width;
+      if (left < 12) left = 12;
+    } else {
       width = Math.max(220, 2 * r.r);
       left = r.cx - r.r;
       if (left + width > vw - 12) left = vw - 12 - width;
       if (left < 12) { left = 12; width = Math.min(width, vw - 24); }
+      top = r.cy + r.r + 8;
     }
-    const top = r.cy + r.r + 8;
     const maxH = Math.max(120, Math.min(vh * 0.38, vh - top - 12));
     el.style.left = Math.round(left) + 'px';
     el.style.top = Math.round(top) + 'px';
@@ -19931,7 +19951,7 @@ const WhereIs = (() => {
     _vignette(ctx, cx, cy, R);
     if (mapOk) { ctx.globalAlpha = 0.9; _lines(ctx, [attr], cx, attrTop, '500 8px ' + sans, 'rgba(240,238,245,0.9)', 9); }
     ctx.restore();
-    window._dreamWhereHit = { x: cx - R, y: cy - R, w: R * 2, h: R * 2 };
+    window._dreamWhereHit = { x: cx - R, y: cy - R, w: R * 2, h: R * 2, cx: cx, cy: cy, r: R };
 
     /* Micro: directly beneath the macro, a smaller circle */
     const r2 = dr.r * 0.5;
@@ -19982,7 +20002,7 @@ const WhereIs = (() => {
     }
     _vignette(ctx, cx2, cy2, r2);
     ctx.restore();
-    window._dreamMicroHit = { x: cx2 - r2, y: cy2 - r2, w: r2 * 2, h: r2 * 2 };
+    window._dreamMicroHit = { x: cx2 - r2, y: cy2 - r2, w: r2 * 2, h: r2 * 2, cx: cx2, cy: cy2, r: r2 };
   }
 
   /* ── Stage taps: the toggle and the map circle, the same interception as Comm ── */
@@ -19994,10 +20014,13 @@ const WhereIs = (() => {
       const hit = (e, h) => {
         if (!h || !cv) return false;
         const rct = cv.getBoundingClientRect(); const x = e.clientX - rct.left, y = e.clientY - rct.top;
+        if (h.r != null) { const dx = x - h.cx, dy = y - h.cy; return dx * dx + dy * dy <= h.r * h.r; }
         return x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
       };
       const which = e => {
         if (typeof focusedContactId === 'undefined' || !focusedContactId) return null;
+        /* A sphere under the finger always wins over the drawn regions */
+        try { if (typeof hitTestNetwork === 'function' && hitTestNetwork(e.clientX, e.clientY)) return null; } catch (err) {}
         if (hit(e, window._dreamToggleHit)) return 'toggle';
         if (_mode === 'whereis' && (hit(e, window._dreamWhereHit) || hit(e, window._dreamMicroHit))) return 'map';
         return null;
@@ -25771,7 +25794,7 @@ function drawNetworkView(t) {
             ctx.font = '600 ' + _dfS + 'px "JetBrains Mono", "SF Mono", monospace';
             ctx.fillText(_dcs.count, _dcCx, _dcCy + _dcR * 0.82); ctx.restore();
           }
-          window._dreamCommHit = { x: _dcCx - _dcR, y: _dcCy - _dcR, w: _dcR * 2, h: _dcR * 2 };
+          window._dreamCommHit = { x: _dcCx - _dcR, y: _dcCy - _dcR, w: _dcR * 2, h: _dcR * 2, cx: _dcCx, cy: _dcCy, r: _dcR };
         }
       }
     } catch (e) { window._dreamCommHit = null; }
