@@ -5645,6 +5645,19 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
 .dream-comm-label { font-family: var(--nous-mono, monospace); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(240,238,245,0.75); }
 .dream-comm-name { font-size: 13px; font-weight: 700; margin: 2px 0 8px; color: #f0eef5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dream-comm .comm-row { background: rgba(255,255,255,0.04); }
+/* Dream state: the strip fades and breathes with the image above it, shows one
+   communication at a time and cycles through the last 24 hours. A tap
+   activates it: solid, every item, scrollable. */
+.dream-comm.is-dream { background: transparent; border-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; overflow: hidden; cursor: pointer;
+  text-shadow: 0 0 14px rgba(56,189,248,0.45), 0 0 2px rgba(0,0,0,0.8); }
+.dream-comm.is-dream .comm-row { background: transparent; border-color: transparent; box-shadow: none !important; animation: none; }
+.dream-comm.is-dream .comm-row.is-latest { border-color: transparent; }
+.dream-comm.is-dream .dream-comm-slide { animation: dreamSlideIn 0.9s ease both; }
+@keyframes dreamSlideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.dream-comm-count { font-family: var(--nous-mono, monospace); font-size: 10px; color: rgba(159,216,255,0.8); letter-spacing: 1px; margin-top: 4px; }
+.dream-comm-hint { font-size: 11px; color: rgba(240,238,245,0.6); margin-top: 6px; }
+.dream-comm .dream-comm-x { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; font-size: 18px; }
+@media (prefers-reduced-motion: reduce) { .dream-comm.is-dream .dream-comm-slide { animation: none; } }
 
 
 /* Pressed and busy feedback on every control */
@@ -11219,6 +11232,10 @@ const I18n = (function () {
     "bc.save": "Save to Sphere",
     "bc.done": "Done: back to your Circle",
     "views.importName": "Roster {date}",
+    "comm.tapHint": "Tap to open all",
+    "comm.emptyShort": "No communication in the last 24 hours",
+    "comm.back": "Back to the dream state",
+    "comm.opened": "Communication opened. Tap the X to return to the dream state.",
     "views.bannerImport": "Team view \"{name}\" created and showing. To see everyone, or switch teams, tap your centre sphere and choose a view.",
     "bc.circle": "Share with Circle",
     "bc.active": "Camera active",
@@ -11493,6 +11510,10 @@ const I18n = (function () {
     "bc.save": "Salva nella sfera",
     "bc.done": "Fatto: torna alla tua Cerchia",
     "views.importName": "Elenco {date}",
+    "comm.tapHint": "Tocca per aprire tutto",
+    "comm.emptyShort": "Nessuna comunicazione nelle ultime 24 ore",
+    "comm.back": "Torna allo stato di sogno",
+    "comm.opened": "Comunicazione aperta. Tocca la X per tornare allo stato di sogno.",
     "views.bannerImport": "Vista Squadra \"{name}\" creata e attiva. Per vedere tutti, o cambiare squadra, tocca la tua sfera centrale e scegli una vista.",
     "bc.circle": "Condividi con la cerchia",
     "bc.active": "Fotocamera attiva",
@@ -15064,6 +15085,15 @@ var _REST_CYCLE_MS = 12000;     /* cycle dream image every 12 seconds */
 function _markInteraction(e) {
   /* Reading or scrolling the Communication strip under the dream is not a wake-up */
   try { if (e && e.target && e.target.closest && e.target.closest('#dreamComm')) return; } catch (err) {}
+  /* Nor is a touch on the communication drawn under the dream image */
+  try {
+    var _h = window._dreamCommHit;
+    if (_h && e && typeof e.clientX === 'number') {
+      var _cv = document.getElementById('sphere'); var _rc = _cv.getBoundingClientRect();
+      var _x = e.clientX - _rc.left, _y = e.clientY - _rc.top;
+      if (_x >= _h.x && _x <= _h.x + _h.w && _y >= _h.y && _y <= _h.y + _h.h) return;
+    }
+  } catch (err) {}
   _lastInteractionTime = Date.now();
   if (_restModeActive) _exitRestMode();
 }
@@ -15089,6 +15119,8 @@ function _enterRestMode() {
 
 function _cycleDreamContact() {
   if (blufOpen || appState !== 'network') { _exitRestMode(); return; }
+  /* Communication opened by a tap: hold this member until it is closed */
+  try { if (typeof Comm !== 'undefined' && Comm.isActive) return; } catch (e) {}
   /* Only show contacts that have a photo (imported contacts bring photos) */
   var pool = DEMO_CONTACTS.filter(function(c) { return contactPhotos.has(c.id); });
   if (pool.length === 0) { _exitRestMode(); return; }
@@ -18450,23 +18482,64 @@ const Comm = (() => {
   }
 
   /* ── Dream strip ── */
+  let _active = false;      /* false: dream state (faded, cycling); true: tapped open, full list */
+  let _ix = 0;              /* which communication the dream state is showing */
+  let _slideAt = 0;         /* when the current one appeared */
+  const SLIDE_MS = 4000;
+  function activate() {
+    _active = true; _slideAt = 0;
+    try { if (!_dreamFor && typeof focusedContactId !== 'undefined') _dreamFor = focusedContactId; } catch (e) {}
+    const el = $('dreamComm'); if (el) { el.classList.remove('is-dream'); el.classList.add('is-active'); el.style.opacity = ''; }
+    _paint();
+    try { if (typeof A11y !== 'undefined') A11y.announce(_t('comm.opened', 'Communication opened. Tap the X to return to the dream state.')); } catch (e) {}
+  }
+  function deactivate() {
+    _active = false; _ix = 0; _slideAt = Date.now(); _slideFor = null;
+    const el = $('dreamComm'); if (el) { el.classList.add('is-dream'); el.classList.remove('is-active'); el.scrollTop = 0; }
+    _paint();
+  }
   function _bind() {
     if (_bound) return;
     const el = $('dreamComm');
     if (!el) return;
     _bound = true;
+    el.classList.add('is-dream');
+    /* Taps on the drawn communication under the dream image */
+    try {
+      const st = document.getElementById('stage'), cv = document.getElementById('sphere');
+      const inHit = e => {
+        const h = window._dreamCommHit; if (!h || _active || !cv) return false;
+        const rct = cv.getBoundingClientRect(); const x = e.clientX - rct.left, y = e.clientY - rct.top;
+        return x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
+      };
+      let _downHit = false;
+      if (st) {
+        ['pointerdown', 'mousedown', 'touchstart'].forEach(evt => st.addEventListener(evt, e => {
+          const pt = (e.touches && e.touches[0]) || e;
+          if (inHit(pt)) { _downHit = true; e.stopImmediatePropagation(); }
+        }, true));
+        ['pointerup', 'mouseup', 'touchend', 'click'].forEach(evt => st.addEventListener(evt, e => {
+          if (!_downHit) return;
+          e.stopImmediatePropagation(); e.preventDefault();
+          if (evt === 'pointerup' || evt === 'touchend') { _downHit = false; activate(); }
+        }, true));
+      }
+    } catch (e) {}
     /* A pointer on the strip is not an interaction with the stage: keep Rest Mode and the galaxy taps untouched */
     ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'touchstart', 'touchmove', 'touchend', 'wheel'].forEach(evt => {
       el.addEventListener(evt, e => { e.stopPropagation(); }, { passive: true });
     });
     el.addEventListener('click', e => {
       e.stopPropagation();
+      if (e.target.closest('.dream-comm-x')) { e.preventDefault(); deactivate(); return; }
+      if (!_active) { e.preventDefault(); activate(); return; }
       const row = e.target.closest('.comm-row');
       if (row) { e.preventDefault(); openRow(row); }
     });
     el.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && _active) { e.preventDefault(); e.stopPropagation(); deactivate(); return; }
       const row = e.target.closest('.comm-row');
-      if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); openRow(row); }
+      if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); if (_active) openRow(row); else activate(); }
     });
     window.addEventListener('localeChanged', () => { _dreamFor = null; refresh(); });
     if (!_tickTimer) _tickTimer = setInterval(() => { if (_dreamFor) _paint(); try { if (typeof blufOpen !== 'undefined' && blufOpen && selectedContact) Social.renderBluf(selectedContact); } catch (e) {} }, 60000);
@@ -18478,14 +18551,71 @@ const Comm = (() => {
     const items = cached(c.id) || [];
     _dreamItems = items;
     el.setAttribute('aria-label', _t('comm.a11y.strip', 'Communication from {first}', { first: _first(c) }));
-    el.innerHTML = '<div class="dream-comm-label">' + _esc(_t('comm.label', 'COMMUNICATION')) + '</div>' +
-      '<div class="dream-comm-name">' + _esc(_first(c)) + '</div>' + _listHtml(items, c, false);
+    const head = '<div class="dream-comm-label">' + _esc(_t('comm.label', 'COMMUNICATION')) + '</div>' +
+      '<div class="dream-comm-name">' + _esc(_first(c)) + '</div>';
+    if (_active) {
+      el.innerHTML = '<button type="button" class="card-x dream-comm-x" aria-label="' + _esc(_t('comm.back', 'Back to the dream state')) + '" title="' + _esc(_t('comm.back', 'Back to the dream state')) + '">&times;</button>' +
+        head + _listHtml(items, c, false);
+      return;
+    }
+    if (!items.length) { el.innerHTML = head + _emptyHtml(c); return; }
+    if (_ix >= items.length) _ix = 0;
+    const it = items[_ix];
+    el.innerHTML = head + '<div class="dream-comm-slide" data-ix="' + _ix + '">' + _rowHtml(it, _ix, _ix === 0) + '</div>' +
+      (items.length > 1 ? '<div class="dream-comm-count">' + (_ix + 1) + ' / ' + items.length + '</div>' : '') +
+      '<div class="dream-comm-hint">' + _esc(_t('comm.tapHint', 'Tap to open all')) + '</div>';
+    if (!_slideAt) _slideAt = Date.now();
+  }
+  /* What the canvas draws under the dream image: one communication, cycling */
+  let _slideFor = null, _slideItems = [];
+  function _wrap(text, max) {
+    const words = String(text || '').split(/\s+/), out = []; let line = '';
+    for (const w of words) {
+      if ((line + ' ' + w).trim().length > max) { if (line) out.push(line); line = w; if (out.length === 2) break; }
+      else line = (line + ' ' + w).trim();
+    }
+    if (line && out.length < 2) out.push(line);
+    if (out.length === 2 && words.join(' ').length > out.join(' ').length) out[1] = out[1].slice(0, Math.max(0, max - 1)) + '\u2026';
+    return out;
+  }
+  const _imgs = new Map();  /* url -> HTMLImageElement (null while loading or failed) */
+  function image(url) {
+    if (!url) return null;
+    if (_imgs.has(url)) { const im = _imgs.get(url); return (im && im.complete && im.naturalWidth) ? im : null; }
+    const im = new Image();
+    im.decoding = 'async';
+    im.onerror = () => { _imgs.set(url, null); };
+    im.src = url;
+    _imgs.set(url, im);
+    return null;
+  }
+  function dreamSlide(contactId, t, maxCharsIn) {
+    if (!contactId || _active) return null;
+    const c = _contact(contactId); if (!c) return null;
+    if (_slideFor !== contactId) { _slideFor = contactId; _ix = 0; _slideAt = Date.now(); _slideItems = cached(contactId) || []; itemsFor(contactId).then(() => { if (_slideFor === contactId) _slideItems = cached(contactId) || []; }); _bind(); renderDream(); }
+    const items = _slideItems;
+    const maxChars = Math.max(16, maxCharsIn || ((window.innerWidth <= 480) ? 30 : 38));
+    if (!items.length) return { label: _t('comm.label', 'COMMUNICATION'), name: _first(c), channel: _t('comm.label', 'COMMUNICATION'), thumb: null, lines: _wrap(_t('comm.emptyShort', 'No communication in the last 24 hours'), maxChars), when: '', count: '', hint: _t('comm.tapHint', 'Tap to open all') };
+    if (items.length > 1 && Date.now() - _slideAt >= SLIDE_MS) { _ix = (_ix + 1) % items.length; _slideAt = Date.now(); }
+    if (_ix >= items.length) _ix = 0;
+    const it = items[_ix];
+    return { label: _t('comm.label', 'COMMUNICATION'), name: _first(c), channel: channelLabel(it.channel), thumb: it.thumb || null, lines: _wrap(it.text, maxChars), when: lonelyTime(it.ts, it.channel),
+             count: items.length > 1 ? (_ix + 1) + ' / ' + items.length : '', hint: _t('comm.tapHint', 'Tap to open all') };
+  }
+  /* Dream state: move to the next communication every few seconds */
+  function _cycle() {
+    if (_active) return;
+    const c = _contact(_dreamFor); if (!c) return;
+    const items = cached(c.id) || [];
+    if (items.length < 2) return;
+    if (Date.now() - _slideAt >= SLIDE_MS) { _ix = (_ix + 1) % items.length; _slideAt = Date.now(); _paint(); }
   }
   function renderDream() {
     _bind();
     const id = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
     const c = _contact(id);
     if (!c) { _dreamFor = null; return; }
+    if (_dreamFor !== c.id) { _active = false; _ix = 0; _slideAt = 0; const el0 = $('dreamComm'); if (el0) { el0.classList.add('is-dream'); el0.classList.remove('is-active'); } }
     _dreamFor = c.id;
     _paint();
     itemsFor(c.id).then(() => { if (_dreamFor === c.id) _paint(); });
@@ -18512,6 +18642,7 @@ const Comm = (() => {
       return;
     }
     if (_dreamFor !== focusedContactId) renderDream();
+    if (!_active) { if (!el.hidden) el.hidden = true; return; }
     if (el.hidden) el.hidden = false;
     const r = window._dreamRect;
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -18529,8 +18660,18 @@ const Comm = (() => {
     el.style.top = Math.round(top) + 'px';
     el.style.width = Math.round(width) + 'px';
     el.style.maxHeight = Math.round(maxH) + 'px';
-    const latest = el.querySelector('.comm-row.is-latest');
-    if (latest && !latest.classList.contains('btn-advance')) latest.classList.add('btn-advance');
+    if (_active) {
+      el.style.opacity = '';
+      const latest = el.querySelector('.comm-row.is-latest');
+      if (latest && !latest.classList.contains('btn-advance')) latest.classList.add('btn-advance');
+    } else {
+      /* Same breathing as the image above, lifted so the words stay readable */
+      const a = (typeof r.alpha === 'number') ? r.alpha : 0.45;
+      el.style.opacity = String(Math.min(1, 0.35 + a * 1.2).toFixed(3));
+      const latest = el.querySelector('.comm-row.btn-advance');
+      if (latest) latest.classList.remove('btn-advance');
+      _cycle();
+    }
   }
 
   /* ── Calls ── */
@@ -18555,7 +18696,8 @@ const Comm = (() => {
   }
 
   return { itemsFor: itemsFor, lonelyTime: lonelyTime, renderDream: renderDream, renderCard: renderCard, logCall: logCall, refresh: refresh,
-           frame: frame, cardHtml: cardHtml, warm: warm, openRow: openRow, openItem: openItem, select: select, channelLabel: channelLabel, glyph: glyph };
+           frame: frame, cardHtml: cardHtml, warm: warm, openRow: openRow, openItem: openItem, select: select, channelLabel: channelLabel, glyph: glyph,
+           activate: activate, deactivate: deactivate, dreamSlide: dreamSlide, image: image, get isActive() { return _active; } };
 })();
 
 /* ══════════════════════════════════════════════════════════════
@@ -23677,10 +23819,77 @@ function drawNetworkView(t) {
     ctx.fillStyle = _drVig;
     ctx.fillRect(_drCx - _drR, _drCy - _drR, _drR * 2, _drR * 2);
     ctx.restore();
+    ctx.restore();
     /* The Communication strip reads the same circle numbers (CSS px) */
-    window._dreamRect = { cx: _drCx, cy: _drCy, r: _drR };
+    window._dreamRect = { cx: _drCx, cy: _drCy, r: _drR, alpha: _dreamAlpha };
+    /* Communication: a second dream image beneath the first, the same fade and
+       breathing, showing the post's own picture where the platform gives one,
+       else the words as written. One at a time, cycling through the last 24
+       hours. A tap opens the full list. */
+    try {
+      window._dreamCommHit = null;
+      if (typeof Comm !== 'undefined' && !Comm.isActive) {
+        /* Mirror of the dream image: same band, left side, a little smaller */
+        var _dcR = _drR * 0.74;
+        var _dcCx = Math.max(_dcR + 10, Math.min(_drCx - _drR - _dcR - W * 0.03, _dcR + W * 0.05));
+        var _dcCy = _drCy + (_drR - _dcR) * 0.6;
+        var _dcs = Comm.dreamSlide(focusedContactId, t, Math.round(_dcR * 1.5 / 6.6));
+        if (_dcs) {
+          ctx.save();
+          ctx.beginPath(); ctx.arc(_dcCx, _dcCy, _dcR, 0, Math.PI * 2); ctx.clip();
+          var _dcImg = _dcs.thumb ? Comm.image(_dcs.thumb) : null;
+          ctx.globalAlpha = _dreamAlpha;
+          if (_dcImg) {
+            var _diw = _dcImg.naturalWidth || _dcImg.width, _dih = _dcImg.naturalHeight || _dcImg.height;
+            var _dsc = Math.max((_dcR * 2) / _diw, (_dcR * 2) / _dih);
+            ctx.drawImage(_dcImg, _dcCx - _diw * _dsc / 2, _dcCy - _dih * _dsc / 2, _diw * _dsc, _dih * _dsc);
+          } else {
+            var _dcg = ctx.createRadialGradient(_dcCx, _dcCy, 0, _dcCx, _dcCy, _dcR);
+            _dcg.addColorStop(0, 'rgba(56,120,180,0.55)'); _dcg.addColorStop(1, 'rgba(10,14,24,0.9)');
+            ctx.fillStyle = _dcg; ctx.fillRect(_dcCx - _dcR, _dcCy - _dcR, _dcR * 2, _dcR * 2);
+          }
+          /* The words, as written, over the image or the glow */
+          var _dfB = Math.max(11, Math.min(15, Math.round(_dcR * 0.16)));
+          var _dfS = Math.max(9, Math.min(11, Math.round(_dcR * 0.11)));
+          var _dlines = _dcs.lines;
+          var _dblockH = (_dfS + 6) + _dlines.length * (_dfB + 4) + (_dfS + 4);
+          var _dty = _dcCy - _dblockH / 2;
+          if (_dcImg) { ctx.fillStyle = 'rgba(8,10,16,0.55)'; ctx.fillRect(_dcCx - _dcR, _dty - 10, _dcR * 2, _dblockH + 20); }
+          ctx.globalAlpha = Math.min(1, 0.35 + _dreamAlpha * 1.3);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
+          ctx.fillStyle = '#9fd8ff';
+          ctx.font = '700 ' + _dfS + 'px "JetBrains Mono", "SF Mono", monospace';
+          ctx.fillText(_dcs.channel.toUpperCase(), _dcCx, _dty); _dty += _dfS + 6;
+          ctx.fillStyle = '#f0eef5';
+          ctx.font = '500 ' + _dfB + 'px "Hanken Grotesk", system-ui, sans-serif';
+          for (var _dli = 0; _dli < _dlines.length; _dli++) { ctx.fillText(_dlines[_dli], _dcCx, _dty); _dty += _dfB + 4; }
+          ctx.fillStyle = '#c7d2e2';
+          ctx.font = '600 ' + _dfS + 'px "JetBrains Mono", "SF Mono", monospace';
+          var _dwl = _dcs.when.length * _dfS * 0.62 > _dcR * 1.6 && _dcs.when.indexOf(', ') > 0
+            ? [_dcs.when.slice(0, _dcs.when.indexOf(', ') + 1), _dcs.when.slice(_dcs.when.indexOf(', ') + 2)] : [_dcs.when];
+          for (var _dwi = 0; _dwi < _dwl.length; _dwi++) { ctx.fillText(_dwl[_dwi], _dcCx, _dty); _dty += _dfS + 4; }
+          ctx.shadowBlur = 0;
+          /* Same vignette as the image above */
+          ctx.globalAlpha = 1;
+          var _dcVig = ctx.createRadialGradient(_dcCx, _dcCy, _dcR * 0.2, _dcCx, _dcCy, _dcR);
+          _dcVig.addColorStop(0, 'rgba(8,10,16,0)'); _dcVig.addColorStop(0.4, 'rgba(8,10,16,0.25)');
+          _dcVig.addColorStop(0.65, 'rgba(8,10,16,0.58)'); _dcVig.addColorStop(0.85, 'rgba(8,10,16,0.85)'); _dcVig.addColorStop(1, 'rgba(8,10,16,0.97)');
+          ctx.fillStyle = _dcVig; ctx.fillRect(_dcCx - _dcR, _dcCy - _dcR, _dcR * 2, _dcR * 2);
+          ctx.restore();
+          /* Count, faint, just under the circle */
+          if (_dcs.count) {
+            ctx.save(); ctx.globalAlpha = _dreamAlpha * 1.2; ctx.fillStyle = '#9fd8ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            ctx.font = '600 ' + _dfS + 'px "JetBrains Mono", "SF Mono", monospace';
+            ctx.fillText(_dcs.count, _dcCx, _dcCy + _dcR * 0.82); ctx.restore();
+          }
+          window._dreamCommHit = { x: _dcCx - _dcR, y: _dcCy - _dcR, w: _dcR * 2, h: _dcR * 2 };
+        }
+      }
+    } catch (e) { window._dreamCommHit = null; }
   } else {
     window._dreamRect = null;
+    window._dreamCommHit = null;
   }
 
   /* Physics */
@@ -24304,71 +24513,10 @@ function drawNetworkView(t) {
   if (_circleAggregate.totalCount > 0) {
     const _hudFs = Math.max(11, Math.round(centerR * 0.16));
     const _hudSmFs = Math.max(10, Math.round(centerR * 0.13)); /* 10 px floor keeps the HUD readable at 360 px */
+
+    /* The view name, sync dot, active count and trend arrows above the centre
+       sphere were retired: the circle itself and the view badge carry them. */
     const _hudX = cx;
-    const _hudBaseY = cy - centerR * 1.1 - 10;
-
-    /* "CIRCLE COMMAND" label — makes it clear this is the aggregate view */
-    ctx.font = `600 ${_hudSmFs}px "Hanken Grotesk", system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillStyle = `rgba(${uc.r},${uc.g},${uc.b},0.8)`;
-    /* Letter spacing is placed by hand (Safari has no ctx.letterSpacing): see hudSpacedText */
-    /* Show active view name or default CIRCLE COMMAND */
-    var _activeViewObj = (typeof SentinelViews !== 'undefined') ? SentinelViews.getActiveView() : null;
-    const _ccLabel = _activeViewObj ? _activeViewObj.name.toUpperCase() : I18n.t('net.circleLabel');
-    const _ccBox = hudSpacedText(ctx, _ccLabel, _hudX, _hudBaseY - 2, _hudSmFs * 0.14);
-    const _ccStartX = _ccBox.left;
-    /* Sync status dot, left of the HUD label (only when signed in) */
-    if (_hudSync.authenticated) {
-      const _sdCol = _hudSync.state === 'synced' ? '#4ade80'
-        : (_hudSync.state === 'pending' || _hudSync.state === 'syncing') ? '#fbbf24'
-        : _hudSync.state === 'error' ? '#f87171' : '#94a3b8';
-      const _sdR = Math.max(2.5, _hudSmFs * 0.32);
-      const _sdX = _ccStartX - _sdR - Math.max(4, _hudSmFs * 0.55);
-      const _sdY = _hudBaseY - 2 - _hudSmFs * 0.38;
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle = _sdCol;
-      ctx.beginPath(); ctx.arc(_sdX, _sdY, _sdR, 0, Math.PI * 2); ctx.fill();
-      if (_hudSync.pending > 0) {
-        ctx.font = `600 ${Math.max(6, _hudSmFs - 1)}px "Hanken Grotesk", system-ui, sans-serif`;
-        ctx.textBaseline = 'middle';
-        const _pdTxt = String(_hudSync.pending);
-        hudSpacedText(ctx, _pdTxt, _sdX - _sdR - 3 - ctx.measureText(_pdTxt).width / 2, _sdY, 0);
-      }
-      ctx.restore();
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-    }
-
-    /* Active count / total */
-    const _activeLabel = I18n.t('net.activeCount', { active: _circleAggregate.activeCount, total: _circleAggregate.totalCount });
-    ctx.font = `500 ${_hudFs}px "Hanken Grotesk", system-ui, sans-serif`;
-    const _activePct = _circleAggregate.totalCount > 0
-      ? _circleAggregate.activeCount / _circleAggregate.totalCount : 0;
-    const _activeColor = _activePct > 0.5 ? 'rgba(74,222,128,0.8)' /* green */
-      : _activePct > 0 ? 'rgba(251,191,36,0.8)' /* amber */
-      : 'rgba(186,198,214,0.85)'; /* gray */
-    ctx.fillStyle = _activeColor;
-    const _activeY = _hudBaseY - 2 - Math.round(_hudSmFs * 1.35) - 4;
-    hudSpacedText(ctx, _activeLabel, _hudX, _activeY, 0);
-
-    /* Trend summary arrows: ↑N ↓N —N */
-    if (_circleAggregate.trendingUp > 0 || _circleAggregate.trendingDown > 0) {
-      const _trendY = _activeY - Math.round(_hudFs * 1.3) - 4;
-      ctx.font = `600 ${_hudSmFs}px "Hanken Grotesk", system-ui, sans-serif`;
-      let _trendParts = [];
-      if (_circleAggregate.trendingUp > 0)
-        _trendParts.push('▲' + _circleAggregate.trendingUp);
-      if (_circleAggregate.trendingDown > 0)
-        _trendParts.push('▼' + _circleAggregate.trendingDown);
-      if (_circleAggregate.steady > 0)
-        _trendParts.push('=' + _circleAggregate.steady);
-      const _trendText = _trendParts.join('  ');
-      ctx.fillStyle = 'rgba(203,213,225,0.6)';
-      hudSpacedText(ctx, _trendText, _hudX, _trendY, 0);
-    }
-
     /* Aggregate HR readout if any contacts have HR */
     if (_circleAggregate.avgHR > 0) {
       const _hrY = cy + centerR * 1.1 + 6 + _nameFs + 6; /* below the name, whatever its size */
