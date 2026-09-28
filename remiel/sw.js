@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-sentinel-v54';
+const CACHE_NAME = 'remiel-sentinel-v55';
 
 const PRECACHE_URLS = [
   './',
@@ -13,7 +13,10 @@ const PRECACHE_URLS = [
   './sw.js',
   './remiel-logo.png',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './apple-touch-icon.png',
+  './favicon-64.png',
+  './favicon-32.png'
 ];
 
 /* ── Install: pre-cache core shell ──
