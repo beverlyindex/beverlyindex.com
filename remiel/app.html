@@ -12689,6 +12689,7 @@ const I18n = (function () {
     "whereis.a11y.on": "WHEREIS shown. Tap the map to open the full view.",
     "whereis.a11y.off": "Communication shown.",
     "whereis.noneShared": "No location shared. {first} can turn it on in Settings, Location Sharing.",
+    "whereis.signIn": "Not signed in, so shared locations cannot load. Tap Settings, then Account, to sign in.",
     "whereis.noMap": "Map not available",
     "whereis.since": "since {time}",
     "whereis.notAtPlace": "Not at any of your Places",
@@ -12819,6 +12820,7 @@ const I18n = (function () {
     "whereis.a11y.on": "WHEREIS mostrato. Tocca la mappa per aprire la vista completa.",
     "whereis.a11y.off": "Comunicazione mostrata.",
     "whereis.noneShared": "Nessuna posizione condivisa. {first} può attivarla in Impostazioni, Condivisione posizione.",
+    "whereis.signIn": "Non hai effettuato l'accesso, quindi le posizioni condivise non si caricano. Tocca Impostazioni, poi Account, per accedere.",
     "whereis.noMap": "Mappa non disponibile",
     "whereis.since": "dalle {time}",
     "whereis.notAtPlace": "In nessuno dei tuoi Luoghi",
@@ -19685,6 +19687,11 @@ const WhereIs = (() => {
   function _authed() { try { return typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated() && !SyncEngine.isLocalOnly(); } catch (e) { return false; } }
   function _contact(id) { try { return DEMO_CONTACTS.find(c => c.id === id || String(c.id) === String(id)) || null; } catch (e) { return null; } }
   function _first(c) { return (c && c.first) ? c.first : _t('msg.contact', 'Contact'); }
+  /* The empty line tells the truth: not signed in is not the same as nothing shared */
+  function _noneMsg(c) {
+    if (!_authed()) return _t('whereis.signIn', 'Not signed in, so shared locations cannot load. Tap Settings, then Account, to sign in.');
+    return _t('whereis.noneShared', 'No location shared. {first} can turn it on in Settings, Location Sharing.', { first: _first(c) });
+  }
   function _lit_() { if (_lit) return _lit; try { _lit = getComputedStyle(document.documentElement).getPropertyValue('--lit-fill').trim(); } catch (e) {} return _lit || '#38bdf8'; }
   function _clock(ts) { try { return Comm.clock(ts); } catch (e) { return new Date(ts).toLocaleTimeString(); } }
   function _toast(msg) { try { showToast(msg); } catch (e) {} }
@@ -19984,7 +19991,7 @@ const WhereIs = (() => {
     let y = cy - R + R * 0.34;
     _lines(ctx, [_t('whereis.label', 'WHEREIS')], cx, y, '700 ' + fS + 'px ' + mono, '#9fd8ff', fS + 6); y += fS + 6;
     if (!entry) {
-      const msg = _t('whereis.noneShared', 'No location shared. {first} can turn it on in Settings, Location Sharing.', { first: _first(c) });
+      const msg = _noneMsg(c);
       _lines(ctx, _wrap(msg, Math.round(R * 1.5 / 6.2), 4), cx, cy + R * 0.08, '500 ' + fS + 'px ' + sans, '#f0eef5', fS + 4);
     } else {
       if (mapOk) pulseDot(ctx, cx, cy, t, _lit_());
@@ -20147,7 +20154,7 @@ const WhereIs = (() => {
     const box = $('whereisMap'); if (!box) return;
     box.innerHTML = '';
     const center = entry ? { lat: _num(entry.latitude), lon: _num(entry.longitude) } : (_places[0] ? { lat: _num(_places[0].latitude), lon: _num(_places[0].longitude) } : null);
-    if (!center) { box.innerHTML = '<div class="whereis-mapnote">' + _esc(_t('whereis.noneShared', 'No location shared. {first} can turn it on in Settings, Location Sharing.', { first: _first(c) })) + '</div>'; return; }
+    if (!center) { box.innerHTML = '<div class="whereis-mapnote">' + _esc(_noneMsg(c)) + '</div>'; return; }
     const z = entry ? _zoomFor(entry) : 13;
     const ok = await _loadMapLibre();
     if (_panelFor !== c.id) return;
@@ -20192,7 +20199,7 @@ const WhereIs = (() => {
     loop();
   }
   function _memberLine(c, entry) {
-    if (!entry) return _t('whereis.noneShared', 'No location shared. {first} can turn it on in Settings, Location Sharing.', { first: _first(c) });
+    if (!entry) return _noneMsg(c);
     const parts = [];
     if (entry.place) {
       parts.push(entry.place.name);
@@ -30137,14 +30144,47 @@ const SyncEngine = (() => {
 
     var response = await fetch(url, Object.assign({}, options, { headers: headers }));
 
-    if (response.status === 401 && _refreshToken) {
-      var refreshed = (_accessToken && _accessToken !== sentToken) ? true : await _tryRefresh();
-      if (refreshed) {
+    if (response.status === 401) {
+      /* Session heals itself: a token another tab rotated, a refresh, or the device identity again */
+      var healed = (_accessToken && _accessToken !== sentToken) ? true : await _recoverSession();
+      if (healed && _accessToken) {
         headers['Authorization'] = 'Bearer ' + _accessToken;
         response = await fetch(url, Object.assign({}, options, { headers: headers }));
       }
     }
     return response;
+  }
+
+  /* Another tab may hold newer tokens (refresh rotates them): adopt those before giving up */
+  async function _adoptStoredTokens(sentAccess) {
+    try {
+      var at = await RemielDB.getSetting(TOKEN_KEY) || null;
+      var rt = await RemielDB.getSetting(REFRESH_KEY) || null;
+      if (at && at !== sentAccess) { _accessToken = at; if (rt) _refreshToken = rt; return true; }
+      if (rt && rt !== _refreshToken) { _refreshToken = rt; }
+    } catch (e) {}
+    return false;
+  }
+
+  var _recoverAt = 0, _recoverPromise = null;
+  function _recoverSession() {
+    if (_recoverPromise) return _recoverPromise;
+    _recoverPromise = (async function() {
+      var sent = _accessToken;
+      if (await _adoptStoredTokens(sent)) return true;
+      if (_refreshToken && await _tryRefresh()) return true;
+      /* No usable refresh token: re-create the device identity, at most once every 30 s */
+      if (Date.now() - _recoverAt < 30000) return false;
+      _recoverAt = Date.now();
+      _accessToken = null; _refreshToken = null;
+      await _saveConfig();
+      _emitStatus();
+      var ok = await ensureIdentity();
+      if (!ok) _emitStatus();
+      return !!ok;
+    })();
+    _recoverPromise.then(function() { _recoverPromise = null; }, function() { _recoverPromise = null; });
+    return _recoverPromise;
   }
 
   function _tryRefresh() {
