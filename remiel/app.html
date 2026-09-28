@@ -8647,6 +8647,36 @@ function trackCodeUsage(codeHash) {
 let appRevealed = false;
 /* M4: a ?call= guest link never shows onboarding. Read before
    SentinelCall.checkCallInvite cleans the URL. */
+/* Safety net: an uncaught error never leaves a silent black screen. A small
+   banner names the error and offers Reload; the console keeps the details. */
+(function () {
+  var shown = 0;
+  function banner(msg) {
+    try {
+      if (shown >= 3) return; shown++;
+      var el = document.createElement('div');
+      el.setAttribute('role', 'alert');
+      el.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);transform:translateX(-50%);z-index:2147483000;max-width:min(94vw,560px);background:rgba(60,8,12,0.96);color:#fecaca;border:1px solid rgba(239,68,68,0.6);border-radius:12px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;display:flex;gap:10px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,0.5)';
+      var t = document.createElement('div'); t.style.flex = '1'; t.textContent = 'Something went wrong: ' + msg;
+      var r = document.createElement('button'); r.textContent = 'Reload'; r.style.cssText = 'background:#ef4444;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer';
+      r.onclick = function () { location.reload(); };
+      var x = document.createElement('button'); x.textContent = '\u00d7'; x.setAttribute('aria-label', 'Dismiss'); x.style.cssText = 'background:transparent;color:#fecaca;border:none;font-size:18px;cursor:pointer';
+      x.onclick = function () { el.remove(); };
+      el.appendChild(t); el.appendChild(r); el.appendChild(x);
+      (document.body || document.documentElement).appendChild(el);
+    } catch (e) {}
+  }
+  window.addEventListener('error', function (e) {
+    var m = (e && e.message) || 'unknown error';
+    if (/ResizeObserver|Script error\.?$/.test(m)) return; /* browser noise */
+    banner(m + (e && e.lineno ? ' (line ' + e.lineno + ')' : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason; var m = (r && (r.message || String(r))) || 'unknown';
+    if (/AbortError|NotAllowedError|play\(\) request|Load failed|Failed to fetch|NetworkError|Local only|Not configured/i.test(m)) return; /* expected offline and media outcomes */
+    banner(m);
+  });
+})();
 let _guestCallMode = false;
 try { _guestCallMode = !!new URLSearchParams(window.location.search).get('call'); } catch (e) {}
 /* B1: revealApp needs RemielDB, I18n and the modules declared further down
