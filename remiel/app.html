@@ -38344,6 +38344,25 @@ var AlarmCenter = (function () {
         b.style.right = Math.round(window.innerWidth - r.right) + 'px';
       }
     }
+    _layoutTopRow(er);
+  }
+  /* Top-right row: bell, gear, Exit. The gear and bell sit 8 px apart to the
+     left of Exit's real width (it changes with the language), centred on
+     Exit's line, so nothing overlaps on any screen. */
+  function _layoutTopRow(er) {
+    if (!er || !er.width) return;
+    var gap = 8;
+    var mid = er.top + er.height / 2;
+    var right = window.innerWidth - er.left + gap;
+    ['settingsBtn', 'alertBell'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var w = el.offsetWidth || 36, h = el.offsetHeight || 36;
+      if (getComputedStyle(el).display === 'none') return;
+      el.style.right = Math.round(right) + 'px';
+      el.style.top = Math.round(mid - h / 2) + 'px';
+      right += w + gap;
+    });
   }
   function closeHelpCard() { var w = document.getElementById('helpCardWrap'); if (w) w.remove(); try { rsOverlayFlag('helpcard', false); } catch (e) {} }
   function _openHelpSettings() {
@@ -38501,7 +38520,7 @@ var AlarmCenter = (function () {
     /* Help button appears once signed in and past the access code */
     updateFab();
     window.addEventListener('sentinel:syncstatus', updateFab);
-    window.addEventListener('localeChanged', updateFab);
+    window.addEventListener('localeChanged', function () { updateFab(); setTimeout(updateFab, 60); });
     window.addEventListener('resize', updateFab);
     setInterval(updateFab, 2000);
   }
