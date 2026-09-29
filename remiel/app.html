@@ -4524,7 +4524,26 @@
     text-align: center; padding: 0 10px;
   }
   .sc-tile.live .sc-tile-state { display: none; }
-  .sc-tile.gone { opacity: 0.45; }
+  /* Narrow screens: a smaller self view, and the tiles start below it so
+     none is covered */
+  @media (max-width: 699px) {
+    .sentinel-call-overlay.group .sc-local-video { width: 72px; height: 96px; }
+    .sentinel-call-overlay.group .sc-group-head { padding-right: 96px; min-height: 104px; align-content: flex-start; }
+  }
+  .sc-tile.gone { opacity: 0.75; border-color: rgba(255,255,255,0.08); }
+  .sc-tile.gone video { display: none; }
+  .sc-tile-retry {
+    position: absolute; left: 0; right: 0; bottom: 36px; margin: 0 auto; width: max-content; max-width: calc(100% - 12px); z-index: 2;
+    min-height: 36px; padding: 6px 14px; border-radius: 18px; white-space: nowrap;
+    border: 1px solid rgba(255,255,255,0.7); background: transparent; color: #fff;
+    font: 600 13px 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer;
+  }
+  .sc-group-note {
+    margin: 14px auto 0; max-width: 420px; padding: 10px 14px; border-radius: 12px;
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.18);
+    font-size: 14px; line-height: 1.45; color: #fff; text-align: center;
+  }
+  .sc-group-note[hidden] { display: none; }
   .sc-group .sc-invite-line { margin: 14px auto 10px; }
   .sc-group .sc-invite-actions { margin-bottom: 8px; }
   .sv-badge-call {
@@ -7495,6 +7514,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <div class="sc-group" id="scGroup" hidden>
     <div class="sc-group-head"><span id="scGroupHead" aria-live="polite"></span><span class="sc-group-timer" id="scGroupTimer" hidden>00:00</span><span class="sc-group-safety-hint" id="scGroupSafetyHint" hidden></span></div>
     <div class="sc-grid" id="scGrid"></div>
+    <div class="sc-group-note" id="scGroupNote" role="status" hidden></div>
     <div class="sc-safety-pop" id="scSafetyPop" hidden role="dialog">
       <div class="sc-safety-title" id="scSafetyPopTitle"></div>
       <span class="sc-safety-words" id="scSafetyPopWords"></span>
@@ -10722,7 +10742,13 @@ const I18n = (function () {
     'group.invited': "Link sent",
     'group.waitingTap': "Waiting for the tap",
     'group.noAnswer': "No answer",
-    'group.noReach': "No phone or email saved",
+    'group.noReach': "No Sentinel ID, phone or email on their card",
+    'group.callAgain': "Call again",
+    'group.offline': "Not online",
+    'group.ringingPhone': "Not online. Ringing their phone.",
+    'group.noneJoined': "No one has joined. Each tile says why. Tap Call again on a tile, or tap the red button to end the call.",
+    'group.noneJoinedGuest': "No one else is on the call. Tap the red button to end it.",
+    'group.noneReachable': "No one in {view} can be called yet. Open a person's card and add a phone number or email, or message them so they link with their Sentinel ID.",
     'group.left': "Left",
     'group.you': "You",
     'group.member': "Member",
@@ -11391,7 +11417,13 @@ const I18n = (function () {
     'group.invited': "Link inviato",
     'group.waitingTap': "In attesa del tocco",
     'group.noAnswer': "Nessuna risposta",
-    'group.noReach': "Nessun telefono o email salvati",
+    'group.noReach': "Nessun Sentinel ID, telefono o email nella scheda",
+    'group.callAgain': "Richiama",
+    'group.offline': "Non in linea",
+    'group.ringingPhone': "Non in linea. Squilla il suo telefono.",
+    'group.noneJoined': "Nessuno è entrato. Ogni riquadro dice perché. Tocca Richiama su un riquadro, oppure tocca il pulsante rosso per chiudere la chiamata.",
+    'group.noneJoinedGuest': "Nessun altro è nella chiamata. Tocca il pulsante rosso per chiuderla.",
+    'group.noneReachable': "Nessuno in {view} può essere chiamato per ora. Apri la scheda di una persona e aggiungi un telefono o un'email, oppure scrivile così si collega con il suo Sentinel ID.",
     'group.left': "Uscito",
     'group.you': "Tu",
     'group.member': "Membro",
@@ -35066,6 +35098,7 @@ const SentinelCall = (function() {
     _peer.on('error', (err) => {
       console.warn('SentinelCall: error', err.type, err.message);
       if (err.type === 'peer-unavailable') {
+        if (_group) { _groupUnavailable(err); return; }
         /* App closed on their side: wake their phone with a push, then keep
            dialling so the call reaches them the moment they open the app. */
         if (_callCtx && _currentCall && !_activeShown && _callCtx.rung !== false) {
@@ -35734,19 +35767,61 @@ const SentinelCall = (function() {
     const st = tile.querySelector('.sc-tile-state');
     if (st) st.textContent = text;
   }
-  function _removeTile(peerId, afterMs) {
+  /* A person who did not join keeps their tile, dimmed, with the reason on
+     it (No answer, Left, Not online...) and, for the host, Call again. Tiles
+     never vanish without a word. */
+  function _removeTile(peerId) {
     const grid = document.getElementById('scGrid');
     const tile = grid ? grid.querySelector('[data-peer="' + peerId + '"]') : null;
     if (!tile) return;
+    tile.classList.remove('live');
     tile.classList.add('gone');
-    setTimeout(() => { try { tile.remove(); } catch (e) {} }, afterMs || 0);
+    _tileRetry(peerId);
+    _renderGroupNote();
+  }
+  /* A placeholder taken over by the person who joined: that tile does go */
+  function _deleteTile(peerId) {
+    const grid = document.getElementById('scGrid');
+    const tile = grid ? grid.querySelector('[data-peer="' + peerId + '"]') : null;
+    if (tile) { try { tile.remove(); } catch (e) {} }
+  }
+  function _tileRetry(peerId) {
+    const grid = document.getElementById('scGrid');
+    const tile = grid ? grid.querySelector('[data-peer="' + peerId + '"]') : null;
+    if (!tile) return;
+    const old = tile.querySelector('.sc-tile-retry');
+    if (old) old.remove();
+    const c = _group && _group.isHost && _group.targets ? _group.targets[peerId] : null;
+    if (!c || !tile.classList.contains('gone')) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sc-tile-retry';
+    b.textContent = _t('group.callAgain', 'Call again');
+    b.addEventListener('click', (e) => { e.stopPropagation(); _callMember(c, true); });
+    tile.appendChild(b);
+  }
+  /* Under the tiles: when nobody is live or still being called, say so and
+     say what to do. */
+  function _renderGroupNote() {
+    const note = document.getElementById('scGroupNote');
+    if (!note) return;
+    if (!_group) { note.hidden = true; return; }
+    const grid = document.getElementById('scGrid');
+    const tiles = grid ? Array.from(grid.querySelectorAll('.sc-tile')) : [];
+    const live = tiles.some(t => t.classList.contains('live'));
+    const waiting = tiles.some(t => !t.classList.contains('live') && !t.classList.contains('gone'));
+    if (live || waiting || !tiles.length) { note.hidden = true; return; }
+    note.textContent = _group.isHost
+      ? _t('group.noneJoined', 'No one has joined. Each tile says why. Tap Call again on a tile, or tap the red button to end the call.')
+      : _t('group.noneJoinedGuest', 'No one else is on the call. Tap the red button to end it.');
+    note.hidden = false;
   }
 
   function _startGroup(opts) {
     _group = {
       room: opts.room, hostPeer: opts.hostPeer, isHost: !!opts.isHost,
       viewName: opts.viewName || '', total: opts.total || 0, myName: opts.myName || '',
-      peers: new Map(), hostConn: null, onLeave: opts.onLeave || null, invited: {}
+      peers: new Map(), hostConn: null, onLeave: opts.onLeave || null, invited: {}, targets: {}
     };
     _showGroupScreen();
   }
@@ -35769,8 +35844,9 @@ const SentinelCall = (function() {
         const tile = _tileFor(peerId, entry.name, entry.contactId);
         const vid = tile ? tile.querySelector('video') : null;
         if (vid && vid.srcObject !== remoteStream) { vid.srcObject = remoteStream; vid.play().catch(() => {}); }
-        if (tile) tile.classList.add('live');
+        if (tile) { tile.classList.remove('gone'); tile.classList.add('live'); const rb = tile.querySelector('.sc-tile-retry'); if (rb) rb.remove(); }
         if (entry.timer) { clearTimeout(entry.timer); entry.timer = null; }
+        _renderGroupNote();
         const wasLive = entry.live;
         entry.live = true;
         _startTimer();
@@ -35779,7 +35855,7 @@ const SentinelCall = (function() {
         if (!wasLive && _group.isHost) _broadcastRoster();
       });
       const gone = () => {
-        if (!_group || _group.peers.get(peerId) !== entry) return;
+        if (!_group || _group.peers.get(peerId) !== entry || entry.call !== call) return;
         _dropGroupPeer(peerId, _t('group.left', 'Left'));
       };
       call.on('close', gone);
@@ -35805,7 +35881,7 @@ const SentinelCall = (function() {
     try { if (entry.call) entry.call.close(); } catch (e) {}
     try { if (entry.conn) entry.conn.close(); } catch (e) {}
     _tileState(peerId, stateText || _t('group.left', 'Left'));
-    _removeTile(peerId, 1500);
+    _removeTile(peerId);
     if (peerId === _group.hostPeer && !_group.isHost && entry.live) {
       showToast(_tp('group.hostLeft', '{host} left the call. You are still connected to the others.', { host: entry.name || _t('group.member', 'Member') }));
     }
@@ -35908,7 +35984,7 @@ const SentinelCall = (function() {
     const ph = _group.invited && _group.invited[key];
     if (!ph) return;
     delete _group.invited[key];
-    _removeTile(key, 0);
+    _deleteTile(key);
     const entry = _group.peers.get(peerId);
     if (entry) {
       if (ph.name) entry.name = ph.name;
@@ -35977,7 +36053,74 @@ const SentinelCall = (function() {
     try { if (g.hostConn) g.hostConn.close(); } catch (e) {}
     const grid = document.getElementById('scGrid');
     if (grid) grid.innerHTML = '';
+    _renderGroupNote();
     if (g.onLeave) { try { g.onLeave(); } catch (e) {} }
+  }
+
+  /* Host: call one member who has a Sentinel ID (first time or Call again) */
+  function _callMember(c, again) {
+    if (!_group || !_group.isHost || !_peer || !_localStream) return;
+    const target = 'sentinel-' + String(c.sentinelId).trim().toLowerCase();
+    const name = _contactName(c);
+    _group.targets[target] = c;
+    if (again) {
+      const old = _group.peers.get(target);
+      if (old) { _group.peers.delete(target); if (old.timer) clearTimeout(old.timer); try { if (old.call) old.call.close(); } catch (e) {} try { if (old.conn) old.conn.close(); } catch (e) {} }
+      const grid = document.getElementById('scGrid');
+      const tile = grid ? grid.querySelector('[data-peer="' + target + '"]') : null;
+      if (tile) { tile.classList.remove('gone'); const rb = tile.querySelector('.sc-tile-retry'); if (rb) rb.remove(); }
+      _tileState(target, _t('group.calling', 'Calling'));
+    }
+    const meta = { room: _group.room, kind: 'group', callerName: _group.myName, callerId: _myId, viewName: _group.viewName, total: _group.total };
+    let conn = null, call = null;
+    try { conn = _peer.connect(target, { metadata: { room: _group.room, host: _myId, kind: 'group-invite', hostName: _group.myName, viewName: _group.viewName } }); } catch (e) { conn = null; }
+    try { call = _peer.call(target, _localStream, { metadata: meta }); } catch (e) { call = null; }
+    const entry = _addGroupPeer(target, call, name, c.id);
+    if (entry) { entry.sid = String(c.sentinelId).trim(); entry.meta = meta; }
+    if (entry && conn) { entry.conn = conn; conn.on('error', () => {}); }
+    if (!call) { _tileState(target, _t('call.couldNotPlace', 'Could not place call')); _group.peers.delete(target); _removeTile(target); return; }
+    _armGroupNoAnswer(target);
+    _renderGroupNote();
+  }
+
+  /* Group: a member's app is closed. Ring their phone by push and keep
+     dialling them for a minute; the rest of the call carries on. */
+  function _groupUnavailable(err) {
+    if (!_group) return false;
+    const m = /sentinel-[a-z0-9]+/i.exec(String((err && err.message) || ''));
+    const peerId = m ? m[0].toLowerCase() : '';
+    const entry = peerId ? _group.peers.get(peerId) : null;
+    if (!entry || entry.live) return true;
+    if (!_group.isHost || !entry.sid) { _dropGroupPeer(peerId, _t('group.offline', 'Not online')); return true; }
+    if (entry.ringing) return true;
+    if (entry.rungAt) {
+      if (Date.now() - entry.rungAt > _PUSH_RING_MS) { _ring(entry.sid, 'missed'); _dropGroupPeer(peerId, _t('group.offline', 'Not online')); return true; }
+      setTimeout(() => {
+        if (!_group || _group.peers.get(peerId) !== entry || entry.live || !_peer || _peer.destroyed || !_localStream) return;
+        let call = null;
+        try { call = _peer.call(peerId, _localStream, { metadata: entry.meta }); } catch (e) { call = null; }
+        if (!call) return;
+        const old = entry.call;
+        _addGroupPeer(peerId, call, entry.name, entry.contactId);
+        try { if (old && old !== call) old.close(); } catch (e) {}
+      }, _REDIAL_MS);
+      return true;
+    }
+    entry.ringing = true;
+    _tileState(peerId, _t('group.ringingPhone', 'Not online. Ringing their phone.'));
+    _ring(entry.sid, 'ringing').then((n) => {
+      entry.ringing = false;
+      if (!_group || _group.peers.get(peerId) !== entry || entry.live) return;
+      if (n > 0) {
+        entry.rungAt = Date.now();
+        if (entry.timer) clearTimeout(entry.timer);
+        entry.timer = setTimeout(() => { entry.timer = null; if (_group && _group.peers.get(peerId) === entry && !entry.live) { _ring(entry.sid, 'missed'); _dropGroupPeer(peerId, _t('group.noAnswer', 'No answer')); } }, _PUSH_RING_MS);
+        _groupUnavailable(err);
+      } else {
+        _dropGroupPeer(peerId, _t('group.offline', 'Not online'));
+      }
+    });
+    return true;
   }
 
   /* Host: video call everyone in a Unit or Team view */
@@ -36004,6 +36147,14 @@ const SentinelCall = (function() {
       if (c) members.push(c);
     }
     if (!members.length) { showToast(_t('call.contactNotFound', 'Contact not found')); return; }
+    /* Nobody in the view can be reached: say so before the camera opens */
+    const reach = members.filter(c => _isValidSid(c.sentinelId || '') || c.phone || c.email);
+    if (!reach.length) {
+      const _nr = uiConfirm(_tp('group.noneReachable', 'No one in {view} can be called yet. Open a person\'s card and add a phone number or email, or message them so they link with their Sentinel ID.', { view: view.name || _t('views.type.unit', 'Unit') }), 'OK');
+      try { const ovs = document.querySelectorAll('.ui-confirm-overlay'); const no = ovs.length ? ovs[ovs.length - 1].querySelector('.ui-confirm-no') : null; if (no) no.style.display = 'none'; } catch (e) {}
+      await _nr;
+      return;
+    }
     if (!(await _ensurePeer())) return;
     if (!_myId) { showToast(_t('toast.sidNotReady', 'Sentinel ID not ready yet')); return; }
     try {
@@ -36023,23 +36174,13 @@ const SentinelCall = (function() {
     for (const c of members) {
       if (!_group) return; /* hung up while a name loaded */
       const name = _contactName(c);
-      if (_isValidSid(c.sentinelId || '')) {
-        const target = 'sentinel-' + c.sentinelId.trim().toLowerCase();
-        let conn = null, call = null;
-        try { conn = _peer.connect(target, { metadata: { room: room, host: _myId, kind: 'group-invite', hostName: myName, viewName: viewName } }); } catch (e) { conn = null; }
-        try { call = _peer.call(target, _localStream, { metadata: { room: room, kind: 'group', callerName: myName, callerId: _myId, viewName: viewName, total: members.length + 1 } }); } catch (e) { call = null; }
-        const entry = _addGroupPeer(target, call, name, c.id);
-        if (entry && conn) { entry.conn = conn; conn.on('error', () => {}); }
-        if (!call) { _tileState(target, _t('call.couldNotPlace', 'Could not place call')); _removeTile(target, 4000); _group.peers.delete(target); continue; }
-        _armGroupNoAnswer(target);
-        continue;
-      }
+      if (_isValidSid(c.sentinelId || '')) { _callMember(c, false); continue; }
       const key = 'invite-' + String(c.id == null ? name : c.id);
       _tileFor(key, name, c.id);
       _group.invited[key] = { name: name, contactId: c.id == null ? null : c.id };
       if (!c.phone && !c.email) {
-        _tileState(key, _t('group.noReach', 'No phone or email saved'));
-        _removeTile(key, 6000);
+        _tileState(key, _t('group.noReach', 'No Sentinel ID, phone or email on their card'));
+        _removeTile(key);
         continue;
       }
       _tileState(key, _tp('call.sendingInviteAny', 'Sending {first} the link.', { first: c.first || name }));
@@ -36049,7 +36190,7 @@ const SentinelCall = (function() {
       if (sent.ok) { _tileState(key, _t('group.invited', 'Link sent') + '. ' + _t('group.waitingTap', 'Waiting for the tap')); }
       else { _tileState(key, _t('group.waitingTap', 'Waiting for the tap')); pending.push(c); }
       /* A guest who never taps: the placeholder tile goes after the invite window */
-      setTimeout(() => { if (_group && _group.room === room && _group.invited[key]) { delete _group.invited[key]; _tileState(key, _t('group.noAnswer', 'No answer')); _removeTile(key, 1500); } }, _AWAIT_GUEST_MS);
+      setTimeout(() => { if (_group && _group.room === room && _group.invited[key]) { delete _group.invited[key]; _tileState(key, _t('group.noAnswer', 'No answer')); _removeTile(key); } }, _AWAIT_GUEST_MS);
     }
     if (pending.length && _group) _offerGroupManualInvite(pending, link, memberLink, myName, viewName);
   }
