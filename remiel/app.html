@@ -11035,6 +11035,22 @@ const I18n = (function () {
     'alarm.cancelled': "Alarm cancelled.",
     'help.desc': "Sends an urgent alarm to the person you choose. It rings on their screen and phone every 2 minutes until they tap Acknowledge.",
     'help.goesTo': "Help goes to",
+    'clv.select': "Select",
+    'clv.selectDone': "Done selecting",
+    'clv.selectAll': "Select all",
+    'clv.selectNone': "Clear selection",
+    'clv.showing': "Showing {group}",
+    'clv.count': "{n} selected",
+    'clv.tapToSelect': "Tap people to select them",
+    'clv.removeFromGroup': "Remove from {group}",
+    'clv.removeFromTeam': "Remove from a team",
+    'clv.whichTeam': "Which team?",
+    'clv.back': "Back",
+    'clv.removeFromCircle': "Remove from circle",
+    'clv.confirmGroup': "Take {n} out of {group}? They stay in your circle.",
+    'clv.removedGroup': "{n} taken out of {group}.",
+    'clv.confirmCircle': "Remove {n} from your circle? Their notes and history on this device go with them.",
+    'clv.removedCircle': "{n} removed from your circle.",
     'tb.button': "Team",
     'tb.buttonAria': "Teams: build a team or its units",
     'tb.liveAria': "{name}, {n} people. Drag spheres here. Tap to finish.",
@@ -11685,6 +11701,22 @@ const I18n = (function () {
     'alarm.cancelled': "Allarme annullato.",
     'help.desc': "Invia un allarme urgente alla persona che scegli. Suona sul suo schermo e sul suo telefono ogni 2 minuti finché non tocca Conferma.",
     'help.goesTo': "L’aiuto va a",
+    'clv.select': "Seleziona",
+    'clv.selectDone': "Fine selezione",
+    'clv.selectAll': "Seleziona tutti",
+    'clv.selectNone': "Deseleziona tutti",
+    'clv.showing': "Visualizzi {group}",
+    'clv.count': "{n} selezionati",
+    'clv.tapToSelect': "Tocca le persone per selezionarle",
+    'clv.removeFromGroup': "Togli da {group}",
+    'clv.removeFromTeam': "Togli da una squadra",
+    'clv.whichTeam': "Quale squadra?",
+    'clv.back': "Indietro",
+    'clv.removeFromCircle': "Rimuovi dalla cerchia",
+    'clv.confirmGroup': "Togliere {n} da {group}? Restano nella tua cerchia.",
+    'clv.removedGroup': "{n} tolti da {group}.",
+    'clv.confirmCircle': "Rimuovere {n} dalla tua cerchia? Note e cronologia su questo dispositivo vengono eliminate con loro.",
+    'clv.removedCircle': "{n} rimossi dalla tua cerchia.",
     'tb.button': "Squadra",
     'tb.buttonAria': "Squadre: crea una squadra o i suoi gruppi",
     'tb.liveAria': "{name}, {n} persone. Trascina qui le sfere. Tocca per finire.",
@@ -29308,8 +29340,21 @@ const ContactListView = (() => {
       '.clv-btn{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.05);color:#e5e7eb;' +
       'font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;}' +
       '.clv-btn.primary{background:#C5A55A;color:#000;border-color:#C5A55A;}' +
-      '.clv-btn.danger{border-color:rgba(239,68,68,0.6);color:#fca5a5;}' +
-      '.clv-empty{padding:16px 4px;color:#9ca3af;font:400 14px "Hanken Grotesk",system-ui,sans-serif;}';
+      '.clv-btn.danger{border-color:#FF1E1E;color:#FF1E1E;background:transparent;}' +
+      '.clv-empty{padding:16px 4px;color:#9ca3af;font:400 14px "Hanken Grotesk",system-ui,sans-serif;}' +
+      '.clv-tools{display:flex;gap:8px;align-items:center;margin:0 0 8px;flex-wrap:wrap}' +
+      '.clv-tool{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid rgba(56,212,255,.5);background:transparent;color:#e5e7eb;font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}' +
+      '.clv-tool[aria-pressed="true"]{background:#38d4ff;color:#04121a;border-color:#38d4ff}' +
+      '.clv-scope{font:400 12px "Hanken Grotesk",system-ui,sans-serif;color:#9ca3af;margin-left:auto}' +
+      '.clv-item.sel-mode{display:flex;gap:12px;align-items:flex-start;cursor:pointer}' +
+      '.clv-item.sel-mode .clv-actions{display:none}' +
+      '.clv-item.selected{background:rgba(56,212,255,.10);border-radius:10px}' +
+      '.clv-check{flex:none;width:24px;height:24px;margin-top:2px;border-radius:6px;border:2px solid rgba(56,212,255,.7);display:flex;align-items:center;justify-content:center;color:#04121a;font:800 15px system-ui}' +
+      '.clv-item.selected .clv-check{background:#38d4ff;border-color:#38d4ff}' +
+      '.clv-bar{display:none;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0 0;border-top:1px solid rgba(255,255,255,.1);margin-top:6px}' +
+      '.clv-bar.on{display:flex}' +
+      '.clv-count{font:600 13px "Hanken Grotesk",system-ui,sans-serif;margin-right:auto}' +
+      '.clv-pick{display:flex;flex-direction:column;gap:6px;width:100%}';
     document.head.appendChild(css);
 
     const btn = _el('button', { type: 'button', id: 'clvToggle', class: 'clv-toggle', 'aria-haspopup': 'dialog', 'aria-controls': 'contactListView', 'data-i18n': 'a11y.listView' },
@@ -29326,7 +29371,16 @@ const ContactListView = (() => {
     x.addEventListener('click', close);
     head.appendChild(x);
     panel.appendChild(head);
+    const tools = _el('div', { class: 'clv-tools', id: 'clvTools' });
+    const selBtn = _el('button', { type: 'button', class: 'clv-tool', id: 'clvSelect', 'aria-pressed': 'false' }, _t('clv.select', 'Select'));
+    selBtn.addEventListener('click', () => _setSelecting(!_selecting));
+    const allBtn = _el('button', { type: 'button', class: 'clv-tool', id: 'clvSelectAll', 'aria-pressed': 'false', hidden: '' }, _t('clv.selectAll', 'Select all'));
+    allBtn.addEventListener('click', _toggleAll);
+    tools.appendChild(selBtn); tools.appendChild(allBtn);
+    tools.appendChild(_el('span', { class: 'clv-scope', id: 'clvScope' }));
+    panel.appendChild(tools);
     panel.appendChild(_el('ul', { id: 'clvList', class: 'clv-list', 'aria-labelledby': 'clvTitle' }));
+    panel.appendChild(_el('div', { class: 'clv-bar', id: 'clvBar', role: 'group', 'aria-live': 'polite' }));
     ov.appendChild(panel);
     document.body.appendChild(ov);
   }
@@ -29349,10 +29403,89 @@ const ContactListView = (() => {
     try {
       if (typeof SentinelViews !== 'undefined' && SentinelViews.getActiveView && SentinelViews.getActiveView()) {
         const f = SentinelViews.getFilteredContacts && SentinelViews.getFilteredContacts();
-        if (Array.isArray(f) && f.length) list = f.slice();
+        if (f && typeof f.has === 'function') list = list.filter(c => f.has(c.id));
       }
     } catch (e) {}
     return list.sort((a, b) => (a.sev - b.sev) || String(a.first || '').localeCompare(String(b.first || '')));
+  }
+
+  /* ── Select / Select all: remove many people at once ── */
+  let _selecting = false;
+  const _sel = new Set();
+  function _activeGroup() {
+    try { const v = SentinelViews.getActiveView(); return v && (v.type === 'team' || v.type === 'unit') ? v : null; } catch (e) { return null; }
+  }
+  function _setSelecting(on) {
+    _selecting = !!on;
+    _sel.clear();
+    const b = document.getElementById('clvSelect');
+    if (b) { b.setAttribute('aria-pressed', String(_selecting)); b.textContent = _selecting ? _t('clv.selectDone', 'Done selecting') : _t('clv.select', 'Select'); }
+    const a = document.getElementById('clvSelectAll');
+    if (a) a.hidden = !_selecting;
+    _render();
+  }
+  function _toggleAll() {
+    const ids = _contacts().map(c => c.id);
+    const all = ids.length && ids.every(id => _sel.has(id));
+    _sel.clear();
+    if (!all) ids.forEach(id => _sel.add(id));
+    _render();
+  }
+  function _names(ids) {
+    return ids.map(id => { const c = DEMO_CONTACTS.find(x => x.id === id); return c ? [c.first, c.last].filter(Boolean).join(' ') : ''; }).filter(Boolean);
+  }
+  async function _removeFromGroup(view, ids) {
+    const n = ids.length;
+    if (!(await uiConfirm(_t('clv.confirmGroup', 'Take {n} out of {group}? They stay in your circle.', { n: n, group: view.name })))) return;
+    const drop = new Set(ids);
+    if (view.type === 'team') {
+      SentinelViews.updateView(view.id, { contactIds: view.contactIds.filter(id => !drop.has(id)), pinnedIds: (view.pinnedIds || []).filter(id => !drop.has(id)) });
+      try { if (typeof TeamBuilder !== 'undefined') TeamBuilder.autoAssign(view.id); } catch (e) {}
+    } else {
+      SentinelViews.updateView(view.id, { contactIds: view.contactIds.filter(id => !drop.has(id)), manualIds: (view.manualIds || []).filter(id => !drop.has(id)) });
+      /* Taken out by hand: the position sort leaves them out of this Unit from now on */
+      const team = view.parentId && SentinelViews.views.find(t => t.id === view.parentId);
+      if (team) SentinelViews.updateView(team.id, { pinnedIds: Array.from(new Set((team.pinnedIds || []).concat(ids))) });
+    }
+    try { SentinelViews.refresh(); } catch (e) {}
+    showToast(_t('clv.removedGroup', '{n} taken out of {group}.', { n: n, group: view.name }));
+    _sel.clear();
+    _render();
+  }
+  async function _removeFromCircle(ids) {
+    const n = ids.length;
+    if (!(await uiConfirm(_t('clv.confirmCircle', 'Remove {n} from your circle? Their notes and history on this device go with them.', { n: n })))) return;
+    for (const id of ids) { try { await removeContactFromCircle(id); } catch (e) { console.warn('remove failed', e); } }
+    showToast(_t('clv.removedCircle', '{n} removed from your circle.', { n: n }));
+    _sel.clear();
+    _render();
+  }
+  function _renderBar() {
+    const bar = document.getElementById('clvBar');
+    const scope = document.getElementById('clvScope');
+    const group = _activeGroup();
+    if (scope) scope.textContent = group ? _t('clv.showing', 'Showing {group}', { group: group.name }) : '';
+    if (!bar) return;
+    bar.textContent = '';
+    bar.classList.toggle('on', _selecting);
+    if (!_selecting) return;
+    const ids = Array.from(_sel);
+    bar.appendChild(_el('span', { class: 'clv-count' }, ids.length ? _t('clv.count', '{n} selected', { n: ids.length }) : _t('clv.tapToSelect', 'Tap people to select them')));
+    if (!ids.length) return;
+    if (group) {
+      bar.appendChild(_action(_t('clv.removeFromGroup', 'Remove from {group}', { group: group.name }), 'primary', () => _removeFromGroup(group, ids)));
+    } else {
+      const teams = SentinelViews.views.filter(v => v.type === 'team' && v.contactIds.some(id => _sel.has(id)));
+      if (teams.length) bar.appendChild(_action(_t('clv.removeFromTeam', 'Remove from a team'), 'primary', () => {
+        bar.textContent = '';
+        const pick = _el('div', { class: 'clv-pick' });
+        pick.appendChild(_el('span', { class: 'clv-count' }, _t('clv.whichTeam', 'Which team?')));
+        teams.forEach(t => pick.appendChild(_action(t.name, '', () => _removeFromGroup(t, ids.filter(id => t.contactIds.includes(id))))));
+        pick.appendChild(_action(_t('clv.back', 'Back'), '', _renderBar));
+        bar.appendChild(pick);
+      }));
+    }
+    bar.appendChild(_action(_t('clv.removeFromCircle', 'Remove from circle'), 'danger', () => _removeFromCircle(ids)));
   }
 
   function _action(label, cls, fn) {
@@ -29370,10 +29503,23 @@ const ContactListView = (() => {
       ul.appendChild(_el('li', { class: 'clv-empty' }, _t('a11y.listEmpty', 'No contacts yet.')));
       return;
     }
+    /* Select all reads Clear selection while everyone shown is selected */
+    const _allBtn = document.getElementById('clvSelectAll');
+    if (_allBtn) { const allOn = list.length > 0 && list.every(c => _sel.has(c.id)); _allBtn.setAttribute('aria-pressed', String(allOn)); _allBtn.textContent = allOn ? _t('clv.selectNone', 'Clear selection') : _t('clv.selectAll', 'Select all'); }
+    _renderBar();
     list.forEach(c => {
       const name = [c.first, c.last].filter(Boolean).join(' ') || _t('a11y.unnamed', 'Unnamed');
       const _svl = (typeof c.sev === 'number') ? sevLabel(c.sev) : '';
-      const li = _el('li', { class: 'clv-item' });
+      const li = _el('li', { class: 'clv-item' + (_selecting ? ' sel-mode' : '') + (_sel.has(c.id) ? ' selected' : '') });
+      if (_selecting) {
+        li.setAttribute('role', 'checkbox');
+        li.setAttribute('aria-checked', String(_sel.has(c.id)));
+        li.tabIndex = 0;
+        li.appendChild(_el('span', { class: 'clv-check', 'aria-hidden': 'true' }, _sel.has(c.id) ? '\u2713' : ''));
+        const toggle = () => { if (_sel.has(c.id)) _sel.delete(c.id); else _sel.add(c.id); _render(); };
+        li.addEventListener('click', toggle);
+        li.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
+      }
       const _nm = _el('p', { class: 'clv-name' }, name);
       try { const _rl = contactRole(c); if (_rl) _nm.appendChild(_el('span', { class: 'clv-role' }, ' ' + _rl)); } catch (e) {}
       const _av = PhotoFit.avatarHtml(c.id, 28);
@@ -29399,6 +29545,11 @@ const ContactListView = (() => {
         showToast(_t('list.removed', '{name} removed', { name: name }));
       }));
       li.appendChild(acts);
+      if (_selecting) {
+        const body = _el('div', { style: 'flex:1;min-width:0' });
+        while (li.children.length > 1) body.appendChild(li.children[1]);
+        li.appendChild(body);
+      }
       ul.appendChild(li);
       /* Last contact is async: fill in when known */
       if (typeof computeSeverity === 'function') {
@@ -29431,6 +29582,7 @@ const ContactListView = (() => {
   function close() {
     const ov = document.getElementById('contactListView');
     if (!ov || !ov.classList.contains('open')) return;
+    if (_selecting) _setSelecting(false);
     ov.classList.remove('open');
     _setCanvasHidden(false);
     const t = document.getElementById('clvToggle');
