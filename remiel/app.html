@@ -11037,6 +11037,7 @@ const I18n = (function () {
     'help.goesTo': "Help goes to",
     'size.aria': "Sphere size",
     'size.title': "Sphere size: {n}%",
+    'roster.repairFound': "Found {n} missing photos.",
     'clv.select': "Select",
     'clv.selectDone': "Done selecting",
     'clv.selectAll': "Select all",
@@ -11705,6 +11706,7 @@ const I18n = (function () {
     'help.goesTo': "L’aiuto va a",
     'size.aria': "Dimensione delle sfere",
     'size.title': "Dimensione delle sfere: {n}%",
+    'roster.repairFound': "Trovate {n} foto mancanti.",
     'clv.select': "Seleziona",
     'clv.selectDone': "Fine selezione",
     'clv.selectAll': "Seleziona tutti",
@@ -23362,6 +23364,62 @@ var RosterImport = (function() {
     if (!err && res && res.ok) return { data: await res.json() };
     return { error: await _apiError(res, err), status: res && res.status };
   }
+  /* Missing roster photos: a headshot that failed once used to
+     stay missing. Once per session, for people imported by roster search who
+     still show initials, read their team's roster again, match by name, and
+     fetch any headshot the source has. People the source has no headshot for
+     keep their initials. */
+  var _repairRan = false;
+  async function repairPhotos() {
+    if (_repairRan) return { missing: 0, found: 0, noSource: 0 };
+    try { if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated()) return { missing: 0, found: 0, noSource: 0 }; } catch (e) { return { missing: 0, found: 0, noSource: 0 }; }
+    _repairRan = true;
+    var norm = function (a, b) { return (String(a || '') + ' ' + String(b || '')).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
+    var missing = DEMO_CONTACTS.filter(function (c) {
+      var src = c.details && c.details.source;
+      return !contactPhotos.has(c.id) && src && src.kind === 'search' && src.ref && /:/.test(src.ref);
+    });
+    var byRef = {};
+    missing.forEach(function (c) { (byRef[c.details.source.ref] = byRef[c.details.source.ref] || []).push(c); });
+    var jobs = [], noSource = 0;
+    for (var ref in byRef) {
+      var parts = ref.split(':');
+      var out = await _api('/roster/team?league=' + encodeURIComponent(parts[0]) + '&id=' + encodeURIComponent(parts.slice(1).join(':')));
+      if (out.error) continue;
+      var shots = {};
+      ((out.data && out.data.players) || []).forEach(function (pl) {
+        var f = pl.first, l = pl.last;
+        if (!f) { var sp = RosterKit.splitName(pl.fullName); f = sp.first; l = sp.last; }
+        if (pl.headshot) shots[norm(f, l)] = pl.headshot;
+      });
+      byRef[ref].forEach(function (c) { var u = shots[norm(c.first, c.last)]; if (u) jobs.push({ id: c.id, url: u }); else noSource++; });
+    }
+    var found = 0, next = 0;
+    async function worker() {
+      while (next < jobs.length) {
+        var j = jobs[next++];
+        try {
+          var blob = await _headshotBlob(j.url);
+          await RemielDB.putPhoto(j.id, blob);
+          await new Promise(function (res) {
+            var im = new Image();
+            im.onload = function () { contactPhotos.set(j.id, { img: im, w: im.naturalWidth, h: im.naturalHeight }); res(); };
+            im.onerror = res;
+            im.src = URL.createObjectURL(blob);
+          });
+          found++;
+        } catch (e) { /* still unavailable; tried again next session */ }
+      }
+    }
+    await Promise.all([worker(), worker(), worker()]);
+    if (found) {
+      try { if (SyncEngine.markDirty) SyncEngine.markDirty(); } catch (e) {}
+      showToast(_t('roster.repairFound', 'Found {n} missing photos.', { n: found }));
+    }
+    console.log('RosterImport: missing photos', missing.length, 'found', found, 'source has none', noSource);
+    return { missing: missing.length, found: found, noSource: noSource };
+  }
+
   function _proxyPhoto(url) {
     return (async function() {
       for (var attempt = 0; attempt < 3; attempt++) {
@@ -23487,7 +23545,7 @@ var RosterImport = (function() {
            handleGroupPhoto: handleGroupPhoto, toggleFace: toggleFace,
            toggleAllFaces: toggleAllFaces, setFaceName: setFaceName,
            doGroupImport: doGroupImport, retryImage: retryImage, cancelImage: cancelImage,
-           searchTeams: searchTeams, pickTeam: pickTeam, _importRecords: function(recs, src) { _source = src || null; _parsed = recs.map(_entry); _showPreview(); } };
+           searchTeams: searchTeams, pickTeam: pickTeam, repairPhotos: repairPhotos, _importRecords: function(recs, src) { _source = src || null; _parsed = recs.map(_entry); _showPreview(); } };
 })();
 
 function getContactHeadline(contact) {
@@ -39154,6 +39212,18 @@ var SphereSize = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else setTimeout(start, 0);
   return { apply: apply, place: place };
+})();
+
+/* Missing roster photos: one quiet repair pass per session, once signed in and in the galaxy */
+(function () {
+  var t = setInterval(function () {
+    try {
+      if (typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated() && typeof appState !== 'undefined' && appState === 'network' && DEMO_CONTACTS.length) {
+        clearInterval(t);
+        setTimeout(function () { RosterImport.repairPhotos().catch(function () {}); }, 4000);
+      }
+    } catch (e) {}
+  }, 3000);
 })();
 
 /* B1: every declaration above is now initialised; release any queued reveal. */
