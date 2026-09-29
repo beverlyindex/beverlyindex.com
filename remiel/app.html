@@ -14890,6 +14890,13 @@ function rebuildNodeTargets() {
   });
 }
 
+/* The name under a sphere: the surname, which tells teammates apart; the
+   first name when there is no surname. */
+function sphereLabel(c) {
+  var l = c && c.last ? String(c.last).trim() : '';
+  return l || (c && c.first ? String(c.first).trim() : '');
+}
+
 /* The role shown under a sphere's name: position (sports), MOS or rank
    (service), specialty or role (medical). Empty when nothing is recorded. */
 function contactRole(c) {
@@ -26383,7 +26390,7 @@ function drawNetworkView(t) {
       const _nfs = Math.max(9, Math.min(14, Math.round(12 * _s)));
       const _hfs = Math.max(8, Math.min(12, Math.round(10 * _s)));
       const _roleL = contactRole(node.contact);
-      const _nw = Math.max(30, Math.max(String(node.contact.first || '').length, _roleL.length * 0.85) * _nfs * 0.6);
+      const _nw = Math.max(30, Math.max(String(sphereLabel(node.contact)).length, _roleL.length * 0.85) * _nfs * 0.6);
       const _nameR = { x: p.sx - _nw / 2, y: p.sy + _r + 2 * _s, w: _nw, h: _nfs + 2 + (_roleL ? 15 : 0) };
       let _hw = 120 * _s;
       try {
@@ -26712,9 +26719,10 @@ function drawNetworkView(t) {
       ctx.globalAlpha = 0.95 * (alphaOverride || 1) * (node._lblName === undefined ? 1 : node._lblName);
       const _nfs = Math.max(9, Math.min(14, Math.round(12 * s)));
       ctx.font = `600 ${_nfs}px "Hanken Grotesk", system-ui, sans-serif`;
-      const _nmW = ctx.measureText(node.contact.first || '').width;
+      const _lbl = sphereLabel(node.contact);
+      const _nmW = ctx.measureText(_lbl).width;
       const _nmX = Math.max(6 + _nmW / 2, Math.min(W - 6 - _nmW / 2, sx));
-      ctx.fillText(node.contact.first, _nmX, sy + r + 12 * s);
+      ctx.fillText(_lbl, _nmX, sy + r + 12 * s);
     }
     var _roleTxt = (s > 0.38) ? contactRole(node.contact) : '';
     var _roleY = 0;
