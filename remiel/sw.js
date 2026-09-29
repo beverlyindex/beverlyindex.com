@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-sentinel-v58';
+const CACHE_NAME = 'remiel-sentinel-v59';
 
 const PRECACHE_URLS = [
   './',
@@ -99,8 +99,9 @@ self.addEventListener('fetch', (event) => {
 });
 
 /* ── Push: handle server-sent push events ──
-   Push subscription and server integration not wired yet,
-   but the handler is ready for when they are. */
+   Payload {title, body, tag, url, kind, urgent}. kind "call" is an incoming
+   video call; urgent (calls and critical alerts) stays on screen until the
+   person acts and vibrates harder. */
 self.addEventListener('push', (event) => {
   let data = {
     title: 'Remiel Sentinel',
@@ -116,6 +117,8 @@ self.addEventListener('push', (event) => {
       data.body = json.body || data.body;
       data.tag = json.tag || data.tag;
       data.url = json.url || data.url;
+      data.kind = json.kind || null;
+      data.urgent = json.urgent === true;
     } catch (e) {
       data.body = event.data.text() || data.body;
     }
@@ -127,9 +130,11 @@ self.addEventListener('push', (event) => {
     badge: './remiel-logo.png',
     tag: data.tag,
     renotify: true,
-    requireInteraction: false,
+    requireInteraction: !!data.urgent,
     data: { url: data.url }
   };
+  if (data.kind === 'call') options.vibrate = [400, 200, 400, 200, 400, 200, 800];
+  else if (data.urgent) options.vibrate = [300, 150, 300, 150, 600];
 
   event.waitUntil(
     self.registration.showNotification(data.title, options)

@@ -10925,6 +10925,13 @@ const I18n = (function () {
     'acct.handleTaken': "That handle is taken. Try",
     'acct.setupFailed': "Could not connect right now. Your data is safe on this device.",
     'call.unreachable': "Could not reach that person. They may not be online.",
+    'call.ringingPhone': "Ringing {name} on their phone. The call connects when they open Remiel Sentinel.",
+    'call.connecting': "Connecting you to the call. It rings here in a moment.",
+    'call.missedFrom': "You missed a video call from {name}.",
+    'call.missedUnknown': "You missed a video call from someone who is not in your circle yet.",
+    'call.callBack': "Call back",
+    'call.incomingTitle': "Incoming video call",
+    'call.incomingBody': "{name} is calling you. Tap to answer.",
     'call.connectionLost': "connection lost",
     'call.noAnswer': "No answer",
     'call.alreadyInCall': "Already in a call",
@@ -11440,6 +11447,13 @@ const I18n = (function () {
     'acct.handleTaken': "Questo nome utente è già preso. Prova",
     'acct.setupFailed': "Impossibile collegarsi adesso. I tuoi dati sono al sicuro su questo dispositivo.",
     'call.unreachable': "Impossibile raggiungere questa persona. Forse non è online.",
+    'call.ringingPhone': "Sto facendo squillare il telefono di {name}. La chiamata si collega quando apre Remiel Sentinel.",
+    'call.connecting': "Ti sto collegando alla chiamata. Tra un momento squilla qui.",
+    'call.missedFrom': "Hai perso una videochiamata da {name}.",
+    'call.missedUnknown': "Hai perso una videochiamata da una persona che non è ancora nella tua cerchia.",
+    'call.callBack': "Richiama",
+    'call.incomingTitle': "Videochiamata in arrivo",
+    'call.incomingBody': "{name} ti sta chiamando. Tocca per rispondere.",
     'call.connectionLost': "connessione persa",
     'call.noAnswer': "Nessuna risposta",
     'call.alreadyInCall': "Sei già in una chiamata",
@@ -28202,14 +28216,14 @@ const AlertEngine = (() => {
     await saveAlerts();
     updateUI();
 
-    /* System notifications for new critical/elevated */
+    /* System notifications for new critical/elevated, here and (by push)
+       on this account's other devices. Same tag on both, so a device that
+       raised the alert itself shows it once. */
     for (const al of newAlerts) {
       if (al.sevLevel <= 1) {
-        showNotification(
-          TYPE_LABELS[al.type] + ': ' + al.contactName,
-          al.message,
-          al.id
-        );
+        const title = TYPE_LABELS[al.type] + ': ' + al.contactName;
+        showNotification(title, al.message, 'alert-' + al.id);
+        _relayAlert(al, title);
       }
     }
     return newAlerts;
@@ -28238,6 +28252,25 @@ const AlertEngine = (() => {
 
   function getAlertsForContact(contactId) {
     return alerts.filter(a => a.contactId === contactId);
+  }
+
+  /* ── Relay to other devices (Alarms step 1): POST /push/alert. Never throws. ── */
+  async function _relayAlert(al, title) {
+    try {
+      if (typeof SyncEngine === 'undefined' || !SyncEngine.isAuthenticated || !SyncEngine.isAuthenticated()) return;
+      if (SyncEngine.isLocalOnly && SyncEngine.isLocalOnly()) return;
+      let endpoint = null;
+      try {
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+          const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 2000))]);
+          const sub = reg ? await reg.pushManager.getSubscription() : null;
+          endpoint = sub ? sub.endpoint : null;
+        }
+      } catch (e) {}
+      await SyncEngine.apiFetch('/push/alert', { method: 'POST', body: JSON.stringify({
+        id: String(al.id).slice(0, 200), title: String(title).slice(0, 200), body: String(al.message || '').slice(0, 1000),
+        level: al.sevLevel, except_endpoint: endpoint }) });
+    } catch (e) { /* offline or signed out: the alert still shows here */ }
   }
 
   /* ── Notification API ── */
@@ -34260,6 +34293,7 @@ const SentinelCall = (function() {
 
   /* ── Initialize ── */
   async function init() {
+    _watchCallLinks();
     /* Get or create Sentinel ID (older builds wrote the key sentinelId) */
     _myId = await RemielDB.getSetting('sentinelCallId');
     if (!_isValidSid(_myId || '')) {
@@ -34273,6 +34307,46 @@ const SentinelCall = (function() {
     /* Fast connect: the library and the peer are ready before the first call */
     if (window.Peer) { await _initPeer(); return; }
     _scheduleWarm();
+  }
+
+  /* ── A tapped call notification (Alarms step 1) ──
+     #call=SID: someone is calling. Connect now so the caller's next attempt
+     rings here; if no call arrives within 25 s, offer Call back.
+     #callback=SID: the call is over. Offer Call back at once. */
+  let _callLinkWatched = false;
+  function _watchCallLinks() {
+    if (_callLinkWatched) return;
+    _callLinkWatched = true;
+    _onCallLink(location.hash);
+    try {
+      if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', (e) => {
+        if (e.data && e.data.type === 'NOTIFICATION_CLICK') _onCallLink(String(e.data.url || ''));
+      });
+    } catch (e) {}
+    window.addEventListener('hashchange', () => _onCallLink(location.hash));
+  }
+  function _contactBySid(sid) {
+    try { return DEMO_CONTACTS.find(c => c.sentinelId && String(c.sentinelId).toUpperCase() === sid) || null; } catch (e) { return null; }
+  }
+  function _offerCallBack(sid) {
+    const c = _contactBySid(sid);
+    if (!c) { showToast(_t('call.missedUnknown', 'You missed a video call from someone who is not in your circle yet.')); return; }
+    const name = ((c.first || '') + ' ' + (c.last || '')).trim() || _t('call.thisContact', 'this contact');
+    showActionToast(_tp('call.missedFrom', 'You missed a video call from {name}.', { name: name }),
+      [{ label: _t('call.callBack', 'Call back'), run: () => callContact(c.id) }], 15000);
+  }
+  async function _onCallLink(where) {
+    const m = /#(call|callback)=([A-Za-z0-9]{8})(?![A-Za-z0-9])/.exec(String(where || ''));
+    if (!m) return;
+    const sid = m[2].toUpperCase();
+    try { if (/#(call|callback)=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    if (m[1] === 'callback') { _offerCallBack(sid); return; }
+    if (_currentCall || _incomingCall) return;
+    showToast(_t('call.connecting', 'Connecting you to the call. It rings here in a moment.'));
+    const until = Date.now() + 10000;
+    while (!_signedIn() && Date.now() < until) await new Promise(r => setTimeout(r, 500));
+    try { await warm(); } catch (e) {}
+    setTimeout(() => { if (!_currentCall && !_incomingCall && !_activeShown) _offerCallBack(sid); }, 25000);
   }
 
   function _signedIn() {
@@ -34341,16 +34415,79 @@ const SentinelCall = (function() {
     _peer.on('error', (err) => {
       console.warn('SentinelCall: error', err.type, err.message);
       if (err.type === 'peer-unavailable') {
-        if (_callCtx && _callCtx.leaveMsg && _currentCall && !_activeShown) {
-          /* Not connected right now: ring out the short window, then offer a message */
-          const left = Math.max(0, _OFFLINE_RING_MS - (Date.now() - _callCtx.started));
-          _armNoAnswer(_currentCall, _callCtx.onTimeout, left, true);
+        /* App closed on their side: wake their phone with a push, then keep
+           dialling so the call reaches them the moment they open the app. */
+        if (_callCtx && _currentCall && !_activeShown && _callCtx.rung !== false) {
+          if (_callCtx.rung === true) { _redialSoon(); return; }
+          if (!_callCtx.ringing) {
+            const ctx = _callCtx;
+            ctx.ringing = true;
+            _ring(ctx.targetId, 'ringing').then((n) => {
+              ctx.ringing = false;
+              ctx.rung = n > 0;
+              if (_callCtx !== ctx || !_currentCall || _activeShown) return;
+              if (ctx.rung) _redialSoon();
+              else _unavailable();
+            });
+          }
           return;
         }
-        endCall();
-        showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
+        _unavailable();
       }
     });
+  }
+
+  /* No push reached them: the earlier behaviour (short ring, then Leave a
+     message for a linked person; otherwise end with a toast). */
+  function _unavailable() {
+    if (_callCtx && _callCtx.leaveMsg && _currentCall && !_activeShown) {
+      /* Not connected right now: ring out the short window, then offer a message */
+      const left = Math.max(0, _OFFLINE_RING_MS - (Date.now() - _callCtx.started));
+      _armNoAnswer(_currentCall, _callCtx.onTimeout, left, true);
+      return;
+    }
+    endCall();
+    showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
+  }
+
+  /* ── Ring by push (Alarms step 1) ──
+     POST /call/ring. Returns how many of their devices the push reached
+     (0 when signed out, push not configured, or offline). Never throws. */
+  const _PUSH_RING_MS = 60000;
+  const _REDIAL_MS = 4000;
+  async function _ring(sid, state) {
+    if (!_signedIn() || !_isValidSid(sid || '')) return 0;
+    try {
+      const r = await SyncEngine.apiFetch('/call/ring', { method: 'POST', body: JSON.stringify({ to_sentinel_id: sid, state: state }) });
+      if (!r.ok) return 0;
+      const d = await r.json();
+      return Number(d && d.sent) || 0;
+    } catch (e) { return 0; }
+  }
+  /* Their phone was rung: keep the outgoing screen up for the longer push
+     window and place the call again every few seconds until it connects. */
+  function _redialSoon() {
+    const ctx = _callCtx;
+    if (!ctx || ctx.redialTimer || !_currentCall || _activeShown) return;
+    const left = _PUSH_RING_MS - (Date.now() - ctx.started);
+    if (left <= 0) return;
+    if (!ctx.pushWindow) {
+      ctx.pushWindow = true;
+      _armNoAnswer(_currentCall, ctx.onTimeout, left, ctx.leaveMsg);
+      _setInviteLine(_tp('call.ringingPhone', 'Ringing {name} on their phone. The call connects when they open Remiel Sentinel.', { name: ctx.contact.first || _t('call.thisContact', 'this contact') }));
+    }
+    ctx.redialTimer = setTimeout(() => {
+      ctx.redialTimer = null;
+      if (_callCtx !== ctx || !_currentCall || _activeShown || !_peer || _peer.destroyed || !_localStream) return;
+      const old = _currentCall;
+      let call = null;
+      try { call = _peer.call(ctx.remotePeerId, _localStream, { metadata: ctx.meta }); } catch (e) { call = null; }
+      if (!call) { _redialSoon(); return; }
+      _currentCall = call;
+      _attachCall(call);
+      try { old.close(); } catch (e) {}
+      _armNoAnswer(call, ctx.onTimeout, Math.max(1000, _PUSH_RING_MS - (Date.now() - ctx.started)), ctx.leaveMsg);
+    }, _REDIAL_MS);
   }
 
   /* ── Get camera stream ── */
@@ -34557,11 +34694,10 @@ const SentinelCall = (function() {
     /* Place the call */
     const remotePeerId = 'sentinel-' + targetId.trim().toLowerCase();
     let call = null;
+    let callMeta = null;
     try {
-      const callerName = await _getMyName();
-      call = _peer.call(remotePeerId, _localStream, {
-        metadata: { callerName: callerName, callerId: _myId }
-      });
+      callMeta = { callerName: await _getMyName(), callerId: _myId };
+      call = _peer.call(remotePeerId, _localStream, { metadata: callMeta });
     } catch (e) { call = null; }
     if (!call) {
       endCall();
@@ -34573,7 +34709,8 @@ const SentinelCall = (function() {
     const _mg = (typeof Magnet !== 'undefined' && Magnet) ? Magnet : null;
     const leaveMsg = !!(_mg && _mg.isOnRs(contact));
     const offline = !!(_mg && _mg.isOnline(targetId) === false);
-    _callCtx = { contact: contact, started: Date.now(), leaveMsg: leaveMsg, onTimeout: leaveMsg ? () => _offerMessage(contact) : null };
+    _callCtx = { contact: contact, started: Date.now(), leaveMsg: leaveMsg, onTimeout: leaveMsg ? () => _offerMessage(contact) : null,
+      targetId: targetId.trim().toUpperCase(), remotePeerId: remotePeerId, meta: callMeta };
     _armNoAnswer(call, _callCtx.onTimeout, offline ? _OFFLINE_RING_MS : _NO_ANSWER_MS, leaveMsg);
   }
 
@@ -34676,6 +34813,10 @@ const SentinelCall = (function() {
   /* ── End call cleanup ── */
   function endCall() {
     _clearAwaitGuest();
+    const ctx = _callCtx;
+    _callCtx = null;
+    if (ctx && ctx.redialTimer) { clearTimeout(ctx.redialTimer); ctx.redialTimer = null; }
+    if (ctx && ctx.rung && !_activeShown && !ctx.connected) _ring(ctx.targetId, 'missed');
     const call = _currentCall;
     _currentCall = null;
     _incomingCall = null;
@@ -35407,6 +35548,10 @@ const SentinelCall = (function() {
     rsOverlayFlag('call', true);
 
     _playRingtone();
+    /* App in the background: the ringtone alone may go unheard */
+    if (document.hidden && typeof AlertEngine !== 'undefined' && AlertEngine.showNotification) {
+      try { AlertEngine.showNotification(_t('call.incomingTitle', 'Incoming video call'), _tp('call.incomingBody', '{name} is calling you. Tap to answer.', { name: name }), 'call-incoming'); } catch (e) {}
+    }
 
     /* Auto-timeout after 30s */
     if (_incomingTimer) clearTimeout(_incomingTimer);
@@ -35423,6 +35568,7 @@ const SentinelCall = (function() {
       if (rv && remoteStream && rv.srcObject !== remoteStream) { rv.srcObject = remoteStream; rv.play().catch(() => {}); }
       return;
     }
+    if (_callCtx) { _callCtx.connected = true; if (_callCtx.pushWindow) _setInviteLine(null); }
     _activeShown = true;
     if (_noAnswerTimer) { clearTimeout(_noAnswerTimer); _noAnswerTimer = null; }
     const remoteVid = document.getElementById('scRemoteVideo');
