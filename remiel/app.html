@@ -6427,6 +6427,18 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       </div>
     </div>
 
+    <div class="settings-section" id="helpSection" style="display:none;">
+      <div class="settings-section-title" data-i18n="help.title">Help</div>
+      <div class="settings-card">
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;" data-i18n="help.desc">Sends an urgent alarm to the person you choose. It rings on their screen and phone every 2 minutes until they tap Acknowledge.</p>
+        <label class="push-toggle-label" for="helpTarget" data-i18n="help.goesTo">Help goes to</label>
+        <select id="helpTarget" class="help-target" onchange="AlarmCenter.setHelpTarget(this.value)"></select>
+        <div class="push-toggle-sub" id="helpTargetNote" hidden></div>
+        <button type="button" class="help-hold-btn" id="helpHoldBtn"><span class="help-hold-fill" id="helpHoldFill"></span><span class="help-hold-text" data-i18n="help.hold">Press and hold 2 seconds to send Help</span></button>
+        <div class="push-status-text" id="helpStatus" hidden></div>
+      </div>
+    </div>
+
     <div class="settings-section push-section" id="pushNotifySection" style="display:none;">
       <div class="settings-section-title" data-i18n="settings.push">Push Notifications</div>
     <p class="settings-help" data-i18n="help.set.push"></p>
@@ -10957,6 +10969,22 @@ const I18n = (function () {
     'alarm.acked': "Acknowledged. The alarm has stopped.",
     'alarm.ackFailed': "Could not acknowledge. Check your connection and tap Acknowledge again.",
     'alarm.cancelled': "Alarm cancelled.",
+    'help.title': "Help",
+    'help.desc': "Sends an urgent alarm to the person you choose. It rings on their screen and phone every 2 minutes until they tap Acknowledge.",
+    'help.goesTo': "Help goes to",
+    'help.choose': "Choose a person",
+    'help.noneLinked': "Nobody is linked with you yet. Help can only go to a linked person: send them a message in Remiel Sentinel; you are linked once they accept, and they then appear in this list.",
+    'help.chooseFirst': "Choose who Help goes to first, in the list above.",
+    'help.hold': "Press and hold 2 seconds to send Help",
+    'help.keepHolding': "Keep holding...",
+    'help.alarmTitle': "Help requested: {name}",
+    'help.alarmBody': "{name} tapped Help in Remiel Sentinel.",
+    'help.sent': "Help sent to {name}. If you are safe, tap Cancel alarm on the red bar at the top of the screen.",
+    'help.notLinked': "Help could not be sent: you are not linked with {name} yet. Send them a message in Remiel Sentinel; you are linked once they accept.",
+    'help.failed': "Help could not be sent. Check your connection and hold the button again. If you are in danger, call your local emergency number.",
+    'alarm.takeoverHide': "Hide for now",
+    'alarm.from': "From {name}",
+    'alarm.soundOn': "Tap anywhere to turn on the alarm sound",
     'call.connectionLost': "connection lost",
     'call.noAnswer': "No answer",
     'call.alreadyInCall': "Already in a call",
@@ -11496,6 +11524,22 @@ const I18n = (function () {
     'alarm.acked': "Confermato. L’allarme si è fermato.",
     'alarm.ackFailed': "Impossibile confermare. Controlla la connessione e tocca di nuovo Conferma.",
     'alarm.cancelled': "Allarme annullato.",
+    'help.title': "Aiuto",
+    'help.desc': "Invia un allarme urgente alla persona che scegli. Suona sul suo schermo e sul suo telefono ogni 2 minuti finché non tocca Conferma.",
+    'help.goesTo': "L’aiuto va a",
+    'help.choose': "Scegli una persona",
+    'help.noneLinked': "Nessuno è ancora collegato con te. L’aiuto può andare solo a una persona collegata: inviale un messaggio in Remiel Sentinel; siete collegati appena accetta, e da quel momento compare in questo elenco.",
+    'help.chooseFirst': "Prima scegli a chi va l’aiuto, nell’elenco qui sopra.",
+    'help.hold': "Tieni premuto 2 secondi per inviare Aiuto",
+    'help.keepHolding': "Continua a tenere premuto...",
+    'help.alarmTitle': "Richiesta di aiuto: {name}",
+    'help.alarmBody': "{name} ha toccato Aiuto in Remiel Sentinel.",
+    'help.sent': "Aiuto inviato a {name}. Se sei al sicuro, tocca Annulla allarme sulla barra rossa in cima allo schermo.",
+    'help.notLinked': "Impossibile inviare l’aiuto: non sei ancora collegato con {name}. Inviale un messaggio in Remiel Sentinel; siete collegati appena accetta.",
+    'help.failed': "Impossibile inviare l’aiuto. Controlla la connessione e tieni premuto di nuovo il pulsante. Se sei in pericolo, chiama il numero di emergenza locale.",
+    'alarm.takeoverHide': "Nascondi per ora",
+    'alarm.from': "Da {name}",
+    'alarm.soundOn': "Tocca un punto qualsiasi per attivare il suono dell’allarme",
     'call.connectionLost': "connessione persa",
     'call.noAnswer': "Nessuna risposta",
     'call.alreadyInCall': "Sei già in una chiamata",
@@ -28855,6 +28899,7 @@ const A11y = (() => {
           VideoNoteShare.updateVisibility();
           VideoNoteShare.loadShared();
         }
+        if (typeof AlarmCenter !== 'undefined') { try { AlarmCenter.onSettingsOpen(); } catch (e) {} }
         if (typeof PushNotify !== 'undefined') {
           PushNotify.updateVisibility();
           PushNotify.checkStatus();
@@ -37480,16 +37525,22 @@ const MedImageReader = (() => {
 })();
 
 
-/* ═══ AlarmCenter (Alarms step 2) ═══
-   Shows open Level 2 (amber) and Level 3 (red) alarms from the server as bars
-   at the top of the screen, each with Acknowledge. Polls GET /alarms every
-   30 s while the app is visible and signed in (the poll also lets the server
-   send due repeats and escalations). Opens straight to an alarm from a tapped
-   notification (#alarm=ID). The full-screen takeover is Step 3. */
+/* ═══ AlarmCenter (Alarms steps 2 and 3) ═══
+   Open Level 2 (amber) and Level 3 (red) alarms from the server show as bars
+   at the top of the screen, each with Acknowledge. An open Level 3 alarm for
+   this person also takes over the whole screen with a siren and vibration
+   that repeat every 30 s until Acknowledge (Hide for now returns to the bar
+   until the server's next repeat). Polls GET /alarms every 30 s while the app
+   is visible and signed in, at once when a push arrives, and when a tapped
+   notification opens the app (#alarm=ID). Nothing shows over the access-code
+   screen. Help (Settings, Help) raises a Level 3 alarm to a linked person. */
 var AlarmCenter = (function () {
   var POLL_MS = 30000;
+  var SIREN_EVERY_MS = 30000;
+  var HOLD_MS = 2000;
   var _open = [];
   var _hidden = {};
+  var _hiddenTakeover = {};
   var _busy = false;
 
   function _authed() {
@@ -37511,7 +37562,7 @@ var AlarmCenter = (function () {
       '.alarm-bar.l3{background:#b3121f;border:2px solid #ff5a66;animation:alarmPulse 1.2s ease-in-out infinite}' +
       '.alarm-bar.l2{background:#8a5a00;border:2px solid #ffb020}' +
       '@keyframes alarmPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,90,102,.7)}50%{box-shadow:0 0 0 8px rgba(255,90,102,0)}}' +
-      '@media (prefers-reduced-motion: reduce){.alarm-bar.l3{animation:none}}' +
+      '@media (prefers-reduced-motion: reduce){.alarm-bar.l3,.alarm-takeover{animation:none !important}}' +
       '.alarm-lvl{font-size:11px;font-weight:800;letter-spacing:.08em;opacity:.95}' +
       '.alarm-title{font-size:15px;font-weight:700;margin:2px 28px 2px 0}' +
       '.alarm-body{font-size:13px;opacity:.95}' +
@@ -37521,8 +37572,21 @@ var AlarmCenter = (function () {
       '.alarm-ack{background:#fff;color:#111}' +
       '.alarm-cancel{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.6) !important}' +
       '.alarm-x{position:absolute;top:6px;right:8px;background:none;border:0;color:#fff;font-size:20px;line-height:1;cursor:pointer;padding:4px 8px}' +
+      '.alarm-takeover{position:fixed;inset:0;z-index:9500;background:#9e0f1b;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:calc(env(safe-area-inset-top,0px) + 24px) 16px calc(env(safe-area-inset-bottom,0px) + 24px);animation:alarmFlash 1s steps(2,end) infinite}' +
+      '@keyframes alarmFlash{0%{background:#9e0f1b}50%{background:#d11a2a}}' +
+      '.alarm-takeover .tk-lvl{font-size:14px;font-weight:900;letter-spacing:.2em}' +
+      '.alarm-takeover .tk-title{font-size:clamp(24px,6vw,40px);font-weight:800;margin:12px 0 8px;max-width:640px}' +
+      '.alarm-takeover .tk-body{font-size:17px;max-width:560px;opacity:.95}' +
+      '.alarm-takeover .tk-meta{font-size:14px;margin-top:8px;opacity:.9}' +
+      '.alarm-takeover .tk-ack{margin-top:28px;font:inherit;font-size:20px;font-weight:800;padding:18px 44px;border-radius:16px;border:0;background:#fff;color:#9e0f1b;cursor:pointer;min-width:min(320px,100%)}' +
+      '.alarm-takeover .tk-hide{margin-top:14px;font:inherit;font-size:15px;font-weight:600;padding:10px 18px;border-radius:12px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.7);cursor:pointer}' +
+      '.alarm-takeover .tk-sound{margin-top:14px;font-size:13px;font-weight:700;background:rgba(0,0,0,.25);padding:6px 12px;border-radius:8px}' +
       '.alarm-test-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}' +
-      '.alarm-test-btn{font:inherit;font-weight:700;font-size:13px;padding:8px 14px;border-radius:10px;border:1px solid #ff5a66;background:#b3121f;color:#fff;cursor:pointer;white-space:nowrap}';
+      '.alarm-test-btn{font:inherit;font-weight:700;font-size:13px;padding:8px 14px;border-radius:10px;border:1px solid #ff5a66;background:#b3121f;color:#fff;cursor:pointer;white-space:nowrap}' +
+      '.help-target{display:block;width:100%;margin:6px 0 10px;padding:10px;border-radius:10px;background:rgba(255,255,255,.06);color:inherit;border:1px solid rgba(56,212,255,.6);font:inherit}' +
+      '.help-hold-btn{position:relative;overflow:hidden;display:block;width:100%;padding:14px;border-radius:12px;border:2px solid #ff5a66;background:#b3121f;color:#fff;font:inherit;font-size:15px;font-weight:800;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}' +
+      '.help-hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.35)}' +
+      '.help-hold-text{position:relative}';
     document.head.appendChild(st);
   }
   function _stack() {
@@ -37538,8 +37602,9 @@ var AlarmCenter = (function () {
     return el;
   }
   function _myId() { try { return SyncEngine.getUserId && SyncEngine.getUserId(); } catch (e) { return null; } }
+  /* Raised by me for someone else (Help): I can cancel it, not acknowledge it. */
+  function _mineForOther(a) { var me = _myId(); return !!(a.raised_by && a.raised_by === me && a.owner_id !== me); }
 
-  /* Nothing shows over the access-code screen; the bars appear once it is unlocked. */
   var _lockTimer = null;
   function _locked() {
     var g = document.getElementById('gateScreen');
@@ -37547,17 +37612,106 @@ var AlarmCenter = (function () {
     var cs = getComputedStyle(g);
     return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > 0.5;
   }
+
+  /* ── Siren (Web Audio) and vibration ── */
+  var _ctx = null;
+  var _sirenTimer = null;
+  function _audio() {
+    try {
+      if (!_ctx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) _ctx = new AC(); }
+      if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(function () {});
+    } catch (e) {}
+    return _ctx;
+  }
+  function _unlockAudio() { _audio(); var s = document.getElementById('alarmTkSound'); if (s && _ctx && _ctx.state === 'running') s.hidden = true; }
+  document.addEventListener('pointerdown', _unlockAudio, true);
+  document.addEventListener('keydown', _unlockAudio, true);
+  function _sirenOnce() {
+    try { if (navigator.vibrate) navigator.vibrate([600, 250, 600, 250, 900]); } catch (e) {}
+    var c = _audio();
+    var s = document.getElementById('alarmTkSound');
+    if (!c || c.state !== 'running') { if (s) s.hidden = false; return; }
+    if (s) s.hidden = true;
+    var t = c.currentTime;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.05);
+    g.gain.setValueAtTime(0.35, t + 3.0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+    g.connect(c.destination);
+    var o = c.createOscillator();
+    o.type = 'sawtooth';
+    for (var i = 0; i < 6; i++) {
+      o.frequency.setValueAtTime(960, t + i * 0.5);
+      o.frequency.setValueAtTime(700, t + i * 0.5 + 0.25);
+    }
+    o.connect(g);
+    o.start(t);
+    o.stop(t + 3.25);
+  }
+  function _sirenStart() {
+    if (_sirenTimer) return;
+    _sirenOnce();
+    _sirenTimer = setInterval(_sirenOnce, SIREN_EVERY_MS);
+  }
+  function _sirenStop() {
+    if (_sirenTimer) { clearInterval(_sirenTimer); _sirenTimer = null; }
+    try { if (navigator.vibrate) navigator.vibrate(0); } catch (e) {}
+  }
+
+  function _takeoverKey(a) { return a.id + ':' + a.repeats_sent + ':' + a.escalation_step; }
+  function _takeoverAlarm() {
+    for (var i = 0; i < _open.length; i++) {
+      var a = _open[i];
+      if (a.level === 3 && !_mineForOther(a) && !_hiddenTakeover[_takeoverKey(a)]) return a;
+    }
+    return null;
+  }
+  function _renderTakeover() {
+    var a = _locked() ? null : _takeoverAlarm();
+    var el = document.getElementById('alarmTakeover');
+    if (!a) { if (el) el.remove(); _sirenStop(); return; }
+    if (el && el.dataset.key === _takeoverKey(a)) return;
+    if (el) el.remove();
+    el = document.createElement('div');
+    el.id = 'alarmTakeover';
+    el.className = 'alarm-takeover';
+    el.dataset.key = _takeoverKey(a);
+    el.setAttribute('role', 'alertdialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'alarmTkTitle');
+    function add(tag, cls, text, id) { var n = document.createElement(tag); n.className = cls; if (id) n.id = id; n.textContent = text; el.appendChild(n); return n; }
+    add('div', 'tk-lvl', _t('alarm.urgent', 'URGENT'));
+    add('div', 'tk-title', a.title, 'alarmTkTitle');
+    if (a.body) add('div', 'tk-body', a.body);
+    if (a.raised_by_name && a.raised_by !== _myId()) add('div', 'tk-meta', _t('alarm.from', 'From {name}', { name: a.raised_by_name }));
+    if (a.escalation_step > 0) add('div', 'tk-meta', _t('alarm.escalated', 'Escalated: nobody acknowledged it in time.'));
+    var ack = add('button', 'tk-ack btn-advance', _t('alarm.ack', 'Acknowledge'));
+    ack.type = 'button';
+    ack.onclick = function () { acknowledge(a.id); };
+    var hide = add('button', 'tk-hide', _t('alarm.takeoverHide', 'Hide for now'));
+    hide.type = 'button';
+    hide.onclick = function () { _hiddenTakeover[_takeoverKey(a)] = 1; _renderTakeover(); };
+    var snd = add('div', 'tk-sound', _t('alarm.soundOn', 'Tap anywhere to turn on the alarm sound'), 'alarmTkSound');
+    snd.hidden = true;
+    el.addEventListener('pointerdown', function () { _unlockAudio(); if (_ctx && _ctx.state === 'running' && !snd.hidden) { snd.hidden = true; _sirenOnce(); } });
+    document.body.appendChild(el);
+    setTimeout(function () { try { ack.focus({ preventScroll: true }); } catch (e) {} }, 50);
+    _sirenStop();
+    _sirenStart();
+  }
+
   function render() {
     _css();
     var el = _stack();
     el.innerHTML = '';
     if (_locked()) {
+      _renderTakeover();
       if (!_lockTimer && _open.some(function (a) { return a.level >= 2; })) {
         _lockTimer = setTimeout(function () { _lockTimer = null; render(); }, 2000);
       }
       return;
     }
-    var me = _myId();
     _open.filter(function (a) { return a.level >= 2 && !_hidden[a.id + ':' + a.escalation_step]; }).forEach(function (a, i) {
       var bar = document.createElement('div');
       bar.className = 'alarm-bar l' + a.level;
@@ -37570,17 +37724,19 @@ var AlarmCenter = (function () {
       if (a.body) { var bo = document.createElement('div'); bo.className = 'alarm-body'; bo.textContent = a.body; bar.appendChild(bo); }
       if (a.escalation_step > 0) { var es = document.createElement('div'); es.className = 'alarm-esc'; es.textContent = _t('alarm.escalated', 'Escalated: nobody acknowledged it in time.'); bar.appendChild(es); }
       var acts = document.createElement('div'); acts.className = 'alarm-acts';
-      var ack = document.createElement('button');
-      ack.type = 'button'; ack.className = 'alarm-ack btn-advance';
-      ack.textContent = _t('alarm.ack', 'Acknowledge');
-      ack.onclick = function () { acknowledge(a.id); };
-      acts.appendChild(ack);
-      if (a.raised_by && a.raised_by === me && a.owner_id !== me) {
+      var first = null;
+      if (_mineForOther(a)) {
         var ca = document.createElement('button');
-        ca.type = 'button'; ca.className = 'alarm-cancel';
+        ca.type = 'button'; ca.className = 'alarm-cancel btn-advance';
         ca.textContent = _t('alarm.cancel', 'Cancel alarm');
         ca.onclick = function () { cancel(a.id); };
-        acts.appendChild(ca);
+        acts.appendChild(ca); first = ca;
+      } else {
+        var ack = document.createElement('button');
+        ack.type = 'button'; ack.className = 'alarm-ack btn-advance';
+        ack.textContent = _t('alarm.ack', 'Acknowledge');
+        ack.onclick = function () { acknowledge(a.id); };
+        acts.appendChild(ack); first = ack;
       }
       bar.appendChild(acts);
       var x = document.createElement('button');
@@ -37589,8 +37745,9 @@ var AlarmCenter = (function () {
       x.onclick = function () { _hidden[a.id + ':' + a.escalation_step] = 1; render(); };
       bar.appendChild(x);
       el.appendChild(bar);
-      if (i === 0) setTimeout(function () { try { ack.focus({ preventScroll: true }); } catch (e) {} }, 50);
+      if (i === 0 && !document.getElementById('alarmTakeover')) setTimeout(function () { try { first.focus({ preventScroll: true }); } catch (e) {} }, 50);
     });
+    _renderTakeover();
   }
 
   async function poll() {
@@ -37603,12 +37760,12 @@ var AlarmCenter = (function () {
     finally { _busy = false; }
   }
 
+  function _drop(id) { _open = _open.filter(function (a) { return a.id !== id; }); render(); }
   async function acknowledge(id) {
     try {
       var r = await _api('/alarms/' + id + '/ack', { method: 'POST', body: '{}' });
       if (!r.ok) throw new Error('ack ' + r.status);
-      _open = _open.filter(function (a) { return a.id !== id; });
-      render();
+      _drop(id);
       showToast(_t('alarm.acked', 'Acknowledged. The alarm has stopped.'));
     } catch (e) {
       showToast(_t('alarm.ackFailed', 'Could not acknowledge. Check your connection and tap Acknowledge again.'));
@@ -37618,33 +37775,116 @@ var AlarmCenter = (function () {
     try {
       var r = await _api('/alarms/' + id + '/cancel', { method: 'POST', body: '{}' });
       if (!r.ok) throw new Error('cancel ' + r.status);
-      _open = _open.filter(function (a) { return a.id !== id; });
-      render();
+      _drop(id);
       showToast(_t('alarm.cancelled', 'Alarm cancelled.'));
     } catch (e) {
       showToast(_t('alarm.ackFailed', 'Could not acknowledge. Check your connection and tap Acknowledge again.'));
     }
   }
 
-  function _testStatus(text) {
-    var el = document.getElementById('alarmTestStatus');
+  function _status(id, text) {
+    var el = document.getElementById(id);
     if (!el) { showToast(text); return; }
     el.textContent = text; el.hidden = !text;
   }
   async function sendTest() {
-    if (!_authed()) { _testStatus(_t('alarm.testFailed', 'Could not send the test alarm. Check that you are signed in: Settings, Account.')); return; }
+    _audio();
+    if (!_authed()) { _status('alarmTestStatus', _t('alarm.testFailed', 'Could not send the test alarm. Check that you are signed in: Settings, Account.')); return; }
     try {
       var r = await _api('/alarms', { method: 'POST', body: JSON.stringify({
         level: 3, kind: 'test', title: _t('alarm.testTitle', 'Test urgent alarm'),
         body: _t('alarm.testBody', 'This is a test. Tap Acknowledge to stop it.'), client_ref: 'test-' + Date.now() }) });
       if (!r.ok) throw new Error('raise ' + r.status);
-      _testStatus(r.data && r.data.sent > 0
+      _status('alarmTestStatus', r.data && r.data.sent > 0
         ? _t('alarm.testSent', 'Test alarm sent. Look for the red bar at the top of the screen and tap Acknowledge.')
         : _t('alarm.testNoPush', 'Test alarm raised, but this device is not set up for push. Turn on the switch above: Settings, Push Notifications.'));
       await poll();
     } catch (e) {
-      _testStatus(_t('alarm.testFailed', 'Could not send the test alarm. Check that you are signed in: Settings, Account.'));
+      _status('alarmTestStatus', _t('alarm.testFailed', 'Could not send the test alarm. Check that you are signed in: Settings, Account.'));
     }
+  }
+
+  /* ── Help ── */
+  function _contactName(c) { return ((c.first || '') + ' ' + (c.last || '')).trim() || c.sentinelId; }
+  function _linked() {
+    try {
+      return (DEMO_CONTACTS || []).filter(function (c) { return typeof Magnet !== 'undefined' && Magnet && Magnet.isOnRs(c); })
+        .sort(function (x, y) { return _contactName(x).localeCompare(_contactName(y)); });
+    } catch (e) { return []; }
+  }
+  async function _helpTargetId() { try { return await RemielDB.getSetting('helpTargetId'); } catch (e) { return null; } }
+  async function setHelpTarget(id) { try { await RemielDB.putSetting('helpTargetId', id || null); } catch (e) {} _status('helpStatus', ''); }
+  async function _fillHelp() {
+    var sel = document.getElementById('helpTarget');
+    var note = document.getElementById('helpTargetNote');
+    if (!sel) return;
+    var list = _linked();
+    var cur = await _helpTargetId();
+    if (list.length === 1 && !list.some(function (c) { return c.id === cur; })) { cur = list[0].id; await setHelpTarget(cur); }
+    sel.innerHTML = '';
+    var o0 = document.createElement('option'); o0.value = ''; o0.textContent = _t('help.choose', 'Choose a person'); sel.appendChild(o0);
+    list.forEach(function (c) { var o = document.createElement('option'); o.value = c.id; o.textContent = _contactName(c); if (c.id === cur) o.selected = true; sel.appendChild(o); });
+    if (note) { note.hidden = list.length > 0; note.textContent = list.length ? '' : _t('help.noneLinked', 'Nobody is linked with you yet.'); }
+  }
+  async function sendHelp() {
+    _audio();
+    var id = await _helpTargetId();
+    var c = null;
+    _linked().forEach(function (x) { if (x.id === id) c = x; });
+    if (!c) { _status('helpStatus', _t('help.chooseFirst', 'Choose who Help goes to first, in the list above.')); return; }
+    if (!_authed()) { _status('helpStatus', _t('help.failed', 'Help could not be sent.')); return; }
+    var myName = '';
+    try { myName = (await RemielDB.getSetting('userSphereName')) || ''; } catch (e) {}
+    if (!myName) { try { myName = SyncEngine.getDisplayName() || ''; } catch (e) {} }
+    myName = String(myName).trim() || 'A member';
+    try {
+      var r = await _api('/alarms', { method: 'POST', body: JSON.stringify({
+        level: 3, kind: 'help', to_sentinel_id: c.sentinelId,
+        title: _t('help.alarmTitle', 'Help requested: {name}', { name: myName }),
+        body: _t('help.alarmBody', '{name} tapped Help in Remiel Sentinel.', { name: myName }),
+        member_name: myName, client_ref: 'help-' + Date.now() }) });
+      if (r.status === 403) { _status('helpStatus', _t('help.notLinked', 'Not linked with {name}.', { name: _contactName(c) })); return; }
+      if (!r.ok) throw new Error('help ' + r.status);
+      _status('helpStatus', _t('help.sent', 'Help sent to {name}.', { name: _contactName(c) }));
+      try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) {}
+      await poll();
+    } catch (e) {
+      _status('helpStatus', _t('help.failed', 'Help could not be sent.'));
+    }
+  }
+  /* Press and hold, so a pocket tap never sends Help */
+  function _wireHold() {
+    var btn = document.getElementById('helpHoldBtn');
+    if (!btn || btn._wired) return;
+    btn._wired = true;
+    var fill = document.getElementById('helpHoldFill');
+    var txt = btn.querySelector('.help-hold-text');
+    var timer = null, raf = null, t0 = 0;
+    function reset() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      if (fill) fill.style.width = '0';
+      if (txt) txt.textContent = _t('help.hold', 'Press and hold 2 seconds to send Help');
+    }
+    function start(e) {
+      if (timer) return;
+      if (e && e.preventDefault) e.preventDefault();
+      t0 = Date.now();
+      if (txt) txt.textContent = _t('help.keepHolding', 'Keep holding...');
+      (function step() { if (fill) fill.style.width = Math.min(100, (Date.now() - t0) / HOLD_MS * 100) + '%'; raf = requestAnimationFrame(step); })();
+      timer = setTimeout(function () { timer = null; reset(); sendHelp(); }, HOLD_MS);
+    }
+    btn.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { btn.addEventListener(ev, function () { if (timer) reset(); }); });
+    btn.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) start(e); });
+    btn.addEventListener('keyup', function (e) { if (e.key === 'Enter' || e.key === ' ') { if (timer) reset(); } });
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  }
+  function onSettingsOpen() {
+    var sec = document.getElementById('helpSection');
+    if (sec) sec.style.display = _authed() ? '' : 'none';
+    _wireHold();
+    _fillHelp();
   }
 
   function _onLink(where) {
@@ -37652,6 +37892,7 @@ var AlarmCenter = (function () {
     if (!m) return;
     try { if (/#alarm=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     Object.keys(_hidden).forEach(function (k) { if (k.indexOf(m[1] + ':') === 0) delete _hidden[k]; });
+    Object.keys(_hiddenTakeover).forEach(function (k) { if (k.indexOf(m[1] + ':') === 0) delete _hiddenTakeover[k]; });
     var until = Date.now() + 10000;
     (function wait() {
       if (_authed()) { poll(); return; }
@@ -37664,7 +37905,9 @@ var AlarmCenter = (function () {
     _onLink(location.hash);
     try {
       if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
-        if (e.data && e.data.type === 'NOTIFICATION_CLICK') { _onLink(String(e.data.url || '')); poll(); }
+        if (!e.data) return;
+        if (e.data.type === 'NOTIFICATION_CLICK') { _onLink(String(e.data.url || '')); poll(); }
+        else if (e.data.type === 'PUSH_RECEIVED' && e.data.kind === 'alarm') poll();
       });
     } catch (e) {}
     window.addEventListener('hashchange', function () { _onLink(location.hash); });
@@ -37676,7 +37919,8 @@ var AlarmCenter = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else setTimeout(start, 0);
 
-  return { poll: poll, acknowledge: acknowledge, cancel: cancel, sendTest: sendTest, _open: function () { return _open.slice(); } };
+  return { poll: poll, acknowledge: acknowledge, cancel: cancel, sendTest: sendTest, sendHelp: sendHelp,
+    setHelpTarget: setHelpTarget, onSettingsOpen: onSettingsOpen, _open: function () { return _open.slice(); } };
 })();
 
 /* B1: every declaration above is now initialised; release any queued reveal. */

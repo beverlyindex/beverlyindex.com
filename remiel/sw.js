@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-sentinel-v60';
+const CACHE_NAME = 'remiel-sentinel-v61';
 
 const PRECACHE_URLS = [
   './',
@@ -136,9 +136,15 @@ self.addEventListener('push', (event) => {
   if (data.kind === 'call') options.vibrate = [400, 200, 400, 200, 400, 200, 800];
   else if (data.urgent) options.vibrate = [300, 150, 300, 150, 600];
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  /* An open app hears about it at once (an alarm redraws without waiting for its next poll) */
+  const tellClients = self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    list.forEach((c) => { try { c.postMessage({ type: 'PUSH_RECEIVED', kind: data.kind, tag: data.tag }); } catch (e) {} });
+  }).catch(() => {});
+
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(data.title, options),
+    tellClients
+  ]));
 });
 
 /* ── Notification Click: focus existing window or open new one ── */
