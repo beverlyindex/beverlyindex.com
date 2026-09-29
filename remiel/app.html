@@ -37821,8 +37821,8 @@ var AlarmCenter = (function () {
       '.help-target{display:block;width:100%;margin:6px 0 10px;padding:10px;border-radius:10px;background:rgba(255,255,255,.06);color:inherit;border:1px solid rgba(56,212,255,.6);font:inherit}' +
       '.help-hold-btn{position:relative;overflow:hidden;display:block;width:100%;padding:14px;border-radius:12px;border:2px solid #E10600;background:transparent;color:#ff3b30;font:inherit;font-size:15px;font-weight:800;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}' +
       '.help-hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(225,6,0,.3)}' +
-      '.help-fab{position:fixed;left:20px;bottom:20px;z-index:8000;height:48px;padding:0 16px;border-radius:24px;box-sizing:border-box;border:1.5px solid #FF1E1E;background:transparent;color:#FF1E1E;font:600 13px "Hanken Grotesk",system-ui,sans-serif;display:none;cursor:pointer}' +
-      '.help-fab.on{display:block}.help-fab:focus-visible{outline:2px solid #C5A55A;outline-offset:2px}' +
+      '.help-fab{position:fixed;z-index:8000;box-sizing:border-box;border:1px solid #FF1E1E;background:transparent;color:#FF1E1E;font-family:inherit;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;line-height:1;padding:7px 14px;border-radius:18px;display:none;align-items:center;justify-content:center;cursor:pointer}' +
+      '.help-fab.on{display:flex}.help-fab:focus-visible{outline:2px solid #C5A55A;outline-offset:2px}' +
       'body.rs-overlay-open .help-fab{display:none !important}' +
       '.help-card-wrap{position:fixed;inset:0;z-index:8800;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}' +
       '.help-card{position:relative;width:min(440px,100%);background:#10131c;border:2px solid #E10600;border-radius:18px;padding:20px 16px 16px;color:#e8ecf4;box-shadow:0 12px 40px rgba(0,0,0,.6)}' +
@@ -38225,10 +38225,24 @@ var AlarmCenter = (function () {
     b.setAttribute('aria-label', _t('help.fabAria', 'Help: send an urgent alarm'));
     return b;
   }
+  /* Directly under Exit, at exactly Exit's size */
   function updateFab() {
     _css();
     var b = _fab();
-    b.classList.toggle('on', _authed() && !_locked());
+    var ex = document.getElementById('exitBtn');
+    var er = ex ? ex.getBoundingClientRect() : null;
+    /* Help lives under Exit: it shows only while Exit does */
+    var on = _authed() && !_locked() && !!(er && er.width && er.height);
+    b.classList.toggle('on', on);
+    if (on) {
+      var r = er;
+      if (r.width && r.height) {
+        b.style.width = Math.round(r.width) + 'px';
+        b.style.height = Math.round(r.height) + 'px';
+        b.style.top = Math.round(r.bottom + 8) + 'px';
+        b.style.right = Math.round(window.innerWidth - r.right) + 'px';
+      }
+    }
   }
   function closeHelpCard() { var w = document.getElementById('helpCardWrap'); if (w) w.remove(); try { rsOverlayFlag('helpcard', false); } catch (e) {} }
   function _openHelpSettings() {
@@ -38387,6 +38401,7 @@ var AlarmCenter = (function () {
     updateFab();
     window.addEventListener('sentinel:syncstatus', updateFab);
     window.addEventListener('localeChanged', updateFab);
+    window.addEventListener('resize', updateFab);
     setInterval(updateFab, 2000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
