@@ -10633,6 +10633,17 @@ const I18n = (function () {
     'social.sub': "Paste contact info below",
     'social.preview': "Preview",
     'social.done': "Done: see them in your Circle",
+    'social.res.added': "Added {n} to your Circle",
+    'social.res.photos': "with {n} photos",
+    'social.res.dupes': "{n} already in your Circle.",
+    'social.res.failed': "{n} could not be saved. Tap Import Selected to try them again.",
+    'social.res.failedAll': "Nothing could be saved. Tap Import Selected to try again.",
+    'social.res.allDupes': "Nothing new: all {n} are already in your Circle.",
+    'social.res.none': "Nothing was imported.",
+    'social.res.noneSelected': "No contacts selected. Tick at least one name.",
+    'social.importing': "Importing...",
+    'social.importedFrom': "Imported from {src}",
+    'social.fromDevice': "Imported from device contacts",
     'roster.btn': "Import Roster (Image, Paste, or File)",
     'roster.title': "Import Roster",
     'roster.tab.image': "Image",
@@ -11308,6 +11319,17 @@ const I18n = (function () {
     'social.sub': "Incolla qui sotto i contatti",
     'social.preview': "Anteprima",
     'social.done': "Fatto: vedili nella tua Cerchia",
+    'social.res.added': "{n} aggiunti alla tua Cerchia",
+    'social.res.photos': "con {n} foto",
+    'social.res.dupes': "{n} già nella tua Cerchia.",
+    'social.res.failed': "{n} non salvati. Tocca Importa i selezionati per riprovare.",
+    'social.res.failedAll': "Nessuno è stato salvato. Tocca Importa i selezionati per riprovare.",
+    'social.res.allDupes': "Niente di nuovo: tutti i {n} sono già nella tua Cerchia.",
+    'social.res.none': "Non è stato importato nulla.",
+    'social.res.noneSelected': "Nessun contatto selezionato. Spunta almeno un nome.",
+    'social.importing': "Importazione...",
+    'social.importedFrom': "Importato da {src}",
+    'social.fromDevice': "Importato dalla rubrica del dispositivo",
     'roster.btn': "Importa elenco (immagine, testo o file)",
     'roster.title': "Importa elenco",
     'roster.tab.image': "Immagine",
@@ -32660,6 +32682,15 @@ const SocialImport = (() => {
     try {
       if (typeof SettingsPanel !== 'undefined' && SettingsPanel.close) SettingsPanel.close();
     } catch (e) {}
+    /* A Team or Unit view showing would hide the new people: show everyone */
+    try {
+      if (_justAdded.length && typeof SentinelViews !== 'undefined' && SentinelViews.getActiveView && SentinelViews.getActiveView()) {
+        var v = SentinelViews.getActiveView();
+        var inView = new Set((v.contactIds || []).map(String));
+        if (_justAdded.some(function (id) { return !inView.has(String(id)); })) SentinelViews.activateView(null);
+      }
+    } catch (e) { console.warn('SocialImport: view', e); }
+    _justAdded = [];
     try {
       if (typeof appState !== 'undefined' && appState !== 'network' && typeof enterNetwork === 'function') enterNetwork();
       else if (typeof buildNodes === 'function') buildNodes(false);
@@ -32774,61 +32805,100 @@ const SocialImport = (() => {
     if (_parsedContacts[idx]) _parsedContacts[idx]._selected = checked;
   }
 
+  /* Saves the confirmed people and puts them straight into the circle: each
+     gets an id, lands in the live list the galaxy draws from, in storage, and
+     in the next sync. Same names already in the circle are skipped. A person
+     who fails to save is counted as failed, never as a duplicate. */
+  var _lastImportId = 0;
+  function _importId() {
+    var t = Date.now();
+    _lastImportId = t > _lastImportId ? t : _lastImportId + 1;
+    return _lastImportId;
+  }
+  async function _addToCircle(list, notesFor, photoFor) {
+    var res = { added: 0, dupes: 0, failed: 0, photos: 0, ids: [] };
+    var seen = {};
+    var key = function (f, l) { return (String(f || '') + ' ' + String(l || '')).toLowerCase().trim(); };
+    DEMO_CONTACTS.forEach(function (c) { seen[key(c.first, c.last)] = true; });
+    try { (await RemielDB.getAllContacts()).forEach(function (c) { seen[key(c.first, c.last)] = true; }); } catch (e) {}
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      var k = key(c.first, c.last);
+      if (!k) { res.failed++; continue; }
+      if (seen[k]) { res.dupes++; continue; }
+      var nc = {
+        id: _importId(), first: c.first, last: c.last || '', cat: 'friend', sev: 3,
+        phone: c.phone || '', email: c.email || '', sentinelId: '',
+        notes: notesFor(c), createdAt: Date.now(), updatedAt: Date.now()
+      };
+      try { await RemielDB.putContact(nc); }
+      catch (e) { console.warn('SocialImport: save failed for', c.first, e); res.failed++; continue; }
+      seen[k] = true;
+      DEMO_CONTACTS.push(nc);
+      res.ids.push(nc.id);
+      res.added++;
+      if (c.address) {
+        try { await RemielDB.putProfile({ contactId: nc.id, address: c.address, birthday: '', doctor: '', allergies: '', emergencyName: '', emergencyPhone: '', notes: '' }); }
+        catch (e) { console.warn('SocialImport: address save failed', e); }
+      }
+      var blob = photoFor ? photoFor(c) : null;
+      if (blob) {
+        try {
+          await RemielDB.putPhoto(nc.id, blob);
+          res.photos++;
+          (function (cId, bl) {
+            var im = new Image();
+            im.onload = function () { contactPhotos.set(cId, { img: im, w: im.naturalWidth, h: im.naturalHeight }); };
+            im.src = URL.createObjectURL(bl);
+          })(nc.id, blob);
+        } catch (pe) { console.warn('SocialImport: photo save failed for', c.first, pe); }
+      }
+    }
+    if (res.added) {
+      try { if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty(); } catch (e) {}
+      try { if (typeof SyncEngine !== 'undefined' && SyncEngine.syncPhotos && res.photos && SyncEngine.isAuthenticated()) SyncEngine.syncPhotos(); } catch (e) {}
+      _justAdded = res.ids.slice();
+      try { if (typeof buildNodes === 'function') buildNodes(false); } catch (e) {}
+    }
+    return res;
+  }
+  var _justAdded = [];
+  function _it(k, fb, params) {
+    var v = (typeof I18n !== 'undefined') ? I18n.t(k, params) : k;
+    if (!v || v === k) { v = fb; Object.keys(params || {}).forEach(function (p) { v = v.split('{' + p + '}').join(params[p]); }); }
+    return v;
+  }
+  function _resultText(r) {
+    var parts = [_it('social.res.added', 'Added {n} to your Circle', { n: r.added })];
+    if (r.photos) parts.push(_it('social.res.photos', 'with {n} photos', { n: r.photos }));
+    var line = parts.join(' ') + '.';
+    if (r.dupes) line += ' ' + _it('social.res.dupes', '{n} already in your Circle.', { n: r.dupes });
+    if (r.failed) line += ' ' + _it('social.res.failed', '{n} could not be saved. Tap Import Selected to try them again.', { n: r.failed });
+    return line;
+  }
+  function _nothingText(r) {
+    if (r.failed) return _it('social.res.failedAll', 'Nothing could be saved. Tap Import Selected to try again.', {});
+    if (r.dupes) return _it('social.res.allDupes', 'Nothing new: all {n} are already in your Circle.', { n: r.dupes });
+    return _it('social.res.none', 'Nothing was imported.', {});
+  }
+
   async function doImport() {
     var selected = _parsedContacts.filter(function(c) { return c._selected; });
     if (selected.length === 0) {
-      _showResult('No contacts selected.', true);
+      _showResult(_it('social.res.noneSelected', 'No contacts selected. Tick at least one name.', {}), true);
       return;
     }
-
-    var imported = 0;
-    var skipped = 0;
-
-    for (var i = 0; i < selected.length; i++) {
-      var c = selected[i];
-      try {
-        /* Check for duplicate by name */
-        var allContacts = await RemielDB.getAllContacts();
-        var duplicate = allContacts.some(function(existing) {
-          return existing.first && existing.first.toLowerCase() === c.first.toLowerCase() &&
-                 (existing.last || '').toLowerCase() === (c.last || '').toLowerCase();
-        });
-        if (duplicate) { skipped++; continue; }
-
-        await RemielDB.putContact({
-          first: c.first,
-          last: c.last || '',
-          cat: 'friend',
-          sev: 3,
-          phone: c.phone || '',
-          email: c.email || '',
-          notes: (c.handle ? c.source + ': @' + c.handle : 'Imported from ' + c.source),
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-        imported++;
-
-        /* Mark dirty for sync */
-        if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) {
-          SyncEngine.markDirty();
-        }
-      } catch (e) {
-        console.warn('SocialImport: failed to import', c.first, e);
-        skipped++;
-      }
-    }
-
-    if (imported === 0) {
-      _showResult(skipped > 0 ? 'Nothing new: ' + skipped + ' already in your Circle.' : 'Nothing was imported.', true);
-      return;
-    }
-    _finished('Imported ' + imported + ' contact' + (imported !== 1 ? 's' : '') +
-      (skipped > 0 ? ' (' + skipped + ' skipped as duplicates)' : '') + '.');
-
-    /* Refresh the galaxy if possible */
-    if (typeof loadAndRender === 'function') {
-      setTimeout(function() { loadAndRender(); }, 500);
-    }
+    var btn = _$('siImportBtn');
+    btn.disabled = true;
+    var label = btn.textContent;
+    btn.textContent = _it('social.importing', 'Importing...', {});
+    var r = await _addToCircle(selected, function (c) {
+      return c.handle ? c.source + ': @' + c.handle : _it('social.importedFrom', 'Imported from {src}', { src: c.source });
+    }, null);
+    btn.disabled = false;
+    btn.textContent = label;
+    if (!r.added) { _showResult(_nothingText(r), true); return; }
+    _finished(_resultText(r));
   }
 
   function _showResult(msg, isError) {
@@ -33004,117 +33074,24 @@ const SocialImport = (() => {
   async function importPickedContacts() {
     var selected = _pickedContacts.filter(function(c) { return c._selected; });
     if (selected.length === 0) {
-      _showResult('No contacts selected.', true);
+      _showResult(_it('social.res.noneSelected', 'No contacts selected. Tick at least one name.', {}), true);
       return;
     }
-
-    _$('siImportBtn').disabled = true;
-    _$('siImportBtn').textContent = 'Importing...';
-
-    var imported = 0;
-    var skipped = 0;
-    var photosStored = 0;
-
-    for (var i = 0; i < selected.length; i++) {
-      var c = selected[i];
-      try {
-        /* Check for duplicate by name */
-        var allContacts = await RemielDB.getAllContacts();
-        var duplicate = allContacts.some(function(existing) {
-          return existing.first && existing.first.toLowerCase() === c.first.toLowerCase() &&
-                 (existing.last || '').toLowerCase() === (c.last || '').toLowerCase();
-        });
-        if (duplicate) { skipped++; continue; }
-
-        var newId = Date.now() + i;  /* offset to prevent ID collision */
-        var importNotes = 'Imported from device contacts';
-        if (c.notes) importNotes += ' | ' + c.notes;
-
-        var newContact = {
-          id: newId,
-          first: c.first,
-          last: c.last || '',
-          cat: 'friend',
-          sev: 3,
-          phone: c.phone || '',
-          email: c.email || '',
-          notes: importNotes,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-
-        /* Store address in profile if available */
-        if (c.address) {
-          try {
-            await RemielDB.putProfile({
-              contactId: newId,
-              address: c.address,
-              birthday: '',
-              doctor: '',
-              allergies: '',
-              emergencyName: '',
-              emergencyPhone: '',
-              notes: '',
-            });
-          } catch(ae) { console.warn('Contact Picker: profile save failed', ae); }
-        }
-
-        await RemielDB.putContact(newContact);
-        DEMO_CONTACTS.push(newContact);
-        imported++;
-
-        /* Store photo if available and load into galaxy */
-        if (_pickedPhotos[c._idx]) {
-          try {
-            var photoBlob = _pickedPhotos[c._idx];
-            await RemielDB.putPhoto(newId, photoBlob);
-            photosStored++;
-            /* Load into contactPhotos map so galaxy sphere shows it immediately */
-            (function(cId, blob) {
-              var _cpUrl = URL.createObjectURL(blob);
-              var _cpImg = new Image();
-              _cpImg.onload = function() {
-                contactPhotos.set(cId, { img: _cpImg, w: _cpImg.naturalWidth, h: _cpImg.naturalHeight });
-              };
-              _cpImg.src = _cpUrl;
-            })(newId, photoBlob);
-          } catch (pe) {
-            console.warn('Contact Picker: photo store failed for', c.first, pe);
-          }
-        }
-
-        if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) {
-          SyncEngine.markDirty();
-        }
-      } catch (e) {
-        console.warn('Contact Picker: import failed for', c.first, e);
-        skipped++;
-      }
-    }
-
-    var msg = 'Imported ' + imported + ' contact' + (imported !== 1 ? 's' : '');
-    if (photosStored > 0) msg += ' with ' + photosStored + ' photo' + (photosStored !== 1 ? 's' : '');
-    if (skipped > 0) msg += ' (' + skipped + ' skipped as duplicates)';
-    msg += '.';
-
-    if (imported === 0) _showResult(skipped > 0 ? 'Nothing new: ' + skipped + ' already in your Circle.' : 'Nothing was imported.', true);
-    else _finished(msg);
-    _$('siImportBtn').disabled = false;
-    _$('siImportBtn').textContent = 'Import Selected';
-
-    /* Revoke photo object URLs */
+    var btn = _$('siImportBtn');
+    btn.disabled = true;
+    btn.textContent = _it('social.importing', 'Importing...', {});
+    var r = await _addToCircle(selected, function (c) {
+      var n = _it('social.fromDevice', 'Imported from device contacts', {});
+      return c.notes ? n + ' | ' + c.notes : n;
+    }, function (c) { return _pickedPhotos[c._idx] || null; });
+    btn.disabled = false;
+    btn.textContent = _it('roster.importSelected', 'Import Selected', {});
+    if (!r.added) { _showResult(_nothingText(r), true); return; }
+    _finished(_resultText(r));
     var thumbs = document.querySelectorAll('.cp-photo-thumb');
     thumbs.forEach(function(img) { try { URL.revokeObjectURL(img.src); } catch(e){} });
-
-    /* Clean up */
     _pickedContacts = [];
     _pickedPhotos = {};
-
-    /* Rebuild galaxy */
-    buildNodes(true);
-    if (typeof loadAndRender === 'function') {
-      setTimeout(function() { loadAndRender(); }, 500);
-    }
   }
 
   /* Hide contact picker button on unsupported browsers at startup */
