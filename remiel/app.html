@@ -20260,17 +20260,14 @@ const WhereIs = (() => {
     ctx.restore();
   }
   function _vignette(ctx, cx, cy, r) {
-    const v = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
-    v.addColorStop(0, 'rgba(8,10,16,0)'); v.addColorStop(0.4, 'rgba(8,10,16,0.25)'); v.addColorStop(0.65, 'rgba(8,10,16,0.58)');
-    v.addColorStop(0.85, 'rgba(8,10,16,0.85)'); v.addColorStop(1, 'rgba(8,10,16,0.97)');
-    ctx.globalAlpha = 1; ctx.fillStyle = v; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    dreamVignette(ctx, cx, cy, r, !!(window._dreamRect && window._dreamRect.boost));
   }
   function _glow(ctx, cx, cy, r, cat, alpha, initials) {
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
     g.addColorStop(0, 'rgba(' + cat.r + ',' + cat.g + ',' + cat.b + ',0.22)'); g.addColorStop(0.5, 'rgba(' + cat.r + ',' + cat.g + ',' + cat.b + ',0.10)'); g.addColorStop(1, 'rgba(' + cat.r + ',' + cat.g + ',' + cat.b + ',0)');
-    ctx.globalAlpha = alpha * 2.5; ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.globalAlpha = Math.min(1, alpha * 2.5); ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     if (initials) {
-      ctx.globalAlpha = alpha * 3.5; ctx.fillStyle = 'rgb(' + cat.r + ',' + cat.g + ',' + cat.b + ')';
+      ctx.globalAlpha = Math.min(1, alpha * 3.5); ctx.fillStyle = 'rgb(' + cat.r + ',' + cat.g + ',' + cat.b + ')';
       ctx.font = '700 ' + Math.round(r * 0.5) + 'px "Hanken Grotesk", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(initials, cx, cy - r * 0.12);
     }
@@ -23521,7 +23518,8 @@ function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
     var pillX = flipLeft ? startX - pillW : startX;
 
     /* Frosted pill background */
-    ctx.globalAlpha = 0.72 * fadeAlpha;
+    /* Inside a Unit the Dream State behind is bright: the pills go near solid to stay readable */
+    ctx.globalAlpha = (dreamInUnit() ? 0.95 : 0.72) * fadeAlpha;
     ctx.fillStyle = 'rgba(12,14,24,0.88)';
     var pillY = ly - pillH / 2;
     ctx.beginPath();
@@ -26120,6 +26118,23 @@ function drawSphereView(t) {
   ctx.beginPath(); ctx.arc(cx, cy, oR * 1.1, 0, Math.PI * 2); ctx.fill();
 }
 
+/* Dream State edge fade. Inside a Unit it is much lighter so the member, their
+   Communication and WHEREIS read clearly; elsewhere it fades to the dark sky. */
+function dreamInUnit() {
+  try { const v = SentinelViews.getActiveView(); return !!(v && v.type === 'unit'); } catch (e) { return false; }
+}
+function dreamVignette(ctx, cx, cy, r, boost) {
+  const v = ctx.createRadialGradient(cx, cy, r * (boost ? 0.45 : 0.2), cx, cy, r);
+  if (boost) {
+    v.addColorStop(0, 'rgba(8,10,16,0)'); v.addColorStop(0.55, 'rgba(8,10,16,0.08)'); v.addColorStop(0.78, 'rgba(8,10,16,0.35)');
+    v.addColorStop(0.92, 'rgba(8,10,16,0.7)'); v.addColorStop(1, 'rgba(8,10,16,0.9)');
+  } else {
+    v.addColorStop(0, 'rgba(8,10,16,0)'); v.addColorStop(0.4, 'rgba(8,10,16,0.25)'); v.addColorStop(0.65, 'rgba(8,10,16,0.58)');
+    v.addColorStop(0.85, 'rgba(8,10,16,0.85)'); v.addColorStop(1, 'rgba(8,10,16,0.97)');
+  }
+  ctx.globalAlpha = 1; ctx.fillStyle = v; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+}
+
 function drawNetworkView(t) {
   /* Work in CSS pixels via DPR transform — matches CareCircle's proven approach */
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -26146,15 +26161,16 @@ function drawNetworkView(t) {
     const _focNode = NODES.find(n => n.contact.id === focusedContactId);
     const _focCat = _focNode ? (CATS[_focNode.contact.cat] || CATS.other) : CATS.other;
     ctx.save();
-    /* Dream region — large circle in upper-right quadrant */
+    /* Dream region — large circle in upper-right quadrant. Inside a Unit it is brighter. */
+    var _drBoost = dreamInUnit();
     var _drR = Math.min(W, H) * 0.28;
     var _drCx = W - _drR - W * 0.05;
     var _drCy = _drR + H * 0.06;
     ctx.beginPath();
     ctx.arc(_drCx, _drCy, _drR, 0, Math.PI * 2);
     ctx.clip();
-    /* Dreamy breathing opacity — very faded, gently pulsing */
-    var _dreamAlpha = 0.38 + 0.10 * Math.sin(t * 0.0008);
+    /* Breathing: a clear pulse from dark to light (about 8 s); inside a Unit, bright to full */
+    var _dreamAlpha = _drBoost ? 0.75 + 0.15 * Math.sin(t * 0.0008) : 0.34 + 0.24 * Math.sin(t * 0.0008);
     if (_memPhoto && _memPhoto.img) {
       const _memImg = _memPhoto.img;
       const _mw = _memPhoto.isVideo ? _memImg.videoWidth : (_memImg.naturalWidth || _memImg.width);
@@ -26176,11 +26192,11 @@ function drawNetworkView(t) {
       _drGlow.addColorStop(0, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.22)');
       _drGlow.addColorStop(0.5, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.10)');
       _drGlow.addColorStop(1, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0)');
-      ctx.globalAlpha = _dreamAlpha * 2.5;
+      ctx.globalAlpha = Math.min(1, _dreamAlpha * 2.5);
       ctx.fillStyle = _drGlow;
       ctx.fillRect(_drCx - _drR, _drCy - _drR, _drR * 2, _drR * 2);
       /* Initials in dream circle */
-      ctx.globalAlpha = _dreamAlpha * 3.5;
+      ctx.globalAlpha = Math.min(1, _dreamAlpha * 3.5);
       ctx.fillStyle = 'rgb(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ')';
       ctx.font = '700 ' + Math.round(_drR * 0.5) + 'px "Hanken Grotesk", system-ui, sans-serif';
       ctx.textAlign = 'center';
@@ -26188,19 +26204,11 @@ function drawNetworkView(t) {
       ctx.fillText(_focNode.initials || '', _drCx, _drCy);
     }
     /* Vignette — soft radial fade to match dark space background */
-    ctx.globalAlpha = 1;
-    var _drVig = ctx.createRadialGradient(_drCx, _drCy, _drR * 0.2, _drCx, _drCy, _drR);
-    _drVig.addColorStop(0, 'rgba(8,10,16,0)');
-    _drVig.addColorStop(0.4, 'rgba(8,10,16,0.25)');
-    _drVig.addColorStop(0.65, 'rgba(8,10,16,0.58)');
-    _drVig.addColorStop(0.85, 'rgba(8,10,16,0.85)');
-    _drVig.addColorStop(1, 'rgba(8,10,16,0.97)');
-    ctx.fillStyle = _drVig;
-    ctx.fillRect(_drCx - _drR, _drCy - _drR, _drR * 2, _drR * 2);
+    dreamVignette(ctx, _drCx, _drCy, _drR, _drBoost);
     ctx.restore();
     ctx.restore();
     /* The Communication strip reads the same circle numbers (CSS px) */
-    window._dreamRect = { cx: _drCx, cy: _drCy, r: _drR, alpha: _dreamAlpha };
+    window._dreamRect = { cx: _drCx, cy: _drCy, r: _drR, alpha: _dreamAlpha, boost: _drBoost };
     /* Communication: a second dream image beneath the first, the same fade and
        breathing, showing the post's own picture where the platform gives one,
        else the words as written. One at a time, cycling through the last 24
@@ -26270,15 +26278,11 @@ function drawNetworkView(t) {
           for (var _dwi = 0; _dwi < _dwl.length; _dwi++) { ctx.fillText(_dwl[_dwi], _dcCx, _dty); _dty += _dfS + 4; }
           ctx.shadowBlur = 0;
           /* Same vignette as the image above */
-          ctx.globalAlpha = 1;
-          var _dcVig = ctx.createRadialGradient(_dcCx, _dcCy, _dcR * 0.2, _dcCx, _dcCy, _dcR);
-          _dcVig.addColorStop(0, 'rgba(8,10,16,0)'); _dcVig.addColorStop(0.4, 'rgba(8,10,16,0.25)');
-          _dcVig.addColorStop(0.65, 'rgba(8,10,16,0.58)'); _dcVig.addColorStop(0.85, 'rgba(8,10,16,0.85)'); _dcVig.addColorStop(1, 'rgba(8,10,16,0.97)');
-          ctx.fillStyle = _dcVig; ctx.fillRect(_dcCx - _dcR, _dcCy - _dcR, _dcR * 2, _dcR * 2);
+          dreamVignette(ctx, _dcCx, _dcCy, _dcR, _drBoost);
           ctx.restore();
           /* Count, faint, just under the circle */
           if (_dcs.count) {
-            ctx.save(); ctx.globalAlpha = _dreamAlpha * 1.2; ctx.fillStyle = '#9fd8ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            ctx.save(); ctx.globalAlpha = Math.min(1, _dreamAlpha * 1.2); ctx.fillStyle = '#9fd8ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
             ctx.font = '600 ' + _dfS + 'px "JetBrains Mono", "SF Mono", monospace';
             ctx.fillText(_dcs.count, _dcCx, _dcCy + _dcR * 0.82); ctx.restore();
           }
