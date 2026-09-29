@@ -4458,6 +4458,52 @@
     object-fit: cover; background: #111; border: 2px solid rgba(255,210,77,0.4);
     z-index: 100002; margin-top: 12px;
   }
+  /* Two people: the screen is split between them, side by side on a wide
+     screen and one above the other on a tall one */
+  .sentinel-call-overlay.duo .sc-remote-video,
+  .sentinel-call-overlay.duo .sc-local-video {
+    position: absolute; margin: 0; border: 0; border-radius: 0; object-fit: cover; background: #000;
+  }
+  .sentinel-call-overlay.duo .sc-remote-video { left: 0; top: 0; width: 50%; height: 100%; }
+  .sentinel-call-overlay.duo .sc-local-video { left: 50%; right: auto; top: 0; width: 50%; height: 100%; z-index: 100001; box-shadow: -2px 0 0 #05070c; }
+  .sc-duo-label {
+    position: absolute; z-index: 100002; top: calc(env(safe-area-inset-top, 0px) + 14px);
+    padding: 4px 10px; border-radius: 12px; background: rgba(0,0,0,0.55); color: #fff;
+    font: 600 13px 'Hanken Grotesk', system-ui, sans-serif; max-width: 40%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sc-duo-label[hidden] { display: none; }
+  .sc-duo-remote { left: 14px; }
+  .sc-duo-local { right: 14px; }
+  .sentinel-call-overlay.duo .sc-safety { top: calc(env(safe-area-inset-top, 0px) + 50px); right: calc(50% + 14px); }
+  .sc-media-state {
+    position: absolute; z-index: 100002; left: 0; top: 50%; transform: translateY(-50%); width: 50%;
+    box-sizing: border-box; padding: 0 20px; text-align: center; color: #fff;
+    font: 600 16px/1.45 'Hanken Grotesk', system-ui, sans-serif; text-shadow: 0 1px 3px #000;
+  }
+  .sentinel-call-overlay:not(.duo) .sc-media-state { width: 100%; }
+  .sc-media-state.bad {
+    background: rgba(0,0,0,0.7); border: 1px solid #FF1E1E; border-radius: 12px; padding: 14px 18px;
+    left: 4%; width: 42%; text-shadow: none; font-weight: 500;
+  }
+  .sc-media-state[hidden] { display: none; }
+  .sc-media-warn {
+    position: absolute; z-index: 100003; left: 50%; transform: translateX(-50%); bottom: 124px;
+    width: min(92%, 520px); box-sizing: border-box; padding: 8px 12px; border-radius: 10px;
+    background: rgba(0,0,0,0.72); border: 1px solid rgba(255,210,77,0.8); color: #ffd24d;
+    font: 500 13px/1.4 'Hanken Grotesk', system-ui, sans-serif; text-align: center;
+  }
+  .sc-media-warn[hidden] { display: none; }
+  @media (orientation: portrait) {
+    .sentinel-call-overlay.duo .sc-remote-video { width: 100%; height: 50%; }
+    .sentinel-call-overlay.duo .sc-local-video { left: 0; top: 50%; width: 100%; height: 50%; box-shadow: 0 -2px 0 #05070c; }
+    .sc-duo-local { left: 14px; right: auto; top: calc(50% + 14px); }
+    .sc-duo-label { max-width: 70%; }
+    .sentinel-call-overlay.duo .sc-safety { right: 16px; }
+    .sc-media-state { width: 100%; top: 25%; }
+    .sc-media-state.bad { left: 6%; width: 88%; }
+  }
+  .sentinel-call-overlay.group .sc-duo-label, .sentinel-call-overlay.group .sc-media-state { display: none; }
   .sc-status {
     position: relative; z-index: 100001;
     text-align: center; color: #fff; padding: 20px;
@@ -7506,6 +7552,10 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 <div class="sentinel-call-overlay" id="scOverlay">
   <video class="sc-remote-video" id="scRemoteVideo" autoplay playsinline></video>
   <video class="sc-local-video" id="scLocalVideo" autoplay playsinline muted></video>
+  <div class="sc-duo-label sc-duo-remote" id="scRemoteLabel" hidden></div>
+  <div class="sc-duo-label sc-duo-local" id="scLocalLabel" hidden></div>
+  <div class="sc-media-state" id="scMediaState" role="status" aria-live="polite" hidden></div>
+  <div class="sc-media-warn" id="scMediaWarn" role="status" hidden></div>
   <div class="sc-call-timer" id="scCallTimer" hidden>00:00</div>
   <div class="sc-safety" id="scSafety" hidden>
     <span id="scSafetyLabel">Safety words</span>: <span class="sc-safety-words" id="scSafetyWords"></span><button type="button" class="sc-safety-help" id="scSafetyHelp" onclick="SentinelCall.toggleSafetyExplain()" aria-label="What are safety words?">?</button>
@@ -11202,6 +11252,24 @@ const I18n = (function () {
     'call.thisContact': "this contact",
     'call.addSidHint': "Add it in Person card, Edit, Sentinel ID.",
     'call.mediaDenied': "Camera/mic access denied",
+    'media.deniedIos': "Remiel Sentinel is not allowed to use your camera or microphone. Open the Settings app, then Apps, then Safari (on older iPhones: Settings, then Safari), then set Camera and Microphone to Allow. Come back and reload this page.",
+    'media.deniedSafari': "Remiel Sentinel is not allowed to use your camera or microphone. In the menu bar click Safari, then Settings for beverly-index.com, and set Camera and Microphone to Allow. Then reload this page.",
+    'media.deniedAndroid': "Remiel Sentinel is not allowed to use your camera or microphone. Tap the icon at the left of the address bar, then Permissions, and turn on Camera and Microphone. Then reload this page.",
+    'media.deniedChrome': "Remiel Sentinel is not allowed to use your camera or microphone. Click the icon at the left of the address bar, then Site settings, and set Camera and Microphone to Allow. Then reload this page.",
+    'media.inUse': "Your camera or microphone is busy in another app (for example FaceTime, Zoom or Teams). Close that app, then start the call again.",
+    'media.noCamera': "No camera was found. Connect a camera or use a phone, then start the call again.",
+    'media.noMic': "No microphone was found. Connect a microphone or headset, then start the call again.",
+    'media.unsupported': "This browser cannot make video calls. Open Remiel Sentinel in Safari or Chrome.",
+    'media.unknown': "Your camera or microphone could not start. Close other apps that use them, then start the call again.",
+    'media.warnCam': "Your camera is not sending a picture. Check that it is not covered or switched off.",
+    'media.warnMic': "Your microphone is sending no sound. Check that it is not muted on your device, or choose another microphone in your system settings.",
+    'call.you': "You",
+    'call.mediaConnecting': "Connecting picture and sound...",
+    'call.mediaReconnecting': "Connection is weak. Reconnecting...",
+    'call.mediaNoRemoteVideo': "Their camera is not sending a picture. Ask them to check that it is not covered or switched off.",
+    'call.mediaFailed': "Picture and sound could not get through between your two networks. Tap the red button, then call again. If it happens again, one of you can switch between Wi-Fi and mobile data.",
+    'call.mediaFailedNoRelay': "Picture and sound could not get through between your two networks. Calls like this need the Remiel Sentinel call relay, which is not switched on yet. Tap the red button to end the call.",
+    'group.noMedia': "Picture and sound could not get through",
     'call.contact': "Contact",
     'call.couldNotPlace': "Could not place call",
     'call.selectFirst': "Select a contact first",
@@ -11888,6 +11956,24 @@ const I18n = (function () {
     'call.thisContact': "questo contatto",
     'call.addSidHint': "Aggiungilo in Scheda della persona, Modifica, ID Sentinel.",
     'call.mediaDenied': "Accesso a fotocamera o microfono negato",
+    'media.deniedIos': "Remiel Sentinel non ha il permesso di usare fotocamera o microfono. Apri l'app Impostazioni, poi App, poi Safari (sui modelli meno recenti: Impostazioni, poi Safari), e imposta Fotocamera e Microfono su Consenti. Torna qui e ricarica la pagina.",
+    'media.deniedSafari': "Remiel Sentinel non ha il permesso di usare fotocamera o microfono. Nella barra dei menu fai clic su Safari, poi Impostazioni per beverly-index.com, e imposta Fotocamera e Microfono su Consenti. Poi ricarica la pagina.",
+    'media.deniedAndroid': "Remiel Sentinel non ha il permesso di usare fotocamera o microfono. Tocca l'icona a sinistra della barra degli indirizzi, poi Autorizzazioni, e attiva Fotocamera e Microfono. Poi ricarica la pagina.",
+    'media.deniedChrome': "Remiel Sentinel non ha il permesso di usare fotocamera o microfono. Fai clic sull'icona a sinistra della barra degli indirizzi, poi Impostazioni sito, e imposta Fotocamera e Microfono su Consenti. Poi ricarica la pagina.",
+    'media.inUse': "La fotocamera o il microfono sono occupati da un'altra app (per esempio FaceTime, Zoom o Teams). Chiudi quell'app, poi avvia di nuovo la chiamata.",
+    'media.noCamera': "Nessuna fotocamera trovata. Collega una fotocamera o usa un telefono, poi avvia di nuovo la chiamata.",
+    'media.noMic': "Nessun microfono trovato. Collega un microfono o delle cuffie, poi avvia di nuovo la chiamata.",
+    'media.unsupported': "Questo browser non può fare videochiamate. Apri Remiel Sentinel in Safari o Chrome.",
+    'media.unknown': "La fotocamera o il microfono non si sono avviati. Chiudi le altre app che li usano, poi avvia di nuovo la chiamata.",
+    'media.warnCam': "La tua fotocamera non invia immagini. Controlla che non sia coperta o spenta.",
+    'media.warnMic': "Il tuo microfono non invia alcun suono. Controlla che non sia disattivato sul dispositivo, oppure scegli un altro microfono nelle impostazioni di sistema.",
+    'call.you': "Tu",
+    'call.mediaConnecting': "Collegamento di immagini e audio...",
+    'call.mediaReconnecting': "Connessione debole. Nuovo collegamento...",
+    'call.mediaNoRemoteVideo': "La sua fotocamera non invia immagini. Chiedigli di controllare che non sia coperta o spenta.",
+    'call.mediaFailed': "Immagini e audio non riescono a passare tra le vostre due reti. Tocca il pulsante rosso, poi chiama di nuovo. Se succede ancora, uno di voi può passare dal Wi-Fi ai dati mobili o viceversa.",
+    'call.mediaFailedNoRelay': "Immagini e audio non riescono a passare tra le vostre due reti. Chiamate come questa richiedono il relay di chiamata di Remiel Sentinel, che non è ancora attivo. Tocca il pulsante rosso per chiudere la chiamata.",
+    'group.noMedia': "Immagini e audio non sono passati",
     'call.contact': "Contatto",
     'call.couldNotPlace': "Impossibile avviare la chiamata",
     'call.selectFirst': "Prima scegli un contatto",
@@ -34826,26 +34912,30 @@ const SentinelCall = (function() {
   let _activeShown = false;
   let _guestPeer = null;
 
-  /* Fallback ICE list used only when GET /turn/credentials is unreachable or empty.
-     These are public STUN servers and the free Open Relay TURN service: a public
-     relay with shared credentials, not suitable for production traffic. The API
-     returns a bare RTCIceServer array; keep that shape. */
+  /* Fallback ICE list used only when the API cannot be reached: public STUN
+     servers, no relay. The shared Open Relay login stopped working when
+     Metered moved it behind per-account keys, so it is no longer listed. The
+     relay itself comes from the API (GET /call/config, "relay": true). */
   const FALLBACK_ICE_SERVERS = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-    { urls: 'turn:standard.relay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:standard.relay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:standard.relay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    { urls: 'stun:stun.cloudflare.com:3478' }
   ];
+  function _hasRelay(list) {
+    return (list || []).some(srv => [].concat((srv && srv.urls) || []).some(u => /^turns?:/i.test(String(u))));
+  }
 
+  /* A guest who opens a call link has no account and no stored API address:
+     they still need the same call settings (server and relay) as the host,
+     so the public API address is the default. */
   function _apiBase() {
+    let b = null;
     try {
-      if (typeof SyncEngine === 'undefined') return null;
-      if (typeof SyncEngine.getApiBase === 'function') return SyncEngine.getApiBase();
-      if (typeof SyncEngine.getStatus === 'function') return (SyncEngine.getStatus() || {}).apiBase || null;
+      if (typeof SyncEngine !== 'undefined') {
+        if (typeof SyncEngine.getApiBase === 'function') b = SyncEngine.getApiBase();
+        else if (typeof SyncEngine.getStatus === 'function') b = (SyncEngine.getStatus() || {}).apiBase || null;
+      }
     } catch (e) {}
-    return null;
+    return b || 'https://remiel-sentinel-api.vercel.app';
   }
 
   /* ── Fetch TURN/STUN ICE servers for NAT traversal ── */
@@ -34897,7 +34987,8 @@ const SentinelCall = (function() {
             secure: p.secure !== false
           } : null;
           const ice = (Array.isArray(data.ice) && data.ice.length) ? data.ice : await _fetchIceServers();
-          _cfgCache = { peer: peer, ice: ice };
+          _cfgCache = { peer: peer, ice: ice, relay: data.relay === true || _hasRelay(ice) };
+          if (!_cfgCache.relay) console.warn('SentinelCall: no call relay (TURN) is configured; calls between some networks will connect without picture or sound');
           _cfgAt = Date.now();
           console.log('SentinelCall: call server', peer ? peer.host : 'shared PeerJS cloud');
           return _cfgCache;
@@ -34907,7 +34998,8 @@ const SentinelCall = (function() {
       console.warn('SentinelCall: call config fetch failed', e.message);
     }
     /* No answer from the API: not cached, so the next attempt asks again */
-    return { peer: null, ice: await _fetchIceServers() };
+    const ice = await _fetchIceServers();
+    return { peer: null, ice: ice, relay: _hasRelay(ice) };
   }
   function _peerOptions(cfg) {
     const opts = { debug: 0, config: { iceServers: cfg.ice } };
@@ -35152,11 +35244,135 @@ const SentinelCall = (function() {
   }
 
   /* ── Get camera stream ── */
-  async function _getStream() {
-    return navigator.mediaDevices.getUserMedia({
-      video: { facingMode: _facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
-      audio: true
+  /* ── Camera and microphone check, before any call starts ──
+     Opens the camera and microphone and confirms they really work: both
+     tracks exist and are live, the camera delivers a picture, and the
+     microphone is not sending pure silence (a hardware or system mute).
+     A blocking problem throws an Error with .code and nothing is dialled;
+     _mediaProblem() then says exactly what to do. Softer problems (camera
+     covered, microphone muted) are kept in _mediaWarn and shown on the
+     call screen. */
+  let _mediaWarn = null;
+  function _mediaErr(code, cause) { const e = new Error('media ' + code); e.code = code; e.cause = cause; return e; }
+  function _mapMediaError(e) {
+    const n = (e && e.name) || '';
+    if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') return 'denied';
+    if (n === 'NotFoundError' || n === 'DevicesNotFoundError' || n === 'OverconstrainedError') return 'nodevice';
+    if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') return 'inuse';
+    return 'unknown';
+  }
+  function _waitCamera(stream, ms) {
+    return new Promise((resolve) => {
+      const v = document.createElement('video');
+      v.muted = true; v.playsInline = true; v.setAttribute('playsinline', '');
+      v.srcObject = stream;
+      let done = false;
+      const finish = (ok) => { if (done) return; done = true; clearInterval(iv); clearTimeout(to); try { v.pause(); v.srcObject = null; } catch (e) {} resolve(ok); };
+      const iv = setInterval(() => { if (v.videoWidth > 0) finish(true); }, 100);
+      const to = setTimeout(() => finish(v.videoWidth > 0), ms);
+      v.play().catch(() => {});
     });
+  }
+  /* Largest sample over ms; 0 means the microphone sends pure silence.
+     null when the level cannot be read (no Web Audio): never a failure. */
+  async function _micPeak(stream, ms) {
+    let ctx = null;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+      if (ctx.state === 'suspended') { try { await ctx.resume(); } catch (e) {} }
+      if (ctx.state !== 'running') return null;
+      const src = ctx.createMediaStreamSource(stream);
+      const an = ctx.createAnalyser();
+      an.fftSize = 2048;
+      src.connect(an);
+      const buf = new Float32Array(an.fftSize);
+      let peak = 0;
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        an.getFloatTimeDomainData(buf);
+        for (let i = 0; i < buf.length; i++) { const a = Math.abs(buf[i]); if (a > peak) peak = a; }
+        await new Promise(r => setTimeout(r, 60));
+      }
+      return peak;
+    } catch (e) { return null; }
+    finally { if (ctx) { try { ctx.close(); } catch (e) {} } }
+  }
+  async function _checkStream(stream) {
+    const vt = stream.getVideoTracks()[0];
+    const at = stream.getAudioTracks()[0];
+    if (!vt) return { fail: 'nocam' };
+    if (!at) return { fail: 'nomic' };
+    if (vt.readyState !== 'live' || at.readyState !== 'live') return { fail: 'inuse' };
+    const [camOk, peak] = await Promise.all([_waitCamera(stream, 4000), _micPeak(stream, 900)]);
+    const warn = [];
+    if (!camOk || vt.muted) warn.push('cam');
+    if (at.muted || peak === 0) warn.push('mic');
+    return { warn: warn.length ? warn : null };
+  }
+  async function _getStream() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw _mediaErr(window.isSecureContext === false ? 'insecure' : 'unsupported');
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: _facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: { echoCancellation: true, noiseSuppression: true }
+      });
+    } catch (e) { throw _mediaErr(_mapMediaError(e), e); }
+    let r;
+    try { r = await _checkStream(stream); } catch (e) { r = {}; }
+    if (r.fail) { try { stream.getTracks().forEach(t => t.stop()); } catch (e) {} throw _mediaErr(r.fail); }
+    _mediaWarn = r.warn || null;
+    console.log('SentinelCall: camera and microphone checked', r.warn ? 'with warnings ' + r.warn.join(',') : 'OK');
+    return stream;
+  }
+  function _browserKind() {
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (ios) return 'ios';
+    if (/Android/.test(ua)) return 'android';
+    if (/Edg\//.test(ua) || /Chrome\//.test(ua)) return 'chrome';
+    if (/Safari\//.test(ua)) return 'safari';
+    return 'other';
+  }
+  /* What went wrong with the camera or microphone, and exactly how to fix it */
+  function _mediaProblemText(code) {
+    if (code === 'denied') {
+      const k = _browserKind();
+      if (k === 'ios') return _t('media.deniedIos', 'Remiel Sentinel is not allowed to use your camera or microphone. Open the Settings app, then Apps, then Safari (on older iPhones: Settings, then Safari), then set Camera and Microphone to Allow. Come back and reload this page.');
+      if (k === 'safari') return _t('media.deniedSafari', 'Remiel Sentinel is not allowed to use your camera or microphone. In the menu bar click Safari, then Settings for beverly-index.com, and set Camera and Microphone to Allow. Then reload this page.');
+      if (k === 'android') return _t('media.deniedAndroid', 'Remiel Sentinel is not allowed to use your camera or microphone. Tap the icon at the left of the address bar, then Permissions, and turn on Camera and Microphone. Then reload this page.');
+      return _t('media.deniedChrome', 'Remiel Sentinel is not allowed to use your camera or microphone. Click the icon at the left of the address bar, then Site settings, and set Camera and Microphone to Allow. Then reload this page.');
+    }
+    if (code === 'inuse') return _t('media.inUse', 'Your camera or microphone is busy in another app (for example FaceTime, Zoom or Teams). Close that app, then start the call again.');
+    if (code === 'nodevice' || code === 'nocam') return _t('media.noCamera', 'No camera was found. Connect a camera or use a phone, then start the call again.');
+    if (code === 'nomic') return _t('media.noMic', 'No microphone was found. Connect a microphone or headset, then start the call again.');
+    if (code === 'insecure' || code === 'unsupported') return _t('media.unsupported', 'This browser cannot make video calls. Open Remiel Sentinel in Safari or Chrome.');
+    return _t('media.unknown', 'Your camera or microphone could not start. Close other apps that use them, then start the call again.');
+  }
+  function _mediaProblem(err) {
+    const code = (err && err.code) || _mapMediaError(err);
+    console.warn('SentinelCall: camera or microphone problem', code, err && err.cause ? err.cause : err);
+    const msg = _mediaProblemText(code);
+    try {
+      const p = uiConfirm(msg, 'OK');
+      const ovs = document.querySelectorAll('.ui-confirm-overlay');
+      const no = ovs.length ? ovs[ovs.length - 1].querySelector('.ui-confirm-no') : null;
+      if (no) no.style.display = 'none';
+      return p;
+    } catch (e) { showToast(msg); }
+    return Promise.resolve(true);
+  }
+  function _showMediaWarn() {
+    const el = document.getElementById('scMediaWarn');
+    if (!el) return;
+    const w = _mediaWarn || [];
+    const lines = [];
+    if (w.indexOf('cam') >= 0) lines.push(_t('media.warnCam', 'Your camera is not sending a picture. Check that it is not covered or switched off.'));
+    if (w.indexOf('mic') >= 0) lines.push(_t('media.warnMic', 'Your microphone is sending no sound. Check that it is not muted on your device, or choose another microphone in your system settings.'));
+    el.textContent = lines.join(' ');
+    el.hidden = !lines.length;
   }
 
   /* ── Safety words ──
@@ -35244,6 +35460,7 @@ const SentinelCall = (function() {
       const inc = document.getElementById('scIncomingOverlay');
       if (inc) inc.classList.remove('active');
       _showActive(remoteStream);
+      _watchMedia(call);
     });
     _watchSafety(call, (words) => { if (_currentCall === call) _showSafetyLine(words); });
     call.on('close', () => {
@@ -35339,7 +35556,7 @@ const SentinelCall = (function() {
     try {
       _localStream = await _getStream();
     } catch (err) {
-      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
+      _mediaProblem(err);
       return;
     }
 
@@ -35396,8 +35613,8 @@ const SentinelCall = (function() {
     try {
       if (!_localStream || !_localStream.active) _localStream = await _getStream();
     } catch(err) {
-      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
       rejectIncoming();
+      _mediaProblem(err);
       return;
     }
     if (_incomingCall !== call) { _cleanupMedia(); return; } /* caller hung up meanwhile */
@@ -35587,7 +35804,7 @@ const SentinelCall = (function() {
     try {
       if (!_localStream || !_localStream.active) _localStream = await _getStream();
     } catch (err) {
-      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
+      _mediaProblem(err);
       return;
     }
     const first = contact.first || _t('call.thisContact', 'this contact');
@@ -35680,9 +35897,10 @@ const SentinelCall = (function() {
     if (grp) grp.hidden = false;
     const localVid = document.getElementById('scLocalVideo');
     if (localVid && _localStream) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
-    if (overlay) { overlay.classList.add('active'); overlay.classList.add('group'); }
+    if (overlay) { overlay.classList.add('active'); overlay.classList.add('group'); overlay.classList.remove('duo'); }
     rsOverlayFlag('call', true);
     _renderGroupHead();
+    _showMediaWarn();
   }
 
   function _tileFor(peerId, name, contactId) {
@@ -35816,11 +36034,19 @@ const SentinelCall = (function() {
     _tileFor(peerId, entry.name, entry.contactId);
     if (call && entry.call !== call) {
       entry.call = call;
-      call.on('stream', (remoteStream) => {
+      call.on('stream', async (remoteStream) => {
         if (!_group || _group.peers.get(peerId) !== entry) return;
-        const tile = _tileFor(peerId, entry.name, entry.contactId);
+        let tile = _tileFor(peerId, entry.name, entry.contactId);
         const vid = tile ? tile.querySelector('video') : null;
         if (vid && vid.srcObject !== remoteStream) { vid.srcObject = remoteStream; vid.play().catch(() => {}); }
+        if (!entry.live) {
+          /* Picture and sound must actually get through before the tile counts as joined */
+          _tileState(peerId, _t('call.mediaConnecting', 'Connecting picture and sound...'));
+          const ok = await _whenConnected(call, 15000);
+          if (!_group || _group.peers.get(peerId) !== entry || entry.call !== call) return;
+          if (!ok) { _dropGroupPeer(peerId, _t('group.noMedia', 'Picture and sound could not get through')); return; }
+          tile = _tileFor(peerId, entry.name, entry.contactId);
+        }
         if (tile) { tile.classList.remove('gone'); tile.classList.add('live'); const rb = tile.querySelector('.sc-tile-retry'); if (rb) rb.remove(); }
         if (entry.timer) { clearTimeout(entry.timer); entry.timer = null; }
         _renderGroupNote();
@@ -36137,7 +36363,7 @@ const SentinelCall = (function() {
     try {
       if (!_localStream || !_localStream.active) _localStream = await _getStream();
     } catch (err) {
-      showToast(_t('call.mediaDenied', 'Camera/mic access denied'));
+      _mediaProblem(err);
       return;
     }
     const myName = await _getMyName();
@@ -36269,7 +36495,9 @@ const SentinelCall = (function() {
     else { el.textContent = initials || '?'; el.classList.remove('has-photo'); }
   }
 
+  let _remoteName = '';
   function _showOutgoing(name, initials, contactId) {
+    _remoteName = name || '';
     const overlay = document.getElementById('scOverlay');
     const status = document.getElementById('scStatus');
     const callerName = document.getElementById('scCallerName');
@@ -36296,6 +36524,7 @@ const SentinelCall = (function() {
     _callContactId = known ? known.id : null;
     const name = (known && ((known.first || '') + ' ' + (known.last || '')).trim()) || meta.callerName || sid;
     const initials = name.substring(0, 2).toUpperCase();
+    _remoteName = name || '';
 
     const overlay = document.getElementById('scIncomingOverlay');
     const callerName = document.getElementById('scInCallerName');
@@ -36350,10 +36579,90 @@ const SentinelCall = (function() {
       remoteVid.play().catch(() => {});
     }
     if (status) status.style.display = 'none';
-    if (timer) timer.hidden = false;
-    if (overlay) overlay.classList.add('active');
+    if (overlay) { overlay.classList.add('active'); overlay.classList.add('duo'); }
+    const rl = document.getElementById('scRemoteLabel');
+    const ll = document.getElementById('scLocalLabel');
+    /* A guest only knows the host's Sentinel ID: no label rather than a code */
+    const rn = /^[A-Z0-9]{8}$/.test(_remoteName || '') ? '' : (_remoteName || '');
+    if (rl) { rl.textContent = rn; rl.hidden = !rn; }
+    if (ll) { ll.textContent = _t('call.you', 'You'); ll.hidden = false; }
+    _showMediaWarn();
+    /* The timer starts when picture and sound actually flow (_watchMedia) */
+    if (!_callStartTime) _setMediaState('connecting');
+  }
 
-    _startTimer();
+  /* ── Is the picture and sound really getting through? ──
+     PeerJS reports the other person's stream as soon as the two devices
+     agree on a call, before the network path exists. When the two networks
+     cannot reach each other (and no relay carries the call) that looks
+     like a live call with a black screen and no sound. This watches the
+     connection itself: the timer starts only once it is up, and after 15
+     seconds without it the screen says so plainly. */
+  let _mediaStateCode = null;
+  function _setMediaState(code) {
+    _mediaStateCode = code;
+    const el = document.getElementById('scMediaState');
+    if (!el) return;
+    if (!code) { el.hidden = true; el.textContent = ''; el.classList.remove('bad'); return; }
+    let text = '';
+    if (code === 'connecting') text = _t('call.mediaConnecting', 'Connecting picture and sound...');
+    else if (code === 'reconnecting') text = _t('call.mediaReconnecting', 'Connection is weak. Reconnecting...');
+    else if (code === 'noRemoteVideo') text = _t('call.mediaNoRemoteVideo', 'Their camera is not sending a picture. Ask them to check that it is not covered or switched off.');
+    else if (code === 'failed') {
+      const relay = !!(_cfgCache && _cfgCache.relay);
+      text = relay
+        ? _t('call.mediaFailed', 'Picture and sound could not get through between your two networks. Tap the red button, then call again. If it happens again, one of you can switch between Wi-Fi and mobile data.')
+        : _t('call.mediaFailedNoRelay', 'Picture and sound could not get through between your two networks. Calls like this need the Remiel Sentinel call relay, which is not switched on yet. Tap the red button to end the call.');
+    }
+    el.textContent = text;
+    el.classList.toggle('bad', code === 'failed' || code === 'noRemoteVideo');
+    el.hidden = false;
+  }
+  function _watchMedia(call) {
+    if (!call || call._scWatch) return;
+    const started = Date.now();
+    let connected = false, connectedAt = 0, remoteChecked = false, logged = false;
+    const tick = () => {
+      if (_currentCall !== call) { clearInterval(iv); return; }
+      const pc = call.peerConnection;
+      if (!pc) return;
+      if (_pcConnected(pc)) {
+        if (!connected) { connected = true; connectedAt = Date.now(); _startTimer(); }
+        if (_mediaStateCode && _mediaStateCode !== 'noRemoteVideo') _setMediaState(null);
+        if (!remoteChecked && Date.now() - connectedAt > 5000) {
+          remoteChecked = true;
+          const rv = document.getElementById('scRemoteVideo');
+          const rs = rv && rv.srcObject;
+          const hasVideo = !!(rs && rs.getVideoTracks && rs.getVideoTracks().length);
+          if (!hasVideo || !rv.videoWidth) _setMediaState('noRemoteVideo');
+        }
+        return;
+      }
+      const st = pc.iceConnectionState, cs = pc.connectionState;
+      if (st === 'failed' || cs === 'failed' || (!connected && Date.now() - started > 15000)) {
+        if (_mediaStateCode !== 'failed') {
+          _setMediaState('failed');
+          if (!logged) { logged = true; console.warn('SentinelCall: media did not connect', { ice: st, conn: cs, relay: !!(_cfgCache && _cfgCache.relay) }); }
+        }
+        return;
+      }
+      if (connected && (st === 'disconnected' || cs === 'disconnected')) _setMediaState('reconnecting');
+    };
+    const iv = setInterval(tick, 500);
+    call._scWatch = iv;
+    tick();
+  }
+  /* Resolves true once the call's connection is up, false after ms */
+  function _whenConnected(call, ms) {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const pc = call && call.peerConnection;
+        if (pc && _pcConnected(pc)) { clearInterval(iv); resolve(true); return; }
+        const failed = pc && (pc.iceConnectionState === 'failed' || pc.connectionState === 'failed');
+        if (failed || Date.now() - t0 > ms) { clearInterval(iv); resolve(false); }
+      }, 400);
+    });
   }
 
   function _startTimer() {
@@ -36396,7 +36705,10 @@ const SentinelCall = (function() {
     hideTileSafety();
     const gHint = document.getElementById('scGroupSafetyHint');
     if (gHint) gHint.hidden = true;
-    if (overlay) overlay.classList.remove('group');
+    if (overlay) { overlay.classList.remove('group'); overlay.classList.remove('duo'); }
+    _setMediaState(null);
+    ['scRemoteLabel', 'scLocalLabel', 'scMediaWarn'].forEach(id => { const e = document.getElementById(id); if (e) e.hidden = true; });
+    _remoteName = '';
     const status = document.getElementById('scStatus');
     if (status) status.style.display = '';
     const inLabel = document.getElementById('scInLabel');
@@ -36568,8 +36880,9 @@ const SentinelCall = (function() {
       try {
         _localStream = await _getStream();
       } catch(err) {
-        statusEl.textContent = _t('call.mediaDenied', 'Camera/mic access denied');
+        statusEl.textContent = _mediaProblemText((err && err.code) || _mapMediaError(err));
         destroyGuest();
+        _mediaProblem(err);
         return;
       }
 
