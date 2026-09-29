@@ -10953,6 +10953,13 @@ const I18n = (function () {
     'pulse.error': "Could not load the feed: ",
     'push.notConfigured': "Push is not enabled on the server yet",
     'push.unsupported': "Push notifications are not supported in this browser.",
+    'push.turningOn': "Turning on...",
+    'push.registerBlocked': "This window could not sign up for notifications. If it is a Safari Private Window, open Remiel Sentinel in a normal window. Otherwise check your connection and turn this switch on again.",
+    'push.privateWindow': "This window cannot receive notifications. Safari Private Windows block them: open Remiel Sentinel in a normal window, or on iPhone add it to the Home Screen, then turn this switch on.",
+    'push.deniedSafari': "Notifications are blocked for this site. In Safari open Settings, Websites, Notifications, set beverly-index.com to Allow. Then turn this switch on again.",
+    'push.deniedChrome': "Notifications are blocked for this site. Click the icon left of the address, set Notifications to Allow, then turn this switch on again.",
+    'push.deniedAndroid': "Notifications are blocked for this site. In Chrome, tap the icon left of the address, then Permissions, Notifications, Allow. Then turn this switch on again.",
+    'push.deniedIos': "Notifications are blocked. On iPhone open Settings, Notifications, Remiel Sentinel, and turn on Allow Notifications. Then turn this switch on again.",
     'push.unavailable': "Push service unavailable. Try again later.",
     'push.denied': "Notification permission denied. Enable it in browser settings.",
     'push.enabled': "Push notifications are on for this device.",
@@ -11559,6 +11566,13 @@ const I18n = (function () {
     'pulse.error': "Impossibile caricare l’elenco: ",
     'push.notConfigured': "Le notifiche push non sono ancora attive sul server",
     'push.unsupported': "Questo browser non supporta le notifiche push.",
+    'push.turningOn': "Attivazione in corso...",
+    'push.registerBlocked': "Questa finestra non è riuscita a iscriversi alle notifiche. Se è una finestra privata di Safari, apri Remiel Sentinel in una finestra normale. Altrimenti controlla la connessione e attiva di nuovo questo interruttore.",
+    'push.privateWindow': "Questa finestra non può ricevere notifiche. Le finestre private di Safari le bloccano: apri Remiel Sentinel in una finestra normale, oppure su iPhone aggiungilo alla schermata Home, poi attiva questo interruttore.",
+    'push.deniedSafari': "Le notifiche sono bloccate per questo sito. In Safari apri Impostazioni, Siti web, Notifiche, imposta beverly-index.com su Consenti. Poi attiva di nuovo questo interruttore.",
+    'push.deniedChrome': "Le notifiche sono bloccate per questo sito. Fai clic sull’icona a sinistra dell’indirizzo, imposta Notifiche su Consenti, poi attiva di nuovo questo interruttore.",
+    'push.deniedAndroid': "Le notifiche sono bloccate per questo sito. In Chrome tocca l’icona a sinistra dell’indirizzo, poi Autorizzazioni, Notifiche, Consenti. Poi attiva di nuovo questo interruttore.",
+    'push.deniedIos': "Le notifiche sono bloccate. Su iPhone apri Impostazioni, Notifiche, Remiel Sentinel, e attiva Consenti notifiche. Poi attiva di nuovo questo interruttore.",
     'push.unavailable': "Servizio push non disponibile. Riprova più tardi.",
     'push.denied': "Permesso per le notifiche negato. Attivalo nelle impostazioni del browser.",
     'push.enabled': "Le notifiche push sono attive su questo dispositivo.",
@@ -33494,29 +33508,57 @@ const SocialImport = (() => {
       _updateToggle(false, true);
     }
 
+    /* The server's public key, fetched ahead of the tap (Settings open) so the
+       tap itself can ask for permission straight away. */
+    var _vapidKey = null;
+    async function _loadKey() {
+      if (_vapidKey) return _vapidKey;
+      var keyResp = await _apiFetch('/push/vapid-key', { method: 'GET' });
+      if (keyResp.status === 503) return 503;
+      if (!keyResp.ok) return null;
+      var keyData = await keyResp.json();
+      _vapidKey = keyData && keyData.publicKey ? keyData.publicKey : 503;
+      return _vapidKey;
+    }
+    function _isPrivateSafari() {
+      /* Safari Private Windows have no persistent storage quota and cannot hold a push subscription */
+      return /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Android|Edg\//.test(navigator.userAgent) && !('PushManager' in window);
+    }
+    function _deniedHelp() {
+      var ua = navigator.userAgent;
+      if (/Android/.test(ua)) return _t('push.deniedAndroid', 'Notifications are blocked for this site. In Chrome, tap the icon left of the address, then Permissions, Notifications, Allow. Then turn this switch on again.');
+      if (/iPhone|iPad/.test(ua)) return _t('push.deniedIos', 'Notifications are blocked. On iPhone open Settings, Notifications, Remiel Sentinel, and turn on Allow Notifications. Then turn this switch on again.');
+      if (/Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return _t('push.deniedSafari', 'Notifications are blocked for this site. In Safari open Settings, Websites, Notifications, set beverly-index.com to Allow. Then turn this switch on again.');
+      return _t('push.deniedChrome', 'Notifications are blocked for this site. Click the icon left of the address, set Notifications to Allow, then turn this switch on again.');
+    }
     async function subscribe() {
+      /* Ask first, inside the tap: Safari refuses a permission prompt that comes after a network wait */
+      var permP = null;
+      try { if ('Notification' in window && Notification.permission !== 'granted') permP = Notification.requestPermission(); } catch (e) { permP = null; }
+      _updateToggle(true);
+      _setStatus(_t('push.turningOn', 'Turning on...'));
       try {
         if (!_supported()) {
-          _setStatus(_t('push.unsupported', 'Push notifications are not supported in this browser.'));
+          _setStatus(_isPrivateSafari() || !('PushManager' in window)
+            ? _t('push.privateWindow', 'This window cannot receive notifications. Safari Private Windows block them: open Remiel Sentinel in a normal window, or on iPhone add it to the Home Screen, then turn this switch on.')
+            : _t('push.unsupported', 'Push notifications are not supported in this browser.'));
           _updateToggle(false);
           return false;
         }
-        var keyResp = await _apiFetch('/push/vapid-key', { method: 'GET' });
-        if (keyResp.status === 503) { _notConfigured(); return false; }
-        if (!keyResp.ok) {
+        var permission = permP ? await permP : Notification.permission;
+        if (permission !== 'granted') {
+          _setStatus(_deniedHelp());
+          _updateToggle(false);
+          return false;
+        }
+        var key = await _loadKey();
+        if (key === 503) { _notConfigured(); return false; }
+        if (!key) {
           _setStatus(_t('push.unavailable', 'Push service unavailable. Try again later.'));
           _updateToggle(false);
           return false;
         }
-        var keyData = await keyResp.json();
-        if (!keyData || !keyData.publicKey) { _notConfigured(); return false; }
-
-        var permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          _setStatus(_t('push.denied', 'Notification permission denied. Enable it in browser settings.'));
-          _updateToggle(false);
-          return false;
-        }
+        var keyData = { publicKey: key };
 
         var reg = await navigator.serviceWorker.ready;
         var subscription = await reg.pushManager.getSubscription();
@@ -33544,7 +33586,11 @@ const SocialImport = (() => {
         _updateToggle(false);
         return false;
       } catch (err) {
-        _setStatus(_t('push.enableFailed', 'Could not turn on push notifications.'));
+        var nm = err && err.name;
+        _setStatus(nm === 'NotAllowedError' ? _deniedHelp()
+          : (nm === 'AbortError' || nm === 'InvalidStateError' || nm === 'NotSupportedError')
+            ? _t('push.registerBlocked', 'This window could not sign up for notifications. If it is a Safari Private Window, open Remiel Sentinel in a normal window. Otherwise check your connection and turn this switch on again.')
+            : _t('push.enableFailed', 'Could not turn on push notifications.') + (nm ? ' (' + nm + ')' : ''));
         _updateToggle(false);
         return false;
       }
@@ -33599,6 +33645,7 @@ const SocialImport = (() => {
         var data = await resp.json();
         if (data.configured === false) { _notConfigured(); return; }
         _configured = true;
+        _loadKey().catch(function () {});
         var reg = await navigator.serviceWorker.ready;
         var subscription = await reg.pushManager.getSubscription();
         _subscribed = !!(data.subscribed && subscription);
