@@ -11035,6 +11035,8 @@ const I18n = (function () {
     'alarm.cancelled': "Alarm cancelled.",
     'help.desc': "Sends an urgent alarm to the person you choose. It rings on their screen and phone every 2 minutes until they tap Acknowledge.",
     'help.goesTo': "Help goes to",
+    'size.aria': "Sphere size",
+    'size.title': "Sphere size: {n}%",
     'clv.select': "Select",
     'clv.selectDone': "Done selecting",
     'clv.selectAll': "Select all",
@@ -11701,6 +11703,8 @@ const I18n = (function () {
     'alarm.cancelled': "Allarme annullato.",
     'help.desc': "Invia un allarme urgente alla persona che scegli. Suona sul suo schermo e sul suo telefono ogni 2 minuti finché non tocca Conferma.",
     'help.goesTo': "L’aiuto va a",
+    'size.aria': "Dimensione delle sfere",
+    'size.title': "Dimensione delle sfere: {n}%",
     'clv.select': "Seleziona",
     'clv.selectDone': "Fine selezione",
     'clv.selectAll': "Seleziona tutti",
@@ -14096,6 +14100,7 @@ const DPR = Math.min(window.devicePixelRatio || 1, 3); /* 3x phones get a 3x can
 /* ── Forward declarations (needed by resize before full init) ── */
 let appState = 'self'; // 'self' | 'network'
 let NODES = [];
+var sphereSizeMul = 1; /* Sphere size slider, 0.6 to 1.6; saved per device */
 
 function resize() {
   if (appState === 'network') {
@@ -14941,7 +14946,8 @@ function buildNodes(fresh) {
       tx: tx, ty: ty, tz: tz,
       x: fresh ? 0 : tx, y: fresh ? 0 : ty, z: fresh ? 0 : tz,
       vx: fresh ? tx * 0.055 : 0, vy: fresh ? ty * 0.055 : 0, vz: fresh ? tz * 0.055 : 0,
-      r: nodeR,
+      r: nodeR * sphereSizeMul,
+      _baseR: nodeR,
       initials: (((contact.first || '')[0] || '') + ((contact.last || '')[0] || '')).toUpperCase() || '?'
     };
   });
@@ -39070,6 +39076,84 @@ var TeamBuilder = (function () {
 
   return { isMember: isMember, posKey: posKey, autoAssign: _autoAssign, openMenu: _openMenu, closeMenu: _closeMenu, finish: _finish,
     _start: _start, _toggle: _toggle, get session() { return _s; } };
+})();
+
+
+/* ═══ Sphere size slider ═══
+   A small, faint horizontal slider under the Remiel Sentinel logo (upper
+   left) that sets how large the people spheres appear, from 60% to 160%.
+   Saved on this device. Shown in the galaxy only. */
+var SphereSize = (function () {
+  var KEY = 'sphereSize';
+  function apply(mul) {
+    sphereSizeMul = Math.max(0.6, Math.min(1.6, Number(mul) || 1));
+    try { NODES.forEach(function (n) { if (n._baseR) n.r = n._baseR * sphereSizeMul; }); } catch (e) {}
+  }
+  function _css() {
+    if (document.getElementById('sphereSizeCss')) return;
+    var st = document.createElement('style');
+    st.id = 'sphereSizeCss';
+    st.textContent =
+      '.sphere-size{position:fixed;z-index:190;display:none;align-items:center;width:112px;height:18px;opacity:.45;transition:opacity .2s}' +
+      'body.network-active .sphere-size{display:flex}' +
+      'body.rs-overlay-open .sphere-size{display:none !important}' +
+      '.sphere-size:hover,.sphere-size:focus-within{opacity:.9}' +
+      '.sphere-size input{-webkit-appearance:none;appearance:none;width:100%;height:18px;margin:0;background:transparent;cursor:pointer}' +
+      '.sphere-size input::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:rgba(224,228,240,.35)}' +
+      '.sphere-size input::-moz-range-track{height:2px;border-radius:1px;background:rgba(224,228,240,.35)}' +
+      '.sphere-size input::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;margin-top:-5px;border-radius:50%;background:rgba(224,228,240,.85);border:0;box-shadow:0 0 6px rgba(60,140,240,.5)}' +
+      '.sphere-size input::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:rgba(224,228,240,.85);border:0}' +
+      '.sphere-size input:focus-visible{outline:2px solid #C5A55A;outline-offset:3px;border-radius:4px}';
+    document.head.appendChild(st);
+  }
+  function _el() {
+    var w = document.getElementById('sphereSize');
+    if (w) return w;
+    _css();
+    w = document.createElement('div'); w.id = 'sphereSize'; w.className = 'sphere-size';
+    var r = document.createElement('input');
+    r.type = 'range'; r.min = '0.6'; r.max = '1.6'; r.step = '0.05'; r.value = String(sphereSizeMul); r.id = 'sphereSizeRange';
+    r.addEventListener('input', function () { apply(r.value); _label(); });
+    r.addEventListener('change', function () { try { RemielDB.putSetting(KEY, Number(r.value)); } catch (e) {} });
+    /* The galaxy must not turn while the slider is dragged */
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(function (ev) { r.addEventListener(ev, function (e) { e.stopPropagation(); }, { passive: true }); });
+    w.appendChild(r);
+    document.body.appendChild(w);
+    _label();
+    return w;
+  }
+  function _label() {
+    var r = document.getElementById('sphereSizeRange'); if (!r) return;
+    var pct = Math.round(Number(r.value) * 100);
+    r.setAttribute('aria-label', _t('size.aria', 'Sphere size'));
+    r.setAttribute('aria-valuetext', pct + '%');
+    r.title = _t('size.title', 'Sphere size: {n}%', { n: pct });
+  }
+  /* Just under the logo, or under the back button when it is lower */
+  function place() {
+    var w = _el();
+    var logo = document.getElementById('appLogo');
+    var back = document.getElementById('backBtn');
+    var lr = logo ? logo.getBoundingClientRect() : null;
+    var br = back && !back.hidden && getComputedStyle(back).display !== 'none' ? back.getBoundingClientRect() : null;
+    var bottom = Math.max(lr && lr.height ? lr.bottom : 0, br && br.height ? br.bottom : 0) || 50;
+    var left = lr && lr.width ? lr.left : 12;
+    w.style.top = (bottom + 6) + 'px';
+    w.style.left = left + 'px';
+  }
+  async function start() {
+    try { var v = await RemielDB.getSetting(KEY); if (v) apply(v); } catch (e) {}
+    var r = document.getElementById('sphereSizeRange');
+    _el();
+    r = document.getElementById('sphereSizeRange'); if (r) r.value = String(sphereSizeMul);
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('localeChanged', _label);
+    setInterval(place, 1500);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else setTimeout(start, 0);
+  return { apply: apply, place: place };
 })();
 
 /* B1: every declaration above is now initialised; release any queued reveal. */
