@@ -1899,6 +1899,13 @@
     color: rgba(160,160,200,0.5);
     pointer-events: none;
   }
+  .ob-initials {
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    color: #bfe9ff;
+    letter-spacing: 0.04em;
+  }
   .ob-media-icon svg {
     width: 32px;
     height: 32px;
@@ -6089,6 +6096,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
     <div class="ob-media-upload" id="obSelfMediaCircle" onclick="document.getElementById('obSelfFileInput').click()" role="button" tabindex="0" aria-label="Upload your photo or video" data-i18n-aria="onboard.name.uploadAria">
       <div class="ob-media-icon" id="obSelfMediaPlaceholder">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
+        <b class="ob-initials" id="obSelfInitials" hidden></b>
         <span data-i18n="onboard.name.addPhoto">Add photo</span>
       </div>
     </div>
@@ -6098,7 +6106,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <button class="ob-media-opt" onclick="document.getElementById('obSelfFileInput').click()" data-i18n="onboard.name.upload">Upload</button>
       <button class="ob-media-opt" onclick="_obOpenCamera('self')" data-i18n="onboard.name.camera">Take Photo/Video</button>
     </div>
-    <p class="ob-media-hint" id="obSelfMediaHint" data-i18n="onboard.name.mediaHint">Photo or short video required</p>
+    <p class="ob-media-hint" id="obSelfMediaHint" data-i18n="onboard.name.mediaHint">Optional. Skip it and your sphere shows your initials.</p>
     <input class="ob-input" id="obUserName" type="text" placeholder="Your first name" data-i18n-placeholder="onboard.name.placeholder" autocomplete="off" maxlength="30" style="text-align:center; font-size:16px; margin-bottom:24px;">
     <button class="ob-btn ob-primary" id="obNameBtn" onclick="obNext(2)" data-i18n="onboard.continue">Continue</button>
     <button type="button" id="obSignInLink" onclick="obSignInExisting()" data-i18n="onboard.signinLink" style="display:block;margin:14px auto 0;background:none;border:0;color:#38bdf8;font-size:13px;text-decoration:underline;cursor:pointer;padding:6px 8px;">Already use Remiel Sentinel on another device? Sign in</button>
@@ -7792,7 +7800,7 @@ var BtnSystem = (function () {
       var btn = $id('obNameBtn'); if (!shown(btn)) return;
       var name = $id('obUserName'), circle = $id('obSelfMediaCircle');
       if (!val('obUserName')) set(btn, false, 'hint.firstName', name, { pre: name });
-      else if (typeof _obSelfMediaBlob !== 'undefined' && !_obSelfMediaBlob) { rim(name, false); set(btn, false, 'hint.selfMedia', circle, { pre: circle }); }
+      /* A photo is optional: without one the sphere shows the person's initials */
       else { rim(circle, false); set(btn, true, '', name); }
     },
     function obStep3() {
@@ -10525,7 +10533,7 @@ const I18n = (function () {
     'onboard.name.addPhoto': "Add photo",
     'onboard.name.upload': "Upload",
     'onboard.name.camera': "Take Photo/Video",
-    'onboard.name.mediaHint': "Photo or short video required",
+    'onboard.name.mediaHint': "Optional. Skip it and your sphere shows your initials.",
     'onboard.name.looksGreat': "Looks great!",
     'onboard.people.photoAria': "Upload contact photo",
     'onboard.people.uploadPhoto': "Upload photo",
@@ -11107,7 +11115,7 @@ const I18n = (function () {
     'onboard.name.addPhoto': "Aggiungi foto",
     'onboard.name.upload': "Carica",
     'onboard.name.camera': "Scatta foto o video",
-    'onboard.name.mediaHint': "Serve una foto o un breve video",
+    'onboard.name.mediaHint': "Facoltativa. Senza foto, la tua sfera mostra le tue iniziali.",
     'onboard.name.looksGreat': "Perfetto!",
     'onboard.people.photoAria': "Carica la foto della persona",
     'onboard.people.uploadPhoto': "Carica foto",
@@ -13404,6 +13412,17 @@ function _obHandleContactMedia(f) {
 function _obValidateStep1() {
   var nameOk = !!(document.getElementById('obUserName') && document.getElementById('obUserName').value.trim());
   var mediaOk = !!_obSelfMediaBlob;
+  /* No photo: preview the initials the sphere will show */
+  var ini = document.getElementById('obSelfInitials');
+  var ph = document.getElementById('obSelfMediaPlaceholder');
+  if (ini && ph) {
+    var nm = nameOk ? document.getElementById('obUserName').value.trim() : '';
+    var letters = nm.split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0); }).join('').toUpperCase();
+    ini.textContent = letters;
+    ini.hidden = !letters || mediaOk;
+    var svg = ph.querySelector('svg');
+    if (svg) svg.style.display = (letters && !mediaOk) ? 'none' : '';
+  }
   var btn = document.getElementById('obNameBtn');
   if (btn) BtnSystem.refresh();
 }
