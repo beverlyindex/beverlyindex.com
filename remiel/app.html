@@ -11035,6 +11035,43 @@ const I18n = (function () {
     'alarm.cancelled': "Alarm cancelled.",
     'help.desc': "Sends an urgent alarm to the person you choose. It rings on their screen and phone every 2 minutes until they tap Acknowledge.",
     'help.goesTo': "Help goes to",
+    'tb.button': "Team",
+    'tb.buttonAria': "Teams: build a team or its units",
+    'tb.liveAria': "{name}, {n} people. Drag spheres here. Tap to finish.",
+    'tb.newTeam': "New team",
+    'tb.newUnit': "New unit",
+    'tb.menuTeams': "Pick a team, then drag spheres onto the pulsing button",
+    'tb.menuUnits': "{team} units: pick one, then drag spheres onto the pulsing button",
+    'tb.units': "Units",
+    'tb.plusNewTeam': "+ New team",
+    'tb.plusNewUnit': "+ New unit",
+    'tb.noUnits': "No units yet.",
+    'tb.backTeams': "\u2039 All teams",
+    'tb.startHint': "Drag any sphere onto the pulsing button. Drag a ringed sphere onto it again to take it out. Tap the button when you are done.",
+    'tb.added': "{name} added",
+    'tb.removed': "{name} taken out",
+    'tb.nameTeam': "Name this team",
+    'tb.nameUnit': "Name this unit",
+    'tb.emptyFirst': "Nobody is in it yet. Drag at least one sphere onto the pulsing button first.",
+    'tb.keepGoing': "Keep going",
+    'tb.discard': "Discard",
+    'tb.discardChanges': "Discard changes",
+    'tb.discarded': "Nothing was saved.",
+    'tb.nameText': "{n} people. Type a name, then tap Save.",
+    'tb.teamPh': "Varsity",
+    'tb.unitPh': "Kickoff return",
+    'tb.needName': "Type a name first.",
+    'tb.save': "Save",
+    'tb.noChanges': "No changes to {name}.",
+    'tb.confirmTitle': "Save {name}?",
+    'tb.confirmText': "{a} added, {r} taken out. {n} people in total.",
+    'tb.savedTeam': "{name} saved",
+    'tb.placed': "Placed {n} players in {u} units by position. Players with no position are in Unassigned.",
+    'tb.done': "Done",
+    'tb.reviewUnits': "Review units",
+    'tb.savedUnit': "{name} saved: {n} people.",
+    'tb.alsoTeam': "{n} also joined {team}.",
+    'tb.unassigned': "Unassigned",
     'help.fab': "Help",
     'help.fabAria': "Help: send an urgent alarm",
     'help.cardTitle': "Send Help",
@@ -11648,6 +11685,43 @@ const I18n = (function () {
     'alarm.cancelled': "Allarme annullato.",
     'help.desc': "Invia un allarme urgente alla persona che scegli. Suona sul suo schermo e sul suo telefono ogni 2 minuti finché non tocca Conferma.",
     'help.goesTo': "L’aiuto va a",
+    'tb.button': "Squadra",
+    'tb.buttonAria': "Squadre: crea una squadra o i suoi gruppi",
+    'tb.liveAria': "{name}, {n} persone. Trascina qui le sfere. Tocca per finire.",
+    'tb.newTeam': "Nuova squadra",
+    'tb.newUnit': "Nuovo gruppo",
+    'tb.menuTeams': "Scegli una squadra, poi trascina le sfere sul pulsante che pulsa",
+    'tb.menuUnits': "Gruppi di {team}: scegline uno, poi trascina le sfere sul pulsante che pulsa",
+    'tb.units': "Gruppi",
+    'tb.plusNewTeam': "+ Nuova squadra",
+    'tb.plusNewUnit': "+ Nuovo gruppo",
+    'tb.noUnits': "Ancora nessun gruppo.",
+    'tb.backTeams': "\u2039 Tutte le squadre",
+    'tb.startHint': "Trascina una sfera sul pulsante che pulsa. Trascina di nuovo una sfera cerchiata per toglierla. Tocca il pulsante quando hai finito.",
+    'tb.added': "{name} aggiunto",
+    'tb.removed': "{name} tolto",
+    'tb.nameTeam': "Dai un nome a questa squadra",
+    'tb.nameUnit': "Dai un nome a questo gruppo",
+    'tb.emptyFirst': "Non c’è ancora nessuno. Trascina prima almeno una sfera sul pulsante che pulsa.",
+    'tb.keepGoing': "Continua",
+    'tb.discard': "Scarta",
+    'tb.discardChanges': "Scarta le modifiche",
+    'tb.discarded': "Non è stato salvato nulla.",
+    'tb.nameText': "{n} persone. Scrivi un nome, poi tocca Salva.",
+    'tb.teamPh': "Prima squadra",
+    'tb.unitPh': "Ritorno di kickoff",
+    'tb.needName': "Scrivi prima un nome.",
+    'tb.save': "Salva",
+    'tb.noChanges': "Nessuna modifica a {name}.",
+    'tb.confirmTitle': "Salvare {name}?",
+    'tb.confirmText': "{a} aggiunti, {r} tolti. {n} persone in tutto.",
+    'tb.savedTeam': "{name} salvata",
+    'tb.placed': "{n} giocatori sistemati in {u} gruppi in base al ruolo. Chi non ha un ruolo è in Non assegnati.",
+    'tb.done': "Fatto",
+    'tb.reviewUnits': "Rivedi i gruppi",
+    'tb.savedUnit': "{name} salvato: {n} persone.",
+    'tb.alsoTeam': "{n} sono entrati anche in {team}.",
+    'tb.unassigned': "Non assegnati",
     'help.fab': "Aiuto",
     'help.fabAria': "Aiuto: invia un allarme urgente",
     'help.cardTitle': "Invia Aiuto",
@@ -18173,15 +18247,15 @@ const SentinelViews = (() => {
     return 'sv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
   }
 
-  function createView(name, type, contactIds) {
-    const view = {
+  function createView(name, type, contactIds, extra) {
+    const view = Object.assign({
       id: _genId(),
       name: name.trim(),
       type: type,
       contactIds: contactIds.slice(),
       createdAt: Date.now(),
       updatedAt: Date.now()
-    };
+    }, extra || {});
     _views.push(view);
     _save();
     return view;
@@ -18192,13 +18266,17 @@ const SentinelViews = (() => {
     if (!view) return null;
     if (updates.name !== undefined) view.name = updates.name.trim();
     if (updates.contactIds !== undefined) view.contactIds = updates.contactIds.slice();
+    /* Team builder fields: parentId (a Unit's Team), posKey (a Unit made from a position),
+       manualIds (placed by hand in this Unit), pinnedIds (a Team's hand-placed players) */
+    ['parentId', 'posKey', 'manualIds', 'pinnedIds'].forEach(k => { if (updates[k] !== undefined) view[k] = Array.isArray(updates[k]) ? updates[k].slice() : updates[k]; });
     view.updatedAt = Date.now();
     _save();
     return view;
   }
 
   function deleteView(id) {
-    _views = _views.filter(v => v.id !== id);
+    /* A Team takes its Units with it */
+    _views = _views.filter(v => v.id !== id && v.parentId !== id);
     if (_activeViewId === id) {
       _activeViewId = null;
       _applyFilter();
@@ -18285,7 +18363,8 @@ const SentinelViews = (() => {
 
     /* Group by type */
     VIEW_TYPES.forEach(type => {
-      const ofType = _views.filter(v => v.type === type);
+      /* Units that live inside a Team are listed under that Team */
+      const ofType = _views.filter(v => v.type === type && !(type === 'unit' && v.parentId && _views.some(t => t.id === v.parentId)));
       if (ofType.length > 0) {
         h += '<div class="sv-section-label">' + _esc(_t('views.section', '{type} views', { type: TYPE_LABELS[type] })) + '</div>';
         ofType.forEach(v => {
@@ -18307,6 +18386,18 @@ const SentinelViews = (() => {
           h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
           h += '</button>';
           h += '</div></div>';
+          if (type === 'team') {
+            _views.filter(u => u.type === 'unit' && u.parentId === v.id).sort((a, b) => a.name.localeCompare(b.name)).forEach(u => {
+              const uActive = _activeViewId === u.id;
+              h += '<div class="sv-card sv-subcard' + (uActive ? ' active' : '') + '" onclick="SentinelViews.activateView(\'' + u.id + '\')">';
+              h += '<div class="sv-card-icon unit">' + TYPE_ICONS.unit + '</div>';
+              h += '<div class="sv-card-info"><div class="sv-card-name">' + _esc(u.name) + '</div>';
+              h += '<div class="sv-card-meta">' + _esc(u.contactIds.length === 1 ? _t('views.countOne', '1 contact') : _t('views.count', '{n} contacts', { n: u.contactIds.length })) + '</div></div>';
+              h += '<div class="sv-card-actions"><button class="sv-card-btn delete" onclick="event.stopPropagation();SentinelViews.confirmDelete(\'' + u.id + '\')" title="' + _esc(_t('views.delete', 'Delete view')) + '" aria-label="' + _esc(_t('views.delete', 'Delete view')) + '">';
+              h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+              h += '</button></div></div>';
+            });
+          }
         });
       }
     });
@@ -18579,7 +18670,7 @@ const SentinelViews = (() => {
     openPanel, closePanel,
     newView, editView, closeEditor,
     toggleContact, toggleContactEl, selectAll, saveView,
-    activateView, clearView, adoptImport, createView, updateView,
+    activateView, clearView, adoptImport, createView, updateView, deleteView, refresh: () => { _applyFilter(); _updateBadge(); },
     confirmDelete,
     getActiveView,
     getFilteredContacts,
@@ -26608,6 +26699,16 @@ function drawNetworkView(t) {
       ctx.globalAlpha = (0.55 + 0.35 * pulseA) * (alphaOverride || 1);
       ctx.font = `600 ${Math.round(9 * s)}px "Hanken Grotesk", system-ui, sans-serif`;
       ctx.fillText(sevLabel(node.contact.sev).toLowerCase(), sx, _roleTxt ? _roleY + 12 : sy + r + 24 * s);
+    }
+
+    /* ── Team builder: thin ring on members of the group being built ── */
+    if (typeof TeamBuilder !== 'undefined' && TeamBuilder && TeamBuilder.isMember(node.contact.id)) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.95 * (alphaOverride || 1);
+      ctx.strokeStyle = '#E8C766';
+      ctx.lineWidth = Math.max(2.5, 4 * s);
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(sx, sy, r + Math.max(4, 7 * s), 0, Math.PI * 2); ctx.stroke();
     }
 
     /* ── Quick-action icons beneath focused/enlarged sphere ── */
@@ -38410,6 +38511,381 @@ var AlarmCenter = (function () {
   return { poll: poll, acknowledge: acknowledge, cancel: cancel, sendTest: sendTest, sendHelp: sendHelp,
     setHelpTarget: setHelpTarget, onSettingsOpen: onSettingsOpen, savePrefs: savePrefs,
     openHelpCard: openHelpCard, closeHelpCard: closeHelpCard, updateFab: updateFab, voiceStrained: voiceStrained, _open: function () { return _open.slice(); } };
+})();
+
+
+/* ═══ TeamBuilder: build Teams and their Units on the canvas ═══
+   Team button (bottom left, same size and font as List view). Tap it: your
+   Teams plus + New team. Pick one: the button pulses with the name and count,
+   and any sphere dragged onto it joins (a member dragged onto it again
+   leaves). A drag that starts on empty space still turns the galaxy. Tap the
+   pulsing button again to finish: name a new group, or confirm the changes.
+   After a Team is saved, each player is placed in a Unit named after the
+   position on their profile (#90, Position PK, goes to PK); players with no
+   position go to Unassigned. Review units works the same way, one Unit at a
+   time. A player placed in a Unit by hand keeps that place when their
+   profile position changes. */
+var TeamBuilder = (function () {
+  var _s = null;            /* { kind: 'team'|'unit', viewId|null, parentId, name, base:Set, ids:Set } */
+  var _menu = null;         /* null | { mode: 'teams' } | { mode: 'units', teamId } */
+  var _drag = null;         /* { node, x0, y0, ghost, live } */
+  var DRAG_PX = 8;
+
+  function _views() { try { return SentinelViews.views || []; } catch (e) { return []; } }
+  function _find(id) { return _views().find(function (v) { return v.id === id; }) || null; }
+  function _contact(id) { try { return DEMO_CONTACTS.find(function (c) { return c.id === id; }) || null; } catch (e) { return null; } }
+  function _cname(c) { return c ? (((c.first || '') + ' ' + (c.last || '')).trim() || '?') : '?'; }
+  function _initials(c) { return c ? (((c.first || '')[0] || '') + ((c.last || '')[0] || '')).toUpperCase() || '?' : '?'; }
+  function _esc(x) { var d = document.createElement('div'); d.textContent = x == null ? '' : String(x); return d.innerHTML; }
+  function isMember(id) { return !!(_s && _s.ids.has(id)); }
+
+  /* Position on the profile: the first code of "WR/KR" is WR. Empty: null. */
+  function posKey(c) {
+    var d = c && c.details;
+    var v = d && typeof d === 'object' ? (d.position || '') : '';
+    v = String(v).trim().split(/[\/,;|\s]+/)[0] || '';
+    return v ? v.toUpperCase().slice(0, 12) : null;
+  }
+
+  function _css() {
+    if (document.getElementById('teamBuilderCss')) return;
+    var st = document.createElement('style');
+    st.id = 'teamBuilderCss';
+    st.textContent =
+      '.team-fab{position:fixed;left:20px;bottom:20px;z-index:8000;height:48px;padding:0 16px;border-radius:24px;box-sizing:border-box;border:1px solid rgba(255,255,255,0.18);background:rgba(19,26,39,0.92);color:#e5e7eb;font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;display:none;max-width:calc(100vw - 210px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      'body.network-active .team-fab{display:block}' +
+      'body.rs-overlay-open .team-fab{display:none !important}' +
+      '.team-fab:focus-visible{outline:2px solid #C5A55A;outline-offset:2px}' +
+      '.team-fab.live{border-color:#38d4ff;color:#bfefff;animation:teamPulse 1.3s ease-in-out infinite}' +
+      '.team-fab.over{background:rgba(56,212,255,.28)}' +
+      '@keyframes teamPulse{0%,100%{box-shadow:0 0 0 0 rgba(56,212,255,.65)}50%{box-shadow:0 0 0 10px rgba(56,212,255,0)}}' +
+      '@media (prefers-reduced-motion: reduce){.team-fab.live{animation:none;box-shadow:0 0 0 3px rgba(56,212,255,.6)}}' +
+      '.team-menu{position:fixed;left:16px;bottom:78px;z-index:8600;width:min(320px,calc(100vw - 32px));max-height:min(60vh,460px);overflow:auto;background:#10131c;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:10px;box-shadow:0 12px 40px rgba(0,0,0,.6);color:#e8ecf4;font:14px "Hanken Grotesk",system-ui,sans-serif}' +
+      '.team-menu h3{margin:4px 34px 8px 6px;font-size:15px}' +
+      '.team-menu .tm-x{position:absolute;top:6px;right:8px;background:none;border:0;color:#e8ecf4;font-size:22px;cursor:pointer;padding:4px 8px}' +
+      '.team-menu .tm-row{display:flex;gap:6px;align-items:center;margin:4px 0}' +
+      '.team-menu .tm-pick{flex:1;text-align:left;font:inherit;font-weight:600;padding:11px 12px;border-radius:12px;border:1px solid rgba(56,212,255,.45);background:transparent;color:#e8ecf4;cursor:pointer}' +
+      '.team-menu .tm-pick .tm-n{color:#94a3b8;font-weight:500}' +
+      '.team-menu .tm-sub{font:inherit;font-size:13px;padding:11px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#cbd5e1;cursor:pointer;white-space:nowrap}' +
+      '.team-menu .tm-new{border-style:dashed;color:#38d4ff}' +
+      '.team-menu .tm-back{font:inherit;font-size:13px;background:none;border:0;color:#94a3b8;cursor:pointer;padding:8px 6px}' +
+      '.team-menu .tm-empty{color:#94a3b8;font-size:13px;margin:6px}' +
+      '.team-ghost{position:fixed;z-index:9900;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(56,212,255,.25);border:2px solid #38d4ff;color:#fff;font:700 16px "Hanken Grotesk",system-ui,sans-serif;display:flex;align-items:center;justify-content:center;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}' +
+      '.team-card-wrap{position:fixed;inset:0;z-index:8800;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}' +
+      '.team-card{position:relative;width:min(420px,100%);background:#10131c;border:1px solid rgba(56,212,255,.5);border-radius:18px;padding:20px 16px 16px;color:#e8ecf4;font:14px "Hanken Grotesk",system-ui,sans-serif;box-shadow:0 12px 40px rgba(0,0,0,.6)}' +
+      '.team-card h2{margin:0 30px 8px 0;font-size:19px}' +
+      '.team-card p{margin:0 0 12px;line-height:1.4}' +
+      '.team-card input{display:block;width:100%;box-sizing:border-box;padding:11px;border-radius:10px;background:rgba(255,255,255,.06);color:inherit;border:1px solid rgba(56,212,255,.6);font:inherit;font-size:16px;margin-bottom:6px}' +
+      '.team-card .tc-x{position:absolute;top:8px;right:10px;background:none;border:0;color:#e8ecf4;font-size:22px;cursor:pointer;padding:4px 8px}' +
+      '.team-card .tc-row{display:flex;gap:10px;margin-top:12px}' +
+      '.team-card .tc-row button{flex:1;font:inherit;font-weight:700;padding:11px;border-radius:12px;cursor:pointer}' +
+      '.team-card .tc-sec{background:transparent;color:#e8ecf4;border:1px solid rgba(255,255,255,.35)}' +
+      '.team-card .tc-go{background:#38d4ff;color:#04121a;border:0}' +
+      '.team-card .tc-err{color:#fca5a5;font-size:13px;min-height:1em}' +
+      '.sv-subcard{margin-left:22px}';
+    document.head.appendChild(st);
+  }
+
+  /* ── Button ── */
+  function _fab() {
+    var b = document.getElementById('teamFab');
+    if (!b) {
+      b = document.createElement('button');
+      b.type = 'button'; b.id = 'teamFab'; b.className = 'team-fab';
+      b.onclick = _onFab;
+      document.body.appendChild(b);
+    }
+    return b;
+  }
+  function _paint() {
+    _css();
+    var b = _fab();
+    b.classList.toggle('live', !!_s);
+    if (_s) {
+      var nm = _s.name || (_s.kind === 'team' ? _t('tb.newTeam', 'New team') : _t('tb.newUnit', 'New unit'));
+      b.textContent = nm + ' · ' + _s.ids.size;
+      b.setAttribute('aria-label', _t('tb.liveAria', '{name}, {n} people. Drag spheres here. Tap to finish.', { name: nm, n: _s.ids.size }));
+    } else {
+      b.textContent = _t('tb.button', 'Team');
+      b.setAttribute('aria-label', _t('tb.buttonAria', 'Teams: build a team or its units'));
+    }
+  }
+  function _onFab() { if (_s) _finish(); else if (_menu) _closeMenu(); else _openMenu({ mode: 'teams' }); }
+
+  /* ── Menu ── */
+  function _closeMenu() { _menu = null; var m = document.getElementById('teamMenu'); if (m) m.remove(); }
+  function _openMenu(state) {
+    _css();
+    _closeMenu();
+    _menu = state;
+    var m = document.createElement('div');
+    m.id = 'teamMenu'; m.className = 'team-menu'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', _t('tb.button', 'Team'));
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'tm-x'; x.textContent = '×'; x.setAttribute('aria-label', _t('alarm.close', 'Hide')); x.onclick = _closeMenu;
+    m.appendChild(x);
+    var h = document.createElement('h3');
+    function row(label, n, onPick, sub) {
+      var r = document.createElement('div'); r.className = 'tm-row';
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'tm-pick';
+      b.innerHTML = _esc(label) + (n == null ? '' : ' <span class="tm-n">· ' + n + '</span>');
+      b.onclick = onPick; r.appendChild(b);
+      if (sub) { var s2 = document.createElement('button'); s2.type = 'button'; s2.className = 'tm-sub'; s2.textContent = sub.label; s2.onclick = sub.run; r.appendChild(s2); }
+      m.appendChild(r);
+      return b;
+    }
+    if (state.mode === 'teams') {
+      h.textContent = _t('tb.menuTeams', 'Pick a team, then drag spheres onto the pulsing button');
+      m.appendChild(h);
+      var teams = _views().filter(function (v) { return v.type === 'team'; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      teams.forEach(function (t) {
+        row(t.name, t.contactIds.length, function () { _start('team', t.id, null); },
+          { label: _t('tb.units', 'Units'), run: function () { _autoAssign(t.id); _openMenu({ mode: 'units', teamId: t.id }); } });
+      });
+      var nb = row(_t('tb.plusNewTeam', '+ New team'), null, function () { _start('team', null, null); });
+      nb.classList.add('tm-new');
+    } else {
+      var team = _find(state.teamId);
+      if (!team) { _openMenu({ mode: 'teams' }); return; }
+      h.textContent = _t('tb.menuUnits', '{team} units: pick one, then drag spheres onto the pulsing button', { team: team.name });
+      m.appendChild(h);
+      var units = _views().filter(function (v) { return v.type === 'unit' && v.parentId === team.id; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      if (!units.length) { var e = document.createElement('div'); e.className = 'tm-empty'; e.textContent = _t('tb.noUnits', 'No units yet.'); m.appendChild(e); }
+      units.forEach(function (u) { row(u.name, u.contactIds.length, function () { _start('unit', u.id, team.id); }); });
+      var nu = row(_t('tb.plusNewUnit', '+ New unit'), null, function () { _start('unit', null, team.id); });
+      nu.classList.add('tm-new');
+      var back = document.createElement('button'); back.type = 'button'; back.className = 'tm-back'; back.textContent = _t('tb.backTeams', '‹ All teams'); back.onclick = function () { _openMenu({ mode: 'teams' }); };
+      m.appendChild(back);
+    }
+    document.body.appendChild(m);
+    var first = m.querySelector('.tm-pick'); if (first) setTimeout(function () { try { first.focus(); } catch (e) {} }, 30);
+  }
+
+  /* ── Session ── */
+  function _start(kind, viewId, parentId) {
+    _closeMenu();
+    var v = viewId ? _find(viewId) : null;
+    var base = new Set(v ? v.contactIds : []);
+    _s = { kind: kind, viewId: viewId, parentId: parentId, name: v ? v.name : '', base: base, ids: new Set(base) };
+    _paint();
+    try { if (typeof enterNetwork === 'function' && appState !== 'network') enterNetwork(); } catch (e) {}
+    showToast(_t('tb.startHint', 'Drag any sphere onto the pulsing button. Drag a ringed sphere onto it again to take it out. Tap the button when you are done.'));
+  }
+  function _toggle(id) {
+    if (!_s) return;
+    var c = _contact(id);
+    if (_s.ids.has(id)) { _s.ids.delete(id); showToast(_t('tb.removed', '{name} taken out', { name: _cname(c) })); }
+    else { _s.ids.add(id); showToast(_t('tb.added', '{name} added', { name: _cname(c) })); }
+    try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
+    _paint();
+  }
+  function _diff() {
+    var added = 0, removed = 0;
+    _s.ids.forEach(function (id) { if (!_s.base.has(id)) added++; });
+    _s.base.forEach(function (id) { if (!_s.ids.has(id)) removed++; });
+    return { added: added, removed: removed };
+  }
+  function _end() { _s = null; _paint(); }
+
+  function _card(title, text, opts) {
+    _css();
+    _closeCard();
+    var wrap = document.createElement('div'); wrap.id = 'teamCardWrap'; wrap.className = 'team-card-wrap';
+    var card = document.createElement('div'); card.className = 'team-card'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-labelledby', 'tcTitle');
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'tc-x'; x.textContent = '×'; x.setAttribute('aria-label', _t('alarm.close', 'Hide')); x.onclick = function () { _closeCard(); if (opts.onClose) opts.onClose(); };
+    var h = document.createElement('h2'); h.id = 'tcTitle'; h.textContent = title;
+    card.appendChild(x); card.appendChild(h);
+    if (text) { var p = document.createElement('p'); p.textContent = text; card.appendChild(p); }
+    var input = null, err = null;
+    if (opts.input) {
+      input = document.createElement('input'); input.type = 'text'; input.maxLength = 40; input.id = 'tcName'; input.placeholder = opts.input.placeholder || ''; input.value = opts.input.value || '';
+      card.appendChild(input);
+      err = document.createElement('div'); err.className = 'tc-err'; card.appendChild(err);
+    }
+    var row = document.createElement('div'); row.className = 'tc-row';
+    (opts.buttons || []).forEach(function (bd) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = bd.primary ? 'tc-go btn-advance' : 'tc-sec'; b.textContent = bd.label;
+      b.onclick = function () { bd.run(input ? input.value.trim() : null, err); };
+      row.appendChild(b);
+    });
+    card.appendChild(row);
+    wrap.appendChild(card); document.body.appendChild(wrap);
+    try { rsOverlayFlag('teamcard', true); } catch (e) {}
+    if (input) {
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { var g = row.querySelector('.tc-go'); if (g) g.click(); } });
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 30);
+    } else { var g = row.querySelector('.tc-go'); if (g) setTimeout(function () { try { g.focus(); } catch (e) {} }, 30); }
+  }
+  function _closeCard() { var w = document.getElementById('teamCardWrap'); if (w) w.remove(); try { rsOverlayFlag('teamcard', false); } catch (e) {} }
+
+  function _finish() {
+    if (!_s) return;
+    var d = _diff();
+    var isTeam = _s.kind === 'team';
+    if (!_s.viewId) {
+      if (!_s.ids.size) {
+        _card(isTeam ? _t('tb.nameTeam', 'Name this team') : _t('tb.nameUnit', 'Name this unit'),
+          _t('tb.emptyFirst', 'Nobody is in it yet. Drag at least one sphere onto the pulsing button first.'),
+          { buttons: [
+            { label: _t('tb.discard', 'Discard'), run: function () { _closeCard(); _end(); } },
+            { label: _t('tb.keepGoing', 'Keep going'), primary: true, run: function () { _closeCard(); } } ] });
+        return;
+      }
+      _card(isTeam ? _t('tb.nameTeam', 'Name this team') : _t('tb.nameUnit', 'Name this unit'),
+        _t('tb.nameText', '{n} people. Type a name, then tap Save.', { n: _s.ids.size }),
+        { input: { placeholder: isTeam ? _t('tb.teamPh', 'Varsity') : _t('tb.unitPh', 'Kickoff return') },
+          buttons: [
+            { label: _t('tb.discard', 'Discard'), run: function () { _closeCard(); _end(); showToast(_t('tb.discarded', 'Nothing was saved.')); } },
+            { label: _t('tb.save', 'Save'), primary: true, run: function (name, err) {
+              if (!name) { if (err) err.textContent = _t('tb.needName', 'Type a name first.'); return; }
+              _closeCard(); _save(name);
+            } } ] });
+      return;
+    }
+    if (!d.added && !d.removed) { var nm0 = _s.name; _end(); showToast(_t('tb.noChanges', 'No changes to {name}.', { name: nm0 })); return; }
+    _card(_t('tb.confirmTitle', 'Save {name}?', { name: _s.name }),
+      _t('tb.confirmText', '{a} added, {r} taken out. {n} people in total.', { a: d.added, r: d.removed, n: _s.ids.size }),
+      { buttons: [
+        { label: _t('tb.discardChanges', 'Discard changes'), run: function () { _closeCard(); _end(); showToast(_t('tb.discarded', 'Nothing was saved.')); } },
+        { label: _t('tb.save', 'Save'), primary: true, run: function () { _closeCard(); _save(null); } } ] });
+  }
+
+  function _save(newName) {
+    var s = _s;
+    var ids = Array.from(s.ids);
+    var view;
+    if (s.kind === 'team') {
+      if (s.viewId) view = SentinelViews.updateView(s.viewId, { contactIds: ids });
+      else view = SentinelViews.createView(newName, 'team', ids, { pinnedIds: [] });
+      _end();
+      var r = _autoAssign(view.id);
+      try { SentinelViews.refresh(); } catch (e) {}
+      _card(_t('tb.savedTeam', '{name} saved', { name: view.name }),
+        _t('tb.placed', 'Placed {n} players in {u} units by position. Players with no position are in Unassigned.', { n: r.placed, u: r.units }),
+        { buttons: [
+          { label: _t('tb.done', 'Done'), run: function () { _closeCard(); } },
+          { label: _t('tb.reviewUnits', 'Review units'), primary: true, run: function () { _closeCard(); _openMenu({ mode: 'units', teamId: view.id }); } } ] });
+      return;
+    }
+    /* Unit: hand placement sticks; a newcomer to the Unit also joins the Team */
+    var team = _find(s.parentId);
+    var added = ids.filter(function (id) { return !s.base.has(id); });
+    var removed = Array.from(s.base).filter(function (id) { return !s.ids.has(id); });
+    if (s.viewId) {
+      var u = _find(s.viewId);
+      var manual = new Set(u.manualIds || []);
+      added.forEach(function (id) { manual.add(id); });
+      removed.forEach(function (id) { manual.delete(id); });
+      view = SentinelViews.updateView(s.viewId, { contactIds: ids, manualIds: Array.from(manual) });
+    } else {
+      view = SentinelViews.createView(newName, 'unit', ids, { parentId: s.parentId, posKey: null, manualIds: ids.slice() });
+    }
+    var joined = 0;
+    if (team) {
+      var tIds = new Set(team.contactIds);
+      var pinned = new Set(team.pinnedIds || []);
+      added.forEach(function (id) { if (!tIds.has(id)) { tIds.add(id); joined++; } pinned.add(id); });
+      removed.forEach(function (id) { pinned.add(id); });
+      SentinelViews.updateView(team.id, { contactIds: Array.from(tIds), pinnedIds: Array.from(pinned) });
+    }
+    _end();
+    try { SentinelViews.refresh(); } catch (e) {}
+    showToast(_t('tb.savedUnit', '{name} saved: {n} people.', { name: view.name, n: ids.length }) + (joined ? ' ' + _t('tb.alsoTeam', '{n} also joined {team}.', { n: joined, team: team.name }) : ''));
+    if (team) setTimeout(function () { _openMenu({ mode: 'units', teamId: team.id }); }, 400);
+  }
+
+  /* Position Units for a Team. Players placed by hand (pinned) keep their places;
+     everyone else follows the position on their profile. */
+  function _autoAssign(teamId) {
+    var team = _find(teamId);
+    if (!team) return { placed: 0, units: 0 };
+    var members = new Set(team.contactIds);
+    var units = _views().filter(function (v) { return v.type === 'unit' && v.parentId === teamId; });
+    var pinned = new Set(team.pinnedIds || []);
+    units.forEach(function (u) { (u.manualIds || []).forEach(function (id) { pinned.add(id); }); });
+    var byKey = {};
+    units.forEach(function (u) { if (u.posKey) byKey[u.posKey] = u; });
+    var want = {};
+    team.contactIds.forEach(function (id) {
+      if (pinned.has(id)) return;
+      var k = posKey(_contact(id)) || '__none__';
+      (want[k] = want[k] || []).push(id);
+    });
+    Object.keys(want).forEach(function (k) {
+      if (!byKey[k]) {
+        byKey[k] = SentinelViews.createView(k === '__none__' ? _t('tb.unassigned', 'Unassigned') : k, 'unit', [], { parentId: teamId, posKey: k, manualIds: [] });
+      }
+    });
+    Object.keys(byKey).forEach(function (k) {
+      var u = byKey[k];
+      var keep = (u.contactIds || []).filter(function (id) { return members.has(id) && pinned.has(id); });
+      var ids = keep.concat((want[k] || []).filter(function (id) { return keep.indexOf(id) < 0; }));
+      if (!ids.length) { SentinelViews.deleteView(u.id); return; }
+      SentinelViews.updateView(u.id, { contactIds: ids });
+    });
+    /* Hand-made Units drop anyone who left the Team */
+    _views().filter(function (v) { return v.type === 'unit' && v.parentId === teamId && !v.posKey; }).forEach(function (u) {
+      var ids = u.contactIds.filter(function (id) { return members.has(id); });
+      if (ids.length !== u.contactIds.length) SentinelViews.updateView(u.id, { contactIds: ids, manualIds: (u.manualIds || []).filter(function (id) { return members.has(id); }) });
+    });
+    var placed = 0;
+    team.contactIds.forEach(function (id) { if (!pinned.has(id)) placed++; });
+    var nUnits = _views().filter(function (v) { return v.type === 'unit' && v.parentId === teamId && v.contactIds.length; }).length;
+    return { placed: placed, units: nUnits };
+  }
+
+  /* ── Drag a sphere onto the button ── */
+  function _overFab(x, y) {
+    var b = document.getElementById('teamFab'); if (!b) return false;
+    var r = b.getBoundingClientRect();
+    return x >= r.left - 24 && x <= r.right + 24 && y >= r.top - 24 && y <= r.bottom + 24;
+  }
+  function _canDrag() {
+    return !!_s && typeof appState !== 'undefined' && appState === 'network' && !(typeof overlayOpen !== 'undefined' && overlayOpen) && !(typeof blufOpen !== 'undefined' && blufOpen) && !document.body.classList.contains('rs-overlay-open');
+  }
+  window.addEventListener('pointerdown', function (e) {
+    _drag = null;
+    if (!_canDrag() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    var t = e.target;
+    if (!t || !(t.id === 'sphere' || (t.closest && t.closest('#stage')))) return;
+    var hit = null;
+    try { hit = hitTestNetwork(e.clientX, e.clientY); } catch (err) { hit = null; }
+    if (hit && hit.node) _drag = { node: hit.node, x0: e.clientX, y0: e.clientY, ghost: null, live: false, pid: e.pointerId };
+  }, true);
+  window.addEventListener('pointermove', function (e) {
+    if (!_drag || e.pointerId !== _drag.pid) return;
+    if (!_drag.live) {
+      if (Math.hypot(e.clientX - _drag.x0, e.clientY - _drag.y0) < DRAG_PX) return;
+      _drag.live = true;
+      /* Take the gesture from the galaxy: it no longer turns */
+      try { cancelPress(); netDragging = false; } catch (err) {}
+      var g = document.createElement('div'); g.className = 'team-ghost'; g.textContent = _initials(_drag.node.contact);
+      document.body.appendChild(g); _drag.ghost = g;
+    }
+    _drag.ghost.style.left = e.clientX + 'px'; _drag.ghost.style.top = e.clientY + 'px';
+    var b = document.getElementById('teamFab'); if (b) b.classList.toggle('over', _overFab(e.clientX, e.clientY));
+  }, true);
+  function _drop(e) {
+    if (!_drag || e.pointerId !== _drag.pid) return;
+    var d = _drag; _drag = null;
+    if (!d.live) return;
+    if (d.ghost) d.ghost.remove();
+    var b = document.getElementById('teamFab'); if (b) b.classList.remove('over');
+    if (e.type === 'pointerup' && _overFab(e.clientX, e.clientY)) _toggle(d.node.contact.id);
+  }
+  window.addEventListener('pointerup', _drop, true);
+  window.addEventListener('pointercancel', _drop, true);
+
+  function start() {
+    _paint();
+    window.addEventListener('localeChanged', _paint);
+    /* Another panel opened: the Team menu steps aside */
+    setInterval(function () { if (_menu && document.body.classList.contains('rs-overlay-open')) _closeMenu(); }, 400);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (document.getElementById('teamCardWrap')) return; if (_menu) _closeMenu(); } });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else setTimeout(start, 0);
+
+  return { isMember: isMember, posKey: posKey, autoAssign: _autoAssign, openMenu: _openMenu, closeMenu: _closeMenu, finish: _finish,
+    _start: _start, _toggle: _toggle, get session() { return _s; } };
 })();
 
 /* B1: every declaration above is now initialised; release any queued reveal. */
