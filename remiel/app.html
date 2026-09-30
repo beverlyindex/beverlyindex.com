@@ -11176,6 +11176,25 @@ const I18n = (function () {
     'tb.menuUnits': "{team} units: pick one, then drag spheres onto the pulsing button",
     'tb.units': "Units",
     'tb.plusNewTeam': "+ New team",
+    'tb.fromTemplate': "+ New team from a template",
+    'tb.pickVenue': "Pick a venue",
+    'tb.pickTemplate': "{venue}: pick a template",
+    'tb.unitsWord': "units",
+    'tb.backVenues': "‹ All venues",
+    'tb.back': "Back",
+    'tb.create': "Create",
+    'tb.tplText': "{n} units: {list}. Type a name for this team, then tap Create.",
+    'tb.tplCreated': "{name} created",
+    'tb.tplFits': "{u} units are ready. {n} people in your circle have a position that fits. Add them now, or drag people onto the pulsing Team button.",
+    'tb.tplEmpty': "{u} units are ready. Drag people onto the pulsing Team button; each goes to the unit that matches the Position on their profile.",
+    'tb.dragIn': "Drag people in",
+    'tb.addFits': "Add {n} by position",
+    'tb.tplPlaced': "Placed {n} people in {u} units by position.",
+    'venue.sports': "Sports",
+    'venue.military': "Military",
+    'venue.health': "Hospitals and clinics",
+    'venue.political': "Political",
+    'venue.federal': "Federal agencies",
     'tb.plusNewUnit': "+ New unit",
     'tb.noUnits': "No units yet.",
     'tb.backTeams': "\u2039 All teams",
@@ -11894,6 +11913,25 @@ const I18n = (function () {
     'tb.menuUnits': "Gruppi di {team}: scegline uno, poi trascina le sfere sul pulsante che pulsa",
     'tb.units': "Gruppi",
     'tb.plusNewTeam': "+ Nuova squadra",
+    'tb.fromTemplate': "+ Nuova squadra da un modello",
+    'tb.pickVenue': "Scegli un ambito",
+    'tb.pickTemplate': "{venue}: scegli un modello",
+    'tb.unitsWord': "gruppi",
+    'tb.backVenues': "‹ Tutti gli ambiti",
+    'tb.back': "Indietro",
+    'tb.create': "Crea",
+    'tb.tplText': "{n} gruppi: {list}. Scrivi un nome per questa squadra, poi tocca Crea.",
+    'tb.tplCreated': "{name} creata",
+    'tb.tplFits': "{u} gruppi sono pronti. {n} persone della tua cerchia hanno un ruolo che corrisponde. Aggiungile ora, oppure trascina le persone sul pulsante Squadra che pulsa.",
+    'tb.tplEmpty': "{u} gruppi sono pronti. Trascina le persone sul pulsante Squadra che pulsa; ognuna va nel gruppo che corrisponde al Ruolo nel suo profilo.",
+    'tb.dragIn': "Trascina le persone",
+    'tb.addFits': "Aggiungi {n} per ruolo",
+    'tb.tplPlaced': "{n} persone messe in {u} gruppi per ruolo.",
+    'venue.sports': "Sport",
+    'venue.military': "Militare",
+    'venue.health': "Ospedali e cliniche",
+    'venue.political': "Politica",
+    'venue.federal': "Agenzie federali",
     'tb.plusNewUnit': "+ Nuovo gruppo",
     'tb.noUnits': "Ancora nessun gruppo.",
     'tb.backTeams': "\u2039 Tutte le squadre",
@@ -39335,6 +39373,129 @@ var AlarmCenter = (function () {
 })();
 
 
+/* ═══ Venue templates: ready-made Teams and Units ═══
+   Each template is one Team with its Units. A person's Position (the first
+   code of the Position field on their profile) places them in a Unit: a code
+   equal to a Unit key, or starting with the key and a hyphen (1PLT-SL goes to
+   1PLT), lands there. Anyone else goes to Unassigned. Structures follow the
+   public organisation of each venue (sources in the Venue Structures
+   reference); names of organisations stay in English. */
+var VENUES = [
+  { id: 'sports', icon: '🏈', label: 'venue.sports', fallback: 'Sports', templates: [
+    { id: 'sp-football', name: 'Football Team', units: [
+      ['Offense', ['QB', 'RB', 'FB', 'HB', 'WR', 'TE', 'OL', 'C', 'G', 'T', 'OG', 'OT', 'LT', 'RT', 'LG', 'RG']],
+      ['Defense', ['DL', 'DE', 'DT', 'NT', 'EDGE', 'LB', 'ILB', 'OLB', 'MLB', 'CB', 'S', 'FS', 'SS', 'DB', 'NB']],
+      ['Special Teams', ['K', 'P', 'LS', 'KR', 'PR', 'ST']],
+      ['Coaching Staff', ['HC', 'OC', 'DC', 'STC', 'COACH', 'QC', 'GA']],
+      ['Medical and Performance', ['AT', 'ATC', 'TRAINER', 'DOC', 'PT', 'SC', 'NUTR']] ] },
+    { id: 'sp-basketball', name: 'Basketball Team', units: [
+      ['Guards', ['PG', 'SG', 'G']], ['Forwards', ['SF', 'PF', 'F']], ['Centers', ['C']],
+      ['Coaching Staff', ['HC', 'AC', 'COACH']], ['Medical and Performance', ['AT', 'ATC', 'TRAINER', 'DOC', 'PT', 'SC']] ] },
+    { id: 'sp-club', name: 'Club or School Team', units: [
+      ['Coaches', ['HC', 'AC', 'COACH']], ['Captains', ['CAPT']], ['Starters', ['START']], ['Reserves', ['RES']],
+      ['Parents and Volunteers', ['PARENT', 'VOL']], ['Medical', ['AT', 'DOC', 'MED']] ] } ] },
+  { id: 'military', icon: '🎖', label: 'venue.military', fallback: 'Military', templates: [
+    { id: 'mil-army-co', name: 'Army Rifle Company', units: [
+      ['Company HQ', ['HQ', 'CO', 'CDR', 'XO', '1SG', 'SUPPLY', 'ARMORER', 'RTO', 'FSO', 'FSNCO']],
+      ['1st Platoon', ['1PLT']], ['2nd Platoon', ['2PLT']], ['3rd Platoon', ['3PLT']], ['Weapons Platoon', ['WPN']] ] },
+    { id: 'mil-army-bn', name: 'Army Battalion', units: [
+      ['Battalion Command', ['CDR', 'XO', 'CSM', 'CHAP', 'PA']], ['Staff (S1 to S6)', ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']],
+      ['HHC', ['HHC']], ['Alpha Company', ['A']], ['Bravo Company', ['B']], ['Charlie Company', ['C']],
+      ['Delta Company', ['D']], ['Forward Support Company', ['FSC']] ] },
+    { id: 'mil-army-bct', name: 'Army Brigade Combat Team', units: [
+      ['Brigade HQ', ['BDE', 'CDR', 'DCO', 'XO', 'CSM']], ['Staff (S1 to S6)', ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']],
+      ['1st Battalion', ['1BN']], ['2nd Battalion', ['2BN']], ['3rd Battalion', ['3BN']], ['Cavalry Squadron', ['CAV']],
+      ['Field Artillery Battalion', ['FA']], ['Brigade Engineer Battalion', ['BEB']], ['Brigade Support Battalion', ['BSB']] ] },
+    { id: 'mil-usmc-co', name: 'Marine Rifle Company', units: [
+      ['Company HQ', ['HQ', 'CO', 'XO', '1STSGT', 'GYSGT']], ['1st Platoon', ['1PLT']], ['2nd Platoon', ['2PLT']],
+      ['3rd Platoon', ['3PLT']], ['Weapons Platoon', ['WPN']] ] },
+    { id: 'mil-navy-ship', name: 'Navy Ship', units: [
+      ['Command', ['CO', 'XO', 'CMC']], ['Operations', ['OPS']], ['Combat Systems', ['CS', 'WEPS']], ['Engineering', ['ENG']],
+      ['Supply', ['SUP']], ['Deck', ['DECK']], ['Navigation', ['NAV']], ['Admin', ['ADMIN']], ['Medical', ['MED', 'HM']] ] },
+    { id: 'mil-af-sq', name: 'Air Force Squadron', units: [
+      ['Command Section', ['CC', 'DO', 'CD', 'SEL', 'CSS', 'FIRSTSGT', 'UDM']], ['A Flight', ['AFLT']], ['B Flight', ['BFLT']],
+      ['C Flight', ['CFLT']], ['D Flight', ['DFLT']] ] },
+    { id: 'mil-af-wing', name: 'Air Force Wing', units: [
+      ['Wing Staff', ['WG', 'CV', 'CCC', 'SE', 'PA', 'JA', 'HC', 'IG', 'EO', 'XP']], ['Operations Group', ['OG', 'OSS', 'FS', 'BS', 'AS', 'ARS']],
+      ['Maintenance Group', ['MXG', 'AMXS', 'MXS', 'MUNS']], ['Mission Support Group', ['MSG', 'SFS', 'CES', 'FSS', 'LRS', 'CONS', 'CS']],
+      ['Medical Group', ['MDG', 'OMRS', 'HCOS']] ] },
+    { id: 'mil-garrison', name: 'Army Installation (Garrison)', units: [
+      ['Garrison HQ', ['GC', 'DGC', 'CSM', 'GAR']], ['Human Resources (DHR)', ['DHR']], ['Plans, Training and Security (DPTMS)', ['DPTMS']],
+      ['Public Works (DPW)', ['DPW']], ['Emergency Services (DES)', ['DES', 'PM', 'FIRE']], ['Family and MWR (DFMWR)', ['DFMWR', 'ACS', 'CYS']],
+      ['Religious Support', ['RSO', 'CHAP']], ['Safety', ['SAFETY']], ['Public Affairs', ['PAO']], ['Medical and Dental', ['MTF', 'DENTAL']] ] },
+    { id: 'mil-sfrg', name: 'Soldier and Family Readiness Group', units: [
+      ['Command Team', ['CDR', '1SG', 'CSM']], ['SFRG Leadership', ['SFRG', 'FRSA']], ['Volunteers', ['VOL', 'POC']], ['Families', ['FAM']] ] } ] },
+  { id: 'health', icon: '🏥', label: 'venue.health', fallback: 'Hospitals and clinics', templates: [
+    { id: 'hc-neuro', name: 'Neurology Department', units: [
+      ['Stroke and Vascular', ['STRK']], ['Epilepsy', ['EPI']], ['Movement Disorders', ['MOVE']], ['Neuromuscular', ['NMUS']],
+      ['Memory and Behavioral Neurology', ['MEM']], ['Multiple Sclerosis', ['MS']], ['Headache', ['HA']], ['Neuro-Oncology', ['NONC']],
+      ['Neurocritical Care', ['NCC']], ['Sleep Medicine', ['SLEEP']], ['Inpatient Neurology', ['INPT']], ['Consult Service', ['CONS']],
+      ['Outpatient Clinic', ['CLIN']], ['Residency and Education', ['EDU', 'PD', 'CHFRES']], ['Leadership', ['CHAIR', 'VCHAIR', 'ADMIN']] ] },
+    { id: 'hc-psych', name: 'Psychiatry and Behavioral Health', units: [
+      ['Adult Inpatient', ['IPADULT']], ['Child and Adolescent', ['CAP']], ['Geriatric Psychiatry', ['GERI']], ['Consultation-Liaison', ['CL']],
+      ['Emergency and Crisis', ['PES']], ['Addiction', ['ADDX']], ['Mood, Anxiety and Neuromodulation', ['MOOD']],
+      ['Psychology and Neuropsychology', ['PSYC']], ['Outpatient, IOP and PHP', ['OUTPT']], ['Research', ['RSCH']], ['Leadership', ['CHAIR', 'VCHAIR', 'ADMIN']] ] },
+    { id: 'hc-onc', name: 'Cancer Center', units: [
+      ['Breast', ['MO-BRST', 'BRST']], ['Thoracic', ['MO-THOR', 'THOR']], ['Gastrointestinal', ['MO-GI', 'GI']], ['Genitourinary', ['MO-GU', 'GU']],
+      ['Gynecologic Oncology', ['MO-GYN', 'GYN']], ['Head and Neck', ['MO-HN', 'HN']], ['Melanoma and Sarcoma', ['MO-MEL', 'MEL']],
+      ['Hematologic Malignancies and BMT', ['HEME']], ['Radiation Oncology', ['RADONC']], ['Surgical Oncology', ['SURGONC']],
+      ['Inpatient Oncology', ['INPT']], ['Infusion Center', ['INF']], ['Palliative and Supportive Care', ['PALL']],
+      ['Clinical Trials Office', ['CTO']], ['Survivorship', ['SURV']], ['Leadership', ['CHAIR', 'DIR', 'ADMIN']] ] },
+    { id: 'hc-cardio', name: 'Heart and Vascular', units: [
+      ['General Cardiology', ['GEN']], ['Cath Lab and Interventional', ['CATH']], ['Electrophysiology', ['EP']], ['Heart Failure and Transplant', ['HF']],
+      ['Cardiovascular Imaging', ['IMG']], ['Preventive and Women’s Heart', ['PREV']], ['Adult Congenital', ['ACHD']], ['Cardiac Surgery', ['CTS']],
+      ['Vascular', ['VASC']], ['Cardiac ICU', ['CICU']], ['Telemetry and Step-down', ['TELE']], ['Leadership', ['CHAIR', 'ADMIN']] ] },
+    { id: 'hc-peds', name: 'Pediatrics', units: [
+      ['Hospital Medicine', ['PHM']], ['Neonatal ICU', ['NICU']], ['Pediatric ICU', ['PICU']], ['Cardiac ICU', ['PCICU']],
+      ['Hematology and Oncology', ['PHO']], ['Neurology and Neurosurgery', ['PNEURO']], ['Pediatric Emergency', ['PEM']],
+      ['Subspecialty Clinics', ['SUBSP']], ['Developmental and Adolescent', ['DBP']], ['Newborn Nursery', ['NURS']] ] },
+    { id: 'hc-ed', name: 'Emergency Department', units: [
+      ['Acute', ['ACUTE']], ['Fast Track', ['FT']], ['Resuscitation and Trauma', ['RESUS']], ['Pediatric ED', ['PED']],
+      ['Psychiatric Emergency', ['PES']], ['Observation Unit', ['OBS']], ['EMS and Prehospital', ['EMS']], ['Leadership', ['CHAIR', 'MEDDIR', 'NM', 'ADMIN']] ] },
+    { id: 'hc-surg', name: 'Surgery', units: [
+      ['Acute Care and Trauma', ['ACS']], ['Surgical Oncology', ['SURGONC']], ['Colorectal', ['CRS']], ['Transplant', ['TX']],
+      ['Vascular', ['VASC']], ['Plastics', ['PLAS']], ['Surgical ICU', ['SICU']], ['Inpatient Ward', ['INPT']], ['Operating Room and PACU', ['OR', 'PACU']] ] },
+    { id: 'hc-unit', name: 'Nursing Unit', units: [
+      ['Unit Leadership', ['NM', 'ANM', 'CNS', 'NE']], ['Day Shift', ['D']], ['Night Shift', ['N']], ['Evening Shift', ['E']],
+      ['Physicians and Providers', ['ATT', 'FEL', 'RES', 'INT', 'NP', 'PA', 'HOSP']],
+      ['Allied Health', ['PHARM', 'SW', 'CM', 'PT', 'OT', 'SLP', 'RT', 'RD', 'CH', 'CLS']], ['Unit Support', ['HUC', 'CNA', 'PCT']] ] } ] },
+  { id: 'political', icon: '🏛', label: 'venue.political', fallback: 'Political', templates: [
+    { id: 'pol-campaign', name: 'Campaign', units: [
+      ['Leadership', ['LDR', 'CAND', 'CM', 'DCM', 'SA']], ['Field', ['FLD']], ['Finance', ['FIN']], ['Communications', ['COM']],
+      ['Digital', ['DIG']], ['Data', ['DAT']], ['Operations', ['OPS']], ['Scheduling and Advance', ['ADV', 'SCH']],
+      ['Policy', ['POL']], ['Legal and Compliance', ['LGL']], ['Ballot Access', ['BAL']] ] },
+    { id: 'pol-office', name: 'Congressional Office', units: [
+      ['Leadership', ['LDR', 'MEM', 'COS', 'DCOS']], ['Legislative', ['LEG']], ['Communications', ['COM']], ['Scheduling', ['SCH']],
+      ['Administration', ['ADM']], ['District or State Office', ['DST']], ['Constituent Services', ['CS']] ] },
+    { id: 'pol-committee', name: 'Committee Staff', units: [
+      ['Majority', ['MAJ']], ['Minority', ['MIN']], ['Nonpartisan Staff', ['NP']],
+      ['Subcommittee 1', ['S01']], ['Subcommittee 2', ['S02']], ['Subcommittee 3', ['S03']] ] },
+    { id: 'pol-state', name: 'State Party', units: [
+      ['Executive Committee', ['EXC']], ['Staff Leadership', ['STF']], ['Finance', ['FIN']], ['Field', ['FLD']],
+      ['Communications', ['COM']], ['Data', ['DAT']], ['County Chairs', ['CTY']], ['District Chairs', ['DST']] ] },
+    { id: 'pol-local', name: 'County or Local Party', units: [
+      ['Officers', ['OFF']], ['Executive Committee', ['EXC']], ['Precinct Officers', ['PCT']], ['Programs', ['PRG']] ] },
+    { id: 'pol-national', name: 'National Party Committee', units: [
+      ['Officers', ['OFF']], ['Executive or Steering Committee', ['EXC']], ['Members', ['MBR']], ['Rules', ['RUL']],
+      ['Credentials', ['CRD']], ['Resolutions and Platform', ['RES', 'PLT']], ['Budget and Finance', ['BUD']], ['Staff', ['STF']] ] } ] },
+  { id: 'federal', icon: '🛡', label: 'venue.federal', fallback: 'Federal agencies', templates: [
+    { id: 'fed-fbi-fo', name: 'FBI Field Office', units: [
+      ['SAC Office', ['SAC', 'ADIC', 'CDC', 'PAO', 'EA']], ['ASAC Staff', ['ASAC']], ['Counterterrorism (JTTF)', ['CT', 'JTTF']],
+      ['Counterintelligence', ['CI']], ['Criminal and Violent Crime', ['CR', 'VC', 'HSTF']], ['Cyber', ['CY']],
+      ['Field Intelligence Group', ['FIG']], ['Resident Agencies', ['RA']], ['Administrative and Support', ['ADM', 'SPT']], ['Tactical and Crisis', ['SWAT', 'CN', 'ERT']] ] },
+    { id: 'fed-taskforce', name: 'Task Force', units: [
+      ['Command', ['CMD', 'DEP']], ['Investigations', ['INV']], ['Intelligence', ['INT', 'IA']], ['Tactical', ['TAC']],
+      ['Liaison', ['LNO']], ['Support', ['SPT', 'ADM']] ] },
+    { id: 'fed-directorate', name: 'Agency Directorate', units: [
+      ['Front Office', ['DIR', 'DDIR', 'COS']], ['Office or Center 1', ['C1']], ['Office or Center 2', ['C2']], ['Office or Center 3', ['C3']], ['Staff', ['STF', 'SPT']] ] },
+    { id: 'fed-detail', name: 'Protective Detail', units: [
+      ['Detail Leadership', ['DL', 'DDL']], ['Shift A', ['SHA']], ['Shift B', ['SHB']], ['Shift C', ['SHC']], ['Advance Team', ['ADV']],
+      ['Transportation', ['TRANS', 'DRV']], ['Counter-Assault', ['CAT']], ['Protective Intelligence', ['PI']], ['Command Post', ['CP']], ['Medical', ['MED']] ] },
+    { id: 'fed-usms', name: 'US Marshals District', units: [
+      ['US Marshal’s Office', ['USM', 'CDUSM']], ['Judicial Security', ['JS']], ['Fugitive Task Force', ['FTF']],
+      ['Prisoner Operations', ['PO']], ['Asset Forfeiture', ['AF']], ['Administrative', ['ADM']] ] } ] }
+];
+
 /* ═══ TeamBuilder: build Teams and their Units on the canvas ═══
    Team button (bottom left, same size and font as List view). Tap it: your
    Teams plus + New team. Pick one: the button pulses with the name and count,
@@ -39463,12 +39624,31 @@ var TeamBuilder = (function () {
       });
       var nb = row(_t('tb.plusNewTeam', '+ New team'), null, function () { _start('team', null, null); });
       nb.classList.add('tm-new');
+      var tb2 = row(_t('tb.fromTemplate', '+ New team from a template'), null, function () { _openMenu({ mode: 'venues' }); });
+      tb2.classList.add('tm-new');
+    } else if (state.mode === 'venues') {
+      h.textContent = _t('tb.pickVenue', 'Pick a venue');
+      m.appendChild(h);
+      VENUES.forEach(function (v) { row(v.icon + '  ' + _t(v.label, v.fallback), v.templates.length, function () { _openMenu({ mode: 'templates', venue: v.id }); }); });
+      var bk = document.createElement('button'); bk.type = 'button'; bk.className = 'tm-back'; bk.textContent = _t('tb.backTeams', '‹ All teams'); bk.onclick = function () { _openMenu({ mode: 'teams' }); };
+      m.appendChild(bk);
+    } else if (state.mode === 'templates') {
+      var ven = VENUES.find(function (v) { return v.id === state.venue; });
+      if (!ven) { _openMenu({ mode: 'venues' }); return; }
+      h.textContent = _t('tb.pickTemplate', '{venue}: pick a template', { venue: _t(ven.label, ven.fallback) });
+      m.appendChild(h);
+      ven.templates.forEach(function (tp) { row(tp.name, tp.units.length + ' ' + _t('tb.unitsWord', 'units'), function () { _confirmTemplate(tp); }); });
+      var bk2 = document.createElement('button'); bk2.type = 'button'; bk2.className = 'tm-back'; bk2.textContent = _t('tb.backVenues', '‹ All venues'); bk2.onclick = function () { _openMenu({ mode: 'venues' }); };
+      m.appendChild(bk2);
     } else {
       var team = _find(state.teamId);
       if (!team) { _openMenu({ mode: 'teams' }); return; }
       h.textContent = _t('tb.menuUnits', '{team} units: pick one, then drag spheres onto the pulsing button', { team: team.name });
       m.appendChild(h);
-      var units = _views().filter(function (v) { return v.type === 'unit' && v.parentId === team.id; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      /* A template Team keeps its own Unit order; others go A to Z */
+      var units = _views().filter(function (v) { return v.type === 'unit' && v.parentId === team.id; });
+      if (!team.template) units.sort(function (a, b) { return a.name.localeCompare(b.name); });
+      else units.sort(function (a, b) { return (a.tpl ? 0 : 1) - (b.tpl ? 0 : 1); });
       if (!units.length) { var e = document.createElement('div'); e.className = 'tm-empty'; e.textContent = _t('tb.noUnits', 'No units yet.'); m.appendChild(e); }
       units.forEach(function (u) { row(u.name, u.contactIds.length, function () { _start('unit', u.id, team.id); }); });
       var nu = row(_t('tb.plusNewUnit', '+ New unit'), null, function () { _start('unit', null, team.id); });
@@ -39613,11 +39793,63 @@ var TeamBuilder = (function () {
     if (team) setTimeout(function () { _openMenu({ mode: 'units', teamId: team.id }); }, 400);
   }
 
+  /* ── Venue templates ── */
+  function _tplFind(id) { var hit = null; VENUES.forEach(function (v) { v.templates.forEach(function (tp) { if (tp.id === id) hit = tp; }); }); return hit; }
+  /* The template Unit a position code belongs to: the code itself, or the code
+     starting with the Unit key and a hyphen (1PLT-SL is in 1PLT) */
+  function _tplUnitFor(units, code) {
+    if (!code) return null;
+    for (var i = 0; i < units.length; i++) {
+      var keys = units[i].posKeys || [];
+      for (var j = 0; j < keys.length; j++) { var k = keys[j]; if (code === k || code.indexOf(k + '-') === 0) return units[i]; }
+    }
+    return null;
+  }
+  function _tplFits(tp) {
+    var keys = [];
+    tp.units.forEach(function (u) { keys = keys.concat(u[1]); });
+    var fake = [{ posKeys: keys }];
+    try { return DEMO_CONTACTS.filter(function (c) { return !!_tplUnitFor(fake, posKey(c)); }).map(function (c) { return c.id; }); } catch (e) { return []; }
+  }
+  function _confirmTemplate(tp) {
+    _closeMenu();
+    var list = tp.units.map(function (u) { return u[0]; }).join(', ');
+    _card(tp.name, _t('tb.tplText', '{n} units: {list}. Type a name for this team, then tap Create.', { n: tp.units.length, list: list }),
+      { input: { value: tp.name, placeholder: tp.name },
+        buttons: [
+          { label: _t('tb.back', 'Back'), run: function () { _closeCard(); _openMenu({ mode: 'templates', venue: VENUES.find(function (v) { return v.templates.indexOf(tp) >= 0; }).id }); } },
+          { label: _t('tb.create', 'Create'), primary: true, run: function (name, err) {
+            if (!name) { if (err) err.textContent = _t('tb.needName', 'Type a name first.'); return; }
+            _closeCard(); _createFromTemplate(tp, name);
+          } } ] });
+  }
+  function _createFromTemplate(tp, name) {
+    var team = SentinelViews.createView(name, 'team', [], { pinnedIds: [], template: tp.id });
+    tp.units.forEach(function (u) { SentinelViews.createView(u[0], 'unit', [], { parentId: team.id, posKey: null, posKeys: u[1].slice(), tpl: true, manualIds: [] }); });
+    try { SentinelViews.refresh(); } catch (e) {}
+    var fits = _tplFits(tp);
+    var btns = [{ label: _t('tb.dragIn', 'Drag people in'), primary: !fits.length, run: function () { _closeCard(); _start('team', team.id, null); } }];
+    if (fits.length) btns.push({ label: _t('tb.addFits', 'Add {n} by position', { n: fits.length }), primary: true, run: function () {
+      _closeCard();
+      SentinelViews.updateView(team.id, { contactIds: fits });
+      var r = _autoAssign(team.id);
+      try { SentinelViews.refresh(); } catch (e) {}
+      showToast(_t('tb.tplPlaced', 'Placed {n} people in {u} units by position.', { n: r.placed, u: r.units }));
+      _openMenu({ mode: 'units', teamId: team.id });
+    } });
+    _card(_t('tb.tplCreated', '{name} created', { name: name }),
+      fits.length
+        ? _t('tb.tplFits', '{u} units are ready. {n} people in your circle have a position that fits. Add them now, or drag people onto the pulsing Team button.', { u: tp.units.length, n: fits.length })
+        : _t('tb.tplEmpty', '{u} units are ready. Drag people onto the pulsing Team button; each goes to the unit that matches the Position on their profile.', { u: tp.units.length }),
+      { buttons: btns });
+  }
+
   /* Position Units for a Team. Players placed by hand (pinned) keep their places;
      everyone else follows the position on their profile. */
   function _autoAssign(teamId) {
     var team = _find(teamId);
     if (!team) return { placed: 0, units: 0 };
+    if (team.template) return _autoAssignTpl(team);
     var members = new Set(team.contactIds);
     var units = _views().filter(function (v) { return v.type === 'unit' && v.parentId === teamId; });
     var pinned = new Set(team.pinnedIds || []);
@@ -39644,6 +39876,45 @@ var TeamBuilder = (function () {
     });
     /* Hand-made Units drop anyone who left the Team */
     _views().filter(function (v) { return v.type === 'unit' && v.parentId === teamId && !v.posKey; }).forEach(function (u) {
+      var ids = u.contactIds.filter(function (id) { return members.has(id); });
+      if (ids.length !== u.contactIds.length) SentinelViews.updateView(u.id, { contactIds: ids, manualIds: (u.manualIds || []).filter(function (id) { return members.has(id); }) });
+    });
+    var placed = 0;
+    team.contactIds.forEach(function (id) { if (!pinned.has(id)) placed++; });
+    var nUnits = _views().filter(function (v) { return v.type === 'unit' && v.parentId === teamId && v.contactIds.length; }).length;
+    return { placed: placed, units: nUnits };
+  }
+
+  /* A template Team: its Units stay (even when empty); each person goes to the
+     Unit that matches their position; anyone else to Unassigned. */
+  function _autoAssignTpl(team) {
+    var teamId = team.id;
+    var members = new Set(team.contactIds);
+    var all = _views().filter(function (v) { return v.type === 'unit' && v.parentId === teamId; });
+    var tplUnits = all.filter(function (u) { return u.tpl; });
+    var pinned = new Set(team.pinnedIds || []);
+    all.forEach(function (u) { (u.manualIds || []).forEach(function (id) { pinned.add(id); }); });
+    var want = {}, none = [];
+    team.contactIds.forEach(function (id) {
+      if (pinned.has(id)) return;
+      var u = _tplUnitFor(tplUnits, posKey(_contact(id)));
+      if (u) (want[u.id] = want[u.id] || []).push(id); else none.push(id);
+    });
+    tplUnits.forEach(function (u) {
+      var keep = (u.contactIds || []).filter(function (id) { return members.has(id) && pinned.has(id); });
+      var ids = keep.concat((want[u.id] || []).filter(function (id) { return keep.indexOf(id) < 0; }));
+      SentinelViews.updateView(u.id, { contactIds: ids });
+    });
+    var un = all.find(function (u) { return u.posKey === '__none__'; });
+    if (none.length) {
+      if (!un) un = SentinelViews.createView(_t('tb.unassigned', 'Unassigned'), 'unit', [], { parentId: teamId, posKey: '__none__', manualIds: [] });
+      var keepN = (un.contactIds || []).filter(function (id) { return members.has(id) && pinned.has(id); });
+      SentinelViews.updateView(un.id, { contactIds: keepN.concat(none.filter(function (id) { return keepN.indexOf(id) < 0; })) });
+    } else if (un) {
+      var keepU = (un.contactIds || []).filter(function (id) { return members.has(id) && pinned.has(id); });
+      if (keepU.length) SentinelViews.updateView(un.id, { contactIds: keepU }); else SentinelViews.deleteView(un.id);
+    }
+    _views().filter(function (v) { return v.type === 'unit' && v.parentId === teamId && !v.tpl && v.posKey !== '__none__'; }).forEach(function (u) {
       var ids = u.contactIds.filter(function (id) { return members.has(id); });
       if (ids.length !== u.contactIds.length) SentinelViews.updateView(u.id, { contactIds: ids, manualIds: (u.manualIds || []).filter(function (id) { return members.has(id); }) });
     });
