@@ -4699,6 +4699,15 @@
     0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; }
   }
   /* Incoming call ring animation */
+  .sc-in-tap { background: none; padding: 0; cursor: pointer; font: inherit; color: inherit; }
+  .sc-in-tap:focus-visible { outline: 2px solid #C5A55A; outline-offset: 6px; }
+  .sc-in-flash {
+    font: 800 15px 'Hanken Grotesk', system-ui, sans-serif; letter-spacing: 0.3em; color: #38d4ff;
+    margin: 0 auto 14px; animation: scInFlash 0.9s ease-in-out infinite;
+  }
+  @keyframes scInFlash { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .sc-in-flash { animation: none; } }
+  .sc-in-tap-hint { font-size: 14px; color: #bfefff; margin: 14px 0 0; }
   .sc-incoming-ring {
     animation: scIncomingPulse 1s ease-in-out infinite alternate;
   }
@@ -7624,11 +7633,13 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 <!-- Incoming Call Overlay (separate so it can ring while main is hidden) -->
 <div class="sentinel-call-overlay" id="scIncomingOverlay">
   <div class="sc-status">
-    <div class="sc-pulse-ring sc-incoming-ring" id="scInPulseRing">
+    <div class="sc-in-flash" id="scInFlash" aria-hidden="true">INCOMING</div>
+    <button type="button" class="sc-pulse-ring sc-incoming-ring sc-in-tap" id="scInPulseRing" onclick="SentinelCall.acceptIncoming()" aria-label="Tap to answer">
       <div class="sc-avatar" id="scInAvatar">?</div>
-    </div>
+    </button>
     <div class="sc-caller-name" id="scInCallerName">Incoming Call</div>
     <div class="sc-call-label" id="scInLabel">Sentinel Call</div>
+    <div class="sc-in-tap-hint" id="scInTapHint">Tap the sphere to answer</div>
   </div>
   <div class="sc-controls">
     <button class="sc-btn sc-btn-reject" onclick="SentinelCall.rejectIncoming()" title="Decline">✕</button>
@@ -11330,6 +11341,9 @@ const I18n = (function () {
     'media.warnCam': "Your camera is not sending a picture. Check that it is not covered or switched off.",
     'media.warnMic': "Your microphone is sending no sound. Check that it is not muted on your device, or choose another microphone in your system settings.",
     'call.you': "You",
+    'call.incomingFlash': "INCOMING",
+    'call.tapSphere': "Tap the sphere to answer",
+    'call.tapSphereAria': "Answer the call from {name}",
     'rec.badgeMine': "Recording, kept on this device",
     'rec.badgeTheirs': "Recording: {name} is keeping a copy",
     'rec.askText': "{name} wants to record this call. The recording (both of you, picture and sound) is kept on {name}'s device. Tap Allow to agree, or Cancel to say no.",
@@ -12082,6 +12096,9 @@ const I18n = (function () {
     'media.warnCam': "La tua fotocamera non invia immagini. Controlla che non sia coperta o spenta.",
     'media.warnMic': "Il tuo microfono non invia alcun suono. Controlla che non sia disattivato sul dispositivo, oppure scegli un altro microfono nelle impostazioni di sistema.",
     'call.you': "Tu",
+    'call.incomingFlash': "IN ARRIVO",
+    'call.tapSphere': "Tocca la sfera per rispondere",
+    'call.tapSphereAria': "Rispondi alla chiamata di {name}",
     'rec.badgeMine': "Registrazione in corso, salvata su questo dispositivo",
     'rec.badgeTheirs': "Registrazione in corso: {name} ne conserva una copia",
     'rec.askText': "{name} vuole registrare questa chiamata. La registrazione (entrambi, immagini e audio) resta sul dispositivo di {name}. Tocca Consenti per accettare, oppure Annulla per rifiutare.",
@@ -36866,6 +36883,10 @@ const SentinelCall = (function() {
 
     if (callerName) callerName.textContent = name;
     _avatarFor(avatar, known ? known.id : null, initials);
+    const _fl = document.getElementById('scInFlash'), _th = document.getElementById('scInTapHint'), _rg = document.getElementById('scInPulseRing');
+    if (_fl) _fl.textContent = _t('call.incomingFlash', 'INCOMING');
+    if (_th) _th.textContent = _t('call.tapSphere', 'Tap the sphere to answer');
+    if (_rg) _rg.setAttribute('aria-label', _tp('call.tapSphereAria', 'Answer the call from {name}', { name: name }));
     const inLabel = document.getElementById('scInLabel');
     if (inLabel) {
       if (!inLabel.dataset.def) inLabel.dataset.def = inLabel.textContent;
