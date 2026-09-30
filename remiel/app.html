@@ -5936,6 +5936,13 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
 .comm-more > summary::-webkit-details-marker { display: none; }
 .comm-more > summary::before { content: '\25B8  '; }
 .comm-more[open] > summary::before { content: '\25BE  '; }
+.bluf-loc-where { margin-top: 8px; }
+.bluf-loc-state { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary, #a8b8d0); margin-bottom: 6px; }
+.bluf-loc-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.whereis-actions { margin: 8px 0 4px; }
+.whereis-apx-label { border-color: rgba(251,191,36,0.6) !important; }
+.loc-ask-actions { justify-content: flex-end; }
+.loc-circle-row { padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.06); }
 .kev-l { display: block; font-size: 12.5px; color: #9aa4b8; margin: 10px 0 4px; }
 .kev-box select.reach-in { appearance: auto; }
 .kev-yearly { margin-top: 12px; }
@@ -6601,8 +6608,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         </div>
         <div class="push-toggle-row" id="locOpenRow" style="margin-top:8px;">
           <div>
-            <div class="push-toggle-label" data-i18n="location.openSwitch">Share my location while Remiel Sentinel is open</div>
-            <div class="push-toggle-sub" data-i18n="location.openDesc">Location updates every 30 seconds while Remiel Sentinel is open on your phone. Nothing is sent when the app is closed.</div>
+            <div class="push-toggle-label" data-i18n="location.openSwitch">Send my location while Remiel Sentinel is open</div>
+            <div class="push-toggle-sub" data-i18n="location.openDesc">On whenever you share with someone below: updates every 30 seconds while the app is open. Turn off to pause sending to everyone.</div>
           </div>
           <label class="push-toggle">
             <input type="checkbox" id="locOpenToggle" onchange="WhereIs.setOpenShare(this.checked)">
@@ -6610,6 +6617,11 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
           </label>
         </div>
         <div class="loc-share-status" id="locOpenStatus" aria-live="polite"></div>
+        <div style="margin-top:14px;">
+          <div class="wi-subtitle" data-i18n="location.circleShareTitle">Share my location with</div>
+          <p class="wi-desc" data-i18n="location.circleShareDesc">Everyone linked with you in your Circle. They can also ask; you answer Allow always, Allow for 8 hours, or Not now.</p>
+          <div id="locCircleList"></div>
+        </div>
         <div style="margin-top:14px;" id="checkinBlock">
           <div class="wi-subtitle" data-i18n="placeCheckin.title">Check in</div>
           <p class="wi-desc" data-i18n="placeCheckin.desc">Places of Circle members who receive your location. Tap a room to check in: the tap is your own action and is sent once.</p>
@@ -7376,6 +7388,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
                 <div class="bluf-loc-value" id="blufLocTime">—</div>
               </div>
             </div>
+            <div class="bluf-loc-where" id="blufLocWhere"></div>
           </div>
         </div>
       </div>
@@ -13809,8 +13822,8 @@ const I18n = (function () {
     "days.th": "T",
     "days.fr": "F",
     "days.sa": "S",
-    "location.openSwitch": "Share my location while Remiel Sentinel is open",
-    "location.openDesc": "Location updates every 30 seconds while Remiel Sentinel is open on your phone. Nothing is sent when the app is closed.",
+    "location.openSwitch": "Send my location while Remiel Sentinel is open",
+    "location.openDesc": "On whenever you share with someone below: updates every 30 seconds while the app is open. Turn off to pause sending to everyone.",
     "location.signInFirst": "Sign in first: Settings, Account. Nothing is shared until then.",
     "location.openOn": "Sharing while Remiel Sentinel is open. Waiting for the first position...",
     "location.openOff": "Off. Nothing is sent.",
@@ -13944,8 +13957,8 @@ const I18n = (function () {
     "days.th": "G",
     "days.fr": "V",
     "days.sa": "S",
-    "location.openSwitch": "Condividi la mia posizione mentre Remiel Sentinel è aperto",
-    "location.openDesc": "La posizione si aggiorna ogni 30 secondi mentre Remiel Sentinel è aperto sul tuo telefono. Nulla viene inviato quando l'app è chiusa.",
+    "location.openSwitch": "Invia la mia posizione mentre Remiel Sentinel è aperto",
+    "location.openDesc": "Attivo quando condividi con qualcuno qui sotto: si aggiorna ogni 30 secondi mentre l'app è aperta. Disattiva per sospendere l'invio a tutti.",
     "location.signInFirst": "Accedi prima: Impostazioni, Account. Fino ad allora nulla viene condiviso.",
     "location.openOn": "Condivisione attiva mentre Remiel Sentinel è aperto. In attesa della prima posizione...",
     "location.openOff": "Spento. Nulla viene inviato.",
@@ -13970,6 +13983,85 @@ const I18n = (function () {
     "guide.h.places": "Tocca + Aggiungi Luogo, dagli un nome, poi tocca Usa la mia posizione o cerca un indirizzo.",
     "guide.whereisFirst": "WHEREIS mostra dove si trova {first}, da ciò che ha scelto di condividere. Tocca la mappa per aprire la vista completa. Aggiungi Luoghi in Impostazioni, Luoghi.",
     "guide.placeFirst": "I membri che condividono la posizione con te vengono registrati quando arrivano in questo Luogo. Aggiungi stanze, poi tocca Stampa codici QR: un membro ne inquadra uno e conferma con un tocco.",
+  });
+  /* WHEREIS: one Circle location switch, requests, approximate area */
+  Object.assign(_strings.en, {
+    "whereis.stSharing": "{first} shares location with you. The position appears the next time {first} opens Remiel Sentinel.",
+    "whereis.stAsked": "You asked {when}. Waiting for {first} to answer.",
+    "whereis.stDeclined": "{first} chose not to share location right now.",
+    "whereis.stNotShared": "{first} is not sharing location with you. Tap the map, then Ask for location.",
+    "whereis.stNotLinked": "{first} is not linked with you in Remiel Sentinel yet. Call {first} once, or link by Sentinel ID, then ask for location.",
+    "whereis.askFailed": "The request did not go through. Check the connection and try again.",
+    "whereis.alreadySharing": "{first} already shares location with you.",
+    "whereis.asked": "Request sent to {first}. You will see the location once {first} allows it.",
+    "whereis.askTitle": "{name} asks to see where you are",
+    "whereis.askBody": "Your location goes only to {name}, and only while Remiel Sentinel is open on this device (the installed app can also send it in the background). You can stop at any time in Settings, Location.",
+    "whereis.askNo": "Not now",
+    "whereis.ask8": "Allow for 8 hours",
+    "whereis.askAlways": "Allow always",
+    "whereis.answerFailed": "Your answer did not go through. It will be asked again.",
+    "whereis.allowed8": "Sharing your location with {name} for 8 hours.",
+    "whereis.allowed": "Sharing your location with {name}.",
+    "whereis.apxCity": "Around {place}",
+    "whereis.apxRegion": "Somewhere in {place}",
+    "whereis.apxCountry": "In {place}",
+    "whereis.apxFromAddress": "from the address on the card",
+    "whereis.apxFromArea": "from the area code",
+    "whereis.apxFromCountry": "from the country code",
+    "whereis.apxWord": "approximate",
+    "whereis.apxWordCap": "APPROXIMATE",
+    "whereis.askAgain": "Ask again",
+    "whereis.askBtn": "Ask for location",
+    "whereis.openBtn": "Open WHEREIS",
+    "location.openPaused": "Paused. Nothing is sent, even to members you share with.",
+    "location.noOne": "You are not sharing your location with anyone. Turn it on for a member below, or allow a request.",
+    "location.circleEmpty": "No one is linked with you yet. Call someone once, or link by Sentinel ID, and they appear here.",
+    "location.theyShare": "Shares with you",
+    "location.theyDont": "Does not share with you",
+    "location.until": "You share until {time}",
+    "location.asksYou": "Asks to see yours",
+    "location.shareWith": "Share my location with {name}",
+    "location.circleShareTitle": "Share my location with",
+    "location.circleShareDesc": "Everyone linked with you in your Circle. They can also ask; you answer Allow always, Allow for 8 hours, or Not now."
+  });
+  Object.assign(_strings.it, {
+    "whereis.stSharing": "{first} condivide la posizione con te. La posizione compare la prossima volta che {first} apre Remiel Sentinel.",
+    "whereis.stAsked": "Hai chiesto {when}. In attesa della risposta di {first}.",
+    "whereis.stDeclined": "{first} ha scelto di non condividere la posizione per ora.",
+    "whereis.stNotShared": "{first} non condivide la posizione con te. Tocca la mappa, poi Chiedi la posizione.",
+    "whereis.stNotLinked": "{first} non è ancora collegato a te in Remiel Sentinel. Chiama {first} una volta, o collegati con il Sentinel ID, poi chiedi la posizione.",
+    "whereis.askFailed": "La richiesta non è andata a buon fine. Controlla la connessione e riprova.",
+    "whereis.alreadySharing": "{first} condivide già la posizione con te.",
+    "whereis.asked": "Richiesta inviata a {first}. Vedrai la posizione quando {first} lo consentirà.",
+    "whereis.askTitle": "{name} chiede di vedere dove ti trovi",
+    "whereis.askBody": "La tua posizione va solo a {name}, e solo mentre Remiel Sentinel è aperto su questo dispositivo (l'app installata può inviarla anche in background). Puoi interrompere in qualsiasi momento in Impostazioni, Posizione.",
+    "whereis.askNo": "Non ora",
+    "whereis.ask8": "Consenti per 8 ore",
+    "whereis.askAlways": "Consenti sempre",
+    "whereis.answerFailed": "La tua risposta non è andata a buon fine. Ti verrà chiesto di nuovo.",
+    "whereis.allowed8": "Condividi la tua posizione con {name} per 8 ore.",
+    "whereis.allowed": "Condividi la tua posizione con {name}.",
+    "whereis.apxCity": "Zona di {place}",
+    "whereis.apxRegion": "Da qualche parte in {place}",
+    "whereis.apxCountry": "In {place}",
+    "whereis.apxFromAddress": "dall'indirizzo sulla scheda",
+    "whereis.apxFromArea": "dal prefisso",
+    "whereis.apxFromCountry": "dal prefisso internazionale",
+    "whereis.apxWord": "approssimativa",
+    "whereis.apxWordCap": "APPROSSIMATIVA",
+    "whereis.askAgain": "Chiedi di nuovo",
+    "whereis.askBtn": "Chiedi la posizione",
+    "whereis.openBtn": "Apri WHEREIS",
+    "location.openPaused": "In pausa. Non viene inviato nulla, nemmeno ai membri con cui condividi.",
+    "location.noOne": "Non condividi la tua posizione con nessuno. Attivala per un membro qui sotto, oppure consenti una richiesta.",
+    "location.circleEmpty": "Nessuno è ancora collegato a te. Chiama qualcuno una volta, o collegati con il Sentinel ID, e comparirà qui.",
+    "location.theyShare": "Condivide con te",
+    "location.theyDont": "Non condivide con te",
+    "location.until": "Condividi fino alle {time}",
+    "location.asksYou": "Chiede di vedere la tua",
+    "location.shareWith": "Condividi la mia posizione con {name}",
+    "location.circleShareTitle": "Condividi la mia posizione con",
+    "location.circleShareDesc": "Tutti i collegati nella tua Cerchia. Possono anche chiedere; rispondi Consenti sempre, Consenti per 8 ore, oppure Non ora."
   });
   /* Key events and This week (KeyEvents, Comm) */
   Object.assign(_strings.en, {
@@ -16771,6 +16863,7 @@ async function updateBlufContent() {
   if (locTime) locTime.textContent = loc.updated || '—';
   const locPrev = document.getElementById('pullPrev_location');
   if (locPrev) locPrev.textContent = loc.macro || '—';
+  try { if (typeof WhereIs !== 'undefined' && selectedContact) WhereIs.fillCard(selectedContact); } catch (e) {}
 
   /* ── Last Contact / Check-in pull — prefer real check-in data ── */
   let lc = d.lastContact || {};
@@ -21369,10 +21462,7 @@ const WhereIs = (() => {
   function _contact(id) { try { return DEMO_CONTACTS.find(c => c.id === id || String(c.id) === String(id)) || null; } catch (e) { return null; } }
   function _first(c) { return (c && c.first) ? c.first : _t('msg.contact', 'Contact'); }
   /* The empty line tells the truth: not signed in is not the same as nothing shared */
-  function _noneMsg(c) {
-    if (!_authed()) return _t('whereis.signIn', 'Not signed in, so shared locations cannot load. Tap Settings, then Account, to sign in.');
-    return _t('whereis.noneShared', 'No location shared. {first} can turn it on in Settings, Location Sharing.', { first: _first(c) });
-  }
+  function _noneMsg(c) { return stateText(c); }
   function _lit_() { if (_lit) return _lit; try { _lit = getComputedStyle(document.documentElement).getPropertyValue('--lit-fill').trim(); } catch (e) {} return _lit || '#38bdf8'; }
   function _clock(ts) { try { return Comm.clock(ts); } catch (e) { return new Date(ts).toLocaleTimeString(); } }
   function _toast(msg) { try { showToast(msg); } catch (e) {} }
@@ -21414,6 +21504,7 @@ const WhereIs = (() => {
     if (!_authed()) { _locs = []; return _locs; }
     if (force) invalidate('/location/shared');
     const d = await _cached('/location/shared', LOC_MS);
+    if (d && Array.isArray(d.sharing)) _sharingNow = d.sharing;
     if (d && Array.isArray(d.locations)) {
       _locs = d.locations; _locsAt = Date.now();
       const sig = _locs.map(l => [l.user_id, l.timestamp, l.place && l.place.id, l.room && l.room.id].join('|')).join('\n');
@@ -21442,6 +21533,7 @@ const WhereIs = (() => {
     try {
       const list = DEMO_CONTACTS || [];
       if (m.user_id) { const byId = list.find(c => c.rsUserId && String(c.rsUserId) === String(m.user_id)); if (byId) return byId; }
+      if (m.sentinel_id) { const sid = String(m.sentinel_id).toUpperCase(); const bySid = list.find(c => c.sentinelId && String(c.sentinelId).toUpperCase() === sid); if (bySid) return bySid; }
       const h = m.handle ? String(m.handle).replace(/^@/, '').toLowerCase() : '';
       if (h) { const byHandle = list.find(c => c.handle && String(c.handle).replace(/^@/, '').toLowerCase() === h); if (byHandle) return byHandle; }
       const dn = m.display_name ? String(m.display_name).trim().toLowerCase() : '';
@@ -21452,6 +21544,196 @@ const WhereIs = (() => {
   function _matches(m, c) { const mc = matchContact(m); return !!(mc && c && String(mc.id) === String(c.id)); }
   function entryFor(c) { if (!c) return null; for (let i = 0; i < _locs.length; i++) if (_matches(_locs[i], c)) return _locs[i]; return null; }
   function _ownerContact(place) { return place && place.owner ? matchContact(place.owner) : null; }
+
+  /* ── One Circle: who shares with me, my requests, and the general area when nothing is shared ──
+     GET /location/circle lists everyone linked with me, whether they share location with me,
+     whether I share with them, and any request either way. A member who shares, and whose
+     app is closed, shows as sharing with no position yet. */
+  let _circle = [];
+  let _sharingNow = [];       /* /location/shared "sharing": everyone sharing with me, position or not */
+  let _iShareAny = false;     /* I share my location with at least one member */
+  async function circle(force) {
+    if (!_authed()) { _circle = []; return _circle; }
+    if (force) invalidate('/location/circle');
+    const d = await _cached('/location/circle', CACHE_MS);
+    if (d && Array.isArray(d.circle)) {
+      _circle = d.circle;
+      const any = _circle.some(r => r.i_share);
+      if (any !== _iShareAny) { _iShareAny = any; _applyAutoShare(); }
+    }
+    return _circle;
+  }
+  function circleFor(c) { if (!c) return null; for (let i = 0; i < _circle.length; i++) if (_matches(_circle[i], c)) return _circle[i]; return null; }
+  function _sharingFor(c) { if (!c) return null; for (let i = 0; i < _sharingNow.length; i++) if (_matches(_sharingNow[i], c)) return _sharingNow[i]; return null; }
+  /* live | sharing | asked | declined | notShared | notLinked | signin */
+  function stateFor(c) {
+    if (!_authed()) return 'signin';
+    if (entryFor(c)) return 'live';
+    const row = circleFor(c);
+    if (_sharingFor(c) || (row && row.they_share)) return 'sharing';
+    if (!row) return 'notLinked';
+    if (row.ask_out && row.ask_out.status === 'pending') return 'asked';
+    if (row.ask_out && row.ask_out.status === 'declined') return 'declined';
+    return 'notShared';
+  }
+  function stateText(c, st) {
+    const first = _first(c);
+    switch (st || stateFor(c)) {
+      case 'signin': return _t('whereis.signIn', 'Not signed in, so shared locations cannot load. Tap Settings, then Account, to sign in.');
+      case 'sharing': return _t('whereis.stSharing', '{first} shares location with you. The position appears the next time {first} opens Remiel Sentinel.', { first: first });
+      case 'asked': {
+        const row = circleFor(c); let when = '';
+        try { when = Comm.lonelyTime(row.ask_out.created_at, null); } catch (e) {}
+        return _t('whereis.stAsked', 'You asked {when}. Waiting for {first} to answer.', { when: when, first: first });
+      }
+      case 'declined': return _t('whereis.stDeclined', '{first} chose not to share location right now.', { first: first });
+      case 'notShared': return _t('whereis.stNotShared', '{first} is not sharing location with you. Tap the map, then Ask for location.', { first: first });
+      case 'notLinked': return _t('whereis.stNotLinked', '{first} is not linked with you in Remiel Sentinel yet. Call {first} once, or link by Sentinel ID, then ask for location.', { first: first });
+    }
+    return '';
+  }
+  async function ask(c) {
+    if (!c) return false;
+    if (!_authed()) { _toast(stateText(c, 'signin')); return false; }
+    await circle();
+    const row = circleFor(c);
+    const body = row ? { user_id: row.user_id } : (c.sentinelId ? { sentinel_id: c.sentinelId } : null);
+    if (!body) { _toast(stateText(c, 'notLinked')); return false; }
+    const r = await _api('/location/ask', { method: 'POST', body: JSON.stringify(body) });
+    if (r && r.status === 403) { _toast(stateText(c, 'notLinked')); return false; }
+    if (!r || !r.ok) { _toast(_t('whereis.askFailed', 'The request did not go through. Check the connection and try again.')); return false; }
+    let j = null; try { j = await r.json(); } catch (e) {}
+    await circle(true);
+    if (j && j.status === 'sharing') { await sharedLocations(true); _toast(_t('whereis.alreadySharing', '{first} already shares location with you.', { first: _first(c) })); }
+    else _toast(_t('whereis.asked', 'Request sent to {first}. You will see the location once {first} allows it.', { first: _first(c) }));
+    if (_panelFor === c.id) _renderPanelBody();
+    return true;
+  }
+  /* The owner's switch for one member, from Settings or an answer */
+  async function shareWith(userId, on, hours) {
+    const r = await _api('/location/share', { method: 'POST', body: JSON.stringify({ user_id: userId, share: !!on, hours: hours || undefined }) });
+    await circle(true);
+    return !!(r && r.ok);
+  }
+
+  /* ── Requests to me: Allow always, Allow for 8 hours, Not now ── */
+  let _asksShown = new Set(), _asksAt = 0;
+  async function checkAsks(force) {
+    if (!_authed() || document.visibilityState !== 'visible') return;
+    if (!force && Date.now() - _asksAt < 60000) return;
+    _asksAt = Date.now();
+    const d = await _json('/location/asks');
+    if (!d || !Array.isArray(d.incoming)) return;
+    const next = d.incoming.find(a => !_asksShown.has(a.id));
+    if (next && !document.getElementById('locAskModal')) _showAsk(next);
+  }
+  function _showAsk(a) {
+    _asksShown.add(a.id);
+    const who = (a.from && (a.from.display_name || (a.from.handle ? '@' + a.from.handle : ''))) || _t('msg.contact', 'Contact');
+    const wrap = document.createElement('div'); wrap.id = 'locAskModal'; wrap.className = 'intel-modal';
+    const box = document.createElement('div'); box.className = 'intel-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    box.innerHTML = '<h3>' + _esc(_t('whereis.askTitle', '{name} asks to see where you are', { name: who })) + '</h3>' +
+      '<p>' + _esc(_t('whereis.askBody', 'Your location goes only to {name}, and only while Remiel Sentinel is open on this device (the installed app can also send it in the background). You can stop at any time in Settings, Location.', { name: who })) + '</p>' +
+      '<div class="intel-actions loc-ask-actions">' +
+        '<button type="button" class="intel-btn quiet" data-a="no">' + _esc(_t('whereis.askNo', 'Not now')) + '</button>' +
+        '<button type="button" class="intel-btn" data-a="hours8">' + _esc(_t('whereis.ask8', 'Allow for 8 hours')) + '</button>' +
+        '<button type="button" class="intel-btn primary" data-a="always">' + _esc(_t('whereis.askAlways', 'Allow always')) + '</button></div>';
+    wrap.appendChild(box); document.body.appendChild(wrap);
+    ['pointerdown', 'touchstart', 'mousedown'].forEach(ev => wrap.addEventListener(ev, e => e.stopPropagation(), { passive: true }));
+    box.addEventListener('click', async e => {
+      const b = e.target.closest('button[data-a]'); if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      box.querySelectorAll('button').forEach(x => { x.disabled = true; });
+      const answer = b.getAttribute('data-a');
+      const r = await _api('/location/asks/' + encodeURIComponent(a.id) + '/answer', { method: 'POST', body: JSON.stringify({ answer: answer }) });
+      wrap.remove();
+      if (!r || !r.ok) { _toast(_t('whereis.answerFailed', 'Your answer did not go through. It will be asked again.')); _asksShown.delete(a.id); return; }
+      if (answer !== 'no') {
+        _toast(answer === 'hours8' ? _t('whereis.allowed8', 'Sharing your location with {name} for 8 hours.', { name: who }) : _t('whereis.allowed', 'Sharing your location with {name}.', { name: who }));
+        _iShareAny = true;
+        _applyAutoShare(true);
+      }
+      await circle(true);
+      setTimeout(() => checkAsks(true), 400);
+    });
+    setTimeout(() => { try { box.querySelector('button.primary').focus({ preventScroll: true }); } catch (e) {} }, 30);
+  }
+
+  /* ── Approximate location: the general area from the area code, the country code, or the city in the address ── */
+  /* North American area code -> [lat, lon, label, city|region|country, ISO]; calling code -> [ISO, lat, lon] of the capital.
+     Built by remiel-sentinel-api/scripts/build-geo.mjs from GeoNames (CC BY 4.0) and libphonenumber (Apache 2.0). */
+  const NANP = {"201":[40.7282,-74.0776,"Jersey City, NJ","city","US"],"202":[38.8974,-77.0364,"Washington D.C.","region","US"],"203":[41.4532,-72.9219,"Connecticut","region","US"],"204":[49.8844,-97.147,"Winnipeg, MB","city","CA"],"205":[33.5207,-86.8025,"Birmingham, AL","city","US"],"206":[47.6062,-122.3321,"Seattle, WA","city","US"],"207":[44.1761,-69.8252,"Maine","region","US"],"208":[44.207,-115.3439,"Idaho","region","US"],"209":[37.9577,-121.2908,"Stockton, CA","city","US"],"210":[29.4241,-98.4936,"San Antonio, TX","city","US"],"212":[40.7143,-74.006,"New York, NY","city","US"],"213":[34.0522,-118.2437,"Los Angeles, CA","city","US"],"214":[32.7831,-96.8067,"Dallas, TX","city","US"],"215":[39.9523,-75.1638,"Philadelphia, PA","city","US"],"216":[41.4995,-81.6954,"Cleveland, OH","city","US"],"217":[41.4821,-88.1965,"Illinois","region","US"],"218":[45.0834,-93.4372,"Minnesota","region","US"],"219":[40.2093,-86.2689,"Indiana","region","US"],"220":[40.5204,-82.7546,"Ohio","region","US"],"223":[40.3939,-76.8427,"Pennsylvania","region","US"],"224":[41.4821,-88.1965,"Illinois","region","US"],"225":[30.4433,-91.1875,"Baton Rouge, LA","city","US"],"226":[43.9669,-79.4755,"Ontario","region","CA"],"227":[39.1377,-76.8024,"Maryland","region","US"],"228":[30.3674,-89.0928,"Gulfport, MS","city","US"],"229":[33.2787,-83.8497,"Georgia","region","US"],"231":[42.7178,-83.9773,"Michigan","region","US"],"234":[40.5204,-82.7546,"Ohio","region","US"],"235":[38.5654,-92.2859,"Missouri","region","US"],"236":[49.5448,-122.4579,"British Columbia","region","CA"],"239":[26.1423,-81.796,"Naples, FL","city","US"],"240":[39.1377,-76.8024,"Maryland","region","US"],"242":[25.0582,-77.3431,"Bahamas","country","BS"],"246":[13.1073,-59.6202,"Barbados","country","BB"],"248":[42.4734,-83.2219,"Southfield, MI","city","US"],"249":[43.9669,-79.4755,"Ontario","region","CA"],"250":[48.4359,-123.3515,"Victoria, BC","city","CA"],"251":[30.6944,-88.043,"Mobile, AL","city","US"],"252":[35.5363,-79.5889,"North Carolina","region","US"],"253":[47.2529,-122.4443,"Tacoma, WA","city","US"],"254":[30.9677,-97.5437,"Texas","region","US"],"256":[34.7304,-86.5859,"Huntsville, AL","city","US"],"257":[45.4112,-75.6981,"Canada","country","CA"],"260":[41.1306,-85.1289,"Fort Wayne, IN","city","US"],"262":[42.5847,-87.8212,"Kenosha, WI","city","US"],"263":[45.5088,-73.5878,"Montreal, QC","city","CA"],"264":[18.217,-63.0578,"Anguilla","country","AI"],"267":[40.3939,-76.8427,"Pennsylvania","region","US"],"268":[17.121,-61.8433,"Antigua and Barbuda","country","AG"],"269":[42.7178,-83.9773,"Michigan","region","US"],"270":[38.0765,-84.797,"Kentucky","region","US"],"272":[40.3939,-76.8427,"Pennsylvania","region","US"],"274":[43.5301,-88.8159,"Wisconsin","region","US"],"276":[37.7821,-77.4296,"Virginia","region","US"],"279":[35.3332,-119.2959,"California","region","US"],"281":[29.7633,-95.3633,"Houston, TX","city","US"],"283":[40.5204,-82.7546,"Ohio","region","US"],"284":[18.4269,-64.6208,"British Virgin Islands","country","VG"],"289":[43.9669,-79.4755,"Ontario","region","CA"],"301":[39.1377,-76.8024,"Maryland","region","US"],"302":[39.4396,-75.5875,"Delaware","region","US"],"303":[39.7392,-104.9847,"Denver, CO","city","US"],"304":[38.9232,-80.9302,"West Virginia","region","US"],"305":[25.7743,-80.1937,"Miami, FL","city","US"],"306":[51.4797,-105.6528,"Saskatchewan","region","CA"],"307":[42.5692,-106.8687,"Wyoming","region","US"],"308":[41.1375,-97.0918,"Nebraska","region","US"],"309":[41.4821,-88.1965,"Illinois","region","US"],"310":[34.0522,-118.2437,"Los Angeles, CA","city","US"],"312":[41.85,-87.65,"Chicago, IL","city","US"],"313":[42.3314,-83.0457,"Detroit, MI","city","US"],"314":[38.6273,-90.1979,"St. Louis, MO","city","US"],"315":[43.0481,-76.1474,"Syracuse, NY","city","US"],"316":[37.6922,-97.3375,"Wichita, KS","city","US"],"317":[39.7684,-86.158,"Indianapolis, IN","city","US"],"318":[30.5816,-91.337,"Louisiana","region","US"],"319":[41.9164,-92.9848,"Iowa","region","US"],"320":[45.5608,-94.1625,"Saint Cloud, MN","city","US"],"321":[27.6288,-81.5001,"Florida","region","US"],"323":[34.0522,-118.2437,"Los Angeles, CA","city","US"],"324":[27.6288,-81.5001,"Florida","region","US"],"325":[31.4638,-100.437,"San Angelo, TX","city","US"],"326":[40.5204,-82.7546,"Ohio","region","US"],"327":[35.1858,-92.6887,"Arkansas","region","US"],"329":[40.9966,-74.1838,"New York","region","US"],"330":[40.5204,-82.7546,"Ohio","region","US"],"331":[41.4821,-88.1965,"Illinois","region","US"],"332":[40.7143,-74.006,"New York, NY","city","US"],"334":[32.3668,-86.3,"Montgomery, AL","city","US"],"336":[35.5363,-79.5889,"North Carolina","region","US"],"337":[30.5816,-91.337,"Louisiana","region","US"],"339":[42.2821,-71.3281,"Massachusetts","region","US"],"340":[18.3419,-64.9307,"U.S. Virgin Islands","country","VI"],"341":[35.3332,-119.2959,"California","region","US"],"343":[43.9669,-79.4755,"Ontario","region","CA"],"345":[19.2866,-81.3744,"Cayman Islands","country","KY"],"346":[30.9677,-97.5437,"Texas","region","US"],"347":[40.9966,-74.1838,"New York","region","US"],"350":[35.3332,-119.2959,"California","region","US"],"351":[42.2821,-71.3281,"Massachusetts","region","US"],"352":[29.6516,-82.3248,"Gainesville, FL","city","US"],"353":[43.5301,-88.8159,"Wisconsin","region","US"],"354":[46.0483,-73.0196,"Quebec","region","CA"],"360":[45.6387,-122.6615,"Vancouver, WA","city","US"],"361":[30.9677,-97.5437,"Texas","region","US"],"363":[40.9966,-74.1838,"New York","region","US"],"364":[38.0765,-84.797,"Kentucky","region","US"],"365":[43.9669,-79.4755,"Ontario","region","CA"],"367":[46.0483,-73.0196,"Quebec","region","CA"],"368":[52.3489,-113.6962,"Alberta","region","CA"],"369":[35.3332,-119.2959,"California","region","US"],"380":[40.5204,-82.7546,"Ohio","region","US"],"382":[43.9669,-79.4755,"Ontario","region","CA"],"385":[40.4569,-111.9461,"Utah","region","US"],"386":[27.6288,-81.5001,"Florida","region","US"],"401":[41.7518,-71.4485,"Rhode Island","region","US"],"402":[41.2563,-95.9404,"Omaha, NE","city","US"],"403":[51.0501,-114.0853,"Calgary, AB","city","CA"],"404":[33.749,-84.388,"Atlanta, GA","city","US"],"405":[35.4676,-97.5164,"Oklahoma City, OK","city","US"],"406":[46.681,-111.1277,"Montana","region","US"],"407":[28.5383,-81.3792,"Orlando, FL","city","US"],"408":[37.3394,-121.895,"San Jose, CA","city","US"],"409":[30.9677,-97.5437,"Texas","region","US"],"410":[39.2904,-76.6122,"Baltimore, MD","city","US"],"412":[40.4406,-79.9959,"Pittsburgh, PA","city","US"],"413":[42.2821,-71.3281,"Massachusetts","region","US"],"414":[43.0389,-87.9065,"Milwaukee, WI","city","US"],"415":[37.7749,-122.4194,"San Francisco, CA","city","US"],"416":[43.7001,-79.4163,"Toronto, ON","city","CA"],"417":[37.2153,-93.2982,"Springfield, MO","city","US"],"418":[46.0483,-73.0196,"Quebec","region","CA"],"419":[41.6639,-83.5552,"Toledo, OH","city","US"],"423":[35.0456,-85.3097,"Chattanooga, TN","city","US"],"424":[35.3332,-119.2959,"California","region","US"],"425":[38.8951,-77.0364,"United States","country","US"],"428":[46.0927,-65.7234,"New Brunswick","region","CA"],"430":[30.9677,-97.5437,"Texas","region","US"],"431":[50.0581,-97.4781,"Manitoba","region","CA"],"432":[30.9677,-97.5437,"Texas","region","US"],"434":[37.7821,-77.4296,"Virginia","region","US"],"435":[40.4569,-111.9461,"Utah","region","US"],"437":[43.7001,-79.4163,"Toronto, ON","city","CA"],"438":[46.0483,-73.0196,"Quebec","region","CA"],"440":[41.4995,-81.6954,"Cleveland, OH","city","US"],"441":[32.2949,-64.783,"Bermuda","country","BM"],"442":[35.3332,-119.2959,"California","region","US"],"443":[39.1377,-76.8024,"Maryland","region","US"],"445":[39.9523,-75.1638,"Philadelphia, PA","city","US"],"447":[41.4821,-88.1965,"Illinois","region","US"],"448":[27.6288,-81.5001,"Florida","region","US"],"450":[46.0483,-73.0196,"Quebec","region","CA"],"458":[44.8542,-122.6347,"Oregon","region","US"],"463":[40.2093,-86.2689,"Indiana","region","US"],"464":[41.4821,-88.1965,"Illinois","region","US"],"468":[46.0483,-73.0196,"Quebec","region","CA"],"469":[30.9677,-97.5437,"Texas","region","US"],"470":[33.2787,-83.8497,"Georgia","region","US"],"472":[35.5363,-79.5889,"North Carolina","region","US"],"473":[12.0529,-61.7523,"Grenada","country","GD"],"474":[51.4797,-105.6528,"Saskatchewan","region","CA"],"475":[41.4532,-72.9219,"Connecticut","region","US"],"478":[33.2787,-83.8497,"Georgia","region","US"],"479":[35.1858,-92.6887,"Arkansas","region","US"],"480":[33.4223,-111.8226,"Mesa, AZ","city","US"],"484":[40.3939,-76.8427,"Pennsylvania","region","US"],"501":[34.7465,-92.2896,"Little Rock, AR","city","US"],"502":[38.2542,-85.7594,"Louisville, KY","city","US"],"503":[45.5234,-122.6762,"Portland, OR","city","US"],"504":[29.9547,-90.0751,"New Orleans, LA","city","US"],"505":[35.0845,-106.6511,"Albuquerque, NM","city","US"],"506":[46.0927,-65.7234,"New Brunswick","region","CA"],"507":[45.0834,-93.4372,"Minnesota","region","US"],"508":[42.2821,-71.3281,"Massachusetts","region","US"],"509":[47.6597,-117.4291,"Spokane, WA","city","US"],"510":[37.8044,-122.2708,"Oakland, CA","city","US"],"512":[30.2672,-97.7431,"Austin, TX","city","US"],"513":[39.1271,-84.5144,"Cincinnati, OH","city","US"],"514":[45.5088,-73.5878,"Montreal, QC","city","CA"],"515":[41.6005,-93.6091,"Des Moines, IA","city","US"],"516":[40.9966,-74.1838,"New York","region","US"],"517":[42.7178,-83.9773,"Michigan","region","US"],"518":[42.6526,-73.7562,"Albany, NY","city","US"],"519":[43.9669,-79.4755,"Ontario","region","CA"],"520":[32.2217,-110.9265,"Tucson, AZ","city","US"],"530":[35.3332,-119.2959,"California","region","US"],"531":[41.1375,-97.0918,"Nebraska","region","US"],"534":[43.5301,-88.8159,"Wisconsin","region","US"],"539":[35.6256,-96.9657,"Oklahoma","region","US"],"540":[37.7821,-77.4296,"Virginia","region","US"],"541":[44.8542,-122.6347,"Oregon","region","US"],"548":[43.9669,-79.4755,"Ontario","region","CA"],"551":[40.4845,-74.388,"New Jersey","region","US"],"557":[38.5654,-92.2859,"Missouri","region","US"],"559":[36.7477,-119.7724,"Fresno, CA","city","US"],"561":[26.3587,-80.0831,"Boca Raton, FL","city","US"],"562":[33.767,-118.1892,"Long Beach, CA","city","US"],"563":[41.9164,-92.9848,"Iowa","region","US"],"564":[38.8951,-77.0364,"United States","country","US"],"567":[40.5204,-82.7546,"Ohio","region","US"],"570":[40.3939,-76.8427,"Pennsylvania","region","US"],"571":[37.7821,-77.4296,"Virginia","region","US"],"572":[35.6256,-96.9657,"Oklahoma","region","US"],"573":[38.9517,-92.3341,"Columbia, MO","city","US"],"574":[40.2093,-86.2689,"Indiana","region","US"],"575":[34.6464,-106.3553,"New Mexico","region","US"],"579":[46.0483,-73.0196,"Quebec","region","CA"],"580":[35.6256,-96.9657,"Oklahoma","region","US"],"581":[46.0483,-73.0196,"Quebec","region","CA"],"582":[40.3939,-76.8427,"Pennsylvania","region","US"],"584":[50.0581,-97.4781,"Manitoba","region","CA"],"585":[43.1548,-77.6156,"Rochester, NY","city","US"],"586":[42.7178,-83.9773,"Michigan","region","US"],"587":[52.3489,-113.6962,"Alberta","region","CA"],"601":[32.2988,-90.1848,"Jackson, MS","city","US"],"602":[33.4484,-112.074,"Phoenix, AZ","city","US"],"603":[43.1227,-71.4361,"New Hampshire","region","US"],"604":[49.2497,-123.1193,"Vancouver, BC","city","CA"],"605":[43.9632,-98.8717,"South Dakota","region","US"],"606":[38.0765,-84.797,"Kentucky","region","US"],"607":[40.9966,-74.1838,"New York","region","US"],"608":[43.0731,-89.4012,"Madison, WI","city","US"],"609":[40.2171,-74.7429,"Trenton, NJ","city","US"],"610":[40.3939,-76.8427,"Pennsylvania","region","US"],"612":[44.98,-93.2638,"Minneapolis, MN","city","US"],"613":[45.4112,-75.6981,"Ottawa, ON","city","CA"],"614":[39.9612,-82.9988,"Columbus, OH","city","US"],"615":[36.1659,-86.7844,"Nashville, TN","city","US"],"616":[42.7178,-83.9773,"Michigan","region","US"],"617":[42.3584,-71.0598,"Boston, MA","city","US"],"618":[41.4821,-88.1965,"Illinois","region","US"],"619":[32.7157,-117.1647,"San Diego, CA","city","US"],"620":[38.4845,-96.3184,"Kansas","region","US"],"623":[33.3441,-111.9183,"Arizona","region","US"],"626":[35.3332,-119.2959,"California","region","US"],"628":[35.3332,-119.2959,"California","region","US"],"629":[35.6578,-87.1638,"Tennessee","region","US"],"630":[41.4821,-88.1965,"Illinois","region","US"],"631":[40.9966,-74.1838,"New York","region","US"],"636":[38.5654,-92.2859,"Missouri","region","US"],"639":[51.4797,-105.6528,"Saskatchewan","region","CA"],"640":[40.4845,-74.388,"New Jersey","region","US"],"641":[41.9164,-92.9848,"Iowa","region","US"],"645":[27.6288,-81.5001,"Florida","region","US"],"646":[40.9966,-74.1838,"New York","region","US"],"647":[43.9669,-79.4755,"Ontario","region","CA"],"649":[21.4612,-71.1419,"Turks and Caicos Islands","country","TC"],"650":[37.3861,-122.0838,"Mountain View, CA","city","US"],"651":[44.9444,-93.0933,"Saint Paul, MN","city","US"],"656":[27.6288,-81.5001,"Florida","region","US"],"657":[35.3332,-119.2959,"California","region","US"],"658":[17.997,-76.7936,"Jamaica","country","JM"],"659":[33.0152,-86.7327,"Alabama","region","US"],"660":[38.5654,-92.2859,"Missouri","region","US"],"661":[35.3733,-119.0187,"Bakersfield, CA","city","US"],"662":[32.4039,-89.5969,"Mississippi","region","US"],"664":[16.7056,-62.2129,"Montserrat","country","MS"],"667":[39.1377,-76.8024,"Maryland","region","US"],"669":[35.3332,-119.2959,"California","region","US"],"670":[15.2123,145.7545,"Northern Mariana Islands","country","MP"],"671":[13.4757,144.7489,"Guam","country","GU"],"672":[49.5448,-122.4579,"British Columbia","region","CA"],"678":[33.2787,-83.8497,"Georgia","region","US"],"680":[40.9966,-74.1838,"New York","region","US"],"681":[38.9232,-80.9302,"West Virginia","region","US"],"682":[30.9677,-97.5437,"Texas","region","US"],"683":[43.9669,-79.4755,"Ontario","region","CA"],"684":[-14.2781,-170.7025,"American Samoa","country","AS"],"686":[37.7821,-77.4296,"Virginia","region","US"],"689":[27.6288,-81.5001,"Florida","region","US"],"701":[47.3266,-99.2718,"North Dakota","region","US"],"702":[36.175,-115.1372,"Las Vegas, NV","city","US"],"703":[38.8048,-77.0469,"Alexandria, VA","city","US"],"704":[35.2271,-80.8431,"Charlotte, NC","city","US"],"705":[43.9669,-79.4755,"Ontario","region","CA"],"706":[33.2787,-83.8497,"Georgia","region","US"],"707":[38.4405,-122.7144,"Santa Rosa, CA","city","US"],"708":[41.4821,-88.1965,"Illinois","region","US"],"709":[48.2622,-54.6847,"Newfoundland and Labrador","region","CA"],"712":[41.9164,-92.9848,"Iowa","region","US"],"713":[29.7633,-95.3633,"Houston, TX","city","US"],"714":[33.8703,-117.9253,"Fullerton, CA","city","US"],"715":[43.5301,-88.8159,"Wisconsin","region","US"],"716":[42.8865,-78.8784,"Buffalo, NY","city","US"],"717":[40.3939,-76.8427,"Pennsylvania","region","US"],"718":[40.6501,-73.9496,"Brooklyn, NY","city","US"],"719":[38.8339,-104.8214,"Colorado Springs, CO","city","US"],"720":[39.5795,-105.1342,"Colorado","region","US"],"721":[18.026,-63.0458,"Sint Maarten","country","SX"],"724":[40.3939,-76.8427,"Pennsylvania","region","US"],"725":[36.9295,-116.0944,"Nevada","region","US"],"726":[29.4241,-98.4936,"San Antonio, TX","city","US"],"727":[27.7709,-82.6793,"St. Petersburg, FL","city","US"],"728":[26.7056,-80.0364,"Palm Beach, FL","city","US"],"730":[41.4821,-88.1965,"Illinois","region","US"],"731":[35.6578,-87.1638,"Tennessee","region","US"],"732":[39.9537,-74.1979,"Toms River, NJ","city","US"],"734":[42.3684,-83.3527,"Livonia, MI","city","US"],"737":[30.9677,-97.5437,"Texas","region","US"],"738":[35.3332,-119.2959,"California","region","US"],"740":[40.5204,-82.7546,"Ohio","region","US"],"742":[43.9669,-79.4755,"Ontario","region","CA"],"743":[35.5363,-79.5889,"North Carolina","region","US"],"747":[35.3332,-119.2959,"California","region","US"],"748":[39.5795,-105.1342,"Colorado","region","US"],"753":[43.9669,-79.4755,"Ontario","region","CA"],"754":[27.6288,-81.5001,"Florida","region","US"],"757":[36.8529,-75.978,"Virginia Beach, VA","city","US"],"758":[13.9957,-61.0061,"Saint Lucia","country","LC"],"760":[35.3332,-119.2959,"California","region","US"],"762":[33.2787,-83.8497,"Georgia","region","US"],"763":[45.0834,-93.4372,"Minnesota","region","US"],"765":[40.4167,-86.8753,"Lafayette, IN","city","US"],"767":[15.3017,-61.3881,"Dominica","country","DM"],"769":[32.4039,-89.5969,"Mississippi","region","US"],"770":[33.2787,-83.8497,"Georgia","region","US"],"771":[38.8974,-77.0364,"Washington D.C.","region","US"],"772":[27.6288,-81.5001,"Florida","region","US"],"773":[41.85,-87.65,"Chicago, IL","city","US"],"774":[42.2821,-71.3281,"Massachusetts","region","US"],"775":[39.5296,-119.8138,"Reno, NV","city","US"],"778":[49.5448,-122.4579,"British Columbia","region","CA"],"779":[41.4821,-88.1965,"Illinois","region","US"],"780":[53.5501,-113.4687,"Edmonton, AB","city","CA"],"781":[42.2821,-71.3281,"Massachusetts","region","US"],"782":[45.4112,-75.6981,"Canada","country","CA"],"784":[13.1553,-61.2274,"Saint Vincent and the Grenadines","country","VC"],"785":[38.9717,-95.2352,"Lawrence, KS","city","US"],"786":[27.6288,-81.5001,"Florida","region","US"],"787":[18.4663,-66.1057,"Puerto Rico","country","PR"],"801":[40.7608,-111.891,"Salt Lake City, UT","city","US"],"802":[43.6106,-72.9726,"Rutland, VT","city","US"],"803":[34.0007,-81.0348,"Columbia, SC","city","US"],"804":[37.5538,-77.4603,"Richmond, VA","city","US"],"805":[35.3332,-119.2959,"California","region","US"],"806":[35.222,-101.8313,"Amarillo, TX","city","US"],"807":[43.9669,-79.4755,"Ontario","region","CA"],"808":[21.3069,-157.8583,"Honolulu, HI","city","US"],"809":[18.4719,-69.8923,"Dominican Republic","country","DO"],"810":[42.7178,-83.9773,"Michigan","region","US"],"812":[37.9748,-87.5559,"Evansville, IN","city","US"],"813":[27.9475,-82.4584,"Tampa, FL","city","US"],"814":[42.1292,-80.0851,"Erie, PA","city","US"],"815":[42.2711,-89.094,"Rockford, IL","city","US"],"816":[39.0997,-94.5786,"Kansas City, MO","city","US"],"817":[32.7254,-97.3208,"Fort Worth, TX","city","US"],"818":[34.1425,-118.2551,"Glendale, CA","city","US"],"819":[45.4772,-75.7016,"Gatineau, QC","city","CA"],"820":[35.3332,-119.2959,"California","region","US"],"821":[33.8614,-80.9272,"South Carolina","region","US"],"825":[52.3489,-113.6962,"Alberta","region","CA"],"826":[37.7821,-77.4296,"Virginia","region","US"],"828":[35.5363,-79.5889,"North Carolina","region","US"],"829":[18.4719,-69.8923,"Dominican Republic","country","DO"],"830":[29.703,-98.1244,"New Braunfels, TX","city","US"],"831":[35.3332,-119.2959,"California","region","US"],"832":[30.9677,-97.5437,"Texas","region","US"],"835":[40.3939,-76.8427,"Pennsylvania","region","US"],"838":[40.9966,-74.1838,"New York","region","US"],"839":[33.8614,-80.9272,"South Carolina","region","US"],"840":[35.3332,-119.2959,"California","region","US"],"843":[33.8614,-80.9272,"South Carolina","region","US"],"845":[40.9966,-74.1838,"New York","region","US"],"847":[41.4821,-88.1965,"Illinois","region","US"],"848":[40.4845,-74.388,"New Jersey","region","US"],"849":[18.4719,-69.8923,"Dominican Republic","country","DO"],"850":[30.4383,-84.2807,"Tallahassee, FL","city","US"],"854":[33.8614,-80.9272,"South Carolina","region","US"],"856":[40.4845,-74.388,"New Jersey","region","US"],"857":[42.2821,-71.3281,"Massachusetts","region","US"],"858":[32.7157,-117.1647,"San Diego, CA","city","US"],"859":[37.9887,-84.4777,"Lexington, KY","city","US"],"860":[41.4532,-72.9219,"Connecticut","region","US"],"862":[40.4845,-74.388,"New Jersey","region","US"],"863":[27.6288,-81.5001,"Florida","region","US"],"864":[34.8526,-82.394,"Greenville, SC","city","US"],"865":[35.9606,-83.9207,"Knoxville, TN","city","US"],"867":[45.4112,-75.6981,"Canada","country","CA"],"868":[10.6667,-61.5189,"Trinidad and Tobago","country","TT"],"869":[17.2955,-62.725,"Saint Kitts and Nevis","country","KN"],"870":[35.1858,-92.6887,"Arkansas","region","US"],"872":[41.85,-87.65,"Chicago, IL","city","US"],"873":[46.0483,-73.0196,"Quebec","region","CA"],"876":[17.997,-76.7936,"Jamaica","country","JM"],"878":[40.3939,-76.8427,"Pennsylvania","region","US"],"879":[48.2622,-54.6847,"Newfoundland and Labrador","region","CA"],"901":[35.1495,-90.049,"Memphis, TN","city","US"],"902":[45.4112,-75.6981,"Canada","country","CA"],"903":[30.9677,-97.5437,"Texas","region","US"],"904":[30.3322,-81.6556,"Jacksonville, FL","city","US"],"905":[43.9669,-79.4755,"Ontario","region","CA"],"906":[42.7178,-83.9773,"Michigan","region","US"],"907":[61.2181,-149.9003,"Anchorage, AK","city","US"],"908":[40.4845,-74.388,"New Jersey","region","US"],"909":[35.3332,-119.2959,"California","region","US"],"910":[35.0527,-78.8784,"Fayetteville, NC","city","US"],"912":[33.2787,-83.8497,"Georgia","region","US"],"913":[38.4845,-96.3184,"Kansas","region","US"],"914":[40.9966,-74.1838,"New York","region","US"],"915":[31.7587,-106.4869,"El Paso, TX","city","US"],"916":[38.5816,-121.4944,"Sacramento, CA","city","US"],"917":[40.9966,-74.1838,"New York","region","US"],"918":[36.154,-95.9928,"Tulsa, OK","city","US"],"919":[35.7721,-78.6386,"Raleigh, NC","city","US"],"920":[43.5301,-88.8159,"Wisconsin","region","US"],"925":[37.6624,-121.8747,"Pleasanton, CA","city","US"],"928":[35.1981,-111.6513,"Flagstaff, AZ","city","US"],"929":[40.9966,-74.1838,"New York","region","US"],"930":[40.2093,-86.2689,"Indiana","region","US"],"931":[35.6578,-87.1638,"Tennessee","region","US"],"934":[40.7143,-74.006,"New York, NY","city","US"],"936":[30.9677,-97.5437,"Texas","region","US"],"937":[39.759,-84.1916,"Dayton, OH","city","US"],"938":[33.0152,-86.7327,"Alabama","region","US"],"939":[18.4663,-66.1057,"Puerto Rico","country","PR"],"940":[33.2148,-97.1331,"Denton, TX","city","US"],"941":[27.3364,-82.5306,"Sarasota, FL","city","US"],"942":[43.7001,-79.4163,"Toronto, ON","city","CA"],"943":[33.2787,-83.8497,"Georgia","region","US"],"945":[30.9677,-97.5437,"Texas","region","US"],"947":[42.7178,-83.9773,"Michigan","region","US"],"948":[37.7821,-77.4296,"Virginia","region","US"],"949":[33.6695,-117.8231,"Irvine, CA","city","US"],"951":[33.9534,-117.3962,"Riverside, CA","city","US"],"952":[45.0834,-93.4372,"Minnesota","region","US"],"954":[27.6288,-81.5001,"Florida","region","US"],"956":[30.9677,-97.5437,"Texas","region","US"],"959":[41.4532,-72.9219,"Connecticut","region","US"],"970":[40.5853,-105.0844,"Fort Collins, CO","city","US"],"971":[44.8542,-122.6347,"Oregon","region","US"],"972":[30.9677,-97.5437,"Texas","region","US"],"973":[40.4845,-74.388,"New Jersey","region","US"],"975":[38.5654,-92.2859,"Missouri","region","US"],"978":[42.2821,-71.3281,"Massachusetts","region","US"],"979":[30.9677,-97.5437,"Texas","region","US"],"980":[35.5363,-79.5889,"North Carolina","region","US"],"983":[39.5795,-105.1342,"Colorado","region","US"],"984":[35.5363,-79.5889,"North Carolina","region","US"],"985":[30.5816,-91.337,"Louisiana","region","US"],"986":[44.207,-115.3439,"Idaho","region","US"],"989":[42.7178,-83.9773,"Michigan","region","US"]};
+  const CALLING = {"1":["US",38.8951,-77.0364],"7":["RU",55.7522,37.6156],"20":["EG",30.0626,31.2497],"27":["ZA",-25.7449,28.1878],"30":["GR",37.9838,23.7278],"31":["NL",52.374,4.8897],"32":["BE",50.8505,4.3488],"33":["FR",48.8534,2.3488],"34":["ES",40.4165,-3.7026],"36":["HU",47.4984,19.0405],"39":["IT",41.8919,12.5113],"40":["RO",44.4323,26.1063],"41":["CH",46.9481,7.4474],"43":["AT",48.2085,16.3721],"44":["GB",51.5085,-0.1257],"45":["DK",55.6759,12.5655],"46":["SE",59.3294,18.0687],"47":["NO",59.9127,10.7461],"48":["PL",52.2298,21.0118],"49":["DE",52.5244,13.4105],"51":["PE",-12.0432,-77.0282],"52":["MX",19.4285,-99.1277],"53":["CU",23.133,-82.383],"54":["AR",-34.6131,-58.3772],"55":["BR",-15.7797,-47.9297],"56":["CL",-33.4569,-70.6483],"57":["CO",4.6097,-74.0817],"58":["VE",10.488,-66.8792],"60":["MY",3.1412,101.6865],"61":["AU",-35.2835,149.1281],"62":["ID",-6.2146,106.8451],"63":["PH",14.6042,120.9822],"64":["NZ",-41.2866,174.7756],"65":["SG",1.2897,103.8501],"66":["TH",13.754,100.5014],"81":["JP",35.6895,139.6917],"82":["KR",37.566,126.9784],"84":["VN",21.0245,105.8412],"86":["CN",39.9075,116.3972],"90":["TR",39.9199,32.8543],"91":["IN",28.6358,77.2245],"92":["PK",33.7215,73.0433],"93":["AF",34.5281,69.1723],"94":["LK",6.9355,79.8487],"95":["MM",16.8053,96.1561],"98":["IR",35.6944,51.4215],"211":["SS",4.8517,31.5825],"212":["MA",34.0133,-6.8325],"213":["DZ",36.7323,3.0875],"216":["TN",36.819,10.1658],"218":["LY",32.8874,13.1873],"220":["GM",13.4527,-16.578],"221":["SN",14.6937,-17.4441],"222":["MR",18.0858,-15.9785],"223":["ML",12.65,-8],"224":["GN",9.538,-13.6773],"225":["CI",6.8206,-5.2767],"226":["BF",12.3657,-1.5339],"227":["NE",13.5137,2.1098],"228":["TG",6.1287,1.2215],"229":["BJ",6.4965,2.6036],"230":["MU",-20.1619,57.4989],"231":["LR",6.3005,-10.7969],"232":["SL",8.4871,-13.2356],"233":["GH",5.556,-0.1969],"234":["NG",9.0579,7.4951],"235":["TD",12.1067,15.0444],"236":["CF",4.3612,18.555],"237":["CM",3.8667,11.5167],"238":["CV",14.9315,-23.5125],"239":["ST",0.3365,6.7273],"240":["GQ",3.7558,8.7817],"241":["GA",0.3924,9.4536],"242":["CG",-4.2661,15.2832],"243":["CD",-4.3276,15.3136],"244":["AO",-8.8368,13.2343],"245":["GW",11.8636,-15.5977],"248":["SC",-4.62,55.455],"249":["SD",15.5518,32.5324],"250":["RW",-1.9499,30.0589],"251":["ET",9.025,38.7469],"252":["SO",2.0371,45.3438],"253":["DJ",11.589,43.145],"254":["KE",-1.2833,36.8167],"255":["TZ",-6.1722,35.7395],"256":["UG",0.3163,32.5822],"257":["BI",-3.4271,29.9246],"258":["MZ",-25.9655,32.5832],"260":["ZM",-15.4067,28.2871],"261":["MG",-18.9137,47.5361],"262":["RE",-20.8823,55.4504],"263":["ZW",-17.8277,31.0534],"264":["NA",-22.5594,17.0832],"265":["MW",-13.9669,33.7873],"266":["LS",-29.3167,27.4833],"267":["BW",-24.6545,25.9086],"268":["SZ",-26.4667,31.2],"269":["KM",-11.7022,43.2551],"290":["SH",-15.9387,-5.7167],"291":["ER",15.3381,38.9318],"297":["AW",12.524,-70.027],"298":["FO",62.0097,-6.7716],"299":["GL",64.1835,-51.7216],"350":["GI",36.1447,-5.3526],"351":["PT",38.7167,-9.1333],"352":["LU",49.6117,6.13],"353":["IE",53.3331,-6.2489],"354":["IS",64.1355,-21.8954],"355":["AL",41.3275,19.8189],"356":["MT",35.8997,14.5148],"357":["CY",35.1753,33.3642],"358":["FI",60.1695,24.9355],"359":["BG",42.6975,23.3242],"370":["LT",54.6892,25.2798],"371":["LV",56.946,24.1059],"372":["EE",59.437,24.7535],"373":["MD",47.0056,28.8575],"374":["AM",40.1811,44.5136],"375":["BY",53.9,27.5667],"376":["AD",42.5078,1.5211],"377":["XK",42.6727,21.1669],"378":["SM",43.969,12.4817],"379":["VA",41.9027,12.4541],"380":["UA",50.4547,30.5238],"381":["RS",44.804,20.4651],"382":["ME",42.4411,19.2636],"383":["XK",42.6727,21.1669],"385":["HR",45.8144,15.978],"386":["XK",42.6727,21.1669],"387":["BA",43.8486,18.3564],"389":["MK",41.9965,21.4314],"420":["CZ",50.088,14.4208],"421":["SK",48.1482,17.1067],"423":["LI",47.1415,9.5215],"500":["FK",-51.6938,-57.857],"501":["BZ",17.25,-88.7667],"502":["GT",14.6407,-90.5133],"503":["SV",13.6894,-89.1872],"504":["HN",14.0818,-87.2068],"505":["NI",12.1328,-86.2504],"506":["CR",9.9333,-84.0833],"507":["PA",9.334,-79.8917],"508":["PM",46.7791,-56.1773],"509":["HT",18.5435,-72.3388],"590":["GP",15.9971,-61.7321],"591":["BO",-19.0333,-65.2627],"592":["GY",6.8045,-58.1553],"593":["EC",-0.2298,-78.5249],"594":["GF",4.9333,-52.3333],"595":["PY",-25.2865,-57.647],"596":["MQ",14.6037,-61.0742],"597":["SR",5.8664,-55.1668],"598":["UY",-34.9033,-56.1882],"670":["TL",-8.5586,125.5736],"672":["AQ",-77.846,166.676],"673":["BN",4.8904,114.9401],"674":["NR",-0.5508,166.9252],"675":["PG",-9.4772,147.1509],"676":["TO",-21.1394,-175.2018],"677":["SB",-9.4333,159.95],"678":["VU",-17.7365,168.3137],"679":["FJ",-18.1416,178.4415],"680":["PW",7.5008,134.6238],"681":["WF",-13.2816,-176.1745],"682":["CK",-21.2075,-159.7754],"683":["NU",-19.0545,-169.9177],"685":["WS",-13.8333,-171.7667],"686":["KI",1.3278,172.977],"687":["NC",-22.2741,166.4488],"688":["TV",-8.5242,179.1942],"689":["PF",-17.5373,-149.5665],"690":["TK",-8.5421,-172.5159],"691":["FM",7.4465,151.8414],"692":["MH",7.0897,171.3803],"850":["KP",39.0339,125.7543],"852":["HK",22.2783,114.1747],"853":["MO",22.2006,113.5461],"855":["KH",11.5625,104.916],"856":["LA",17.9667,102.6],"880":["BD",23.7104,90.4074],"886":["TW",25.0478,121.5319],"960":["MV",4.1752,73.5092],"961":["LB",33.8933,35.5016],"962":["JO",31.9552,35.945],"963":["SY",33.5102,36.2913],"964":["IQ",33.3406,44.4009],"965":["KW",29.3697,47.9783],"966":["SA",24.6877,46.7219],"967":["YE",15.3547,44.2067],"968":["OM",23.5841,58.4078],"970":["PS",31.8996,35.2042],"971":["AE",24.4512,54.397],"972":["IL",31.769,35.2163],"973":["BH",26.2279,50.5857],"974":["QA",25.2855,51.531],"975":["BT",27.4661,89.6419],"976":["MN",47.9077,106.8832],"977":["NP",27.7017,85.3206],"992":["TJ",38.5358,68.7791],"993":["TM",37.95,58.3833],"994":["AZ",40.3777,49.892],"995":["GE",41.6941,44.8337],"996":["KG",42.87,74.59],"998":["UZ",41.2647,69.2163],"1242":["BS",25.0582,-77.3431],"1246":["BB",13.1073,-59.6202],"1264":["AI",18.217,-63.0578],"1268":["AG",17.121,-61.8433],"1284":["VG",18.4269,-64.6208],"1340":["VI",18.3419,-64.9307],"1345":["KY",19.2866,-81.3744],"1441":["BM",32.2949,-64.783],"1473":["GD",12.0529,-61.7523],"1649":["TC",21.4612,-71.1419],"1664":["MS",16.7056,-62.2129],"1670":["MP",15.2123,145.7545],"1671":["GU",13.4757,144.7489],"1684":["AS",-14.2781,-170.7025],"1721":["SX",18.026,-63.0458],"1758":["LC",13.9957,-61.0061],"1767":["DM",15.3017,-61.3881],"1784":["VC",13.1553,-61.2274],"1787":["PR",18.4663,-66.1057],"1809":["DO",18.4719,-69.8923],"1829":["DO",18.4719,-69.8923],"1849":["DO",18.4719,-69.8923],"1868":["TT",10.6667,-61.5189],"1869":["KN",17.2955,-62.725],"1876":["JM",17.997,-76.7936],"1939":["PR",18.4663,-66.1057],"4779":["SJ",78.2233,15.6469],"5997":["BQ",12.15,-68.2667],"5999":["CW",12.1084,-68.9335]};
+  const _approx = new Map();   /* contactId -> { sig, v, p } */
+  function _phoneApprox(phone) {
+    const raw = String(phone || '').trim();
+    if (!raw) return null;
+    let d = raw.replace(/[^\d+]/g, '');
+    if (d.indexOf('00') === 0) d = '+' + d.slice(2);
+    const digits = d.replace(/\D/g, '');
+    let nanp = null;
+    if (d[0] === '+' && digits[0] === '1' && digits.length === 11) nanp = digits.slice(1, 4);
+    else if (d[0] !== '+' && digits.length === 10 && /^[2-9]/.test(digits)) nanp = digits.slice(0, 3);
+    else if (d[0] !== '+' && digits.length === 11 && digits[0] === '1') nanp = digits.slice(1, 4);
+    if (nanp && NANP[nanp]) {
+      const r = NANP[nanp];
+      return { lat: r[0], lon: r[1], label: r[2], precision: r[3], cc: r[4], source: 'area' };
+    }
+    if (d[0] === '+') {
+      for (let n = 4; n >= 1; n--) {
+        const code = digits.slice(0, n);
+        if (CALLING[code]) { const r = CALLING[code]; return { lat: r[1], lon: r[2], label: _countryName(r[0]), precision: 'country', cc: r[0], source: 'country' }; }
+      }
+    }
+    return null;
+  }
+  function _countryName(iso) {
+    try { return new Intl.DisplayNames([_itLoc() ? 'it' : 'en'], { type: 'region' }).of(iso) || iso; } catch (e) { return iso; }
+  }
+  function _itLoc() { try { return I18n.locale === 'it'; } catch (e) { return false; } }
+  async function _approxLoad(c, sig, phone, addr) {
+    const base = _phoneApprox(phone);
+    let city = null;
+    if (addr && _authed()) {
+      /* Only the end of the address (where the city is), without numbers */
+      const q = String(addr).split(/[,\n]+/).slice(-2).join(', ').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+      if (q.length >= 3) {
+        const j = await _json('/geo/city?q=' + encodeURIComponent(q) + (base && base.cc ? '&cc=' + encodeURIComponent(base.cc) : ''));
+        if (j && j.city) city = { lat: _num(j.city.latitude), lon: _num(j.city.longitude), label: j.city.name, precision: 'city', cc: j.city.country, source: 'address' };
+      }
+    }
+    return city || base || null;
+  }
+  /* Synchronous for the canvas: the value when ready, else null (and the load starts) */
+  function approxFor(c) {
+    if (!c) return null;
+    const phone = c.phone || '';
+    let e = _approx.get(c.id);
+    if (e && e.phone === phone) return e.v;
+    e = { phone: phone, v: null, p: null };
+    _approx.set(c.id, e);
+    e.p = (async () => {
+      let addr = '', ph = phone;
+      try { const pr = await RemielDB.getProfile(c.id); if (pr) { addr = pr.address || ''; if (!ph) ph = pr.phone || ''; } } catch (err) {}
+      e.v = await _approxLoad(c, '', ph, addr);
+      return e.v;
+    })();
+    return null;
+  }
+  function approxText(a) {
+    if (!a) return '';
+    const where = a.precision === 'city' ? _t('whereis.apxCity', 'Around {place}', { place: a.label })
+      : a.precision === 'region' ? _t('whereis.apxRegion', 'Somewhere in {place}', { place: a.label })
+      : _t('whereis.apxCountry', 'In {place}', { place: a.label });
+    const from = a.source === 'address' ? _t('whereis.apxFromAddress', 'from the address on the card')
+      : a.source === 'area' ? _t('whereis.apxFromArea', 'from the area code')
+      : _t('whereis.apxFromCountry', 'from the country code');
+    return where + ' (' + _t('whereis.apxWord', 'approximate') + ', ' + from + ')';
+  }
+  function _apxZoom(a) { return a.precision === 'city' ? 9 : a.precision === 'region' ? 6 : 4; }
+  function _apxRadiusM(a) { return a.precision === 'city' ? 15000 : a.precision === 'region' ? 220000 : 450000; }
+  /* A reset for the approximate cache when a card's phone or address changes */
+  function forgetApprox(id) { if (id == null) _approx.clear(); else _approx.delete(id); }
 
   /* ── Geometry ── */
   function _dist(a, b) {
@@ -21592,6 +21874,8 @@ const WhereIs = (() => {
     if (!id) return;
     if (!force && _refreshFor === id && Date.now() - _refreshAt < LOC_MS) return;
     _refreshFor = id; _refreshAt = Date.now();
+    circle(force);
+    try { approxFor(_contact(id)); } catch (e) {}
     sharedLocations(force).then(() => {
       const c = _contact(id), e = entryFor(c);
       myPlaces().then(() => { if (e && e.place && e.place.id) nowFor(e.place.id); });
@@ -21655,22 +21939,41 @@ const WhereIs = (() => {
     ctx.font = '500 8px ' + sans;
     const attrW = ctx.measureText(attr).width + 6;
     const attrTop = cy + R - 16 - Math.max(0, (R - Math.sqrt(Math.max(0, R * R - (attrW / 2) * (attrW / 2)))) - 8);
-    if (entry) {
-      const z = _zoomFor(entry);
+    const apx = entry ? null : approxFor(c);
+    if (entry || apx) {
+      const z = entry ? _zoomFor(entry) : _apxZoom(apx);
+      const lat = entry ? _num(entry.latitude) : apx.lat, lon = entry ? _num(entry.longitude) : apx.lon;
       ctx.fillStyle = '#0b0d14'; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
       const k = (R * 2) / 384;   /* 1.5 tiles across the circle, 3x3 always covers it */
-      const st = drawTiles(ctx, cx, cy, _num(entry.latitude), _num(entry.longitude), z, TILE_PX * k, R, R, true);
+      const st = drawTiles(ctx, cx, cy, lat, lon, z, TILE_PX * k, R, R, true);
       mapOk = st.drawn > 0; mapFailed = st.total > 0 && st.failed === st.total;
       if (st.failed && !st.drawn) mapFailed = true;
+      /* The general area: a soft wide ring, never a dot */
+      if (apx && mapOk) {
+        const rr = Math.min(R * 0.92, Math.max(R * 0.28, _apxRadiusM(apx) / _mpp(lat, z, TILE_PX * k)));
+        ctx.save(); ctx.globalAlpha = Math.min(1, alpha * 1.6);
+        ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fillStyle = 'rgba(56,189,248,0.14)'; ctx.fill();
+        ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(159,216,255,0.8)'; ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore();
+      }
     }
     if (!mapOk) _glow(ctx, cx, cy, R, cat, alpha, (node && !mapFailed) ? node.initials : '');
     ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
     ctx.globalAlpha = Math.min(1, 0.35 + alpha * 1.3);
     let y = cy - R + R * 0.34;
     _lines(ctx, [_t('whereis.label', 'WHEREIS')], cx, y, '700 ' + fS + 'px ' + mono, '#9fd8ff', fS + 6); y += fS + 6;
-    if (!entry) {
-      const msg = _noneMsg(c);
-      _lines(ctx, _wrap(msg, Math.round(R * 1.5 / 6.2), 4), cx, cy + R * 0.08, '500 ' + fS + 'px ' + sans, '#f0eef5', fS + 4);
+    if (!entry && apx && mapOk) {
+      /* Name and the general area at the foot of the circle; what to do next goes in the circle below */
+      let ny = Math.min(cy + R * 0.42, attrTop - (fB + fS + 14) - 6);
+      if (ny < cy + 14) ny = y + 2;
+      ctx.fillStyle = 'rgba(8,10,16,0.62)'; ctx.fillRect(cx - R, ny - 6, R * 2, fB + fS + 18);
+      _lines(ctx, [_first(c)], cx, ny, '700 ' + fB + 'px ' + sans, '#f0eef5', fB + 4);
+      const where = apx.precision === 'city' ? _t('whereis.apxCity', 'Around {place}', { place: apx.label }) : apx.precision === 'region' ? _t('whereis.apxRegion', 'Somewhere in {place}', { place: apx.label }) : _t('whereis.apxCountry', 'In {place}', { place: apx.label });
+      _lines(ctx, _wrap(where, Math.round(R * 1.7 / (fS * 0.62)), 1), cx, ny + fB + 4, '600 ' + fS + 'px ' + mono, '#c7d2e2', fS + 4);
+      _lines(ctx, [_t('whereis.apxWordCap', 'APPROXIMATE')], cx, y, '700 ' + Math.max(8, fS - 1) + 'px ' + mono, '#fbbf24', fS + 4);
+    } else if (!entry) {
+      /* No map tiles: the general area in words (what to do is in the circle below), else the state */
+      const msg = apx ? approxText(apx) : _noneMsg(c);
+      _lines(ctx, _wrap(msg, Math.round(R * 1.5 / 6.2), 5), cx, cy + R * 0.02, '500 ' + fS + 'px ' + sans, '#f0eef5', fS + 4);
     } else {
       if (mapOk) pulseDot(ctx, cx, cy, t, _lit_());
       if (mapFailed) _lines(ctx, _wrap(_t('whereis.noMap', 'Map not available'), 20, 1), cx, cy - fS * 0.5, '500 ' + fS + 'px ' + sans, '#f0eef5', fS + 4);
@@ -21715,7 +22018,11 @@ const WhereIs = (() => {
     const f2 = Math.max(9, Math.min(12, Math.round(r2 * 0.18))), f3 = Math.max(8, Math.min(10, Math.round(r2 * 0.14)));
     const maxC = Math.round(r2 * 1.6 / (f2 * 0.55));
     let lines = [];
-    if (!entry) lines = [];
+    if (!entry) {
+      /* No position: what is going on and what to do, in the Place circle */
+      const st = stateFor(c);
+      if (apx || st !== 'signin') lines = _wrap(stateText(c, st), maxC + 4, 6).map(l => ({ t: l }));
+    }
     else if (place) {
       lines = _wrap(place.name || '', maxC, 2).map(l => ({ t: l, b: true }));
       if (room && room.name) lines.push({ t: room.name });
@@ -21778,7 +22085,9 @@ const WhereIs = (() => {
         }, true));
       }
     } catch (e) {}
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _startWatch(); else _stopWatch(true); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') { _startWatch(); checkAsks(false); circle(); } else _stopWatch(true);
+    });
     window.addEventListener('localeChanged', () => { if (_panelFor) _renderPanelBody(); renderPlaces(); renderCheckin(); });
   }
 
@@ -21815,7 +22124,7 @@ const WhereIs = (() => {
     try { if (typeof A11y !== 'undefined') A11y.announce(_t('whereis.opened', 'WHEREIS opened. Tap the X at the top right to return.')); } catch (e) {}
     const x = el.querySelector('.whereis-x'); if (x) { try { x.focus({ preventScroll: true }); } catch (e) {} }
     _renderPanelBody();
-    await Promise.all([sharedLocations(true), myPlaces()]);
+    await Promise.all([sharedLocations(true), myPlaces(), circle(true)]);
     const entry = entryFor(c);
     const pts = entry && entry.user_id ? await trail(entry.user_id) : [];
     if (_panelFor !== c.id || el.hidden) return;
@@ -21831,9 +22140,11 @@ const WhereIs = (() => {
   async function _renderMap(c, entry, pts) {
     const box = $('whereisMap'); if (!box) return;
     box.innerHTML = '';
-    const center = entry ? { lat: _num(entry.latitude), lon: _num(entry.longitude) } : (_places[0] ? { lat: _num(_places[0].latitude), lon: _num(_places[0].longitude) } : null);
+    let apx = null;
+    if (!entry) { approxFor(c); const e0 = _approx.get(c.id); if (e0 && e0.p) { try { apx = await e0.p; } catch (e) {} } if (_panelFor !== c.id) return; if (apx) _renderPanelBody(); }
+    const center = entry ? { lat: _num(entry.latitude), lon: _num(entry.longitude) } : apx ? { lat: apx.lat, lon: apx.lon } : (_places[0] ? { lat: _num(_places[0].latitude), lon: _num(_places[0].longitude) } : null);
     if (!center) { box.innerHTML = '<div class="whereis-mapnote">' + _esc(_noneMsg(c)) + '</div>'; return; }
-    const z = entry ? _zoomFor(entry) : 13;
+    const z = entry ? _zoomFor(entry) : apx ? _apxZoom(apx) : 13;
     const ok = await _loadMapLibre();
     if (_panelFor !== c.id) return;
     if (ok) {
@@ -21848,6 +22159,13 @@ const WhereIs = (() => {
             _places.forEach(p => { const d = document.createElement('div'); d.className = 'whereis-place-label'; d.textContent = p.name; new window.maplibregl.Marker({ element: d, anchor: 'bottom' }).setLngLat([_num(p.longitude), _num(p.latitude)]).addTo(_map); });
           }
           if (entry) { const d = document.createElement('div'); d.className = 'whereis-member-dot'; d.title = _first(c); new window.maplibregl.Marker({ element: d }).setLngLat([center.lon, center.lat]).addTo(_map); }
+          if (!entry && apx) {
+            _map.addSource('apx', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [_circlePoly(apx.lat, apx.lon, _apxRadiusM(apx))] } } });
+            _map.addLayer({ id: 'apx-fill', type: 'fill', source: 'apx', paint: { 'fill-color': '#38bdf8', 'fill-opacity': 0.12 } });
+            _map.addLayer({ id: 'apx-line', type: 'line', source: 'apx', paint: { 'line-color': '#9fd8ff', 'line-width': 1.2, 'line-dasharray': [2, 2] } });
+            const d = document.createElement('div'); d.className = 'whereis-place-label whereis-apx-label'; d.textContent = approxText(apx);
+            new window.maplibregl.Marker({ element: d, anchor: 'bottom' }).setLngLat([apx.lon, apx.lat]).addTo(_map);
+          }
         });
         return;
       } catch (e) { box.innerHTML = ''; }
@@ -21868,6 +22186,7 @@ const WhereIs = (() => {
       if (pts.length > 1) { ctx.beginPath(); pts.forEach((p, i) => { const q = toPx(_num(p.latitude), _num(p.longitude)); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }); ctx.strokeStyle = 'rgba(159,216,255,0.8)'; ctx.lineWidth = 1.5; ctx.stroke(); }
       _places.forEach(p => { const q = toPx(_num(p.latitude), _num(p.longitude)); const r = (_num(p.radius_m) || 150) / mpp; ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.fillStyle = 'rgba(56,189,248,0.12)'; ctx.fill(); ctx.strokeStyle = 'rgba(56,189,248,0.9)'; ctx.lineWidth = 1.2; ctx.stroke(); ctx.font = '600 11px "Hanken Grotesk", system-ui, sans-serif'; ctx.fillStyle = '#f0eef5'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4; ctx.fillText(p.name, q.x, q.y - r - 3); ctx.shadowBlur = 0; });
       if (entry) pulseDot(ctx, W / 2, H / 2, Date.now(), _lit_());
+      if (!entry && apx) { const r = _apxRadiusM(apx) / mpp; ctx.beginPath(); ctx.arc(W / 2, H / 2, r, 0, Math.PI * 2); ctx.fillStyle = 'rgba(56,189,248,0.12)'; ctx.fill(); ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(159,216,255,0.8)'; ctx.stroke(); ctx.setLineDash([]); }
       if (!st.drawn && st.total && st.failed === st.total) { ctx.font = '500 12px "Hanken Grotesk", system-ui, sans-serif'; ctx.fillStyle = '#f0eef5'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(_t('whereis.noMap', 'Map not available'), W / 2, H / 2 - 24); }
       ctx.font = '500 9px "Hanken Grotesk", system-ui, sans-serif'; ctx.fillStyle = 'rgba(240,238,245,0.85)'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('© OpenStreetMap © CARTO', W - 6, H - 4);
       return st;
@@ -21877,7 +22196,7 @@ const WhereIs = (() => {
     loop();
   }
   function _memberLine(c, entry) {
-    if (!entry) return _noneMsg(c);
+    if (!entry) { const a = approxFor(c); return stateText(c) + (a ? ' ' + approxText(a) + '.' : ''); }
     const parts = [];
     if (entry.place) {
       parts.push(entry.place.name);
@@ -21893,8 +22212,16 @@ const WhereIs = (() => {
   }
   async function _renderPanelBody() {
     const body = $('whereisBody'); const c = _contact(_panelFor); if (!body || !c) return;
+    if (!body.getAttribute('data-ask-bound')) {
+      body.setAttribute('data-ask-bound', '1');
+      body.addEventListener('click', e => { const b = e.target.closest('#whereisAskBtn'); if (!b) return; e.preventDefault(); e.stopPropagation(); b.disabled = true; ask(_contact(_panelFor)).then(() => { b.disabled = false; }); });
+    }
     const entry = entryFor(c);
     let html = '<div class="whereis-member">' + _esc(_memberLine(c, entry)) + '</div>';
+    const st = entry ? 'live' : stateFor(c);
+    if (st === 'notShared' || st === 'declined' || st === 'asked' || st === 'notLinked') {
+      html += '<div class="whereis-actions"><button type="button" class="posts-btn posts-btn-lit" id="whereisAskBtn">' + _esc(st === 'asked' ? _t('whereis.askAgain', 'Ask again') : _t('whereis.askBtn', 'Ask for location')) + '</button></div>';
+    }
     if (!_places.length) {
       html += '<div class="whereis-note">' + _esc(_t('whereis.addPlaces', 'Add Places in Settings, Places, to see arrivals here.')) + ' ' + Guide.linkHtml('settings.places') + '</div>';
       body.innerHTML = html; return;
@@ -22214,16 +22541,26 @@ const WhereIs = (() => {
 
   /* ══ Member side: share while open, check in, QR link ══ */
   let _openOn = false, _watchId = null, _tick = null, _lastPost = 0, _lastFix = null, _lastPosted = null, _posting = false;
+  let _paused = false;        /* my own Pause switch; sending otherwise follows whom I share with */
   function _openStatus(msg) { const s = $('locOpenStatus'); if (s) s.textContent = msg || ''; }
+  /* Sending my position while the app is open is on whenever I share with someone, unless I paused it */
+  function _applyAutoShare(postNow) {
+    const t = $('locOpenToggle'); if (t && t.checked !== !_paused) t.checked = !_paused;
+    if (!_authed()) { _openOn = false; _stopWatch(false); _openStatus(_t('location.signInFirst', 'Sign in first: Settings, Account. Nothing is shared until then.')); return; }
+    if (_paused) { _openOn = false; _stopWatch(false); _openStatus(_t('location.openPaused', 'Paused. Nothing is sent, even to members you share with.')); return; }
+    if (!_iShareAny) { _openOn = false; _stopWatch(false); _openStatus(_t('location.noOne', 'You are not sharing your location with anyone. Turn it on for a member below, or allow a request.')); return; }
+    const was = _openOn;
+    _openOn = true;
+    _startWatch();
+    if (!was) _openStatus(_t('location.openOn', 'Sharing while Remiel Sentinel is open. Waiting for the first position...'));
+    if (postNow && navigator.geolocation) {
+      try { navigator.geolocation.getCurrentPosition(pos => { _lastFix = pos; _lastPost = 0; _post(pos); }, () => {}, { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }); } catch (e) {}
+    }
+  }
   async function setOpenShare(on) {
-    _openOn = !!on;
-    try { await RemielDB.putSetting('locShareOpen', _openOn); } catch (e) {}
-    const t = $('locOpenToggle'); if (t && t.checked !== _openOn) t.checked = _openOn;
-    if (_openOn) {
-      if (!_authed()) { _openStatus(_t('location.signInFirst', 'Sign in first: Settings, Account. Nothing is shared until then.')); return; }
-      _startWatch();
-      _openStatus(_t('location.openOn', 'Sharing while Remiel Sentinel is open. Waiting for the first position...'));
-    } else { _stopWatch(false); _openStatus(_t('location.openOff', 'Off. Nothing is sent.')); }
+    _paused = !on;
+    try { await RemielDB.putSetting('locSharePaused', _paused); } catch (e) {}
+    _applyAutoShare(!!on);
   }
   function _startWatch() {
     if (!_openOn || _watchId != null || !_authed()) return;
@@ -22336,20 +22673,87 @@ const WhereIs = (() => {
     _readQrParam();
     await _loadMode();
     await _loadMine();
-    try { const v = await RemielDB.getSetting('locShareOpen'); _openOn = !!v; } catch (e) {}
-    const t = $('locOpenToggle'); if (t) t.checked = _openOn;
+    try { const v = await RemielDB.getSetting('locSharePaused'); _paused = v === true; } catch (e) {}
+    const t = $('locOpenToggle'); if (t) t.checked = !_paused;
     _bind();
     const start = async () => {
       try { if (typeof SyncEngine !== 'undefined') await SyncEngine.ready(); } catch (e) {}
       updateVisibility();
-      if (_openOn && _authed()) { _startWatch(); _openStatus(_t('location.openOn', 'Sharing while Remiel Sentinel is open. Waiting for the first position...')); }
+      if (_authed()) {
+        await circle(true);
+        _applyAutoShare(true);
+        checkAsks(true);
+      }
       if (_qr) _runQr();
     };
     start();
+    /* A notification tap for a location request opens the app on #locask */
+    window.addEventListener('hashchange', () => { if (/locask/.test(location.hash)) checkAsks(true); });
+    setInterval(() => { if (document.visibilityState === 'visible') checkAsks(false); }, 90000);
   }
-  function onSettingsOpen() { updateVisibility(); renderPlaces(); renderCheckin(); const t = $('locOpenToggle'); if (t) t.checked = _openOn; }
+  function onSettingsOpen() { updateVisibility(); renderPlaces(); renderCheckin(); renderCircleShare(); const t = $('locOpenToggle'); if (t) t.checked = !_paused; }
+
+  /* ── The card's Location block: the live position, else what is going on and the general area ── */
+  async function fillCard(c) {
+    const box = $('blufLocWhere'); if (!box || !c) return;
+    if (!box.getAttribute('data-bound')) {
+      box.setAttribute('data-bound', '1');
+      box.addEventListener('click', e => {
+        const b = e.target.closest('button[data-wa]'); if (!b) return;
+        e.preventDefault(); e.stopPropagation();
+        const cur = (typeof selectedContact !== 'undefined') ? selectedContact : null; if (!cur) return;
+        if (b.getAttribute('data-wa') === 'ask') { b.disabled = true; ask(cur).then(() => fillCard(cur)); }
+        else openPanel(cur.id);
+      });
+    }
+    if (_authed()) { await Promise.all([circle(), sharedLocations()]); }
+    approxFor(c);
+    const e0 = _approx.get(c.id); if (e0 && e0.p) { try { await e0.p; } catch (err) {} }
+    const cur = (typeof selectedContact !== 'undefined') ? selectedContact : null;
+    if (!cur || cur.id !== c.id) return;
+    const entry = entryFor(c), st = entry ? 'live' : stateFor(c), apx = entry ? null : approxFor(c);
+    const set = (id, v) => { const el = $(id); if (el && v) el.textContent = v; };
+    if (entry) {
+      set('blufLocMacro', entry.place ? entry.place.name : _t('whereis.notAtPlace', 'Not at any of your Places'));
+      set('blufLocMicro', entry.room && entry.room.name ? entry.room.name : (entry.label || ''));
+      set('blufLocTime', ageText(entry.timestamp));
+      set('pullPrev_location', entry.place ? entry.place.name : ageText(entry.timestamp));
+    } else if (apx) {
+      set('blufLocMacro', approxText(apx));
+      set('pullPrev_location', apx.label + ' (' + _t('whereis.apxWord', 'approximate') + ')');
+    }
+    const ask = (st === 'notShared' || st === 'declined' || st === 'asked' || st === 'notLinked');
+    box.innerHTML = (entry ? '' : '<div class="bluf-loc-state">' + _esc(stateText(c, st)) + '</div>') +
+      '<div class="bluf-loc-btns">' + (ask ? '<button type="button" class="posts-btn posts-btn-lit" data-wa="ask">' + _esc(st === 'asked' ? _t('whereis.askAgain', 'Ask again') : _t('whereis.askBtn', 'Ask for location')) + '</button>' : '') +
+      '<button type="button" class="posts-btn" data-wa="open">' + _esc(_t('whereis.openBtn', 'Open WHEREIS')) + '</button></div>';
+  }
+
+  /* ── Settings, Location: who I share with, one switch per member ── */
+  async function renderCircleShare() {
+    const el = $('locCircleList'); if (!el) return;
+    if (!_authed()) { el.innerHTML = '<div class="wi-note">' + _esc(_t('location.signInFirst', 'Sign in first: Settings, Account. Nothing is shared until then.')) + '</div>'; return; }
+    const rows = await circle(true);
+    if (!rows.length) { el.innerHTML = '<div class="wi-note">' + _esc(_t('location.circleEmpty', 'No one is linked with you yet. Call someone once, or link by Sentinel ID, and they appear here.')) + '</div>'; return; }
+    el.innerHTML = rows.map(r => {
+      const name = r.display_name || (r.handle ? '@' + r.handle : r.sentinel_id || '');
+      let sub = r.they_share ? _t('location.theyShare', 'Shares with you') : _t('location.theyDont', 'Does not share with you');
+      if (r.i_share && r.i_until) sub += '. ' + _t('location.until', 'You share until {time}', { time: _clock(r.i_until) });
+      if (r.ask_in) sub += '. ' + _t('location.asksYou', 'Asks to see yours');
+      return '<div class="push-toggle-row loc-circle-row"><div><div class="push-toggle-label">' + _esc(name) + '</div><div class="push-toggle-sub">' + _esc(sub) + '</div></div>' +
+        '<label class="push-toggle"><input type="checkbox" data-uid="' + _esc(r.user_id) + '"' + (r.i_share ? ' checked' : '') + ' aria-label="' + _esc(_t('location.shareWith', 'Share my location with {name}', { name: name })) + '"><span class="push-toggle-slider"></span></label></div>';
+    }).join('');
+    el.querySelectorAll('input[data-uid]').forEach(inp => inp.addEventListener('change', async () => {
+      inp.disabled = true;
+      const ok = await shareWith(inp.getAttribute('data-uid'), inp.checked);
+      inp.disabled = false;
+      if (!ok) { inp.checked = !inp.checked; _toast(_t('whereis.answerFailed', 'Your answer did not go through. It will be asked again.')); }
+      _applyAutoShare(inp.checked);
+      renderCircleShare();
+    }));
+  }
 
   return { init, mode, setMode, drawToggle, drawDream, hideAnchor, openPanel, closePanel, arrivalItemsFor, pulseLine, placeChipHtml, matchContact, entryFor,
+           circle, circleFor, stateFor, stateText, ask, shareWith, checkAsks, approxFor, approxText, forgetApprox, renderCircleShare, fillCard,
            updateVisibility, renderPlaces, addPlace, editPlace, closeEditor, savePlace, deletePlace, printQr, setOpenShare, renderCheckin, checkIn, onSettingsOpen,
            sharedLocations, myPlaces, sharedPlaces, nowFor, arrivalsFor, trail, tile, drawTiles, ageText, invalidate,
            get openShare() { return _openOn; }, get panelOpen() { return !!_panelFor; } };
@@ -25435,6 +25839,7 @@ async function saveProfile() {
   }
   try {
     await RemielDB.putProfile(profile);
+    try { if (typeof WhereIs !== 'undefined') WhereIs.forgetApprox(profile.contactId || contactId); } catch (e) {}
     /* Flash saved message */
     const msg = document.getElementById('profileSavedMsg');
     if (msg) {
