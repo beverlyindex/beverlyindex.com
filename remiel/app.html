@@ -6509,6 +6509,16 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         <div class="push-toggle-sub" id="helpTargetNote" hidden></div>
         <button type="button" class="help-hold-btn" id="helpHoldBtn"><span class="help-hold-fill" id="helpHoldFill"></span><span class="help-hold-text" data-i18n="help.hold">Press and hold 2 seconds to send Help</span></button>
         <div class="push-status-text" id="helpStatus" hidden></div>
+        <div class="push-toggle-row" style="margin-top:14px;">
+          <div>
+            <div class="push-toggle-label" data-i18n="bg.label">Break Glass word</div>
+            <div class="push-toggle-sub" data-i18n="bg.sub">A silent Help. Type Break Glass (or just Glass on its own) in any message, check-in note or Ledger note, or say it while dictating. An urgent alarm goes to the person above with nothing shown on your screen. The message is still sent as normal.</div>
+          </div>
+          <label class="push-toggle">
+            <input type="checkbox" id="bgToggle" onchange="AlarmCenter.setBreakGlass(this.checked)">
+            <span class="push-toggle-slider"></span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -10659,6 +10669,13 @@ const I18n = (function () {
     'help.set.help': "Tips and a short tour of the app.",
     'help.title': "Help",
     'help.btnTitle': "Help button",
+    'bg.label': "Break Glass word",
+    'bg.sub': "A silent Help. Type Break Glass (or just Glass on its own) in any message, check-in note or Ledger note, or say it while dictating. An urgent alarm goes to the person above with nothing shown on your screen. The message is still sent as normal.",
+    'bg.alarmTitle': "Break Glass: {name} needs help",
+    'bg.alarmBody': "{name} used the Break Glass word in {where}. This is a silent alarm: they may not be able to talk freely. Do not call them openly first. Check WHEREIS for their location and follow your plan.",
+    'bg.inMessage': "a message",
+    'bg.inCheckin': "a check-in note",
+    'bg.inLedger': "a Ledger note",
     'guest.title': "Video Call",
     'guest.callingYou': "{name} is calling you",
     'guest.sub': "Enter your name to join the call",
@@ -11370,6 +11387,13 @@ const I18n = (function () {
     'help.set.help': "Suggerimenti e un breve giro dell’app.",
     'help.title': "Aiuto",
     'help.btnTitle': "Pulsante Aiuto",
+    'bg.label': "Parola Rompi il vetro",
+    'bg.sub': "Un Aiuto silenzioso. Scrivi Rompi il vetro (o solo Vetro, da solo) in un messaggio, in una nota di check-in o nel Registro, oppure dillo mentre detti. Un allarme urgente va alla persona indicata sopra e sul tuo schermo non appare nulla. Il messaggio viene comunque inviato normalmente. Funziona anche Break Glass.",
+    'bg.alarmTitle': "Rompi il vetro: {name} ha bisogno di aiuto",
+    'bg.alarmBody': "{name} ha usato la parola Rompi il vetro in {where}. È un allarme silenzioso: potrebbe non poter parlare liberamente. Non chiamarlo apertamente per primo. Controlla WHEREIS per la sua posizione e segui il vostro piano.",
+    'bg.inMessage': "un messaggio",
+    'bg.inCheckin': "una nota di check-in",
+    'bg.inLedger': "una nota del Registro",
     'guest.title': "Videochiamata",
     'guest.callingYou': "{name} ti sta chiamando",
     'guest.sub': "Scrivi il tuo nome per entrare nella chiamata",
@@ -18019,6 +18043,7 @@ const SentinelMessaging = (() => {
     if (!text) return;
     inp.value = '';
     inp.style.height = 'auto';
+    try { if (typeof AlarmCenter !== 'undefined') AlarmCenter.checkBreakGlass(text, 'message'); } catch (e) {}
 
     const contactId = _activeContactId;
     const contact = _findContact(contactId);
@@ -24088,6 +24113,7 @@ async function sendLedgerEntry(type) {
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
+  try { if (typeof AlarmCenter !== 'undefined') AlarmCenter.checkBreakGlass(text, 'ledger'); } catch (e) {}
 
   const contactId = (typeof selectedContact !== 'undefined' && selectedContact)
     ? selectedContact.id : 'self';
@@ -34257,6 +34283,7 @@ const SocialImport = (() => {
       var note = '';
       var noteEl = document.getElementById('checkinNote');
       if (noteEl) note = noteEl.value.trim();
+      try { if (note && typeof AlarmCenter !== 'undefined') AlarmCenter.checkBreakGlass(note, 'checkin'); } catch (e) {}
 
       try {
         /* Same shape as the main mood logger (logMood): level 1..5 and ts,
@@ -38904,6 +38931,54 @@ var AlarmCenter = (function () {
     list.forEach(function (c) { var o = document.createElement('option'); o.value = c.id; o.textContent = _contactName(c); if (c.id === cur) o.selected = true; sel.appendChild(o); });
     if (note) { note.hidden = list.length > 0; note.textContent = list.length ? '' : _t('help.noneLinked', 'Nobody is linked with you yet.'); }
   }
+  /* ── Break Glass: a silent Help ──
+     Typing (or dictating) Break Glass, or Glass as a whole message, raises an
+     urgent alarm to the Help person. Nothing appears on this screen: no toast,
+     no bar, no vibration (the server also hides it from this account's own
+     alarm list). The text itself is sent or saved as normal, so an onlooker
+     sees an ordinary message. Once per 2 minutes; retried if offline. */
+  var _bgLast = 0;
+  function _bgMatch(text) {
+    var n = String(text || '').toLowerCase();
+    try { n = n.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
+    n = n.replace(/[^a-z]+/g, ' ').trim();
+    if (!n) return false;
+    if (n === 'glass' || n === 'vetro') return true;
+    return /(^| )break ?glass( |$)/.test(n) || /(^| )rompi (il )?vetro( |$)/.test(n);
+  }
+  async function _bgOn() { try { var v = await RemielDB.getSetting('breakGlassOn'); return v !== false; } catch (e) { return true; } }
+  async function setBreakGlass(on) { try { await RemielDB.putSetting('breakGlassOn', !!on); } catch (e) {} }
+  async function _bgSend(source, tries) {
+    var id = await _helpTargetId();
+    var c = null;
+    _linked().forEach(function (x) { if (x.id === id) c = x; });
+    if (!c || !_authed()) { console.warn('Break Glass: no Help person chosen or not signed in'); return; }
+    var myName = '';
+    try { myName = (await RemielDB.getSetting('userSphereName')) || ''; } catch (e) {}
+    myName = String(myName).trim() || 'A member';
+    var where = source === 'checkin' ? _t('bg.inCheckin', 'a check-in note') : source === 'ledger' ? _t('bg.inLedger', 'a Ledger note') : _t('bg.inMessage', 'a message');
+    try {
+      var r = await _api('/alarms', { method: 'POST', body: JSON.stringify({
+        level: 3, kind: 'breakglass', to_sentinel_id: c.sentinelId,
+        title: _t('bg.alarmTitle', 'Break Glass: {name} needs help', { name: myName }),
+        body: _t('bg.alarmBody', '{name} used the Break Glass word in {where}. This is a silent alarm: they may not be able to talk freely. Do not call them openly first. Check WHEREIS for their location and follow your plan.', { name: myName, where: where }),
+        member_name: myName, client_ref: 'bg-' + _bgLast }) });
+      if (!r.ok && r.status !== 403) throw new Error('bg ' + r.status);
+    } catch (e) {
+      if ((tries || 0) < 4) setTimeout(function () { _bgSend(source, (tries || 0) + 1); }, 15000);
+    }
+  }
+  async function checkBreakGlass(text, source) {
+    try {
+      if (!_bgMatch(text)) return false;
+      if (!(await _bgOn())) return false;
+      if (Date.now() - _bgLast < 120000) return true;
+      _bgLast = Date.now();
+      _bgSend(source || 'message', 0);
+      return true;
+    } catch (e) { return false; }
+  }
+
   async function sendHelp(statusId) {
     statusId = statusId || 'helpStatus';
     _audio();
@@ -39208,6 +39283,7 @@ var AlarmCenter = (function () {
   function onSettingsOpen() {
     var on = _authed();
     ['helpSection', 'alarmPrefsSection'].forEach(function (id) { var sec = document.getElementById(id); if (sec) sec.style.display = on ? '' : 'none'; });
+    _bgOn().then(function (v) { var t = document.getElementById('bgToggle'); if (t) t.checked = v; });
     _css();
     _wireHold();
     _fillHelp();
@@ -39253,6 +39329,7 @@ var AlarmCenter = (function () {
   else setTimeout(start, 0);
 
   return { poll: poll, acknowledge: acknowledge, cancel: cancel, sendTest: sendTest, sendHelp: sendHelp,
+    checkBreakGlass: checkBreakGlass, setBreakGlass: setBreakGlass, _bgMatch: _bgMatch,
     setHelpTarget: setHelpTarget, onSettingsOpen: onSettingsOpen, savePrefs: savePrefs,
     openHelpCard: openHelpCard, closeHelpCard: closeHelpCard, updateFab: updateFab, voiceStrained: voiceStrained, _open: function () { return _open.slice(); } };
 })();
