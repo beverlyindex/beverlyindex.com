@@ -6263,6 +6263,11 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 .sv-card.active { box-shadow: 0 0 0 2px var(--lit-fill); border-color: var(--lit-fill) !important; }
 .bio-hr-btn.on { background: var(--lit-fill) !important; color: var(--lit-ink) !important; }
 .st-nav .st-back[aria-hidden="true"] { visibility: hidden; }
+.push-status-text[data-tone="ok"] { color: #5fbf7a; }
+.push-status-text[data-tone="warn"] { color: #fcd34d; }
+.push-status-text[data-tone="wait"] { color: #9fd8ff; }
+.push-test-row { margin: 8px 0 4px; }
+.push-test-row[hidden] { display: none; }
 .push-toggle input:disabled + .push-toggle-slider { opacity: 0.55 !important; filter: none; border: 1px dashed #94a3b8; }
 /* Ghost and icon controls: full brightness text, never below 4.5:1 */
 #exitBtn, #backBtn, #blufEditBtn, #pulseRefreshBtn, .pulse-close, .cm-photo-label, .checkin-nudge-close,
@@ -6725,7 +6730,10 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
             <span class="push-toggle-slider"></span>
           </label>
         </div>
-        <div class="push-status-text" id="pushStatusText">Checking status...</div>
+        <div class="push-status-text" id="pushStatusText" aria-live="polite">Checking status...</div>
+        <div class="push-test-row" id="pushTestRow" hidden>
+          <button type="button" class="settings-action-btn secondary" id="pushTestBtn" onclick="PushNotify.sendTest()" data-i18n="push.testBtn">Send a test notification</button>
+        </div>
         <div class="alarm-test-row">
           <div>
             <div class="push-toggle-label" data-i18n="alarm.testLabel">Test urgent alarm</div>
@@ -14105,6 +14113,37 @@ const I18n = (function () {
     "location.shareWith": "Condividi la mia posizione con {name}",
     "location.circleShareTitle": "Condividi la mia posizione con",
     "location.circleShareDesc": "Tutti i collegati nella tua Cerchia. Possono anche chiedere; rispondi Consenti sempre, Consenti per 8 ore, oppure Non ora."
+  });
+  /* Notifications: proof by a test notification */
+  Object.assign(_strings.en, {
+    "push.testBtn": "Send a test notification",
+    "push.confirmed": "On, and confirmed: a test notification reached this device at {time}.",
+    "push.confirmedEarlier": "On. A test notification last reached this device on {when}.",
+    "push.unconfirmed": "Signed up, not yet confirmed. Tap Send a test notification to check that notifications reach this device.",
+    "push.testing": "Sending a test notification to this device. It should appear within a few seconds.",
+    "push.testGone": "This device had dropped off the notification list. Turn the switch on again to sign it up.",
+    "push.testFailed": "The test notification could not be sent. Check the connection and tap Send a test notification again.",
+    "push.noArrivalMac": "Signed up, but the test notification has not arrived. On the Mac open System Settings, Notifications, choose Safari (or Remiel Sentinel if you opened it from the Dock) and turn on Allow notifications. Also turn off Focus or Do Not Disturb. Then tap Send a test notification.",
+    "push.noArrivalMacChrome": "Signed up, but the test notification has not arrived. On the Mac open System Settings, Notifications, choose Google Chrome and turn on Allow notifications. Also turn off Focus or Do Not Disturb. Then tap Send a test notification.",
+    "push.noArrivalAndroid": "Signed up, but the test notification has not arrived. Open the phone Settings, Apps, Chrome, Notifications and turn them on, and check that Do Not Disturb is off. Then tap Send a test notification.",
+    "push.noArrivalIos": "Signed up, but the test notification has not arrived. Open iPhone Settings, Notifications, Remiel Sentinel and turn on Allow Notifications, and check that Focus is off. Then tap Send a test notification.",
+    "push.noArrival": "Signed up, but the test notification has not arrived. Check that this browser is allowed to show notifications in your computer settings, and that Focus or Do Not Disturb is off. Then tap Send a test notification.",
+    "push.deniedSafariMac": "Safari is not allowing notifications here. If the top left of this window says Private, it is a Private Window, and Private Windows can never receive notifications: open Remiel Sentinel in a normal Safari window (File, New Window) or from the Dock, and turn this switch on there. Otherwise open Safari, Settings, Websites, Notifications, set beverly-index.com to Allow, then turn this switch on again."
+  });
+  Object.assign(_strings.it, {
+    "push.testBtn": "Invia una notifica di prova",
+    "push.confirmed": "Attive e confermate: una notifica di prova è arrivata su questo dispositivo alle {time}.",
+    "push.confirmedEarlier": "Attive. L'ultima notifica di prova è arrivata su questo dispositivo il {when}.",
+    "push.unconfirmed": "Registrato, non ancora confermato. Tocca Invia una notifica di prova per verificare che le notifiche arrivino su questo dispositivo.",
+    "push.testing": "Invio di una notifica di prova a questo dispositivo. Dovrebbe comparire entro pochi secondi.",
+    "push.testGone": "Questo dispositivo era uscito dall'elenco delle notifiche. Riattiva l'interruttore per registrarlo di nuovo.",
+    "push.testFailed": "Non è stato possibile inviare la notifica di prova. Controlla la connessione e tocca di nuovo Invia una notifica di prova.",
+    "push.noArrivalMac": "Registrato, ma la notifica di prova non è arrivata. Sul Mac apri Impostazioni di Sistema, Notifiche, scegli Safari (o Remiel Sentinel se l'hai aperto dal Dock) e attiva Consenti notifiche. Disattiva anche Full immersion o Non disturbare. Poi tocca Invia una notifica di prova.",
+    "push.noArrivalMacChrome": "Registrato, ma la notifica di prova non è arrivata. Sul Mac apri Impostazioni di Sistema, Notifiche, scegli Google Chrome e attiva Consenti notifiche. Disattiva anche Full immersion o Non disturbare. Poi tocca Invia una notifica di prova.",
+    "push.noArrivalAndroid": "Registrato, ma la notifica di prova non è arrivata. Apri Impostazioni del telefono, App, Chrome, Notifiche e attivale, e controlla che Non disturbare sia disattivato. Poi tocca Invia una notifica di prova.",
+    "push.noArrivalIos": "Registrato, ma la notifica di prova non è arrivata. Apri Impostazioni di iPhone, Notifiche, Remiel Sentinel e attiva Consenti notifiche, e controlla che Full immersion sia disattivato. Poi tocca Invia una notifica di prova.",
+    "push.noArrival": "Registrato, ma la notifica di prova non è arrivata. Controlla che questo browser possa mostrare notifiche nelle impostazioni del computer, e che Full immersion o Non disturbare siano disattivati. Poi tocca Invia una notifica di prova.",
+    "push.deniedSafariMac": "Safari non consente le notifiche qui. Se in alto a sinistra la finestra dice Privata, è una finestra privata, e le finestre private non ricevono mai notifiche: apri Remiel Sentinel in una normale finestra di Safari (File, Nuova finestra) o dal Dock, e attiva l'interruttore lì. Altrimenti apri Safari, Impostazioni, Siti web, Notifiche, imposta beverly-index.com su Consenti, poi riattiva l'interruttore."
   });
   /* Installed app: background location and push */
   Object.assign(_strings.en, {
@@ -29489,16 +29528,22 @@ const SettingsNav = (function () {
       }
       inp.click();
     });
-    /* A short On / Off under the switch, so a tap is seen to work */
+    /* A short On / Off under the switch, shown only once the switch has settled (a handler may
+       turn it back), and never for notifications: those say On only after a test has arrived */
     root.addEventListener('change', e => {
       const inp = e.target;
-      if (!inp || inp.type !== 'checkbox' || !inp.closest('.push-toggle')) return;
+      if (!inp || inp.type !== 'checkbox' || !inp.closest('.push-toggle') || inp.id === 'pushToggle') return;
       const row = inp.closest('.push-toggle-row'); if (!row) return;
       const host = row.firstElementChild; if (!host || host.classList.contains('push-toggle')) return;
       let n = host.querySelector('.push-toggle-saved');
       if (!n) { n = document.createElement('div'); n.className = 'push-toggle-saved'; n.setAttribute('role', 'status'); host.appendChild(n); }
-      n.textContent = inp.checked ? _t('setnav.savedOn', 'On') : _t('setnav.savedOff', 'Off');
-      clearTimeout(n._t); n._t = setTimeout(() => { n.textContent = ''; }, 2500);
+      n.textContent = '';
+      clearTimeout(n._t);
+      n._t = setTimeout(() => {
+        if (inp.disabled) return;
+        n.textContent = inp.checked ? _t('setnav.savedOn', 'On') : _t('setnav.savedOff', 'Off');
+        n._t = setTimeout(() => { n.textContent = ''; }, 2500);
+      }, 1200);
     });
   }
   function _markDisabled() {
@@ -36365,10 +36410,74 @@ const SocialImport = (() => {
       /* Safari Private Windows have no persistent storage quota and cannot hold a push subscription */
       return /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Android|Edg\//.test(navigator.userAgent) && !('PushManager' in window);
     }
+    /* ── Proof: a test notification to this device; "on" is confirmed only when it arrives ── */
+    var CONF_KEY = 'pushConfirmed';
+    var _testTimer = null, _testSentAt = 0, _endpoint = null;
+    function _clock(ts) { try { return new Date(ts).toLocaleTimeString(I18n && I18n.locale === 'it' ? 'it-IT' : 'en-US', { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
+    async function _confirmedFor(ep) { try { var v = await RemielDB.getSetting(CONF_KEY); return (v && ep && v.endpoint === ep) ? v : null; } catch (e) { return null; } }
+    function _testRow(show) { var r = document.getElementById('pushTestRow'); if (r) r.hidden = !show; }
+    function _onTestArrived() {
+      if (!_testSentAt) return;
+      clearTimeout(_testTimer); _testTimer = null;
+      var at = Date.now(); _testSentAt = 0;
+      try { RemielDB.putSetting(CONF_KEY, { endpoint: _endpoint, at: at }); } catch (e) {}
+      _setStatus(_t('push.confirmed', 'On, and confirmed: a test notification reached this device at {time}.').replace('{time}', _clock(at)), false, 'ok');
+      _updateToggle(true);
+    }
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
+      var d = e && e.data;
+      if (d && d.type === 'PUSH_RECEIVED' && d.kind === 'test') _onTestArrived();
+    });
+    async function sendTest() {
+      var btn = document.getElementById('pushTestBtn');
+      try {
+        var reg = await navigator.serviceWorker.ready;
+        var sub = await reg.pushManager.getSubscription();
+        if (!sub) { _subscribed = false; _updateToggle(false); _testRow(false); _setStatus(_t('push.inactive', 'Push notifications are off. Turn them on with the switch above: Settings, Push Notifications.'), true); return; }
+        _endpoint = sub.endpoint;
+        if (btn) btn.disabled = true;
+        _setStatus(_t('push.testing', 'Sending a test notification to this device. It should appear within a few seconds.'), false, 'wait');
+        var lang = 'en'; try { lang = I18n.locale === 'it' ? 'it' : 'en'; } catch (e) {}
+        _testSentAt = Date.now();
+        var r = await _apiFetch('/push/test', { method: 'POST', body: JSON.stringify({ endpoint: sub.endpoint, lang: lang }) });
+        var j = null; try { j = await r.json(); } catch (e) {}
+        if (!r.ok || !j || !j.sent) {
+          _testSentAt = 0;
+          if (r.status === 404 || (j && j.gone)) {
+            /* The push service no longer knows this device: sign it up again */
+            try { await sub.unsubscribe(); } catch (e) {}
+            _subscribed = false; _updateToggle(false); _testRow(false);
+            _setStatus(_t('push.testGone', 'This device had dropped off the notification list. Turn the switch on again to sign it up.'), false, 'warn');
+          } else {
+            _setStatus(_t('push.testFailed', 'The test notification could not be sent. Check the connection and tap Send a test notification again.'), false, 'warn');
+          }
+          return;
+        }
+        clearTimeout(_testTimer);
+        _testTimer = setTimeout(function () {
+          if (!_testSentAt) return;
+          _testSentAt = 0;
+          _setStatus(_noArrivalHelp(), false, 'warn');
+        }, 20000);
+      } catch (err) {
+        _testSentAt = 0;
+        _setStatus(_t('push.testFailed', 'The test notification could not be sent. Check the connection and tap Send a test notification again.'), false, 'warn');
+      } finally { if (btn) btn.disabled = false; }
+    }
+    function _noArrivalHelp() {
+      var ua = navigator.userAgent;
+      if (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return _t('push.noArrivalMac', 'Signed up, but the test notification has not arrived. On the Mac open System Settings, Notifications, choose Safari (or Remiel Sentinel if you opened it from the Dock) and turn on Allow notifications. Also turn off Focus or Do Not Disturb. Then tap Send a test notification.');
+      if (/Macintosh/.test(ua)) return _t('push.noArrivalMacChrome', 'Signed up, but the test notification has not arrived. On the Mac open System Settings, Notifications, choose Google Chrome and turn on Allow notifications. Also turn off Focus or Do Not Disturb. Then tap Send a test notification.');
+      if (/Android/.test(ua)) return _t('push.noArrivalAndroid', 'Signed up, but the test notification has not arrived. Open the phone Settings, Apps, Chrome, Notifications and turn them on, and check that Do Not Disturb is off. Then tap Send a test notification.');
+      if (/iPhone|iPad/.test(ua)) return _t('push.noArrivalIos', 'Signed up, but the test notification has not arrived. Open iPhone Settings, Notifications, Remiel Sentinel and turn on Allow Notifications, and check that Focus is off. Then tap Send a test notification.');
+      return _t('push.noArrival', 'Signed up, but the test notification has not arrived. Check that this browser is allowed to show notifications in your computer settings, and that Focus or Do Not Disturb is off. Then tap Send a test notification.');
+    }
+
     function _deniedHelp() {
       var ua = navigator.userAgent;
       if (/Android/.test(ua)) return _t('push.deniedAndroid', 'Notifications are blocked for this site. In Chrome, tap the icon left of the address, then Permissions, Notifications, Allow. Then turn this switch on again.');
       if (/iPhone|iPad/.test(ua)) return _t('push.deniedIos', 'Notifications are blocked. On iPhone open Settings, Notifications, Remiel Sentinel, and turn on Allow Notifications. Then turn this switch on again.');
+      if (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return _t('push.deniedSafariMac', 'Safari is not allowing notifications here. If the top left of this window says Private, it is a Private Window, and Private Windows can never receive notifications: open Remiel Sentinel in a normal Safari window (File, New Window) or from the Dock, and turn this switch on there. Otherwise open Safari, Settings, Websites, Notifications, set beverly-index.com to Allow, then turn this switch on again.');
       if (/Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return _t('push.deniedSafari', 'Notifications are blocked for this site. In Safari open Settings, Websites, Notifications, set beverly-index.com to Allow. Then turn this switch on again.');
       return _t('push.deniedChrome', 'Notifications are blocked for this site. Click the icon left of the address, set Notifications to Allow, then turn this switch on again.');
     }
@@ -36418,8 +36527,11 @@ const SocialImport = (() => {
 
         if (resp.ok) {
           _subscribed = true;
-          _setStatus(_t('push.enabled', 'Push notifications are on for this device.'));
+          _endpoint = subJson.endpoint;
           _updateToggle(true);
+          _testRow(true);
+          /* The switch shows on; the words say on only once a real notification has arrived */
+          sendTest();
           return true;
         }
         if (resp.status === 503) { _notConfigured(); return false; }
@@ -36454,6 +36566,8 @@ const SocialImport = (() => {
           }
         }
         _subscribed = false;
+        _testRow(false);
+        try { RemielDB.putSetting(CONF_KEY, null); } catch (e) {}
         _setStatus(_t('push.disabled', 'Push notifications are off for this device.'));
         _updateToggle(false);
       } catch (err) {
@@ -36507,8 +36621,13 @@ const SocialImport = (() => {
         var subscription = await reg.pushManager.getSubscription();
         _subscribed = !!(data.subscribed && subscription);
         _updateToggle(_subscribed);
-        _setStatus(_subscribed ? _t('push.enabled', 'Push notifications are on for this device.')
-                               : _t('push.inactive', 'Push notifications are off. Turn them on with the switch above: Settings, Push Notifications.'), !_subscribed);
+        _testRow(_subscribed);
+        if (!_subscribed) { _setStatus(_t('push.inactive', 'Push notifications are off. Turn them on with the switch above: Settings, Push Notifications.'), true); return; }
+        _endpoint = subscription.endpoint;
+        if (_testSentAt) return;
+        var conf = await _confirmedFor(_endpoint);
+        _setStatus(conf ? _t('push.confirmedEarlier', 'On. A test notification last reached this device on {when}.').replace('{when}', new Date(conf.at).toLocaleString(I18n && I18n.locale === 'it' ? 'it-IT' : 'en-US', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))
+                        : _t('push.unconfirmed', 'Signed up, not yet confirmed. Tap Send a test notification to check that notifications reach this device.'), false, conf ? 'ok' : 'warn');
       } catch (err) {
         _subscribed = false;
         _updateToggle(false);
@@ -36516,10 +36635,11 @@ const SocialImport = (() => {
       }
     }
 
-    function _setStatus(text, showMe) {
+    function _setStatus(text, showMe, tone) {
       var el = document.getElementById('pushStatusText');
       if (!el) return;
       el.textContent = text;
+      el.setAttribute('data-tone', tone || '');
       if (showMe) el.appendChild(Guide.linkEl('settings.push'));
     }
 
@@ -36548,6 +36668,7 @@ const SocialImport = (() => {
     return {
       subscribe: subscribe,
       unsubscribe: unsubscribe,
+      sendTest: sendTest,
       toggle: toggle,
       checkStatus: checkStatus,
       updateVisibility: updateVisibility,
