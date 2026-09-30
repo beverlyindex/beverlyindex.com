@@ -6840,8 +6840,8 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <img class="sc-guest-mark" src="remiel-logo.png" alt="" aria-hidden="true" draggable="false">
   <div class="sc-guest-logo">Remiel Sentinel</div>
   <div class="sc-guest-tag">The Light Between Us</div>
-  <div class="sc-guest-title">Video Call</div>
-  <p style="font-size:15px;opacity:0.7;margin:0 0 24px;max-width:300px;text-align:center;line-height:1.5;">
+  <div class="sc-guest-title" id="scGuestTitle">Video Call</div>
+  <p id="scGuestSub" style="font-size:15px;opacity:0.7;margin:0 0 24px;max-width:300px;text-align:center;line-height:1.5;">
     Enter your name to join the call
   </p>
   <input class="sc-guest-name-input" id="scGuestName" type="text" placeholder="Your name" maxlength="30" autocomplete="name">
@@ -9639,6 +9639,8 @@ const RemielDB = (() => {
       try {
         if ((key === 'onboardingComplete' || key === 'userSphereName') && SyncEngine.ensureIdentity) {
           setTimeout(function() { SyncEngine.ensureIdentity(); }, 500);
+          /* The account name others see (calls, alarms, invites) follows this person's own sphere name */
+          if (key === 'userSphereName' && SyncEngine.syncDisplayName) setTimeout(function() { SyncEngine.syncDisplayName(); }, 800);
         } else if (key === 'sentinelCallId' && SyncEngine.registerSentinelId) {
           setTimeout(function() { SyncEngine.registerSentinelId(); }, 500);
         }
@@ -10657,6 +10659,11 @@ const I18n = (function () {
     'help.set.help': "Tips and a short tour of the app.",
     'help.title': "Help",
     'help.btnTitle': "Help button",
+    'guest.title': "Video Call",
+    'guest.callingYou': "{name} is calling you",
+    'guest.sub': "Enter your name to join the call",
+    'guest.namePh': "Your name",
+    'guest.join': "Join Call",
     'help.tourTitle': "Tour and tips",
     'help.how': "Remiel Sentinel shows the people you care about as spheres around your own. You log calls, visits, moods and medications, and each person gets a status from Quiet to Urgent so you can see who may need you first. Your data is saved on this device, and a private copy is kept on the Remiel Sentinel server so you can use it on another device. You can turn that copy off in Settings, Account. People in The Circle see only what you turn on for them.",
     'help.tour': "Take the tour",
@@ -11363,6 +11370,11 @@ const I18n = (function () {
     'help.set.help': "Suggerimenti e un breve giro dell’app.",
     'help.title': "Aiuto",
     'help.btnTitle': "Pulsante Aiuto",
+    'guest.title': "Videochiamata",
+    'guest.callingYou': "{name} ti sta chiamando",
+    'guest.sub': "Scrivi il tuo nome per entrare nella chiamata",
+    'guest.namePh': "Il tuo nome",
+    'guest.join': "Entra nella chiamata",
     'help.tourTitle': "Tour e suggerimenti",
     'help.how': "Remiel Sentinel mostra le persone a cui tieni come sfere intorno alla tua. Tu registri chiamate, visite, umore e farmaci, e ogni persona riceve uno stato, da Tranquillo a Urgente, così vedi subito chi potrebbe avere bisogno di te. I tuoi dati sono salvati su questo dispositivo e una copia privata è conservata sul server di Remiel Sentinel, così puoi usarli su un altro dispositivo. Puoi disattivare questa copia in Impostazioni, Account. Le persone nella cerchia vedono solo ciò che attivi per loro.",
     'help.tour': "Fai il giro guidato",
@@ -31039,6 +31051,20 @@ const SyncEngine = (() => {
   function isLocalOnly() { return _localOnly; }
   function getUserId() { return _userId; }
   function getDisplayName() { return _displayName; }
+  /* Keeps the server's display name equal to this device's own sphere name, so
+     every call, invite and alarm shows the right person's name. */
+  async function syncDisplayName() {
+    try {
+      if (!isAuthenticated()) return false;
+      var n = String((await RemielDB.getSetting('userSphereName')) || '').trim();
+      if (!n || n === _displayName) return false;
+      var res = await _fetch('/profile', { method: 'PUT', body: JSON.stringify({ display_name: n.slice(0, 80) }) });
+      if (!res.ok) return false;
+      _displayName = n;
+      try { await _saveConfig(); } catch (e) {}
+      return true;
+    } catch (e) { return false; }
+  }
   function getApiBase() { return _apiBase; }
   function getAccessToken() { return _accessToken; }
 
@@ -32284,7 +32310,7 @@ const SyncEngine = (() => {
     signup: signup, login: login, logout: logout, claim: claim,
     ensureIdentity: ensureIdentity, forgetDevice: forgetDevice, getProfile: getProfile, updateProfile: updateProfile,
     registerSentinelId: registerSentinelId, useDeviceIdentity: useDeviceIdentity,
-    isAuthenticated: isAuthenticated, getUserId: getUserId, getDisplayName: getDisplayName,
+    isAuthenticated: isAuthenticated, getUserId: getUserId, getDisplayName: getDisplayName, syncDisplayName: syncDisplayName,
     getApiBase: getApiBase, getAccessToken: getAccessToken,
     push: push, pull: pull, sync: sync, pollInbox: pollInbox, onSyncHooks: onSyncHooks,
     pushPhotos: pushPhotos, pullPhotos: pullPhotos, syncPhotos: syncPhotos,
@@ -34458,6 +34484,7 @@ if (document.readyState === 'loading') {
       delete window._pendingGateCode;
     }
     SentinelCall.init();
+    setTimeout(function () { try { SyncEngine.syncDisplayName(); } catch (e) {} }, 6000);
     /* Check for ?call= invite link — if present, show guest overlay and skip gate */
     if (typeof SentinelCall !== 'undefined' && SentinelCall.checkCallInvite()) {
       /* Guest call mode — gate is bypassed, only call UI shown */
@@ -35742,8 +35769,14 @@ const SentinelCall = (function() {
       acts.hidden = !(buttons && buttons.length);
     }
   }
+  /* The call link carries the host's first name (n=) so the guest sees who
+     they are talking to rather than a Sentinel ID. */
+  let _myNameCache = '';
   function _guestLink() {
-    return window.location.origin + window.location.pathname + '?call=' + _myId;
+    let url = window.location.origin + window.location.pathname + '?call=' + _myId;
+    const first = String(_myNameCache || '').trim().split(/\s+/)[0] || '';
+    if (first && first !== 'Someone') url += '&n=' + encodeURIComponent(first.slice(0, 30));
+    return url;
   }
   /* The signed-in user's own email, for the Reply-To of an emailed invite */
   function _myEmail() {
@@ -35832,8 +35865,8 @@ const SentinelCall = (function() {
       showToast(msg);
     }, _AWAIT_GUEST_MS);
 
-    const link = _guestLink();
     const myName = await _getMyName();
+    const link = _guestLink() + (contact.first ? '&g=' + encodeURIComponent(String(contact.first).trim().slice(0, 30)) : '');
     if (_awaitGuestFor === null) return; /* hung up while the name loaded */
     _setInviteLine(contact.phone
       ? _tp('call.sendingInvite', 'Sending {first} a text with the link.', { first: first })
@@ -36375,7 +36408,7 @@ const SentinelCall = (function() {
     const viewName = view.name || _t('views.type.unit', 'Unit');
     _startGroup({ room: room, hostPeer: _myPeerId(), isHost: true, viewName: viewName, total: members.length + 1, myName: myName });
     const link = _guestLink() + '&room=' + encodeURIComponent(room);
-    const memberLink = (c) => link + (c.id == null ? '' : '&m=' + encodeURIComponent(String(c.id)));
+    const memberLink = (c) => link + (c.id == null ? '' : '&m=' + encodeURIComponent(String(c.id))) + (c.first ? '&g=' + encodeURIComponent(String(c.first).trim().slice(0, 30)) : '');
     const pending = [];   /* members without a Sentinel ID whose link this device must send */
 
     for (const c of members) {
@@ -36756,11 +36789,17 @@ const SentinelCall = (function() {
   }
 
   /* ── Get user's display name ── */
+  /* This device's own name: the sphere name set at onboarding, else the
+     account's display name. Never a fixed or shared name. */
   async function _getMyName() {
     try {
-      const n = await RemielDB.getSetting('userSphereName');
-      if (n) return n;
+      const n = String((await RemielDB.getSetting('userSphereName')) || '').trim();
+      if (n) { _myNameCache = n; return n; }
     } catch(e) {}
+    try {
+      const d = String((typeof SyncEngine !== 'undefined' && SyncEngine.getDisplayName && SyncEngine.getDisplayName()) || '').trim();
+      if (d) { _myNameCache = d; return d; }
+    } catch (e) {}
     return 'Someone';
   }
 
@@ -36773,12 +36812,16 @@ const SentinelCall = (function() {
   let _guestTargetId = null;
   let _guestRoom = null;
   let _guestMember = null;   /* which member of the host's view this guest is, from the link */
+  let _guestHostName = '';   /* the host's first name, from the link (n=) */
 
   function checkCallInvite() {
     const params = new URLSearchParams(window.location.search);
     const callTarget = params.get('call');
     if (!callTarget) return false;
     _guestTargetId = callTarget.toUpperCase();
+    const hn = (params.get('n') || '').replace(/[<>"]/g, '').trim().slice(0, 30);
+    _guestHostName = hn;
+    const gn = (params.get('g') || '').replace(/[<>"]/g, '').trim().slice(0, 30);
     const room = params.get('room');
     _guestRoom = (room && /^[A-Za-z0-9-]{4,40}$/.test(room)) ? room : null;
     const m = params.get('m');
@@ -36787,6 +36830,24 @@ const SentinelCall = (function() {
        panel, so move it to <body> to escape that stacking context (M4). */
     const _gOv = document.getElementById('scGuestOverlay');
     if (_gOv && _gOv.parentNode !== document.body) document.body.appendChild(_gOv);
+    /* In the guest's own language, with the host's name when the link has it.
+       Re-applied once the language is known (it loads a moment after). */
+    const _guestLabels = () => {
+      const _gt = document.getElementById('scGuestTitle');
+      const _gs = document.getElementById('scGuestSub');
+      const _gb = document.getElementById('scGuestJoinBtn');
+      const _gi = document.getElementById('scGuestName');
+      if (_gt) _gt.textContent = _guestHostName ? _tp('guest.callingYou', '{name} is calling you', { name: _guestHostName }) : _t('guest.title', 'Video Call');
+      if (_gs) _gs.textContent = _t('guest.sub', 'Enter your name to join the call');
+      if (_gi) _gi.placeholder = _t('guest.namePh', 'Your name');
+      if (_gb && !_gb.dataset.joining) _gb.textContent = _t('guest.join', 'Join Call');
+    };
+    _guestLabels();
+    window.addEventListener('localeChanged', _guestLabels);
+    setTimeout(_guestLabels, 900);
+    const _gn = document.getElementById('scGuestName');
+    if (_gn && gn && !_gn.value) _gn.value = gn;
+    try { if (gn && typeof BtnSystem !== 'undefined') setTimeout(function () { BtnSystem.refresh(); }, 50); } catch (e) {}
     _gOv.classList.remove('hidden');
     const _ob = document.getElementById('onboarding');
     if (_ob) _ob.hidden = true;
@@ -36894,7 +36955,7 @@ const SentinelCall = (function() {
       document.getElementById('scGuestOverlay').classList.add('hidden');
       const localVid = document.getElementById('scLocalVideo');
       if (localVid) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
-      _showOutgoing(_guestTargetId, '?');
+      _showOutgoing(_guestHostName || _guestTargetId, (_guestHostName || '?').slice(0, 1).toUpperCase());
 
       /* Place the call */
       const remotePeerId = 'sentinel-' + _guestTargetId.toLowerCase();
@@ -36972,7 +37033,7 @@ const SentinelCall = (function() {
 
   function shareCallLink() {
     if (!_myId) { showToast(I18n.t('toast.sidNotReady')); return; }
-    const url = window.location.origin + window.location.pathname + '?call=' + _myId;
+    const url = _guestLink();
     if (navigator.share) {
       navigator.share({
         title: 'Video Call Me on Sentinel',
