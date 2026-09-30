@@ -3444,7 +3444,9 @@
   }
   .settings-panel.open {
     opacity: 1;
-    transform: translateY(0);
+    /* No transform once open: iPhone Safari mis-aims taps on form controls inside a
+       transformed, fixed, scrolling panel, so switches seemed dead */
+    transform: none;
     pointer-events: auto;
   }
 
@@ -3479,6 +3481,30 @@
   .settings-section {
     margin-bottom: 28px;
   }
+  /* Settings home and groups (SettingsNav) */
+  .settings-panel[data-view="home"] .settings-section { display: none !important; }
+  .settings-panel[data-view="cat"] .settings-section:not(.is-cat) { display: none !important; }
+  .settings-panel[data-view="cat"] .settings-home { display: none; }
+  .settings-home { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .settings-home-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 14px; box-sizing: border-box;
+    border-radius: 12px; background: var(--surface, #0e1219); border: 1px solid rgba(255,255,255,0.08); color: var(--text, #e0e4ec);
+    text-align: left; cursor: pointer; font: inherit; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .settings-home-row:hover, .settings-home-row:focus-visible { border-color: rgba(56,189,248,0.55); outline: none; background: rgba(56,189,248,0.06); }
+  .settings-home-ico { flex: 0 0 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: rgba(56,189,248,0.12); color: #7dd3fc; font-size: 18px; }
+  .settings-home-txt { flex: 1; min-width: 0; }
+  .settings-home-t { display: block; font: 600 15px 'Hanken Grotesk', system-ui, sans-serif; }
+  .settings-home-d { display: block; font: 12.5px/1.4 'Hanken Grotesk', system-ui, sans-serif; color: var(--text-dim, #8b94a8); margin-top: 2px; }
+  .settings-home-s { display: block; font: 12px/1.4 'Hanken Grotesk', system-ui, sans-serif; color: #5fbf7a; margin-top: 2px; }
+  .settings-home-chev { color: var(--text-dim, #8b94a8); font-size: 22px; flex: 0 0 auto; }
+  .settings-back { width: 36px; height: 36px; margin-right: 6px; border: none; background: rgba(255,255,255,0.05); border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .settings-back[hidden] { display: none; }
+  .settings-back svg { width: 18px; height: 18px; stroke: var(--text, #e0e4ec); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .settings-header .settings-title { flex: 1; }
+  .settings-cat-empty { padding: 14px 16px; border-radius: 12px; background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.35); color: #fcd34d;
+    font: 14px/1.5 'Hanken Grotesk', system-ui, sans-serif; margin-bottom: 16px; }
+  .settings-cat-empty[hidden] { display: none; }
+  .settings-cat-empty button { margin-top: 10px; }
   .settings-section-title {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
@@ -5241,29 +5267,39 @@ span.rp-thumb { cursor:default; }
   .push-toggle-sub {
     font-size: 11px; color: var(--text-dim); margin-top: 2px;
   }
+  /* Switches: the real checkbox covers the whole switch (a tap lands on the control itself on
+     every phone), 52 x 32 like the system switch, and the row around it is tappable too */
   .push-toggle {
-    position: relative; width: 44px; height: 24px;
-    flex-shrink: 0;
+    position: relative; width: 52px; height: 32px;
+    flex-shrink: 0; margin-left: 12px; display: inline-block;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   }
   .push-toggle input {
-    opacity: 0; width: 0; height: 0;
+    position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px);
+    margin: 0; opacity: 0; z-index: 2; cursor: pointer; -webkit-appearance: none; appearance: none;
   }
+  .push-toggle input:disabled { cursor: not-allowed; }
   .push-toggle-slider {
-    position: absolute; cursor: pointer; inset: 0;
-    background: var(--surface-dim, #555); border-radius: 24px;
-    transition: background 0.25s;
+    position: absolute; inset: 0; pointer-events: none;
+    background: rgba(148,163,184,0.35); border-radius: 32px;
+    transition: background 0.2s;
   }
   .push-toggle-slider::before {
-    content: ''; position: absolute; width: 18px; height: 18px;
-    left: 3px; bottom: 3px; background: #fff; border-radius: 50%;
-    transition: transform 0.25s;
+    content: ''; position: absolute; width: 26px; height: 26px;
+    left: 3px; top: 3px; background: #fff; border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    transition: transform 0.2s;
   }
   .push-toggle input:checked + .push-toggle-slider {
-    background: var(--accent, #6366f1);
+    background: #22c55e;
   }
   .push-toggle input:checked + .push-toggle-slider::before {
     transform: translateX(20px);
   }
+  .push-toggle input:focus-visible + .push-toggle-slider { outline: 2px solid #7dd3fc; outline-offset: 2px; }
+  .push-toggle-row { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; gap: 10px; }
+  .push-toggle-row.is-disabled { cursor: default; }
+  .push-toggle-saved { font-size: 11px; color: #5fbf7a; margin-top: 2px; }
   .push-status-text {
     font-size: 11px; color: var(--text-dim); margin-top: 4px;
   }
@@ -6227,7 +6263,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 .sv-card.active { box-shadow: 0 0 0 2px var(--lit-fill); border-color: var(--lit-fill) !important; }
 .bio-hr-btn.on { background: var(--lit-fill) !important; color: var(--lit-ink) !important; }
 .st-nav .st-back[aria-hidden="true"] { visibility: hidden; }
-.push-toggle input:disabled + .push-toggle-slider { opacity: 1 !important; filter: none; border: 1px dashed #94a3b8; }
+.push-toggle input:disabled + .push-toggle-slider { opacity: 0.55 !important; filter: none; border: 1px dashed #94a3b8; }
 /* Ghost and icon controls: full brightness text, never below 4.5:1 */
 #exitBtn, #backBtn, #blufEditBtn, #pulseRefreshBtn, .pulse-close, .cm-photo-label, .checkin-nudge-close,
 .alert-clear-btn, #ddDismiss, #ledgerMicBtn { color: #aeb6c4 !important; opacity: 1 !important; }
@@ -6466,14 +6502,21 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 <!-- ═══ Settings Panel (full-screen) ═══ -->
 <div class="settings-panel" id="settingsPanel" data-adv-scope role="dialog" aria-modal="true" aria-label="Settings">
   <div class="settings-header">
-    <h2 class="settings-title" data-i18n="settings.title">Settings</h2>
+    <button type="button" class="settings-back" id="settingsBack" hidden onclick="SettingsNav.home()" aria-label="Back to all settings" data-i18n-aria="setnav.back">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 5 8 12 15 19"/></svg>
+    </button>
+    <h2 class="settings-title" id="settingsTitle" data-i18n="settings.title">Settings</h2>
     <button class="settings-close" onclick="SettingsPanel.close()" aria-label="Close settings" data-i18n-aria="settings.close">
       <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   </div>
 
+  <!-- Settings home: one row per group; a group shows only its own sections (SettingsNav) -->
+  <nav class="settings-home" id="settingsHome" aria-label="Settings groups"></nav>
+  <div class="settings-cat-empty" id="settingsCatEmpty" hidden></div>
+
   <!-- Language -->
-  <div class="settings-section">
+  <div class="settings-section" data-cat="general">
     <div class="settings-section-title" data-i18n="settings.language">Language</div>
     <p class="settings-help" data-i18n="help.set.language"></p>
     <div class="settings-card">
@@ -6489,7 +6532,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 
 
   <!-- Account & Sync -->
-  <div class="settings-section" id="syncSection">
+  <div class="settings-section" id="syncSection" data-cat="account">
     <div class="settings-section-title" data-i18n="sync.account">Account</div>
     <p class="settings-help" data-i18n="help.set.account"></p>
     <div class="settings-card">
@@ -6590,12 +6633,12 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 
   <!-- Data Summary -->
   
-    <div class="settings-section" id="locationShareSection" style="display:none;">
+    <div class="settings-section" id="locationShareSection" style="display:none;" data-cat="location">
       <div class="settings-section-title" data-i18n="location.title">Location Sharing</div>
     <p class="settings-help" data-i18n="help.set.location"></p>
       <div class="settings-card">
-        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;" data-i18n="location.desc">Sends your current position once, only to Circle members you have turned Location on for; nothing is tracked in the background, and Stop removes it from the server.</p>
-        <div class="loc-share-section">
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;" data-i18n="location.desc">Your location goes only to the people you choose below, and only while Remiel Sentinel is open on this device. Anyone in your Circle can ask; you answer each request. To see where others are, tap WHEREIS beside their picture.</p>
+        <div class="loc-share-section" hidden>
           <button class="loc-share-btn" onclick="LocationShare.shareNow()">
             <span class="loc-icon">📍</span>
             <span data-i18n="location.shareNow">Share My Location Now</span>
@@ -6627,7 +6670,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
           <p class="wi-desc" data-i18n="placeCheckin.desc">Places of Circle members who receive your location. Tap a room to check in: the tap is your own action and is sent once.</p>
           <div id="checkinList"></div>
         </div>
-        <div style="margin-top:14px;">
+        <div style="margin-top:14px;" hidden>
           <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:6px;" data-i18n="location.circleTitle">Circle Locations</div>
           <button class="loc-share-btn" onclick="LocationShare.loadShared()" style="margin-bottom:6px;">
             <span class="loc-icon">🔄</span>
@@ -6639,7 +6682,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         </div>
       </div>
     </div>
-    <div class="settings-section" id="placesSection" style="display:none;">
+    <div class="settings-section" id="placesSection" style="display:none;" data-cat="location">
       <div class="settings-section-title" data-i18n="places.title">Places</div>
     <p class="settings-help" data-i18n="help.set.places"></p>
       <div class="settings-card">
@@ -6652,7 +6695,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         <div id="placeEditor" hidden></div>
       </div>
     </div>
-    <div class="settings-section" id="sharedVideoNotesSection" style="display:none;">
+    <div class="settings-section" id="sharedVideoNotesSection" style="display:none;" data-cat="circle">
       <div class="settings-section-title" data-i18n="settings.videoNotes">Shared Video Notes</div>
     <p class="settings-help" data-i18n="help.set.videonotes"></p>
       <div class="settings-card">
@@ -6667,7 +6710,34 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       </div>
     </div>
 
-    <div class="settings-section" id="helpSection" style="display:none;">
+    <div class="settings-section push-section" id="pushNotifySection" style="display:none;" data-cat="alerts">
+      <div class="settings-section-title" data-i18n="settings.push">Push Notifications</div>
+    <p class="settings-help" data-i18n="help.set.push"></p>
+      <div class="settings-card">
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;" data-i18n="push.desc">Lets the Remiel Sentinel server notify this device, even when the app is closed; turning it off removes this device from the list.</p>
+        <div class="push-toggle-row">
+          <div>
+            <div class="push-toggle-label" data-i18n="settings.push.enable">Enable Push Notifications</div>
+            <div class="push-toggle-sub" data-i18n="push.sub">Incoming calls, alarms, alerts, new messages, Circle invitations, shared video notes, a daily digest</div>
+          </div>
+          <label class="push-toggle">
+            <input type="checkbox" id="pushToggle" onchange="PushNotify.toggle(this.checked)">
+            <span class="push-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="push-status-text" id="pushStatusText">Checking status...</div>
+        <div class="alarm-test-row">
+          <div>
+            <div class="push-toggle-label" data-i18n="alarm.testLabel">Test urgent alarm</div>
+            <div class="push-toggle-sub" data-i18n="alarm.testSub">Sends yourself a Level 3 alarm. It repeats every 2 minutes until you tap Acknowledge on the red bar at the top of the screen.</div>
+          </div>
+          <button type="button" class="alarm-test-btn" id="alarmTestBtn" onclick="AlarmCenter.sendTest()" data-i18n="alarm.testBtn">Send test</button>
+        </div>
+        <div class="push-status-text" id="alarmTestStatus" hidden></div>
+      </div>
+    </div>
+
+    <div class="settings-section" id="helpSection" style="display:none;" data-cat="alerts">
       <div class="settings-section-title" data-i18n="help.btnTitle">Help button</div>
       <div class="settings-card">
         <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;" data-i18n="help.desc">Sends an urgent alarm to the person you choose. It rings on their screen and phone every 2 minutes until they tap Acknowledge.</p>
@@ -6689,7 +6759,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       </div>
     </div>
 
-    <div class="settings-section" id="alarmPrefsSection" style="display:none;">
+    <div class="settings-section" id="alarmPrefsSection" style="display:none;" data-cat="alerts">
       <div class="settings-section-title" data-i18n="ap.title">Urgent alarms</div>
       <div class="settings-card">
         <div class="push-toggle-label" data-i18n="ap.chainLabel">After you, urgent alarms go to</div>
@@ -6734,41 +6804,14 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         </div>
 
         <button type="button" class="ap-save btn-advance" id="apSaveBtn" onclick="AlarmCenter.savePrefs()" data-i18n="ap.save">Save urgent alarm settings</button>
+        <script>(function(){ var t=null; function soon(){ clearTimeout(t); t=setTimeout(function(){ try { AlarmCenter.savePrefs(); } catch(e){} }, 600); }
+          ['apQuietOn','apQuietStart','apQuietEnd','apSilence'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('change', soon); }); })();</script>
         <div class="push-status-text" id="apStatus" hidden></div>
       </div>
     </div>
 
-    <div class="settings-section push-section" id="pushNotifySection" style="display:none;">
-      <div class="settings-section-title" data-i18n="settings.push">Push Notifications</div>
-    <p class="settings-help" data-i18n="help.set.push"></p>
-      <div class="settings-card">
-        <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;" data-i18n="push.desc">Lets the Remiel Sentinel server notify this device, even when the app is closed; turning it off removes this device from the list.</p>
-        <div class="push-toggle-row">
-          <div>
-            <div class="push-toggle-label" data-i18n="settings.push.enable">Enable Push Notifications</div>
-            <div class="push-toggle-sub" data-i18n="push.sub">Incoming calls, alarms, alerts, new messages, Circle invitations, shared video notes, a daily digest</div>
-          </div>
-          <label class="push-toggle">
-            <input type="checkbox" id="pushToggle" onchange="PushNotify.toggle(this.checked)">
-            <span class="push-toggle-slider"></span>
-          </label>
-        </div>
-        <div class="push-status-text" id="pushStatusText">Checking status...</div>
-        <div class="alarm-test-row">
-          <div>
-            <div class="push-toggle-label" data-i18n="alarm.testLabel">Test urgent alarm</div>
-            <div class="push-toggle-sub" data-i18n="alarm.testSub">Sends yourself a Level 3 alarm. It repeats every 2 minutes until you tap Acknowledge on the red bar at the top of the screen.</div>
-          </div>
-          <button type="button" class="alarm-test-btn" id="alarmTestBtn" onclick="AlarmCenter.sendTest()" data-i18n="alarm.testBtn">Send test</button>
-        </div>
-        <div class="push-status-text" id="alarmTestStatus" hidden></div>
-      </div>
-    </div>
-
-
-
     <!-- Motion Sensing -->
-    <div class="settings-section" id="bioMotionSection">
+    <div class="settings-section" id="bioMotionSection" data-cat="sensors">
       <div class="settings-section-title" data-i18n="settings.motion">Motion Sensing</div>
     <p class="settings-help" data-i18n="help.set.motion"></p>
       <div class="settings-card bio-motion-card">
@@ -6797,7 +6840,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       </div>
     </div>
 
-    <div class="settings-section">
+    <div class="settings-section" data-cat="sensors">
     <div class="settings-section-title" data-i18n="settings.bioMonitor">Circle Bio Monitor</div>
     <p class="settings-help" data-i18n="help.set.biomonitor"></p>
     <div class="settings-card">
@@ -6823,7 +6866,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       </div>
     </div>
 
-    <div class="settings-section">
+    <div class="settings-section" data-cat="data">
     <div class="settings-section-title" data-i18n="settings.yourData">Your Data</div>
     <p class="settings-help" data-i18n="help.set.data"></p>
     <div class="settings-card">
@@ -6840,7 +6883,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <!-- Sentinel Call ID -->
 
   <!-- The Circle (Connections) -->
-  <div class="settings-section" id="circleSection" style="display:none;">
+  <div class="settings-section" id="circleSection" style="display:none;" data-cat="circle">
     <div class="settings-section-title" data-i18n="circle.title">The Circle</div>
     <p class="settings-help" data-i18n="help.set.circle"></p>
     <div class="settings-card">
@@ -6867,7 +6910,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
     </div>
   </div>
 
-  <div class="settings-section" id="socialImportSection">
+  <div class="settings-section" id="socialImportSection" data-cat="circle">
     <div class="settings-section-title" data-i18n="social.import">Import Contacts</div>
     <p class="settings-help" data-i18n="help.set.import"></p>
     <div class="settings-card">
@@ -6931,7 +6974,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
     </div>
   </div>
 
-  <div class="settings-section">
+  <div class="settings-section" data-cat="account">
     <div class="settings-section-title" data-i18n="call.title">Sentinel Call</div>
     <p class="settings-help" data-i18n="help.set.call"></p>
     <div class="settings-card">
@@ -6949,7 +6992,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   </div>
 
   <!-- Export -->
-  <div class="settings-section">
+  <div class="settings-section" data-cat="data">
     <div class="settings-section-title" data-i18n="settings.export">Export Encrypted Backup</div>
     <p class="settings-help" data-i18n="help.set.export"></p>
     <div class="settings-card">
@@ -6964,7 +7007,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   </div>
 
   <!-- Import -->
-  <div class="settings-section" id="importSection">
+  <div class="settings-section" id="importSection" data-cat="data">
     <div class="settings-section-title" data-i18n="settings.import">Import Backup</div>
     <p class="settings-help" data-i18n="help.set.restore"></p>
     <div class="settings-card">
@@ -6985,7 +7028,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   </div>
 
   <!-- Help -->
-  <div class="settings-section" id="tourSection">
+  <div class="settings-section" id="tourSection" data-cat="general">
     <div class="settings-section-title" data-i18n="help.tourTitle">Tour and tips</div>
     <p class="settings-help" data-i18n="help.set.help"></p>
     <div class="settings-card">
@@ -6998,7 +7041,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   </div>
 
   <!-- Danger Zone -->
-  <div class="settings-section">
+  <div class="settings-section" data-cat="data">
     <div class="settings-section-title" data-i18n="settings.dangerZone">Danger Zone</div>
     <p class="settings-help" data-i18n="help.set.danger"></p>
     <div class="settings-card" style="border-color:rgba(224,82,82,0.15);">
@@ -7832,7 +7875,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <input type="file" id="cmPhotoFileInput" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime" hidden onchange="handleCmPhoto(event)">
     </div>
     <div id="cmImportRow" style="text-align:center;margin:-2px 0 6px;">
-      <button onclick="closeContactModal(); setTimeout(function(){ var sp = document.getElementById('settingsPanel'); if(!sp.classList.contains('open')) SettingsPanel.open(); var sec = document.getElementById('socialImportSection'); if(sec) sec.scrollIntoView({behavior:'smooth',block:'center'}); }, 300);" style="background:none;border:none;color:#4CAF50;font-size:12px;cursor:pointer;padding:4px 8px;text-decoration:underline;font-family:inherit;">
+      <button onclick="closeContactModal(); setTimeout(function(){ var sp = document.getElementById('settingsPanel'); if(!sp.classList.contains('open')) SettingsPanel.open(); var sec = document.getElementById('socialImportSection'); if(sec) { try { SettingsNav.showFor(sec); } catch(e){} sec.scrollIntoView({behavior:'smooth',block:'center'}); } }, 300);" style="background:none;border:none;color:#4CAF50;font-size:12px;cursor:pointer;padding:4px 8px;text-decoration:underline;font-family:inherit;">
         &#x1F4F1; <span data-i18n="cm.importMany">Import several from phone contacts</span>
       </button>
     </div>
@@ -10842,7 +10885,7 @@ const I18n = (function () {
     'settings.bioMonitor': "Circle Bio Monitor",
     'help.set.language': "Changes the language of Remiel Sentinel on this device. Your choice is saved.",
     'help.set.account': "Your data is saved on this device, and a private copy is kept on the Remiel Sentinel server so you can use it on another device. You can turn that copy off below.",
-    'help.set.location': "Shares your position once, when you tap Share, and only with Circle members who have Location turned on. Nothing is tracked in the background.",
+    'help.set.location': "Choose who in your Circle sees where you are, and answer requests. Your position is sent only while the app is open.",
     'help.set.videonotes': "Video notes that people in your Circle chose to share with you in the last 7 days.",
     'help.set.push': "Notifications arrive only after push is enabled on the server and you allow them here.",
     'help.set.motion': "Uses your phone motion to change how your own ring glows. A Bluetooth heart rate strap can set the ring pulse. Readings sync with your other devices and are shown to Circle members only if you share them.",
@@ -11105,7 +11148,7 @@ const I18n = (function () {
     'guide.msgFirst': "Messages are delivered only when you are signed in and both of you have Sentinel IDs. Otherwise they are saved on this device.",
     'guide.views': "A view shows only some of your people, for example just family. Tap the badge to switch back.",
     'guide.circleInvite': "The invitation waits until they accept. Nothing is shared until you turn on a switch.",
-    'guide.locationShare': "Your position is sent once, only to people with Location turned on. Tap Stop to remove it.",
+    'guide.locationShare': "Your position goes only to the people you switch on, and only while the app is open.",
     'guide.dailySummary': "This is your daily summary: who may need you, medications due today, and your check-in streak",
     'guide.alertsBell': "Alerts come from what you log on this device: overdue doses, long gaps, birthdays and more",
     'guide.restMode': "Rest mode: with no touch for 30 seconds, a different person comes forward every few seconds. Touch the screen to stop.",
@@ -11223,7 +11266,7 @@ const I18n = (function () {
     'location.stopped': "Your shared location was removed from the server.",
     'location.stopFailed': "Could not remove your location. Try again.",
     'location.loadFailed': "Could not load shared locations",
-    'location.none': "No one in your Circle is sharing their location right now. To share yours: Settings, Location Sharing, Share My Location Now.",
+    'location.none': "No one in your Circle is sharing their location with you right now. To ask someone: tap WHEREIS beside their picture, then Ask for location.",
     'vn.justNow': "just now",
     'vn.noVideo': "No video to share. Record or upload first.",
     'vn.signIn': "Sign in to share with your Circle: Settings, Account.",
@@ -11701,7 +11744,7 @@ const I18n = (function () {
     'settings.bioMonitor': "Monitor cardiaci della cerchia",
     'help.set.language': "Cambia la lingua di Remiel Sentinel su questo dispositivo. La tua scelta viene salvata.",
     'help.set.account': "I tuoi dati sono salvati su questo dispositivo e una copia privata è conservata sul server di Remiel Sentinel, così puoi usarli su un altro dispositivo. Puoi disattivare questa copia qui sotto.",
-    'help.set.location': "Condivide la tua posizione una volta sola, quando tocchi Condividi, e solo con chi nella cerchia ha la posizione attiva. Niente viene seguito in background.",
+    'help.set.location': "Scegli chi nella tua Cerchia vede dove sei, e rispondi alle richieste. La tua posizione viene inviata solo mentre l'app è aperta.",
     'help.set.videonotes': "Le videonote che le persone della tua cerchia hanno scelto di condividere con te negli ultimi 7 giorni.",
     'help.set.push': "Le notifiche arrivano solo quando le notifiche push sono attive sul server e tu le permetti qui.",
     'help.set.motion': "Usa il movimento del telefono per cambiare la luce del tuo anello. Una fascia cardio Bluetooth può dare il ritmo al battito dell’anello. Le letture vengono sincronizzate con gli altri tuoi dispositivi e mostrate ai membri della cerchia solo se le condividi.",
@@ -11964,7 +12007,7 @@ const I18n = (function () {
     'guide.msgFirst': "I messaggi arrivano solo se hai fatto l’accesso ed entrambi avete un ID Sentinel. Altrimenti restano salvati su questo dispositivo.",
     'guide.views': "Una vista mostra solo alcune delle tue persone, per esempio solo la famiglia. Tocca il badge per tornare a tutti.",
     'guide.circleInvite': "L’invito resta in attesa finché non lo accettano. Niente viene condiviso finché non attivi un interruttore.",
-    'guide.locationShare': "La tua posizione viene inviata una volta, solo a chi ha la posizione attiva. Tocca Smetti per toglierla.",
+    'guide.locationShare': "La tua posizione va solo alle persone che attivi, e solo mentre l'app è aperta.",
     'guide.dailySummary': "Questo è il tuo riepilogo del giorno: chi potrebbe avere bisogno di te, i farmaci di oggi e la tua serie di check-in",
     'guide.alertsBell': "Gli avvisi nascono da quello che registri su questo dispositivo: dosi saltate, lunghe pause, compleanni e altro",
     'guide.restMode': "Modalità riposo: se non tocchi lo schermo per 30 secondi, ogni pochi secondi viene in primo piano una persona diversa. Tocca lo schermo per fermarla.",
@@ -12082,7 +12125,7 @@ const I18n = (function () {
     'location.stopped': "La posizione condivisa è stata tolta dal server.",
     'location.stopFailed': "Impossibile togliere la posizione. Riprova.",
     'location.loadFailed': "Impossibile caricare le posizioni condivise",
-    'location.none': "Adesso nessuno nella tua cerchia sta condividendo la posizione. Per condividere la tua: Impostazioni, Condivisione Posizione, Condividi ora la mia posizione.",
+    'location.none': "Adesso nessuno nella tua Cerchia condivide la posizione con te. Per chiederla: tocca WHEREIS accanto alla sua immagine, poi Chiedi la posizione.",
     'vn.justNow': "adesso",
     'vn.noVideo': "Nessun video da condividere. Prima registra o carica un video.",
     'vn.signIn': "Accedi per condividere con la tua cerchia: Impostazioni, Account.",
@@ -13230,7 +13273,7 @@ const I18n = (function () {
     "cm.saveChanges": "Save Changes",
     "cm.add": "Add",
     "cm.remove": "Remove This Person",
-    "location.desc": "Sends your current position once, only to Circle members you have turned Location on for; nothing is tracked in the background, and Stop removes it from the server.",
+    "location.desc": "Your location goes only to the people you choose below, and only while Remiel Sentinel is open on this device. Anyone in your Circle can ask; you answer each request. To see where others are, tap WHEREIS beside their picture.",
     "push.desc": "Lets the Remiel Sentinel server notify this device, even when the app is closed; turning it off removes this device from the list.",
     "push.sub": "Incoming calls, alarms, alerts, new messages, Circle invitations, shared video notes, a daily digest",
     "nous.connBtn": "NOUS connection",
@@ -13349,7 +13392,7 @@ const I18n = (function () {
     "cm.saveChanges": "Salva modifiche",
     "cm.add": "Aggiungi",
     "cm.remove": "Rimuovi questa persona",
-    "location.desc": "Invia la tua posizione attuale una sola volta, solo ai membri della Cerchia per cui hai attivato Posizione; nulla viene tracciato in background, e Interrompi la rimuove dal server.",
+    "location.desc": "La tua posizione va solo alle persone che scegli qui sotto, e solo mentre Remiel Sentinel è aperto su questo dispositivo. Chiunque nella tua Cerchia può chiedere; rispondi a ogni richiesta. Per vedere dove sono gli altri, tocca WHEREIS accanto alla loro immagine.",
     "push.desc": "Permette al server di Remiel Sentinel di inviare notifiche a questo dispositivo, anche quando l’app è chiusa; disattivandole questo dispositivo viene rimosso dall’elenco.",
     "push.sub": "Chiamate in arrivo, allarmi, avvisi, nuovi messaggi, inviti alla Cerchia, video note condivise, un riepilogo giornaliero",
     "nous.connBtn": "Connessione NOUS",
@@ -13476,7 +13519,7 @@ const I18n = (function () {
     "guide.h.discover": "Leave this on so people who have your number or email can find you.",
     "guide.h.myPhone": "Type your phone number, then tap Save number.",
     "guide.h.push": "Turn this switch on to hear about messages and requests while the app is closed.",
-    "guide.h.location": "Tap Share My Location Now to send your position once.",
+    "guide.h.location": "Turn on the switch beside each person who may see where you are.",
     "guide.h.pulseAdd": "Tap + Add person to add someone.",
     "guide.h.search": "Type a team name here, then tap Search.",
     "guide.h.paste": "Type or paste one name per line here.",
@@ -13533,7 +13576,7 @@ const I18n = (function () {
     "guide.h.discover": "Lascialo attivo perché chi ha il tuo numero o la tua email possa trovarti.",
     "guide.h.myPhone": "Scrivi il tuo numero di telefono, poi tocca Salva numero.",
     "guide.h.push": "Attiva questo interruttore per ricevere messaggi e richieste anche ad app chiusa.",
-    "guide.h.location": "Tocca Condividi ora la mia posizione per inviare la tua posizione una volta.",
+    "guide.h.location": "Attiva l'interruttore accanto a ogni persona che può vedere dove sei.",
     "guide.h.pulseAdd": "Tocca + Aggiungi persona per aggiungere qualcuno.",
     "guide.h.search": "Scrivi qui il nome di una squadra, poi tocca Cerca.",
     "guide.h.paste": "Scrivi o incolla qui un nome per riga.",
@@ -14062,6 +14105,59 @@ const I18n = (function () {
     "location.shareWith": "Condividi la mia posizione con {name}",
     "location.circleShareTitle": "Condividi la mia posizione con",
     "location.circleShareDesc": "Tutti i collegati nella tua Cerchia. Possono anche chiedere; rispondi Consenti sempre, Consenti per 8 ore, oppure Non ora."
+  });
+  /* Settings groups (SettingsNav) */
+  Object.assign(_strings.en, {
+    "setnav.back": "Back to all settings",
+    "setnav.account": "Account and devices",
+    "setnav.accountD": "Your name, your number and email, sign in on another device, your Sentinel ID",
+    "setnav.circle": "People and Circle",
+    "setnav.circleD": "Invite people, import contacts or a roster, shared video notes",
+    "setnav.location": "Location and Places",
+    "setnav.locationD": "Who sees where you are, requests, Places and check-in",
+    "setnav.alerts": "Notifications and Help",
+    "setnav.alertsD": "Notifications on this device, the Help button, urgent alarms",
+    "setnav.sensors": "Motion and heart rate",
+    "setnav.sensorsD": "Device motion and Bluetooth heart rate monitors",
+    "setnav.data": "Your data and backup",
+    "setnav.dataD": "What is saved, encrypted backup, restore, clear this device",
+    "setnav.general": "Language and tips",
+    "setnav.generalD": "English or Italian, the tour, show tips again",
+    "setnav.stLocal": "Kept on this device only",
+    "setnav.stSignedIn": "Signed in",
+    "setnav.stNotSigned": "Not signed in yet",
+    "setnav.stSending": "Sending your location while open",
+    "setnav.stPushOn": "Notifications on",
+    "setnav.needSignIn": "These settings appear once this device is signed in.",
+    "setnav.goAccount": "Open Account and devices",
+    "setnav.savedOn": "On",
+    "setnav.savedOff": "Off"
+  });
+  Object.assign(_strings.it, {
+    "setnav.back": "Torna a tutte le impostazioni",
+    "setnav.account": "Account e dispositivi",
+    "setnav.accountD": "Il tuo nome, numero ed email, accesso da un altro dispositivo, il tuo Sentinel ID",
+    "setnav.circle": "Persone e Cerchia",
+    "setnav.circleD": "Invita persone, importa contatti o una rosa, video note condivise",
+    "setnav.location": "Posizione e Luoghi",
+    "setnav.locationD": "Chi vede dove sei, richieste, Luoghi e check-in",
+    "setnav.alerts": "Notifiche e Aiuto",
+    "setnav.alertsD": "Notifiche su questo dispositivo, il pulsante Aiuto, allarmi urgenti",
+    "setnav.sensors": "Movimento e battito",
+    "setnav.sensorsD": "Movimento del dispositivo e cardiofrequenzimetri Bluetooth",
+    "setnav.data": "I tuoi dati e backup",
+    "setnav.dataD": "Cosa è salvato, backup cifrato, ripristino, cancella questo dispositivo",
+    "setnav.general": "Lingua e suggerimenti",
+    "setnav.generalD": "Inglese o italiano, il tour, mostra di nuovo i suggerimenti",
+    "setnav.stLocal": "Solo su questo dispositivo",
+    "setnav.stSignedIn": "Accesso effettuato",
+    "setnav.stNotSigned": "Accesso non ancora effettuato",
+    "setnav.stSending": "Invia la tua posizione mentre è aperta",
+    "setnav.stPushOn": "Notifiche attive",
+    "setnav.needSignIn": "Queste impostazioni compaiono dopo l'accesso su questo dispositivo.",
+    "setnav.goAccount": "Apri Account e dispositivi",
+    "setnav.savedOn": "Attivo",
+    "setnav.savedOff": "Disattivo"
   });
   /* Key events and This week (KeyEvents, Comm) */
   Object.assign(_strings.en, {
@@ -17626,6 +17722,7 @@ const SentinelTour = (() => {
   }
   function _openSettingsAt(sel) {
     try { if (typeof SettingsPanel !== 'undefined') SettingsPanel.open(); } catch (_) {}
+    try { const el0 = document.querySelector(sel); if (el0 && typeof SettingsNav !== 'undefined') SettingsNav.showFor(el0); } catch (_) {}
     setTimeout(() => { const el = document.querySelector(sel); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' }); }, 350);
   }
   function _closeBlufIfOpen() {
@@ -29003,7 +29100,8 @@ const SettingsPanel = (function () {
   }
 
   /* ── Panel Open / Close ── */
-  function openPanel() {
+  function openPanel(keepView) {
+    if (keepView !== true) { try { SettingsNav.home(); } catch (e) {} }
     $('settingsPanel').classList.add('open');
     rsOverlayFlag('settings', true); /* hides the floating List view and Pulse buttons */
     if (typeof SentinelGuide !== 'undefined') SentinelGuide.onOpenSettings();
@@ -29023,6 +29121,7 @@ const SettingsPanel = (function () {
     const ob = document.getElementById('onboarding');
     if (ob && !ob.hidden) panel.classList.add('above-ob');
     openPanel();
+    try { SettingsNav.showCat('data'); } catch (e) {}
     setTimeout(() => {
       const sec = $('importSection');
       if (sec) { try { sec.scrollIntoView({ block: 'start' }); } catch (e) { sec.scrollIntoView(); } }
@@ -29209,6 +29308,136 @@ const SettingsPanel = (function () {
   };
 })();
 
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SettingsNav: Settings opens on a short list of groups; a group shows
+   only its own sections, with a back arrow. Guide links, the tour and
+   Import Backup open the group that holds their target. Every switch
+   row is tappable as a whole, and a switch says On or Off when tapped.
+   ═══════════════════════════════════════════════════════════════ */
+const SettingsNav = (function () {
+  'use strict';
+  const CATS = [
+    { id: 'account',  ico: '\u{1F464}', t: ['setnav.account', 'Account and devices'],  d: ['setnav.accountD', 'Your name, your number and email, sign in on another device, your Sentinel ID'] },
+    { id: 'circle',   ico: '\u{1F465}', t: ['setnav.circle', 'People and Circle'],      d: ['setnav.circleD', 'Invite people, import contacts or a roster, shared video notes'] },
+    { id: 'location', ico: '\u{1F4CD}', t: ['setnav.location', 'Location and Places'],  d: ['setnav.locationD', 'Who sees where you are, requests, Places and check-in'] },
+    { id: 'alerts',   ico: '\u{1F514}', t: ['setnav.alerts', 'Notifications and Help'], d: ['setnav.alertsD', 'Notifications on this device, the Help button, urgent alarms'] },
+    { id: 'sensors',  ico: '\u{2764}\u{FE0F}', t: ['setnav.sensors', 'Motion and heart rate'], d: ['setnav.sensorsD', 'Device motion and Bluetooth heart rate monitors'] },
+    { id: 'data',     ico: '\u{1F5C4}\u{FE0F}', t: ['setnav.data', 'Your data and backup'], d: ['setnav.dataD', 'What is saved, encrypted backup, restore, clear this device'] },
+    { id: 'general',  ico: '\u{1F310}', t: ['setnav.general', 'Language and tips'],     d: ['setnav.generalD', 'English or Italian, the tour, show tips again'] }
+  ];
+  let _cat = null;
+  function _t(k, fb, p) { try { const v = I18n.t(k, p); if (v && v !== k) return v; } catch (e) {} return fb; }
+  function _esc(s) { const d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+  function $(id) { return document.getElementById(id); }
+  function _panel() { return $('settingsPanel'); }
+  function _status(id) {
+    try {
+      if (id === 'account') {
+        if (typeof SyncEngine === 'undefined') return '';
+        if (SyncEngine.isLocalOnly && SyncEngine.isLocalOnly()) return _t('setnav.stLocal', 'Kept on this device only');
+        return SyncEngine.isAuthenticated() ? _t('setnav.stSignedIn', 'Signed in') : _t('setnav.stNotSigned', 'Not signed in yet');
+      }
+      if (id === 'location' && typeof WhereIs !== 'undefined') return WhereIs.openShare ? _t('setnav.stSending', 'Sending your location while open') : '';
+      if (id === 'alerts') { const t = $('pushToggle'); return t && t.checked ? _t('setnav.stPushOn', 'Notifications on') : ''; }
+    } catch (e) {}
+    return '';
+  }
+  function renderHome() {
+    const el = $('settingsHome'); if (!el) return;
+    el.innerHTML = CATS.map(c => {
+      const st = _status(c.id);
+      return '<button type="button" class="settings-home-row" data-cat="' + c.id + '"><span class="settings-home-ico" aria-hidden="true">' + c.ico + '</span>' +
+        '<span class="settings-home-txt"><span class="settings-home-t">' + _esc(_t(c.t[0], c.t[1])) + '</span><span class="settings-home-d">' + _esc(_t(c.d[0], c.d[1])) + '</span>' +
+        (st ? '<span class="settings-home-s">' + _esc(st) + '</span>' : '') + '</span><span class="settings-home-chev" aria-hidden="true">›</span></button>';
+    }).join('');
+  }
+  function _title(txt) { const t = $('settingsTitle'); if (t) t.textContent = txt; }
+  function home() {
+    _cat = null;
+    const p = _panel(); if (!p) return;
+    p.setAttribute('data-view', 'home');
+    p.querySelectorAll('.settings-section.is-cat').forEach(x => x.classList.remove('is-cat'));
+    const b = $('settingsBack'); if (b) b.hidden = true;
+    const e = $('settingsCatEmpty'); if (e) e.hidden = true;
+    _title(_t('settings.title', 'Settings'));
+    renderHome();
+    p.scrollTop = 0;
+  }
+  function showCat(id, keepScroll) {
+    const c = CATS.find(x => x.id === id); const p = _panel(); if (!c || !p) return;
+    _cat = id;
+    p.setAttribute('data-view', 'cat');
+    p.querySelectorAll('.settings-section').forEach(x => x.classList.toggle('is-cat', x.getAttribute('data-cat') === id));
+    const b = $('settingsBack'); if (b) b.hidden = false;
+    _title(_t(c.t[0], c.t[1]));
+    try { if (id === 'location' && typeof WhereIs !== 'undefined') WhereIs.onSettingsOpen(); } catch (e) {}
+    try { if (id === 'account' && typeof AccountPanel !== 'undefined') AccountPanel.render(); } catch (e) {}
+    /* Sections that need an account stay hidden until sign in: say so, with the way there */
+    setTimeout(() => {
+      const e = $('settingsCatEmpty'); if (!e || _cat !== id) return;
+      const any = Array.from(p.querySelectorAll('.settings-section.is-cat')).some(x => x.getClientRects().length > 0);
+      if (any || id === 'account') { e.hidden = true; return; }
+      e.innerHTML = _esc(_t('setnav.needSignIn', 'These settings appear once this device is signed in.')) +
+        '<div><button type="button" class="settings-action-btn" onclick="SettingsNav.showCat(\'account\')">' + _esc(_t('setnav.goAccount', 'Open Account and devices')) + '</button></div>';
+      e.hidden = false;
+    }, 30);
+    if (!keepScroll) p.scrollTop = 0;
+  }
+  /* Open the group that holds an element (Guide, tour, deep links) */
+  function showFor(el) {
+    if (!el || !el.closest) return;
+    const sec = el.closest('.settings-section[data-cat]');
+    if (!sec) return;
+    const id = sec.getAttribute('data-cat');
+    const p = _panel();
+    if (p && (p.getAttribute('data-view') !== 'cat' || _cat !== id)) showCat(id, true);
+  }
+  /* The whole row of a switch toggles it; a disabled switch explains instead */
+  function _bindRows(root) {
+    root.addEventListener('click', e => {
+      const row = e.target.closest('.push-toggle-row');
+      if (!row || e.target.closest('label, input, button, a, select, textarea')) return;
+      const inp = row.querySelector('.push-toggle input[type="checkbox"]');
+      if (!inp) return;
+      if (inp.disabled) {
+        const card = row.closest('.settings-card');
+        const st = card && card.querySelector('.push-status-text, .loc-share-status');
+        if (st && st.textContent) { try { showToast(st.textContent); } catch (x) {} }
+        return;
+      }
+      inp.click();
+    });
+    /* A short On / Off under the switch, so a tap is seen to work */
+    root.addEventListener('change', e => {
+      const inp = e.target;
+      if (!inp || inp.type !== 'checkbox' || !inp.closest('.push-toggle')) return;
+      const row = inp.closest('.push-toggle-row'); if (!row) return;
+      const host = row.firstElementChild; if (!host || host.classList.contains('push-toggle')) return;
+      let n = host.querySelector('.push-toggle-saved');
+      if (!n) { n = document.createElement('div'); n.className = 'push-toggle-saved'; n.setAttribute('role', 'status'); host.appendChild(n); }
+      n.textContent = inp.checked ? _t('setnav.savedOn', 'On') : _t('setnav.savedOff', 'Off');
+      clearTimeout(n._t); n._t = setTimeout(() => { n.textContent = ''; }, 2500);
+    });
+  }
+  function _markDisabled() {
+    document.querySelectorAll('#settingsPanel .push-toggle-row').forEach(r => { const i = r.querySelector('.push-toggle input'); r.classList.toggle('is-disabled', !!(i && i.disabled)); });
+  }
+  function init() {
+    const p = _panel(); if (!p) return;
+    const h = $('settingsHome');
+    if (h) h.addEventListener('click', e => { const r = e.target.closest('.settings-home-row'); if (r) { e.preventDefault(); e.stopPropagation(); showCat(r.getAttribute('data-cat')); } });
+    _bindRows(p);
+    /* Escape steps out of a group first */
+    p.addEventListener('keydown', e => { if (e.key === 'Escape' && p.getAttribute('data-view') === 'cat') { e.preventDefault(); e.stopPropagation(); home(); } }, true);
+    window.addEventListener('localeChanged', () => { if (_cat) showCat(_cat, true); else home(); });
+    home();
+    setInterval(() => { if (p.classList.contains('open')) _markDisabled(); }, 1500);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else setTimeout(init, 0);
+  return { home: home, showCat: showCat, showFor: showFor, renderHome: renderHome, get current() { return _cat; } };
+})();
 
 /* ==============================================================
    NOUS INTEGRATION — JS
@@ -35426,7 +35655,7 @@ const SocialImport = (() => {
         var data = await resp.json();
         var locs = data.locations || [];
         if (locs.length === 0) {
-          list.innerHTML = _note(_t('location.none', 'No one in your Circle is sharing their location right now. To share yours: Settings, Location Sharing, Share My Location Now.'));
+          list.innerHTML = _note(_t('location.none', 'No one in your Circle is sharing their location with you right now. To ask someone: tap WHEREIS beside their picture, then Ask for location.'));
           list.appendChild(Guide.linkEl('settings.location'));
           return;
         }
@@ -39589,7 +39818,7 @@ var Guide = (function () {
     'settings.circle': [_openSettings, function () { return $('circleInviteInput'); }, 'guide.h.circle', 'settingsPanel', true],
     'settings.account': [_openSettings, function (o) { return _accountEl(o && o.field); }, null, 'settingsPanel'],
     'settings.push': [_openSettings, function () { var t = $('pushToggle'); return t ? (t.closest('.push-toggle-row') || t) : null; }, 'guide.h.push', 'settingsPanel', true],
-    'settings.location': [_openSettings, function () { return document.querySelector('#locationShareSection [onclick*="LocationShare.shareNow"]'); }, 'guide.h.location', 'settingsPanel', true],
+    'settings.location': [_openSettings, function () { return document.getElementById('locCircleList') || document.getElementById('locOpenRow'); }, 'guide.h.location', 'settingsPanel', true],
     'settings.places': [_openSettings, function () { return $('placesAddBtn'); }, 'guide.h.places', 'settingsPanel', true],
     'whereis': [function (o) {
       var c = _contact(o && o.contactId) || (typeof focusedContactId !== 'undefined' && _contact(focusedContactId)) || (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS[0] : null);
@@ -39645,7 +39874,11 @@ var Guide = (function () {
     /* Panels focus their first field about 200 ms after opening: land after that */
     await _wait(260);
     var el = null;
-    for (var i = 0; i < 20 && !_visible(el); i++) { await _wait(50); el = def[1](opts); }
+    for (var i = 0; i < 20 && !_visible(el); i++) {
+      await _wait(50); el = def[1](opts);
+      /* A Settings target lives in one group: open that group */
+      if (el) { try { if (typeof SettingsNav !== 'undefined') SettingsNav.showFor(el); } catch (e) {} }
+    }
     if (!el) return false;
     var det = el.closest('details');
     if (det && !det.open) det.open = true;
