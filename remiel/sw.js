@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-sentinel-v77';
+const CACHE_NAME = 'remiel-sentinel-v78';
 
 const PRECACHE_URLS = [
   './',
@@ -12,6 +12,7 @@ const PRECACHE_URLS = [
   './manifest.json',
   './sw.js',
   './remiel-logo.png',
+  './badge-96.png',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
@@ -126,8 +127,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: './remiel-logo.png',
-    badge: './remiel-logo.png',
+    icon: './icon-192.png',
+    badge: './badge-96.png',
     tag: data.tag,
     renotify: true,
     requireInteraction: !!data.urgent,
@@ -183,8 +184,8 @@ self.addEventListener('message', (event) => {
     case 'SHOW_NOTIFICATION': {
       const options = {
         body: event.data.body || '',
-        icon: './remiel-logo.png',
-        badge: './remiel-logo.png',
+        icon: './icon-192.png',
+        badge: './badge-96.png',
         tag: event.data.tag || 'remiel-alert',
         renotify: true,
         requireInteraction: false,
