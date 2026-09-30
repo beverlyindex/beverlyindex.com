@@ -3144,6 +3144,42 @@
     line-height: 1.45;
   }
 
+  /* --- Clinical reports in Intelligence (IntelReports) --- */
+  .intel-rep { display: flex; flex-direction: column; gap: 10px; padding: 12px 0 4px; }
+  .intel-rep:empty { display: none; }
+  .intel-rep-title { font: 600 13.5px 'DM Sans', sans-serif; color: var(--text, #e0e4ec); }
+  .intel-rep-line { font: 13px/1.5 'Hanken Grotesk', sans-serif; color: var(--text-dim, #8b94a8); margin: 0; }
+  .intel-rep-item { padding: 12px 14px; border-radius: 10px; background: var(--nous-panel2, rgba(24,28,42,0.45)); border: 1px solid rgba(42,51,72,0.5); }
+  .intel-rep-item.ready { border-color: rgba(56,189,248,0.45); }
+  .intel-rep-item .intel-rep-line { color: var(--text, #e0e4ec); }
+  .intel-rep-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .intel-btn { min-height: 40px; padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(56,189,248,0.7); background: rgba(56,189,248,0.08);
+    color: #38bdf8; font: 600 13px 'Hanken Grotesk', sans-serif; cursor: pointer; }
+  .intel-btn.primary { background: #38bdf8; color: #05070c; border-color: #38bdf8; }
+  .intel-btn.quiet { border-color: rgba(255,255,255,0.2); background: transparent; color: var(--text-dim, #8b94a8); }
+  .intel-btn:disabled { opacity: 0.45; cursor: default; }
+  .intel-rep-earlier { font: 12px/1.5 'Hanken Grotesk', sans-serif; color: var(--text-dim, #8b94a8); margin: 2px 0 0; padding-left: 16px; }
+  .intel-modal { position: fixed; inset: 0; z-index: 100001; background: rgba(2,6,23,0.8); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .intel-box { width: min(620px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: #10131c; border: 1px solid rgba(56,212,255,0.45); border-radius: 16px; padding: 18px 18px 14px; color: #e8ecf4;
+    font: 14px/1.55 'Hanken Grotesk', system-ui, sans-serif; box-sizing: border-box; }
+  .intel-box h3 { margin: 0 0 10px; font-size: 18px; }
+  .intel-box h4 { margin: 16px 0 6px; font-size: 15px; color: #fff; }
+  .intel-box p { margin: 0 0 10px; }
+  .intel-box ul { margin: 0 0 12px; padding-left: 20px; }
+  .intel-box li { margin-bottom: 8px; }
+  .intel-box textarea { width: 100%; min-height: 150px; box-sizing: border-box; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2);
+    background: #0a0d14; color: #e8ecf4; padding: 10px; font: 15px/1.5 'Hanken Grotesk', system-ui, sans-serif; }
+  .intel-agree { display: flex; gap: 10px; align-items: flex-start; margin: 6px 0 12px; font-weight: 600; cursor: pointer; }
+  .intel-agree input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 1px; }
+  .intel-meta { font-size: 12.5px; color: #9aa4b8; margin-bottom: 10px; }
+  .intel-notice { padding: 10px 12px; border-radius: 10px; background: rgba(255,210,77,0.08); border: 1px solid rgba(255,210,77,0.4); color: #ffd24d; font-size: 13px; margin-bottom: 12px; }
+  .intel-actions { position: sticky; bottom: -14px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 12px 0 2px; background: #10131c; }
+  .intel-count { font-size: 12.5px; color: #9aa4b8; margin: 4px 0 10px; }
+  .intel-rec { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 12px; }
+  .intel-pick { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+  .intel-pick button { text-align: left; }
+
   /* --- NOUS Intelligence Pull --- */
   .nous-intel-container {
     display: flex;
@@ -7511,12 +7547,13 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
       <!-- Pull 8: NOUS Intelligence -->
       <div class="bluf-pull" id="pull_intelligence">
         <div class="bluf-pull-header" onclick="togglePull('intelligence')">
-          <div class="bluf-section-label" data-i18n="pull.intelligence">NOUS Intelligence</div>
-          <span class="bluf-pull-preview" id="pullPrev_intelligence" data-i18n="nous.prevOptional">Optional NOUS connection</span>
+          <div class="bluf-section-label" data-i18n="pull.intelligence">Intelligence</div>
+          <span class="bluf-pull-preview" id="pullPrev_intelligence" data-i18n="intel.title">Clinical report</span>
           <span class="bluf-pull-chevron">&#9660;</span>
         </div>
         <div class="bluf-pull-body">
           <div class="bluf-pull-content">
+            <div class="intel-rep" id="intelRep"></div>
             <div class="nous-intel-container" id="nousIntelUI">
               <div class="nous-intel-header">
                 <span class="nih-badge">NOUS</span>
@@ -11379,6 +11416,69 @@ const I18n = (function () {
     'media.warnMic': "Your microphone is sending no sound. Check that it is not muted on your device, or choose another microphone in your system settings.",
     'call.you': "You",
     'call.swapHint': "Tap either picture to swap sizes",
+    'intel.title': "Clinical report",
+    'intel.signIn': "Sign in to Remiel Sentinel to ask for your clinical report. Open Settings (the gear), then Account.",
+    'intel.notYet': "Clinical reports are not available yet.",
+    'intel.fromTitle': "Report from {name}",
+    'intel.recvLine': "{name} sent you a report on {date}. It is kept here until {until}; if you have not saved it by then, it is destroyed.",
+    'intel.read': "Read report",
+    'intel.pdf': "Download PDF",
+    'intel.delete': "Delete",
+    'intel.send': "Send to someone in your Circle",
+    'intel.processing': "Your report is being prepared. You will get a notification when it is ready.",
+    'intel.cancelReq': "Cancel request",
+    'intel.readyLine': "Your report is ready. It is kept here until {until}; if you have not saved it by then, it is destroyed.",
+    'intel.intro': "Ask for a clinical report about yourself. You write or record how you have been; the report comes back here for you alone.",
+    'intel.request': "Ask for my clinical report",
+    'intel.h.sent': "Sent to {name} on {date}. Remiel Sentinel keeps no copy for you.",
+    'intel.h.saved': "Saved on {date}. Remiel Sentinel no longer holds any copy.",
+    'intel.h.expired': "Not saved in time. Destroyed on {date}.",
+    'intel.h.failed': "Could not be completed on {date}. Nothing was kept.",
+    'intel.h.cancelled': "Cancelled on {date}. Nothing was kept.",
+    'intel.h.deleted': "Deleted on {date}. Nothing was kept.",
+    'intel.cTitle': "Before you ask for your clinical report",
+    'intel.c1': "This report is about you. Only you can ask for it, and only you receive it.",
+    'intel.c2': "What you write or record below is sent securely to the Beverly Index analysis service. It is used only to prepare your report. Remiel Sentinel does not keep it, and the analysis service deletes it once your report is delivered.",
+    'intel.c3': "The analysis service does not receive your name, email or Sentinel ID.",
+    'intel.c4': "The report gives estimates drawn from patterns in language and voice. It is not a diagnosis. Talk to a qualified clinician about any health concern.",
+    'intel.c5': "When your report is ready it waits in this Intelligence section for up to {days} days. If you have not saved it by then, it is destroyed.",
+    'intel.c6': "Once you save the PDF, or send the report to someone in your Circle, it is yours alone. Remiel Sentinel then destroys every copy it holds and cannot recover it. You are responsible for anyone you share it with.",
+    'intel.c7': "Until the report is ready, you can cancel the request here.",
+    'intel.agree': "I have read this and I agree.",
+    'intel.continue': "Continue",
+    'intel.iTitle': "How have you been lately?",
+    'intel.iHelp': "Write, or tap the microphone on your keyboard and speak, about how you have been in the last few weeks: sleep, mood, energy, work, the people around you. At least 40 words. You can also record your voice for up to 60 seconds.",
+    'intel.record': "Record my voice",
+    'intel.recordAgain': "Record again",
+    'intel.stop': "Stop",
+    'intel.recording': "Recording {n} seconds. Tap Stop to finish.",
+    'intel.recorded': "Recorded {n} seconds.",
+    'intel.micDenied': "The microphone is not allowed. You can write instead.",
+    'intel.words': "{n} of 40 words",
+    'intel.sendAnalysis': "Send for analysis",
+    'intel.sending': "Sending...",
+    'intel.sentTitle': "Sent",
+    'intel.sentText': "Nothing you wrote or recorded is kept by Remiel Sentinel. You will get a notification when your report is ready. It will appear here, in your own card under Intelligence.",
+    'intel.already': "A report is already being prepared for you.",
+    'intel.failed': "The request did not go through. Nothing was kept. Please try again later.",
+    'intel.prepared': "Prepared {date}. Kept here until {until}.",
+    'intel.close': "Close",
+    'intel.gone': "This report is no longer held here.",
+    'intel.confirmSaved': "Open the PDF you just saved and check that you can read it. If it opened, tap Yes, I have it: the report is then destroyed here and cannot be recovered, and it is yours alone. If it did not open, tap Cancel and download it again.",
+    'intel.yesHave': "Yes, I have it",
+    'intel.savedToast': "Saved. Remiel Sentinel no longer holds any copy of your report.",
+    'intel.pickHelp': "Tap the person to send your report to. Only people connected with you in The Circle are listed.",
+    'intel.pickNone': "No one in your Circle has accepted a connection with you yet. Only people connected with you can receive your report. You can still download the PDF and share it yourself.",
+    'intel.sendConfirm': "Send your report to {name}? It leaves your Intelligence section now and Remiel Sentinel keeps no copy for you. {name} can read it and save it; once they save it, it is destroyed here.",
+    'intel.sendBtn': "Send",
+    'intel.sentTo': "Sent to {name}.",
+    'intel.notLinked': "{name} has not accepted a connection with you in The Circle yet, so the report was not sent.",
+    'intel.cancelConfirm': "Cancel this request? What you sent is discarded.",
+    'intel.deleteConfirm': "Delete this report? It is destroyed now and cannot be recovered.",
+    'intel.yesCancel': "Yes, cancel it",
+    'intel.fromNone': "Reports that {name} chooses to send you appear here.",
+    'intel.prevContact': "Reports sent to you",
+    'intel.prevOwn': "Your clinical report",
     'call.incomingFlash': "INCOMING",
     'call.tapSphere': "Tap the sphere to answer",
     'call.tapSphereAria': "Answer the call from {name}",
@@ -12146,6 +12246,69 @@ const I18n = (function () {
     'media.warnMic': "Il tuo microfono non invia alcun suono. Controlla che non sia disattivato sul dispositivo, oppure scegli un altro microfono nelle impostazioni di sistema.",
     'call.you': "Tu",
     'call.swapHint': "Tocca un'immagine per scambiare le dimensioni",
+    'intel.title': "Referto clinico",
+    'intel.signIn': "Accedi a Remiel Sentinel per richiedere il tuo referto clinico. Apri Impostazioni (l'ingranaggio), poi Account.",
+    'intel.notYet': "I referti clinici non sono ancora disponibili.",
+    'intel.fromTitle': "Referto da {name}",
+    'intel.recvLine': "{name} ti ha inviato un referto il {date}. Resta qui fino al {until}; se non lo hai salvato entro quella data, viene distrutto.",
+    'intel.read': "Leggi il referto",
+    'intel.pdf': "Scarica PDF",
+    'intel.delete': "Elimina",
+    'intel.send': "Invia a una persona del tuo Cerchio",
+    'intel.processing': "Il tuo referto è in preparazione. Riceverai una notifica quando sarà pronto.",
+    'intel.cancelReq': "Annulla la richiesta",
+    'intel.readyLine': "Il tuo referto è pronto. Resta qui fino al {until}; se non lo hai salvato entro quella data, viene distrutto.",
+    'intel.intro': "Richiedi un referto clinico su di te. Scrivi o registra come sei stato; il referto torna qui, solo per te.",
+    'intel.request': "Richiedi il mio referto clinico",
+    'intel.h.sent': "Inviato a {name} il {date}. Remiel Sentinel non conserva alcuna copia per te.",
+    'intel.h.saved': "Salvato il {date}. Remiel Sentinel non conserva più alcuna copia.",
+    'intel.h.expired': "Non salvato in tempo. Distrutto il {date}.",
+    'intel.h.failed': "Non completato il {date}. Non è stato conservato nulla.",
+    'intel.h.cancelled': "Annullato il {date}. Non è stato conservato nulla.",
+    'intel.h.deleted': "Eliminato il {date}. Non è stato conservato nulla.",
+    'intel.cTitle': "Prima di richiedere il tuo referto clinico",
+    'intel.c1': "Questo referto riguarda te. Solo tu puoi richiederlo e solo tu lo ricevi.",
+    'intel.c2': "Ciò che scrivi o registri qui sotto viene inviato in modo sicuro al servizio di analisi di Beverly Index. Serve solo a preparare il tuo referto. Remiel Sentinel non lo conserva, e il servizio di analisi lo cancella non appena il referto è consegnato.",
+    'intel.c3': "Il servizio di analisi non riceve il tuo nome, la tua email né il tuo Sentinel ID.",
+    'intel.c4': "Il referto fornisce stime basate su schemi del linguaggio e della voce. Non è una diagnosi. Per qualsiasi problema di salute rivolgiti a un medico qualificato.",
+    'intel.c5': "Quando il referto è pronto, resta in questa sezione Intelligence per un massimo di {days} giorni. Se non lo hai salvato entro quel termine, viene distrutto.",
+    'intel.c6': "Quando salvi il PDF, o invii il referto a una persona del tuo Cerchio, diventa solo tuo. Remiel Sentinel distrugge allora ogni copia in suo possesso e non può recuperarla. Sei tu responsabile di chiunque tu lo condivida.",
+    'intel.c7': "Finché il referto non è pronto, puoi annullare la richiesta da qui.",
+    'intel.agree': "Ho letto e accetto.",
+    'intel.continue': "Continua",
+    'intel.iTitle': "Come sei stato ultimamente?",
+    'intel.iHelp': "Scrivi, oppure tocca il microfono della tastiera e parla, di come sei stato nelle ultime settimane: sonno, umore, energia, lavoro, le persone intorno a te. Almeno 40 parole. Puoi anche registrare la tua voce per un massimo di 60 secondi.",
+    'intel.record': "Registra la mia voce",
+    'intel.recordAgain': "Registra di nuovo",
+    'intel.stop': "Stop",
+    'intel.recording': "Registrazione: {n} secondi. Tocca Stop per finire.",
+    'intel.recorded': "Registrati {n} secondi.",
+    'intel.micDenied': "Il microfono non è consentito. Puoi scrivere invece.",
+    'intel.words': "{n} di 40 parole",
+    'intel.sendAnalysis': "Invia per l'analisi",
+    'intel.sending': "Invio in corso...",
+    'intel.sentTitle': "Inviato",
+    'intel.sentText': "Remiel Sentinel non conserva nulla di ciò che hai scritto o registrato. Riceverai una notifica quando il referto sarà pronto. Comparirà qui, nella tua scheda sotto Intelligence.",
+    'intel.already': "Un referto è già in preparazione per te.",
+    'intel.failed': "La richiesta non è andata a buon fine. Non è stato conservato nulla. Riprova più tardi.",
+    'intel.prepared': "Preparato il {date}. Resta qui fino al {until}.",
+    'intel.close': "Chiudi",
+    'intel.gone': "Questo referto non è più conservato qui.",
+    'intel.confirmSaved': "Apri il PDF che hai appena salvato e controlla di poterlo leggere. Se si è aperto, tocca Sì, ce l'ho: il referto viene allora distrutto qui, non può essere recuperato ed è solo tuo. Se non si è aperto, tocca Annulla e scaricalo di nuovo.",
+    'intel.yesHave': "Sì, ce l'ho",
+    'intel.savedToast': "Salvato. Remiel Sentinel non conserva più alcuna copia del tuo referto.",
+    'intel.pickHelp': "Tocca la persona a cui inviare il referto. Sono elencate solo le persone collegate con te nel Cerchio.",
+    'intel.pickNone': "Nessuno nel tuo Cerchio ha ancora accettato un collegamento con te. Solo le persone collegate con te possono ricevere il referto. Puoi comunque scaricare il PDF e condividerlo tu stesso.",
+    'intel.sendConfirm': "Inviare il tuo referto a {name}? Lascia subito la tua sezione Intelligence e Remiel Sentinel non conserva alcuna copia per te. {name} può leggerlo e salvarlo; quando lo salva, viene distrutto qui.",
+    'intel.sendBtn': "Invia",
+    'intel.sentTo': "Inviato a {name}.",
+    'intel.notLinked': "{name} non ha ancora accettato un collegamento con te nel Cerchio, quindi il referto non è stato inviato.",
+    'intel.cancelConfirm': "Annullare questa richiesta? Ciò che hai inviato viene scartato.",
+    'intel.deleteConfirm': "Eliminare questo referto? Viene distrutto subito e non può essere recuperato.",
+    'intel.yesCancel': "Sì, annulla",
+    'intel.fromNone': "Qui compaiono i referti che {name} sceglie di inviarti.",
+    'intel.prevContact': "Referti inviati a te",
+    'intel.prevOwn': "Il tuo referto clinico",
     'call.incomingFlash': "IN ARRIVO",
     'call.tapSphere': "Tocca la sfera per rispondere",
     'call.tapSphereAria': "Rispondi alla chiamata di {name}",
@@ -28753,7 +28916,7 @@ const NousIntelligence = (function () {
     const configured = NousClient.isConfigured();
     updateConnectionStatus(result.connected, configured);
     const prev = document.getElementById('pullPrev_intelligence');
-    if (prev) prev.textContent = result.connected ? _t('nous.prevConnected', 'NOUS connected') : _t('nous.prevOptional', 'Optional NOUS connection');
+    if (prev && configured) prev.textContent = result.connected ? _t('nous.prevConnected', 'NOUS connected') : _t('nous.prevOptional', 'Optional NOUS connection');
     if (!result.connected) return;
     const cid = _cid();
     _setCard('nousCardVoca', _esc(_t('nous.loading', 'Loading...')), _t('nous.connected', 'Connected'), 'available');
@@ -28772,6 +28935,385 @@ const NousIntelligence = (function () {
 })();
 
 
+
+// ── IntelReports: the person's own clinical report, from consent to destruction ──
+// Only the person a report is about can ask for it, from their own card. It
+// waits here encrypted until they save the PDF (and confirm it opened) or send
+// it to one person in their Circle; then every copy on the server is destroyed.
+const IntelReports = (function () {
+  'use strict';
+  const CONSENT_VERSION = 'rs-intel-consent-1';
+  let _status = null, _reports = [], _busy = false;
+
+  function _esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+  function _lang() { try { return I18n.locale === 'it' ? 'it' : 'en'; } catch (e) { return 'en'; } }
+  function _date(ms) { try { return new Date(Number(ms)).toLocaleDateString(_lang() === 'it' ? 'it-IT' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } }
+  function _authed() { try { return typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated() && !(SyncEngine.isLocalOnly && SyncEngine.isLocalOnly()); } catch (e) { return false; } }
+  function _contact() { return (typeof selectedContact !== 'undefined' && selectedContact) ? selectedContact : null; }
+  function _sameSid(a, b) { return !!(a && b && String(a).toUpperCase() === String(b).toUpperCase()); }
+  async function _api(path, opts) {
+    const r = await SyncEngine.apiFetch(path, opts || { method: 'GET' });
+    let body = null;
+    try { body = await r.clone().json(); } catch (e) {}
+    return { ok: r.ok, status: r.status, body, raw: r };
+  }
+  function _toast(msg) { try { if (typeof showToast === 'function') return showToast(msg); } catch (e) {} }
+
+  function _consentLines(days) {
+    return [
+      _t('intel.c1', 'This report is about you. Only you can ask for it, and only you receive it.'),
+      _t('intel.c2', 'What you write or record below is sent securely to the Beverly Index analysis service. It is used only to prepare your report. Remiel Sentinel does not keep it, and the analysis service deletes it once your report is delivered.'),
+      _t('intel.c3', 'The analysis service does not receive your name, email or Sentinel ID.'),
+      _t('intel.c4', 'The report gives estimates drawn from patterns in language and voice. It is not a diagnosis. Talk to a qualified clinician about any health concern.'),
+      _t('intel.c5', 'When your report is ready it waits in this Intelligence section for up to {days} days. If you have not saved it by then, it is destroyed.', { days }),
+      _t('intel.c6', 'Once you save the PDF, or send the report to someone in your Circle, it is yours alone. Remiel Sentinel then destroys every copy it holds and cannot recover it. You are responsible for anyone you share it with.'),
+      _t('intel.c7', 'Until the report is ready, you can cancel the request here.'),
+    ];
+  }
+  async function _sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // ── The block inside the Intelligence section ──
+  async function render() {
+    const box = document.getElementById('intelRep');
+    if (!box) return;
+    const c = _contact();
+    _legacy();
+    const emptyForContact = () => '<p class="intel-rep-line">' + _esc(_t('intel.fromNone', 'Reports that {name} chooses to send you appear here.', { name: (c && (c.first || c.last)) || '' })) + '</p>';
+    if (!_authed()) {
+      box.innerHTML = c ? emptyForContact() : '<div class="intel-rep-title">' + _esc(_t('intel.title', 'Clinical report')) + '</div><p class="intel-rep-line">' +
+        _esc(_t('intel.signIn', 'Sign in to Remiel Sentinel to ask for your clinical report. Open Settings (the gear), then Account.')) + ' ' +
+        (typeof Guide !== 'undefined' && Guide.linkHtml ? Guide.linkHtml('settings.account') : '') + '</p>';
+      return;
+    }
+    let st, list;
+    try { [st, list] = await Promise.all([_api('/intel/status'), _api('/intel/reports')]); } catch (e) { box.innerHTML = ''; return; }
+    if (_contact() !== c) return; /* the card changed while loading */
+    _status = st.ok ? st.body : null;
+    _reports = list.ok && list.body ? list.body.reports || [] : [];
+    const days = (_status && _status.hold_days) || 30;
+    let html = '';
+    if (c) {
+      /* Someone else's card: only reports they sent to me */
+      const mine = _reports.filter(r => r.role === 'recipient' && r.from && _sameSid(r.from.sentinel_id, c.sentinelId));
+      if (!mine.length) { box.innerHTML = emptyForContact(); return; }
+      const open = mine.filter(r => r.status === 'sent');
+      const earlier = mine.filter(r => r.status !== 'sent').slice(0, 5);
+      html += '<div class="intel-rep-title">' + _esc(_t('intel.fromTitle', 'Report from {name}', { name: (mine[0].from && mine[0].from.name) || '' })) + '</div>';
+      open.forEach(r => {
+        html += '<div class="intel-rep-item ready"><p class="intel-rep-line">' + _esc(_t('intel.recvLine', '{name} sent you a report on {date}. It is kept here until {until}; if you have not saved it by then, it is destroyed.', { name: (r.from && r.from.name) || '', date: _date(r.sent_at), until: _date(r.expires_at) })) + '</p>' +
+          '<div class="intel-rep-btns"><button type="button" class="intel-btn primary" data-act="read" data-id="' + _esc(r.id) + '">' + _esc(_t('intel.read', 'Read report')) + '</button>' +
+          '<button type="button" class="intel-btn" data-act="pdf" data-id="' + _esc(r.id) + '">' + _esc(_t('intel.pdf', 'Download PDF')) + '</button>' +
+          '<button type="button" class="intel-btn quiet" data-act="delete" data-id="' + _esc(r.id) + '">' + _esc(_t('intel.delete', 'Delete')) + '</button></div></div>';
+      });
+      if (earlier.length) html += '<ul class="intel-rep-earlier">' + earlier.map(r => '<li>' + _esc(_historyLine(r)) + '</li>').join('') + '</ul>';
+      box.innerHTML = html;
+      return;
+    }
+    /* My own card */
+    html += '<div class="intel-rep-title">' + _esc(_t('intel.title', 'Clinical report')) + '</div>';
+    if (!_status || !_status.connected) {
+      box.innerHTML = html + '<p class="intel-rep-line">' + _esc(_t('intel.notYet', 'Clinical reports are not available yet.')) + '</p>';
+      return;
+    }
+    const own = _reports.filter(r => r.role === 'subject' || r.role === 'sender');
+    const open = own.filter(r => r.role === 'subject' && (r.status === 'processing' || r.status === 'ready'));
+    const earlier = own.filter(r => open.indexOf(r) < 0).slice(0, 5);
+    open.forEach(r => {
+      if (r.status === 'processing') {
+        html += '<div class="intel-rep-item"><p class="intel-rep-line">' + _esc(_t('intel.processing', 'Your report is being prepared. You will get a notification when it is ready.')) + '</p>' +
+          '<div class="intel-rep-btns"><button type="button" class="intel-btn quiet" data-act="cancel" data-id="' + _esc(r.id) + '">' + _esc(_t('intel.cancelReq', 'Cancel request')) + '</button></div></div>';
+      } else {
+        html += '<div class="intel-rep-item ready"><p class="intel-rep-line">' + _esc(_t('intel.readyLine', 'Your report is ready. It is kept here until {until}; if you have not saved it by then, it is destroyed.', { until: _date(r.expires_at) })) + '</p>' +
+          '<div class="intel-rep-btns"><button type="button" class="intel-btn primary" data-act="read" data-id="' + _esc(r.id) + '">' + _esc(_t('intel.read', 'Read report')) + '</button>' +
+          '<button type="button" class="intel-btn" data-act="pdf" data-id="' + _esc(r.id) + '">' + _esc(_t('intel.pdf', 'Download PDF')) + '</button>' +
+          '<button type="button" class="intel-btn" data-act="send" data-id="' + _esc(r.id) + '">' + _esc(_t('intel.send', 'Send to someone in your Circle')) + '</button>' +
+          '<button type="button" class="intel-btn quiet" data-act="delete" data-id="' + _esc(r.id) + '">' + _esc(_t('intel.delete', 'Delete')) + '</button></div></div>';
+      }
+    });
+    if (!open.length) {
+      html += '<p class="intel-rep-line">' + _esc(_t('intel.intro', 'Ask for a clinical report about yourself. You write or record how you have been; the report comes back here for you alone.')) + '</p>' +
+        '<div class="intel-rep-btns"><button type="button" class="intel-btn primary" data-act="request">' + _esc(_t('intel.request', 'Ask for my clinical report')) + '</button></div>';
+    }
+    if (earlier.length) html += '<ul class="intel-rep-earlier">' + earlier.map(r => '<li>' + _esc(_historyLine(r)) + '</li>').join('') + '</ul>';
+    box.innerHTML = html;
+  }
+
+  /* The older direct NOUS cards stay hidden unless an endpoint was configured
+     on this device; people using the app never need to see NOUS. */
+  function _legacy() {
+    const legacy = document.getElementById('nousIntelUI');
+    let on = false;
+    try { on = typeof NousClient !== 'undefined' && NousClient.isConfigured && NousClient.isConfigured(); } catch (e) {}
+    if (legacy) legacy.style.display = on ? '' : 'none';
+    const prev = document.getElementById('pullPrev_intelligence');
+    if (prev && !on) prev.textContent = _t('intel.title', 'Clinical report');
+  }
+
+  /* A tapped notification: #intel opens my own card, #intel=<Sentinel ID>
+     opens the card of the person who sent me a report. */
+  function _openFromLink(hash) {
+    const m = /#intel(?:=([A-Za-z0-9]{8}))?/.exec(String(hash || ''));
+    if (!m) return;
+    let tries = 0;
+    const go = () => {
+      const gate = document.getElementById('gateScreen');
+      const ready = typeof openBluf === 'function' && (!gate || gate.hidden || getComputedStyle(gate).display === 'none') && Array.isArray(DEMO_CONTACTS);
+      if (!ready) { if (++tries < 40) setTimeout(go, 500); return; }
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      try {
+        if (m[1]) {
+          const c = DEMO_CONTACTS.find(x => _sameSid(x.sentinelId, m[1]));
+          if (!c) return;
+          if (typeof focusContact === 'function') focusContact(c.id);
+        } else {
+          if (document.getElementById('blufOverlay').classList.contains('open')) closeBluf();
+          selectedContact = null;
+          openBluf();
+        }
+        setTimeout(() => { const pl = document.getElementById('pull_intelligence'); if (pl && !pl.classList.contains('open')) togglePull('intelligence'); else render(); }, 450);
+      } catch (e) {}
+    };
+    setTimeout(go, 1500);
+  }
+  try {
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'NOTIFICATION_CLICK' && /#intel/.test(String(e.data.url || ''))) _openFromLink(String(e.data.url).slice(String(e.data.url).indexOf('#')));
+    });
+  } catch (e) {}
+  if (/^#intel/.test(location.hash)) _openFromLink(location.hash);
+  window.addEventListener('hashchange', () => { if (/^#intel/.test(location.hash)) _openFromLink(location.hash); });
+
+  function _historyLine(r) {
+    const d = _date(r.destroyed_at || r.sent_at || r.created_at);
+    if (r.role === 'sender') return _t('intel.h.sent', 'Sent to {name} on {date}. Remiel Sentinel keeps no copy for you.', { name: (r.to && r.to.name) || '', date: _date(r.sent_at) });
+    if (r.status === 'collected') return _t('intel.h.saved', 'Saved on {date}. Remiel Sentinel no longer holds any copy.', { date: d });
+    if (r.status === 'expired') return _t('intel.h.expired', 'Not saved in time. Destroyed on {date}.', { date: d });
+    if (r.status === 'failed') return _t('intel.h.failed', 'Could not be completed on {date}. Nothing was kept.', { date: d });
+    if (r.status === 'cancelled') return _t('intel.h.cancelled', 'Cancelled on {date}. Nothing was kept.', { date: d });
+    if (r.status === 'deleted') return _t('intel.h.deleted', 'Deleted on {date}. Nothing was kept.', { date: d });
+    return '';
+  }
+
+  document.addEventListener('click', function (e) {
+    const b = e.target && e.target.closest && e.target.closest('#intelRep [data-act]');
+    if (!b) return;
+    e.stopPropagation();
+    const id = b.dataset.id, act = b.dataset.act;
+    if (act === 'request') openRequest();
+    else if (act === 'read') openReport(id);
+    else if (act === 'pdf') downloadPdf(id);
+    else if (act === 'send') pickRecipient(id);
+    else if (act === 'delete') remove(id, false);
+    else if (act === 'cancel') remove(id, true);
+  }, true);
+
+  // ── Modal helper ──
+  function _modal(html) {
+    close();
+    const ov = document.createElement('div');
+    ov.className = 'intel-modal';
+    ov.id = 'intelModal';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = '<div class="intel-box">' + html + '</div>';
+    document.body.appendChild(ov);
+    return ov;
+  }
+  function close() {
+    const m = document.getElementById('intelModal');
+    if (m) m.remove();
+    _stopRec(true);
+  }
+
+  // ── Ask: consent first, then what to send ──
+  function openRequest() {
+    const days = (_status && _status.hold_days) || 30;
+    const lines = _consentLines(days);
+    const ov = _modal('<h3>' + _esc(_t('intel.cTitle', 'Before you ask for your clinical report')) + '</h3><ul>' +
+      lines.map(l => '<li>' + _esc(l) + '</li>').join('') + '</ul>' +
+      '<label class="intel-agree"><input type="checkbox" id="intelAgree"> <span>' + _esc(_t('intel.agree', 'I have read this and I agree.')) + '</span></label>' +
+      '<div class="intel-actions"><button type="button" class="intel-btn quiet" id="intelNo">' + _esc(_t('busy.cancel', 'Cancel')) + '</button>' +
+      '<button type="button" class="intel-btn primary" id="intelGo" disabled>' + _esc(_t('intel.continue', 'Continue')) + '</button></div>');
+    const agree = ov.querySelector('#intelAgree'), go = ov.querySelector('#intelGo');
+    agree.addEventListener('change', () => { go.disabled = !agree.checked; });
+    ov.querySelector('#intelNo').onclick = close;
+    go.onclick = () => { if (agree.checked) _inputs(lines); };
+  }
+
+  let _rec = null;
+  function _stopRec(discard) {
+    if (!_rec) return;
+    try { clearInterval(_rec.timer); } catch (e) {}
+    try { if (_rec.mr && _rec.mr.state !== 'inactive') _rec.mr.stop(); } catch (e) {}
+    try { _rec.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    if (discard) _rec = null;
+  }
+  function _words(s) { return String(s || '').trim().split(/\s+/).filter(Boolean).length; }
+
+  function _inputs(lines) {
+    const ov = _modal('<h3>' + _esc(_t('intel.iTitle', 'How have you been lately?')) + '</h3>' +
+      '<p>' + _esc(_t('intel.iHelp', 'Write, or tap the microphone on your keyboard and speak, about how you have been in the last few weeks: sleep, mood, energy, work, the people around you. At least 40 words. You can also record your voice for up to 60 seconds.')) + '</p>' +
+      '<textarea id="intelText" maxlength="20000"></textarea><div class="intel-count" id="intelCount"></div>' +
+      '<div class="intel-rec"><button type="button" class="intel-btn" id="intelRecBtn">' + _esc(_t('intel.record', 'Record my voice')) + '</button><span id="intelRecState" class="intel-count"></span></div>' +
+      '<div class="intel-actions"><button type="button" class="intel-btn quiet" id="intelNo">' + _esc(_t('busy.cancel', 'Cancel')) + '</button>' +
+      '<button type="button" class="intel-btn primary" id="intelSend" disabled>' + _esc(_t('intel.sendAnalysis', 'Send for analysis')) + '</button></div>');
+    const ta = ov.querySelector('#intelText'), cnt = ov.querySelector('#intelCount'), send = ov.querySelector('#intelSend');
+    const recBtn = ov.querySelector('#intelRecBtn'), recSt = ov.querySelector('#intelRecState');
+    let audio = null;
+    const refresh = () => {
+      const n = _words(ta.value);
+      cnt.textContent = _t('intel.words', '{n} of 40 words', { n });
+      send.disabled = !(n >= 40 || (audio && audio.secs >= 10));
+    };
+    ta.addEventListener('input', refresh);
+    refresh();
+    ov.querySelector('#intelNo').onclick = close;
+    recBtn.onclick = async () => {
+      if (_rec && _rec.mr && _rec.mr.state === 'recording') { _rec.mr.stop(); return; }
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch (e) { recSt.textContent = _t('intel.micDenied', 'The microphone is not allowed. You can write instead.'); return; }
+      const chunks = [];
+      let mr;
+      try { mr = new MediaRecorder(stream); } catch (e) { stream.getTracks().forEach(t => t.stop()); recSt.textContent = _t('intel.micDenied', 'The microphone is not allowed. You can write instead.'); return; }
+      const t0 = Date.now();
+      _rec = { mr, stream, timer: null };
+      mr.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+      mr.onstop = () => {
+        const secs = Math.round((Date.now() - t0) / 1000);
+        _stopRec(false);
+        _rec = null;
+        const blob = new Blob(chunks, { type: (mr.mimeType || 'audio/webm') });
+        audio = { blob, secs, mime: (mr.mimeType || 'audio/webm') };
+        recBtn.textContent = _t('intel.recordAgain', 'Record again');
+        recSt.textContent = _t('intel.recorded', 'Recorded {n} seconds.', { n: secs });
+        refresh();
+      };
+      mr.start(1000);
+      recBtn.textContent = _t('intel.stop', 'Stop');
+      _rec.timer = setInterval(() => {
+        const secs = Math.round((Date.now() - t0) / 1000);
+        recSt.textContent = _t('intel.recording', 'Recording {n} seconds. Tap Stop to finish.', { n: secs });
+        if (secs >= 60 && mr.state === 'recording') mr.stop();
+      }, 500);
+    };
+    send.onclick = async () => {
+      if (send.disabled) return;
+      send.disabled = true;
+      send.textContent = _t('intel.sending', 'Sending...');
+      try {
+        const body = { consent: true, consent_version: CONSENT_VERSION, consent_text_sha256: await _sha256(lines.join('\n')), lang: _lang(), text: ta.value };
+        if (audio && audio.blob && audio.blob.size) {
+          body.audio_b64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1] || ''); fr.onerror = rej; fr.readAsDataURL(audio.blob); });
+          body.audio_mime = audio.mime;
+        }
+        const r = await _api('/intel/request', { method: 'POST', body: JSON.stringify(body) });
+        ta.value = ''; audio = null;
+        if (r.ok) {
+          _modal('<h3>' + _esc(_t('intel.sentTitle', 'Sent')) + '</h3><p>' + _esc(_t('intel.sentText', 'Nothing you wrote or recorded is kept by Remiel Sentinel. You will get a notification when your report is ready. It will appear here, in your own card under Intelligence.')) + '</p>' +
+            '<div class="intel-actions"><button type="button" class="intel-btn primary" id="intelOk">OK</button></div>').querySelector('#intelOk').onclick = close;
+        } else {
+          const msg = r.status === 409 ? _t('intel.already', 'A report is already being prepared for you.')
+            : r.status === 503 ? _t('intel.notYet', 'Clinical reports are not available yet.')
+            : _t('intel.failed', 'The request did not go through. Nothing was kept. Please try again later.');
+          _modal('<h3>' + _esc(_t('intel.title', 'Clinical report')) + '</h3><p>' + _esc(msg) + '</p><div class="intel-actions"><button type="button" class="intel-btn primary" id="intelOk">OK</button></div>').querySelector('#intelOk').onclick = close;
+        }
+      } catch (e) {
+        _modal('<h3>' + _esc(_t('intel.title', 'Clinical report')) + '</h3><p>' + _esc(_t('intel.failed', 'The request did not go through. Nothing was kept. Please try again later.')) + '</p><div class="intel-actions"><button type="button" class="intel-btn primary" id="intelOk">OK</button></div>').querySelector('#intelOk').onclick = close;
+      }
+      render();
+    };
+  }
+
+  // ── Read on screen ──
+  async function openReport(id) {
+    const r = await _api('/intel/reports/' + encodeURIComponent(id));
+    if (!r.ok || !r.body || !r.body.report) { _gone(); return; }
+    const rep = r.body.report, meta = r.body.meta || {};
+    const secs = (rep.sections || []).map(s => (s.heading ? '<h4>' + _esc(s.heading) + '</h4>' : '') + (s.paragraphs || []).map(p => '<p>' + _esc(p) + '</p>').join('')).join('');
+    const canSend = meta.role === 'subject';
+    const ov = _modal('<h3>' + _esc(rep.title || _t('intel.title', 'Clinical report')) + '</h3>' +
+      '<div class="intel-meta">' + _esc(_t('intel.prepared', 'Prepared {date}. Kept here until {until}.', { date: _date(rep.generated_at), until: _date(meta.expires_at) })) + '</div>' +
+      (rep.notice ? '<div class="intel-notice">' + _esc(rep.notice) + '</div>' : '') + secs +
+      '<div class="intel-actions"><button type="button" class="intel-btn quiet" id="intelNo">' + _esc(_t('intel.close', 'Close')) + '</button>' +
+      (canSend ? '<button type="button" class="intel-btn" id="intelSendTo">' + _esc(_t('intel.send', 'Send to someone in your Circle')) + '</button>' : '') +
+      '<button type="button" class="intel-btn primary" id="intelPdf">' + _esc(_t('intel.pdf', 'Download PDF')) + '</button></div>');
+    ov.querySelector('#intelNo').onclick = close;
+    ov.querySelector('#intelPdf').onclick = () => downloadPdf(id);
+    const st = ov.querySelector('#intelSendTo');
+    if (st) st.onclick = () => pickRecipient(id);
+  }
+  function _gone() {
+    _modal('<h3>' + _esc(_t('intel.title', 'Clinical report')) + '</h3><p>' + _esc(_t('intel.gone', 'This report is no longer held here.')) + '</p><div class="intel-actions"><button type="button" class="intel-btn primary" id="intelOk">OK</button></div>').querySelector('#intelOk').onclick = close;
+    render();
+  }
+
+  // ── Save: download, then the person confirms it opened; then it is destroyed ──
+  async function downloadPdf(id) {
+    if (_busy) return;
+    _busy = true;
+    try {
+      const r = await SyncEngine.apiFetch('/intel/reports/' + encodeURIComponent(id) + '/pdf', { method: 'GET' });
+      if (!r.ok) { _gone(); return; }
+      const blob = await r.blob();
+      const cd = r.headers.get('Content-Disposition') || '';
+      const m = /filename="([^"]+)"/.exec(cd);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = m ? m[1] : 'Clinical-Report-' + new Date().toISOString().slice(0, 10) + '.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      close();
+      const yes = await uiConfirm(_t('intel.confirmSaved', 'Open the PDF you just saved and check that you can read it. If it opened, tap Yes, I have it: the report is then destroyed here and cannot be recovered, and it is yours alone. If it did not open, tap Cancel and download it again.'), _t('intel.yesHave', 'Yes, I have it'));
+      if (yes) {
+        const s = await _api('/intel/reports/' + encodeURIComponent(id) + '/saved', { method: 'POST', body: '{}' });
+        _toast(s.ok ? _t('intel.savedToast', 'Saved. Remiel Sentinel no longer holds any copy of your report.') : _t('intel.gone', 'This report is no longer held here.'));
+      }
+    } catch (e) { _gone(); }
+    finally { _busy = false; render(); }
+  }
+
+  // ── Send to one Circle member: it leaves my Intelligence section ──
+  function pickRecipient(id) {
+    let people = [];
+    try { people = (DEMO_CONTACTS || []).filter(c => typeof Magnet !== 'undefined' && Magnet.isOnRs(c)); } catch (e) {}
+    const name = c => ((c.first || '') + ' ' + (c.last || '')).trim();
+    const ov = _modal('<h3>' + _esc(_t('intel.send', 'Send to someone in your Circle')) + '</h3>' +
+      (people.length ? '<p>' + _esc(_t('intel.pickHelp', 'Tap the person to send your report to. Only people connected with you in The Circle are listed.')) + '</p><div class="intel-pick">' +
+        people.map((c, i) => '<button type="button" class="intel-btn" data-i="' + i + '">' + _esc(name(c)) + '</button>').join('') + '</div>'
+        : '<p>' + _esc(_t('intel.pickNone', 'No one in your Circle has accepted a connection with you yet. Only people connected with you can receive your report. You can still download the PDF and share it yourself.')) + '</p>') +
+      '<div class="intel-actions"><button type="button" class="intel-btn quiet" id="intelNo">' + _esc(_t('busy.cancel', 'Cancel')) + '</button></div>');
+    ov.querySelector('#intelNo').onclick = close;
+    ov.querySelectorAll('.intel-pick [data-i]').forEach(b => {
+      b.onclick = async () => {
+        const c = people[Number(b.dataset.i)];
+        close();
+        const ok = await uiConfirm(_t('intel.sendConfirm', 'Send your report to {name}? It leaves your Intelligence section now and Remiel Sentinel keeps no copy for you. {name} can read it and save it; once they save it, it is destroyed here.', { name: name(c) }), _t('intel.sendBtn', 'Send'));
+        if (!ok) return;
+        const r = await _api('/intel/reports/' + encodeURIComponent(id) + '/send', { method: 'POST', body: JSON.stringify({ to_sentinel_id: String(c.sentinelId || '').trim() }) });
+        if (r.ok) _toast(_t('intel.sentTo', 'Sent to {name}.', { name: name(c) }));
+        else if (r.status === 403) await uiConfirm(_t('intel.notLinked', '{name} has not accepted a connection with you in The Circle yet, so the report was not sent.', { name: name(c) }), 'OK');
+        else _gone();
+        render();
+      };
+    });
+  }
+
+  async function remove(id, isCancel) {
+    const ok = await uiConfirm(isCancel ? _t('intel.cancelConfirm', 'Cancel this request? What you sent is discarded.') : _t('intel.deleteConfirm', 'Delete this report? It is destroyed now and cannot be recovered.'),
+      isCancel ? _t('intel.yesCancel', 'Yes, cancel it') : _t('intel.delete', 'Delete'));
+    if (!ok) return;
+    await _api('/intel/reports/' + encodeURIComponent(id), { method: 'DELETE' });
+    close();
+    render();
+  }
+
+  return { render, openRequest, openReport, downloadPdf, pickRecipient, close };
+})();
+
 // ── Pull integration: hook VoiceCheckin/Intelligence init ────
 (function hookNousPullInit() {
   const _origTogglePull = window.togglePull;
@@ -28781,7 +29323,7 @@ const NousIntelligence = (function () {
       const el = document.getElementById('pull_' + pullId);
       if (el && el.classList.contains('open')) {
         if (pullId === 'voicecheckin') VoiceCheckin.init();
-        if (pullId === 'intelligence') NousIntelligence.init();
+        if (pullId === 'intelligence') { NousIntelligence.init(); IntelReports.render(); }
         if (pullId === 'medication') MedicationTracker.loadMeds();
       }
     };
