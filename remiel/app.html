@@ -4458,14 +4458,17 @@
     object-fit: cover; background: #111; border: 2px solid rgba(255,210,77,0.4);
     z-index: 100002; margin-top: 12px;
   }
-  /* Two people: the screen is split between them, side by side on a wide
-     screen and one above the other on a tall one */
+  /* Two people: the other person gets two thirds of the screen and you get
+     one third, side by side on a wide screen and one above the other on a
+     tall one. Tapping either picture swaps the sizes (.swap). */
   .sentinel-call-overlay.duo .sc-remote-video,
   .sentinel-call-overlay.duo .sc-local-video {
     position: absolute; margin: 0; border: 0; border-radius: 0; object-fit: cover; background: #000;
   }
-  .sentinel-call-overlay.duo .sc-remote-video { left: 0; top: 0; width: 50%; height: 100%; }
-  .sentinel-call-overlay.duo .sc-local-video { left: 50%; right: auto; top: 0; width: 50%; height: 100%; z-index: 100001; box-shadow: -2px 0 0 #05070c; }
+  .sentinel-call-overlay.duo .sc-remote-video { left: 0; top: 0; width: 66.667%; height: 100%; cursor: pointer; }
+  .sentinel-call-overlay.duo .sc-local-video { left: 66.667%; right: auto; top: 0; width: 33.333%; height: 100%; z-index: 100001; box-shadow: -2px 0 0 #05070c; cursor: pointer; }
+  .sentinel-call-overlay.duo.swap .sc-local-video { left: 0; width: 66.667%; box-shadow: 2px 0 0 #05070c; }
+  .sentinel-call-overlay.duo.swap .sc-remote-video { left: 66.667%; width: 33.333%; }
   .sc-duo-label {
     position: absolute; z-index: 100002; top: calc(env(safe-area-inset-top, 0px) + 14px);
     padding: 4px 10px; border-radius: 12px; background: rgba(0,0,0,0.55); color: #fff;
@@ -4474,18 +4477,30 @@
   }
   .sc-duo-label[hidden] { display: none; }
   .sc-duo-remote { left: 14px; }
-  .sc-duo-local { right: 14px; }
-  .sentinel-call-overlay.duo .sc-safety { top: calc(env(safe-area-inset-top, 0px) + 50px); right: calc(50% + 14px); }
+  .sc-duo-local { left: calc(66.667% + 14px); right: auto; max-width: calc(33.333% - 28px); }
+  .sentinel-call-overlay.duo.swap .sc-duo-local { left: 14px; max-width: 40%; }
+  .sentinel-call-overlay.duo.swap .sc-duo-remote { left: calc(66.667% + 14px); max-width: calc(33.333% - 28px); }
+  .sentinel-call-overlay.duo .sc-safety { top: calc(env(safe-area-inset-top, 0px) + 50px); right: calc(33.333% + 14px); }
+  .sc-swap-hint {
+    position: absolute; z-index: 100003; left: 50%; transform: translateX(-50%); bottom: 124px;
+    padding: 6px 14px; border-radius: 14px; background: rgba(0,0,0,0.7); color: #fff;
+    font: 500 13px 'Hanken Grotesk', system-ui, sans-serif; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis;
+    pointer-events: none;
+  }
+  .sc-swap-hint[hidden] { display: none; }
+  .sentinel-call-overlay:not(.duo) .sc-swap-hint { display: none; }
   .sc-media-state {
-    position: absolute; z-index: 100002; left: 0; top: 50%; transform: translateY(-50%); width: 50%;
+    position: absolute; z-index: 100002; left: 0; top: 50%; transform: translateY(-50%); width: 66.667%;
     box-sizing: border-box; padding: 0 20px; text-align: center; color: #fff;
     font: 600 16px/1.45 'Hanken Grotesk', system-ui, sans-serif; text-shadow: 0 1px 3px #000;
   }
   .sentinel-call-overlay:not(.duo) .sc-media-state { width: 100%; }
   .sc-media-state.bad {
     background: rgba(0,0,0,0.7); border: 1px solid #FF1E1E; border-radius: 12px; padding: 14px 18px;
-    left: 4%; width: 42%; text-shadow: none; font-weight: 500;
+    left: 4%; width: 58%; text-shadow: none; font-weight: 500;
   }
+  .sentinel-call-overlay.duo.swap .sc-media-state { left: 66.667%; width: 33.333%; padding: 0 10px; font-size: 14px; }
+  .sentinel-call-overlay.duo.swap .sc-media-state.bad { left: 68%; width: 30%; padding: 10px; }
   .sc-media-state[hidden] { display: none; }
   .sc-media-warn {
     position: absolute; z-index: 100003; left: 50%; transform: translateX(-50%); bottom: 124px;
@@ -4495,13 +4510,19 @@
   }
   .sc-media-warn[hidden] { display: none; }
   @media (orientation: portrait) {
-    .sentinel-call-overlay.duo .sc-remote-video { width: 100%; height: 50%; }
-    .sentinel-call-overlay.duo .sc-local-video { left: 0; top: 50%; width: 100%; height: 50%; box-shadow: 0 -2px 0 #05070c; }
-    .sc-duo-local { left: 14px; right: auto; top: calc(50% + 14px); }
+    .sentinel-call-overlay.duo .sc-remote-video { left: 0; top: 0; width: 100%; height: 66.667%; }
+    .sentinel-call-overlay.duo .sc-local-video { left: 0; top: 66.667%; width: 100%; height: 33.333%; box-shadow: 0 -2px 0 #05070c; }
+    .sentinel-call-overlay.duo.swap .sc-local-video { left: 0; top: 0; width: 100%; height: 66.667%; box-shadow: 0 2px 0 #05070c; }
+    .sentinel-call-overlay.duo.swap .sc-remote-video { left: 0; top: 66.667%; width: 100%; height: 33.333%; }
+    .sc-duo-local, .sentinel-call-overlay.duo.swap .sc-duo-remote { left: 14px; right: auto; top: calc(66.667% + 14px); max-width: 70%; }
+    .sentinel-call-overlay.duo.swap .sc-duo-local { left: 14px; top: calc(env(safe-area-inset-top, 0px) + 14px); max-width: 70%; }
     .sc-duo-label { max-width: 70%; }
     .sentinel-call-overlay.duo .sc-safety { right: 16px; }
-    .sc-media-state { width: 100%; top: 25%; }
+    .sc-media-state { width: 100%; top: 33%; }
     .sc-media-state.bad { left: 6%; width: 88%; }
+    .sentinel-call-overlay.duo.swap .sc-media-state { left: 0; width: 100%; top: 78%; }
+    .sentinel-call-overlay.duo.swap .sc-media-state.bad { left: 6%; width: 88%; top: 72%; }
+    .sc-swap-hint { bottom: auto; top: calc(66.667% - 40px); }
   }
   .sentinel-call-overlay.group .sc-duo-label, .sentinel-call-overlay.group .sc-media-state { display: none; }
   .sc-btn-rec { background: rgba(255,255,255,0.15); color: #fff; }
@@ -4589,6 +4610,10 @@
     text-align: center; padding: 0 10px;
   }
   .sc-tile.live .sc-tile-state { display: none; }
+  /* Tiles sized by _fitGrid so the group fills the screen with no scrolling */
+  .sc-grid.fit { flex: 0 0 auto; }
+  @media (min-width: 700px) { .sc-grid.fit { max-width: calc(100% - 150px); } }
+  .sc-grid.fit .sc-tile { aspect-ratio: auto; height: 100%; }
   /* Narrow screens: a smaller self view, and the tiles start below it so
      none is covered */
   @media (max-width: 699px) {
@@ -7595,6 +7620,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <div class="sc-media-state" id="scMediaState" role="status" aria-live="polite" hidden></div>
   <div class="sc-media-warn" id="scMediaWarn" role="status" hidden></div>
   <div class="sc-rec-badge" id="scRecBadge" role="status" aria-live="polite" hidden></div>
+  <div class="sc-swap-hint" id="scSwapHint" hidden></div>
   <div class="sc-call-timer" id="scCallTimer" hidden>00:00</div>
   <div class="sc-safety" id="scSafety" hidden>
     <span id="scSafetyLabel">Safety words</span>: <span class="sc-safety-words" id="scSafetyWords"></span><button type="button" class="sc-safety-help" id="scSafetyHelp" onclick="SentinelCall.toggleSafetyExplain()" aria-label="What are safety words?">?</button>
@@ -11352,6 +11378,7 @@ const I18n = (function () {
     'media.warnCam': "Your camera is not sending a picture. Check that it is not covered or switched off.",
     'media.warnMic': "Your microphone is sending no sound. Check that it is not muted on your device, or choose another microphone in your system settings.",
     'call.you': "You",
+    'call.swapHint': "Tap either picture to swap sizes",
     'call.incomingFlash': "INCOMING",
     'call.tapSphere': "Tap the sphere to answer",
     'call.tapSphereAria': "Answer the call from {name}",
@@ -12118,6 +12145,7 @@ const I18n = (function () {
     'media.warnCam': "La tua fotocamera non invia immagini. Controlla che non sia coperta o spenta.",
     'media.warnMic': "Il tuo microfono non invia alcun suono. Controlla che non sia disattivato sul dispositivo, oppure scegli un altro microfono nelle impostazioni di sistema.",
     'call.you': "Tu",
+    'call.swapHint': "Tocca un'immagine per scambiare le dimensioni",
     'call.incomingFlash': "IN ARRIVO",
     'call.tapSphere': "Tocca la sfera per rispondere",
     'call.tapSphereAria': "Rispondi alla chiamata di {name}",
@@ -36122,10 +36150,88 @@ const SentinelCall = (function() {
     if (grp) grp.hidden = false;
     const localVid = document.getElementById('scLocalVideo');
     if (localVid && _localStream) { localVid.srcObject = _localStream; localVid.play().catch(() => {}); }
-    if (overlay) { overlay.classList.add('active'); overlay.classList.add('group'); overlay.classList.remove('duo'); }
+    if (overlay) { overlay.classList.add('active'); overlay.classList.add('group'); overlay.classList.remove('duo'); overlay.classList.remove('swap'); }
+    _hideSwapHint();
     rsOverlayFlag('call', true);
+    _wireFit();
     _renderGroupHead();
+    _fitGridSoon();
     _showMediaWarn();
+  }
+
+  /* Two person call: tap either picture to swap which one is large. A short
+     hint says so the first few seconds of each call. */
+  let _swapWired = false, _swapHintTimer = null;
+  function _armSwap() {
+    const overlay = document.getElementById('scOverlay');
+    if (!_swapWired) {
+      _swapWired = true;
+      ['scRemoteVideo', 'scLocalVideo'].forEach(id => {
+        const v = document.getElementById(id);
+        if (v) v.addEventListener('click', () => {
+          if (!overlay || !overlay.classList.contains('duo') || overlay.classList.contains('group')) return;
+          overlay.classList.toggle('swap');
+          _hideSwapHint();
+        });
+      });
+    }
+    const h = document.getElementById('scSwapHint');
+    if (h) {
+      h.textContent = _t('call.swapHint', 'Tap either picture to swap sizes');
+      h.hidden = false;
+      clearTimeout(_swapHintTimer);
+      _swapHintTimer = setTimeout(_hideSwapHint, 6000);
+    }
+  }
+  function _hideSwapHint() {
+    clearTimeout(_swapHintTimer); _swapHintTimer = null;
+    const h = document.getElementById('scSwapHint');
+    if (h) h.hidden = true;
+  }
+  /* Group call: choose the number of columns that gives each tile the most
+     room, then size the rows so every tile shows at once with no scrolling. */
+  let _fitWired = false, _fitRaf = 0;
+  function _fitGridSoon() {
+    if (_fitRaf) return;
+    _fitRaf = requestAnimationFrame(() => { _fitRaf = 0; _fitGrid(); });
+  }
+  function _fitGrid() {
+    const grp = document.getElementById('scGroup');
+    const grid = document.getElementById('scGrid');
+    if (!grp || !grid || grp.hidden) return;
+    const n = grid.querySelectorAll('.sc-tile').length;
+    if (!n) return;
+    const gap = 8;
+    const gs = getComputedStyle(grp);
+    let H = grp.clientHeight - parseFloat(gs.paddingTop) - parseFloat(gs.paddingBottom);
+    Array.from(grp.children).forEach(ch => {
+      if (ch === grid || ch.hidden) return;
+      const cs = getComputedStyle(ch);
+      if (cs.display === 'none' || cs.position === 'absolute' || cs.position === 'fixed') return;
+      H -= ch.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+    });
+    H = Math.max(H, 140);
+    const W = grid.clientWidth;
+    let best = null;
+    for (let cols = 1; cols <= n; cols++) {
+      const rows = Math.ceil(n / cols);
+      const w = (W - gap * (cols - 1)) / cols, h = (H - gap * (rows - 1)) / rows;
+      /* Count only the part of a cell that is not too thin or too flat */
+      const area = Math.min(w, h * 1.8) * Math.min(h, w * 1.6);
+      if (!best || area > best.area) best = { cols, h, area };
+    }
+    grid.style.gridTemplateColumns = 'repeat(' + best.cols + ', minmax(0, 1fr))';
+    grid.style.gridAutoRows = Math.max(100, Math.floor(best.h)) + 'px';
+    grid.classList.add('fit');
+  }
+  function _wireFit() {
+    if (_fitWired) return;
+    _fitWired = true;
+    window.addEventListener('resize', _fitGridSoon);
+    const grp = document.getElementById('scGroup');
+    if (grp && typeof MutationObserver !== 'undefined') {
+      new MutationObserver(_fitGridSoon).observe(grp, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    }
   }
 
   function _tileFor(peerId, name, contactId) {
@@ -36963,6 +37069,7 @@ const SentinelCall = (function() {
     const rn = /^[A-Z0-9]{8}$/.test(_remoteName || '') ? '' : (_remoteName || '');
     if (rl) { rl.textContent = rn; rl.hidden = !rn; }
     if (ll) { ll.textContent = _t('call.you', 'You'); ll.hidden = false; }
+    _armSwap();
     _showMediaWarn();
     _showRecBtn(!_group && typeof MediaRecorder !== 'undefined');
     /* The timer starts when picture and sound actually flow (_watchMedia) */
@@ -37083,7 +37190,9 @@ const SentinelCall = (function() {
     hideTileSafety();
     const gHint = document.getElementById('scGroupSafetyHint');
     if (gHint) gHint.hidden = true;
-    if (overlay) { overlay.classList.remove('group'); overlay.classList.remove('duo'); }
+    if (overlay) { overlay.classList.remove('group'); overlay.classList.remove('duo'); overlay.classList.remove('swap'); }
+    _hideSwapHint();
+    if (grid) { grid.classList.remove('fit'); grid.style.gridTemplateColumns = ''; grid.style.gridAutoRows = ''; }
     _setMediaState(null);
     ['scRemoteLabel', 'scLocalLabel', 'scMediaWarn'].forEach(id => { const e = document.getElementById(id); if (e) e.hidden = true; });
     _remoteName = '';
