@@ -14106,6 +14106,21 @@ const I18n = (function () {
     "location.circleShareTitle": "Condividi la mia posizione con",
     "location.circleShareDesc": "Tutti i collegati nella tua Cerchia. Possono anche chiedere; rispondi Consenti sempre, Consenti per 8 ore, oppure Non ora."
   });
+  /* Installed app: background location and push */
+  Object.assign(_strings.en, {
+    "location.bgTitle": "Remiel Sentinel is sharing your location",
+    "location.bgMessage": "Only with the people you chose. Open Remiel Sentinel, Settings, Location and Places to stop.",
+    "location.bgDenied": "Location is off for Remiel Sentinel. Open your phone Settings, Remiel Sentinel, Location, and choose Always.",
+    "location.bgOn": "Sending your location to the people you chose, also while Remiel Sentinel is closed. Your phone shows a location notice while it runs.",
+    "push.nativeSoon": "Notifications in the installed app are being connected. Until then, calls and alarms ring while Remiel Sentinel is open."
+  });
+  Object.assign(_strings.it, {
+    "location.bgTitle": "Remiel Sentinel sta condividendo la tua posizione",
+    "location.bgMessage": "Solo con le persone che hai scelto. Apri Remiel Sentinel, Impostazioni, Posizione e Luoghi per interrompere.",
+    "location.bgDenied": "La posizione è disattivata per Remiel Sentinel. Apri Impostazioni del telefono, Remiel Sentinel, Posizione, e scegli Sempre.",
+    "location.bgOn": "Invii la tua posizione alle persone che hai scelto, anche quando Remiel Sentinel è chiuso. Il telefono mostra un avviso di posizione mentre è attivo.",
+    "push.nativeSoon": "Le notifiche nell'app installata sono in fase di collegamento. Nel frattempo, chiamate e allarmi suonano mentre Remiel Sentinel è aperto."
+  });
   /* Settings groups (SettingsNav) */
   Object.assign(_strings.en, {
     "setnav.back": "Back to all settings",
@@ -22659,7 +22674,70 @@ const WhereIs = (() => {
     try { await RemielDB.putSetting('locSharePaused', _paused); } catch (e) {}
     _applyAutoShare(!!on);
   }
+  /* ── Installed app (App Store, Google Play): the native location service keeps sending while
+     the app is closed or the phone is locked, for the people the member chose, until they stop ── */
+  const _cap = window.Capacitor;
+  const NATIVE = !!(_cap && typeof _cap.isNativePlatform === 'function' && _cap.isNativePlatform());
+  let _bg = null, _bgWatch = null, _bgStarting = false, _bgLast = 0, _bgLastPos = null;
+  function _bgPlugin() { if (!_bg && NATIVE) { try { _bg = (_cap.Plugins && _cap.Plugins.BackgroundGeolocation) || _cap.registerPlugin('BackgroundGeolocation'); } catch (e) { _bg = null; } } return _bg; }
+  async function _nativeStart() {
+    if (!NATIVE || _bgWatch || _bgStarting) return;
+    const bg = _bgPlugin(); if (!bg) return;
+    _bgStarting = true;
+    /* Android 13 and later: permission for the notice that shows while location runs */
+    try { const LN = (_cap.Plugins && _cap.Plugins.LocalNotifications) || _cap.registerPlugin('LocalNotifications'); if (LN && LN.requestPermissions) await LN.requestPermissions(); } catch (e) {}
+    try {
+      _bgWatch = await bg.addWatcher({
+        backgroundTitle: _t('location.bgTitle', 'Remiel Sentinel is sharing your location'),
+        backgroundMessage: _t('location.bgMessage', 'Only with the people you chose. Open Remiel Sentinel, Settings, Location and Places to stop.'),
+        requestPermissions: true, stale: false, distanceFilter: 25
+      }, (loc, err) => {
+        if (err) {
+          if (err.code === 'NOT_AUTHORIZED') {
+            _openStatus(_t('location.bgDenied', 'Location is off for Remiel Sentinel. Open your phone Settings, Remiel Sentinel, Location, and choose Always.'));
+            try { bg.openSettings(); } catch (x) {}
+          }
+          return;
+        }
+        if (loc) _nativePost(loc);
+      });
+      _openStatus(_t('location.bgOn', 'Sending your location to the people you chose, also while Remiel Sentinel is closed. Your phone shows a location notice while it runs.'));
+    } catch (e) { _bgWatch = null; }
+    _bgStarting = false;
+  }
+  async function _nativeStop() {
+    const bg = _bgPlugin();
+    if (bg && _bgWatch) { try { await bg.removeWatcher({ id: _bgWatch }); } catch (e) {} }
+    _bgWatch = null;
+  }
+  /* Every 30 seconds at most, or sooner after moving 50 m; sent with the native HTTP client so
+     Android does not hold it back while the app is in the background */
+  async function _nativePost(loc) {
+    const pos = { coords: { latitude: _num(loc.latitude), longitude: _num(loc.longitude), accuracy: loc.accuracy == null ? null : _num(loc.accuracy) }, timestamp: _num(loc.time) || Date.now() };
+    const moved = !_bgLastPos || _dist({ lat: _bgLastPos.coords.latitude, lon: _bgLastPos.coords.longitude }, { lat: pos.coords.latitude, lon: pos.coords.longitude }) >= 50;
+    if (!moved && Date.now() - _bgLast < LOC_MS) return;
+    if (!_authed() || !_openOn) return;
+    _bgLast = Date.now(); _bgLastPos = pos; _lastFix = pos;
+    const body = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy, continuous: true };
+    try {
+      const H = _cap.Plugins && _cap.Plugins.CapacitorHttp;
+      const base = SyncEngine.getApiBase ? SyncEngine.getApiBase() : null, tok = SyncEngine.getAccessToken ? SyncEngine.getAccessToken() : null;
+      if (H && base && tok) {
+        const r = await H.post({ url: base + '/location', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, data: body });
+        if (r && r.status >= 200 && r.status < 300) {
+          _lastPost = Date.now(); _lastPosted = pos;
+          const j = r.data && typeof r.data === 'object' ? r.data : null;
+          if (j && Array.isArray(j.arrivals) && j.arrivals.length) _recordMine(j.arrivals);
+          return;
+        }
+      }
+    } catch (e) {}
+    /* An expired sign in, or no native client: the normal path refreshes and sends */
+    _lastPost = 0; _post(pos);
+  }
+
   function _startWatch() {
+    if (NATIVE) { if (_openOn && _authed()) _nativeStart(); return; }
     if (!_openOn || _watchId != null || !_authed()) return;
     if (document.visibilityState !== 'visible') return;
     if (!navigator.geolocation) { _openStatus(_t('location.unsupported', 'Location is not available in this browser.')); return; }
@@ -22674,6 +22752,8 @@ const WhereIs = (() => {
     if (!_tick) _tick = setInterval(() => { if (_lastFix && document.visibilityState === 'visible' && Date.now() - _lastPost >= LOC_MS) _post(_lastFix); }, LOC_MS);
   }
   function _stopWatch(hidden) {
+    /* The installed app keeps sending in the background; it stops only when sharing stops */
+    if (NATIVE) { if (!hidden) _nativeStop(); return; }
     if (_watchId != null) { try { navigator.geolocation.clearWatch(_watchId); } catch (e) {} _watchId = null; }
     if (_tick) { clearInterval(_tick); _tick = null; }
     if (hidden && _openOn) _openStatus(_t('location.paused', 'Paused: nothing is sent while Remiel Sentinel is in the background.'));
@@ -22853,7 +22933,7 @@ const WhereIs = (() => {
            circle, circleFor, stateFor, stateText, ask, shareWith, checkAsks, approxFor, approxText, forgetApprox, renderCircleShare, fillCard,
            updateVisibility, renderPlaces, addPlace, editPlace, closeEditor, savePlace, deletePlace, printQr, setOpenShare, renderCheckin, checkIn, onSettingsOpen,
            sharedLocations, myPlaces, sharedPlaces, nowFor, arrivalsFor, trail, tile, drawTiles, ageText, invalidate,
-           get openShare() { return _openOn; }, get panelOpen() { return !!_panelFor; } };
+           get openShare() { return _openOn; }, get panelOpen() { return !!_panelFor; }, get native() { return NATIVE; } };
 })();
 
 /* ══════════════════════════════════════════════════════════════
@@ -36393,6 +36473,12 @@ const SocialImport = (() => {
     }
     async function checkStatus() {
       try {
+        /* Inside the App Store or Google Play app the browser's push service is not available */
+        if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+          _setStatus(_t('push.nativeSoon', 'Notifications in the installed app are being connected. Until then, calls and alarms ring while Remiel Sentinel is open.'));
+          _updateToggle(false, true);
+          return;
+        }
         if (_iosNotInstalled()) {
           _setStatus(_t('push.iosHome', 'On iPhone, notifications work only in Remiel Sentinel added to your Home Screen. Open beverly-index.com/remiel/app.html in Safari, tap Share (the square with the arrow), then Add to Home Screen. Open Remiel Sentinel from the new icon and turn this switch on there.'));
           _updateToggle(false, true);
