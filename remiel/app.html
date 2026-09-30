@@ -4504,6 +4504,25 @@
     .sc-media-state.bad { left: 6%; width: 88%; }
   }
   .sentinel-call-overlay.group .sc-duo-label, .sentinel-call-overlay.group .sc-media-state { display: none; }
+  .sc-btn-rec { background: rgba(255,255,255,0.15); color: #fff; }
+  .sc-btn-rec[hidden] { display: none; }
+  .sc-rec-dot { width: 20px; height: 20px; border-radius: 50%; border: 3px solid #FF1E1E; box-sizing: border-box; }
+  .sc-btn-rec.on .sc-rec-dot { background: #FF1E1E; border-radius: 4px; width: 18px; height: 18px; }
+  .sentinel-call-overlay.group .sc-btn-rec { display: none; }
+  .sc-rec-badge {
+    position: absolute; z-index: 100003; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 84px);
+    padding: 5px 12px; border-radius: 14px; background: rgba(0,0,0,0.7); border: 1px solid #FF1E1E; color: #fff;
+    font: 600 12px 'Hanken Grotesk', system-ui, sans-serif; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sc-rec-badge::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #FF1E1E; margin-right: 6px; vertical-align: 1px; animation: scRecBlink 1.2s steps(2) infinite; }
+  @keyframes scRecBlink { 50% { opacity: 0.2; } }
+  @media (prefers-reduced-motion: reduce) { .sc-rec-badge::before { animation: none; } }
+  .sentinel-call-overlay.duo .sc-safety { top: calc(env(safe-area-inset-top, 0px) + 50px); }
+  .rec-player-wrap { position: fixed; inset: 0; z-index: 100010; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .rec-player { position: relative; width: min(900px, 100%); background: #10131c; border: 1px solid rgba(56,212,255,.5); border-radius: 16px; padding: 14px; color: #e8ecf4; font: 14px 'Hanken Grotesk', system-ui, sans-serif; }
+  .rec-player video { width: 100%; max-height: 70vh; background: #000; border-radius: 10px; display: block; }
+  .rec-player h3 { margin: 0 34px 10px 2px; font-size: 16px; }
+  .rec-player .rp-x { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: #e8ecf4; font-size: 22px; cursor: pointer; padding: 4px 8px; }
   .sc-status {
     position: relative; z-index: 100001;
     text-align: center; color: #fff; padding: 20px;
@@ -7566,6 +7585,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
   <div class="sc-duo-label sc-duo-local" id="scLocalLabel" hidden></div>
   <div class="sc-media-state" id="scMediaState" role="status" aria-live="polite" hidden></div>
   <div class="sc-media-warn" id="scMediaWarn" role="status" hidden></div>
+  <div class="sc-rec-badge" id="scRecBadge" role="status" aria-live="polite" hidden></div>
   <div class="sc-call-timer" id="scCallTimer" hidden>00:00</div>
   <div class="sc-safety" id="scSafety" hidden>
     <span id="scSafetyLabel">Safety words</span>: <span class="sc-safety-words" id="scSafetyWords"></span><button type="button" class="sc-safety-help" id="scSafetyHelp" onclick="SentinelCall.toggleSafetyExplain()" aria-label="What are safety words?">?</button>
@@ -7597,6 +7617,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
     <button class="sc-btn sc-btn-mute" id="scMuteBtn" onclick="SentinelCall.toggleMute()" title="Mute">🎤</button>
     <button class="sc-btn sc-btn-hangup" id="scHangupBtn" onclick="SentinelCall.hangUp()" title="End Call">📵</button>
     <button class="sc-btn sc-btn-flip" id="scFlipBtn" onclick="SentinelCall.flipCamera()" title="Switch Camera">🔄</button>
+    <button class="sc-btn sc-btn-rec" id="scRecBtn" onclick="SentinelCall.toggleRecord()" title="Record this call" aria-label="Record this call" hidden><span class="sc-rec-dot"></span></button>
   </div>
 </div>
 
@@ -9536,9 +9557,9 @@ const RemielDB = (() => {
   }
 
   /* ── Broadcasts (video/audio recordings) ── */
-  async function saveBroadcast(contactId, blob, duration) {
+  async function saveBroadcast(contactId, blob, duration, meta) {
     await open();
-    const entry = { contactId, blob, duration, timestamp: Date.now(), mimeType: blob.type || 'video/webm' };
+    const entry = Object.assign({ contactId, blob, duration, timestamp: Date.now(), mimeType: blob.type || 'video/webm' }, meta || {});
     var result = await promisify(tx('broadcasts', 'readwrite').add(entry));
     await enqueue('broadcast', 'put', result);
     return result;
@@ -11309,6 +11330,21 @@ const I18n = (function () {
     'media.warnCam': "Your camera is not sending a picture. Check that it is not covered or switched off.",
     'media.warnMic': "Your microphone is sending no sound. Check that it is not muted on your device, or choose another microphone in your system settings.",
     'call.you': "You",
+    'rec.badgeMine': "Recording, kept on this device",
+    'rec.badgeTheirs': "Recording: {name} is keeping a copy",
+    'rec.askText': "{name} wants to record this call. The recording (both of you, picture and sound) is kept on {name}'s device. Tap Allow to agree, or Cancel to say no.",
+    'rec.allow': "Allow",
+    'rec.declined': "{name} said no. Nothing is being recorded.",
+    'rec.stoppedTheirs': "Recording stopped.",
+    'rec.unsupported': "This browser cannot record calls. Use Chrome or Safari.",
+    'rec.noLink': "Could not reach the other device to ask. Try again in a moment.",
+    'rec.asking': "Asking {name} to agree to recording...",
+    'rec.maxed': "Recording stopped at 20 minutes and saved.",
+    'rec.saved': "Recording saved on {name}'s card.",
+    'rec.saveFailed': "The recording could not be saved. The device may be out of space.",
+    'comm.recording': "Recorded call",
+    'comm.recTitle': "Recorded call with {name}",
+    'comm.recMissing': "That recording is no longer on this device.",
     'call.mediaConnecting': "Connecting picture and sound...",
     'call.mediaReconnecting': "Connection is weak. Reconnecting...",
     'call.mediaNoRemoteVideo': "Their camera is not sending a picture. Ask them to check that it is not covered or switched off.",
@@ -12046,6 +12082,21 @@ const I18n = (function () {
     'media.warnCam': "La tua fotocamera non invia immagini. Controlla che non sia coperta o spenta.",
     'media.warnMic': "Il tuo microfono non invia alcun suono. Controlla che non sia disattivato sul dispositivo, oppure scegli un altro microfono nelle impostazioni di sistema.",
     'call.you': "Tu",
+    'rec.badgeMine': "Registrazione in corso, salvata su questo dispositivo",
+    'rec.badgeTheirs': "Registrazione in corso: {name} ne conserva una copia",
+    'rec.askText': "{name} vuole registrare questa chiamata. La registrazione (entrambi, immagini e audio) resta sul dispositivo di {name}. Tocca Consenti per accettare, oppure Annulla per rifiutare.",
+    'rec.allow': "Consenti",
+    'rec.declined': "{name} ha detto di no. Non si registra nulla.",
+    'rec.stoppedTheirs': "Registrazione interrotta.",
+    'rec.unsupported': "Questo browser non può registrare le chiamate. Usa Chrome o Safari.",
+    'rec.noLink': "Impossibile raggiungere l'altro dispositivo per chiedere. Riprova tra un momento.",
+    'rec.asking': "Chiedo a {name} il consenso alla registrazione...",
+    'rec.maxed': "Registrazione interrotta a 20 minuti e salvata.",
+    'rec.saved': "Registrazione salvata nella scheda di {name}.",
+    'rec.saveFailed': "Impossibile salvare la registrazione. Il dispositivo potrebbe essere pieno.",
+    'comm.recording': "Chiamata registrata",
+    'comm.recTitle': "Chiamata registrata con {name}",
+    'comm.recMissing': "Questa registrazione non è più su questo dispositivo.",
     'call.mediaConnecting': "Collegamento di immagini e audio...",
     'call.mediaReconnecting': "Connessione debole. Nuovo collegamento...",
     'call.mediaNoRemoteVideo': "La sua fotocamera non invia immagini. Chiedigli di controllare che non sia coperta o spenta.",
@@ -19859,6 +19910,14 @@ const Comm = (() => {
         items.push({ ts: ts, channel: channel, kind: 'call', text: text, url: null, thumb: null, dir: r.type === 'voice_checkin' ? 'in' : 'out' });
       });
     } catch (e) {}
+    /* 4b. Recorded calls, kept on this device */
+    try {
+      const recs = await RemielDB.getBroadcastsByContact(contactId);
+      (Array.isArray(recs) ? recs : []).forEach(b => {
+        if (!b || b.kind !== 'call' || !b.blob) return;
+        items.push({ ts: _num(b.timestamp), channel: 'video call', kind: 'recording', text: _t('comm.recording', 'Recorded call') + _minutesSuffix(_num(b.duration) * 1000), url: null, thumb: null, dir: 'out', recId: b.id });
+      });
+    } catch (e) {}
     /* 5. Arrivals at Places: this member at my Places, and my own at theirs */
     try {
       if (typeof WhereIs !== 'undefined') {
@@ -19932,10 +19991,30 @@ const Comm = (() => {
     if (!open) { try { enterDetail(c, Math.round(window.innerHeight * 0.18)); } catch (e) { return false; } }
     return true;
   }
+  /* A recorded call, played in a simple player over everything */
+  async function playRecording(recId, c) {
+    let rec = null;
+    try { const all = await RemielDB.getBroadcastsByContact(c ? c.id : 'unknown'); rec = (all || []).find(b => b.id === recId) || null; } catch (e) {}
+    if (!rec || !rec.blob) { showToast(_t('comm.recMissing', 'That recording is no longer on this device.')); return; }
+    const old = document.getElementById('recPlayerWrap'); if (old) old.remove();
+    const url = URL.createObjectURL(rec.blob);
+    const wrap = document.createElement('div'); wrap.id = 'recPlayerWrap'; wrap.className = 'rec-player-wrap';
+    const box = document.createElement('div'); box.className = 'rec-player'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    const h = document.createElement('h3');
+    h.textContent = _t('comm.recTitle', 'Recorded call with {name}', { name: (c && ((c.first || '') + ' ' + (c.last || '')).trim()) || rec.withName || _t('msg.contact', 'Contact') }) + ', ' + lonelyTime(rec.timestamp);
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'rp-x'; x.textContent = '×'; x.setAttribute('aria-label', _t('alarm.close', 'Hide'));
+    const v = document.createElement('video'); v.controls = true; v.playsInline = true; v.src = url;
+    const close = () => { try { v.pause(); } catch (e) {} URL.revokeObjectURL(url); wrap.remove(); try { rsOverlayFlag('recplayer', false); } catch (e) {} };
+    x.onclick = close; wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+    box.appendChild(x); box.appendChild(h); box.appendChild(v); wrap.appendChild(box); document.body.appendChild(wrap);
+    try { rsOverlayFlag('recplayer', true); } catch (e) {}
+    v.play().catch(() => {});
+  }
   function openItem(it, c) {
     if (!it) return;
     if (it.kind === 'arrival') { try { WhereIs.openPanel(c ? c.id : null); } catch (e) {} return; }
     if (it.kind === 'post') { if (it.url) { try { window.open(it.url, '_blank', 'noopener,noreferrer'); } catch (e) {} } return; }
+    if (it.kind === 'recording') { playRecording(it.recId, c); return; }
     if (!_openCardFor(c)) return;
     if (it.kind === 'message') { setTimeout(() => { try { SentinelMessaging.openFor(c.id); } catch (e) {} }, 60); return; }
     if (it.kind === 'note') {
@@ -20184,7 +20263,7 @@ const Comm = (() => {
 
   return { itemsFor: itemsFor, lonelyTime: lonelyTime, renderDream: renderDream, renderCard: renderCard, logCall: logCall, refresh: refresh,
            frame: frame, cardHtml: cardHtml, warm: warm, openRow: openRow, openItem: openItem, select: select, channelLabel: channelLabel, glyph: glyph,
-           activate: activate, deactivate: deactivate, dreamSlide: dreamSlide, image: image, clock: ts => _clock(new Date(_num(ts) || Date.now())), get isActive() { return _active; } };
+           activate: activate, deactivate: deactivate, dreamSlide: dreamSlide, playRecording: playRecording, image: image, clock: ts => _clock(new Date(_num(ts) || Date.now())), get isActive() { return _active; } };
 })();
 
 /* Compact QR encoder: byte mode, error correction level M, versions 1 to 10.
@@ -35253,7 +35332,7 @@ const SentinelCall = (function() {
       _showIncoming(call);
     });
 
-    _peer.on('connection', (conn) => { _onGroupConnection(conn); });
+    _peer.on('connection', (conn) => { if (conn.metadata && conn.metadata.kind === 'callctl') { _onCtlConn(conn); return; } _onGroupConnection(conn); });
 
     _peer.on('disconnected', () => {
       console.log('SentinelCall: disconnected, reconnecting...');
@@ -35765,6 +35844,11 @@ const SentinelCall = (function() {
 
   /* ── Release camera, mic, timers and ringtone: used by every exit path ── */
   function _cleanupMedia() {
+    if (_rec) _stopRec(true);
+    _recRemote = false; _recAsking = false;
+    try { if (_ctl) _ctl.close(); } catch (e) {}
+    _ctl = null;
+    _showRecBtn(false); _recBadge();
     _stopRingtone();
     _stopLocalStream();
     if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
@@ -36537,6 +36621,154 @@ const SentinelCall = (function() {
   }
 
   /* ── Mute toggle ── */
+  /* ── Record this call, only with both people's agreement ──
+     The person who taps Record asks; the other person sees who is asking and
+     where the recording will be kept, and taps Allow or Cancel. Recording
+     starts only after Allow: both screens show a red REC badge, and either
+     person can stop it. The recording (both pictures side by side, both
+     voices) is saved on the asking person's device as a Video Note on the
+     other person's card, and listed in their Communication. The requests
+     travel on a small data connection between the two devices. */
+  const REC_MAX_MS = 20 * 60 * 1000;
+  let _ctl = null;          /* data connection for this call */
+  let _rec = null;          /* { mr, chunks, started, canvas, raf, ac, timer } while recording here */
+  let _recRemote = false;   /* the other person is recording */
+  let _recAsking = false;
+  function _localPeerObj() { return _guestPeer || _peer; }
+  function _ctlSend(msg) { try { if (_ctl && _ctl.open) { _ctl.send(msg); return true; } } catch (e) {} return false; }
+  function _onCtlConn(conn) {
+    const bind = () => {
+      conn.on('data', (d) => _onCtl(d, conn));
+      conn.on('close', () => { if (_ctl === conn) _ctl = null; });
+      conn.on('error', () => {});
+    };
+    _ctl = conn; bind();
+  }
+  function _ensureCtl() {
+    return new Promise((resolve) => {
+      if (_ctl && _ctl.open) { resolve(true); return; }
+      const p = _localPeerObj();
+      if (!p || !_currentCall) { resolve(false); return; }
+      let c = null;
+      try { c = p.connect(_currentCall.peer, { metadata: { kind: 'callctl' } }); } catch (e) { c = null; }
+      if (!c) { resolve(false); return; }
+      _ctl = c;
+      c.on('data', (d) => _onCtl(d, c));
+      c.on('close', () => { if (_ctl === c) _ctl = null; });
+      c.on('error', () => resolve(false));
+      const t = setTimeout(() => resolve(!!c.open), 6000);
+      c.on('open', () => { clearTimeout(t); resolve(true); });
+    });
+  }
+  function _recBadge() {
+    const b = document.getElementById('scRecBadge');
+    const btn = document.getElementById('scRecBtn');
+    if (btn) btn.classList.toggle('on', !!_rec);
+    if (!b) return;
+    if (_rec) { b.textContent = _tp('rec.badgeMine', 'Recording, kept on this device', {}); b.hidden = false; }
+    else if (_recRemote) { b.textContent = _tp('rec.badgeTheirs', 'Recording: {name} is keeping a copy', { name: _remoteName || _t('group.member', 'Member') }); b.hidden = false; }
+    else { b.hidden = true; b.textContent = ''; }
+  }
+  function _showRecBtn(on) { const b = document.getElementById('scRecBtn'); if (b) b.hidden = !on; }
+  async function _onCtl(d, conn) {
+    if (!d || typeof d !== 'object') return;
+    if (d.t === 'rec-ask') {
+      const who = String(d.name || _remoteName || _t('group.member', 'Member')).slice(0, 60);
+      let yes = false;
+      try {
+        const p = uiConfirm(_tp('rec.askText', '{name} wants to record this call. The recording (both of you, picture and sound) is kept on {name}\'s device. Tap Allow to agree, or Cancel to say no.', { name: who }), _t('rec.allow', 'Allow'));
+        yes = await p;
+      } catch (e) { yes = false; }
+      if (!_currentCall) return;
+      try { conn.send({ t: yes ? 'rec-yes' : 'rec-no' }); } catch (e) {}
+      if (yes) { _recRemote = true; _recBadge(); }
+      return;
+    }
+    if (d.t === 'rec-yes') { _recAsking = false; _startRec(); return; }
+    if (d.t === 'rec-no') { _recAsking = false; showToast(_tp('rec.declined', '{name} said no. Nothing is being recorded.', { name: _remoteName || _t('group.member', 'Member') })); return; }
+    if (d.t === 'rec-stop') { if (_rec) _stopRec(true); _recRemote = false; _recBadge(); return; }
+    if (d.t === 'rec-ended') { _recRemote = false; _recBadge(); return; }
+  }
+  async function toggleRecord() {
+    if (_rec) { _stopRec(true); _ctlSend({ t: 'rec-ended' }); return; }
+    if (_recRemote) { _ctlSend({ t: 'rec-stop' }); _recRemote = false; _recBadge(); showToast(_t('rec.stoppedTheirs', 'Recording stopped.')); return; }
+    if (!_currentCall || _group || _recAsking) return;
+    if (typeof MediaRecorder === 'undefined') { showToast(_t('rec.unsupported', 'This browser cannot record calls. Use Chrome or Safari.')); return; }
+    _recAsking = true;
+    if (!(await _ensureCtl())) { _recAsking = false; showToast(_t('rec.noLink', 'Could not reach the other device to ask. Try again in a moment.')); return; }
+    const myName = await _getMyName();
+    _ctlSend({ t: 'rec-ask', name: myName });
+    showToast(_tp('rec.asking', 'Asking {name} to agree to recording...', { name: _remoteName || _t('group.member', 'Member') }));
+    setTimeout(() => { _recAsking = false; }, 30000);
+  }
+  function _pickMime() {
+    const list = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1,mp4a', 'video/mp4'];
+    for (const m of list) { try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} }
+    return '';
+  }
+  function _startRec() {
+    if (_rec || !_currentCall) return;
+    const rv = document.getElementById('scRemoteVideo'), lv = document.getElementById('scLocalVideo');
+    const remote = rv && rv.srcObject;
+    if (!remote) return;
+    const W = 960, H = 360;
+    const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+    const g = canvas.getContext('2d');
+    const drawCover = (v, x) => {
+      if (!v || !v.videoWidth) { g.fillStyle = '#000'; g.fillRect(x, 0, W / 2, H); return; }
+      const sw = v.videoWidth, sh = v.videoHeight, tr = (W / 2) / H, sr = sw / sh;
+      let cw = sw, ch = sh, cx = 0, cy = 0;
+      if (sr > tr) { cw = sh * tr; cx = (sw - cw) / 2; } else { ch = sw / tr; cy = (sh - ch) / 2; }
+      g.drawImage(v, cx, cy, cw, ch, x, 0, W / 2, H);
+    };
+    let raf = 0;
+    const loop = () => { drawCover(rv, 0); drawCover(lv, W / 2); raf = requestAnimationFrame(loop); };
+    loop();
+    const out = canvas.captureStream(15);
+    let ac = null;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ac = new AC();
+      const dest = ac.createMediaStreamDestination();
+      [remote, _localStream].forEach(st => { if (st && st.getAudioTracks().length) ac.createMediaStreamSource(new MediaStream(st.getAudioTracks())).connect(dest); });
+      dest.stream.getAudioTracks().forEach(t => out.addTrack(t));
+      if (ac.state === 'suspended') ac.resume().catch(() => {});
+    } catch (e) { ac = null; }
+    let mr;
+    const mime = _pickMime();
+    try { mr = mime ? new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 900000 }) : new MediaRecorder(out); }
+    catch (e) { cancelAnimationFrame(raf); if (ac) try { ac.close(); } catch (e2) {} showToast(_t('rec.unsupported', 'This browser cannot record calls. Use Chrome or Safari.')); return; }
+    const chunks = [];
+    mr.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    _rec = { mr: mr, chunks: chunks, started: Date.now(), raf: raf, ac: ac, cid: _callContactId, name: _remoteName, mime: mr.mimeType || mime || 'video/webm' };
+    _rec.timer = setTimeout(() => { if (_rec) { _stopRec(true); _ctlSend({ t: 'rec-ended' }); showToast(_t('rec.maxed', 'Recording stopped at 20 minutes and saved.')); } }, REC_MAX_MS);
+    mr.start(1000);
+    _recBadge();
+  }
+  /* Stops and saves. Called by the Stop tap, the other person's stop, and hang up. */
+  function _stopRec(save) {
+    const r = _rec; if (!r) return Promise.resolve();
+    _rec = null; _recBadge();
+    clearTimeout(r.timer);
+    return new Promise((resolve) => {
+      r.mr.onstop = async () => {
+        try { cancelAnimationFrame(r.raf); } catch (e) {}
+        try { if (r.ac) r.ac.close(); } catch (e) {}
+        if (save && r.chunks.length) {
+          const blob = new Blob(r.chunks, { type: (r.mime || 'video/webm').split(';')[0] });
+          const secs = Math.round((Date.now() - r.started) / 1000);
+          try {
+            await RemielDB.saveBroadcast(r.cid == null ? 'unknown' : r.cid, blob, secs, { kind: 'call', withName: r.name || '' });
+            try { Comm.refresh(); } catch (e) {}
+            showToast(_tp('rec.saved', 'Recording saved on {name}\'s card.', { name: r.name || _t('group.member', 'Member') }));
+          } catch (e) { showToast(_t('rec.saveFailed', 'The recording could not be saved. The device may be out of space.')); }
+        }
+        resolve();
+      };
+      try { r.mr.stop(); } catch (e) { resolve(); }
+    });
+  }
+
   function toggleMute() {
     if (!_localStream) return;
     _audioMuted = !_audioMuted;
@@ -36689,6 +36921,7 @@ const SentinelCall = (function() {
     if (rl) { rl.textContent = rn; rl.hidden = !rn; }
     if (ll) { ll.textContent = _t('call.you', 'You'); ll.hidden = false; }
     _showMediaWarn();
+    _showRecBtn(!_group && typeof MediaRecorder !== 'undefined');
     /* The timer starts when picture and sound actually flow (_watchMedia) */
     if (!_callStartTime) _setMediaState('connecting');
   }
@@ -36996,6 +37229,7 @@ const SentinelCall = (function() {
       return;
     }
     _guestPeer = guestPeer;
+    guestPeer.on('connection', (conn) => { if (conn.metadata && conn.metadata.kind === 'callctl') _onCtlConn(conn); else { try { conn.close(); } catch (e) {} } });
     /* Leaving (hang up, no answer, error) releases the camera and returns
        the guest to the join screen. */
     const destroyGuest = () => {
@@ -37152,7 +37386,7 @@ const SentinelCall = (function() {
   return {
     init, callContact, callFocused, ensurePeer: _ensurePeer, warm,
     acceptIncoming, rejectIncoming, hangUp, endCall,
-    toggleMute, flipCamera,
+    toggleMute, flipCamera, toggleRecord,
     getMyId, isInCall,
     copyMyId, shareCallLink, regenerateId, updateSettingsDisplay,
     checkCallInvite, guestJoinCall, waitForGuest,
