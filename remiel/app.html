@@ -3158,7 +3158,7 @@
   .intel-btn.quiet { border-color: rgba(255,255,255,0.2); background: transparent; color: var(--text-dim, #8b94a8); }
   .intel-btn:disabled { opacity: 0.45; cursor: default; }
   .intel-rep-earlier { font: 12px/1.5 'Hanken Grotesk', sans-serif; color: var(--text-dim, #8b94a8); margin: 2px 0 0; padding-left: 16px; }
-  .intel-modal { position: fixed; inset: 0; z-index: 100001; background: rgba(2,6,23,0.8); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .intel-modal { position: fixed; inset: 0; z-index: 99990; /* below any call screen */ background: rgba(2,6,23,0.8); display: flex; align-items: center; justify-content: center; padding: 16px; }
   .intel-box { width: min(620px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; -webkit-overflow-scrolling: touch;
     background: #10131c; border: 1px solid rgba(56,212,255,0.45); border-radius: 16px; padding: 18px 18px 14px; color: #e8ecf4;
     font: 14px/1.55 'Hanken Grotesk', system-ui, sans-serif; box-sizing: border-box; }
@@ -3178,6 +3178,17 @@
   .intel-rec { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 12px; }
   .intel-pick { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
   .intel-pick button { text-align: left; }
+  .reach-in { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; min-height: 44px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25);
+    background: #0a0d14; color: #e8ecf4; padding: 8px 12px; font: 16px 'Hanken Grotesk', system-ui, sans-serif; }
+  .reach-row { display: flex; gap: 8px; align-items: stretch; margin: 6px 0; }
+  .reach-row[hidden] { display: none; }
+  .reach-ok { color: #5fbf7a; font-weight: 600; }
+  .reach-msg { min-height: 1em; font-size: 13px; }
+  .ios-hint { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); z-index: 100004;
+    display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: rgba(10,14,24,0.96);
+    border: 1px solid rgba(56,189,248,0.6); color: #e8ecf4; font: 14px/1.45 'Hanken Grotesk', system-ui, sans-serif; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+  .ios-hint p { margin: 0; flex: 1; }
+  .ios-hint button { min-height: 40px; padding: 8px 16px; border-radius: 10px; border: 0; background: #38bdf8; color: #05070c; font-weight: 700; cursor: pointer; }
 
   /* --- NOUS Intelligence Pull --- */
   .nous-intel-container {
@@ -6440,7 +6451,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
           <div id="acctEmail" style="font-size:11px;color:var(--text-dim);margin-bottom:8px;"></div>
           <div style="display:flex;gap:8px;">
             <button class="settings-action-btn secondary" onclick="AccountPanel.show('edit')" style="flex:1;" data-i18n="acct.editBtn">Edit name and handle</button>
-            <button class="settings-action-btn" id="acctUseOtherBtn" onclick="AccountPanel.show('claim')" style="flex:1;" data-i18n="acct.useOther">Use on another device</button>
+            <button class="settings-action-btn" id="acctUseOtherBtn" onclick="Reach.open()" style="flex:1;" data-i18n="acct.useOther">Use on another device</button>
           </div>
           <div class="settings-status" id="acctMainStatus"></div>
           <div id="acctMagnet" class="acct-magnet">
@@ -6454,6 +6465,7 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
               <button class="settings-action-btn secondary" onclick="Magnet.savePhone()" data-i18n="magnet.phoneSave">Save number</button>
             </div>
             <div class="settings-status" id="acctMagnetStatus"></div>
+            <button class="settings-action-btn" type="button" onclick="Reach.open()" style="width:100%;margin-top:8px;" data-i18n="reach.open">Be reachable: number and email</button>
           </div>
         </div>
         <div id="acctEditForm" style="display:none;">
@@ -8914,10 +8926,23 @@ let appRevealed = false;
       (document.body || document.documentElement).appendChild(el);
     } catch (e) {}
   }
+  /* Where it came from: file, line, column and the first frames of the
+     stack, so a screenshot of the box is enough to find it. */
+  function where(e) {
+    var f = '';
+    try { f = String((e && e.filename) || '').split('/').pop().split('?')[0]; } catch (x) {}
+    var at = (f || 'page') + (e && e.lineno ? ':' + e.lineno : '') + (e && e.colno ? ':' + e.colno : '');
+    var st = '';
+    try {
+      var lines = String((e && e.error && e.error.stack) || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      st = lines.slice(0, 4).map(function (l) { return l.replace(/https?:\/\/[^\s)]*\//g, '').slice(0, 90); }).join(' | ');
+    } catch (x) {}
+    return ' [' + at + ']' + (st ? ' ' + st : '');
+  }
   window.addEventListener('error', function (e) {
     var m = (e && e.message) || 'unknown error';
     if (/ResizeObserver|Script error\.?$/.test(m)) return; /* browser noise */
-    banner(m + (e && e.lineno ? ' (line ' + e.lineno + ')' : ''));
+    banner(m + where(e));
   });
   window.addEventListener('unhandledrejection', function (e) {
     var r = e && e.reason; var m = (r && (r.message || String(r))) || 'unknown';
@@ -11472,6 +11497,35 @@ const I18n = (function () {
     'intel.cancelConfirm': "Cancel this request? What you sent is discarded.",
     'intel.deleteConfirm': "Delete this report? It is destroyed now and cannot be recovered.",
     'intel.yesCancel': "Yes, cancel it",
+    'reach.open': "Be reachable: number and email",
+    'reach.title': "Be reachable in one tap",
+    'reach.intro': "People who have your mobile number can video call you in one tap: no codes, no emails. Your email keeps you the same person on every phone and browser.",
+    'reach.phoneLabel': "Your mobile number",
+    'reach.phoneHint': "Include the country code, for example +1 310 555 0142 or +39 333 123 4567.",
+    'reach.emailLabel': "Your email",
+    'reach.emailHint': "We email you a 6 digit code to confirm it. On a new phone or browser, the same kind of code signs you back in.",
+    'reach.sendCode': "Send code",
+    'reach.codeLabel': "Code from the email",
+    'reach.confirm': "Confirm",
+    'reach.confirmed': "Confirmed: {email}",
+    'reach.codeSent': "Code sent to {email}. It arrives within a minute; check the spam folder too.",
+    'reach.codeSentIf': "If {email} has a Remiel Sentinel account, a code is on its way. It arrives within a minute; check the spam folder too.",
+    'reach.codeSix': "The code has 6 digits.",
+    'reach.badEmail': "Check the email address.",
+    'reach.later': "Later",
+    'reach.done': "Done",
+    'reach.saved': "Saved. People who have your number can now call you in one tap.",
+    'reach.emailTaken': "{email} already has a Remiel Sentinel account. If it is yours, tap Sign in with this email to use it here: same Sentinel ID, same circle.",
+    'reach.signInThis': "Sign in with this email",
+    'reach.signinTitle': "Sign in with your email",
+    'reach.signinIntro': "Type the email on your Remiel Sentinel account. We email you a 6 digit code; typing it here brings back your circle and your Sentinel ID.",
+    'reach.signIn': "Sign in",
+    'reach.signedIn': "Signed in. Your circle is loading.",
+    'reach.noEmail': "Email is not set up on the server yet.",
+    'reach.failed': "That did not work. Check your connection and try again.",
+    'ios.inApp': "You opened Remiel Sentinel inside another app. Calls, notifications and your saved circle need Safari: tap the ... or Share button at the top or bottom, choose Open in Safari. Then in Safari tap Share, then Add to Home Screen, and open Remiel Sentinel from the new icon.",
+    'ios.safari': "To get calls and notifications on iPhone: tap Share (the square with the arrow) at the bottom of Safari, then Add to Home Screen. Open Remiel Sentinel from the new icon from now on.",
+    'push.iosHome': "On iPhone, notifications work only in Remiel Sentinel added to your Home Screen. Open beverly-index.com/remiel/app.html in Safari, tap Share (the square with the arrow), then Add to Home Screen. Open Remiel Sentinel from the new icon and turn this switch on there.",
     'intel.fromNone': "Reports that {name} chooses to send you appear here.",
     'intel.prevContact': "Reports sent to you",
     'intel.prevOwn': "Your NOUS Report",
@@ -12302,6 +12356,35 @@ const I18n = (function () {
     'intel.cancelConfirm': "Annullare questa richiesta? Ciò che hai inviato viene scartato.",
     'intel.deleteConfirm': "Eliminare questo referto? Viene distrutto subito e non può essere recuperato.",
     'intel.yesCancel': "Sì, annulla",
+    'reach.open': "Raggiungibile: numero ed email",
+    'reach.title': "Raggiungibile con un tocco",
+    'reach.intro': "Chi ha il tuo numero di cellulare può videochiamarti con un tocco: niente codici, niente email. La tua email ti mantiene la stessa persona su ogni telefono e browser.",
+    'reach.phoneLabel': "Il tuo numero di cellulare",
+    'reach.phoneHint': "Includi il prefisso del paese, per esempio +39 333 123 4567 o +1 310 555 0142.",
+    'reach.emailLabel': "La tua email",
+    'reach.emailHint': "Ti inviamo per email un codice di 6 cifre per confermarla. Su un nuovo telefono o browser, lo stesso tipo di codice ti fa rientrare.",
+    'reach.sendCode': "Invia codice",
+    'reach.codeLabel': "Codice dall'email",
+    'reach.confirm': "Conferma",
+    'reach.confirmed': "Confermata: {email}",
+    'reach.codeSent': "Codice inviato a {email}. Arriva entro un minuto; controlla anche la cartella spam.",
+    'reach.codeSentIf': "Se {email} ha un account Remiel Sentinel, il codice è in arrivo. Arriva entro un minuto; controlla anche la cartella spam.",
+    'reach.codeSix': "Il codice ha 6 cifre.",
+    'reach.badEmail': "Controlla l'indirizzo email.",
+    'reach.later': "Più tardi",
+    'reach.done': "Fatto",
+    'reach.saved': "Salvato. Chi ha il tuo numero ora può chiamarti con un tocco.",
+    'reach.emailTaken': "{email} ha già un account Remiel Sentinel. Se è tuo, tocca Accedi con questa email per usarlo qui: stesso Sentinel ID, stessa cerchia.",
+    'reach.signInThis': "Accedi con questa email",
+    'reach.signinTitle': "Accedi con la tua email",
+    'reach.signinIntro': "Scrivi l'email del tuo account Remiel Sentinel. Ti inviamo un codice di 6 cifre; scriverlo qui riporta la tua cerchia e il tuo Sentinel ID.",
+    'reach.signIn': "Accedi",
+    'reach.signedIn': "Accesso effettuato. La tua cerchia si sta caricando.",
+    'reach.noEmail': "L'email non è ancora configurata sul server.",
+    'reach.failed': "Non ha funzionato. Controlla la connessione e riprova.",
+    'ios.inApp': "Hai aperto Remiel Sentinel dentro un'altra app. Chiamate, notifiche e la tua cerchia salvata richiedono Safari: tocca il pulsante ... o Condividi in alto o in basso e scegli Apri in Safari. Poi in Safari tocca Condividi, poi Aggiungi alla schermata Home, e apri Remiel Sentinel dalla nuova icona.",
+    'ios.safari': "Per ricevere chiamate e notifiche su iPhone: tocca Condividi (il quadrato con la freccia) in basso in Safari, poi Aggiungi alla schermata Home. Da ora apri Remiel Sentinel dalla nuova icona.",
+    'push.iosHome': "Su iPhone le notifiche funzionano solo in Remiel Sentinel aggiunto alla schermata Home. Apri beverly-index.com/remiel/app.html in Safari, tocca Condividi (il quadrato con la freccia), poi Aggiungi alla schermata Home. Apri Remiel Sentinel dalla nuova icona e attiva lì questo interruttore.",
     'intel.fromNone': "Qui compaiono i referti che {name} sceglie di inviarti.",
     'intel.prevContact': "Referti inviati a te",
     'intel.prevOwn': "Il tuo Referto NOUS",
@@ -13983,6 +14066,21 @@ function _obSyncUid() {
   try { return (typeof SyncEngine !== 'undefined' && typeof SyncEngine.getUserId === 'function') ? (SyncEngine.getUserId() || null) : null; } catch (e) { return null; }
 }
 function obSignInExisting() {
+  /* Email code: the same identity, circle and Sentinel ID on this device */
+  if (typeof Reach !== 'undefined' && Reach.signIn) {
+    var ob0 = document.getElementById('onboarding');
+    _obSignIn.armed = true;
+    _obSignIn.done = false;
+    _obSignIn.uid = _obSyncUid();
+    if (ob0) ob0.hidden = true;
+    Reach.signIn('', function (ok) {
+      if (ok || _obSignIn.done) return;
+      _obSignIn.armed = false;
+      var stage = document.getElementById('stage');
+      if (ob0 && (!stage || stage.style.display === 'none')) ob0.hidden = false;
+    });
+    return;
+  }
   var ob = document.getElementById('onboarding');
   var panel = document.getElementById('settingsPanel');
   if (typeof SettingsPanel === 'undefined' || !panel) return;
@@ -25163,7 +25261,7 @@ async function startVideoWith(c) {
   if (typeof Magnet !== 'undefined' && Magnet && Magnet.canFind(c)) {
     try { await Magnet.matchOne(c); } catch (e) {}
     if (_rsHasSid(c)) {
-      if (Magnet.needsLink(c)) Magnet.requestLink(c).catch(function () {});
+      /* No separate request to accept: answering the call connects the two */
       SentinelCall.callContact(c);
       return;
     }
@@ -29310,6 +29408,215 @@ const IntelReports = (function () {
   return { render, openRequest, openReport, downloadPdf, pickRecipient, close };
 })();
 
+
+// ── Reach: be reachable in one tap, and the same person on every device ──
+// Your mobile number lets anyone who has it call you in one tap. Your email,
+// confirmed with a 6 digit code, signs you back in on a new phone or browser
+// with the same Sentinel ID and circle.
+const Reach = (function () {
+  'use strict';
+  function _esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+  function _authed() { try { return SyncEngine.isAuthenticated() && !(SyncEngine.isLocalOnly && SyncEngine.isLocalOnly()); } catch (e) { return false; } }
+  function _st() { try { return SyncEngine.getStatus() || {}; } catch (e) { return {}; } }
+  function _realEmail(e) { return e && !/@remiel\.local$/i.test(e) ? e : ''; }
+  function _validEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim()); }
+  function _digits(p) { let d = String(p || '').replace(/\D+/g, ''); if (d.indexOf('00') === 0) d = d.slice(2); return d; }
+
+  function _modal(html) {
+    close();
+    const ov = document.createElement('div');
+    ov.className = 'intel-modal reach-modal';
+    ov.id = 'reachModal';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('data-adv-scope', '');
+    ov.innerHTML = '<div class="intel-box">' + html + '</div>';
+    document.body.appendChild(ov);
+    return ov;
+  }
+  let _onClose = null;
+  function close(ok) {
+    const m = document.getElementById('reachModal');
+    if (m) m.remove();
+    const cb = _onClose; _onClose = null;
+    if (cb) { try { cb(!!ok); } catch (e) {} }
+  }
+  function _msg(ov, text, bad) { const el = ov.querySelector('.reach-msg'); if (el) { el.textContent = text || ''; el.style.color = bad ? '#f87171' : '#9aa4b8'; } }
+
+  /* ── Number and email ── */
+  async function open() {
+    if (!_authed()) { signIn(''); return; }
+    let phone = '';
+    try { phone = (await RemielDB.getSetting('userPhone')) || ''; } catch (e) {}
+    const st = _st();
+    const email = st.claimed ? _realEmail(st.email) : '';
+    const ov = _modal('<h3>' + _esc(_t('reach.title', 'Be reachable in one tap')) + '</h3>' +
+      '<p>' + _esc(_t('reach.intro', 'People who have your mobile number can video call you in one tap: no codes, no emails. Your email keeps you the same person on every phone and browser.')) + '</p>' +
+      '<h4>' + _esc(_t('reach.phoneLabel', 'Your mobile number')) + '</h4>' +
+      '<input class="reach-in" id="reachPhone" type="tel" autocomplete="tel" maxlength="24" value="' + _esc(phone) + '">' +
+      '<div class="intel-count">' + _esc(_t('reach.phoneHint', 'Include the country code, for example +1 310 555 0142 or +39 333 123 4567.')) + '</div>' +
+      '<h4>' + _esc(_t('reach.emailLabel', 'Your email')) + '</h4>' +
+      (email ? '<p class="reach-ok">' + _esc(_t('reach.confirmed', 'Confirmed: {email}', { email })) + '</p>'
+        : '<div class="reach-row"><input class="reach-in" id="reachEmail" type="email" autocomplete="email"><button type="button" class="intel-btn" id="reachSend">' + _esc(_t('reach.sendCode', 'Send code')) + '</button></div>' +
+          '<div class="intel-count">' + _esc(_t('reach.emailHint', 'We email you a 6 digit code to confirm it. On a new phone or browser, the same kind of code signs you back in.')) + '</div>' +
+          '<div class="reach-row" id="reachCodeRow" hidden><input class="reach-in" id="reachCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="' + _esc(_t('reach.codeLabel', 'Code from the email')) + '"><button type="button" class="intel-btn primary" id="reachConfirm">' + _esc(_t('reach.confirm', 'Confirm')) + '</button></div>') +
+      '<p class="reach-msg" role="status"></p>' +
+      '<div class="intel-actions"><button type="button" class="intel-btn quiet" id="reachLater">' + _esc(_t('reach.later', 'Later')) + '</button>' +
+      '<button type="button" class="intel-btn primary" id="reachDone">' + _esc(_t('reach.done', 'Done')) + '</button></div>');
+    ov.querySelector('#reachLater').onclick = () => { _snooze(); close(false); };
+    const send = ov.querySelector('#reachSend');
+    let pendingEmail = '';
+    if (send) send.onclick = async () => {
+      const em = ov.querySelector('#reachEmail').value.trim();
+      if (!_validEmail(em)) { _msg(ov, _t('reach.badEmail', 'Check the email address.'), true); return; }
+      send.disabled = true;
+      try {
+        await SyncEngine.attachEmail(em);
+        pendingEmail = em;
+        ov.querySelector('#reachCodeRow').hidden = false;
+        _msg(ov, _t('reach.codeSent', 'Code sent to {email}. It arrives within a minute; check the spam folder too.', { email: em }));
+        try { ov.querySelector('#reachCode').focus(); } catch (e) {}
+      } catch (e) {
+        if (e && e.signin) {
+          _msg(ov, _t('reach.emailTaken', '{email} already has a Remiel Sentinel account. If it is yours, tap Sign in with this email to use it here: same Sentinel ID, same circle.', { email: em }), true);
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'intel-btn primary'; b.textContent = _t('reach.signInThis', 'Sign in with this email');
+          b.onclick = () => signIn(em, null, true);
+          ov.querySelector('.reach-msg').after(b);
+        } else _msg(ov, (e && e.status === 503) ? _t('reach.noEmail', 'Email is not set up on the server yet.') : (e && e.message) || _t('reach.failed', 'That did not work. Check your connection and try again.'), true);
+      }
+      send.disabled = false;
+    };
+    const conf = ov.querySelector('#reachConfirm');
+    if (conf) conf.onclick = async () => {
+      const code = ov.querySelector('#reachCode').value.replace(/\D/g, '');
+      if (code.length !== 6) { _msg(ov, _t('reach.codeSix', 'The code has 6 digits.'), true); return; }
+      conf.disabled = true;
+      try {
+        await SyncEngine.confirmEmail(pendingEmail, code);
+        const row = ov.querySelector('#reachCodeRow');
+        row.outerHTML = '<p class="reach-ok">' + _esc(_t('reach.confirmed', 'Confirmed: {email}', { email: pendingEmail })) + '</p>';
+        _msg(ov, '');
+      } catch (e) { _msg(ov, (e && e.message) || _t('reach.failed', 'That did not work. Check your connection and try again.'), true); }
+      conf.disabled = false;
+    };
+    ov.querySelector('#reachDone').onclick = async () => {
+      const ph = ov.querySelector('#reachPhone').value.trim();
+      const d = _digits(ph);
+      if (ph && (d.length < 6 || d.length > 18)) { _msg(ov, _t('magnet.phoneBad', 'That number needs 6 to 18 digits. Include the country code, for example +39.'), true); return; }
+      try {
+        await RemielDB.putSetting('userPhone', ph);
+        if (ph || phone) {
+          const fields = { phone: ph };
+          await SyncEngine.updateProfile(fields);
+          try { await RemielDB.putSetting('_magnet_phone_sent', ph ? 'v2:' + await Magnet.sha256(Magnet.normPhone(ph)) : ''); } catch (e) {}
+        }
+      } catch (e) { _msg(ov, _t('reach.failed', 'That did not work. Check your connection and try again.'), true); return; }
+      const acct = document.getElementById('acctPhoneInput');
+      if (acct) acct.value = ph;
+      close(true);
+      if (ph) showToast(_t('reach.saved', 'Saved. People who have your number can now call you in one tap.'));
+    };
+  }
+
+  /* ── Sign in on this device with an emailed code ── */
+  function signIn(prefill, onClose, sendNow) {
+    const ov = _modal('<h3>' + _esc(_t('reach.signinTitle', 'Sign in with your email')) + '</h3>' +
+      '<p>' + _esc(_t('reach.signinIntro', 'Type the email on your Remiel Sentinel account. We email you a 6 digit code; typing it here brings back your circle and your Sentinel ID.')) + '</p>' +
+      '<div class="reach-row"><input class="reach-in" id="reachSiEmail" type="email" autocomplete="email" value="' + _esc(prefill || '') + '"><button type="button" class="intel-btn" id="reachSiSend">' + _esc(_t('reach.sendCode', 'Send code')) + '</button></div>' +
+      '<div class="reach-row" id="reachSiCodeRow" hidden><input class="reach-in" id="reachSiCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="' + _esc(_t('reach.codeLabel', 'Code from the email')) + '"><button type="button" class="intel-btn primary" id="reachSiGo">' + _esc(_t('reach.signIn', 'Sign in')) + '</button></div>' +
+      '<p class="reach-msg" role="status"></p>' +
+      '<div class="intel-actions"><button type="button" class="intel-btn quiet" id="reachSiNo">' + _esc(_t('busy.cancel', 'Cancel')) + '</button></div>');
+    _onClose = onClose || null;
+    ov.querySelector('#reachSiNo').onclick = () => close(false);
+    const send = ov.querySelector('#reachSiSend'), go = ov.querySelector('#reachSiGo');
+    send.onclick = async () => {
+      const em = ov.querySelector('#reachSiEmail').value.trim();
+      if (!_validEmail(em)) { _msg(ov, _t('reach.badEmail', 'Check the email address.'), true); return; }
+      send.disabled = true;
+      try {
+        await SyncEngine.emailCodeStart(em);
+        ov.querySelector('#reachSiCodeRow').hidden = false;
+        _msg(ov, _t('reach.codeSentIf', 'If {email} has a Remiel Sentinel account, a code is on its way. It arrives within a minute; check the spam folder too.', { email: em }));
+        try { ov.querySelector('#reachSiCode').focus(); } catch (e) {}
+      } catch (e) { _msg(ov, (e && e.status === 503) ? _t('reach.noEmail', 'Email is not set up on the server yet.') : (e && e.message) || _t('reach.failed', 'That did not work. Check your connection and try again.'), true); }
+      send.disabled = false;
+    };
+    go.onclick = async () => {
+      const em = ov.querySelector('#reachSiEmail').value.trim();
+      const code = ov.querySelector('#reachSiCode').value.replace(/\D/g, '');
+      if (code.length !== 6) { _msg(ov, _t('reach.codeSix', 'The code has 6 digits.'), true); return; }
+      go.disabled = true;
+      try {
+        await SyncEngine.loginWithCode(em, code);
+        try { SyncEngine.startAutoSync(); setTimeout(() => { try { SyncEngine.sync(); } catch (e) {} }, 300); } catch (e) {}
+        close(true);
+        showToast(_t('reach.signedIn', 'Signed in. Your circle is loading.'));
+      } catch (e) { _msg(ov, (e && e.message) || _t('reach.failed', 'That did not work. Check your connection and try again.'), true); }
+      go.disabled = false;
+    };
+    if (sendNow && prefill) send.click();
+  }
+
+  /* ── Asked once: after setup, and for people who have not done it ── */
+  async function _snooze() { try { await RemielDB.putSetting('reachSnoozeUntil', Date.now() + 3 * 24 * 60 * 60 * 1000); } catch (e) {} }
+  let _asked = false;
+  async function maybeAsk() {
+    if (_asked || !_authed() || document.getElementById('reachModal')) return;
+    try {
+      const gate = document.getElementById('gateScreen'), ob = document.getElementById('onboarding');
+      const up = (el) => el && !el.hidden && getComputedStyle(el).display !== 'none';
+      if (up(gate) || up(ob)) return;
+      if (typeof SentinelCall !== 'undefined' && SentinelCall.isInCall && SentinelCall.isInCall()) return;
+      if (document.querySelector('.intel-modal, .ui-confirm-overlay, .sentinel-call-overlay.active')) return;
+      const until = await RemielDB.getSetting('reachSnoozeUntil');
+      if (until && Date.now() < Number(until)) return;
+      const phone = await RemielDB.getSetting('userPhone');
+      const st = _st();
+      if (phone && st.claimed && _realEmail(st.email)) return;
+      _asked = true;
+      open();
+    } catch (e) {}
+  }
+  setTimeout(maybeAsk, 9000);
+  window.addEventListener('sentinel:syncstatus', () => { setTimeout(maybeAsk, 6000); });
+
+  return { open, signIn, close, maybeAsk };
+})();
+
+
+// ── iPhone: calls and notifications need the Home Screen app ──
+// Inside Mail, Gmail or another app's browser, and in a Safari tab, iPhone
+// cannot ring or notify. Say so once per visit, with the exact steps.
+(function iosHomeScreenHint() {
+  try {
+    var ua = navigator.userAgent;
+    var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    var standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+    if (!ios || standalone) return;
+    if (/[?&]call=/.test(location.search)) return; /* a guest joining a call needs nothing installed */
+    var inApp = !/Safari\//.test(ua) || /GSA\/|FBAN|FBAV|Instagram|LinkedInApp|Line\/|Twitter|MicroMessenger|Snapchat/.test(ua);
+    try { if (sessionStorage.getItem('rm:iosHint')) return; sessionStorage.setItem('rm:iosHint', '1'); } catch (e) {}
+    var show = function () {
+      var t = (typeof _t === 'function') ? _t : function (k, d) { return d; };
+      var el = document.createElement('div');
+      el.className = 'ios-hint';
+      el.setAttribute('role', 'status');
+      var p = document.createElement('p');
+      p.textContent = inApp
+        ? t('ios.inApp', 'You opened Remiel Sentinel inside another app. Calls, notifications and your saved circle need Safari: tap the ... or Share button at the top or bottom, choose Open in Safari. Then in Safari tap Share, then Add to Home Screen, and open Remiel Sentinel from the new icon.')
+        : t('ios.safari', 'To get calls and notifications on iPhone: tap Share (the square with the arrow) at the bottom of Safari, then Add to Home Screen. Open Remiel Sentinel from the new icon from now on.');
+      var x = document.createElement('button');
+      x.type = 'button'; x.textContent = 'OK';
+      x.onclick = function () { el.remove(); };
+      el.appendChild(p); el.appendChild(x);
+      document.body.appendChild(el);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(show, 1500); });
+    else setTimeout(show, 1500);
+  } catch (e) {}
+})();
+
 // ── Pull integration: hook VoiceCheckin/Intelligence init ────
 (function hookNousPullInit() {
   const _origTogglePull = window.togglePull;
@@ -31858,13 +32165,66 @@ const SyncEngine = (() => {
      Local records made before login stay on this device until edited. */
   async function login(email, password) {
     await _ensureBase();
+    var dc = await _deviceCreds();
     var res = await fetch(_apiBase + '/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, password: password }),
+      body: JSON.stringify({ email: email, password: password, device_id: dc.device_id, device_secret: dc.device_secret }),
     });
     if (!res.ok) throw await _errDetail(res, 'Login failed');
     var data = await res.json();
+    return _afterLogin(data, email);
+  }
+
+  /* This browser's device credentials. Sent when signing in, so that a lost
+     session on this browser returns to the same account (never a new one). */
+  async function _deviceCreds() {
+    var deviceId = await RemielDB.getSetting(DEVICE_ID_KEY);
+    if (!deviceId) { deviceId = _uuid(); await RemielDB.putSetting(DEVICE_ID_KEY, deviceId); }
+    var secret = await RemielDB.getSetting(DEVICE_SECRET_KEY);
+    if (!secret) { secret = _randomHex(32); await RemielDB.putSetting(DEVICE_SECRET_KEY, secret); }
+    return { device_id: deviceId, device_secret: secret };
+  }
+
+  /* Sign in on a new device with a 6 digit code sent to the account's email */
+  async function emailCodeStart(email) {
+    await _ensureBase();
+    var res = await fetch(_apiBase + '/auth/email-code/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }),
+    });
+    if (!res.ok) throw await _errDetail(res, 'Could not send the code');
+    return true;
+  }
+  async function loginWithCode(email, code) {
+    await _ensureBase();
+    var dc = await _deviceCreds();
+    var res = await fetch(_apiBase + '/auth/email-code/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, code: code, device_id: dc.device_id, device_secret: dc.device_secret }),
+    });
+    if (!res.ok) throw await _errDetail(res, 'That code did not work');
+    var data = await res.json();
+    return _afterLogin(data, email);
+  }
+  /* A device account adds its email (confirmed by a code) */
+  async function attachEmail(email) {
+    var res = await _fetch('/auth/email/attach', { method: 'POST', body: JSON.stringify({ email: email }) });
+    var body = null; try { body = await res.clone().json(); } catch (e) {}
+    if (!res.ok) { var er = await _errDetail(res, 'Could not send the code'); er.signin = !!(body && body.signin); throw er; }
+    return body || {};
+  }
+  async function confirmEmail(email, code) {
+    var res = await _fetch('/auth/email/confirm', { method: 'POST', body: JSON.stringify({ email: email, code: code }) });
+    if (!res.ok) throw await _errDetail(res, 'That code did not work');
+    var data = await res.json();
+    _email = data.email || email;
+    _claimed = true;
+    await _saveConfig();
+    _emitStatus();
+    return data;
+  }
+
+  async function _afterLogin(data, email) {
     var sameUser = data.user_id && data.user_id === _userId;
     if (!sameUser) await _resetSyncState();
     _applyAuthData(data);
@@ -33056,6 +33416,7 @@ const SyncEngine = (() => {
   return {
     init: init, ready: ready, configure: configure,
     signup: signup, login: login, logout: logout, claim: claim,
+    emailCodeStart: emailCodeStart, loginWithCode: loginWithCode, attachEmail: attachEmail, confirmEmail: confirmEmail,
     ensureIdentity: ensureIdentity, forgetDevice: forgetDevice, getProfile: getProfile, updateProfile: updateProfile,
     registerSentinelId: registerSentinelId, useDeviceIdentity: useDeviceIdentity,
     isAuthenticated: isAuthenticated, getUserId: getUserId, getDisplayName: getDisplayName, syncDisplayName: syncDisplayName,
@@ -34827,8 +35188,18 @@ const SocialImport = (() => {
       else await unsubscribe();
     }
 
+    function _iosNotInstalled() {
+      var ua = navigator.userAgent;
+      var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+      return ios && !(window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches));
+    }
     async function checkStatus() {
       try {
+        if (_iosNotInstalled()) {
+          _setStatus(_t('push.iosHome', 'On iPhone, notifications work only in Remiel Sentinel added to your Home Screen. Open beverly-index.com/remiel/app.html in Safari, tap Share (the square with the arrow), then Add to Home Screen. Open Remiel Sentinel from the new icon and turn this switch on there.'));
+          _updateToggle(false, true);
+          return;
+        }
         if (!_supported()) {
           _setStatus(_t('push.unsupported', 'Push notifications are not supported in this browser.'));
           _updateToggle(false, true);
@@ -35802,6 +36173,7 @@ const SentinelCall = (function() {
       peer.on('open', () => finish(true));
       peer.on('error', (err) => {
         const type = err && err.type;
+        if (type === 'unavailable-id') { finish('taken'); return; }
         if (type === 'server-error' || type === 'network' || type === 'socket-error' || type === 'socket-closed' || type === 'browser-incompatible') finish(false);
       });
     });
@@ -35815,13 +36187,28 @@ const SentinelCall = (function() {
       if (i > 0) await new Promise(r => setTimeout(r, _RETRY_DELAYS_MS[i - 1]));
       let p = null;
       try { p = new Peer(peerId, _peerOptions(cfg)); } catch (e) { p = null; }
-      if (p && await _waitOpen(p)) return p;
+      const opened = p ? await _waitOpen(p) : false;
+      if (opened === true) return p;
       if (p) { try { p.destroy(); } catch (e) {} }
+      /* The same person is already online on another device with this ID */
+      if (opened === 'taken') return 'taken';
       if (cfg.peer) console.warn('SentinelCall: call server ' + cfg.peer.host + ' not reachable, attempt ' + (i + 1) + ' of ' + attempts);
     }
     if (cfg.peer && !quiet) showToast(_t('call.serverUnreachable', 'Call server unreachable. Try again in a moment.'));
     return null;
   }
+
+  /* Signing in on this device adopts the account's Sentinel ID: go online
+     under it at once, so calls to that ID ring here. */
+  window.addEventListener('sentinel:sentinelid', async (e) => {
+    const id = e && e.detail && e.detail.id ? String(e.detail.id).toUpperCase() : '';
+    if (!_isValidSid(id) || id === _myId) return;
+    _myId = id;
+    try { updateSettingsDisplay(); } catch (x) {}
+    if (_currentCall || _incomingCall || _group) return;
+    if (_peer) { try { _peer.destroy(); } catch (x) {} _peer = null; }
+    if (window.Peer) { try { await _initPeer(true); } catch (x) {} }
+  });
 
   /* ── Initialize ── */
   async function init() {
@@ -35914,8 +36301,16 @@ const SentinelCall = (function() {
   async function _initPeer(quiet) {
     if (!window.Peer || !_myId) return false;
     const cfg = await _fetchCallConfig();
-    const peerId = 'sentinel-' + _myId.toLowerCase();
-    const p = await _connectPeer(peerId, cfg, quiet);
+    /* One account, several devices (phone, Dock app): the first device takes
+       sentinel-<id>, the next -2, then -3. Callers try them in that order. */
+    const base = 'sentinel-' + _myId.toLowerCase();
+    let p = null;
+    for (const peerId of [base, base + '-2', base + '-3']) {
+      p = await _connectPeer(peerId, cfg, true);
+      if (p !== 'taken') break;
+    }
+    if (p === 'taken') p = null;
+    if (!p && !quiet) showToast(_t('call.serverUnreachable', 'Call server unreachable. Try again in a moment.'));
     if (!p) return false;
     _peer = p;
     console.log('SentinelCall: online, peerId=' + p.id + ', sentinelId=' + _myId);
@@ -35950,6 +36345,15 @@ const SentinelCall = (function() {
         if (_group) { _groupUnavailable(err); return; }
         /* App closed on their side: wake their phone with a push, then keep
            dialling so the call reaches them the moment they open the app. */
+        /* Their other devices first (-2, -3), then ring their phone */
+        if (_callCtx && _currentCall && !_activeShown && (_callCtx.alt || 0) < 2 && !_callCtx.pushWindow) {
+          const ctx = _callCtx;
+          ctx.alt = (ctx.alt || 0) + 1;
+          const old = _currentCall;
+          let call = null;
+          try { call = _peer.call(ctx.remotePeerId + '-' + (ctx.alt + 1), _localStream, { metadata: ctx.meta }); } catch (e) { call = null; }
+          if (call) { _currentCall = call; _attachCall(call); try { old.close(); } catch (e) {} return; }
+        }
         if (_callCtx && _currentCall && !_activeShown && _callCtx.rung !== false) {
           if (_callCtx.rung === true) { _redialSoon(); return; }
           if (!_callCtx.ringing) {
@@ -36369,6 +36773,8 @@ const SentinelCall = (function() {
     const offline = !!(_mg && _mg.isOnline(targetId) === false);
     _callCtx = { contact: contact, started: Date.now(), leaveMsg: leaveMsg, onTimeout: leaveMsg ? () => _offerMessage(contact) : null,
       targetId: targetId.trim().toUpperCase(), remotePeerId: remotePeerId, meta: callMeta };
+    /* Noted on the server: when they answer, the two of you are connected */
+    try { if (typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated()) SyncEngine.apiFetch('/call/attempt', { method: 'POST', body: JSON.stringify({ to_sentinel_id: targetId.trim().toUpperCase() }) }).catch(() => {}); } catch (e) {}
     _armNoAnswer(call, _callCtx.onTimeout, offline ? _OFFLINE_RING_MS : _NO_ANSWER_MS, leaveMsg);
   }
 
@@ -36420,6 +36826,8 @@ const SentinelCall = (function() {
       showToast(_t('call.failed', 'Call failed'));
       return;
     }
+    /* Answering is the confirmation: the caller joins my Circle, connected */
+    try { if (meta.callerId && typeof Magnet !== 'undefined' && Magnet.answered) Magnet.answered(meta.callerId).then((c) => { if (c && _currentCall === call && !_callContactId) _callContactId = c.id; }).catch(() => {}); } catch (e) {}
 
     /* Show local video */
     const localVid = document.getElementById('scLocalVideo');
@@ -37589,6 +37997,8 @@ const SentinelCall = (function() {
     }
     if (_callCtx) { _callCtx.connected = true; if (_callCtx.pushWindow) _setInviteLine(null); }
     _activeShown = true;
+    /* They answered: pick up the connection their answer made */
+    if (_callCtx && typeof Magnet !== 'undefined' && Magnet.poll) setTimeout(() => { try { Magnet.poll(); } catch (e) {} }, 2500);
     if (_noAnswerTimer) { clearTimeout(_noAnswerTimer); _noAnswerTimer = null; }
     const remoteVid = document.getElementById('scRemoteVideo');
     const status = document.getElementById('scStatus');
@@ -37911,7 +38321,8 @@ const SentinelCall = (function() {
     const cfg = await _fetchCallConfig();
     const guestPeerId = 'sentinel-' + guestId.toLowerCase();
     /* Same server as the host, or no call: the config decides for both */
-    const guestPeer = await _connectPeer(guestPeerId, cfg, true);
+    let guestPeer = await _connectPeer(guestPeerId, cfg, true);
+    if (guestPeer === 'taken') guestPeer = null;
     if (!guestPeer) {
       const why = cfg.peer ? _t('call.serverUnreachable', 'Call server unreachable. Try again in a moment.') : _t('call.connectFailed', 'Connection failed');
       showToast(why);
@@ -38389,7 +38800,10 @@ var Magnet = (function () {
     var byHash = {};
     for (var i = 0; i < list.length; i++) {
       var c = list[i];
-      var keys = [normPhone(c.phone), normEmail(c.email)].filter(Boolean);
+      var np = normPhone(c.phone);
+      /* The last 9 digits too, so a number saved without its country code
+         still finds the person (the server keeps the same tail hash) */
+      var keys = [np, np && np.length >= 9 ? 't9:' + np.slice(-9) : null, normEmail(c.email)].filter(Boolean);
       for (var k = 0; k < keys.length; k++) {
         var h = await sha256(keys[k]);
         (byHash[h] = byHash[h] || []).push(c);
@@ -38504,6 +38918,12 @@ var Magnet = (function () {
     var c = _bySid(sid);
     var added = false;
     if (!c) {
+      /* Already in the circle under the same name, without an ID: that card */
+      var want = String(party.display_name || [party.first, party.last].filter(Boolean).join(' ') || '').trim().toLowerCase();
+      if (want) c = _contacts().find(function (x) { return !_validSid(x.sentinelId || '') && ((x.first || '') + ' ' + (x.last || '')).trim().toLowerCase() === want; }) || null;
+      if (c) c.sentinelId = sid;
+    }
+    if (!c) {
       var dn = String(party.display_name || party.handle || sid).trim();
       var parts = dn.split(/\s+/);
       c = {
@@ -38544,6 +38964,18 @@ var Magnet = (function () {
       try { SentinelMessaging.poll(); } catch (e) {}
       refreshPresence();
     }
+    return c;
+  }
+  /* I answered a call: the caller and I are now connected in The Circle,
+     so the next call and every message need no request to accept. */
+  async function answered(callerSid) {
+    if (!_authed() || !_validSid(callerSid || '')) return null;
+    var res;
+    try { res = await SyncEngine.apiFetch('/link/answered', { method: 'POST', body: JSON.stringify({ from_sentinel_id: String(callerSid).toUpperCase() }) }); } catch (e) { return null; }
+    if (!res || !res.ok) return null;
+    var data = await res.json().catch(function () { return {}; });
+    var c = await _adopt(data.caller);
+    if (c) { try { refreshPresence(); } catch (e) {} }
     return c;
   }
   function notNow(req) {
@@ -38731,7 +39163,7 @@ var Magnet = (function () {
     if (!_authed()) { _status(_t('magnet.phoneLocal')); return; }
     try {
       await SyncEngine.updateProfile({ phone: v });
-      try { await RemielDB.putSetting('_magnet_phone_sent', v ? await sha256(normPhone(v)) : ''); } catch (e) {}
+      try { await RemielDB.putSetting('_magnet_phone_sent', v ? 'v2:' + await sha256(normPhone(v)) : ''); } catch (e) {}
       _status(v ? _t('magnet.phoneSaved') : _t('magnet.phoneCleared'));
     } catch (e) { _status(_t('magnet.saveFailed'), true); }
   }
@@ -38742,12 +39174,12 @@ var Magnet = (function () {
       var n = normPhone(v);
       if (!n) return;
       var h = await sha256(n);
-      if ((await RemielDB.getSetting('_magnet_phone_sent')) === h) return;
+      if ((await RemielDB.getSetting('_magnet_phone_sent')) === 'v2:' + h) return;
       var fields = { phone: v };
       var d = await RemielDB.getSetting('magnetDiscoverable');
       if (d === false) fields.discoverable = false;
       await SyncEngine.updateProfile(fields);
-      await RemielDB.putSetting('_magnet_phone_sent', h);
+      await RemielDB.putSetting('_magnet_phone_sent', 'v2:' + h);
     } catch (e) {}
   }
 
@@ -38784,7 +39216,7 @@ var Magnet = (function () {
     normPhone: normPhone, normEmail: normEmail, sha256: sha256,
     isOnRs: isOnRs, isLinked: isLinked, needsLink: needsLink, isOnline: isOnline, canFind: canFind,
     matchContacts: matchContacts, matchOne: matchOne, schedule: schedule, findFor: findFor, explainOnce: explainOnce,
-    requestLink: requestLink, accept: accept, poll: poll, promptUnknown: promptUnknown, hidePrompt: hidePrompt,
+    requestLink: requestLink, accept: accept, answered: answered, poll: poll, promptUnknown: promptUnknown, hidePrompt: hidePrompt,
     ping: ping, refreshPresence: refreshPresence, drawBadges: drawBadges, badgeHtml: badgeHtml,
     renderAccount: renderAccount, setDiscoverable: setDiscoverable, savePhone: savePhone,
     get pending() { return _pending.slice(); }
