@@ -12965,6 +12965,33 @@ const I18n = (function () {
     "tb.trimConfirmT": "Remove {n} from your Circle?",
     "tb.trimMore": "and {n} more",
     "tb.trimUndoNote": "You can undo this for 10 seconds.",
+    "wx.level4": "Extreme",
+    "wx.level3": "Severe",
+    "wx.level2": "Moderate",
+    "wx.where": "Warnings where {name} is",
+    "wx.whereYou": "Warnings where you are",
+    "wx.more": "+{n} more",
+    "wx.tap": "Tap here for the official text",
+    "wx.chip": "Official warnings: {who}",
+    "wx.you": "you",
+    "wx.youAnd": "you and {n} more",
+    "wx.person": "1 person",
+    "wx.people": "{n} people",
+    "wx.youName": "You",
+    "wx.sheetCircle": "Official warnings in your Circle",
+    "wx.from": "From {time}",
+    "wx.until": "Until {time}",
+    "wx.km": "{n} km away",
+    "wx.issued": "Issued by {sender}",
+    "wx.source": "Source: {source}",
+    "wx.whatToDo": "What to do",
+    "wx.details": "Details",
+    "wx.open": "Open the official warning",
+    "wx.approx": "Checked for: {place}.",
+    "wx.live": "Checked at the shared location.",
+    "wx.checked": "Checked {n} min ago.",
+    "wx.noneNow": "No official warnings there now.",
+    "wx.close": "Close",
     "ledger.reviewDictation": "Review, then tap Log",
     "medimg.title": "Scan a medication label",
     "medimg.hint": "Point the camera at the medication label or upload a photo",
@@ -13305,6 +13332,33 @@ const I18n = (function () {
     "tb.trimConfirmT": "Togliere {n} dalla tua cerchia?",
     "tb.trimMore": "e altre {n}",
     "tb.trimUndoNote": "Puoi annullare per 10 secondi.",
+    "wx.level4": "Estremo",
+    "wx.level3": "Grave",
+    "wx.level2": "Moderato",
+    "wx.where": "Avvisi dove si trova {name}",
+    "wx.whereYou": "Avvisi dove ti trovi",
+    "wx.more": "+{n} altri",
+    "wx.tap": "Tocca qui per il testo ufficiale",
+    "wx.chip": "Avvisi ufficiali: {who}",
+    "wx.you": "tu",
+    "wx.youAnd": "tu e altri {n}",
+    "wx.person": "1 persona",
+    "wx.people": "{n} persone",
+    "wx.youName": "Tu",
+    "wx.sheetCircle": "Avvisi ufficiali nella tua cerchia",
+    "wx.from": "Dal {time}",
+    "wx.until": "Fino al {time}",
+    "wx.km": "a {n} km",
+    "wx.issued": "Emesso da {sender}",
+    "wx.source": "Fonte: {source}",
+    "wx.whatToDo": "Cosa fare",
+    "wx.details": "Dettagli",
+    "wx.open": "Apri l'avviso ufficiale",
+    "wx.approx": "Controllato per: {place}.",
+    "wx.live": "Controllato nella posizione condivisa.",
+    "wx.checked": "Controllato {n} min fa.",
+    "wx.noneNow": "Nessun avviso ufficiale l\u00EC ora.",
+    "wx.close": "Chiudi",
     "ledger.reviewDictation": "Controlla, poi tocca Registra",
     "medimg.title": "Leggi l’etichetta di un farmaco",
     "medimg.hint": "Inquadra l’etichetta del farmaco o carica una foto",
@@ -21808,6 +21862,8 @@ const Comm = (() => {
       const inHit = e => {
         const h = window._dreamCommHit; if (!h || _active || !cv) return false;
         const rct = cv.getBoundingClientRect(); const x = e.clientX - rct.left, y = e.clientY - rct.top;
+        const wh = window._dreamWarnHit;
+        if (wh && x >= wh.x && x <= wh.x + wh.w && y >= wh.y && y <= wh.y + wh.h) return false;
         /* Inside the drawn circle itself, and only where no sphere sits: a sphere always wins */
         if (h.r != null) { const dx = x - h.cx, dy = y - h.cy; if (dx * dx + dy * dy > h.r * h.r) return false; }
         else if (!(x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h)) return false;
@@ -21946,7 +22002,8 @@ const Comm = (() => {
     else if (items.length) head = '<div class="db-head db-quote">' + _esc(items[0].text) + '</div>';
     else head = '<div class="db-head db-quiet">' + _esc(_t('comm.brief.none', 'No communication in the last 30 days')) + '</div>';
     if (compact) {
-      return '<div class="db-label">' + _esc(_t('comm.week', 'This week for {first}', { first: _first(c) })) + '</div>' + head +
+      let wxc = ''; try { wxc = Warnings.briefHtml(c, true); } catch (e) {}
+      return wxc + '<div class="db-label">' + _esc(_t('comm.week', 'This week for {first}', { first: _first(c) })) + '</div>' + head +
         (iss.length > 1 ? '<div class="db-more">' + _esc(_t('comm.brief.more', '+{n} more this week', { n: iss.length - 1 })) + '</div>' : '');
     }
     const rest = iss.slice(1, iso ? 8 : (phone ? 2 : 4));
@@ -21960,12 +22017,13 @@ const Comm = (() => {
         '<div class="db-last">' + _esc(lonelyTime(it.ts, it.channel, it.place)) + '</div>' +
         (iss.length && (!phone || iso) ? '<div class="db-lastq">' + _esc(it.text) + '</div>' : '');
     }
-    return '<div class="db-top"><span class="db-label">' + _esc(_t('comm.label', 'COMMUNICATION')) + '</span><span class="db-name">' + _esc(_first(c)) + '</span></div>' +
+    let wx = ''; try { wx = Warnings.briefHtml(c, false); } catch (e) {}
+    return wx + '<div class="db-top"><span class="db-label">' + _esc(_t('comm.label', 'COMMUNICATION')) + '</span><span class="db-name">' + _esc(_first(c)) + '</span></div>' +
       head + week + last +
       '<div class="db-t">' + _esc(_t('comm.brief.days', 'Last 7 days')) + '</div>' + _stripHtml(items) +
       (phone && !iso ? '' : '<div class="db-hint">' + _esc(_t('comm.brief.hint', 'Tap for the full 30 days')) + '</div>');
   }
-  function _hideBrief(bEl) { if (bEl && !bEl.hidden) bEl.hidden = true; window._dreamCommHit = null; }
+  function _hideBrief(bEl) { if (bEl && !bEl.hidden) bEl.hidden = true; window._dreamCommHit = null; window._dreamWarnHit = null; }
   function _briefFrame(bEl) {
     if (!bEl) return;
     const r = window._dreamRect, c = _contact(_dreamFor);
@@ -22006,7 +22064,8 @@ const Comm = (() => {
       top = Math.round(Math.max(70, r.cy - r.r * 0.62));
     }
     const e = _cache.get(c.id);
-    const sig = [c.id, mode, phone, compact, iso, e ? e.sig : '', _it(), Math.floor(Date.now() / 60000)].join('~');
+    let wsig = 0; try { wsig = Warnings.sig; } catch (err) {}
+    const sig = [c.id, mode, phone, compact, iso, e ? e.sig : '', _it(), wsig, Math.floor(Date.now() / 60000)].join('~');
     if (sig !== _briefSig) { bEl.innerHTML = _briefHtml(c, compact, phone, iso); _briefSig = sig; }
     bEl.classList.toggle('is-compact', compact);
     bEl.classList.toggle('is-phone', phone);
@@ -22020,6 +22079,10 @@ const Comm = (() => {
       const cv = document.getElementById('sphere'), cr = cv.getBoundingClientRect(), br = bEl.getBoundingClientRect();
       const h = { x: br.left - cr.left, y: br.top - cr.top, w: br.width, h: br.height };
       window._dreamCommHit = h;
+      /* The warnings at the top open their own sheet */
+      const wxEl = bEl.querySelector('.db-wx');
+      if (wxEl) { const wr = wxEl.getBoundingClientRect(); window._dreamWarnHit = { x: wr.left - cr.left, y: wr.top - cr.top, w: wr.width, h: wr.height }; }
+      else window._dreamWarnHit = null;
       /* Where the focused sphere's action pills sit under it, the summary thins so they stay readable */
       const av = window._dreamPillAvoid;
       if (!iso && av && av.x < h.x + h.w && av.x + av.w > h.x && av.y < h.y + h.h && av.y + av.h > h.y) op = 0.3;
@@ -23620,7 +23683,307 @@ const WhereIs = (() => {
            circle, circleFor, stateFor, stateText, ask, shareWith, checkAsks, approxFor, approxText, forgetApprox, renderCircleShare, fillCard,
            updateVisibility, renderPlaces, addPlace, editPlace, closeEditor, savePlace, deletePlace, printQr, setOpenShare, renderCheckin, checkIn, onSettingsOpen,
            sharedLocations, myPlaces, sharedPlaces, nowFor, arrivalsFor, trail, tile, drawTiles, ageText, invalidate,
-           get openShare() { return _openOn; }, get panelOpen() { return !!_panelFor; }, get native() { return NATIVE; } };
+           get openShare() { return _openOn; }, get panelOpen() { return !!_panelFor; }, get native() { return NATIVE; },
+           get myFix() { return _lastFix && _lastFix.coords ? { lat: _lastFix.coords.latitude, lon: _lastFix.coords.longitude } : null; } };
+})();
+
+/* ═══════════════════════════════════════════════════════════
+   Warnings: official warnings where each person is. Every five minutes
+   while the app is open, each sphere's best known position (their shared
+   location, else the approximate area from the card) and my own go to
+   /warnings/check, which asks the official services for that place.
+   A warning shows as a mark on the sphere (red Extreme, orange Severe,
+   yellow Moderate), at the top of the dream summary, and in a Circle
+   chip when nobody is selected; a tap opens the full official text.
+   The server pushes Extreme and Severe once, to me and to a linked
+   member inside the warning.
+   ═══════════════════════════════════════════════════════════ */
+var Warnings = (function () {
+  'use strict';
+  var EVERY_MS = 5 * 60e3;
+  var COLORS = { 4: '#ff3b3b', 3: '#ff8c1a', 2: '#ffd23f' };
+  var _by = new Map(), _at = 0, _busy = false, _sig = 0, _chip = null, _sheet = null;
+  function _t(k, fb, p) {
+    try { var v = I18n.t(k, p); if (v && v !== k) return v; } catch (e) {}
+    var out = fb; Object.keys(p || {}).forEach(function (n) { out = out.split('{' + n + '}').join(p[n]); }); return out;
+  }
+  function _esc(x) { var d = document.createElement('div'); d.textContent = x == null ? '' : String(x); return d.innerHTML; }
+  function _authed() { try { return SyncEngine.isAuthenticated() && !(SyncEngine.isLocalOnly && SyncEngine.isLocalOnly()); } catch (e) { return false; } }
+  function _contact(id) { try { return DEMO_CONTACTS.find(function (c) { return String(c.id) === String(id); }) || null; } catch (e) { return null; } }
+  function _first(c) { return c ? (c.first || ((c.last || '') + '')).trim() : ''; }
+  function _levelLabel(l) { return l >= 4 ? _t('wx.level4', 'Extreme') : l === 3 ? _t('wx.level3', 'Severe') : _t('wx.level2', 'Moderate'); }
+  function _when(t) { try { return new Date(t).toLocaleString(I18n.locale === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+
+  /* Shown warnings for a sphere: Moderate and above, still running */
+  function listFor(id) {
+    var e = _by.get(String(id)); if (!e) return [];
+    var now = Date.now();
+    return e.list.filter(function (w) { return w.level >= 2 && !(w.expires && w.expires < now); });
+  }
+  function levelFor(id) { var l = listFor(id); return l.length ? l[0].level : 0; }
+
+  async function _myPoint() {
+    try { var f = WhereIs.myFix; if (f) return f; } catch (e) {}
+    /* Only when location is already allowed: never a surprise permission prompt */
+    try {
+      if (navigator.permissions && navigator.geolocation) {
+        var st = await navigator.permissions.query({ name: 'geolocation' });
+        if (st && st.state === 'granted') return await new Promise(function (res) {
+          navigator.geolocation.getCurrentPosition(function (p) { res({ lat: p.coords.latitude, lon: p.coords.longitude }); }, function () { res(null); }, { maximumAge: 600000, timeout: 10000 });
+        });
+      }
+    } catch (e) {}
+    return null;
+  }
+  function _pointFor(c) {
+    var e = null, cr = null;
+    try { e = WhereIs.entryFor(c); cr = WhereIs.circleFor(c); } catch (err) {}
+    var uid = (e && e.user_id) || (cr && cr.user_id) || c.rsUserId || null;
+    if (e && isFinite(Number(e.latitude)) && isFinite(Number(e.longitude))) return { lat: Number(e.latitude), lon: Number(e.longitude), user_id: uid, live: true };
+    var a = null; try { a = WhereIs.approxFor(c); } catch (err) {}
+    if (a && isFinite(a.lat) && isFinite(a.lon)) return { lat: a.lat, lon: a.lon, approx: true, user_id: uid, apx: a };
+    return null;
+  }
+  async function refresh(force) {
+    if (_busy || !_authed()) return;
+    if (!force && Date.now() - _at < EVERY_MS) return;
+    _busy = true;
+    try {
+      try { await WhereIs.sharedLocations(); await WhereIs.circle(); } catch (e) {}
+      var pts = [], meta = {};
+      var me = await _myPoint();
+      if (me) { pts.push({ key: 'self', lat: me.lat, lon: me.lon }); meta.self = { live: true }; }
+      (DEMO_CONTACTS || []).forEach(function (c) {
+        if (pts.length >= 300) return;
+        var p = _pointFor(c); if (!p) return;
+        var k = String(c.id);
+        pts.push({ key: k, lat: p.lat, lon: p.lon, approx: !!p.approx, user_id: p.user_id || undefined, name: _first(c) });
+        meta[k] = p;
+      });
+      if (!pts.length) { _at = Date.now(); return; }
+      var r = await SyncEngine.apiFetch('/warnings/check', { method: 'POST', body: JSON.stringify({ points: pts, lang: (typeof I18n !== 'undefined' && I18n.locale) || 'en' }) });
+      if (!r || !r.ok) return;
+      var d = await r.json();
+      var next = new Map();
+      Object.keys(d.results || {}).forEach(function (k) {
+        next.set(k, { list: d.results[k] || [], approx: !!(d.approx && d.approx[k]), apx: meta[k] && meta[k].apx, live: !!(meta[k] && meta[k].live), place: d.place && d.place[k] });
+      });
+      _by = next; _at = Date.now(); _sig++;
+      _paintChip(true);
+      if (_sheet && _sheet._for) _openSheet(_sheet._for);
+    } catch (e) {
+      console.warn('[Warnings] check failed', e);
+    } finally { _busy = false; }
+  }
+
+  /* ── The mark on a sphere: a small triangle in the level's colour ── */
+  function drawMark(ctx, x, y, size, level, alpha, t) {
+    var col = COLORS[level]; if (!col) return;
+    var pulse = (level >= 4 && !(typeof _reducedMotionNow === 'function' && _reducedMotionNow())) ? 0.75 + 0.25 * Math.sin((t || 0) * 0.006) : 1;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = Math.max(0.35, Math.min(1, (alpha || 1))) * pulse;
+    ctx.beginPath();
+    ctx.moveTo(x, y - size); ctx.lineTo(x + size * 1.05, y + size * 0.8); ctx.lineTo(x - size * 1.05, y + size * 0.8); ctx.closePath();
+    ctx.fillStyle = col; ctx.fill();
+    ctx.lineWidth = Math.max(1, size * 0.16); ctx.strokeStyle = 'rgba(8,10,16,0.85)'; ctx.stroke();
+    ctx.fillStyle = '#0b0d14';
+    ctx.font = '800 ' + Math.round(size * 1.1) + 'px "Hanken Grotesk", system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('!', x, y + size * 0.18);
+    ctx.restore();
+  }
+
+  /* ── In the dream summary: the warnings where this person is ── */
+  function briefHtml(c, compact) {
+    var l = listFor(c && c.id); if (!l.length) return '';
+    var top = l[0];
+    var head = _t('wx.where', 'Warnings where {name} is', { name: _first(c) });
+    var rows = (compact ? l.slice(0, 1) : l.slice(0, 2)).map(function (w) {
+      return '<div class="db-wx-row"><span class="db-wx-lv" style="background:' + COLORS[w.level] + '">' + _esc(_levelLabel(w.level)) + '</span><span>' + _esc(w.event || w.headline) + (w.area ? ' · ' + _esc(w.area) : '') + '</span></div>';
+    }).join('');
+    var more = l.length > (compact ? 1 : 2) ? '<div class="db-wx-more">' + _esc(_t('wx.more', '+{n} more', { n: l.length - (compact ? 1 : 2) })) + '</div>' : '';
+    return '<div class="db-wx" style="border-color:' + COLORS[top.level] + '"><div class="db-wx-t">⚠ ' + _esc(head) + '</div>' + rows + more +
+      '<div class="db-wx-tap">' + _esc(_t('wx.tap', 'Tap here for the official text')) + '</div></div>';
+  }
+
+  /* ── A chip over the galaxy when nobody is selected: who is under a warning ── */
+  function _who() {
+    var people = 0, self = false;
+    _by.forEach(function (v, k) { if (!listFor(k).length) return; if (k === 'self') self = true; else if (_contact(k)) people++; });
+    return { people: people, self: self };
+  }
+  function _paintChip(force) {
+    if (!_chip) {
+      if (!document.body) return;
+      _chip = document.createElement('button'); _chip.type = 'button'; _chip.id = 'wxChip'; _chip.className = 'wx-chip'; _chip.hidden = true;
+      _chip.addEventListener('click', function (e) { e.stopPropagation(); _openSheet('circle'); });
+      document.body.appendChild(_chip);
+    }
+    var show = false;
+    try { show = appState === 'network' && !focusedContactId && !(typeof IsoView !== 'undefined' && IsoView.active()); } catch (e) {}
+    var w = _who();
+    if (!w.people && !w.self) show = false;
+    if (!show) { if (!_chip.hidden) _chip.hidden = true; return; }
+    var key = _sig + '|' + w.people + '|' + w.self + '|' + (I18n && I18n.locale);
+    if (force || _chip._key !== key) {
+      _chip._key = key;
+      var lv = 0; _by.forEach(function (v, k) { lv = Math.max(lv, levelFor(k)); });
+      var who = w.self ? (w.people ? _t('wx.youAnd', 'you and {n} more', { n: w.people }) : _t('wx.you', 'you'))
+        : (w.people === 1 ? _t('wx.person', '1 person') : _t('wx.people', '{n} people', { n: w.people }));
+      _chip.innerHTML = '<span class="wx-tri" style="color:' + COLORS[lv] + '">⚠</span> ' + _esc(_t('wx.chip', 'Official warnings: {who}', { who: who }));
+      _chip.style.borderColor = COLORS[lv];
+    }
+    _chip.hidden = false;
+  }
+
+  /* ── The sheet: one person's warnings, or the whole Circle grouped by warning ── */
+  function _css() {
+    if (document.getElementById('wxCss')) return;
+    var st = document.createElement('style'); st.id = 'wxCss';
+    st.textContent =
+      '.wx-chip{position:fixed;left:0;right:0;margin:0 auto;width:max-content;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:8000;max-width:calc(100vw - 32px);box-sizing:border-box;padding:8px 14px;border-radius:18px;border:1.5px solid #ff8c1a;background:rgba(12,14,22,.94);color:#f1f5f9;font:700 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '.wx-chip[hidden]{display:none}.wx-chip .wx-tri{font-size:14px}body.rs-overlay-open .wx-chip{display:none !important}' +
+      '.wx-wrap{position:fixed;inset:0;z-index:9660;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}' +
+      '.wx-sheet{position:relative;width:min(600px,100%);max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box;background:#0e1219;color:#e5e7eb;border:1px solid rgba(255,255,255,.12);border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));font:14px "Hanken Grotesk",system-ui,sans-serif}' +
+      '.wx-sheet h2{margin:0 40px 4px 0;font-size:18px}.wx-sheet .wx-note{color:#9ca3af;font-size:12.5px;margin:0 0 12px}' +
+      '.wx-sheet .wx-x{position:absolute;right:10px;top:8px;background:none;border:0;color:#9ca3af;font-size:26px;cursor:pointer;min-width:44px;min-height:44px}' +
+      '.wx-card{border:1px solid rgba(255,255,255,.12);border-left:6px solid #ff8c1a;border-radius:12px;padding:12px;margin:0 0 12px}' +
+      '.wx-card .wx-lv{display:inline-block;font:800 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#0b0d14;border-radius:6px;padding:2px 7px;margin-right:6px;vertical-align:1px}' +
+      '.wx-card .wx-ev{font-size:16px;font-weight:800}.wx-card .wx-hl{margin:6px 0 4px;font-weight:600}' +
+      '.wx-card .wx-meta{color:#9ca3af;font-size:12.5px;margin:2px 0}' +
+      '.wx-card .wx-sec{font:700 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9fd8ff;margin:10px 0 3px}' +
+      '.wx-card .wx-txt{white-space:pre-line;line-height:1.45;font-size:13.5px}' +
+      '.wx-card a{display:inline-block;margin-top:10px;color:#38d4ff;font-weight:700;text-decoration:none}' +
+      '.wx-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}' +
+      '.wx-names button{font:600 13px "Hanken Grotesk",system-ui,sans-serif;padding:6px 10px;border-radius:14px;border:1px solid rgba(56,212,255,.5);background:transparent;color:#e5e7eb;cursor:pointer}' +
+      '.dream-brief .db-wx{border:1.5px solid #ff8c1a;border-radius:10px;padding:7px 9px;margin:0 0 9px;background:rgba(10,12,18,.72)}' +
+      '.dream-brief .db-wx-t{font:800 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#fde68a;margin-bottom:4px}' +
+      '.dream-brief .db-wx-row{font-size:13px;line-height:1.35;margin:2px 0;display:flex;gap:6px;align-items:baseline}' +
+      '.dream-brief .db-wx-lv{flex:none;font:800 10px "Hanken Grotesk",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:#0b0d14;border-radius:5px;padding:1px 5px;text-shadow:none}' +
+      '.dream-brief .db-wx-more,.dream-brief .db-wx-tap{font-size:11.5px;color:#cbd5e1;margin-top:3px}' +
+      '.dream-brief.is-iso .db-wx-row{font-size:15.5px}.dream-brief.is-iso .db-wx-t{font-size:12.5px}';
+    document.head.appendChild(st);
+  }
+  function _card(w, names) {
+    var col = COLORS[w.level] || '#ff8c1a';
+    var times = [w.onset && w.onset > Date.now() ? _t('wx.from', 'From {time}', { time: _when(w.onset) }) : '', w.expires ? _t('wx.until', 'Until {time}', { time: _when(w.expires) }) : ''].filter(Boolean).join(' · ');
+    var h = '<div class="wx-card" style="border-left-color:' + col + '">' +
+      '<div><span class="wx-lv" style="background:' + col + '">' + _esc(_levelLabel(w.level)) + '</span><span class="wx-ev">' + _esc(w.event || w.headline) + '</span></div>' +
+      (w.headline && w.headline !== w.event ? '<div class="wx-hl">' + _esc(w.headline) + '</div>' : '') +
+      (w.area ? '<div class="wx-meta">' + _esc(w.area) + (w.km != null ? ' · ' + _esc(_t('wx.km', '{n} km away', { n: w.km })) : '') + '</div>' : '') +
+      (times ? '<div class="wx-meta">' + _esc(times) + '</div>' : '') +
+      '<div class="wx-meta">' + _esc([w.sender ? _t('wx.issued', 'Issued by {sender}', { sender: w.sender }) : '', _t('wx.source', 'Source: {source}', { source: w.source })].filter(Boolean).join(' · ')) + '</div>' +
+      (w.instruction ? '<div class="wx-sec">' + _esc(_t('wx.whatToDo', 'What to do')) + '</div><div class="wx-txt">' + _esc(w.instruction) + '</div>' : '') +
+      (w.description ? '<div class="wx-sec">' + _esc(_t('wx.details', 'Details')) + '</div><div class="wx-txt">' + _esc(w.description) + '</div>' : '') +
+      (names ? '<div class="wx-names">' + names + '</div>' : '') +
+      (w.url ? '<a href="' + _esc(w.url) + '" target="_blank" rel="noopener">' + _esc(_t('wx.open', 'Open the official warning')) + ' ›</a>' : '') +
+      '</div>';
+    return h;
+  }
+  function _closeSheet() { if (_sheet) { _sheet.remove(); _sheet = null; try { rsOverlayFlag('wxSheet', false); } catch (e) {} } }
+  function _openSheet(forKey) {
+    _css();
+    var html = '', title = '', note = '';
+    var ago = _at ? Math.max(0, Math.round((Date.now() - _at) / 60000)) : null;
+    var checked = ago == null ? '' : _t('wx.checked', 'Checked {n} min ago.', { n: ago });
+    if (forKey === 'circle') {
+      title = _t('wx.sheetCircle', 'Official warnings in your Circle');
+      var groups = new Map();
+      _by.forEach(function (v, k) {
+        listFor(k).forEach(function (w) {
+          if (!groups.has(w.id)) groups.set(w.id, { w: w, keys: [] });
+          groups.get(w.id).keys.push(k);
+        });
+      });
+      var list = Array.from(groups.values()).sort(function (a, b) { return (b.w.level - a.w.level) || (b.keys.length - a.keys.length); });
+      html = list.map(function (g) {
+        var names = g.keys.map(function (k) {
+          if (k === 'self') return '<button type="button" data-self="1">' + _esc(_t('wx.youName', 'You')) + '</button>';
+          var c = _contact(k); return c ? '<button type="button" data-k="' + _esc(k) + '">' + _esc(_first(c) + (c.last ? ' ' + c.last : '')) + '</button>' : '';
+        }).join('');
+        return _card(g.w, names);
+      }).join('');
+      note = checked;
+    } else {
+      var c = forKey === 'self' ? null : _contact(forKey);
+      var e = _by.get(String(forKey)) || {};
+      title = c ? _t('wx.where', 'Warnings where {name} is', { name: _first(c) }) : _t('wx.whereYou', 'Warnings where you are');
+      var how = e.approx && e.apx ? _t('wx.approx', 'Checked for: {place}.', { place: WhereIs.approxText(e.apx) }) : (e.live ? _t('wx.live', 'Checked at the shared location.') : '');
+      note = [how, checked].filter(Boolean).join(' ');
+      html = listFor(forKey).map(function (w) { return _card(w, ''); }).join('') || '<p class="wx-note">' + _esc(_t('wx.noneNow', 'No official warnings there now.')) + '</p>';
+    }
+    _closeSheet();
+    var wrap = document.createElement('div'); wrap.className = 'wx-wrap'; wrap.id = 'wxSheetWrap';
+    wrap.innerHTML = '<div class="wx-sheet" role="dialog" aria-modal="true" aria-labelledby="wxTitle"><button type="button" class="wx-x" aria-label="' + _esc(_t('wx.close', 'Close')) + '">×</button>' +
+      '<h2 id="wxTitle">' + _esc(title) + '</h2>' + (note ? '<p class="wx-note">' + _esc(note) + '</p>' : '') + html + '</div>';
+    wrap._for = forKey;
+    wrap.addEventListener('click', function (ev) {
+      if (ev.target === wrap || ev.target.closest('.wx-x')) { _closeSheet(); return; }
+      var b = ev.target.closest('.wx-names button'); if (!b) return;
+      _closeSheet();
+      try {
+        if (b.getAttribute('data-self')) { focusedContactId = null; return; }
+        var id = _contact(b.getAttribute('data-k')); if (!id) return;
+        try { if (SentinelViews.getActiveView() && !SentinelViews.getFilteredContacts().has(id.id)) SentinelViews.activateView(null); } catch (e2) {}
+        focusedContactId = id.id; netSpin = false;
+      } catch (e3) {}
+    });
+    wrap.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { ev.stopPropagation(); _closeSheet(); } });
+    ['pointerdown', 'touchstart', 'mousedown'].forEach(function (ev) { wrap.addEventListener(ev, function (e) { e.stopPropagation(); }, { passive: true }); });
+    document.body.appendChild(wrap);
+    _sheet = wrap;
+    try { rsOverlayFlag('wxSheet', true); } catch (e) {}
+    setTimeout(function () { try { wrap.querySelector('.wx-x').focus(); } catch (e) {} }, 30);
+  }
+
+  /* Taps on the warnings at the top of the dream summary open the full text */
+  function _bindDreamTap() {
+    var st = document.getElementById('stage'), cv = document.getElementById('sphere');
+    if (!st || !cv) return;
+    var down = false;
+    var inHit = function (e) {
+      var h = window._dreamWarnHit; if (!h) return false;
+      var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      return x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
+    };
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(function (evt) {
+      st.addEventListener(evt, function (e) { var p = (e.touches && e.touches[0]) || e; if (inHit(p)) { down = true; e.stopImmediatePropagation(); } }, true);
+    });
+    ['pointerup', 'mouseup', 'touchend', 'click'].forEach(function (evt) {
+      st.addEventListener(evt, function (e) {
+        if (!down) return;
+        e.stopImmediatePropagation(); e.preventDefault();
+        if (evt === 'pointerup' || evt === 'touchend') { down = false; try { if (focusedContactId != null) _openSheet(String(focusedContactId)); } catch (err) {} }
+      }, true);
+    });
+  }
+
+  /* Every frame: the chip follows the galaxy state */
+  var _lastPaint = 0;
+  function frame() {
+    var now = Date.now(); if (now - _lastPaint < 250) return; _lastPaint = now;
+    _paintChip(false);
+  }
+  function init() {
+    _css();
+    _bindDreamTap();
+    setTimeout(function () { refresh(true); }, 8000);
+    /* Approximate areas load in the background; a second look soon after the first */
+    setTimeout(function () { refresh(true); }, 70000);
+    setInterval(function () { if (document.visibilityState === 'visible') refresh(false); }, 60000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refresh(false); });
+    try {
+      if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
+        if (e.data && e.data.type === 'PUSH_RECEIVED' && e.data.kind === 'warning') refresh(true);
+      });
+    } catch (e) {}
+    window.addEventListener('localeChanged', function () { _sig++; _paintChip(true); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else setTimeout(init, 0);
+  return { refresh: refresh, listFor: listFor, levelFor: levelFor, drawMark: drawMark, briefHtml: briefHtml, frame: frame, open: _openSheet,
+    _setForTest: function (map) { _by = new Map(Object.keys(map).map(function (k) { return [k, map[k]]; })); _at = Date.now(); _sig++; _paintChip(true); },
+    get sig() { return _sig; } };
 })();
 
 /* ══════════════════════════════════════════════════════════════
@@ -29305,6 +29668,12 @@ function drawNetworkView(t) {
       ctx.beginPath(); ctx.arc(sx, sy, r + Math.max(4, 7 * s), 0, Math.PI * 2); ctx.stroke();
     }
 
+    /* ── Official warning where this person is ── */
+    try {
+      const _wl = Warnings.levelFor(node.contact.id);
+      if (_wl >= 2) Warnings.drawMark(ctx, sx + r * 0.78, sy - r * 0.78, Math.max(6, Math.min(16, r * 0.36)), _wl, alphaOverride || 1, t);
+    } catch (e) {}
+
     /* ── Quick-action icons beneath focused/enlarged sphere ── */
     if (isFocused && s > 0.38) {
       drawQuickActionIcons(ctx, sx, sy, r, s, node.contact, t);
@@ -29514,6 +29883,8 @@ function drawNetworkView(t) {
     }
   }
 
+  /* Official warning where I am */
+  try { const _swl = Warnings.levelFor('self'); if (_swl >= 2) Warnings.drawMark(ctx, cx + centerR * 0.74, cy - centerR * 0.74, Math.max(9, centerR * 0.16), _swl, 1, t); } catch (e) {}
   } /* end centre sphere (not drawn in ISO VIEW) */
 
   /* ── PASS 2: Draw contact spheres IN FRONT of center (with transparency) ── */
@@ -29540,6 +29911,7 @@ function frame(ts) {
   }
   try { Comm.frame(); } catch (e) {}
   try { IsoView.frame(); } catch (e) {}
+  try { Warnings.frame(); } catch (e) {}
 
   /* Mini sphere — draw individual contact sphere, NOT the galaxy */
   if (blufOpen && miniCtx) {
