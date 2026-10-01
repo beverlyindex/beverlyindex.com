@@ -5129,6 +5129,7 @@
 .roster-done-banner strong { color:#8fd694; }
 .roster-done-banner small { display:block; color:rgba(255,255,255,0.6); margin-top:4px; font-size:12px; }
 .roster-done-banner button { position:absolute; top:6px; right:6px; width:32px; height:32px; border:none; background:transparent; color:rgba(255,255,255,0.7); font-size:20px; cursor:pointer; border-radius:8px; }
+.roster-done-banner button.roster-undo-import { position:static; display:inline-block; width:auto; height:auto; margin-top:8px; padding:8px 12px; font:600 13px "Hanken Grotesk",system-ui,sans-serif; color:#ff8a93; border:1px solid rgba(255,90,102,0.6); border-radius:10px; }
 .ob-roster-note { margin:8px 0 0; font:13px/1.4 "Hanken Grotesk",system-ui,sans-serif; color:#e8d48b; }
 .ob-roster-note:empty { display:none; }
 /* Roster import: search tab, table preview, large list tools */
@@ -7067,6 +7068,11 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
         <button class="si-btn primary" id="siDoneBtn" onclick="SocialImport.done()" style="display:none;" data-i18n="social.done">Done: see them in your Circle</button>
       </div>
     </div>
+  </div>
+
+  <div class="settings-section" id="recentImportsSection" data-cat="circle">
+    <div class="settings-section-title" data-i18n="bulk.recentTitle">Recent imports</div>
+    <div class="settings-card"><div id="recentImportsList"></div></div>
   </div>
 
   <div class="settings-section" data-cat="account">
@@ -12925,6 +12931,40 @@ const I18n = (function () {
     "iso.unlockAria": "Unlock ISO view",
     "iso.hint": "Hold ISO to see only {name}. Double-tap to keep it on.",
     "iso.lockedToast": "ISO locked. Tap ISO once, or the ×, to unlock.",
+    "bulk.confirm": "Remove {n} from your Circle? Their notes and history go with them. You can undo this for 10 seconds.",
+    "bulk.confirmImport": "Remove the {n} people this import added? You can undo this for 10 seconds.",
+    "bulk.removeBtn": "Remove {n}",
+    "bulk.removed": "{n} removed from your Circle.",
+    "bulk.undo": "Undo",
+    "bulk.undone": "{n} back in your Circle.",
+    "bulk.undoImport": "Undo this import",
+    "bulk.recentTitle": "Recent imports",
+    "bulk.recentNone": "Each import you make from now on is listed here, so you can remove it in one step.",
+    "bulk.recentMeta": "{date} · {n} in your Circle",
+    "bulk.removeAll": "Remove all ({n})",
+    "bulk.choose": "Choose who to remove",
+    "bulk.chooseTitle": "{name}: choose who to remove",
+    "bulk.chooseHelp": "Tap the people to remove, or Select all and untick the ones to keep.",
+    "bulk.selectAll": "Select all",
+    "bulk.selectNone": "Select none",
+    "bulk.removeN": "Remove {n} from my Circle",
+    "bulk.cancel": "Cancel",
+    "bulk.importOf": "Import of {date}",
+    "tb.removeMenu": "Remove people from my Circle",
+    "tb.removePick": "Remove people from your Circle: pick a group",
+    "tb.removeGroupH": "{name}: remove people from your Circle",
+    "tb.removeTeams": "Teams",
+    "tb.backRemove": "‹ All groups",
+    "tb.trimDrag": "Drag spheres to remove",
+    "tb.trimStart": "Drag a sphere onto the pulsing button to mark it for removal. Drag it again to unmark it. Tap the button to remove the marked people.",
+    "tb.trimFab": "Remove · {n}",
+    "tb.trimAria": "{n} marked for removal. Drag spheres here. Tap to remove them.",
+    "tb.marked": "Marked to remove: {name}",
+    "tb.unmarked": "Unmarked: {name}",
+    "tb.trimNone": "Nobody was marked.",
+    "tb.trimConfirmT": "Remove {n} from your Circle?",
+    "tb.trimMore": "and {n} more",
+    "tb.trimUndoNote": "You can undo this for 10 seconds.",
     "ledger.reviewDictation": "Review, then tap Log",
     "medimg.title": "Scan a medication label",
     "medimg.hint": "Point the camera at the medication label or upload a photo",
@@ -13231,6 +13271,40 @@ const I18n = (function () {
     "iso.unlockAria": "Sblocca la vista ISO",
     "iso.hint": "Tieni premuto ISO per vedere solo {name}. Tocca due volte per tenerla attiva.",
     "iso.lockedToast": "ISO bloccata. Tocca ISO una volta, o la ×, per sbloccare.",
+    "bulk.confirm": "Togliere {n} dalla tua cerchia? Le loro note e la loro cronologia vanno con loro. Puoi annullare per 10 secondi.",
+    "bulk.confirmImport": "Togliere le {n} persone aggiunte da questa importazione? Puoi annullare per 10 secondi.",
+    "bulk.removeBtn": "Togli {n}",
+    "bulk.removed": "{n} persone tolte dalla tua cerchia.",
+    "bulk.undo": "Annulla",
+    "bulk.undone": "{n} persone di nuovo nella tua cerchia.",
+    "bulk.undoImport": "Annulla questa importazione",
+    "bulk.recentTitle": "Importazioni recenti",
+    "bulk.recentNone": "Ogni importazione che fai da ora in poi compare qui, così puoi toglierla in un solo passo.",
+    "bulk.recentMeta": "{date} · {n} nella tua cerchia",
+    "bulk.removeAll": "Togli tutti ({n})",
+    "bulk.choose": "Scegli chi togliere",
+    "bulk.chooseTitle": "{name}: scegli chi togliere",
+    "bulk.chooseHelp": "Tocca le persone da togliere, oppure Seleziona tutti e togli la spunta a chi resta.",
+    "bulk.selectAll": "Seleziona tutti",
+    "bulk.selectNone": "Deseleziona tutti",
+    "bulk.removeN": "Togli {n} dalla mia cerchia",
+    "bulk.cancel": "Annulla",
+    "bulk.importOf": "Importazione del {date}",
+    "tb.removeMenu": "Togli persone dalla mia cerchia",
+    "tb.removePick": "Togli persone dalla tua cerchia: scegli un gruppo",
+    "tb.removeGroupH": "{name}: togli persone dalla tua cerchia",
+    "tb.removeTeams": "Squadre",
+    "tb.backRemove": "‹ Tutti i gruppi",
+    "tb.trimDrag": "Trascina le sfere da togliere",
+    "tb.trimStart": "Trascina una sfera sul pulsante che pulsa per segnarla da togliere. Trascinala di nuovo per togliere il segno. Tocca il pulsante per togliere le persone segnate.",
+    "tb.trimFab": "Togli · {n}",
+    "tb.trimAria": "{n} segnate da togliere. Trascina qui le sfere. Tocca per toglierle.",
+    "tb.marked": "Segnata da togliere: {name}",
+    "tb.unmarked": "Segno tolto: {name}",
+    "tb.trimNone": "Nessuno è stato segnato.",
+    "tb.trimConfirmT": "Togliere {n} dalla tua cerchia?",
+    "tb.trimMore": "e altre {n}",
+    "tb.trimUndoNote": "Puoi annullare per 10 secondi.",
     "ledger.reviewDictation": "Controlla, poi tocca Registra",
     "medimg.title": "Leggi l’etichetta di un farmaco",
     "medimg.hint": "Inquadra l’etichetta del farmaco o carica una foto",
@@ -20139,7 +20213,7 @@ const SentinelViews = (() => {
      id to the server id), so a person who comes back after a restore or a
      re-sync is put back by themselves. Someone who leaves the Circle leaves
      the view too and is listed in view.away, so an empty view can say why. */
-  const AWAY_MAX = 40;
+  const AWAY_MAX = 250;
   function _sid(id) { try { return (typeof SyncEngine !== 'undefined' && SyncEngine.serverIdForContact) ? SyncEngine.serverIdForContact(id) : null; } catch (e) { return null; } }
   function _localFor(sid) { try { return (sid != null && typeof SyncEngine !== 'undefined' && SyncEngine.localContactFor) ? SyncEngine.localContactFor(sid) : null; } catch (e) { return null; } }
   function _liveIds() { const s = new Set(); try { DEMO_CONTACTS.forEach(c => s.add(String(c.id))); } catch (e) {} return s; }
@@ -20238,7 +20312,8 @@ const SentinelViews = (() => {
     let el = document.getElementById('svEmpty');
     const v = getActiveView();
     const show = !!v && typeof appState !== 'undefined' && appState === 'network' && _shown(v) === 0 &&
-      !(typeof TeamBuilder !== 'undefined' && TeamBuilder.session);
+      !(typeof TeamBuilder !== 'undefined' && TeamBuilder.session) &&
+      !(typeof BulkRemove !== 'undefined' && BulkRemove.pending); /* not during the Undo window */
     if (!show) { if (el && !el.hidden) el.hidden = true; return; }
     if (!el) {
       el = document.createElement('div');
@@ -20477,7 +20552,12 @@ var ContactDetails = (function() {
       var v = normalize(f, d[f]);
       if (v !== null && v !== undefined && v !== '') out[f] = v;
     });
-    if (d.source && SOURCE_KINDS[d.source.kind]) out.source = { kind: d.source.kind, ref: d.source.ref != null ? String(d.source.ref).slice(0, 200) : null };
+    if (d.source && SOURCE_KINDS[d.source.kind]) {
+      out.source = { kind: d.source.kind, ref: d.source.ref != null ? String(d.source.ref).slice(0, 200) : null };
+      /* Which import brought this person in, and when: lets the whole import be removed in one step */
+      if (typeof d.source.batch === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(d.source.batch)) out.source.batch = d.source.batch;
+      if (typeof d.source.at === 'number' && isFinite(d.source.at) && d.source.at > 0) out.source.at = Math.round(d.source.at);
+    }
     var posts = cleanPosts(d.posts);
     if (posts.length) out.posts = posts;
     var kd = cleanKeyDates(d.keyDates);
@@ -24259,6 +24339,7 @@ var RosterImport = (function() {
   var _source = null;      /* {kind, ref} stored on each imported contact */
   var _importedIds = [];   /* ids created by the current import, for the Team view */
   var _importTeamName = '';
+  var _lastBatch = null;  /* the import just made, for Undo this import */
   var _filter = { q: '', group: '' };
   var _ocrTable = false;  /* last image read found a table header */
   var _lastId = 0;
@@ -25570,6 +25651,17 @@ var RosterImport = (function() {
       ph.textContent = _t('roster.photos.progress', { k: 0, n: photos });
       b.appendChild(ph);
     }
+    /* Undo this import: everyone it added leaves the Circle in one step */
+    try {
+      var _ub = _lastBatch;
+      if (added > 0 && _ub && BulkRemove.idsInBatch(_ub).length) {
+        var u = document.createElement('button');
+        u.type = 'button'; u.className = 'roster-undo-import';
+        u.textContent = BulkRemove.label('bulk.undoImport', 'Undo this import');
+        u.onclick = function () { BulkRemove.removeBatch(_ub, { importMsg: true }).then(function (ok) { if (ok) b.remove(); }); };
+        b.appendChild(u); b._undo = true;
+      }
+    } catch (e) {}
     var x = document.createElement('button');
     x.type = 'button';
     x.setAttribute('aria-label', _t('roster.banner.close'));
@@ -25582,7 +25674,8 @@ var RosterImport = (function() {
       clearTimeout(b._timer);
       b._timer = setTimeout(function() { if (b.parentNode) { b.style.opacity = '0'; setTimeout(function() { b.remove(); }, 350); } }, ms);
     };
-    if (!photos) b._hide(12000);
+    /* With Undo this import on it, the banner stays longer */
+    if (!photos) b._hide(b._undo ? 30000 : 12000);
     return b;
   }
 
@@ -25644,7 +25737,8 @@ var RosterImport = (function() {
     var inWizard = _obWizardActive();
     var seen = _existingNameSet(inWizard);
     var added = 0, skipped = _parseDupes, jobs = [];
-    var src = _source || { kind: 'paste', ref: null };
+    var src = Object.assign({}, _source || { kind: 'paste', ref: null }, { batch: BulkRemove.newBatch(), at: Date.now() });
+    _lastBatch = src.batch;
     _importedIds = []; _importTeamName = '';
     _importing = true;
     _importBusy(btn, 0, selected.length);
@@ -29205,7 +29299,7 @@ function drawNetworkView(t) {
     if (typeof TeamBuilder !== 'undefined' && TeamBuilder && TeamBuilder.isMember(node.contact.id)) {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 0.95 * (alphaOverride || 1);
-      ctx.strokeStyle = '#E8C766';
+      ctx.strokeStyle = (TeamBuilder.isTrim && TeamBuilder.isTrim()) ? '#FF5A66' : '#E8C766';
       ctx.lineWidth = Math.max(2.5, 4 * s);
       ctx.setLineDash([]);
       ctx.beginPath(); ctx.arc(sx, sy, r + Math.max(4, 7 * s), 0, Math.PI * 2); ctx.stroke();
@@ -30088,6 +30182,7 @@ const SettingsNav = (function () {
     _title(_t(c.t[0], c.t[1]));
     try { if (id === 'location' && typeof WhereIs !== 'undefined') WhereIs.onSettingsOpen(); } catch (e) {}
     try { if (id === 'account' && typeof AccountPanel !== 'undefined') AccountPanel.render(); } catch (e) {}
+    try { if (id === 'circle' && typeof BulkRemove !== 'undefined') BulkRemove.renderRecent(); } catch (e) {}
     try { if (id === 'alerts' && typeof Nearby !== 'undefined') Nearby.renderSettings(); } catch (e) {}
     /* Sections that need an account stay hidden until sign in: say so, with the way there */
     setTimeout(() => {
@@ -32659,10 +32754,7 @@ const ContactListView = (() => {
     _render();
   }
   async function _removeFromCircle(ids) {
-    const n = ids.length;
-    if (!(await uiConfirm(_t('clv.confirmCircle', 'Remove {n} from your circle? Their notes and history on this device go with them.', { n: n })))) return;
-    for (const id of ids) { try { await removeContactFromCircle(id); } catch (e) { console.warn('remove failed', e); } }
-    showToast(_t('clv.removedCircle', '{n} removed from your circle.', { n: n }));
+    if (!(await BulkRemove.remove(ids))) return;
     _sel.clear();
     _render();
   }
@@ -35817,8 +35909,18 @@ const SocialImport = (() => {
      next step. Cancel is gone (there is nothing left to cancel), Done carries
      the rim, and pressing it closes the card and lands the user in their Circle
      where the new spheres are. */
-  function _finished(msg) {
+  function _finished(msg, r) {
     _showResult(msg, false);
+    try {
+      if (r && r.added && r.batch) {
+        var el = _$('siResult');
+        var u = document.createElement('button');
+        u.type = 'button'; u.className = 'si-btn si-undo-import';
+        u.textContent = BulkRemove.label('bulk.undoImport', 'Undo this import');
+        u.onclick = function () { BulkRemove.removeBatch(r.batch, { importMsg: true }).then(function (ok) { if (ok) { _justAdded = []; close(); } }); };
+        if (el) el.appendChild(u);
+      }
+    } catch (e) {}
     _$('siImportBtn').style.display = 'none';
     _$('siParseBtn').style.display = 'none';
     _$('siCancelBtn').style.display = 'none';
@@ -35967,7 +36069,8 @@ const SocialImport = (() => {
     return _lastImportId;
   }
   async function _addToCircle(list, notesFor, photoFor) {
-    var res = { added: 0, dupes: 0, failed: 0, photos: 0, ids: [] };
+    var res = { added: 0, dupes: 0, failed: 0, photos: 0, ids: [], batch: BulkRemove.newBatch() };
+    var _bAt = Date.now();
     var seen = {};
     var key = function (f, l) { return (String(f || '') + ' ' + String(l || '')).toLowerCase().trim(); };
     DEMO_CONTACTS.forEach(function (c) { seen[key(c.first, c.last)] = true; });
@@ -35982,6 +36085,7 @@ const SocialImport = (() => {
         phone: c.phone || '', email: c.email || '', sentinelId: '',
         notes: notesFor(c), createdAt: Date.now(), updatedAt: Date.now()
       };
+      try { nc.details = ContactDetails.clean({ source: { kind: 'paste', ref: null, batch: res.batch, at: _bAt } }); } catch (e) {}
       try { await RemielDB.putContact(nc); }
       catch (e) { console.warn('SocialImport: save failed for', c.first, e); res.failed++; continue; }
       seen[k] = true;
@@ -36049,7 +36153,7 @@ const SocialImport = (() => {
     btn.disabled = false;
     btn.textContent = label;
     if (!r.added) { _showResult(_nothingText(r), true); return; }
-    _finished(_resultText(r));
+    _finished(_resultText(r), r);
   }
 
   function _showResult(msg, isError) {
@@ -36238,7 +36342,7 @@ const SocialImport = (() => {
     btn.disabled = false;
     btn.textContent = _it('roster.importSelected', 'Import Selected', {});
     if (!r.added) { _showResult(_nothingText(r), true); return; }
-    _finished(_resultText(r));
+    _finished(_resultText(r), r);
     var thumbs = document.querySelectorAll('.cp-photo-thumb');
     thumbs.forEach(function(img) { try { URL.revokeObjectURL(img.src); } catch(e){} });
     _pickedContacts = [];
@@ -41647,9 +41751,11 @@ async function saveContactModal() {
 
 /* Remove a person everywhere: the live list, the database (synced as a
    tombstone), every Circle View that named them, and the galaxy. */
-async function removeContactFromCircle(id) {
+async function removeContactFromCircle(id, opts) {
+  opts = opts || {};
   const idx = DEMO_CONTACTS.findIndex(c => String(c.id) === String(id));
-  const goneName = idx !== -1 ? ((DEMO_CONTACTS[idx].first || '') + ' ' + (DEMO_CONTACTS[idx].last || '')).trim() : '';
+  const _known = idx !== -1 ? DEMO_CONTACTS[idx] : (opts.contact || null);
+  const goneName = _known ? ((_known.first || '') + ' ' + (_known.last || '')).trim() : '';
   let goneSid = null;
   try { if (typeof SyncEngine !== 'undefined' && SyncEngine.serverIdForContact) goneSid = SyncEngine.serverIdForContact(id); } catch (e) {}
   if (idx !== -1) DEMO_CONTACTS.splice(idx, 1);
@@ -41659,8 +41765,235 @@ async function removeContactFromCircle(id) {
   if (selectedContact && String(selectedContact.id) === String(id)) { selectedContact = null; if (blufOpen) closeBluf(); }
   if (focusedContactId != null && String(focusedContactId) === String(id)) focusedContactId = null;
   try { if (typeof SyncEngine !== 'undefined' && SyncEngine.markDirty) SyncEngine.markDirty(); } catch (e) {}
-  buildNodes(false);
+  if (!opts.quiet) buildNodes(false);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   BulkRemove: many people leave the Circle in one step, as quickly
+   as they came in. One confirmation for the whole group; they leave
+   the galaxy at once and an Undo bar holds the removal for 10 seconds
+   before anything is deleted. Every import is remembered as a batch
+   (on each person's source, so it syncs), which gives Undo this
+   import, Recent imports in Settings, and the Team menu's
+   Remove people from my Circle.
+   ═══════════════════════════════════════════════════════════ */
+var BulkRemove = (function () {
+  var UNDO_MS = 10000;
+  var _pending = null, _tick = null;
+  function label(k, fb, p) {
+    try { var v = I18n.t(k, p); if (v && v !== k) return v; } catch (e) {}
+    var out = fb; Object.keys(p || {}).forEach(function (n) { out = out.split('{' + n + '}').join(p[n]); }); return out;
+  }
+  function _esc(x) { var d = document.createElement('div'); d.textContent = x == null ? '' : String(x); return d.innerHTML; }
+  function _name(c) { return ((c.first || '') + ' ' + (c.last || '')).trim() || '?'; }
+  function _find(id) { return DEMO_CONTACTS.find(function (c) { return String(c.id) === String(id); }) || null; }
+  function newBatch() { return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function _src(c) { var d = c && c.details; return d && typeof d === 'object' && d.source ? d.source : null; }
+  function idsInBatch(batch) { return DEMO_CONTACTS.filter(function (c) { var s = _src(c); return s && s.batch === batch; }).map(function (c) { return c.id; }); }
+  function _locale() { try { return I18n.locale === 'it' ? 'it-IT' : 'en-US'; } catch (e) { return undefined; } }
+  function _batchName(b) {
+    try {
+      var set = new Set(b.ids.map(String)), best = null, bn = 0;
+      SentinelViews.views.forEach(function (v) {
+        if (v.type !== 'team') return;
+        var n = (v.contactIds || []).filter(function (id) { return set.has(String(id)); }).length;
+        if (n > bn) { bn = n; best = v; }
+      });
+      if (best && bn * 2 >= b.ids.length) return best.name;
+    } catch (e) {}
+    if (b.ref && b.kind !== 'search') return String(b.ref).replace(/\.[a-z0-9]+$/i, '');
+    var d = ''; try { d = new Date(b.at || Date.now()).toLocaleDateString(_locale(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) {}
+    return label('bulk.importOf', 'Import of {date}', { date: d });
+  }
+  /* Imports still represented in the Circle, newest first */
+  function batches() {
+    var map = {};
+    DEMO_CONTACTS.forEach(function (c) {
+      var s = _src(c); if (!s || !s.batch) return;
+      var b = map[s.batch] || (map[s.batch] = { id: s.batch, at: s.at || 0, kind: s.kind, ref: s.ref, ids: [] });
+      b.ids.push(c.id);
+    });
+    var list = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.at - a.at; });
+    list.forEach(function (b) { b.name = _batchName(b); });
+    return list;
+  }
+  function _rebuild() {
+    try { buildNodes(false); } catch (e) {}
+    try { if (typeof ContactListView !== 'undefined' && ContactListView.refresh) ContactListView.refresh(); } catch (e) {}
+    try { if (typeof SentinelViews !== 'undefined') SentinelViews.refresh(); } catch (e) {}
+    try { if (typeof updateBlufContent === 'function') updateBlufContent(); } catch (e) {}
+    try { renderRecent(); } catch (e) {}
+  }
+  /* The removal itself: confirm once, hide at once, delete after the Undo window */
+  async function remove(ids, opts) {
+    opts = opts || {};
+    var recs = [];
+    (ids || []).forEach(function (id) { var c = _find(id); if (c && !recs.some(function (r) { return r.c === c; })) recs.push({ c: c, idx: -1 }); });
+    if (!recs.length) return false;
+    var n = recs.length;
+    if (!opts.confirmed) {
+      var msg = opts.importMsg
+        ? label('bulk.confirmImport', 'Remove the {n} people this import added? You can undo this for 10 seconds.', { n: n })
+        : label('bulk.confirm', 'Remove {n} from your Circle? Their notes and history go with them. You can undo this for 10 seconds.', { n: n });
+      if (!(await uiConfirm(msg, label('bulk.removeBtn', 'Remove {n}', { n: n })))) return false;
+    }
+    await commitPending();
+    var set = new Set(recs.map(function (r) { return String(r.c.id); }));
+    for (var i = DEMO_CONTACTS.length - 1; i >= 0; i--) {
+      var c = DEMO_CONTACTS[i];
+      if (set.has(String(c.id))) { recs.forEach(function (r) { if (r.c === c) r.idx = i; }); DEMO_CONTACTS.splice(i, 1); }
+    }
+    try { if (focusedContactId != null && set.has(String(focusedContactId))) focusedContactId = null; } catch (e) {}
+    try { if (selectedContact && set.has(String(selectedContact.id)) && blufOpen) closeBluf(); } catch (e) {}
+    _pending = { recs: recs, until: Date.now() + UNDO_MS };
+    _pending.timer = setTimeout(commitPending, UNDO_MS);
+    _rebuild();
+    _bar();
+    return true;
+  }
+  function removeBatch(batch, opts) { return remove(idsInBatch(batch), opts); }
+  async function commitPending() {
+    var p = _pending; if (!p) return;
+    _pending = null; clearTimeout(p.timer); _hideBar();
+    /* Ten at a time, so a roster of 100 is gone in moments */
+    for (var i = 0; i < p.recs.length; i += 10) {
+      await Promise.all(p.recs.slice(i, i + 10).map(function (r) {
+        return removeContactFromCircle(r.c.id, { quiet: true, contact: r.c }).catch(function (e) { console.warn('BulkRemove: remove failed', e); });
+      }));
+    }
+    _rebuild();
+  }
+  function undo() {
+    var p = _pending; if (!p) return;
+    _pending = null; clearTimeout(p.timer); _hideBar();
+    p.recs.slice().sort(function (a, b) { return a.idx - b.idx; }).forEach(function (r) {
+      if (!_find(r.c.id)) DEMO_CONTACTS.splice(Math.max(0, Math.min(r.idx, DEMO_CONTACTS.length)), 0, r.c);
+    });
+    _rebuild();
+    try { showToast(label('bulk.undone', '{n} back in your Circle.', { n: p.recs.length })); } catch (e) {}
+  }
+  /* Leaving the app inside the Undo window completes the removal */
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') commitPending(); });
+
+  function _css() {
+    if (document.getElementById('bulkRemoveCss')) return;
+    var st = document.createElement('style'); st.id = 'bulkRemoveCss';
+    st.textContent =
+      '.br-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9700;display:flex;align-items:center;gap:12px;width:min(460px,calc(100vw - 32px));box-sizing:border-box;padding:10px 10px 10px 16px;border-radius:14px;background:#10131c;border:1px solid rgba(255,90,102,.55);color:#e8ecf4;font:600 14px "Hanken Grotesk",system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.6)}' +
+      '.br-bar button{font:inherit;font-weight:800;padding:9px 16px;border-radius:10px;border:0;background:#38d4ff;color:#04121a;cursor:pointer;white-space:nowrap}' +
+      '.br-bar .br-s{color:#94a3b8;font-weight:500;font-size:12px;white-space:nowrap}' +
+      '.br-bar .br-t{flex:1;min-width:0}' +
+      '.br-wrap{position:fixed;inset:0;z-index:9650;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}' +
+      '.br-sheet{width:min(560px,100%);max-height:88vh;display:flex;flex-direction:column;box-sizing:border-box;background:#0e1219;color:#e5e7eb;border:1px solid rgba(255,255,255,.12);border-radius:16px 16px 0 0;padding:16px 16px calc(14px + env(safe-area-inset-bottom,0px));font:14px "Hanken Grotesk",system-ui,sans-serif}' +
+      '.br-sheet h2{margin:0 36px 4px 0;font-size:17px}' +
+      '.br-sheet .br-help{margin:0 0 10px;color:#9ca3af;font-size:13px;line-height:1.4}' +
+      '.br-sheet .br-x{position:absolute;right:12px;top:10px;background:none;border:0;color:#9ca3af;font-size:24px;cursor:pointer;min-width:44px;min-height:44px}' +
+      '.br-tools{display:flex;gap:8px;margin:0 0 8px}' +
+      '.br-tools button{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid rgba(56,212,255,.5);background:transparent;color:#e5e7eb;font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}' +
+      '.br-list{list-style:none;margin:0;padding:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}' +
+      '.br-item{display:flex;gap:12px;align-items:center;padding:10px 6px;border-top:1px solid rgba(255,255,255,.07);cursor:pointer;border-radius:10px}' +
+      '.br-item.on{background:rgba(255,90,102,.12)}' +
+      '.br-check{flex:none;width:24px;height:24px;border-radius:6px;border:2px solid rgba(255,90,102,.75);display:flex;align-items:center;justify-content:center;color:#fff;font:800 15px system-ui}' +
+      '.br-item.on .br-check{background:#ff5a66;border-color:#ff5a66}' +
+      '.br-nm{font-weight:600}.br-sub{color:#9ca3af;font-size:12px}' +
+      '.br-foot{display:flex;gap:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.1);margin-top:6px}' +
+      '.br-foot button{flex:1;font:inherit;font-weight:700;padding:12px;border-radius:12px;cursor:pointer}' +
+      '.br-foot .br-cancel{background:transparent;color:#e5e7eb;border:1px solid rgba(255,255,255,.3)}' +
+      '.br-foot .br-go{background:#ff5a66;color:#fff;border:0}.br-foot .br-go:disabled{opacity:.4;cursor:default}' +
+      '.br-recent{display:flex;flex-direction:column;gap:10px}' +
+      '.br-rec{border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 12px}' +
+      '.br-rec .br-nm{font-size:14px}.br-rec .br-sub{margin:2px 0 8px}' +
+      '.br-rec .br-row{display:flex;gap:8px;flex-wrap:wrap}' +
+      '.br-rec button{font:600 13px "Hanken Grotesk",system-ui,sans-serif;padding:8px 12px;border-radius:10px;cursor:pointer;background:transparent;color:#e5e7eb;border:1px solid rgba(255,255,255,.3)}' +
+      '.br-rec button.br-danger{border-color:rgba(255,90,102,.6);color:#ff8a93}' +
+      '.br-none{color:#9ca3af;font-size:13px;margin:0}' +
+      '.roster-undo-import,.si-undo-import{margin-top:8px;font:600 13px "Hanken Grotesk",system-ui,sans-serif;padding:8px 12px;border-radius:10px;cursor:pointer;background:transparent;color:#ff8a93;border:1px solid rgba(255,90,102,.6)}';
+    document.head.appendChild(st);
+  }
+  function _bar() {
+    _css(); _hideBar();
+    var p = _pending; if (!p) return;
+    var b = document.createElement('div'); b.id = 'bulkUndoBar'; b.className = 'br-bar'; b.setAttribute('role', 'status');
+    var tx = document.createElement('span'); tx.className = 'br-t';
+    tx.textContent = label('bulk.removed', '{n} removed from your Circle.', { n: p.recs.length });
+    var sec = document.createElement('span'); sec.className = 'br-s';
+    var u = document.createElement('button'); u.type = 'button'; u.textContent = label('bulk.undo', 'Undo'); u.onclick = undo;
+    b.appendChild(tx); b.appendChild(sec); b.appendChild(u);
+    document.body.appendChild(b);
+    var upd = function () { if (!_pending) return; sec.textContent = Math.max(0, Math.ceil((_pending.until - Date.now()) / 1000)) + ' s'; };
+    upd(); _tick = setInterval(upd, 250);
+    try { if (typeof A11y !== 'undefined') A11y.announce(tx.textContent); } catch (e) {}
+  }
+  function _hideBar() { clearInterval(_tick); _tick = null; var b = document.getElementById('bulkUndoBar'); if (b) b.remove(); }
+
+  /* Choose who to remove: names with number and position, tap to mark */
+  function choose(ids, title) {
+    _css();
+    var list = (ids || []).map(_find).filter(Boolean);
+    if (!list.length) return;
+    list.sort(function (a, b) { return _name(a).localeCompare(_name(b), undefined, { numeric: true }); });
+    var sel = new Set();
+    var w = document.createElement('div'); w.className = 'br-wrap'; w.id = 'bulkChooser';
+    var sh = document.createElement('div'); sh.className = 'br-sheet'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.style.position = 'relative';
+    sh.innerHTML = '<button type="button" class="br-x" aria-label="' + _esc(label('bulk.cancel', 'Cancel')) + '">×</button>' +
+      '<h2>' + _esc(label('bulk.chooseTitle', '{name}: choose who to remove', { name: title || '' })) + '</h2>' +
+      '<p class="br-help">' + _esc(label('bulk.chooseHelp', 'Tap the people to remove, or Select all and untick the ones to keep.')) + '</p>' +
+      '<div class="br-tools"><button type="button" class="br-all"></button></div><ul class="br-list"></ul>' +
+      '<div class="br-foot"><button type="button" class="br-cancel">' + _esc(label('bulk.cancel', 'Cancel')) + '</button><button type="button" class="br-go"></button></div>';
+    w.appendChild(sh); document.body.appendChild(w);
+    try { rsOverlayFlag('bulkChooser', true); } catch (e) {}
+    var ul = sh.querySelector('.br-list'), all = sh.querySelector('.br-all'), go = sh.querySelector('.br-go');
+    list.forEach(function (c) {
+      var d = c.details || {};
+      var sub = [d.number ? '#' + d.number : '', d.position || '', d.team || ''].filter(Boolean).join(' · ');
+      var li = document.createElement('li'); li.className = 'br-item'; li.setAttribute('role', 'checkbox'); li.setAttribute('aria-checked', 'false'); li.tabIndex = 0;
+      li.innerHTML = '<span class="br-check" aria-hidden="true"></span><span><div class="br-nm">' + _esc(_name(c)) + '</div>' + (sub ? '<div class="br-sub">' + _esc(sub) + '</div>' : '') + '</span>';
+      li._id = c.id;
+      ul.appendChild(li);
+    });
+    function paint() {
+      ul.querySelectorAll('.br-item').forEach(function (li) { var on = sel.has(li._id); li.classList.toggle('on', on); li.setAttribute('aria-checked', String(on)); li.querySelector('.br-check').textContent = on ? '✓' : ''; });
+      all.textContent = sel.size === list.length ? label('bulk.selectNone', 'Select none') : label('bulk.selectAll', 'Select all');
+      go.textContent = label('bulk.removeN', 'Remove {n} from my Circle', { n: sel.size });
+      go.disabled = !sel.size;
+    }
+    function close() { w.remove(); try { rsOverlayFlag('bulkChooser', false); } catch (e) {} }
+    function flip(li) { if (sel.has(li._id)) sel.delete(li._id); else sel.add(li._id); paint(); }
+    ul.addEventListener('click', function (e) { var li = e.target.closest('.br-item'); if (li) flip(li); });
+    ul.addEventListener('keydown', function (e) { var li = e.target.closest('.br-item'); if (li && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); flip(li); } });
+    all.onclick = function () { if (sel.size === list.length) sel.clear(); else list.forEach(function (c) { sel.add(c.id); }); paint(); };
+    sh.querySelector('.br-x').onclick = close; sh.querySelector('.br-cancel').onclick = close;
+    w.addEventListener('click', function (e) { if (e.target === w) close(); });
+    w.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+    go.onclick = function () { var ids2 = Array.from(sel); remove(ids2).then(function (ok) { if (ok) close(); }); };
+    paint();
+    setTimeout(function () { try { all.focus(); } catch (e) {} }, 30);
+  }
+
+  /* Settings, People and Circle: Recent imports */
+  function renderRecent() {
+    var host = document.getElementById('recentImportsList'); if (!host) return;
+    _css();
+    var list = batches();
+    if (!list.length) { host.innerHTML = '<p class="br-none">' + _esc(label('bulk.recentNone', 'Each import you make from now on is listed here, so you can remove it in one step.')) + '</p>'; return; }
+    host.innerHTML = '<div class="br-recent">' + list.map(function (b, i) {
+      var d = ''; try { d = new Date(b.at || Date.now()).toLocaleDateString(_locale(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) {}
+      return '<div class="br-rec"><div class="br-nm">' + _esc(b.name) + '</div><div class="br-sub">' + _esc(label('bulk.recentMeta', '{date} · {n} in your Circle', { date: d, n: b.ids.length })) + '</div>' +
+        '<div class="br-row"><button type="button" class="br-danger" data-i="' + i + '" data-act="all">' + _esc(label('bulk.removeAll', 'Remove all ({n})', { n: b.ids.length })) + '</button>' +
+        '<button type="button" data-i="' + i + '" data-act="choose">' + _esc(label('bulk.choose', 'Choose who to remove')) + '</button></div></div>';
+    }).join('') + '</div>';
+    host.onclick = function (e) {
+      var bt = e.target.closest('button[data-act]'); if (!bt) return;
+      var b = list[+bt.getAttribute('data-i')]; if (!b) return;
+      if (bt.getAttribute('data-act') === 'all') removeBatch(b.id, { importMsg: true });
+      else choose(idsInBatch(b.id), b.name);
+    };
+  }
+  window.addEventListener('localeChanged', function () { try { renderRecent(); } catch (e) {} });
+
+  return { label: label, newBatch: newBatch, idsInBatch: idsInBatch, batches: batches, remove: remove, removeBatch: removeBatch,
+    commitPending: commitPending, undo: undo, choose: choose, renderRecent: renderRecent, get pending() { return !!_pending; } };
+})();
 
 async function deleteContactFromModal() {
   if (_cmEditId == null) return;
@@ -43354,6 +43687,10 @@ var TeamBuilder = (function () {
       '.team-menu .tm-pick .tm-n{color:#94a3b8;font-weight:500}' +
       '.team-menu .tm-sub{font:inherit;font-size:13px;padding:11px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#cbd5e1;cursor:pointer;white-space:nowrap}' +
       '.team-menu .tm-new{border-style:dashed;color:#38d4ff}' +
+      '.team-menu .tm-danger{border-color:rgba(255,90,102,.6);color:#ff8a93}' +
+      '.team-fab.trim{border-color:#ff5a66;color:#ffd0d4;animation:trimPulse 1.3s ease-in-out infinite}' +
+      '@keyframes trimPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,90,102,.65)}50%{box-shadow:0 0 0 10px rgba(255,90,102,0)}}' +
+      '@media (prefers-reduced-motion: reduce){.team-fab.trim{animation:none;box-shadow:0 0 0 3px rgba(255,90,102,.6)}}' +
       '.team-menu .tm-back{font:inherit;font-size:13px;background:none;border:0;color:#94a3b8;cursor:pointer;padding:8px 6px}' +
       '.team-menu .tm-empty{color:#94a3b8;font-size:13px;margin:6px}' +
       '.team-ghost{position:fixed;z-index:9900;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(56,212,255,.25);border:2px solid #38d4ff;color:#fff;font:700 16px "Hanken Grotesk",system-ui,sans-serif;display:flex;align-items:center;justify-content:center;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}' +
@@ -43386,8 +43723,12 @@ var TeamBuilder = (function () {
   function _paint() {
     _css();
     var b = _fab();
-    b.classList.toggle('live', !!_s);
-    if (_s) {
+    b.classList.toggle('live', !!_s && _s.kind !== 'trim');
+    b.classList.toggle('trim', !!_s && _s.kind === 'trim');
+    if (_s && _s.kind === 'trim') {
+      b.textContent = _t('tb.trimFab', 'Remove · {n}', { n: _s.ids.size });
+      b.setAttribute('aria-label', _t('tb.trimAria', '{n} marked for removal. Drag spheres here. Tap to remove them.', { n: _s.ids.size }));
+    } else if (_s) {
       var nm = _s.name || (_s.kind === 'team' ? _t('tb.newTeam', 'New team') : _t('tb.newUnit', 'New unit'));
       b.textContent = nm + ' · ' + _s.ids.size;
       b.setAttribute('aria-label', _t('tb.liveAria', '{name}, {n} people. Drag spheres here. Tap to finish.', { name: nm, n: _s.ids.size }));
@@ -43434,6 +43775,41 @@ var TeamBuilder = (function () {
         var hc = row(_t('nb.teamHead', 'Headcount by Bluetooth'), null, function () { _closeMenu(); Nearby.openHeadcount(); });
         hc.classList.add('tm-new');
       }
+      var rm = row(_t('tb.removeMenu', 'Remove people from my Circle'), null, function () { _openMenu({ mode: 'remove' }); });
+      rm.classList.add('tm-new', 'tm-danger');
+    } else if (state.mode === 'remove') {
+      h.textContent = _t('tb.removePick', 'Remove people from your Circle: pick a group');
+      m.appendChild(h);
+      var _present = function (ids) { var live = new Set(DEMO_CONTACTS.map(function (c) { return String(c.id); })); return (ids || []).filter(function (id) { return live.has(String(id)); }); };
+      var teamsR = _views().filter(function (v) { return v.type === 'team' && _present(v.contactIds).length; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      var batchesR = (typeof BulkRemove !== 'undefined') ? BulkRemove.batches() : [];
+      var label2 = function (text) { var e2 = document.createElement('div'); e2.className = 'tm-empty'; e2.textContent = text; m.appendChild(e2); };
+      if (teamsR.length) label2(_t('tb.removeTeams', 'Teams'));
+      teamsR.forEach(function (t) { row(t.name, _present(t.contactIds).length, function () { _openMenu({ mode: 'removeGroup', teamId: t.id }); }); });
+      if (batchesR.length) label2(_t('bulk.recentTitle', 'Recent imports'));
+      batchesR.forEach(function (b) { row(b.name, b.ids.length, function () { _openMenu({ mode: 'removeGroup', batch: b.id, name: b.name }); }); });
+      var anyR = row(_t('tb.trimDrag', 'Drag spheres to remove'), null, function () { _start('trim', null, null); });
+      anyR.classList.add('tm-new', 'tm-danger');
+      var bkR = document.createElement('button'); bkR.type = 'button'; bkR.className = 'tm-back'; bkR.textContent = _t('tb.backTeams', '‹ All teams'); bkR.onclick = function () { _openMenu({ mode: 'teams' }); };
+      m.appendChild(bkR);
+    } else if (state.mode === 'removeGroup') {
+      var gTeam = state.teamId ? _find(state.teamId) : null;
+      var gName = gTeam ? gTeam.name : (state.name || '');
+      var liveG = new Set(DEMO_CONTACTS.map(function (c) { return String(c.id); }));
+      var gIds = (gTeam ? gTeam.contactIds : (typeof BulkRemove !== 'undefined' ? BulkRemove.idsInBatch(state.batch) : [])).filter(function (id) { return liveG.has(String(id)); });
+      if (!gIds.length) { _openMenu({ mode: 'remove' }); return; }
+      h.textContent = _t('tb.removeGroupH', '{name}: remove people from your Circle', { name: gName });
+      m.appendChild(h);
+      var ra = row(_t('bulk.removeAll', 'Remove all ({n})', { n: gIds.length }), null, function () { _closeMenu(); BulkRemove.remove(gIds, { importMsg: !!state.batch }); });
+      ra.classList.add('tm-danger');
+      row(_t('bulk.choose', 'Choose who to remove'), null, function () { _closeMenu(); BulkRemove.choose(gIds, gName); });
+      row(_t('tb.trimDrag', 'Drag spheres to remove'), null, function () {
+        /* A Team: show only that Team while marking */
+        try { if (gTeam && SentinelViews.activeViewId !== gTeam.id) SentinelViews.activateView(gTeam.id); } catch (e) {}
+        _start('trim', null, null);
+      });
+      var bkG = document.createElement('button'); bkG.type = 'button'; bkG.className = 'tm-back'; bkG.textContent = _t('tb.backRemove', '‹ All groups'); bkG.onclick = function () { _openMenu({ mode: 'remove' }); };
+      m.appendChild(bkG);
     } else if (state.mode === 'venues') {
       h.textContent = _t('tb.pickVenue', 'Pick a venue');
       m.appendChild(h);
@@ -43476,13 +43852,15 @@ var TeamBuilder = (function () {
     _s = { kind: kind, viewId: viewId, parentId: parentId, name: v ? v.name : '', base: base, ids: new Set(base) };
     _paint();
     try { if (typeof enterNetwork === 'function' && appState !== 'network') enterNetwork(); } catch (e) {}
+    if (kind === 'trim') { showToast(_t('tb.trimStart', 'Drag a sphere onto the pulsing button to mark it for removal. Drag it again to unmark it. Tap the button to remove the marked people.')); return; }
     showToast(_t('tb.startHint', 'Drag any sphere onto the pulsing button. Drag a ringed sphere onto it again to take it out. Tap the button when you are done.'));
   }
   function _toggle(id) {
     if (!_s) return;
     var c = _contact(id);
-    if (_s.ids.has(id)) { _s.ids.delete(id); showToast(_t('tb.removed', '{name} taken out', { name: _cname(c) })); }
-    else { _s.ids.add(id); showToast(_t('tb.added', '{name} added', { name: _cname(c) })); }
+    var trim = _s.kind === 'trim';
+    if (_s.ids.has(id)) { _s.ids.delete(id); showToast(trim ? _t('tb.unmarked', 'Unmarked: {name}', { name: _cname(c) }) : _t('tb.removed', '{name} taken out', { name: _cname(c) })); }
+    else { _s.ids.add(id); showToast(trim ? _t('tb.marked', 'Marked to remove: {name}', { name: _cname(c) }) : _t('tb.added', '{name} added', { name: _cname(c) })); }
     try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
     _paint();
   }
@@ -43527,6 +43905,18 @@ var TeamBuilder = (function () {
 
   function _finish() {
     if (!_s) return;
+    if (_s.kind === 'trim') {
+      var tIds = Array.from(_s.ids);
+      if (!tIds.length) { _end(); showToast(_t('tb.trimNone', 'Nobody was marked.')); return; }
+      var tNames = tIds.slice(0, 6).map(function (id) { return _cname(_contact(id)); }).join(', ');
+      if (tIds.length > 6) tNames += ' ' + _t('tb.trimMore', 'and {n} more', { n: tIds.length - 6 });
+      _card(_t('tb.trimConfirmT', 'Remove {n} from your Circle?', { n: tIds.length }),
+        tNames + '. ' + _t('tb.trimUndoNote', 'You can undo this for 10 seconds.'),
+        { buttons: [
+          { label: _t('tb.keepGoing', 'Keep going'), run: function () { _closeCard(); } },
+          { label: _t('bulk.removeBtn', 'Remove {n}', { n: tIds.length }), primary: true, run: function () { _closeCard(); _end(); BulkRemove.remove(tIds, { confirmed: true }); } } ] });
+      return;
+    }
     var d = _diff();
     var isTeam = _s.kind === 'team';
     if (!_s.viewId) {
@@ -43784,7 +44174,8 @@ var TeamBuilder = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else setTimeout(start, 0);
 
-  return { isMember: isMember, posKey: posKey, autoAssign: _autoAssign, openMenu: _openMenu, closeMenu: _closeMenu, finish: _finish,
+  function isTrim() { return !!(_s && _s.kind === 'trim'); }
+  return { isMember: isMember, isTrim: isTrim, posKey: posKey, autoAssign: _autoAssign, openMenu: _openMenu, closeMenu: _closeMenu, finish: _finish,
     _start: _start, _toggle: _toggle, get session() { return _s; } };
 })();
 
