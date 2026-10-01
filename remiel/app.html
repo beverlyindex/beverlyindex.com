@@ -5694,6 +5694,23 @@ span.rp-thumb { cursor:default; }
   transition: opacity 0.2s, transform 0.2s;
 }
 .sv-badge.visible { display: flex; align-items: center; gap: 8px; }
+/* A view with nobody showing says so, with the ways forward */
+.sv-empty {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  z-index: 499; width: min(340px, calc(100vw - 32px)); box-sizing: border-box;
+  padding: 14px 16px; border-radius: 14px;
+  background: rgba(12,14,22,0.94); border: 1px solid rgba(56,189,248,0.25);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #e2e8f0; text-align: center;
+}
+.sv-empty[hidden] { display: none; }
+.sv-empty-t { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+.sv-empty-d { font-size: 13px; line-height: 1.45; color: #94a3b8; margin: 0 0 4px; }
+.sv-empty-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+.sv-empty-row button { font: inherit; font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 10px; cursor: pointer;
+  background: rgba(56,189,248,0.12); color: #38bdf8; border: 1px solid rgba(56,189,248,0.35); }
+.sv-empty-row button.primary { background: #38bdf8; color: #0b1220; border-color: #38bdf8; }
+.sv-empty-row button.danger { background: none; color: #f87171; border-color: rgba(248,113,113,0.4); }
 .sv-badge:hover { background: rgba(56,189,248,0.12); }
 .sv-badge-x {
   background: none; border: none; color: #64748b; cursor: pointer;
@@ -12866,6 +12883,16 @@ const I18n = (function () {
     "views.bannerCreated": "View \"{name}\" created and now active",
     "views.bannerUpdated": "View \"{name}\" updated",
     "views.bannerDeleted": "View deleted",
+    "views.emptyTitle": "{name} has nobody in it right now.",
+    "views.emptyGoneOne": "{who} is no longer in your Circle.",
+    "views.emptyGoneAnon": "The person who was in it is no longer in your Circle.",
+    "views.emptyGoneMany": "{n} people who were in it are no longer in your Circle.",
+    "views.emptyBack": "Anyone who comes back to your Circle returns here by themselves.",
+    "views.emptyAdd": "Add people",
+    "views.emptyAll": "Show everyone",
+    "views.emptyDelTeam": "Delete this Team",
+    "views.emptyDelUnit": "Delete this Unit",
+    "views.emptyDelView": "Delete this view",
     "ledger.reviewDictation": "Review, then tap Log",
     "medimg.title": "Scan a medication label",
     "medimg.hint": "Point the camera at the medication label or upload a photo",
@@ -13157,6 +13184,16 @@ const I18n = (function () {
     "views.bannerCreated": "Vista \"{name}\" creata e ora attiva",
     "views.bannerUpdated": "Vista \"{name}\" aggiornata",
     "views.bannerDeleted": "Vista eliminata",
+    "views.emptyTitle": "In {name} adesso non c'è nessuno.",
+    "views.emptyGoneOne": "{who} non è più nella tua cerchia.",
+    "views.emptyGoneAnon": "La persona che ne faceva parte non è più nella tua cerchia.",
+    "views.emptyGoneMany": "{n} persone che ne facevano parte non sono più nella tua cerchia.",
+    "views.emptyBack": "Chi torna nella tua cerchia torna qui da solo.",
+    "views.emptyAdd": "Aggiungi persone",
+    "views.emptyAll": "Mostra tutti",
+    "views.emptyDelTeam": "Elimina questa squadra",
+    "views.emptyDelUnit": "Elimina questo gruppo",
+    "views.emptyDelView": "Elimina questa vista",
     "ledger.reviewDictation": "Controlla, poi tocca Registra",
     "medimg.title": "Leggi l’etichetta di un farmaco",
     "medimg.hint": "Inquadra l’etichetta del farmaco o carica una foto",
@@ -16114,7 +16151,7 @@ function contactRole(c) {
 function buildNodes(fresh) {
   /* ── SentinelViews filter: only show contacts in active view ── */
   var _viewFilter = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
-  var _source = _viewFilter ? DEMO_CONTACTS.filter(function(c) { return _viewFilter.has(c.id); }) : DEMO_CONTACTS;
+  var _source = _viewFilter ? DEMO_CONTACTS.filter(function(c) { return _viewFilter.has(c.id) || _viewFilter.has(String(c.id)); }) : DEMO_CONTACTS;
 
   const N = _source.length;
   const smaller = Math.min(CV.width / DPR, CV.height / DPR);
@@ -19907,18 +19944,173 @@ const SentinelViews = (() => {
     }
   }
 
+  /* ── Members who leave the Circle ──
+     Each view remembers its members' account records (refs: this device's
+     id to the server id), so a person who comes back after a restore or a
+     re-sync is put back by themselves. Someone who leaves the Circle leaves
+     the view too and is listed in view.away, so an empty view can say why. */
+  const AWAY_MAX = 40;
+  function _sid(id) { try { return (typeof SyncEngine !== 'undefined' && SyncEngine.serverIdForContact) ? SyncEngine.serverIdForContact(id) : null; } catch (e) { return null; } }
+  function _localFor(sid) { try { return (sid != null && typeof SyncEngine !== 'undefined' && SyncEngine.localContactFor) ? SyncEngine.localContactFor(sid) : null; } catch (e) { return null; } }
+  function _liveIds() { const s = new Set(); try { DEMO_CONTACTS.forEach(c => s.add(String(c.id))); } catch (e) {} return s; }
+  function _liveId(id) { try { const c = DEMO_CONTACTS.find(x => String(x.id) === String(id)); return c ? c.id : null; } catch (e) { return null; } }
+  function _has(arr, id) { return Array.isArray(arr) && arr.some(x => String(x) === String(id)); }
+  function _drop(v, id) {
+    ['contactIds', 'pinnedIds', 'manualIds'].forEach(k => { if (Array.isArray(v[k])) v[k] = v[k].filter(x => String(x) !== String(id)); });
+    if (v.refs) delete v.refs[String(id)];
+  }
+  function _swap(v, from, to) {
+    ['contactIds', 'pinnedIds', 'manualIds'].forEach(k => {
+      if (!Array.isArray(v[k])) return;
+      const out = [];
+      v[k].forEach(x => { const y = String(x) === String(from) ? to : x; if (!_has(out, y)) out.push(y); });
+      v[k] = out;
+    });
+    if (v.refs) { const s = v.refs[String(from)]; delete v.refs[String(from)]; if (s != null) v.refs[String(to)] = s; }
+  }
+  function _goAway(v, id, sid, name) {
+    const a = { s: sid != null ? sid : null, n: name || '', at: Date.now() };
+    if (_has(v.pinnedIds, id)) a.p = 1;
+    if (_has(v.manualIds, id)) a.m = 1;
+    _drop(v, id);
+    v.away = (v.away || []).filter(x => !(a.s != null && String(x.s) === String(a.s)));
+    v.away.push(a);
+    if (v.away.length > AWAY_MAX) v.away = v.away.slice(-AWAY_MAX);
+    v.updatedAt = Date.now();
+  }
+  /* Called when a person leaves the Circle, here or on another device */
+  function memberGone(id, serverId, name) {
+    let changed = false;
+    _views.forEach(v => {
+      if (!_has(v.contactIds, id)) return;
+      const sid = serverId != null ? serverId : ((v.refs && v.refs[String(id)]) || _sid(id));
+      _goAway(v, id, sid, name);
+      changed = true;
+    });
+    if (changed) { _save(); _updateBadge(); _renderEmpty(); }
+    return changed;
+  }
+  /* Re-point members whose id on this device changed, bring back members who
+     returned, and move out members who are gone from this device for good */
+  let _reconciling = false;
+  async function reconcile() {
+    if (_reconciling) return;
+    _reconciling = true;
+    try {
+      const live = _liveIds();
+      if (!live.size || !_views.length) return;
+      let stored = null;
+      try { stored = new Set((await RemielDB.getAllContacts()).map(c => String(c.id))); } catch (e) { stored = null; }
+      let changed = false;
+      _views.forEach(v => {
+        if (!Array.isArray(v.contactIds)) return;
+        if (!v.refs || typeof v.refs !== 'object') v.refs = {};
+        Object.keys(v.refs).forEach(k => { if (!_has(v.contactIds, k)) { delete v.refs[k]; changed = true; } });
+        v.contactIds.slice().forEach(id => {
+          if (live.has(String(id))) {
+            const s = _sid(id);
+            if (s != null && String(v.refs[String(id)]) !== String(s)) { v.refs[String(id)] = s; changed = true; }
+            return;
+          }
+          const s = v.refs[String(id)];
+          const back = s != null ? _localFor(s) : null;
+          const nid = back != null ? _liveId(back) : null;
+          if (nid != null) { _swap(v, id, nid); changed = true; return; }
+          if (stored && stored.size && !stored.has(String(id))) { _goAway(v, id, s, ''); changed = true; }
+        });
+        if (Array.isArray(v.away) && v.away.length) {
+          v.away = v.away.filter(a => {
+            if (a.s == null) return true;
+            const nid = _liveId(_localFor(a.s));
+            if (nid == null) return true;
+            if (!_has(v.contactIds, nid)) v.contactIds.push(nid);
+            if (a.p) { v.pinnedIds = v.pinnedIds || []; if (!_has(v.pinnedIds, nid)) v.pinnedIds.push(nid); }
+            if (a.m) { v.manualIds = v.manualIds || []; if (!_has(v.manualIds, nid)) v.manualIds.push(nid); }
+            v.refs[String(nid)] = a.s;
+            changed = true;
+            return false;
+          });
+        }
+      });
+      if (changed) { await _save(); _applyFilter(); _updateBadge(); }
+    } catch (e) {
+      console.warn('[SentinelViews] reconcile error:', e);
+    } finally {
+      _reconciling = false;
+      _renderEmpty();
+    }
+  }
+
+  /* ── An active view with nobody showing ── */
+  function _shown(v) { const live = _liveIds(); return (v.contactIds || []).filter(id => live.has(String(id))).length; }
+  function _emptyKind(v) { return v.type === 'team' ? 'Team' : (v.type === 'unit' ? 'Unit' : 'View'); }
+  function _renderEmpty() {
+    let el = document.getElementById('svEmpty');
+    const v = getActiveView();
+    const show = !!v && typeof appState !== 'undefined' && appState === 'network' && _shown(v) === 0 &&
+      !(typeof TeamBuilder !== 'undefined' && TeamBuilder.session);
+    if (!show) { if (el && !el.hidden) el.hidden = true; return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'svEmpty'; el.className = 'sv-empty'; el.setAttribute('role', 'status');
+      el.addEventListener('click', e => {
+        const b = e.target.closest('button[data-act]'); if (!b) return;
+        const cur = getActiveView(); if (!cur) return;
+        const act = b.getAttribute('data-act');
+        if (act === 'all') activateView(null);
+        else if (act === 'del') confirmDelete(cur.id).then(() => _renderEmpty());
+        else if (act === 'add') {
+          /* Show everyone so there is someone to drag in */
+          if ((cur.type === 'team' || (cur.type === 'unit' && cur.parentId)) && typeof TeamBuilder !== 'undefined' && TeamBuilder._start) {
+            const id = cur.id, kind = cur.type, parent = cur.parentId || null;
+            activateView(null);
+            TeamBuilder._start(kind, id, parent);
+          } else editView(cur.id);
+        }
+      });
+      document.body.appendChild(el);
+    }
+    const away = Array.isArray(v.away) ? v.away : [];
+    let lang = ''; try { lang = I18n.locale || ''; } catch (e) {}
+    const key = v.id + '|' + v.name + '|' + away.length + '|' + lang;
+    if (el._key !== key) {
+      el._key = key;
+      let why = '';
+      if (away.length === 1 && away[0].n) why = _t('views.emptyGoneOne', '{who} is no longer in your Circle.', { who: away[0].n });
+      else if (away.length === 1) why = _t('views.emptyGoneAnon', 'The person who was in it is no longer in your Circle.');
+      else if (away.length > 1) why = _t('views.emptyGoneMany', '{n} people who were in it are no longer in your Circle.', { n: away.length });
+      const back = away.some(a => a.s != null) ? _t('views.emptyBack', 'Anyone who comes back to your Circle returns here by themselves.') : '';
+      const k = _emptyKind(v);
+      el.innerHTML = '<p class="sv-empty-t">' + _esc(_t('views.emptyTitle', '{name} has nobody in it right now.', { name: v.name })) + '</p>' +
+        (why ? '<p class="sv-empty-d">' + _esc(why) + '</p>' : '') +
+        (back ? '<p class="sv-empty-d">' + _esc(back) + '</p>' : '') +
+        '<div class="sv-empty-row">' +
+        '<button type="button" class="primary" data-act="add">' + _esc(_t('views.emptyAdd', 'Add people')) + '</button>' +
+        '<button type="button" data-act="all">' + _esc(_t('views.emptyAll', 'Show everyone')) + '</button>' +
+        '<button type="button" class="danger" data-act="del">' + _esc(_t('views.emptyDel' + k, k === 'Team' ? 'Delete this Team' : (k === 'Unit' ? 'Delete this Unit' : 'Delete this view'))) + '</button>' +
+        '</div>';
+    }
+    el.hidden = false;
+  }
+
   /* ── Init ── */
   async function init() {
     await _load();
     _updateBadge();
+    reconcile();
+    if (_emptyTimer) return;
+    _emptyTimer = setInterval(_renderEmpty, 1000);
+    window.addEventListener('localeChanged', () => { const el = document.getElementById('svEmpty'); if (el) el._key = ''; _renderEmpty(); });
   }
+  let _emptyTimer = null;
 
   return {
     init,
     openPanel, closePanel,
     newView, editView, closeEditor,
     toggleContact, toggleContactEl, selectAll, saveView,
-    activateView, clearView, adoptImport, createView, updateView, deleteView, refresh: () => { _applyFilter(); _updateBadge(); },
+    activateView, clearView, adoptImport, createView, updateView, deleteView, refresh: () => { _applyFilter(); _updateBadge(); _renderEmpty(); },
+    memberGone, reconcile,
     confirmDelete,
     getActiveView,
     getFilteredContacts,
@@ -34357,7 +34549,9 @@ const SyncEngine = (() => {
         delete _serverIdMap[prefix + localId];
         if (type === 'contact') {
           var live = _liveContacts();
-          if (live) { var ix = live.findIndex(function(c) { return c.id === localId; }); if (ix !== -1) { live.splice(ix, 1); _contactsTouched = true; } }
+          var goneName = '';
+          if (live) { var ix = live.findIndex(function(c) { return c.id === localId; }); if (ix !== -1) { goneName = ((live[ix].first || '') + ' ' + (live[ix].last || '')).trim(); live.splice(ix, 1); _contactsTouched = true; } }
+          try { if (typeof SentinelViews !== 'undefined' && SentinelViews.memberGone) SentinelViews.memberGone(localId, item.server_id, goneName); } catch (e) {}
         }
       }
       return;
@@ -34496,7 +34690,10 @@ const SyncEngine = (() => {
       pages++;
       if (!r.hasMore || pages >= 200) break;
     }
-    if (_contactsTouched) _refreshLiveViews();
+    if (_contactsTouched) {
+      _refreshLiveViews();
+      try { if (typeof SentinelViews !== 'undefined' && SentinelViews.reconcile) SentinelViews.reconcile(); } catch (e) {}
+    }
     if (changed) {
       try { window.dispatchEvent(new CustomEvent('sentinel:datachanged', { detail: { source: 'sync', count: changed } })); } catch (e) {}
     }
@@ -34925,6 +35122,8 @@ const SyncEngine = (() => {
     markDirty: markDirty, getPendingCount: getPendingCount,
     setLocalOnly: setLocalOnly, isLocalOnly: isLocalOnly, resetAfterImport: resetAfterImport,
     getCircleBio: getCircleBio,
+    serverIdForContact: function (localId) { var v = _serverIdMap['contact_' + localId]; return v == null ? null : v; },
+    localContactFor: function (serverId) { return _reverseLookup('contact', serverId); },
     apiFetch: _fetch,
   };
 })();
@@ -41221,13 +41420,12 @@ async function saveContactModal() {
    tombstone), every Circle View that named them, and the galaxy. */
 async function removeContactFromCircle(id) {
   const idx = DEMO_CONTACTS.findIndex(c => String(c.id) === String(id));
+  const goneName = idx !== -1 ? ((DEMO_CONTACTS[idx].first || '') + ' ' + (DEMO_CONTACTS[idx].last || '')).trim() : '';
+  let goneSid = null;
+  try { if (typeof SyncEngine !== 'undefined' && SyncEngine.serverIdForContact) goneSid = SyncEngine.serverIdForContact(id); } catch (e) {}
   if (idx !== -1) DEMO_CONTACTS.splice(idx, 1);
   try { await RemielDB.deleteContact(id); } catch (e) { console.warn('Contact delete failed', e); }
-  try {
-    if (typeof SentinelViews !== 'undefined') SentinelViews.views.forEach(v => {
-      if (v.contactIds.some(x => String(x) === String(id))) SentinelViews.updateView(v.id, { contactIds: v.contactIds.filter(x => String(x) !== String(id)) });
-    });
-  } catch (e) {}
+  try { if (typeof SentinelViews !== 'undefined' && SentinelViews.memberGone) SentinelViews.memberGone(id, goneSid, goneName); } catch (e) {}
   try { contactPhotos.delete(id); } catch (e) {}
   if (selectedContact && String(selectedContact.id) === String(id)) { selectedContact = null; if (blufOpen) closeBluf(); }
   if (focusedContactId != null && String(focusedContactId) === String(id)) focusedContactId = null;
