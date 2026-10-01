@@ -6267,6 +6267,15 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
 .push-status-text[data-tone="warn"] { color: #fcd34d; }
 .push-status-text[data-tone="wait"] { color: #9fd8ff; }
 .push-test-row { margin: 8px 0 4px; }
+.nb-bar { height: 14px; border-radius: 7px; background: rgba(255,255,255,0.08); overflow: hidden; margin: 10px 0 6px; }
+.nb-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width 0.4s; }
+.nb-words { font-size: 15px; font-weight: 600; color: #e8ecf4; }
+.nb-person { margin: 10px 0 14px; }
+.nb-sum { font-size: 18px; font-weight: 700; margin: 12px 0 8px; }
+.nb-list { list-style: none; padding: 0; margin: 0 0 10px; }
+.nb-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.nb-list li.nb-missing { color: #fcd34d; } .nb-list li.nb-here { color: #5fbf7a; } .nb-list li.nb-off { color: #a8b8d0; }
+#nbStatus[data-tone="ok"] { color: #5fbf7a; } #nbStatus[data-tone="warn"] { color: #fcd34d; }
 .push-test-row[hidden] { display: none; }
 .push-toggle input:disabled + .push-toggle-slider { opacity: 0.55 !important; filter: none; border: 1px dashed #94a3b8; }
 /* Ghost and icon controls: full brightness text, never below 4.5:1 */
@@ -6763,6 +6772,40 @@ input[type=checkbox] { accent-color: var(--lit-fill); }
             <input type="checkbox" id="bgToggle" onchange="AlarmCenter.setBreakGlass(this.checked)">
             <span class="push-toggle-slider"></span>
           </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section" id="nearbySection" data-cat="alerts">
+      <div class="settings-section-title" data-i18n="nb.set.title">Bluetooth safety</div>
+      <div class="settings-card">
+        <p class="wi-desc" id="nbAppOnly" data-i18n="nb.set.appOnly">Tracker warnings, Find during an alarm and headcounts work in the Remiel Sentinel app from the App Store or Google Play, because browsers cannot use Bluetooth this way.</p>
+        <div id="nbBody" hidden>
+          <div class="push-toggle-row">
+            <div>
+              <div class="push-toggle-label" data-i18n="nb.set.tracker">Warn me if an unknown tracker moves with me</div>
+              <div class="push-toggle-sub" data-i18n="nb.set.trackerSub">Android: checks every 5 minutes while Remiel Sentinel runs. Warns when the same AirTag, Tile, SmartTag or similar tracker has been with you 3 times, over 30 minutes, in places 400 m apart.</div>
+            </div>
+            <label class="push-toggle"><input type="checkbox" id="nbTrackerToggle" onchange="Nearby.setTrackerWatch(this.checked)"><span class="push-toggle-slider"></span></label>
+          </div>
+          <p class="wi-desc" id="nbIosNote" hidden data-i18n="nb.set.ios">On iPhone, Apple warns you itself about an unknown AirTag or Find My tracker moving with you. Check it is on: iPhone Settings, Privacy and Security, Location Services, on; and Bluetooth on. Check now still finds Tile and SmartTag trackers.</p>
+          <button type="button" class="settings-action-btn secondary" onclick="Nearby.checkTrackers(true)" data-i18n="nb.set.check">Check for trackers now</button>
+          <div class="push-status-text" id="nbStatus" aria-live="polite"></div>
+          <div class="push-toggle-row" style="margin-top:12px;">
+            <div>
+              <div class="push-toggle-label" data-i18n="nb.set.findable">Findable during my own alarm</div>
+              <div class="push-toggle-sub" data-i18n="nb.set.findableSub">While an alarm you raised is open (Help, Break Glass), your phone sends a Remiel Sentinel signal so people in your Circle who got the alarm can find you within about 30 m. Off at all other times.</div>
+            </div>
+            <label class="push-toggle"><input type="checkbox" id="nbFindableToggle" onchange="Nearby.setChoice('findable', this.checked, this)"><span class="push-toggle-slider"></span></label>
+          </div>
+          <div class="push-toggle-row">
+            <div>
+              <div class="push-toggle-label" data-i18n="nb.set.head">Count me present in headcounts</div>
+              <div class="push-toggle-sub" data-i18n="nb.set.headSub">While Remiel Sentinel runs, your phone sends a Remiel Sentinel signal so a coach or lead in your Circle can count you present, for example on the bus.</div>
+            </div>
+            <label class="push-toggle"><input type="checkbox" id="nbHeadToggle" onchange="Nearby.setChoice('headcount', this.checked, this)"><span class="push-toggle-slider"></span></label>
+          </div>
+          <button type="button" class="settings-action-btn" onclick="Nearby.openHeadcount()" data-i18n="nb.set.headBtn">Take a headcount</button>
         </div>
       </div>
     </div>
@@ -14113,6 +14156,137 @@ const I18n = (function () {
     "location.shareWith": "Condividi la mia posizione con {name}",
     "location.circleShareTitle": "Condividi la mia posizione con",
     "location.circleShareDesc": "Tutti i collegati nella tua Cerchia. Possono anche chiedere; rispondi Consenti sempre, Consenti per 8 ore, oppure Non ora."
+  });
+  /* Nearby (Bluetooth) */
+  Object.assign(_strings.en, {
+    "nb.appOnly": "This works in the Remiel Sentinel app from the App Store or Google Play.",
+    "nb.btOff": "Bluetooth is off or not allowed for Remiel Sentinel. Turn Bluetooth on, and allow Remiel Sentinel to use it in your phone Settings.",
+    "nb.heardNotFollowing": "Trackers nearby: {n}. None has moved with you so far. Remiel Sentinel keeps checking every 5 minutes while it runs.",
+    "nb.noneHeard": "No trackers heard near you just now.",
+    "nb.warnTitle": "A tracker may be moving with you",
+    "nb.warnBody": "{type}: seen with you {count} times, first {when}, in places {far} m apart. It is not one you marked as yours.",
+    "nb.warnPush": "Open Remiel Sentinel to find it or send Help.",
+    "nb.adv1": "If you feel unsafe, go to a busy public place, do not go home, and call the police.",
+    "nb.adv2": "Find it: tap Find it now and walk around; the bar grows as you get closer. Check bags, pockets, jacket linings and the car.",
+    "nb.adv3": "Found an AirTag: hold the top of an NFC phone against its white side to see its serial number. Keep it as evidence if you report it.",
+    "nb.mine": "It is mine or someone I know",
+    "nb.sendHelp": "Send Help",
+    "nb.findIt": "Find it now",
+    "nb.ignored": "Ignored for 24 hours.",
+    "nb.helpFailed": "Help could not be sent from here. Use the Help button.",
+    "nb.near1": "Very close: within about 1 to 2 m",
+    "nb.near2": "Close: about 2 to 5 m",
+    "nb.near3": "Nearby: about 5 to 15 m",
+    "nb.near4": "Far: more than 15 m, or behind walls",
+    "nb.finding": "Finding: {what}",
+    "nb.walk": "Walk slowly and turn around: the bar grows as you get closer.",
+    "nb.listening": "Listening...",
+    "nb.done": "Done",
+    "nb.warmer": "(getting closer)",
+    "nb.colder": "(getting farther)",
+    "nb.findTitle": "Find {name} nearby",
+    "nb.findTitleAny": "Find someone nearby",
+    "nb.findHelp": "Works within about 30 m, for people in your Circle who turned on Findable during my own alarm, while their alarm is open. Keep this screen open and walk.",
+    "nb.notHeard": "Not heard yet. Move to another floor or area and keep this screen open.",
+    "nb.signIn": "Sign in first: Settings, Account and devices.",
+    "nb.headTitle": "Take a headcount",
+    "nb.headHelp": "Counts the phones of people in your Circle who turned on Count me present, within about 30 m. They get a notification asking them to open Remiel Sentinel.",
+    "nb.headWho": "Who",
+    "nb.headAll": "Everyone in my Circle",
+    "nb.headGo": "Count now",
+    "nb.headNobody": "No one in this group is linked with you in Remiel Sentinel yet.",
+    "nb.headListening": "Listening for {s} seconds...",
+    "nb.message": "Message",
+    "nb.headSum": "Here: {a} of {b}",
+    "nb.headMissing": "Not heard",
+    "nb.headOff": "Count me present is off for them",
+    "nb.headHere": "Here",
+    "nb.headAgain": "Count again",
+    "nb.saveFailed": "That did not save. Check the connection and try again.",
+    "nb.t.findmy": "AirTag or other Find My tracker",
+    "nb.t.tile": "Tile tracker",
+    "nb.t.smarttag": "Samsung Galaxy SmartTag",
+    "nb.t.findhub": "Find Hub tracker (Google network)",
+    "nb.t.chipolo": "Chipolo tracker",
+    "nb.t.other": "Tracker",
+    "nb.set.title": "Bluetooth safety",
+    "nb.set.appOnly": "Tracker warnings, Find during an alarm and headcounts work in the Remiel Sentinel app from the App Store or Google Play, because browsers cannot use Bluetooth this way.",
+    "nb.set.tracker": "Warn me if an unknown tracker moves with me",
+    "nb.set.trackerSub": "Android: checks every 5 minutes while Remiel Sentinel runs. Warns when the same AirTag, Tile, SmartTag or similar tracker has been with you 3 times, over 30 minutes, in places 400 m apart.",
+    "nb.set.ios": "On iPhone, Apple warns you itself about an unknown AirTag or Find My tracker moving with you. Check it is on: iPhone Settings, Privacy and Security, Location Services, on; and Bluetooth on. Check now still finds Tile and SmartTag trackers.",
+    "nb.set.check": "Check for trackers now",
+    "nb.set.findable": "Findable during my own alarm",
+    "nb.set.findableSub": "While an alarm you raised is open (Help, Break Glass), your phone sends a Remiel Sentinel signal so people in your Circle who got the alarm can find you within about 30 m. Off at all other times.",
+    "nb.set.head": "Count me present in headcounts",
+    "nb.set.headSub": "While Remiel Sentinel runs, your phone sends a Remiel Sentinel signal so a coach or lead in your Circle can count you present, for example on the bus.",
+    "nb.set.headBtn": "Take a headcount",
+    "nb.findNearby": "Find nearby",
+    "nb.teamHead": "Headcount by Bluetooth"
+  });
+  Object.assign(_strings.it, {
+    "nb.appOnly": "Funziona nell'app Remiel Sentinel dall'App Store o da Google Play.",
+    "nb.btOff": "Il Bluetooth è spento o non consentito a Remiel Sentinel. Accendi il Bluetooth e consenti a Remiel Sentinel di usarlo nelle Impostazioni del telefono.",
+    "nb.heardNotFollowing": "Tracker nelle vicinanze: {n}. Nessuno si è spostato con te finora. Remiel Sentinel continua a controllare ogni 5 minuti mentre è attivo.",
+    "nb.noneHeard": "Nessun tracker rilevato vicino a te in questo momento.",
+    "nb.warnTitle": "Un tracker potrebbe spostarsi con te",
+    "nb.warnBody": "{type}: visto con te {count} volte, la prima {when}, in luoghi distanti {far} m. Non è uno che hai segnato come tuo.",
+    "nb.warnPush": "Apri Remiel Sentinel per trovarlo o inviare Aiuto.",
+    "nb.adv1": "Se non ti senti al sicuro, vai in un luogo pubblico affollato, non andare a casa e chiama la polizia.",
+    "nb.adv2": "Trovalo: tocca Trovalo ora e muoviti; la barra cresce man mano che ti avvicini. Controlla borse, tasche, fodere delle giacche e l'auto.",
+    "nb.adv3": "Hai trovato un AirTag: avvicina la parte alta di un telefono NFC al suo lato bianco per vedere il numero di serie. Conservalo come prova se lo denunci.",
+    "nb.mine": "È mio o di qualcuno che conosco",
+    "nb.sendHelp": "Invia Aiuto",
+    "nb.findIt": "Trovalo ora",
+    "nb.ignored": "Ignorato per 24 ore.",
+    "nb.helpFailed": "Non è stato possibile inviare Aiuto da qui. Usa il pulsante Aiuto.",
+    "nb.near1": "Molto vicino: entro circa 1 o 2 m",
+    "nb.near2": "Vicino: circa 2 o 5 m",
+    "nb.near3": "Nelle vicinanze: circa 5 o 15 m",
+    "nb.near4": "Lontano: oltre 15 m, o dietro dei muri",
+    "nb.finding": "Ricerca: {what}",
+    "nb.walk": "Cammina lentamente e girati: la barra cresce man mano che ti avvicini.",
+    "nb.listening": "In ascolto...",
+    "nb.done": "Fatto",
+    "nb.warmer": "(ti stai avvicinando)",
+    "nb.colder": "(ti stai allontanando)",
+    "nb.findTitle": "Trova {name} nelle vicinanze",
+    "nb.findTitleAny": "Trova qualcuno nelle vicinanze",
+    "nb.findHelp": "Funziona entro circa 30 m, per le persone della tua Cerchia che hanno attivato Trovabile durante un mio allarme, mentre il loro allarme è aperto. Tieni aperta questa schermata e cammina.",
+    "nb.notHeard": "Non ancora rilevato. Spostati su un altro piano o in un'altra zona e tieni aperta questa schermata.",
+    "nb.signIn": "Accedi prima: Impostazioni, Account e dispositivi.",
+    "nb.headTitle": "Fai un appello",
+    "nb.headHelp": "Conta i telefoni delle persone della tua Cerchia che hanno attivato Contami presente, entro circa 30 m. Ricevono una notifica che chiede di aprire Remiel Sentinel.",
+    "nb.headWho": "Chi",
+    "nb.headAll": "Tutti nella mia Cerchia",
+    "nb.headGo": "Conta ora",
+    "nb.headNobody": "Nessuno in questo gruppo è ancora collegato a te in Remiel Sentinel.",
+    "nb.headListening": "In ascolto per {s} secondi...",
+    "nb.message": "Messaggio",
+    "nb.headSum": "Presenti: {a} su {b}",
+    "nb.headMissing": "Non rilevati",
+    "nb.headOff": "Contami presente è disattivato per loro",
+    "nb.headHere": "Presenti",
+    "nb.headAgain": "Conta di nuovo",
+    "nb.saveFailed": "Non è stato salvato. Controlla la connessione e riprova.",
+    "nb.t.findmy": "AirTag o altro tracker Dov'è",
+    "nb.t.tile": "Tracker Tile",
+    "nb.t.smarttag": "Samsung Galaxy SmartTag",
+    "nb.t.findhub": "Tracker Trova il mio dispositivo (rete Google)",
+    "nb.t.chipolo": "Tracker Chipolo",
+    "nb.t.other": "Tracker",
+    "nb.set.title": "Sicurezza Bluetooth",
+    "nb.set.appOnly": "Avvisi tracker, Trova durante un allarme e appelli funzionano nell'app Remiel Sentinel dall'App Store o da Google Play, perché i browser non possono usare il Bluetooth in questo modo.",
+    "nb.set.tracker": "Avvisami se un tracker sconosciuto si sposta con me",
+    "nb.set.trackerSub": "Android: controlla ogni 5 minuti mentre Remiel Sentinel è attivo. Avvisa quando lo stesso AirTag, Tile, SmartTag o tracker simile è stato con te 3 volte, in 30 minuti, in luoghi distanti 400 m.",
+    "nb.set.ios": "Su iPhone, Apple ti avvisa da sola se un AirTag o un tracker Dov'è sconosciuto si sposta con te. Controlla che sia attivo: Impostazioni di iPhone, Privacy e sicurezza, Localizzazione, attiva; e Bluetooth attivo. Controlla ora trova comunque i tracker Tile e SmartTag.",
+    "nb.set.check": "Controlla i tracker ora",
+    "nb.set.findable": "Trovabile durante un mio allarme",
+    "nb.set.findableSub": "Mentre è aperto un allarme che hai inviato (Aiuto, Rompi il vetro), il tuo telefono invia un segnale Remiel Sentinel così le persone della tua Cerchia che hanno ricevuto l'allarme possono trovarti entro circa 30 m. Disattivo in ogni altro momento.",
+    "nb.set.head": "Contami presente negli appelli",
+    "nb.set.headSub": "Mentre Remiel Sentinel è attivo, il tuo telefono invia un segnale Remiel Sentinel così un allenatore o un responsabile della tua Cerchia può contarti presente, per esempio sul pullman.",
+    "nb.set.headBtn": "Fai un appello",
+    "nb.findNearby": "Trova nelle vicinanze",
+    "nb.teamHead": "Appello via Bluetooth"
   });
   /* Notifications: proof by a test notification */
   Object.assign(_strings.en, {
@@ -29493,6 +29667,7 @@ const SettingsNav = (function () {
     _title(_t(c.t[0], c.t[1]));
     try { if (id === 'location' && typeof WhereIs !== 'undefined') WhereIs.onSettingsOpen(); } catch (e) {}
     try { if (id === 'account' && typeof AccountPanel !== 'undefined') AccountPanel.render(); } catch (e) {}
+    try { if (id === 'alerts' && typeof Nearby !== 'undefined') Nearby.renderSettings(); } catch (e) {}
     /* Sections that need an account stay hidden until sign in: say so, with the way there */
     setTimeout(() => {
       const e = $('settingsCatEmpty'); if (!e || _cat !== id) return;
@@ -41597,6 +41772,12 @@ var AlarmCenter = (function () {
     var ack = add('button', 'tk-ack btn-advance', _t('alarm.ack', 'Acknowledge'));
     ack.type = 'button';
     ack.onclick = function () { acknowledge(a.id); };
+    /* Installed app: find the person who raised it, by their phone's signal */
+    if (a.raised_by && a.raised_by !== _myId() && typeof Nearby !== 'undefined' && Nearby.native) {
+      var fn = add('button', 'tk-hide', _t('nb.findNearby', 'Find nearby'));
+      fn.type = 'button';
+      fn.onclick = function () { _hiddenTakeover[_takeoverKey(a)] = 1; _renderTakeover(); Nearby.openFind(a); };
+    }
     var hide = add('button', 'tk-hide', _t('alarm.takeoverHide', 'Hide for now'));
     hide.type = 'button';
     hide.onclick = function () { _hiddenTakeover[_takeoverKey(a)] = 1; _renderTakeover(); };
@@ -41645,6 +41826,13 @@ var AlarmCenter = (function () {
         ack.textContent = _t('alarm.ack', 'Acknowledge');
         ack.onclick = function () { acknowledge(a.id); };
         acts.appendChild(ack); first = ack;
+        if (a.raised_by && a.raised_by !== _myId() && typeof Nearby !== 'undefined' && Nearby.native) {
+          var fnb = document.createElement('button');
+          fnb.type = 'button'; fnb.className = 'alarm-ack';
+          fnb.textContent = _t('nb.findNearby', 'Find nearby');
+          fnb.onclick = function () { Nearby.openFind(a); };
+          acts.appendChild(fnb);
+        }
       }
       bar.appendChild(acts);
       var x = document.createElement('button');
@@ -41749,7 +41937,7 @@ var AlarmCenter = (function () {
     if (_sidOk(c)) {
       try {
         var r = await _api('/alarms', { method: 'POST', body: JSON.stringify({ level: 3, kind: kind, to_sentinel_id: String(c.sentinelId).trim(), title: title, body: body, member_name: myName, client_ref: ref }) });
-        if (r.ok) return { ok: true, via: 'app' };
+        if (r.ok) { try { if (typeof Nearby !== 'undefined') Nearby.ownAlarmChanged(); } catch (e) {} return { ok: true, via: 'app' }; }
         if (r.status !== 403 && r.status !== 404) throw new Error('alarm ' + r.status);
       } catch (e) { if (!_emailOf(c)) return { ok: false, why: 'failed' }; }
       try { if (typeof Magnet !== 'undefined' && Magnet.requestLink) Magnet.requestLink(c).catch(function () {}); } catch (e) {}
@@ -42308,6 +42496,383 @@ var VENUES = [
       ['Prisoner Operations', ['PO']], ['Asset Forfeiture', ['AF']], ['Administrative', ['ADM']] ] } ] }
 ];
 
+/* ═══ Nearby (Bluetooth): three safety tools in the installed app ═══
+   1. Tracker warning. Android: the phone listens for item trackers (AirTag and other Find My
+      trackers away from their owner, Tile, Galaxy SmartTag, Find Hub trackers, Chipolo) and warns
+      when the same one has been seen with the member at least 3 times, over at least 30 minutes,
+      in places at least 400 m apart. iPhone: Apple does not let apps hear Find My trackers, and
+      the iPhone warns by itself; the app shows where that is switched on and can still check for
+      Tile and SmartTag trackers on demand.
+   2. Find during an alarm. A member who chose "Findable during my own alarm" advertises a
+      Remiel Sentinel signal while their own alarm is open (RemielBeacon, a plugin of the app).
+      A Circle member who received the alarm taps Find nearby and sees how close that phone is.
+   3. Headcount. Members who chose "Count me present" advertise while the app runs; a lead
+      taps Take a headcount, the members are asked by notification to open the app, and the
+      lead's phone lists who was heard and who was not.
+   The signal is an 8 byte token that changes every 15 minutes; only the Remiel Sentinel server
+   can tell whose it is, and it answers only the scanner's own Circle (routes/ble.js). */
+var Nearby = (function () {
+  'use strict';
+  var SERVICE = '7a1d5e00-6f2b-4c1e-9a53-52454d49454c';
+  var TOKEN_CH = '7a1d5e01-6f2b-4c1e-9a53-52454d49454c';
+  var cap = window.Capacitor;
+  var NATIVE = !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
+  var PLATFORM = NATIVE && typeof cap.getPlatform === 'function' ? cap.getPlatform() : 'web';
+  var SCAN_EVERY_MS = 5 * 60 * 1000, SCAN_MS = 12000;
+  var _me = null, _meAt = 0, _adv = false, _bleReady = null, _scanning = false, _trackerTimer = null, _ownTimer = null;
+  var TYPES = {
+    findmy:   ['nb.t.findmy', 'AirTag or other Find My tracker'],
+    tile:     ['nb.t.tile', 'Tile tracker'],
+    smarttag: ['nb.t.smarttag', 'Samsung Galaxy SmartTag'],
+    findhub:  ['nb.t.findhub', 'Find Hub tracker (Google network)'],
+    chipolo:  ['nb.t.chipolo', 'Chipolo tracker']
+  };
+
+  function _t(k, fb, p) { var s = fb; try { var v = I18n.t(k, p); if (v && v !== k) return v; } catch (e) {} if (p) s = s.replace(/\{(\w+)\}/g, function (m, x) { return p[x] != null ? p[x] : m; }); return s; }
+  function _esc(s) { var d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+  function $(id) { return document.getElementById(id); }
+  function _authed() { try { return SyncEngine.isAuthenticated() && !SyncEngine.isLocalOnly(); } catch (e) { return false; } }
+  async function _api(path, opts) { try { var r = await SyncEngine.apiFetch(path, opts || { method: 'GET' }); var j = null; try { j = await r.json(); } catch (e) {} return { ok: r.ok, status: r.status, data: j }; } catch (e) { return { ok: false, status: 0, data: null }; } }
+  function _toast(m) { try { showToast(m); } catch (e) {} }
+  function _plugin(name) { if (!NATIVE) return null; try { return (cap.Plugins && cap.Plugins[name]) || cap.registerPlugin(name); } catch (e) { return null; } }
+  function _ble() { return _plugin('BluetoothLe'); }
+  function _beacon() { return _plugin('RemielBeacon'); }
+  function _hex(s) { return String(s || '').replace(/[^0-9a-f]/gi, '').toLowerCase(); }
+  function _bytes(s) { var h = _hex(s), out = []; for (var i = 0; i + 1 < h.length; i += 2) out.push(parseInt(h.substr(i, 2), 16)); return out; }
+  function _uuid(u) { u = String(u || '').toLowerCase(); return /^[0-9a-f]{4}$/.test(u) ? '0000' + u + '-0000-1000-8000-00805f9b34fb' : u; }
+  function _short(u) { u = _uuid(u); return /^0000[0-9a-f]{4}-0000-1000-8000-00805f9b34fb$/.test(u) ? u.substr(4, 4) : u; }
+  function _get(key, fb) { return RemielDB.getSetting(key).then(function (v) { return v == null ? fb : v; }).catch(function () { return fb; }); }
+  function _put(key, v) { try { return RemielDB.putSetting(key, v); } catch (e) { return Promise.resolve(); } }
+
+  async function _init() {
+    if (!NATIVE) return false;
+    if (_bleReady) return _bleReady;
+    _bleReady = (async function () {
+      var b = _ble(); if (!b) return false;
+      try { await b.initialize({ androidNeverForLocation: false }); return true; } catch (e) { _bleReady = null; return false; }
+    })();
+    return _bleReady;
+  }
+  /* One scan: calls onResult for each advertisement heard; resolves when done */
+  async function _scan(opts, onResult, ms) {
+    var b = _ble(); if (!b || !(await _init())) throw new Error('bluetooth');
+    if (_scanning) { try { await b.stopLEScan(); } catch (e) {} }
+    _scanning = true;
+    var l = await b.addListener('onScanResult', function (r) { try { onResult(r); } catch (e) {} });
+    try {
+      await b.requestLEScan(Object.assign({ allowDuplicates: true, scanMode: 2 }, opts || {}));
+      await new Promise(function (res) { setTimeout(res, ms); });
+    } finally {
+      try { await b.stopLEScan(); } catch (e) {}
+      try { l.remove(); } catch (e) {}
+      _scanning = false;
+    }
+  }
+
+  /* ── 1. Tracker warning ── */
+  function classify(r) {
+    var md = r.manufacturerData || {}, sd = r.serviceData || {}, uu = (r.uuids || []).map(_short);
+    var sdk = {}; Object.keys(sd).forEach(function (k) { sdk[_short(k)] = sd[k]; });
+    var apple = md['76'];
+    if (apple) { var b = _bytes(apple); if (b[0] === 0x12 && b[1] === 0x19) return 'findmy'; }
+    if (sdk.feed || sdk.feec || uu.indexOf('feed') >= 0 || uu.indexOf('feec') >= 0) return 'tile';
+    if (sdk.fd5a || uu.indexOf('fd5a') >= 0) return 'smarttag';
+    if (sdk.feaa) { var f = _bytes(sdk.feaa); if (f[0] === 0x40 || f[0] === 0x41) return 'findhub'; }
+    if (sdk.fe33 || uu.indexOf('fe33') >= 0) return 'chipolo';
+    return null;
+  }
+  function _dist(a, b) {
+    var R = 6371000, toR = Math.PI / 180, dLat = (b.lat - a.lat) * toR, dLon = (b.lon - a.lon) * toR;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+  /* The rule: seen at least 3 times, over at least 30 minutes, in places at least 400 m apart */
+  function evaluate(sightings, now) {
+    now = now || Date.now();
+    var by = {};
+    sightings.forEach(function (s) { if (now - s.t <= 24 * 3600e3) (by[s.id] = by[s.id] || []).push(s); });
+    var out = [];
+    Object.keys(by).forEach(function (id) {
+      var list = by[id].sort(function (a, b) { return a.t - b.t; });
+      if (list.length < 3) return;
+      var span = list[list.length - 1].t - list[0].t;
+      if (span < 30 * 60e3) return;
+      var located = list.filter(function (s) { return s.lat != null; }), far = 0;
+      for (var i = 0; i < located.length; i++) for (var j = i + 1; j < located.length; j++) far = Math.max(far, _dist(located[i], located[j]));
+      if (far < 400) return;
+      out.push({ id: id, type: list[0].type, first: list[0].t, last: list[list.length - 1].t, count: list.length, far: Math.round(far) });
+    });
+    return out;
+  }
+  function _position() {
+    return new Promise(function (res) {
+      try {
+        navigator.geolocation.getCurrentPosition(function (p) { res({ lat: p.coords.latitude, lon: p.coords.longitude }); }, function () { res(null); }, { enableHighAccuracy: false, maximumAge: 120000, timeout: 15000 });
+      } catch (e) { res(null); }
+    });
+  }
+  async function checkTrackers(manual) {
+    if (!NATIVE) { if (manual) _toast(_t('nb.appOnly', 'This works in the Remiel Sentinel app from the App Store or Google Play.')); return []; }
+    var heard = {};
+    try {
+      await _scan(PLATFORM === 'ios' ? { services: [_uuid('feed'), _uuid('feec'), _uuid('fd5a'), _uuid('fe33'), _uuid('feaa')] } : {}, function (r) {
+        var ty = classify(r); if (!ty || !r.device) return;
+        var id = r.device.deviceId; if (!heard[id] || r.rssi > heard[id].rssi) heard[id] = { id: id, type: ty, rssi: r.rssi };
+      }, SCAN_MS);
+    } catch (e) {
+      if (manual) _status(_t('nb.btOff', 'Bluetooth is off or not allowed for Remiel Sentinel. Turn Bluetooth on, and allow Remiel Sentinel to use it in your phone Settings.'), 'warn');
+      return [];
+    }
+    var pos = await _position(), now = Date.now();
+    var ignore = await _get('trackerIgnore', {});
+    var list = await _get('trackerSightings', []);
+    Object.keys(heard).forEach(function (id) { list.push({ id: id, type: heard[id].type, t: now, rssi: heard[id].rssi, lat: pos ? pos.lat : null, lon: pos ? pos.lon : null }); });
+    list = list.filter(function (s) { return now - s.t <= 24 * 3600e3; }).slice(-2000);
+    await _put('trackerSightings', list);
+    var found = evaluate(list, now).filter(function (f) { return !(ignore[f.id] && ignore[f.id] > now); });
+    if (found.length) _warn(found[0]);
+    else if (manual) _status(Object.keys(heard).length
+      ? _t('nb.heardNotFollowing', 'Trackers nearby: {n}. None has moved with you so far. Remiel Sentinel keeps checking every 5 minutes while it runs.', { n: Object.keys(heard).length })
+      : _t('nb.noneHeard', 'No trackers heard near you just now.'), 'ok');
+    return found;
+  }
+  function _typeName(ty) { var x = TYPES[ty] || ['nb.t.other', 'Tracker']; return _t(x[0], x[1]); }
+  async function _warn(f) {
+    if ($('nbWarn')) return;
+    var when = ''; try { when = Comm.lonelyTime(f.first, null); when = when.charAt(0).toLowerCase() + when.slice(1); } catch (e) {}
+    var title = _t('nb.warnTitle', 'A tracker may be moving with you');
+    var body = _t('nb.warnBody', '{type}: seen with you {count} times, first {when}, in places {far} m apart. It is not one you marked as yours.', { type: _typeName(f.type), count: f.count, when: when, far: f.far });
+    /* Also as a phone notification, in case the app is not on screen */
+    try { var LN = _plugin('LocalNotifications'); if (LN) await LN.schedule({ notifications: [{ id: 7101, title: title, body: _t('nb.warnPush', 'Open Remiel Sentinel to find it or send Help.') }] }); } catch (e) {}
+    var wrap = document.createElement('div'); wrap.id = 'nbWarn'; wrap.className = 'intel-modal';
+    var box = document.createElement('div'); box.className = 'intel-box'; box.setAttribute('role', 'alertdialog'); box.setAttribute('aria-modal', 'true');
+    box.innerHTML = '<h3>' + _esc(title) + '</h3><p>' + _esc(body) + '</p>' +
+      '<ul><li>' + _esc(_t('nb.adv1', 'If you feel unsafe, go to a busy public place, do not go home, and call the police.')) + '</li>' +
+      '<li>' + _esc(_t('nb.adv2', 'Find it: tap Find it now and walk around; the bar grows as you get closer. Check bags, pockets, jacket linings and the car.')) + '</li>' +
+      '<li>' + _esc(_t('nb.adv3', 'Found an AirTag: hold the top of an NFC phone against its white side to see its serial number. Keep it as evidence if you report it.')) + '</li></ul>' +
+      '<div class="intel-actions"><button type="button" class="intel-btn quiet" data-a="mine">' + _esc(_t('nb.mine', 'It is mine or someone I know')) + '</button>' +
+      '<button type="button" class="intel-btn" data-a="help">' + _esc(_t('nb.sendHelp', 'Send Help')) + '</button>' +
+      '<button type="button" class="intel-btn primary" data-a="find">' + _esc(_t('nb.findIt', 'Find it now')) + '</button></div>';
+    wrap.appendChild(box); document.body.appendChild(wrap);
+    box.addEventListener('click', async function (e) {
+      var b = e.target.closest('button[data-a]'); if (!b) return;
+      var a = b.getAttribute('data-a');
+      if (a === 'mine') { var ig = await _get('trackerIgnore', {}); ig[f.id] = Date.now() + 24 * 3600e3; await _put('trackerIgnore', ig); wrap.remove(); _toast(_t('nb.ignored', 'Ignored for 24 hours.')); }
+      else if (a === 'help') { wrap.remove(); try { await AlarmCenter.sendHelp(); } catch (x) { _toast(_t('nb.helpFailed', 'Help could not be sent from here. Use the Help button.')); } }
+      else if (a === 'find') { wrap.remove(); _meter({ title: _typeName(f.type), match: function (r) { return r.device && r.device.deviceId === f.id; } }); }
+    });
+  }
+  function _trackerLoop(on) {
+    clearInterval(_trackerTimer); _trackerTimer = null;
+    if (!on || !NATIVE || PLATFORM !== 'android') return;
+    _trackerTimer = setInterval(function () { checkTrackers(false); }, SCAN_EVERY_MS);
+    setTimeout(function () { checkTrackers(false); }, 4000);
+  }
+
+  /* ── Signal strength in words ── */
+  function nearWords(rssi) {
+    if (rssi >= -55) return { pct: 100, w: _t('nb.near1', 'Very close: within about 1 to 2 m') };
+    if (rssi >= -67) return { pct: 75, w: _t('nb.near2', 'Close: about 2 to 5 m') };
+    if (rssi >= -80) return { pct: 45, w: _t('nb.near3', 'Nearby: about 5 to 15 m') };
+    return { pct: 18, w: _t('nb.near4', 'Far: more than 15 m, or behind walls') };
+  }
+  /* A live meter: one thing, its smoothed signal, getting warmer or colder */
+  function _meter(o) {
+    var old = $('nbMeter'); if (old) old.remove();
+    var wrap = document.createElement('div'); wrap.id = 'nbMeter'; wrap.className = 'intel-modal';
+    var box = document.createElement('div'); box.className = 'intel-box nb-meter'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    box.innerHTML = '<h3>' + _esc(_t('nb.finding', 'Finding: {what}', { what: o.title })) + '</h3>' +
+      '<p class="intel-meta">' + _esc(_t('nb.walk', 'Walk slowly and turn around: the bar grows as you get closer.')) + '</p>' +
+      '<div class="nb-bar"><i id="nbBarFill"></i></div><div class="nb-words" id="nbWords" aria-live="polite">' + _esc(_t('nb.listening', 'Listening...')) + '</div>' +
+      '<div class="intel-actions"><button type="button" class="intel-btn primary" data-a="close">' + _esc(_t('nb.done', 'Done')) + '</button></div>';
+    wrap.appendChild(box); document.body.appendChild(wrap);
+    var ema = null, prev = null, stop = false;
+    box.querySelector('[data-a="close"]').onclick = function () { stop = true; wrap.remove(); };
+    (async function loop() {
+      while (!stop && wrap.isConnected) {
+        try {
+          await _scan(o.scan || {}, function (r) {
+            if (!o.match(r)) return;
+            ema = ema == null ? r.rssi : ema * 0.7 + r.rssi * 0.3;
+            var n = nearWords(ema), fill = $('nbBarFill'), w = $('nbWords');
+            if (fill) fill.style.width = n.pct + '%';
+            var trend = prev == null ? '' : (ema > prev + 2 ? ' ' + _t('nb.warmer', '(getting closer)') : ema < prev - 2 ? ' ' + _t('nb.colder', '(getting farther)') : '');
+            if (w) w.textContent = n.w + trend;
+          }, 3000);
+          prev = ema;
+        } catch (e) { var w2 = $('nbWords'); if (w2) w2.textContent = _t('nb.btOff', 'Bluetooth is off or not allowed for Remiel Sentinel. Turn Bluetooth on, and allow Remiel Sentinel to use it in your phone Settings.'); break; }
+      }
+    })();
+  }
+
+  /* ── Remiel Sentinel signals heard nearby: token from the advertisement, else read from the phone ── */
+  async function _heardTokens(ms, onEach) {
+    var byDev = {}, reading = {};
+    var b = _ble();
+    await _scan({ services: [SERVICE] }, function (r) {
+      if (!r.device) return;
+      var id = r.device.deviceId, d = byDev[id] = byDev[id] || { id: id, rssi: r.rssi, token: null };
+      d.rssi = d.rssi == null ? r.rssi : d.rssi * 0.7 + r.rssi * 0.3;
+      var sd = r.serviceData || {};
+      Object.keys(sd).forEach(function (k) { if (_uuid(k) === SERVICE) { var h = _hex(sd[k]); if (h.length === 16) d.token = h; } });
+      if (onEach) onEach(d);
+    }, ms);
+    /* iPhones do not carry the token in the advertisement: read it (a short connection) */
+    var ids = Object.keys(byDev).filter(function (id) { return !byDev[id].token; }).slice(0, 25);
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i]; if (reading[id]) continue; reading[id] = 1;
+      try {
+        await b.connect({ deviceId: id, timeout: 5000 });
+        var v = await b.read({ deviceId: id, service: SERVICE, characteristic: TOKEN_CH });
+        var h = _hex(v && v.value); if (h.length === 16) byDev[id].token = h;
+      } catch (e) {} finally { try { await b.disconnect({ deviceId: id }); } catch (e2) {} }
+      if (onEach) onEach(byDev[id]);
+    }
+    return byDev;
+  }
+  async function _resolve(byDev, purpose) {
+    var tokens = Object.keys(byDev).map(function (k) { return byDev[k].token; }).filter(Boolean);
+    if (!tokens.length) return [];
+    var r = await _api('/ble/resolve', { method: 'POST', body: JSON.stringify({ tokens: tokens, purpose: purpose }) });
+    var m = (r.ok && r.data && r.data.matches) || [];
+    return m.map(function (x) { var dev = Object.keys(byDev).map(function (k) { return byDev[k]; }).find(function (d) { return d.token === x.token; }); return Object.assign({}, x, { deviceId: dev && dev.id, rssi: dev && dev.rssi }); });
+  }
+
+  /* ── 2. Find during an alarm ── */
+  async function openFind(alarm) {
+    if (!NATIVE) { _toast(_t('nb.appOnly', 'This works in the Remiel Sentinel app from the App Store or Google Play.')); return; }
+    var name = (alarm && (alarm.raised_by_name || alarm.member_name)) || '';
+    var wrap = document.createElement('div'); wrap.id = 'nbFind'; wrap.className = 'intel-modal';
+    var box = document.createElement('div'); box.className = 'intel-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    box.innerHTML = '<h3>' + _esc(name ? _t('nb.findTitle', 'Find {name} nearby', { name: name }) : _t('nb.findTitleAny', 'Find someone nearby')) + '</h3>' +
+      '<p class="intel-meta">' + _esc(_t('nb.findHelp', 'Works within about 30 m, for people in your Circle who turned on Findable during my own alarm, while their alarm is open. Keep this screen open and walk.')) + '</p>' +
+      '<div id="nbFindList" aria-live="polite"><div class="nb-words">' + _esc(_t('nb.listening', 'Listening...')) + '</div></div>' +
+      '<div class="intel-actions"><button type="button" class="intel-btn primary" data-a="close">' + _esc(_t('nb.done', 'Done')) + '</button></div>';
+    wrap.appendChild(box); document.body.appendChild(wrap);
+    var stop = false; box.querySelector('[data-a="close"]').onclick = function () { stop = true; wrap.remove(); };
+    var found = {}, rounds = 0;
+    while (!stop && wrap.isConnected) {
+      rounds++;
+      var byDev;
+      try { byDev = await _heardTokens(4000); } catch (e) { $('nbFindList').innerHTML = '<div class="nb-words">' + _esc(_t('nb.btOff', 'Bluetooth is off or not allowed for Remiel Sentinel. Turn Bluetooth on, and allow Remiel Sentinel to use it in your phone Settings.')) + '</div>'; return; }
+      var m = await _resolve(byDev, 'find');
+      m.forEach(function (x) { var f = found[x.user_id]; found[x.user_id] = { name: x.display_name, rssi: f && f.rssi != null && x.rssi != null ? f.rssi * 0.5 + x.rssi * 0.5 : x.rssi, prev: f ? f.rssi : null, at: Date.now() }; });
+      var list = $('nbFindList'); if (!list) return;
+      var keys = Object.keys(found).filter(function (k) { return Date.now() - found[k].at < 20000; });
+      list.innerHTML = keys.length ? keys.map(function (k) {
+        var f = found[k], n = nearWords(f.rssi == null ? -90 : f.rssi);
+        var trend = f.prev == null ? '' : (f.rssi > f.prev + 2 ? ' ' + _t('nb.warmer', '(getting closer)') : f.rssi < f.prev - 2 ? ' ' + _t('nb.colder', '(getting farther)') : '');
+        return '<div class="nb-person"><b>' + _esc(f.name) + '</b><div class="nb-bar"><i style="width:' + n.pct + '%"></i></div><div class="nb-words">' + _esc(n.w + trend) + '</div></div>';
+      }).join('') : '<div class="nb-words">' + _esc(rounds < 3 ? _t('nb.listening', 'Listening...') : _t('nb.notHeard', 'Not heard yet. Move to another floor or area and keep this screen open.')) + '</div>';
+    }
+  }
+  /* My side: advertise while I chose Findable and my own alarm is open, or while I chose headcount */
+  async function _syncAdvertising(force) {
+    if (!NATIVE || !_authed()) return;
+    if (force || !_me || Date.now() - _meAt > 55000) {
+      var r = await _api('/ble/me'); if (r.ok && r.data) { _me = r.data; _meAt = Date.now(); }
+    }
+    if (!_me) return;
+    var want = (_me.findable && !!_me.own_alarm) || _me.headcount;
+    var bc = _beacon(); if (!bc) return;
+    if (want && !_adv) { try { await bc.start({ key: _me.key, periodSec: _me.period || 900 }); _adv = true; } catch (e) { _adv = false; } }
+    else if (!want && _adv) { try { await bc.stop(); } catch (e) {} _adv = false; }
+  }
+  function ownAlarmChanged() { _syncAdvertising(true); }
+
+  /* ── 3. Headcount ── */
+  async function openHeadcount() {
+    if (!NATIVE) { _toast(_t('nb.appOnly', 'This works in the Remiel Sentinel app from the App Store or Google Play.')); return; }
+    if (!_authed()) { _toast(_t('nb.signIn', 'Sign in first: Settings, Account and devices.')); return; }
+    var views = []; try { views = (SentinelViews.views || []).filter(function (v) { return v.type === 'team' || v.type === 'unit'; }); } catch (e) {}
+    var wrap = document.createElement('div'); wrap.id = 'nbHead'; wrap.className = 'intel-modal';
+    var box = document.createElement('div'); box.className = 'intel-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+    box.innerHTML = '<h3>' + _esc(_t('nb.headTitle', 'Take a headcount')) + '</h3>' +
+      '<p class="intel-meta">' + _esc(_t('nb.headHelp', 'Counts the phones of people in your Circle who turned on Count me present, within about 30 m. They get a notification asking them to open Remiel Sentinel.')) + '</p>' +
+      '<label class="kev-l" for="nbHeadWho">' + _esc(_t('nb.headWho', 'Who')) + '</label>' +
+      '<select id="nbHeadWho" class="reach-in"><option value="">' + _esc(_t('nb.headAll', 'Everyone in my Circle')) + '</option>' +
+      views.map(function (v) { return '<option value="' + _esc(v.id) + '">' + _esc(v.name) + '</option>'; }).join('') + '</select>' +
+      '<div id="nbHeadOut" aria-live="polite"></div>' +
+      '<div class="intel-actions"><button type="button" class="intel-btn quiet" data-a="close">' + _esc(_t('nb.done', 'Done')) + '</button>' +
+      '<button type="button" class="intel-btn primary" data-a="go">' + _esc(_t('nb.headGo', 'Count now')) + '</button></div>';
+    wrap.appendChild(box); document.body.appendChild(wrap);
+    box.querySelector('[data-a="close"]').onclick = function () { wrap.remove(); };
+    box.querySelector('[data-a="go"]').onclick = function () { _runHeadcount(box, $('nbHeadWho').value); };
+  }
+  async function _runHeadcount(box, viewId) {
+    var out = $('nbHeadOut'), go = box.querySelector('[data-a="go"]');
+    go.disabled = true;
+    var circle = []; try { circle = await WhereIs.circle(true); } catch (e) {}
+    var contacts = [];
+    try {
+      var v = viewId ? (SentinelViews.views || []).find(function (x) { return x.id === viewId; }) : null;
+      contacts = DEMO_CONTACTS.filter(function (c) { return !v || v.contactIds.indexOf(c.id) >= 0; });
+    } catch (e) {}
+    var people = circle.filter(function (row) { return !viewId || contacts.some(function (c) { try { return WhereIs.matchContact(row) === c; } catch (e) { return false; } }); });
+    if (!people.length) { out.innerHTML = '<p>' + _esc(_t('nb.headNobody', 'No one in this group is linked with you in Remiel Sentinel yet.')) + '</p>'; go.disabled = false; return; }
+    var ask = await _api('/ble/headcount', { method: 'POST', body: JSON.stringify({ user_ids: people.map(function (p) { return p.user_id; }) }) });
+    var off = (ask.ok && ask.data && ask.data.off) || [];
+    var present = {}, secs = 30;
+    out.innerHTML = '<div class="nb-words">' + _esc(_t('nb.headListening', 'Listening for {s} seconds...', { s: secs })) + '</div>';
+    var tick = setInterval(function () { secs -= 1; var w = out.querySelector('.nb-words'); if (w && secs > 0) w.textContent = _t('nb.headListening', 'Listening for {s} seconds...', { s: secs }); }, 1000);
+    try {
+      for (var round = 0; round < 3; round++) {
+        var byDev = await _heardTokens(8000);
+        (await _resolve(byDev, 'headcount')).forEach(function (x) { present[x.user_id] = x; });
+      }
+    } catch (e) { clearInterval(tick); out.innerHTML = '<p>' + _esc(_t('nb.btOff', 'Bluetooth is off or not allowed for Remiel Sentinel. Turn Bluetooth on, and allow Remiel Sentinel to use it in your phone Settings.')) + '</p>'; go.disabled = false; return; }
+    clearInterval(tick);
+    var here = people.filter(function (p) { return present[p.user_id]; });
+    var missing = people.filter(function (p) { return !present[p.user_id] && off.indexOf(p.user_id) < 0; });
+    var notOn = people.filter(function (p) { return !present[p.user_id] && off.indexOf(p.user_id) >= 0; });
+    function li(p, cls) { var c = null; try { c = WhereIs.matchContact(p); } catch (e) {} return '<li class="' + cls + '">' + _esc(p.display_name) + (c && cls !== 'nb-here' ? ' <button type="button" class="posts-btn" data-msg="' + _esc(c.id) + '">' + _esc(_t('nb.message', 'Message')) + '</button>' : '') + '</li>'; }
+    out.innerHTML = '<div class="nb-sum">' + _esc(_t('nb.headSum', 'Here: {a} of {b}', { a: here.length, b: people.length })) + '</div>' +
+      (missing.length ? '<div class="comm-section-title">' + _esc(_t('nb.headMissing', 'Not heard')) + '</div><ul class="nb-list">' + missing.map(function (p) { return li(p, 'nb-missing'); }).join('') + '</ul>' : '') +
+      (notOn.length ? '<div class="comm-section-title">' + _esc(_t('nb.headOff', 'Count me present is off for them')) + '</div><ul class="nb-list">' + notOn.map(function (p) { return li(p, 'nb-off'); }).join('') + '</ul>' : '') +
+      (here.length ? '<div class="comm-section-title">' + _esc(_t('nb.headHere', 'Here')) + '</div><ul class="nb-list">' + here.map(function (p) { return li(p, 'nb-here'); }).join('') + '</ul>' : '');
+    out.querySelectorAll('[data-msg]').forEach(function (b) { b.onclick = function () { var id = b.getAttribute('data-msg'); document.getElementById('nbHead').remove(); try { SentinelMessaging.openFor(id); } catch (e) {} }; });
+    go.textContent = _t('nb.headAgain', 'Count again'); go.disabled = false;
+  }
+
+  /* ── Settings: Bluetooth safety ── */
+  function _status(text, tone) { var el = $('nbStatus'); if (el) { el.textContent = text || ''; el.setAttribute('data-tone', tone || ''); } }
+  async function renderSettings() {
+    var sec = $('nearbySection'); if (!sec) return;
+    var app = $('nbAppOnly'), body = $('nbBody'), ios = $('nbIosNote');
+    if (app) app.hidden = NATIVE;
+    if (body) body.hidden = !NATIVE;
+    if (ios) ios.hidden = PLATFORM !== 'ios';
+    var tr = $('nbTrackerToggle'); if (tr) { tr.checked = (await _get('trackerWatch', true)) !== false; tr.disabled = PLATFORM !== 'android'; }
+    if (NATIVE && _authed()) {
+      var r = await _api('/ble/me');
+      if (r.ok && r.data) { _me = r.data; _meAt = Date.now(); var f = $('nbFindableToggle'), h = $('nbHeadToggle'); if (f) f.checked = !!r.data.findable; if (h) h.checked = !!r.data.headcount; }
+    }
+  }
+  async function setTrackerWatch(on) { await _put('trackerWatch', !!on); _trackerLoop(!!on); }
+  async function setChoice(field, on, inp) {
+    if (!_authed()) { if (inp) inp.checked = !on; _toast(_t('nb.signIn', 'Sign in first: Settings, Account and devices.')); return; }
+    var body = {}; body[field] = !!on;
+    var r = await _api('/ble/me', { method: 'PUT', body: JSON.stringify(body) });
+    if (!r.ok) { if (inp) inp.checked = !on; _toast(_t('nb.saveFailed', 'That did not save. Check the connection and try again.')); return; }
+    _syncAdvertising(true);
+  }
+
+  function init() {
+    if (!NATIVE) return;
+    _get('trackerWatch', true).then(function (v) { _trackerLoop(v !== false); });
+    var poll = function () { _syncAdvertising(false); };
+    setTimeout(poll, 3000);
+    _ownTimer = setInterval(poll, 60000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') _syncAdvertising(true); });
+    window.addEventListener('hashchange', function () { if (/headcount/.test(location.hash)) _syncAdvertising(true); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else setTimeout(init, 0);
+
+  return { native: NATIVE, platform: PLATFORM, classify: classify, evaluate: evaluate, nearWords: nearWords, checkTrackers: checkTrackers,
+    openFind: openFind, openHeadcount: openHeadcount, ownAlarmChanged: ownAlarmChanged, renderSettings: renderSettings,
+    setTrackerWatch: setTrackerWatch, setChoice: setChoice, _sync: _syncAdvertising, get advertising() { return _adv; } };
+})();
+
 /* ═══ TeamBuilder: build Teams and their Units on the canvas ═══
    Team button (bottom left, same size and font as List view). Tap it: your
    Teams plus + New team. Pick one: the button pulses with the name and count,
@@ -42438,6 +43003,10 @@ var TeamBuilder = (function () {
       nb.classList.add('tm-new');
       var tb2 = row(_t('tb.fromTemplate', '+ New team from a template'), null, function () { _openMenu({ mode: 'venues' }); });
       tb2.classList.add('tm-new');
+      if (typeof Nearby !== 'undefined' && Nearby.native) {
+        var hc = row(_t('nb.teamHead', 'Headcount by Bluetooth'), null, function () { _closeMenu(); Nearby.openHeadcount(); });
+        hc.classList.add('tm-new');
+      }
     } else if (state.mode === 'venues') {
       h.textContent = _t('tb.pickVenue', 'Pick a venue');
       m.appendChild(h);
