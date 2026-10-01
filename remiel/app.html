@@ -6124,6 +6124,33 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
 .dream-brief.is-phone .db-issue { font-size: 12px; }
 .dream-brief.is-compact .db-head { font-size: 13.5px; -webkit-line-clamp: 2; }
 .dream-brief.is-compact .db-label { display: block; margin-bottom: 4px; letter-spacing: 1.5px; }
+/* ISO VIEW: the summary grows, reads on a solid ground and never fades */
+.dream-brief.is-iso { padding: 16px 18px 14px; background: rgba(8,10,18,0.985); border-color: rgba(56,189,248,0.35); }
+.dream-brief.is-iso .db-name { font-size: 19px; }
+.dream-brief.is-iso .db-head { font-size: 21px; -webkit-line-clamp: 4; }
+.dream-brief.is-iso .db-sub { font-size: 13.5px; }
+.dream-brief.is-iso .db-t { font-size: 11px; margin-top: 14px; }
+.dream-brief.is-iso .db-issue { font-size: 16px; -webkit-line-clamp: 3; margin-bottom: 6px; }
+.dream-brief.is-iso .db-more, .dream-brief.is-iso .db-hint { font-size: 13px; }
+.dream-brief.is-iso .db-last, .dream-brief.is-iso .db-lastq { font-size: 15px; }
+.dream-brief.is-iso .db-dots { height: 10px; }
+.dream-brief.is-iso .db-dots i { width: 8px; height: 8px; }
+.dream-brief.is-iso .db-dl { font-size: 11px; }
+.dream-brief.is-iso.is-phone .db-head { font-size: 18px; }
+.dream-brief.is-iso.is-phone .db-issue { font-size: 14.5px; }
+.iso-btn { position: fixed; left: 20px; bottom: calc(128px + env(safe-area-inset-bottom, 0px)); z-index: 600;
+  min-width: 64px; height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid rgba(56,189,248,0.55); background: rgba(12,14,22,0.92);
+  color: #38bdf8; font: 700 14px 'Hanken Grotesk', system-ui, sans-serif; letter-spacing: 0.12em; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.iso-btn[hidden] { display: none; }
+.iso-btn:focus-visible, .iso-x:focus-visible { outline: 2px solid #C5A55A; outline-offset: 2px; }
+.iso-btn.is-on { background: #38bdf8; color: #04121a; border-color: #38bdf8; }
+.iso-btn.is-locked { background: #C5A55A; color: #000; border-color: #C5A55A; }
+.iso-btn .iso-lock { font-size: 13px; letter-spacing: 0; }
+.iso-x { position: fixed; z-index: 601; width: 36px; height: 36px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(8,10,18,0.92); color: #fff; font: 400 22px/1 system-ui, sans-serif; cursor: pointer; padding: 0; }
+.iso-x[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .dream-comm.is-dream .dream-comm-slide { animation: none; } }
 
 
@@ -12893,6 +12920,11 @@ const I18n = (function () {
     "views.emptyDelTeam": "Delete this Team",
     "views.emptyDelUnit": "Delete this Unit",
     "views.emptyDelView": "Delete this view",
+    "iso.btn": "ISO",
+    "iso.aria": "ISO view: hold to see only this person, double-tap to lock",
+    "iso.unlockAria": "Unlock ISO view",
+    "iso.hint": "Hold ISO to see only {name}. Double-tap to keep it on.",
+    "iso.lockedToast": "ISO locked. Tap ISO once, or the ×, to unlock.",
     "ledger.reviewDictation": "Review, then tap Log",
     "medimg.title": "Scan a medication label",
     "medimg.hint": "Point the camera at the medication label or upload a photo",
@@ -13194,6 +13226,11 @@ const I18n = (function () {
     "views.emptyDelTeam": "Elimina questa squadra",
     "views.emptyDelUnit": "Elimina questo gruppo",
     "views.emptyDelView": "Elimina questa vista",
+    "iso.btn": "ISO",
+    "iso.aria": "Vista ISO: tieni premuto per vedere solo questa persona, tocca due volte per bloccarla",
+    "iso.unlockAria": "Sblocca la vista ISO",
+    "iso.hint": "Tieni premuto ISO per vedere solo {name}. Tocca due volte per tenerla attiva.",
+    "iso.lockedToast": "ISO bloccata. Tocca ISO una volta, o la ×, per sbloccare.",
     "ledger.reviewDictation": "Controlla, poi tocca Registra",
     "medimg.title": "Leggi l’etichetta di un farmaco",
     "medimg.hint": "Inquadra l’etichetta del farmaco o carica una foto",
@@ -16246,14 +16283,17 @@ function hitTestNetwork(clientX, clientY) {
   const mx = clientX - rect.left;
   const my = clientY - rect.top;
   const cx = CV.width / DPR / 2, cy = CV.height / DPR / 2;
+  /* ISO VIEW: the faint dots and the centre cannot be tapped, only the member */
+  const _iso = (typeof IsoView !== 'undefined') && IsoView.active();
   // Center sphere (user) — matches render size (CSS px)
   const W = CV.width / DPR;
   const centerR = netCenterR(W);
-  if (Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
+  if (!_iso && Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
   // Contact nodes — find front-most hit
   let closest = null;
   let closestZ = -Infinity;
   for (const node of NODES) {
+    if (_iso && node.contact.id !== focusedContactId) continue;
     const p = projectNode(node);
     const d = Math.hypot(mx - p.sx, my - p.sy);
     const hitR = node.r * p.scale * 1.6;
@@ -16261,6 +16301,156 @@ function hitTestNetwork(clientX, clientY) {
   }
   return closest ? { isCenter: false, node: closest } : null;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ISO VIEW: one member alone. Hold the ISO button and every other
+   sphere becomes a faint dot while the dream state grows; let go and
+   all returns. Double-tap ISO to keep it. Unlock with one tap on ISO,
+   the × beside the dream state, Esc, or Back (Android). It unlocks
+   itself for an urgent alarm, another view, or leaving the galaxy.
+   While on, only the member can be tapped, so a stray touch on a dot
+   or on empty space changes nothing.
+   ═══════════════════════════════════════════════════════════ */
+var IsoView = (function () {
+  var HOLD_TAP_MS = 300, DOUBLE_MS = 380;
+  var _hold = false, _locked = false, _btn = null, _x = null;
+  var _downAt = 0, _lastTapUp = 0, _hintT = null, _view = null;
+  var _hist = false, _skipPop = false, _lastCheck = 0, _sig = '';
+  function _t2(k, fb, p) {
+    try { var v = I18n.t(k, p); if (v && v !== k) return v; } catch (e) {}
+    var out = fb; Object.keys(p || {}).forEach(function (n) { out = out.split('{' + n + '}').join(p[n]); }); return out;
+  }
+  function _eligible() { try { return !!focusedContactId && appState === 'network'; } catch (e) { return false; } }
+  function active() { return (_hold || _locked) && _eligible(); }
+  function locked() { return _locked && _eligible(); }
+  function _first() { try { var c = DEMO_CONTACTS.find(function (x) { return x.id === focusedContactId; }); return c ? (c.first || '') : ''; } catch (e) { return ''; } }
+  function _say(msg) { try { if (typeof A11y !== 'undefined' && A11y.announce) A11y.announce(msg); } catch (e) {} }
+  function lock() {
+    if (!_eligible()) return;
+    clearTimeout(_hintT);
+    _locked = true; _hold = false;
+    try { _view = (typeof SentinelViews !== 'undefined') ? SentinelViews.activeViewId : null; } catch (e) { _view = null; }
+    try { if (!_hist) { history.pushState({ rsIso: 1 }, ''); _hist = true; } } catch (e) {}
+    _paint();
+    var m = _t2('iso.lockedToast', 'ISO locked. Tap ISO once, or the ×, to unlock.');
+    try { showToast(m); } catch (e) {}
+    _say(m);
+  }
+  function unlock(fromBack) {
+    if (!_locked && !_hold) return;
+    _locked = false; _hold = false;
+    if (_hist) { _hist = false; if (!fromBack) { _skipPop = true; try { history.back(); } catch (e) { _skipPop = false; } } }
+    _paint();
+  }
+  function _hint() {
+    clearTimeout(_hintT);
+    _hintT = setTimeout(function () {
+      if (_locked || _hold) return;
+      try { showToast(_t2('iso.hint', 'Hold ISO to see only {name}. Double-tap to keep it on.', { name: _first() })); } catch (e) {}
+    }, DOUBLE_MS + 40);
+  }
+  function _down(e) {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    try { _btn.setPointerCapture(e.pointerId); } catch (x) {}
+    _downAt = Date.now();
+    if (_locked) return; /* while locked, the tap is read on release */
+    _hold = true; _paint();
+  }
+  function _up(e) {
+    if (!_downAt) return;
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var now = Date.now(), held = now - _downAt; _downAt = 0;
+    if (_locked) { if (held < 700) unlock(); return; }
+    _hold = false;
+    var tap = held < HOLD_TAP_MS;
+    if (tap && now - _lastTapUp < DOUBLE_MS) { _lastTapUp = 0; lock(); return; }
+    _lastTapUp = tap ? now : 0;
+    if (tap) _hint();
+    _paint();
+  }
+  function _cancel() { _downAt = 0; if (_hold && !_locked) { _hold = false; _paint(); } }
+  function _build() {
+    if (_btn) return;
+    _btn = document.createElement('button');
+    _btn.type = 'button'; _btn.id = 'isoBtn'; _btn.className = 'iso-btn'; _btn.hidden = true;
+    _btn.addEventListener('pointerdown', _down);
+    _btn.addEventListener('pointerup', _up);
+    _btn.addEventListener('pointercancel', _cancel);
+    _btn.addEventListener('lostpointercapture', function () { if (_downAt) _cancel(); });
+    _btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    /* Keyboard: Enter or Space locks and unlocks */
+    _btn.addEventListener('click', function (e) { if (e.detail === 0) { if (_locked) unlock(); else lock(); } });
+    document.body.appendChild(_btn);
+    _x = document.createElement('button');
+    _x.type = 'button'; _x.id = 'isoX'; _x.className = 'iso-x'; _x.hidden = true; _x.textContent = '×';
+    _x.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    _x.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); unlock(); });
+    document.body.appendChild(_x);
+    /* Esc unlocks before anything else hears it */
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && _locked) { e.preventDefault(); e.stopImmediatePropagation(); unlock(); }
+    }, true);
+    /* Back (Android, or the browser) unlocks */
+    window.addEventListener('popstate', function () {
+      if (_skipPop) { _skipPop = false; return; }
+      if (_hist) { _hist = false; if (_locked) unlock(true); }
+    });
+    window.addEventListener('localeChanged', function () { _sig = ''; _paint(); });
+  }
+  function _paint() {
+    if (!_btn) return;
+    var show = _eligible();
+    try { if (blufOpen && window.innerWidth < 700) show = false; } catch (e) {}
+    var on = active(), lk = locked();
+    var sig = [show, on, lk, (typeof I18n !== 'undefined' ? I18n.locale : '')].join('|');
+    if (sig !== _sig) {
+      _sig = sig;
+      _btn.hidden = !show;
+      _btn.classList.toggle('is-on', on && !lk);
+      _btn.classList.toggle('is-locked', lk);
+      _btn.setAttribute('aria-pressed', String(lk));
+      _btn.innerHTML = (lk ? '<span class="iso-lock" aria-hidden="true">🔒</span>' : '') + '<span>' + _t2('iso.btn', 'ISO') + '</span>';
+      _btn.setAttribute('aria-label', lk ? _t2('iso.unlockAria', 'Unlock ISO view') : _t2('iso.aria', 'ISO view: hold to see only this person, double-tap to lock'));
+      _x.setAttribute('aria-label', _t2('iso.unlockAria', 'Unlock ISO view'));
+      try { document.body.classList.toggle('iso-on', on); } catch (e) {}
+    }
+    if (!lk) { if (!_x.hidden) _x.hidden = true; return; }
+    /* The × sits on the dream summary's corner, or on the dream circle */
+    var bx = null, by = null;
+    try {
+      var b = document.getElementById('dreamBrief');
+      if (b && !b.hidden) { var br = b.getBoundingClientRect(); bx = br.right - 20; by = br.top - 16; }
+      else if (window._dreamRect) {
+        var cr = document.getElementById('sphere').getBoundingClientRect(), r = window._dreamRect;
+        bx = cr.left + r.cx + r.r * 0.68; by = cr.top + r.cy - r.r * 0.68;
+      }
+    } catch (e) {}
+    if (bx == null) { _x.hidden = true; return; }
+    bx = Math.max(8, Math.min(window.innerWidth - 44, bx)); by = Math.max(8, by);
+    _x.style.left = Math.round(bx) + 'px'; _x.style.top = Math.round(by) + 'px';
+    if (_x.hidden) _x.hidden = false;
+  }
+  function _alarmShowing() {
+    try {
+      var a = document.querySelector('.alarm-stack .alarm-bar, .alarm-takeover');
+      return !!(a && a.getClientRects().length);
+    } catch (e) { return false; }
+  }
+  /* Every frame from the render loop */
+  function frame() {
+    if (!_btn) { if (document.body) _build(); else return; }
+    if ((_locked || _hold) && !_eligible()) { unlock(); return; }
+    var now = Date.now();
+    if (_locked && now - _lastCheck > 300) {
+      _lastCheck = now;
+      var v = null; try { v = (typeof SentinelViews !== 'undefined') ? SentinelViews.activeViewId : null; } catch (e) {}
+      if (v !== _view || _alarmShowing()) { unlock(); return; }
+    }
+    _paint();
+  }
+  return { active: active, locked: locked, lock: lock, unlock: unlock, frame: frame };
+})();
 
 /* ── State transitions ── */
 function enterSelf() {
@@ -21668,18 +21858,18 @@ const Comm = (() => {
     }
     return '<div class="db-strip">' + cells + '</div>';
   }
-  function _briefHtml(c, compact, phone) {
+  function _briefHtml(c, compact, phone, iso) {
     const items = (cached(c.id) || []).filter(it => it.ts && Date.now() - it.ts <= WINDOW_MS);
     const iss = issues(c.id);
     let head;
-    if (iss.length) head = '<div class="db-head">' + _tagHtml(iss[0].type) + '<span>' + _esc(iss[0].text) + '</span></div>' + (iss[0].sub && !compact && !phone ? '<div class="db-sub">' + _esc(iss[0].sub) + '</div>' : '');
+    if (iss.length) head = '<div class="db-head">' + _tagHtml(iss[0].type) + '<span>' + _esc(iss[0].text) + '</span></div>' + (iss[0].sub && !compact && (!phone || iso) ? '<div class="db-sub">' + _esc(iss[0].sub) + '</div>' : '');
     else if (items.length) head = '<div class="db-head db-quote">' + _esc(items[0].text) + '</div>';
     else head = '<div class="db-head db-quiet">' + _esc(_t('comm.brief.none', 'No communication in the last 30 days')) + '</div>';
     if (compact) {
       return '<div class="db-label">' + _esc(_t('comm.week', 'This week for {first}', { first: _first(c) })) + '</div>' + head +
         (iss.length > 1 ? '<div class="db-more">' + _esc(_t('comm.brief.more', '+{n} more this week', { n: iss.length - 1 })) + '</div>' : '');
     }
-    const rest = iss.slice(1, phone ? 2 : 4);
+    const rest = iss.slice(1, iso ? 8 : (phone ? 2 : 4));
     const week = rest.length ? '<div class="db-t">' + _esc(_t('comm.brief.week', 'This week')) + '</div>' +
       rest.map(x => '<div class="db-issue">' + _tagHtml(x.type) + '<span>' + _esc(x.text) + '</span></div>').join('') +
       (iss.length > 1 + rest.length ? '<div class="db-more">' + _esc(_t('comm.brief.more', '+{n} more this week', { n: iss.length - 1 - rest.length })) + '</div>' : '') : '';
@@ -21688,12 +21878,12 @@ const Comm = (() => {
       const it = items[0];
       last = '<div class="db-t">' + _esc(_t('comm.brief.last', 'Last contact')) + '</div>' +
         '<div class="db-last">' + _esc(lonelyTime(it.ts, it.channel, it.place)) + '</div>' +
-        (iss.length && !phone ? '<div class="db-lastq">' + _esc(it.text) + '</div>' : '');
+        (iss.length && (!phone || iso) ? '<div class="db-lastq">' + _esc(it.text) + '</div>' : '');
     }
     return '<div class="db-top"><span class="db-label">' + _esc(_t('comm.label', 'COMMUNICATION')) + '</span><span class="db-name">' + _esc(_first(c)) + '</span></div>' +
       head + week + last +
       '<div class="db-t">' + _esc(_t('comm.brief.days', 'Last 7 days')) + '</div>' + _stripHtml(items) +
-      (phone ? '' : '<div class="db-hint">' + _esc(_t('comm.brief.hint', 'Tap for the full 30 days')) + '</div>');
+      (phone && !iso ? '' : '<div class="db-hint">' + _esc(_t('comm.brief.hint', 'Tap for the full 30 days')) + '</div>');
   }
   function _hideBrief(bEl) { if (bEl && !bEl.hidden) bEl.hidden = true; window._dreamCommHit = null; }
   function _briefFrame(bEl) {
@@ -21703,8 +21893,19 @@ const Comm = (() => {
     let mode = 'comm';
     try { if (typeof WhereIs !== 'undefined') mode = WhereIs.mode(); } catch (e) {}
     const vw = window.innerWidth, vh = window.innerHeight, phone = vw <= 480;
-    let left, width, top, compact = false;
-    if (mode === 'whereis') {
+    const iso = (typeof IsoView !== 'undefined') && IsoView.active();
+    let left, width, top, compact = false, isoMaxH = 0;
+    if (iso && mode !== 'whereis') {
+      /* ISO VIEW: under the larger picture on a phone, beside it on a wider screen */
+      const cvr = document.getElementById('sphere').getBoundingClientRect();
+      if (phone) { left = 12; width = vw - 24; top = Math.round(cvr.top + r.cy + r.r + 34); isoMaxH = Math.max(140, vh - top - 186); }
+      else {
+        left = Math.max(16, Math.round(vw * 0.03));
+        width = Math.round(Math.min(460, Math.max(260, r.cx - r.r - left - 24)));
+        top = Math.round(Math.max(70, cvr.top + r.cy - r.r * 0.8));
+        isoMaxH = Math.round(Math.min(vh * 0.8, vh - top - 190));
+      }
+    } else if (mode === 'whereis') {
       const m = window._dreamMicroHit || window._dreamWhereHit;
       if (!m) { _hideBrief(bEl); return; }
       compact = true;
@@ -21725,14 +21926,15 @@ const Comm = (() => {
       top = Math.round(Math.max(70, r.cy - r.r * 0.62));
     }
     const e = _cache.get(c.id);
-    const sig = [c.id, mode, phone, compact, e ? e.sig : '', _it(), Math.floor(Date.now() / 60000)].join('~');
-    if (sig !== _briefSig) { bEl.innerHTML = _briefHtml(c, compact, phone); _briefSig = sig; }
+    const sig = [c.id, mode, phone, compact, iso, e ? e.sig : '', _it(), Math.floor(Date.now() / 60000)].join('~');
+    if (sig !== _briefSig) { bEl.innerHTML = _briefHtml(c, compact, phone, iso); _briefSig = sig; }
     bEl.classList.toggle('is-compact', compact);
     bEl.classList.toggle('is-phone', phone);
+    bEl.classList.toggle('is-iso', iso);
     bEl.style.left = left + 'px'; bEl.style.top = top + 'px'; bEl.style.width = width + 'px';
-    bEl.style.maxHeight = Math.round(phone ? vh * 0.36 : Math.min(vh * 0.62, vh - top - 110)) + 'px';
+    bEl.style.maxHeight = Math.round(isoMaxH || (phone ? vh * 0.36 : Math.min(vh * 0.62, vh - top - 110))) + 'px';
     const a = (typeof r.alpha === 'number') ? r.alpha : 0.45;
-    let op = Math.min(1, 0.6 + a * 0.9);
+    let op = iso ? 1 : Math.min(1, 0.6 + a * 0.9);
     if (bEl.hidden) bEl.hidden = false;
     try {
       const cv = document.getElementById('sphere'), cr = cv.getBoundingClientRect(), br = bEl.getBoundingClientRect();
@@ -21740,7 +21942,7 @@ const Comm = (() => {
       window._dreamCommHit = h;
       /* Where the focused sphere's action pills sit under it, the summary thins so they stay readable */
       const av = window._dreamPillAvoid;
-      if (av && av.x < h.x + h.w && av.x + av.w > h.x && av.y < h.y + h.h && av.y + av.h > h.y) op = 0.3;
+      if (!iso && av && av.x < h.x + h.w && av.x + av.w > h.x && av.y < h.y + h.h && av.y + av.h > h.y) op = 0.3;
     } catch (err) { window._dreamCommHit = null; }
     bEl.style.opacity = String(op.toFixed(3));
   }
@@ -27110,6 +27312,8 @@ function onPressEnd(e) {
             }
           }, SPHERE_TAP_MS);
         }
+      } else if (typeof IsoView !== 'undefined' && IsoView.active()) {
+        /* ISO VIEW: a touch on empty space or a faint dot changes nothing */
       } else {
         /* Tapped empty space — unfocus */
         focusedContactId = null;
@@ -28463,15 +28667,17 @@ function drawNetworkView(t) {
     const _focCat = _focNode ? (CATS[_focNode.contact.cat] || CATS.other) : CATS.other;
     ctx.save();
     /* Dream region: large circle in upper-right quadrant. Inside a Unit it is brighter. */
-    var _drBoost = dreamInUnit();
-    var _drR = Math.min(W, H) * 0.28;
-    var _drCx = W - _drR - W * 0.05;
-    var _drCy = _drR + H * 0.06;
+    var _drIso = (typeof IsoView !== 'undefined') && IsoView.active();
+    var _drBoost = _drIso || dreamInUnit();
+    var _drR, _drCx, _drCy;
+    if (_drIso && W <= 480) { _drR = W * 0.30; _drCx = W / 2; _drCy = _drR + H * 0.07; }
+    else if (_drIso) { _drR = Math.min(W, H) * 0.40; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
+    else { _drR = Math.min(W, H) * 0.28; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
     ctx.beginPath();
     ctx.arc(_drCx, _drCy, _drR, 0, Math.PI * 2);
     ctx.clip();
     /* Breathing: a clear pulse from dark to light (about 8 s); inside a Unit, bright to full */
-    var _dreamAlpha = _drBoost ? 0.75 + 0.15 * Math.sin(t * 0.0008) : 0.34 + 0.24 * Math.sin(t * 0.0008);
+    var _dreamAlpha = _drIso ? 0.9 : (_drBoost ? 0.75 + 0.15 * Math.sin(t * 0.0008) : 0.34 + 0.24 * Math.sin(t * 0.0008));
     if (_memPhoto && _memPhoto.img) {
       const _memImg = _memPhoto.img;
       const _mw = _memPhoto.isVideo ? _memImg.videoWidth : (_memImg.naturalWidth || _memImg.width);
@@ -28546,6 +28752,7 @@ function drawNetworkView(t) {
 
   /* ── Rest Mode — auto-dream idle check ── */
   if (!_restModeActive && !blufOpen && appState === 'network' &&
+      !(typeof IsoView !== 'undefined' && IsoView.active()) &&
       (Date.now() - _lastInteractionTime) > _REST_IDLE_MS && DEMO_CONTACTS.length > 0) {
     _enterRestMode();
   }
@@ -28556,6 +28763,8 @@ function drawNetworkView(t) {
   /* Project and depth-sort (back to front) */
   const projected = NODES.map(node => ({ node, p: projectNode(node) }));
   projected.sort((a, b) => a.p.z - b.p.z);
+  /* ISO VIEW: everyone but the member is a faint dot, with no links */
+  const _isoNow = (typeof IsoView !== 'undefined') && IsoView.active();
 
   /* ── Connector lines — CareCircle curved links from center edge to each sphere ── */
   ctx.globalCompositeOperation = 'lighter';
@@ -28563,6 +28772,7 @@ function drawNetworkView(t) {
   const _cR = netCenterR(W, H);
   const _cEdge = _cR * 1.15; /* start just outside the center sphere rim */
   for (const { node, p } of projected) {
+    if (_isoNow) break;
     const cat = CATS[node.contact.cat] || CATS.other;
     const col = `rgb(${cat.r},${cat.g},${cat.b})`;
     const a = Math.max(0.16, Math.min(0.7, p.scale * 0.7));
@@ -28663,6 +28873,14 @@ function drawNetworkView(t) {
     const colHex = '#' + [cat.r, cat.g, cat.b].map(v => v.toString(16).padStart(2,'0')).join('');
     const s = p.scale;
     const isFocused = focusedContactId === node.contact.id;
+    if (_isoNow && !isFocused) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(1.6, 2.6 * s), 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      return;
+    }
     const focusMul = isFocused ? FOCUS_SCALE : 1;
     /* Breathing — gentle scale pulse per-sphere, gated by pulseOn */
     const _cb = (pulseOn && !_reducedMotionNow()) ? (1 + (SEVS[node.contact.sev] || SEVS[4]).pulseAmp * Math.sin(t * (SEVS[node.contact.sev] || SEVS[4]).pulseSpd + node.tx)) : 1;
@@ -29012,6 +29230,14 @@ function drawNetworkView(t) {
   }
 
   /* ── Center sphere (user) — full sphere with media, rings, identity ── */
+  if (_isoNow) {
+    const _iuc = CATS[userCat] || CATS.family;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = `rgb(${_iuc.r},${_iuc.g},${_iuc.b})`;
+    ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  } else {
   const uc = CATS[userCat] || CATS.family;
   const usv = SEVS[userSev] || SEVS[4];
   /* Match the self-mode sphere visual size — derived from stage width min(400, 88vw) * 0.44 */
@@ -29194,6 +29420,8 @@ function drawNetworkView(t) {
     }
   }
 
+  } /* end centre sphere (not drawn in ISO VIEW) */
+
   /* ── PASS 2: Draw contact spheres IN FRONT of center (with transparency) ── */
   for (const item of _frontNodes) {
     _drawOneContactSphere(item, 0.72);
@@ -29217,6 +29445,7 @@ function frame(ts) {
     drawSphereView(t);
   }
   try { Comm.frame(); } catch (e) {}
+  try { IsoView.frame(); } catch (e) {}
 
   /* Mini sphere — draw individual contact sphere, NOT the galaxy */
   if (blufOpen && miniCtx) {
