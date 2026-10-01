@@ -15554,7 +15554,7 @@ const CV = document.getElementById('sphere');
 const ctx = CV.getContext('2d');
 const stage = document.getElementById('stage');
 const sphereLabelsEl = document.getElementById('sphereLabels');
-const DPR = Math.min(window.devicePixelRatio || 1, 3); /* 3x phones get a 3x canvas so HUD text stays crisp */
+const DPR = Math.min(window.devicePixelRatio || 1, 2); /* 2x is sharp on every phone; a 3x canvas has over twice the pixels to paint each frame and slowed rotation */
 
 /* ── Forward declarations (needed by resize before full init) ── */
 let appState = 'self'; // 'self' | 'network'
@@ -29173,49 +29173,76 @@ function dreamInUnit() {
    volume, a soft key light and a specular glint sit at the upper left, and a rim of the
    sphere's own colour lights the lower edge. k scales it (spheres in front are lighter);
    over a photo the shading is gentler so faces stay clear. */
+/* Glows and glass lighting are painted once per colour into small images and then
+   stamped, instead of being rebuilt from gradients for every sphere on every frame. */
+const _spriteCache = new Map();
+function _sprite(key, size, paint) {
+  let c = _spriteCache.get(key);
+  if (!c) { c = document.createElement('canvas'); c.width = c.height = size; paint(c.getContext('2d'), size / 2); _spriteCache.set(key, c); }
+  return c;
+}
+function _haloSprite(colHex) {
+  return _sprite('halo' + colHex, 256, (g, R) => {
+    const gg = g.createRadialGradient(R, R, 0, R, R, R);
+    gg.addColorStop(0, colHex + 'cc'); gg.addColorStop(0.16, colHex + '88'); gg.addColorStop(0.42, colHex + '2e'); gg.addColorStop(1, colHex + '00');
+    g.fillStyle = gg; g.fillRect(0, 0, R * 2, R * 2);
+  });
+}
+/* Shading (painted normally) and light (added), each clipped to the sphere */
+function _orbSprites(c, photo) {
+  const key = c.r + ',' + c.g + ',' + c.b + (photo ? 'p' : '');
+  const shade = _sprite('os' + key, 192, (g, R) => {
+    g.beginPath(); g.arc(R, R, R, 0, Math.PI * 2); g.clip();
+    const lx = R - R * 0.38, ly = R - R * 0.42;
+    const sh = g.createRadialGradient(lx, ly, R * 0.12, R, R, R * 1.04);
+    sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(0.62, 'rgba(2,4,14,0.10)'); sh.addColorStop(1, 'rgba(2,4,14,' + (photo ? 0.32 : 0.72) + ')');
+    g.fillStyle = sh; g.fillRect(0, 0, R * 2, R * 2);
+  });
+  const light = _sprite('ol' + key, 192, (g, R) => {
+    g.beginPath(); g.arc(R, R, R, 0, Math.PI * 2); g.clip();
+    const lx = R - R * 0.38, ly = R - R * 0.42;
+    if (!photo) {
+      const kl = g.createRadialGradient(lx, ly, 0, lx, ly, R * 0.95);
+      kl.addColorStop(0, 'rgba(255,255,255,0.18)'); kl.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = kl; g.fillRect(0, 0, R * 2, R * 2);
+      const rim = g.createRadialGradient(R - R * 0.22, R - R * 0.28, R * 0.80, R, R, R * 1.02);
+      rim.addColorStop(0, 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',0)'); rim.addColorStop(1, 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',0.6)');
+      g.globalCompositeOperation = 'lighter'; g.fillStyle = rim; g.fillRect(0, 0, R * 2, R * 2);
+    }
+  });
+  const glint = _sprite('og' + (photo ? 'p' : ''), 64, (g, R) => {
+    const gk = photo ? 0.5 : 1;
+    g.translate(R, R); g.scale(1, 0.6);
+    const sp = g.createRadialGradient(0, 0, 0, 0, 0, R);
+    sp.addColorStop(0, 'rgba(255,255,255,' + (0.72 * gk) + ')'); sp.addColorStop(0.35, 'rgba(255,255,255,' + (0.26 * gk) + ')'); sp.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = sp; g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.fill();
+  });
+  return { shade, light, glint };
+}
 function drawOrbLight(ctx, x, y, r, c, k, photo) {
   if (!(r > 4)) return;
   k = (k == null) ? 1 : k;
   const L = ctx.globalAlpha, O = ctx.globalCompositeOperation;
+  const sp = _orbSprites(c, !!photo);
   ctx.save();
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
-  const lx = x - r * 0.38, ly = y - r * 0.42;
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = k;
   ctx.globalCompositeOperation = 'source-over';
-  const sh = ctx.createRadialGradient(lx, ly, r * 0.12, x, y, r * 1.04);
-  sh.addColorStop(0, 'rgba(0,0,0,0)');
-  sh.addColorStop(0.62, 'rgba(2,4,14,' + (0.10 * k) + ')');
-  sh.addColorStop(1, 'rgba(2,4,14,' + ((photo ? 0.32 : 0.72) * k) + ')');
-  ctx.fillStyle = sh; ctx.fillRect(x - r, y - r, r * 2, r * 2);
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(sp.shade, x - r, y - r, r * 2, r * 2);
   if (photo) {
     /* Over a face: no wash of light or colour across it, so skin tones stay true.
        Only a thin coloured edge and the glint. */
-    ctx.globalCompositeOperation = 'source-over';
     ctx.beginPath(); ctx.arc(x, y, r - Math.max(0.6, r * 0.03), 0, Math.PI * 2);
     ctx.lineWidth = Math.max(1, r * 0.06);
     ctx.strokeStyle = 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + (0.55 * k) + ')';
-    ctx.stroke();
-    ctx.globalCompositeOperation = 'lighter';
-  } else {
-    const kl = ctx.createRadialGradient(lx, ly, 0, lx, ly, r * 0.95);
-    kl.addColorStop(0, 'rgba(255,255,255,' + (0.18 * k) + ')');
-    kl.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = kl; ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    const rim = ctx.createRadialGradient(x - r * 0.22, y - r * 0.28, r * 0.80, x, y, r * 1.02);
-    rim.addColorStop(0, 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',0)');
-    rim.addColorStop(1, 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + (0.6 * k) + ')');
-    ctx.fillStyle = rim; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    ctx.globalAlpha = 1; ctx.stroke(); ctx.globalAlpha = k;
   }
+  ctx.globalCompositeOperation = 'lighter';
+  if (!photo) ctx.drawImage(sp.light, x - r, y - r, r * 2, r * 2);
   if (r > 9) {
-    const gk = photo ? 0.5 : 1;
+    /* glint: ellipse r*0.27 wide, rotated, at the upper left (stays inside the sphere) */
     const gr = r * 0.27;
-    ctx.translate(x - r * 0.36, y - r * 0.44); ctx.rotate(-0.62); ctx.scale(1, 0.6);
-    const sp = ctx.createRadialGradient(0, 0, 0, 0, 0, gr);
-    sp.addColorStop(0, 'rgba(255,255,255,' + (0.72 * k * gk) + ')');
-    sp.addColorStop(0.35, 'rgba(255,255,255,' + (0.26 * k * gk) + ')');
-    sp.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = sp; ctx.beginPath(); ctx.arc(0, 0, gr, 0, Math.PI * 2); ctx.fill();
+    ctx.translate(x - r * 0.36, y - r * 0.44); ctx.rotate(-0.62);
+    ctx.drawImage(sp.glint, -gr, -gr, gr * 2, gr * 2);
   }
   ctx.restore();
   ctx.globalAlpha = L; ctx.globalCompositeOperation = O;
@@ -29546,15 +29573,9 @@ function drawNetworkView(t) {
       pulseA = _reducedMotionNow() ? 0.5 : 0.5 + 0.5 * Math.sin(t * 7 + node.tx);
       haloMul = 4.6 + pulseA * 1.8;
     }
-    const halo = r * haloMul;
-    const gg = ctx.createRadialGradient(sx, sy, 0, sx, sy, halo);
-    gg.addColorStop(0, colHex + 'cc');
-    gg.addColorStop(0.16, colHex + '88');
-    gg.addColorStop(0.42, colHex + '2e');
-    gg.addColorStop(1, colHex + '00');
+    const halo = r * haloMul * (isUrgent ? 1 : (0.55 + 0.45 * _haloK)); /* tighter glows in a large circle */
     ctx.globalAlpha = (0.30 + 0.55 * s + (isUrgent ? 0.25 * pulseA : 0)) * (alphaOverride || 1) * (isUrgent ? 1 : _haloK);
-    ctx.fillStyle = gg;
-    ctx.beginPath(); ctx.arc(sx, sy, halo, 0, Math.PI * 2); ctx.fill();
+    ctx.drawImage(_haloSprite(colHex), sx - halo, sy - halo, halo * 2, halo * 2);
 
     /* Translucent shell */
     ctx.globalAlpha = 0.30 * (alphaOverride || 1);
