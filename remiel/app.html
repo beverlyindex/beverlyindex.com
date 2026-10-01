@@ -6149,7 +6149,8 @@ body.rs-overlay-open .clv-toggle, body.rs-overlay-open #pulseBtn { display: none
 .dream-brief .db-dl { font: 700 9.5px var(--nous-mono, monospace); color: rgba(240,246,255,0.8); margin-top: 3px; }
 .dream-brief .db-day.is-today .db-dl { color: #fff; }
 .dream-brief .db-hint { font-size: 11px; color: rgba(214,229,255,0.75); margin-top: 9px; }
-.dream-brief.is-phone { padding: 10px 11px 8px; }
+.dream-brief.is-phone { padding: 10px 11px 8px; transition: top 0.35s ease, left 0.35s ease; }
+@media (prefers-reduced-motion: reduce) { .dream-brief.is-phone { transition: none; } }
 .dream-brief.is-phone .db-head { font-size: 14px; }
 .dream-brief.is-phone .db-issue { font-size: 12px; }
 .dream-brief.is-compact .db-head { font-size: 13.5px; -webkit-line-clamp: 2; }
@@ -22052,6 +22053,25 @@ const Comm = (() => {
       '<div class="db-t">' + _esc(_t('comm.brief.days', 'Last 7 days')) + '</div>' + _stripHtml(items) +
       (phone && !iso ? '' : '<div class="db-hint">' + _esc(_t('comm.brief.hint', 'Tap for the full 30 days')) + '</div>');
   }
+  /* Four spots on a phone, in order: top left, bottom left, bottom right, top right. The
+     summary keeps its spot until the selected sphere or its call buttons move into it. */
+  let _phoneSlot = 0;
+  function _phonePlace(bEl, left0, top0, width, vw, vh) {
+    const h = Math.min(bEl.offsetHeight || 220, Math.round(vh * 0.36));
+    const blocks = [];
+    try {
+      const cr = document.getElementById('sphere').getBoundingClientRect();
+      const av = window._dreamPillAvoid, fo = window._focusOrb;
+      if (av) blocks.push({ x: cr.left + av.x - 6, y: cr.top + av.y - 6, w: av.w + 12, h: av.h + 12 });
+      if (fo) blocks.push({ x: cr.left + fo.x - fo.r - 6, y: cr.top + fo.y - fo.r - 6, w: fo.r * 2 + 12, h: fo.r * 2 + 12 });
+    } catch (e) {}
+    const low = Math.max(top0, vh - 186 - h);
+    const slots = [{ left: left0, top: top0 }, { left: 12, top: low }, { left: vw - 12 - width, top: low }, { left: vw - 12 - width, top: top0 }];
+    const hits = (sl) => blocks.some(b => sl.left < b.x + b.w && sl.left + width > b.x && sl.top < b.y + b.h && sl.top + h > b.y);
+    if (!hits(slots[_phoneSlot])) return { left: slots[_phoneSlot].left, top: slots[_phoneSlot].top, blocked: false };
+    for (let i = 0; i < slots.length; i++) if (!hits(slots[i])) { _phoneSlot = i; return { left: slots[i].left, top: slots[i].top, blocked: false }; }
+    return { left: slots[_phoneSlot].left, top: slots[_phoneSlot].top, blocked: true };
+  }
   function _hideBrief(bEl) { if (bEl && !bEl.hidden) bEl.hidden = true; window._dreamCommHit = null; window._dreamWarnHit = null; }
   function _briefFrame(bEl) {
     if (!bEl) return;
@@ -22102,10 +22122,13 @@ const Comm = (() => {
     bEl.classList.toggle('is-compact', compact);
     bEl.classList.toggle('is-phone', phone);
     bEl.classList.toggle('is-iso', iso);
+    /* A phone: the summary takes the first spot clear of the selected sphere and its call buttons */
+    let blocked = false;
+    if (phone && !iso && mode !== 'whereis') { const ps = _phonePlace(bEl, left, top, width, vw, vh); left = ps.left; top = ps.top; blocked = ps.blocked; }
     bEl.style.left = left + 'px'; bEl.style.top = top + 'px'; bEl.style.width = width + 'px';
     bEl.style.maxHeight = Math.round(isoMaxH || (phone ? vh * 0.36 : Math.min(vh * 0.62, vh - top - 110))) + 'px';
     const a = (typeof r.alpha === 'number') ? r.alpha : 0.45;
-    let op = iso ? 1 : Math.min(1, 0.6 + a * 0.9);
+    let op = iso ? 1 : Math.min(1, 0.88 + a * 0.3); /* a gentle breath, never washed out */
     if (bEl.hidden) bEl.hidden = false;
     try {
       const cv = document.getElementById('sphere'), cr = cv.getBoundingClientRect(), br = bEl.getBoundingClientRect();
@@ -22117,7 +22140,8 @@ const Comm = (() => {
       else window._dreamWarnHit = null;
       /* Where the focused sphere's action pills sit under it, the summary thins so they stay readable */
       const av = window._dreamPillAvoid;
-      if (!iso && av && av.x < h.x + h.w && av.x + av.w > h.x && av.y < h.y + h.h && av.y + av.h > h.y) op = 0.5;
+      if (phone && !iso && mode !== 'whereis') { if (blocked) op = 0.5; }
+      else if (!iso && av && av.x < h.x + h.w && av.x + av.w > h.x && av.y < h.y + h.h && av.y + av.h > h.y) op = 0.5;
     } catch (err) { window._dreamCommHit = null; }
     bEl.style.opacity = String(op.toFixed(3));
   }
@@ -29257,8 +29281,9 @@ function drawNetworkView(t) {
             var _tgLineH = Math.max(22, Math.round(26 * _tgP.scale)), _tgGap = Math.max(14, 18 * _tgP.scale);
             var _tgX = _tgP.sx + _tgR + _tgGap, _tgFlip = (_tgX + 80) > W;
             _tgAvoid = { x: _tgFlip ? _tgP.sx - _tgR - _tgGap - 80 : _tgX, y: _tgP.sy - _tgLineH * 2, w: 80, h: _tgLineH * 4 };
-          }
-        } catch (e) { _tgAvoid = null; }
+            window._focusOrb = { x: _tgP.sx, y: _tgP.sy, r: _tgR };
+          } else window._focusOrb = null;
+        } catch (e) { _tgAvoid = null; window._focusOrb = null; }
         window._dreamPillAvoid = _tgAvoid;
         WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId, _tgAvoid);
         _dreamWhere = WhereIs.mode() === 'whereis';
@@ -29273,6 +29298,7 @@ function drawNetworkView(t) {
     window._dreamRect = null;
     window._dreamCommHit = null;
     window._dreamPillAvoid = null;
+    window._focusOrb = null;
     try { if (typeof WhereIs !== 'undefined') WhereIs.hideAnchor(); } catch (e) {}
   }
 
