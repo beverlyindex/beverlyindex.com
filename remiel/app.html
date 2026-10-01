@@ -29181,14 +29181,58 @@ function drawOrbLight(ctx, x, y, r, c, k, photo) {
   ctx.globalAlpha = L; ctx.globalCompositeOperation = O;
 }
 
+/* The dream picture's frame: an outer aura and an inner rim glow in the member's colour,
+   a glass edge lit from the upper left, and one slow glint travelling round it. */
+function drawDreamFrame(ctx, cx, cy, r, c, t) {
+  if (!(r > 10)) return;
+  c = c || { r: 56, g: 189, b: 248 };
+  const rgb = c.r + ',' + c.g + ',' + c.b;
+  const still = (typeof _reducedMotionNow === 'function') && _reducedMotionNow();
+  const breath = still ? 0.8 : 0.72 + 0.18 * Math.sin((t || 0) * 0.0008);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  /* Outer aura */
+  const au = ctx.createRadialGradient(cx, cy, r * 0.97, cx, cy, r * 1.32);
+  au.addColorStop(0, 'rgba(' + rgb + ',' + (0.20 * breath) + ')');
+  au.addColorStop(0.4, 'rgba(' + rgb + ',' + (0.07 * breath) + ')');
+  au.addColorStop(1, 'rgba(' + rgb + ',0)');
+  ctx.fillStyle = au;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.32, 0, Math.PI * 2); ctx.arc(cx, cy, r * 0.97, 0, Math.PI * 2, true); ctx.fill();
+  /* Inner rim glow */
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
+  const ig = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r);
+  ig.addColorStop(0, 'rgba(' + rgb + ',0)');
+  ig.addColorStop(1, 'rgba(' + rgb + ',' + (0.22 * breath) + ')');
+  ctx.fillStyle = ig; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  ctx.restore();
+  /* Glass edge, lit from the upper left */
+  const eg = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  eg.addColorStop(0, 'rgba(225,245,255,0.62)');
+  eg.addColorStop(0.45, 'rgba(' + rgb + ',0.42)');
+  eg.addColorStop(1, 'rgba(' + rgb + ',0.10)');
+  ctx.strokeStyle = eg; ctx.lineWidth = Math.max(1.2, r * 0.008);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  /* One glint travelling round the edge (resting at the upper left when motion is reduced) */
+  const ang = still ? -2.3 : -2.3 + (t || 0) * 0.00035;
+  const gx = cx + Math.cos(ang) * r, gy = cy + Math.sin(ang) * r;
+  const gl = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 0.16);
+  gl.addColorStop(0, 'rgba(255,255,255,0.55)');
+  gl.addColorStop(0.3, 'rgba(' + rgb + ',0.25)');
+  gl.addColorStop(1, 'rgba(' + rgb + ',0)');
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(gx, gy, r * 0.16, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
 function dreamVignette(ctx, cx, cy, r, boost) {
   const v = ctx.createRadialGradient(cx, cy, r * (boost ? 0.45 : 0.2), cx, cy, r);
   if (boost) {
     v.addColorStop(0, 'rgba(8,10,16,0)'); v.addColorStop(0.55, 'rgba(8,10,16,0.08)'); v.addColorStop(0.78, 'rgba(8,10,16,0.35)');
     v.addColorStop(0.92, 'rgba(8,10,16,0.7)'); v.addColorStop(1, 'rgba(8,10,16,0.9)');
   } else {
-    v.addColorStop(0, 'rgba(8,10,16,0)'); v.addColorStop(0.4, 'rgba(8,10,16,0.25)'); v.addColorStop(0.65, 'rgba(8,10,16,0.58)');
-    v.addColorStop(0.85, 'rgba(8,10,16,0.85)'); v.addColorStop(1, 'rgba(8,10,16,0.97)');
+    /* A lighter fade: the picture carries to the lit rim instead of sinking into black */
+    v.addColorStop(0, 'rgba(8,10,16,0)'); v.addColorStop(0.45, 'rgba(8,10,16,0.16)'); v.addColorStop(0.7, 'rgba(8,10,16,0.42)');
+    v.addColorStop(0.88, 'rgba(8,10,16,0.66)'); v.addColorStop(1, 'rgba(8,10,16,0.8)');
   }
   ctx.globalAlpha = 1; ctx.fillStyle = v; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 }
@@ -29249,11 +29293,17 @@ function drawNetworkView(t) {
     } else if (_focNode) {
       /* Fallback: no photo — draw category-colored dreamy glow with initials */
       var _drGlow = ctx.createRadialGradient(_drCx, _drCy, 0, _drCx, _drCy, _drR);
-      _drGlow.addColorStop(0, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.22)');
-      _drGlow.addColorStop(0.5, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.10)');
-      _drGlow.addColorStop(1, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0)');
+      _drGlow.addColorStop(0, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.36)');
+      _drGlow.addColorStop(0.5, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.16)');
+      _drGlow.addColorStop(1, 'rgba(' + _focCat.r + ',' + _focCat.g + ',' + _focCat.b + ',0.04)');
       ctx.globalAlpha = Math.min(1, _dreamAlpha * 2.5);
       ctx.fillStyle = _drGlow;
+      ctx.fillRect(_drCx - _drR, _drCy - _drR, _drR * 2, _drR * 2);
+      /* A second, violet light from the lower right gives the empty picture depth */
+      var _drGlow2 = ctx.createRadialGradient(_drCx + _drR * 0.45, _drCy + _drR * 0.5, 0, _drCx + _drR * 0.45, _drCy + _drR * 0.5, _drR * 0.9);
+      _drGlow2.addColorStop(0, 'rgba(139,92,246,0.22)');
+      _drGlow2.addColorStop(1, 'rgba(139,92,246,0)');
+      ctx.fillStyle = _drGlow2;
       ctx.fillRect(_drCx - _drR, _drCy - _drR, _drR * 2, _drR * 2);
       /* Initials in dream circle */
       ctx.globalAlpha = Math.min(1, _dreamAlpha * 3.5);
@@ -29267,6 +29317,8 @@ function drawNetworkView(t) {
     dreamVignette(ctx, _drCx, _drCy, _drR, _drBoost);
     ctx.restore();
     ctx.restore();
+    /* The frame: aura, rim glow, lit glass edge, travelling glint */
+    try { drawDreamFrame(ctx, _drCx, _drCy, _drR, _focCat, t); } catch (e) {}
     /* The Communication strip reads the same circle numbers (CSS px) */
     window._dreamRect = { cx: _drCx, cy: _drCy, r: _drR, alpha: _dreamAlpha, boost: _drBoost };
     /* COMMUNICATION | WHEREIS: the small toggle line under the member's picture */
