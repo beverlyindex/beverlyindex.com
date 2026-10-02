@@ -4644,6 +4644,14 @@
     box-shadow: 0 0 12px rgba(255,210,77,0.35);
   }
   .sc-invite-btn:active { background: rgba(255,210,77,0.3); }
+  /* Invite screen: "Have their Sentinel ID? Add it" */
+  .sc-addsid { max-width: 320px; margin: -8px auto 20px; text-align: center; }
+  .sc-addsid[hidden], .sc-addsid-form[hidden], .sc-addsid-err[hidden] { display: none; }
+  .sc-addsid-link { min-height: 44px; padding: 0 10px; background: none; border: none; color: rgba(159,216,255,0.9); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .sc-addsid-form { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .sc-addsid-input { width: 150px; min-height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); color: #fff; font: 600 17px 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 2px; text-transform: uppercase; text-align: center; outline: none; }
+  .sc-addsid-input:focus { border-color: rgb(56,189,248); box-shadow: 0 0 0 3px rgba(56,189,248,0.2); }
+  .sc-addsid-err { margin-top: 8px; font-size: 13px; color: #ffb4b4; }
   /* Group call: one tile per remote participant, local preview stays in its corner */
   .sc-group {
     position: absolute; inset: 0; z-index: 100001;
@@ -4860,6 +4868,14 @@
 .sc-guest-join-btn:active { transform: scale(0.96); }
 .sc-guest-join-btn:disabled { opacity: 0.4; cursor: default; }
 .sc-guest-status { margin-top: 16px; font-size: 13px; opacity: 0.6; }
+/* Guest, after the call: get a Sentinel ID so the caller can ring directly */
+.sc-guest-after { margin-top: 22px; max-width: 320px; text-align: center; }
+.sc-guest-after[hidden] { display: none; }
+.sc-guest-getid { min-height: 48px; padding: 12px 18px; border-radius: 14px; border: 1px solid rgba(255,210,77,0.7); background: rgba(255,210,77,0.14); color: #ffd24d; font: 600 15px/1.3 inherit; cursor: pointer; box-shadow: 0 0 14px rgba(255,210,77,0.3); }
+.sc-guest-getid:disabled { opacity: 0.6; cursor: default; }
+.sc-guest-after-note { margin-top: 10px; font-size: 13px; line-height: 1.45; color: rgba(255,255,255,0.7); }
+.sc-guest-id-label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.55); }
+.sc-guest-id { margin: 6px 0 4px; font: 700 26px 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 4px; color: #9fd8ff; user-select: all; -webkit-user-select: all; }
 /* Guest join screen branding: the NOUS serif wordmark and the Beverly Index mark behind */
 .sc-guest-overlay { overflow: hidden; }
 .sc-guest-brand { position: absolute; left: 50%; top: 50%; width: min(78vw, 720px); transform: translate(-50%, -50%); opacity: 0.09; pointer-events: none; filter: blur(0.3px); }
@@ -7225,6 +7241,7 @@ body #importContactsFab {
   <input class="sc-guest-name-input" id="scGuestName" type="text" placeholder="Your name" maxlength="30" autocomplete="name">
   <button class="sc-guest-join-btn" id="scGuestJoinBtn" onclick="SentinelCall.guestJoinCall()">Join Call</button>
   <div class="sc-guest-status" id="scGuestStatus"></div>
+  <div class="sc-guest-after" id="scGuestAfter" hidden></div>
   </div>
   <div class="sc-guest-foot">Beverly Index LLC</div>
 </div>
@@ -7966,6 +7983,14 @@ body #importContactsFab {
     <div class="sc-call-label" id="scCallLabel"><span class="sc-connecting-dots">Connecting</span></div>
     <div class="sc-invite-line" id="scInviteLine" hidden></div>
     <div class="sc-invite-actions" id="scInviteActions" hidden></div>
+    <div class="sc-addsid" id="scAddSid" hidden>
+      <button type="button" class="sc-addsid-link" id="scAddSidLink" onclick="SentinelCall.addSidOpen()"></button>
+      <div class="sc-addsid-form" id="scAddSidForm" hidden>
+        <input class="sc-addsid-input" id="scAddSidInput" type="text" maxlength="8" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" aria-label="Sentinel ID">
+        <button type="button" class="sc-invite-btn" id="scAddSidGo" onclick="SentinelCall.addSidSave()"></button>
+      </div>
+      <div class="sc-addsid-err" id="scAddSidErr" role="alert" hidden></div>
+    </div>
   </div>
   <div class="sc-controls" id="scControls">
     <button class="sc-btn sc-btn-mute" id="scMuteBtn" onclick="SentinelCall.toggleMute()" title="Mute">🎤</button>
@@ -11203,6 +11228,24 @@ const I18n = (function () {
     'acct.codeNeeded': "This server asks for an invite code. Type it in the Invite code field above, then tap Attach email.",
     'qa.addSid': "Add Sentinel ID",
     'call.inviting': "Inviting {first}",
+    'call.haveSid': "Have {first}'s Sentinel ID? Add it",
+    'call.sidPh': "8 characters",
+    'call.sidSaveCall': "Save and call",
+    'call.sidBad': "A Sentinel ID is 8 letters or digits.",
+    'call.sidOwn': "That is your own Sentinel ID.",
+    'call.sendLink': "Send a link",
+    'call.unreachableLink': "Could not reach {name}. Their app may be closed.",
+    'guest.theCaller': "the caller",
+    'guest.endedTitle': "Call ended",
+    'guest.callAgain': "Call {name} again",
+    'guest.getId': "Get your Sentinel ID so {name} can ring you directly",
+    'guest.getIdNote': "One tap. It uses the name you typed.",
+    'guest.gettingId': "Creating your Sentinel ID...",
+    'guest.getIdFailed': "Could not create your Sentinel ID right now. Check your connection and tap again.",
+    'guest.yourId': "Your Sentinel ID",
+    'guest.idSent': "{name} has been sent it. Once {name} saves it, their calls ring you directly.",
+    'guest.idNotSent': "Give this code to {name} so their calls ring you directly.",
+    'guest.keepOpen': "Keep this page open: calls ring here.",
     'call.sendingInvite': "Sending {first} a text with the link.",
     'call.textSent': "Text sent to {phone}. Waiting for {first} to tap it.",
     'call.sendItYourself': "Send {first} the link yourself. This screen waits.",
@@ -12062,6 +12105,24 @@ const I18n = (function () {
     'acct.codeNeeded': "Questo server richiede un codice invito. Scrivilo nel campo Codice invito qui sopra, poi tocca Collega l’email.",
     'qa.addSid': "Aggiungi ID Sentinel",
     'call.inviting': "Invito a {first}",
+    'call.haveSid': "Hai il Sentinel ID di {first}? Aggiungilo",
+    'call.sidPh': "8 caratteri",
+    'call.sidSaveCall': "Salva e chiama",
+    'call.sidBad': "Un Sentinel ID ha 8 lettere o cifre.",
+    'call.sidOwn': "Questo è il tuo Sentinel ID.",
+    'call.sendLink': "Invia un link",
+    'call.unreachableLink': "Impossibile raggiungere {name}. La sua app potrebbe essere chiusa.",
+    'guest.theCaller': "chi ti ha chiamato",
+    'guest.endedTitle': "Chiamata terminata",
+    'guest.callAgain': "Richiama {name}",
+    'guest.getId': "Ottieni il tuo Sentinel ID così {name} può chiamarti direttamente",
+    'guest.getIdNote': "Un tocco. Usa il nome che hai scritto.",
+    'guest.gettingId': "Creo il tuo Sentinel ID...",
+    'guest.getIdFailed': "Non è stato possibile creare il tuo Sentinel ID adesso. Controlla la connessione e tocca di nuovo.",
+    'guest.yourId': "Il tuo Sentinel ID",
+    'guest.idSent': "È stato inviato a {name}. Quando {name} lo salva, le sue chiamate squillano direttamente da te.",
+    'guest.idNotSent': "Dai questo codice a {name} così le sue chiamate squillano direttamente da te.",
+    'guest.keepOpen': "Tieni aperta questa pagina: le chiamate squillano qui.",
     'call.sendingInvite': "Invio a {first} un SMS con il link.",
     'call.textSent': "SMS inviato a {phone}. In attesa che {first} lo tocchi.",
     'call.sendItYourself': "Invia tu il link a {first}. Questa schermata aspetta.",
@@ -13866,6 +13927,9 @@ const I18n = (function () {
     "magnet.accept": "Accept",
     "magnet.notNow": "Not now",
     "magnet.accepted": "{name} is connected. You can call and message each other with one tap.",
+    "magnet.saveSid": "Save this as {card}'s Sentinel ID? {name} answered your call link.",
+    "magnet.save": "Save",
+    "magnet.sidSaved": "Saved. Video now rings {name} directly.",
     "magnet.acceptFailed": "Could not accept right now. The request stays here; try again in a moment.",
     "magnet.requestSent": "Asked {name} to connect on Remiel Sentinel. Your message goes out as soon as they accept.",
     "magnet.awaiting": "Waiting for {name} to accept",
@@ -13923,6 +13987,9 @@ const I18n = (function () {
     "magnet.accept": "Accetta",
     "magnet.notNow": "Non ora",
     "magnet.accepted": "{name} è collegato. Potete chiamarvi e scrivervi con un tocco.",
+    "magnet.saveSid": "Salvare come Sentinel ID di {card}? {name} ha risposto al tuo link di chiamata.",
+    "magnet.save": "Salva",
+    "magnet.sidSaved": "Salvato. Ora Video chiama {name} direttamente.",
     "magnet.acceptFailed": "Impossibile accettare adesso. La richiesta resta qui; riprova tra poco.",
     "magnet.requestSent": "Hai chiesto a {name} di collegarsi su Remiel Sentinel. Il tuo messaggio parte appena accetta.",
     "magnet.awaiting": "In attesa che {name} accetti",
@@ -39088,7 +39155,13 @@ const SentinelCall = (function() {
       _armNoAnswer(_currentCall, _callCtx.onTimeout, left, true);
       return;
     }
+    const c = _callCtx && _callCtx.contact;
     endCall();
+    if (c) {
+      showActionToast(_tp('call.unreachableLink', 'Could not reach {name}. Their app may be closed.', { name: c.first || _t('call.thisContact', 'this contact') }),
+        [_sendLinkAction(c)], 12000);
+      return;
+    }
     showToast(_t('call.unreachable', 'Could not reach that person. They may not be online.'));
   }
 
@@ -39388,7 +39461,12 @@ const SentinelCall = (function() {
     showActionToast(_t('magnet.offline', '{name} is not online right now.').replace('{name}', name), [{
       label: _t('magnet.leaveMsg', 'Leave a message'),
       run: () => { try { SentinelMessaging.openFor(contact.id); } catch (e) {} }
-    }], 12000);
+    }, _sendLinkAction(contact)], 12000);
+  }
+  /* A saved Sentinel ID that cannot be rung right now never leaves a dead end:
+     the link invite is one tap away. */
+  function _sendLinkAction(contact) {
+    return { label: _t('call.sendLink', 'Send a link'), run: () => { waitForGuest(contact); } };
   }
 
   /* ── Call a contact by ID ── */
@@ -39601,6 +39679,8 @@ const SentinelCall = (function() {
     _cleanupMedia();
     _hideAllOverlays();
     _setInviteLine(null);
+    /* A Sentinel ID that came back on the call link is offered now, not mid-call */
+    try { if (_signedIn() && typeof Magnet !== 'undefined' && Magnet && Magnet.poll) setTimeout(() => { Magnet.poll(); }, 800); } catch (e) {}
   }
 
   /* ── Guest invite: video with a person who is not on Remiel Sentinel ──
@@ -39618,6 +39698,85 @@ const SentinelCall = (function() {
     _awaitGuestFor = null;
     _awaitGuestUntil = 0;
     if (_awaitGuestTimer) { clearTimeout(_awaitGuestTimer); _awaitGuestTimer = null; }
+    _addSidHide();
+  }
+
+  /* ── Call-link token ──
+     The link carries a token kept here against the invited card. The person
+     who opens the link sends it back with their Sentinel ID, so this device
+     knows which card to offer it for. One token per card, reused for 25 days. */
+  const _INVITE_KEY = 'callInviteTokens';
+  async function _inviteToken(contact) {
+    if (!contact || contact.id == null || _isValidSid(contact.sentinelId || '') || !_signedIn()) return '';
+    try {
+      let map = (await RemielDB.getSetting(_INVITE_KEY)) || {};
+      if (!map || typeof map !== 'object' || Array.isArray(map)) map = {};
+      const now = Date.now(), DAY = 86400000;
+      Object.keys(map).forEach(k => { if (!map[k] || now - (map[k].at || 0) > 30 * DAY) delete map[k]; });
+      let tok = Object.keys(map).find(k => String(map[k].cid) === String(contact.id) && now - map[k].at < 25 * DAY) || '';
+      if (!tok) {
+        const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+        const arr = new Uint8Array(16);
+        crypto.getRandomValues(arr);
+        for (let i = 0; i < 16; i++) tok += chars[arr[i] % chars.length];
+        map[tok] = { cid: contact.id, at: now };
+        await RemielDB.putSetting(_INVITE_KEY, map);
+      }
+      const r = await SyncEngine.apiFetch('/link/invite', { method: 'POST', body: JSON.stringify({ token: tok }) });
+      return (r && r.ok) ? tok : '';
+    } catch (e) { return ''; }
+  }
+
+  /* ── "Have their Sentinel ID? Add it" on the invite screen ──
+     Shown only while waiting for a person whose card has no Sentinel ID. */
+  let _addSidFor = null;
+  function _addSidShow(contact) {
+    const box = document.getElementById('scAddSid');
+    if (!box) return;
+    if (!contact || contact.id == null || _isValidSid(contact.sentinelId || '')) { _addSidHide(); return; }
+    _addSidFor = contact;
+    const first = contact.first || _t('call.thisContact', 'this contact');
+    const link = document.getElementById('scAddSidLink');
+    const form = document.getElementById('scAddSidForm');
+    const inp = document.getElementById('scAddSidInput');
+    const go = document.getElementById('scAddSidGo');
+    const err = document.getElementById('scAddSidErr');
+    if (link) { link.textContent = _tp('call.haveSid', "Have {first}'s Sentinel ID? Add it", { first: first }); link.hidden = false; }
+    if (form) form.hidden = true;
+    if (inp) { inp.value = ''; inp.placeholder = _t('call.sidPh', '8 characters'); inp.onkeydown = (e) => { if (e.key === 'Enter') addSidSave(); }; }
+    if (go) go.textContent = _t('call.sidSaveCall', 'Save and call');
+    if (err) { err.textContent = ''; err.hidden = true; }
+    box.hidden = false;
+  }
+  function _addSidHide() {
+    _addSidFor = null;
+    const box = document.getElementById('scAddSid');
+    if (box) box.hidden = true;
+  }
+  function addSidOpen() {
+    if (!_addSidFor) return;
+    const link = document.getElementById('scAddSidLink');
+    const form = document.getElementById('scAddSidForm');
+    const inp = document.getElementById('scAddSidInput');
+    if (link) link.hidden = true;
+    if (form) form.hidden = false;
+    if (inp) setTimeout(() => { try { inp.focus(); } catch (e) {} }, 50);
+  }
+  async function addSidSave() {
+    const contact = _addSidFor;
+    if (!contact) return;
+    const inp = document.getElementById('scAddSidInput');
+    const err = document.getElementById('scAddSidErr');
+    const v = String((inp && inp.value) || '').trim().toUpperCase();
+    const bad = (msg) => { if (err) { err.textContent = msg; err.hidden = false; } };
+    if (!_isValidSid(v)) { bad(_t('call.sidBad', 'A Sentinel ID is 8 letters or digits.')); return; }
+    if (v === String(_myId || '').toUpperCase()) { bad(_t('call.sidOwn', 'That is your own Sentinel ID.')); return; }
+    contact.sentinelId = v;
+    try { await RemielDB.putContact(contact); } catch (e) { console.warn('SentinelCall: saving the Sentinel ID failed', e); }
+    try { if (typeof selectedContact !== 'undefined' && selectedContact && selectedContact.id === contact.id) selectedContact.sentinelId = v; } catch (e) {}
+    /* Stop waiting on the link and ring the ID directly */
+    endCall();
+    callContact(contact.id);
   }
   function _setInviteLine(text, buttons) {
     const line = document.getElementById(_group ? 'scGroupInviteLine' : 'scInviteLine');
@@ -39732,8 +39891,10 @@ const SentinelCall = (function() {
       showToast(msg);
     }, _AWAIT_GUEST_MS);
 
+    _addSidShow(contact);
     const myName = await _getMyName();
-    const link = _guestLink() + (contact.first ? '&g=' + encodeURIComponent(String(contact.first).trim().slice(0, 30)) : '');
+    const token = await _inviteToken(contact);
+    const link = _guestLink() + (contact.first ? '&g=' + encodeURIComponent(String(contact.first).trim().slice(0, 30)) : '') + (token ? '&t=' + token : '');
     if (_awaitGuestFor === null) return; /* hung up while the name loaded */
     _setInviteLine(contact.phone
       ? _tp('call.sendingInvite', 'Sending {first} a text with the link.', { first: first })
@@ -40916,6 +41077,10 @@ const SentinelCall = (function() {
   let _guestRoom = null;
   let _guestMember = null;   /* which member of the host's view this guest is, from the link */
   let _guestHostName = '';   /* the host's first name, from the link (n=) */
+  let _guestToken = null;    /* the caller's call-link token (t=): sent back with my Sentinel ID */
+  let _guestConnected = false; /* this guest call reached picture and sound */
+  let _guestShared = null;   /* null not sent, else 'pending' | 'accepted' | 'failed' */
+  let _guestRelabel = null;  /* re-applies the guest card's wording */
 
   function checkCallInvite() {
     const params = new URLSearchParams(window.location.search);
@@ -40929,6 +41094,8 @@ const SentinelCall = (function() {
     _guestRoom = (room && /^[A-Za-z0-9-]{4,40}$/.test(room)) ? room : null;
     const m = params.get('m');
     _guestMember = (m && /^[A-Za-z0-9_-]{1,40}$/.test(m)) ? m : null;
+    const tk = params.get('t');
+    _guestToken = (tk && /^[a-z0-9]{12,24}$/.test(tk)) ? tk : null;
     /* Show guest overlay instead of gate. It is authored inside the Settings
        panel, so move it to <body> to escape that stacking context (M4). */
     const _gOv = document.getElementById('scGuestOverlay');
@@ -40940,11 +41107,15 @@ const SentinelCall = (function() {
       const _gs = document.getElementById('scGuestSub');
       const _gb = document.getElementById('scGuestJoinBtn');
       const _gi = document.getElementById('scGuestName');
-      if (_gt) _gt.textContent = _guestHostName ? _tp('guest.callingYou', '{name} is calling you', { name: _guestHostName }) : _t('guest.title', 'Video Call');
-      if (_gs) _gs.textContent = _t('guest.sub', 'Enter your name to join the call');
+      /* After a call that connected, the card says so instead of "is calling you" */
+      const ended = _guestConnected && !_currentCall;
+      if (_gt) _gt.textContent = ended ? _t('guest.endedTitle', 'Call ended')
+        : (_guestHostName ? _tp('guest.callingYou', '{name} is calling you', { name: _guestHostName }) : _t('guest.title', 'Video Call'));
+      if (_gs) _gs.textContent = ended ? '' : _t('guest.sub', 'Enter your name to join the call');
       if (_gi) _gi.placeholder = _t('guest.namePh', 'Your name');
-      if (_gb && !_gb.dataset.joining) _gb.textContent = _t('guest.join', 'Join Call');
+      if (_gb && !_gb.dataset.joining) _gb.textContent = ended ? _tp('guest.callAgain', 'Call {name} again', { name: _guestHostLabel() }) : _t('guest.join', 'Join Call');
     };
+    _guestRelabel = _guestLabels;
     _guestLabels();
     window.addEventListener('localeChanged', _guestLabels);
     setTimeout(_guestLabels, 900);
@@ -41043,6 +41214,7 @@ const SentinelCall = (function() {
       try { guestPeer.destroy(); } catch (e) {}
       _cleanupMedia();
       _guestBackToJoin(document.getElementById('scGuestStatus').textContent);
+      _guestAfterCall();
     };
 
     const onOpen = async () => {
@@ -41092,6 +41264,8 @@ const SentinelCall = (function() {
       }
 
       _currentCall = call;
+      /* Picture and sound arrived: a signed-in person's Sentinel ID goes back to the caller */
+      call.on('stream', () => { if (!_guestConnected) { _guestConnected = true; _guestShareId(); } });
       _attachCall(call, destroyGuest);
       _armNoAnswer(call, destroyGuest);
     };
@@ -41106,6 +41280,91 @@ const SentinelCall = (function() {
       destroyGuest();
     });
     await onOpen();
+  }
+
+  /* ── After a guest call: the caller gets this person's Sentinel ID ──
+     Signed in on this device: the ID goes back once the call connects.
+     Not signed in: one button creates a Sentinel ID under the name typed and
+     sends it. Either way the caller confirms before it is saved on a card. */
+  function _guestHostLabel() { return _guestHostName || _t('guest.theCaller', 'the caller'); }
+  async function _guestShareId() {
+    if (_guestShared !== null || _guestRoom || !_signedIn()) return _guestShared;
+    if (typeof Magnet === 'undefined' || !Magnet || !Magnet.linkFromCall) return null;
+    if (!_isValidSid(_guestTargetId || '') || String(_guestTargetId).toUpperCase() === String(_myId || '').toUpperCase()) return null;
+    _guestShared = 'failed';
+    let st = null;
+    try { st = await Magnet.linkFromCall(_guestTargetId, _guestToken); } catch (e) { st = null; }
+    _guestShared = st || 'failed';
+    return _guestShared;
+  }
+  function _guestAfterCall() {
+    const box = document.getElementById('scGuestAfter');
+    if (!box) return;
+    if (!_guestConnected || _guestRoom) { box.hidden = true; return; }
+    const st = document.getElementById('scGuestStatus');
+    if (st) st.textContent = '';
+    try { if (_guestRelabel) _guestRelabel(); } catch (e) {}
+    box.innerHTML = '';
+    box.hidden = false;
+    if (_signedIn()) {
+      if (_guestShared === 'pending' || _guestShared === 'accepted') _guestShowId(true);
+      else { box.hidden = true; }
+      return;
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'sc-guest-getid'; btn.id = 'scGuestGetId';
+    btn.textContent = _tp('guest.getId', 'Get your Sentinel ID so {name} can ring you directly', { name: _guestHostLabel() });
+    btn.onclick = () => guestGetId();
+    const note = document.createElement('div');
+    note.className = 'sc-guest-after-note'; note.id = 'scGuestAfterNote';
+    note.textContent = _t('guest.getIdNote', 'One tap. It uses the name you typed.');
+    box.appendChild(btn); box.appendChild(note);
+  }
+  function _guestShowId(sent) {
+    const box = document.getElementById('scGuestAfter');
+    if (!box) return;
+    box.innerHTML = '';
+    box.hidden = false;
+    const add = (cls, text, id) => { const d = document.createElement('div'); d.className = cls; if (id) d.id = id; d.textContent = text; box.appendChild(d); return d; };
+    add('sc-guest-id-label', _t('guest.yourId', 'Your Sentinel ID'));
+    add('sc-guest-id', String(_myId || '').toUpperCase(), 'scGuestMyId');
+    add('sc-guest-after-note', sent
+      ? _tp('guest.idSent', '{name} has been sent it. Once {name} saves it, their calls ring you directly.', { name: _guestHostLabel() })
+      : _tp('guest.idNotSent', 'Give this code to {name} so their calls ring you directly.', { name: _guestHostLabel() }), 'scGuestAfterNote');
+    add('sc-guest-after-note', _t('guest.keepOpen', 'Keep this page open: calls ring here.'));
+  }
+  let _guestGetting = false;
+  async function guestGetId() {
+    if (_guestGetting) return;
+    _guestGetting = true;
+    const btn = document.getElementById('scGuestGetId');
+    const note = document.getElementById('scGuestAfterNote');
+    const label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = _t('guest.gettingId', 'Creating your Sentinel ID...'); }
+    const fail = () => {
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+      if (note) note.textContent = _t('guest.getIdFailed', 'Could not create your Sentinel ID right now. Check your connection and tap again.');
+    };
+    try {
+      const typed = String((document.getElementById('scGuestName') || {}).value || '').trim().slice(0, 60);
+      let have = '';
+      try { have = String((await RemielDB.getSetting('userSphereName')) || '').trim(); } catch (e) {}
+      if (!have) {
+        if (!typed) { fail(); return; }
+        await RemielDB.putSetting('userSphereName', typed);
+        _myNameCache = typed;
+      }
+      let ok = false;
+      try { ok = await SyncEngine.ensureIdentity(); } catch (e) { ok = false; }
+      if (!ok || !_signedIn()) { fail(); return; }
+      /* One Sentinel ID per account: take the server's if it already had one */
+      try { await SyncEngine.registerSentinelId(); } catch (e) {}
+      try { const sid = await RemielDB.getSetting('sentinelCallId'); if (_isValidSid(sid || '')) _myId = String(sid).toUpperCase(); } catch (e) {}
+      const st = await _guestShareId();
+      try { warm(); } catch (e) {}
+      _guestShowId(st === 'pending' || st === 'accepted');
+    } catch (e) { fail(); }
+    finally { _guestGetting = false; }
   }
 
   /* Helper to load PeerJS if not loaded */
@@ -41195,7 +41454,7 @@ const SentinelCall = (function() {
     toggleMute, flipCamera, toggleRecord,
     getMyId, isInCall,
     copyMyId, shareCallLink, regenerateId, updateSettingsDisplay,
-    checkCallInvite, guestJoinCall, waitForGuest,
+    checkCallInvite, guestJoinCall, waitForGuest, guestGetId, addSidOpen, addSidSave,
     callGroup, GROUP_MAX,
     toggleSafetyExplain, showTileSafety, hideTileSafety,
     isAwaitingGuest: () => _awaitGuestFor !== null,
@@ -41620,9 +41879,80 @@ var Magnet = (function () {
     return c.linkState;
   }
 
+  /* ── Sentinel ID over a call link ──
+     The person who opened my call link sends a link request carrying the
+     link's token. On the caller's device the token names the invited card,
+     so the prompt reads "Save this as FLUFFY's Sentinel ID?" and Save puts
+     the ID on that card. Nothing is saved without that tap. */
+  var INVITE_KEY = 'callInviteTokens';
+  var ADOPT_LATER_KEY = '_link_adopt_later';
+  var _inviteMap = {};
+  async function _loadInvites() {
+    try { var m = await RemielDB.getSetting(INVITE_KEY); _inviteMap = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; } catch (e) { _inviteMap = {}; }
+  }
+  /* The card a call-link token was made for, while it still has no Sentinel ID */
+  function _inviteCard(req) {
+    var tok = req && req.invite_token;
+    var e = tok ? _inviteMap[tok] : null;
+    if (!e) return null;
+    var c = _byId(e.cid);
+    if (!c) return null;
+    var sid = String((req.other && req.other.sentinel_id) || '').toUpperCase();
+    if (_validSid(c.sentinelId || '') && String(c.sentinelId).toUpperCase() !== sid) return null;
+    return c;
+  }
+  function _callBusy() {
+    try { return typeof SentinelCall !== 'undefined' && (SentinelCall.isInCall() || SentinelCall.isAwaitingGuest()); } catch (e) { return false; }
+  }
+  /* Guest side: I opened someone's call link; send them my Sentinel ID. */
+  async function linkFromCall(hostSid, token) {
+    if (!_authed() || !_validSid(hostSid || '')) return null;
+    var sid = String(hostSid).toUpperCase();
+    var me = await _myNames();
+    var body = { to_sentinel_id: sid, first: me.first, last: me.last };
+    if (token) body.invite_token = token;
+    var res;
+    try { res = await SyncEngine.apiFetch('/link/request', { method: 'POST', body: JSON.stringify(body) }); } catch (e) { return null; }
+    if (!res || !res.ok) return null;
+    var data = await res.json().catch(function () { return {}; });
+    var r = data.request || {};
+    var st = r.status === 'accepted' ? 'accepted' : 'pending';
+    var c = _bySid(sid);
+    if (c && c.linkState !== 'accepted') {
+      c.linked = true; c.linkState = st; c.linkReqId = r.id || null;
+      await _save(c);
+    }
+    return st;
+  }
+  async function _onboarded() {
+    try { return !!(await RemielDB.getSetting('onboardingComplete')); } catch (e) { return false; }
+  }
+  /* A card for the other person is never added before this device has been
+     set up (a saved card would skip the first-run setup): it is kept and
+     added on the first check after set-up. */
+  async function _adoptLater(party) {
+    try {
+      var list = (await RemielDB.getSetting(ADOPT_LATER_KEY)) || [];
+      if (!Array.isArray(list)) list = [];
+      var sid = String(party.sentinel_id || '').toUpperCase();
+      if (!list.some(function (x) { return String(x.sentinel_id || '').toUpperCase() === sid; })) list.push(party);
+      await RemielDB.putSetting(ADOPT_LATER_KEY, list.slice(-20));
+    } catch (e) {}
+    return null;
+  }
+  async function _adoptWaiting() {
+    try {
+      var list = await RemielDB.getSetting(ADOPT_LATER_KEY);
+      if (!Array.isArray(list) || !list.length || !(await _onboarded())) return;
+      await RemielDB.putSetting(ADOPT_LATER_KEY, []);
+      for (var i = 0; i < list.length; i++) { if (!_bySid(list[i].sentinel_id)) await _adopt(list[i]); }
+    } catch (e) {}
+  }
+
   /* Contact from the other party of an accepted link */
   async function _adopt(party) {
     if (!party || !_validSid(party.sentinel_id || '')) return null;
+    if (!(await _onboarded())) return _adoptLater(party);
     var sid = String(party.sentinel_id).toUpperCase();
     var c = _bySid(sid);
     var added = false;
@@ -41666,9 +41996,15 @@ var Magnet = (function () {
       party = data.from || party;
     }
     _pending = _pending.filter(function (p) { return p.id !== req.id; });
+    /* From my call link: the ID goes on the card the link was sent for */
+    var card = _inviteCard(req);
+    if (card && party && _validSid(party.sentinel_id || '') && !_bySid(party.sentinel_id)) card.sentinelId = String(party.sentinel_id).toUpperCase();
     var c = await _adopt(party);
     if (c) {
-      showToast(_t('magnet.accepted', { name: _name(c) }));
+      if (card && req.invite_token) {
+        try { delete _inviteMap[req.invite_token]; await RemielDB.putSetting(INVITE_KEY, _inviteMap); } catch (e) {}
+      }
+      showToast(card ? _t('magnet.sidSaved', { name: _name(c) }) : _t('magnet.accepted', { name: _name(c) }));
       try { SentinelMessaging.flushAwaiting(c.id); } catch (e) {}
       try { SentinelMessaging.poll(); } catch (e) {}
       refreshPresence();
@@ -41702,6 +42038,9 @@ var Magnet = (function () {
   function showPrompt(req) {
     var key = req.id ? 'r' + req.id : 's' + ((req.other && req.other.sentinel_id) || '');
     if (_dismissed.has(key) || _promptFor === key) return;
+    var card = _inviteCard(req);
+    /* A Sentinel ID from my call link is offered after the call, not during it */
+    if (card && _callBusy()) return;
     hidePrompt();
     _promptFor = key;
     var o = req.other || {};
@@ -41717,11 +42056,12 @@ var Magnet = (function () {
     av.textContent = String(name || '?').charAt(0).toUpperCase();
     var txt = document.createElement('div');
     txt.className = 'magnet-prompt-text';
-    txt.textContent = _t('magnet.wants', { name: name });
+    txt.textContent = card ? _t('magnet.saveSid', { card: _name(card), name: name }) : _t('magnet.wants', { name: name });
+    if (card) el.setAttribute('data-invite', '1');
     var row = document.createElement('div');
     row.className = 'magnet-prompt-row';
     var ok = document.createElement('button');
-    ok.type = 'button'; ok.className = 'magnet-accept btn-lit btn-advance'; ok.textContent = _t('magnet.accept');
+    ok.type = 'button'; ok.className = 'magnet-accept btn-lit btn-advance'; ok.textContent = card ? _t('magnet.save') : _t('magnet.accept');
     ok.addEventListener('click', function () { accept(req); });
     var later = document.createElement('button');
     later.type = 'button'; later.className = 'magnet-later'; later.textContent = _t('magnet.notNow');
@@ -41732,7 +42072,8 @@ var Magnet = (function () {
     try { if (typeof A11y !== 'undefined') A11y.announce(txt.textContent, 'assertive'); } catch (e) {}
   }
   function _showNextPrompt() {
-    var next = _pending.find(function (p) { return !_dismissed.has('r' + p.id); });
+    var busy = _callBusy();
+    var next = _pending.find(function (p) { return !_dismissed.has('r' + p.id) && !(busy && _inviteCard(p)); });
     if (next) showPrompt(next);
   }
   /* An unknown sender goes through the same Accept prompt */
@@ -41747,6 +42088,8 @@ var Magnet = (function () {
     _polling = true;
     try {
       await _pushOwnPhone();
+      await _loadInvites();
+      await _adoptWaiting();
       var res = await SyncEngine.apiFetch('/link/pending', { method: 'GET' });
       if (res && res.ok) {
         var data = await res.json().catch(function () { return {}; });
@@ -41771,6 +42114,9 @@ var Magnet = (function () {
               if (r.direction === 'outgoing') showToast(_t('magnet.accepted', { name: _name(c) }));
               try { await SentinelMessaging.flushAwaiting(c.id); } catch (e) {}
             } else if (!c && r.direction === 'incoming') {
+              await _adopt(r.other);
+            } else if (!c && r.direction === 'outgoing' && _validSid(r.other.sentinel_id || '')) {
+              /* They saved my Sentinel ID from their call link: their card appears here */
               await _adopt(r.other);
             }
           } else if (r.status === 'declined' && c && r.direction === 'outgoing' && c.linkState === 'pending') {
@@ -41925,7 +42271,7 @@ var Magnet = (function () {
     normPhone: normPhone, normEmail: normEmail, sha256: sha256,
     isOnRs: isOnRs, isLinked: isLinked, needsLink: needsLink, isOnline: isOnline, canFind: canFind,
     matchContacts: matchContacts, matchOne: matchOne, schedule: schedule, findFor: findFor, explainOnce: explainOnce,
-    requestLink: requestLink, accept: accept, answered: answered, poll: poll, promptUnknown: promptUnknown, hidePrompt: hidePrompt,
+    requestLink: requestLink, linkFromCall: linkFromCall, accept: accept, answered: answered, poll: poll, promptUnknown: promptUnknown, hidePrompt: hidePrompt,
     ping: ping, refreshPresence: refreshPresence, drawBadges: drawBadges, badgeHtml: badgeHtml,
     renderAccount: renderAccount, setDiscoverable: setDiscoverable, savePhone: savePhone,
     get pending() { return _pending.slice(); }
