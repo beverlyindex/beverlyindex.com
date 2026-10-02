@@ -149,6 +149,19 @@ button{font-family:var(--sans);cursor:pointer}
 .blip:hover .lab{opacity:1}
 .radar-legend{display:flex;gap:14px;margin-top:12px;font-size:11px;color:var(--mut);flex-wrap:wrap;justify-content:center}
 .radar-legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+/* WHEREIS vicinity map (ported from Remiel Sentinel) */
+.halo-map{position:relative;width:100%;height:340px;border-radius:14px;overflow:hidden;border:1px solid var(--line2);background:#0a1020}
+.halo-map canvas{border-radius:14px}
+.map-note{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;
+  color:var(--dim);font-size:12px;font-family:var(--mono);z-index:2;pointer-events:none}
+.maplibregl-ctrl-attrib{font-size:9px!important;opacity:.45}
+.you-dot{width:16px;height:16px;border-radius:50%;background:var(--watch);
+  box-shadow:0 0 0 4px rgba(63,116,214,.22),0 0 16px var(--watch)}
+.you-dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--watch);animation:ping 2.4s ease-out infinite}
+@keyframes ping{0%{transform:scale(.55);opacity:.85}100%{transform:scale(2.6);opacity:0}}
+.dev-marker{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.85);cursor:pointer;
+  box-shadow:0 0 10px rgba(0,0,0,.6);transition:transform .12s}
+.dev-marker:hover{transform:scale(1.3)}
 
 /* tickers */
 .ticker{position:relative;height:40px;overflow:hidden;border-top:1px solid var(--line);
@@ -358,12 +371,7 @@ button{font-family:var(--sans);cursor:pointer}
         <div class="grid two">
           <div class="card radar-wrap">
             <h3>Radius<span class="n" id="radarCount">0 near</span></h3>
-            <div class="radar" id="radar">
-              <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div><div class="ring r4"></div>
-              <div class="cross h"></div><div class="cross v"></div>
-              <div class="sweep"></div>
-              <div class="me" title="You"></div>
-            </div>
+            <div class="halo-map" id="haloMap"><div class="map-note" id="mapNote">Locating you&hellip;</div></div>
             <div class="radar-legend">
               <span><i style="background:var(--clear)"></i>Known</span>
               <span><i style="background:var(--warn)"></i>New</span>
@@ -635,7 +643,7 @@ function recomputeBluf(){
 
 /* ---------- rendering ---------- */
 const el = id=>document.getElementById(id);
-function render(){ renderBluf(); renderMode(); renderRadar(); renderChanges(); renderSrc(); }
+function render(){ renderBluf(); renderMode(); renderMap(); renderChanges(); renderSrc(); }
 
 function renderSrc(){
   [el('srcPillM'),el('srcPillD')].forEach(p=>{
@@ -669,23 +677,66 @@ function renderMode(){
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ S.mode=b.dataset.m; recomputeBluf(); render(); });
 }
 
-function renderRadar(){
-  const r=el('radar'); if(!r)return;
-  r.querySelectorAll('.blip').forEach(b=>b.remove());
-  const pres=S.devices.filter(d=>d.present);
-  el('radarCount').textContent = pres.length+' near';
-  const R = r.clientWidth/2;
-  pres.forEach(d=>{
-    const rad = bandRadius(d.rssi)*R*0.92;
-    const ang = (d.bearing-90)*Math.PI/180;
-    const x = R + Math.cos(ang)*rad, y = R + Math.sin(ang)*rad;
-    const b=document.createElement('div'); b.className='blip';
-    b.style.left=x+'px'; b.style.top=y+'px';
-    b.style.background = d.withYou?'var(--action)':d.onRoute?'var(--route)':d.knownBefore?'var(--clear)':'var(--warn)';
-    b.innerHTML = `<span class="lab">${d.name}</span>`;
-    b.onclick=()=>{ openDeviceInRoster(d); };
-    r.appendChild(b);
+/* WHEREIS vicinity map, ported from Remiel Sentinel (MapLibre GL + CARTO dark basemap) */
+let MAP=null, MAP_CENTER=null, MAP_MARKERS={}, _mlP=null, _mapInit=false;
+function loadMapLibre(){
+  if(window.maplibregl) return Promise.resolve(true);
+  if(_mlP) return _mlP;
+  _mlP=new Promise(res=>{
+    const to=setTimeout(()=>res(false),6000);
+    try{
+      const css=document.createElement('link'); css.rel='stylesheet';
+      css.href='https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css'; document.head.appendChild(css);
+      const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
+      s.async=true; s.onload=()=>{clearTimeout(to);res(true)}; s.onerror=()=>{clearTimeout(to);res(false)}; document.head.appendChild(s);
+    }catch(e){ res(false); }
   });
+  return _mlP;
+}
+const mapStyle=()=>({version:8,sources:{carto:{type:'raster',tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],tileSize:256,attribution:'&copy; OpenStreetMap &copy; CARTO'}},layers:[{id:'carto',type:'raster',source:'carto'}]});
+function circlePoly(lat,lon,m){ const pts=[],dLat=m/111320,dLon=m/(111320*Math.cos(lat*Math.PI/180));
+  for(let i=0;i<=48;i++){const a=i/48*Math.PI*2; pts.push([lon+Math.cos(a)*dLon, lat+Math.sin(a)*dLat]);} return pts; }
+function devMeters(rssi){ return rssi>-62?40:rssi>-75?130:300; }
+function devLngLat(d){ const m=devMeters(d.rssi), a=d.bearing*Math.PI/180, lat=MAP_CENTER.lat;
+  const dLat=Math.cos(a)*m/111320, dLon=Math.sin(a)*m/(111320*Math.cos(lat*Math.PI/180));
+  return [MAP_CENTER.lon+dLon, MAP_CENTER.lat+dLat]; }
+function markerColor(d){ return d.withYou?'var(--action)':d.onRoute?'var(--route)':d.knownBefore?'var(--clear)':'var(--warn)'; }
+async function initMap(){
+  if(_mapInit) return; _mapInit=true;
+  const box=el('haloMap'), note=el('mapNote'); if(!box) return;
+  const center=await new Promise(res=>{
+    if(!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lon:p.coords.longitude}),()=>res(null),{timeout:4500,maximumAge:60000});
+  });
+  MAP_CENTER = center || {lat:34.0522, lon:-118.2437};
+  if(note){ if(center){ note.style.display='none'; } else { note.textContent='Location off. Showing an approximate area.'; } }
+  const ok=await loadMapLibre();
+  if(!ok){ if(note){note.style.display='';note.textContent='Map needs a connection. Open Roster for the device list.';} _mapInit=false; return; }
+  MAP=new window.maplibregl.Map({container:box, style:mapStyle(), center:[MAP_CENTER.lon,MAP_CENTER.lat], zoom:16, attributionControl:true, dragRotate:false, pitchWithRotate:false});
+  MAP.on('load',()=>{
+    MAP.addSource('rings',{type:'geojson',data:{type:'FeatureCollection',features:[40,130,300].map(r=>({type:'Feature',geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,r)]}}))}});
+    MAP.addLayer({id:'rings-l',type:'line',source:'rings',paint:{'line-color':'#3f74d6','line-width':1,'line-opacity':.35}});
+    const you=document.createElement('div'); you.className='you-dot';
+    new window.maplibregl.Marker({element:you}).setLngLat([MAP_CENTER.lon,MAP_CENTER.lat]).addTo(MAP);
+    updateDeviceMarkers();
+  });
+}
+function updateDeviceMarkers(){
+  if(!MAP||!MAP_CENTER) return;
+  const pres=S.devices.filter(d=>d.present), ids=new Set(pres.map(d=>d.id));
+  Object.keys(MAP_MARKERS).forEach(id=>{ if(!ids.has(id)){ MAP_MARKERS[id].remove(); delete MAP_MARKERS[id]; } });
+  pres.forEach(d=>{
+    const ll=devLngLat(d);
+    if(MAP_MARKERS[d.id]){ MAP_MARKERS[d.id].setLngLat(ll); MAP_MARKERS[d.id].getElement().style.background=markerColor(d); }
+    else{ const elm=document.createElement('div'); elm.className='dev-marker'; elm.style.background=markerColor(d);
+      elm.title=d.name; elm.onclick=()=>openDeviceInRoster(d);
+      MAP_MARKERS[d.id]=new window.maplibregl.Marker({element:elm}).setLngLat(ll).addTo(MAP); }
+  });
+}
+function renderMap(){
+  const rc=el('radarCount'); if(rc) rc.textContent=S.devices.filter(d=>d.present).length+' near';
+  if(S.view!=='overview') return;
+  if(!MAP){ initMap(); } else { updateDeviceMarkers(); }
 }
 
 function renderChanges(){
@@ -751,6 +802,7 @@ function setView(v){
   // overview-only elements
   el('blufHost').classList.toggle('hidden', v!=='overview');
   el('modeHostMobile').classList.toggle('hidden', v!=='overview');
+  if(v==='overview'){ renderMap(); if(MAP) setTimeout(()=>{try{MAP.resize()}catch(e){}},60); }
   if(v==='roster') renderRoster();
   if(v==='evidence') renderEvidence();
 }
