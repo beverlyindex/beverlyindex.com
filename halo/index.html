@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070b16">
+<title>Remiel Halo</title>
+<meta name="description" content="Remiel Halo. A stand-alone counter-surveillance detection and evidence instrument.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#070b16; --bg2:#0b1120; --bg3:#0f1830;
+  --panel:rgba(16,24,44,.62); --panel2:rgba(22,32,56,.72);
+  --line:rgba(120,160,220,.16); --line2:rgba(120,160,220,.30);
+  --ink:#e9f0ff; --mut:#93a6cc; --dim:#6b7ea4;
+  --chrome:#4aa3ff; --chrome2:#7cc0ff;
+  --clear:#4ae88a; --watch:#4aa3ff; --warn:#e8a84a; --action:#ff5a5a; --purple:#9b6ae8;
+  --sans:'Inter',system-ui,sans-serif; --disp:'Saira',system-ui,sans-serif; --mono:'IBM Plex Mono',monospace;
+  --r:16px; --r2:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:var(--sans); color:var(--ink); background:var(--bg);
+  background-image:
+    radial-gradient(1100px 600px at 80% -10%, rgba(74,163,255,.12), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(155,106,232,.10), transparent 60%);
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+button{font-family:var(--sans);cursor:pointer}
+.mono{font-family:var(--mono)}
+.hidden{display:none !important}
+
+/* ---------- wordmark ---------- */
+.wordmark{font-family:var(--disp);font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--chrome2);text-shadow:0 0 18px rgba(74,163,255,.55);position:relative;line-height:1}
+.wordmark .arc{position:absolute;left:50%;top:-0.62em;width:112%;height:.7em;transform:translateX(-50%);
+  border-radius:50%/100% 100% 0 0;border-top:2px solid rgba(124,192,255,.85);
+  box-shadow:0 -6px 22px rgba(74,163,255,.5);pointer-events:none}
+
+/* ---------- gate ---------- */
+#gate{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(900px 600px at 50% 20%, rgba(74,163,255,.14), transparent 60%),var(--bg)}
+.gate-card{width:100%;max-width:400px;text-align:center;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r);padding:38px 26px 30px;backdrop-filter:blur(14px);box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.gate-card .wordmark{font-size:30px;margin:14px 0 6px}
+.gate-sub{color:var(--mut);font-size:13px;margin:0 0 26px}
+.gate-sub b{color:var(--chrome2);font-weight:600}
+.field{display:block;width:100%;text-align:center;font-family:var(--mono);font-size:16px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink);background:rgba(8,14,28,.7);border:1px solid var(--line2);
+  border-radius:var(--r2);padding:14px 12px;outline:none}
+.field:focus{border-color:var(--chrome);box-shadow:0 0 0 3px rgba(74,163,255,.22)}
+.gate-err{color:var(--action);font-size:12.5px;min-height:16px;margin:10px 0 0}
+.btn{border:1px solid var(--line2);background:rgba(74,163,255,.14);color:var(--chrome2);font-weight:600;
+  font-size:14px;padding:13px 18px;border-radius:var(--r2);width:100%;transition:.16s}
+.btn:hover{background:rgba(74,163,255,.24);border-color:var(--chrome)}
+.btn.primary{background:linear-gradient(180deg,rgba(74,163,255,.9),rgba(40,120,220,.9));color:#04101f;
+  border-color:rgba(124,192,255,.9);box-shadow:0 10px 30px rgba(74,163,255,.35)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.ghost-red{background:transparent;border:1.5px solid #ff4d4d;color:#ff6b6b}
+.btn.ghost-red:hover{background:rgba(255,77,77,.1)}
+.gate-foot{margin-top:22px;color:var(--dim);font-size:11px;letter-spacing:.02em}
+
+/* ---------- app shell ---------- */
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(10,16,32,.9),rgba(10,16,32,.55));backdrop-filter:blur(10px);
+  padding-top:calc(12px + env(safe-area-inset-top))}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand .wordmark{font-size:18px}
+.brand .tag{color:var(--dim);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.topbar .spacer{flex:1}
+.src-pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;padding:5px 9px;border-radius:999px;
+  border:1px solid var(--line2);color:var(--mut);white-space:nowrap}
+.src-pill.live{color:var(--clear);border-color:rgba(74,232,138,.5);box-shadow:0 0 12px rgba(74,232,138,.25)}
+
+/* mode control */
+.modewrap{display:flex;align-items:center;gap:8px}
+.seg{display:flex;background:rgba(8,14,28,.7);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--mut);font-weight:600;font-size:12px;
+  padding:7px 13px;border-radius:999px;transition:.16s;letter-spacing:.03em}
+.seg button.on{color:#04101f;background:linear-gradient(180deg,var(--chrome2),var(--chrome));
+  box-shadow:0 4px 14px rgba(74,163,255,.4)}
+.seg.auto button.on{background:linear-gradient(180deg,#b79bf0,var(--purple));box-shadow:0 4px 14px rgba(155,106,232,.4)}
+
+/* bluf */
+.bluf{margin:14px 16px 0;border-radius:var(--r);padding:18px 18px;position:relative;overflow:hidden;
+  border:1px solid var(--line2);background:var(--panel)}
+.bluf::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--tierc,var(--clear));
+  box-shadow:0 0 26px 2px var(--tierc,var(--clear))}
+.bluf .tier{display:flex;align-items:center;gap:9px;font-family:var(--disp);font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;font-size:13px;color:var(--tierc,var(--clear))}
+.bluf .dot{width:9px;height:9px;border-radius:50%;background:var(--tierc,var(--clear));
+  box-shadow:0 0 12px var(--tierc,var(--clear));animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.bluf .sentence{font-size:17.5px;line-height:1.35;margin:9px 0 0;font-weight:500}
+.bluf .meta{color:var(--mut);font-size:12px;margin-top:8px;font-family:var(--mono)}
+.bluf .modebadge{position:absolute;right:14px;top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:4px 8px}
+
+/* layout */
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:28px}
+.grid{display:grid;gap:14px;padding:14px 16px}
+@media(min-width:900px){ .grid.two{grid-template-columns:1.05fr .95fr} }
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h3{margin:0 0 12px;font-family:var(--disp);font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  font-size:12.5px;color:var(--mut)}
+.card h3 .n{color:var(--chrome2);margin-left:6px}
+
+/* radar */
+.radar-wrap{display:flex;flex-direction:column;align-items:center}
+.radar{position:relative;width:min(78vw,330px);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle at 50% 50%, rgba(74,163,255,.08), rgba(8,14,28,.2) 70%);
+  border:1px solid var(--line2)}
+.radar .ring{position:absolute;border:1px solid rgba(120,160,220,.14);border-radius:50%;inset:0}
+.radar .ring.r2{inset:16.6%} .radar .ring.r3{inset:33.3%} .radar .ring.r4{inset:50%}
+.radar .cross{position:absolute;background:rgba(120,160,220,.12)}
+.radar .cross.h{left:0;right:0;top:50%;height:1px} .radar .cross.v{top:0;bottom:0;left:50%;width:1px}
+.radar .sweep{position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg, rgba(74,163,255,.42), rgba(74,163,255,0) 42%, rgba(74,163,255,0) 100%);
+  -webkit-mask:radial-gradient(circle,#000 69%,transparent 70%);mask:radial-gradient(circle,#000 69%,transparent 70%);
+  animation:spin 4.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.radar .me{position:absolute;left:50%;top:50%;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);
+  background:var(--chrome2);box-shadow:0 0 16px var(--chrome)}
+.blip{position:absolute;width:13px;height:13px;border-radius:50%;transform:translate(-50%,-50%);cursor:pointer;
+  border:1.5px solid rgba(255,255,255,.75);transition:left .9s linear,top .9s linear}
+.blip:hover{transform:translate(-50%,-50%) scale(1.3)}
+.blip .lab{position:absolute;left:16px;top:-4px;font-family:var(--mono);font-size:9.5px;white-space:nowrap;
+  color:var(--mut);opacity:0;transition:.15s}
+.blip:hover .lab{opacity:1}
+.radar-legend{display:flex;gap:14px;margin-top:12px;font-size:11px;color:var(--mut);flex-wrap:wrap;justify-content:center}
+.radar-legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+/* tickers */
+.ticker{position:relative;height:40px;overflow:hidden;border-top:1px solid var(--line);
+  background:rgba(8,14,28,.55);display:flex;align-items:center}
+.ticker .lead{position:absolute;left:0;top:0;bottom:0;z-index:2;display:flex;align-items:center;gap:6px;
+  padding:0 14px 0 12px;font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.12em;
+  color:#04101f;background:var(--chrome);box-shadow:16px 0 18px -4px rgba(74,163,255,.5)}
+.ticker.wtcs .lead{background:var(--purple);box-shadow:16px 0 18px -4px rgba(155,106,232,.5)}
+.ticker .track{display:flex;gap:40px;white-space:nowrap;padding-left:130px;animation:marq 42s linear infinite;
+  font-size:12.5px;color:var(--mut)}
+.ticker .track b{color:var(--ink);font-weight:600}
+.ticker .track .date{color:var(--dim);font-family:var(--mono);font-size:11px}
+@keyframes marq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* roster */
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.chipbtn{border:1px solid var(--line2);background:transparent;color:var(--mut);font-size:12px;font-weight:600;
+  padding:7px 12px;border-radius:999px;transition:.15s}
+.chipbtn.on{color:#04101f;background:var(--chrome2);border-color:var(--chrome2)}
+.rost{display:flex;flex-direction:column;gap:9px}
+.rrow{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:center;padding:12px;
+  border:1px solid var(--line);border-radius:var(--r2);background:rgba(10,16,32,.5);transition:.15s;cursor:pointer}
+.rrow:hover{border-color:var(--line2);background:rgba(16,24,44,.7)}
+.glyph{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;background:rgba(74,163,255,.12);border:1px solid var(--line2)}
+.rname{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rsub{color:var(--mut);font-size:11.5px;font-family:var(--mono);margin-top:3px}
+.tagf{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:999px;
+  border:1px solid var(--line2);color:var(--warn)}
+.tagf.route{color:var(--purple);border-color:rgba(155,106,232,.5)}
+.tagf.with{color:var(--action);border-color:rgba(255,90,90,.5)}
+.band{text-align:right;min-width:82px}
+.band .d{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.04em}
+.band .s{font-size:10.5px;color:var(--dim);font-family:var(--mono);margin-top:3px}
+.strength{display:inline-flex;gap:2px;vertical-align:middle}
+.strength i{width:4px;height:10px;border-radius:1px;background:rgba(120,160,220,.25)}
+.strength i.on{background:var(--chrome2)}
+
+/* capture */
+#capture{position:fixed;inset:0;z-index:50;background:#04060c;display:flex;flex-direction:column}
+.cap-head{display:flex;align-items:center;gap:12px;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));
+  border-bottom:1px solid var(--line);background:rgba(8,12,22,.7)}
+.cap-head .t{font-family:var(--disp);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px}
+.cap-head .x{margin-left:auto}
+.iconx{width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);background:transparent;color:var(--mut);
+  font-size:18px;display:flex;align-items:center;justify-content:center}
+.iconx:hover{color:var(--ink);border-color:var(--line2)}
+.cap-stage{position:relative;flex:1;overflow:hidden;background:#06090f}
+#capVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#capOverlay{position:absolute;inset:0;width:100%;height:100%}
+.cap-syn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);
+  font-size:12.5px;text-align:center;padding:24px;background:
+   repeating-linear-gradient(120deg,rgba(74,163,255,.05) 0 2px,transparent 2px 22px),#070b14}
+.cap-hint{position:absolute;left:0;right:0;bottom:0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,transparent,rgba(4,6,12,.9));display:flex;flex-direction:column;gap:10px}
+.cap-status{display:flex;align-items:center;gap:10px;justify-content:center;font-weight:600;font-size:15px}
+.cap-status .warm{color:var(--clear)} .cap-status .cold{color:var(--mut)}
+.cap-aim{display:flex;align-items:center;gap:10px}
+.cap-aim input{flex:1;accent-color:var(--chrome)}
+.cap-aim .lbl{font-size:11px;color:var(--dim);font-family:var(--mono);white-space:nowrap}
+.cap-cta{display:flex;gap:10px}
+.cap-cta .btn{width:auto;flex:1}
+
+/* device signature card */
+#device{position:fixed;inset:0;z-index:55;background:var(--bg);display:flex;flex-direction:column}
+.dev-body{position:relative;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;
+  padding-bottom:calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;
+  max-width:760px;margin:0 auto;width:100%}
+.dev-hero{display:flex;gap:14px;align-items:center}
+.dev-hero .glyph{width:52px;height:52px;font-size:24px;border-radius:13px}
+.dev-hero .nm{font-family:var(--disp);font-weight:700;font-size:20px;letter-spacing:.02em}
+.dev-hero .cl{color:var(--mut);font-size:12.5px;font-family:var(--mono);margin-top:3px}
+.dev-threat{display:flex;align-items:center;gap:14px;border:1px solid var(--line2);border-radius:var(--r2);
+  padding:14px;background:var(--panel)}
+.dev-threat .cell{font-family:var(--disp);font-weight:700;font-size:20px;color:var(--tc,var(--clear));
+  border:1px solid var(--tc,var(--clear));border-radius:10px;padding:8px 12px;box-shadow:0 0 18px -5px var(--tc,var(--clear))}
+.dev-threat .tt{font-family:var(--disp);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px;color:var(--tc,var(--clear))}
+.dev-threat .ts{color:var(--mut);font-size:11.5px;margin-top:3px}
+.dsec{border:1px solid var(--line);border-radius:var(--r2);background:rgba(10,16,32,.5);padding:13px 14px}
+.dsec h4{margin:0 0 10px;font-family:var(--disp);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:11px;color:var(--mut)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:13px}
+.kv .k{color:var(--dim);font-family:var(--mono);font-size:11.5px;white-space:nowrap}
+.kv .v{color:var(--ink);text-align:right}
+.kv .v.warnc{color:var(--warn)} .kv .v.actionc{color:var(--action)} .kv .v.purplec{color:var(--purple)}
+.dev-acts{display:flex;gap:10px;flex-wrap:wrap}
+.dev-acts .btn{width:auto;flex:1;min-width:120px}
+.flagrow{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
+
+/* evidence */
+.ev{display:flex;flex-direction:column;gap:8px}
+.evrow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:11px 12px;
+  border:1px solid var(--line);border-radius:var(--r2);background:rgba(10,16,32,.5)}
+.evrow .ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  background:rgba(74,163,255,.12);border:1px solid var(--line2);font-size:14px}
+.evrow .et{font-weight:600;font-size:13px}
+.evrow .eh{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:3px;word-break:break-all}
+.evrow .ed{font-family:var(--mono);font-size:10.5px;color:var(--mut);white-space:nowrap}
+.empty{color:var(--dim);font-size:13px;text-align:center;padding:26px 10px}
+
+/* nav */
+.maincol{display:flex;flex-direction:column;flex:1;min-height:0}
+#nav{display:none}
+.nav{display:flex;border-top:1px solid var(--line);background:rgba(8,12,22,.92);backdrop-filter:blur(10px);
+  padding-bottom:env(safe-area-inset-bottom)}
+.nav button{flex:1;border:0;background:transparent;color:var(--dim);padding:10px 4px 9px;font-size:10.5px;
+  font-weight:600;letter-spacing:.04em;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.14s}
+.nav button .gi{font-size:19px;line-height:1}
+.nav button.on{color:var(--chrome2)}
+.nav button.on .gi{filter:drop-shadow(0 0 10px rgba(74,163,255,.6))}
+.nav .capbtn{color:var(--chrome2)}
+
+@media(min-width:900px){
+  #app{flex-direction:row}
+  .topbar{display:none}
+  #nav{display:flex}
+  #navMobile{display:none}
+  #modeHostMobile{display:none !important}
+  .railtop{display:flex}
+  .nav{flex-direction:column;width:94px;border-top:0;border-right:1px solid var(--line);padding-top:14px;justify-content:flex-start;gap:4px}
+  .nav button{flex:none;padding:14px 4px}
+  .maincol{flex:1;display:flex;flex-direction:column;min-width:0}
+  .desktoptop{display:flex !important}
+}
+.railtop,.desktoptop{display:none}
+.desktoptop{align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(10,16,32,.9),rgba(10,16,32,.5))}
+.toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:70;background:var(--panel2);
+  border:1px solid var(--line2);border-radius:999px;padding:10px 18px;font-size:13px;color:var(--ink);
+  box-shadow:0 14px 40px rgba(0,0,0,.5);opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ============ GATE ============ -->
+<div id="gate">
+  <div class="gate-card">
+    <div class="wordmark" style="font-size:12px;letter-spacing:.3em">REMIEL</div>
+    <div class="wordmark">HALO<span class="arc"></span></div>
+    <p class="gate-sub">Stand-alone counter-surveillance instrument.<br>Enter your <b>access key</b> to continue.</p>
+    <input id="gateKey" class="field" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RH-XXXX-2026" maxlength="14">
+    <p id="gateErr" class="gate-err"></p>
+    <button id="gateGo" class="btn primary" style="margin-top:4px">Unlock</button>
+    <div class="gate-foot">Beverly Index LLC. Access is logged. United States.</div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+
+  <!-- desktop rail -->
+  <nav class="nav" id="nav">
+    <div class="railtop" style="flex-direction:column;align-items:center;gap:4px;padding:0 6px 14px">
+      <div class="wordmark" style="font-size:13px">HALO<span class="arc"></span></div>
+    </div>
+    <button data-view="overview" class="on"><span class="gi">◎</span>Overview</button>
+    <button data-view="roster"><span class="gi">▤</span>Roster</button>
+    <button data-view="evidence"><span class="gi">⛓</span>Evidence</button>
+  </nav>
+
+  <div class="maincol">
+    <!-- desktop topbar -->
+    <div class="desktoptop">
+      <div class="brand"><span class="tag">Stand-alone instrument</span></div>
+      <div class="spacer"></div>
+      <div class="modewrap" id="modeWrapD"></div>
+      <span class="src-pill" id="srcPillD">DEMO FEED</span>
+    </div>
+
+    <!-- mobile topbar -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="wordmark">HALO<span class="arc"></span></div>
+      </div>
+      <div class="spacer"></div>
+      <span class="src-pill" id="srcPillM">DEMO</span>
+    </div>
+
+    <div class="scroll" id="scroll">
+
+      <!-- BLUF (always visible on overview) -->
+      <div id="blufHost"></div>
+
+      <!-- mobile mode control -->
+      <div class="grid" id="modeHostMobile" style="padding-bottom:0"></div>
+
+      <!-- VIEW: OVERVIEW -->
+      <section data-pane="overview">
+        <div class="grid two">
+          <div class="card radar-wrap">
+            <h3>Radius<span class="n" id="radarCount">0 near</span></h3>
+            <div class="radar" id="radar">
+              <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div><div class="ring r4"></div>
+              <div class="cross h"></div><div class="cross v"></div>
+              <div class="sweep"></div>
+              <div class="me" title="You"></div>
+            </div>
+            <div class="radar-legend">
+              <span><i style="background:var(--clear)"></i>Known</span>
+              <span><i style="background:var(--warn)"></i>New</span>
+              <span><i style="background:var(--purple)"></i>Seen on route</span>
+              <span><i style="background:var(--action)"></i>With you</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>What changed here</h3>
+            <div id="changeList" class="ev"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: ROSTER -->
+      <section data-pane="roster" class="hidden">
+        <div class="grid">
+          <div class="card">
+            <h3>Device roster<span class="n" id="rosterCount">0</span></h3>
+            <div class="toolbar">
+              <button class="chipbtn on" data-sort="near">Nearest</button>
+              <button class="chipbtn" data-sort="new">Newest</button>
+              <button class="chipbtn" data-sort="seen">Seen before</button>
+            </div>
+            <div class="rost" id="rost"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: EVIDENCE -->
+      <section data-pane="evidence" class="hidden">
+        <div class="grid">
+          <div class="card">
+            <h3>Evidence chain<span class="n" id="evCount">0</span></h3>
+            <div class="toolbar">
+              <button class="chipbtn" id="evExport">Export signed log</button>
+            </div>
+            <div class="ev" id="evList"></div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /scroll -->
+
+    <!-- tickers sit above nav -->
+    <div class="ticker" id="tickerHDCS">
+      <div class="lead">HDCS</div><div class="track" id="trackHDCS"></div>
+    </div>
+    <div class="ticker wtcs" id="tickerWTCS">
+      <div class="lead">WTCS</div><div class="track" id="trackWTCS"></div>
+    </div>
+
+    <!-- mobile nav -->
+    <nav class="nav" id="navMobile">
+      <button data-view="overview" class="on"><span class="gi">◎</span>Overview</button>
+      <button data-view="roster"><span class="gi">▤</span>Roster</button>
+        <button data-view="evidence"><span class="gi">⛓</span>Evidence</button>
+    </nav>
+  </div>
+</div>
+
+<!-- ============ DEVICE SIGNATURE CARD ============ -->
+<div id="device" class="hidden">
+  <div class="cap-head">
+    <span class="t">Device</span>
+    <span id="devCall" class="mono" style="font-size:12px;color:var(--mut)"></span>
+    <button class="iconx x" id="devClose">✕</button>
+  </div>
+  <div class="dev-body" id="devBody"></div>
+</div>
+
+<!-- ============ CAPTURE NOW ============ -->
+<div id="capture" class="hidden">
+  <div class="cap-head">
+    <span class="t">Capture Now</span>
+    <span id="capTarget" class="mono" style="font-size:12px;color:var(--mut)"></span>
+    <button class="iconx x" id="capClose">✕</button>
+  </div>
+  <div class="cap-stage">
+    <video id="capVideo" playsinline muted></video>
+    <div class="cap-syn hidden" id="capSyn">Camera not available in this view.<br>The crosshair and bearing cone still work over a synthetic scene, and a signed capture is still produced.</div>
+    <canvas id="capOverlay"></canvas>
+    <div class="cap-hint">
+      <div class="cap-status" id="capStatus"><span class="cold">Pick a device, then aim.</span></div>
+      <div class="cap-aim">
+        <span class="lbl">Aim</span>
+        <input type="range" id="capAim" min="0" max="359" value="0">
+        <span class="lbl" id="capAimVal">0°</span>
+      </div>
+      <div class="cap-cta">
+        <button class="btn" id="capPick">Pick device</button>
+        <button class="btn primary" id="capShot">Lock and capture</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   Remiel Halo. Stand-alone build. Single file, desktop and mobile.
+   ============================================================ */
+
+/* ---------- safe storage ---------- */
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+};
+
+/* ---------- access gate ---------- */
+const OWNER = "RH-BEVR-2026";
+const BETA  = "RH-HALO-2026";
+const codeOk = c => {
+  c = (c||"").trim().toUpperCase();
+  if(c===OWNER || c===BETA) return true;
+  return /^RH-[A-Z0-9]{4}-2026$/.test(c); // tester codes
+};
+const gate = document.getElementById('gate');
+const app  = document.getElementById('app');
+function openApp(){ gate.classList.add('hidden'); app.classList.remove('hidden'); boot(); }
+document.getElementById('gateGo').addEventListener('click', tryUnlock);
+document.getElementById('gateKey').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
+function tryUnlock(){
+  const v = document.getElementById('gateKey').value;
+  const err = document.getElementById('gateErr');
+  if(codeOk(v)){ store.set('halo_key', v.trim().toUpperCase()); err.textContent=''; openApp(); }
+  else { err.textContent = 'Key not recognised. Format RH-XXXX-2026.'; }
+}
+if(codeOk(store.get('halo_key'))) openApp();
+
+/* ---------- state ---------- */
+const S = {
+  mode:'auto',        // auto | hdcs | wtcs
+  lead:'hdcs',        // which mode currently leads BLUF
+  live:false,         // real bluetooth data arrived
+  sort:'near',
+  view:'overview',
+  devices:[],
+  wtcs:[],            // technology events
+  changes:[],
+  evidence:[],
+  prevHash:'0'.repeat(16),
+  capTarget:null, capAim:0, capStream:null, capRAF:0
+};
+
+/* ---------- callsign generator ---------- */
+const W1=['Amber','Iron','Silent','North','Grey','Hollow','Pale','Copper','Dusk','Vexed','Quiet','Stone','Red','Low','Blue','Wry','Still','Far','Lone','Dim'];
+const W2=['Harbor','Sparrow','Lantern','Current','Vector','Marten','Signal','Cipher','Meadow','Anchor','Falcon','Ember','Pivot','Cedar','Relay','Shadow','Compass','Beacon','Thistle','Warden'];
+const GLY=['◆','▲','●','✦','⬟','⬢','◈','✸','❖','⬣','◉','✚'];
+const CLASSES=['Phone','Wearable','Tag','Laptop','Vehicle','Unknown'];
+let cs=0;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function callsign(){ return pick(W1)+' '+pick(W2); }
+
+function makeDevice(opts={}){
+  const cls = opts.cls || pick(CLASSES);
+  const d = {
+    id:'d'+(cs++),
+    name: callsign(),
+    glyph: pick(GLY),
+    cls,
+    rssi: opts.rssi!=null?opts.rssi:rnd(-92,-55),
+    bearing: opts.bearing!=null?opts.bearing:rnd(0,359),
+    firstSeen: Date.now()-Math.floor(rnd(0, opts.old?2.4e6:9e5)),
+    lastSeen: Date.now(),
+    present:true,
+    randomizes: Math.random()<0.4,
+    identity: opts.identity!=null?opts.identity:Math.floor(rnd(1,4)),
+    onRoute: opts.onRoute||false,
+    withYou: opts.withYou||false,
+    knownBefore: opts.knownBefore|| (Math.random()<0.4)
+  };
+  d.trend = pick(['Approaching','Steady','Leaving']);
+  d.timesSeen = Math.floor(rnd(1, opts.old?40:7));
+  d.wifi = {
+    link: pick(['Home router','Public AP "CoffeeHouse"','Unknown access point','Mobile hotspot','None observed']),
+    stores: Math.random() < 0.5,
+    relay: pick(['No relay observed','Relays to a cloud host','Relays to an unknown endpoint'])
+  };
+  d.bt = pick(['Advertising continuously','Paired-device traffic','Silent, answers scans','Beaconing on an interval']);
+  d.sig = {
+    capability: pick(['Dual-band, BLE 5.x','Single-band, BLE 4.x','Multi-radio, BLE and UWB']),
+    networks: pick(['Seeks one saved network','Seeks several saved networks','Seeks no saved network']),
+    phys: 'Clock offset and power-ramp traits recorded'
+  };
+  d.watched = false;
+  if(d.cls==='Unknown' && d.randomizes) d.identity=Math.min(d.identity,2);
+  return d;
+}
+function band(rssi){ return rssi>-62?['Very near',rssi]:rssi>-75?['Near',rssi]:['In the area',rssi]; }
+function bandRadius(rssi){ return rssi>-62?0.26:rssi>-75?0.52:0.82; } // 0..1 of radar radius
+
+/* ---------- seed environment ---------- */
+function seed(){
+  const base = [
+    makeDevice({cls:'Phone', rssi:-58, identity:3, knownBefore:true}),
+    makeDevice({cls:'Wearable', rssi:-67, identity:3, knownBefore:true}),
+    makeDevice({cls:'Tag', rssi:-71, identity:2, onRoute:true, old:true}),
+    makeDevice({cls:'Laptop', rssi:-80, identity:2}),
+    makeDevice({cls:'Vehicle', rssi:-74, identity:1}),
+    makeDevice({cls:'Unknown', rssi:-69, identity:1})
+  ];
+  S.devices = base;
+  S.wtcs = [
+    {id:'w1', kind:'Scan', sev:0, text:'No attack recorded on your devices.'},
+  ];
+}
+
+/* ---------- tick: evolve the environment ---------- */
+function tick(){
+  const now=Date.now();
+  S.devices.forEach(d=>{
+    d.rssi += rnd(-3,3);
+    d.rssi = Math.max(-96, Math.min(-50, d.rssi));
+    d.bearing = (d.bearing + rnd(-6,6) + 360)%360;
+    if(d.present) d.lastSeen=now;
+    if(Math.random()<0.02) d.present=!d.present;
+  });
+  // occasional arrival
+  if(Math.random()<0.05 && S.devices.length<9){
+    const nd = makeDevice({rssi:-85});
+    if(Math.random()<0.3){ nd.onRoute=true; }
+    S.devices.push(nd);
+    pushChange(nd.name+' appeared nearby.', nd.onRoute?'route':'new');
+  }
+  // a device that stays very near and arrived with you escalates
+  const near = S.devices.filter(d=>d.present && d.rssi>-66);
+  near.forEach(d=>{
+    if(d.onRoute && d.rssi>-64 && !d.withYou && Math.random()<0.08){
+      d.withYou=true;
+      pushChange(d.name+' has stayed with you across locations.', 'with');
+    }
+  });
+  recomputeBluf();
+  render();
+}
+function pushChange(text, kind){
+  S.changes.unshift({text, kind, t:Date.now()});
+  S.changes = S.changes.slice(0,8);
+  logEvidence('change', text);
+}
+
+/* ---------- BLUF logic ---------- */
+function tierOf(t){ return ['clear','watch','warn','action'][t]; }
+const TIER_NAME=['Clear','Watch','Warning','Take Action'];
+const TIER_VAR=['--clear','--watch','--warn','--action'];
+
+function hdcsAssess(){
+  const pres=S.devices.filter(d=>d.present);
+  const withYou=pres.find(d=>d.withYou);
+  const onRouteNear=pres.find(d=>d.onRoute && d.rssi>-70);
+  const newUnknown=pres.find(d=>!d.knownBefore && d.rssi>-72);
+  if(withYou) return {t:3, s:'A device has stayed with you across two locations.', d:withYou};
+  if(onRouteNear) return {t:2, s:'A device seen on this route before is near you again.', d:onRouteNear};
+  if(newUnknown) return {t:1, s:'A new device is nearby that was not here before.', d:newUnknown};
+  return {t:0, s:'Nothing around you has changed.', d:null};
+}
+function wtcsAssess(){
+  const sev = Math.max(0, ...S.wtcs.map(w=>w.sev));
+  const w = S.wtcs.find(x=>x.sev===sev);
+  const s = sev===0 ? 'No attack recorded on your devices.' : (w?w.text:'Activity recorded on your devices.');
+  return {t:sev, s, d:null};
+}
+function recomputeBluf(){
+  const h=hdcsAssess(), w=wtcsAssess();
+  let lead, a;
+  if(S.mode==='hdcs'){ lead='hdcs'; a=h; }
+  else if(S.mode==='wtcs'){ lead='wtcs'; a=w; }
+  else { if(w.t>h.t){ lead='wtcs'; a=w; } else { lead='hdcs'; a=h; } }
+  S.lead=lead; S.bluf=a;
+}
+
+/* ---------- rendering ---------- */
+const el = id=>document.getElementById(id);
+function render(){ renderBluf(); renderMode(); renderRadar(); renderChanges(); renderRoster(); renderSrc(); }
+
+function renderSrc(){
+  [el('srcPillM'),el('srcPillD')].forEach(p=>{
+    if(!p)return;
+    p.textContent = S.live ? 'LIVE' : (p.id==='srcPillD'?'DEMO FEED':'DEMO');
+    p.classList.toggle('live', S.live);
+  });
+}
+
+function renderBluf(){
+  const a=S.bluf||{t:0,s:'',d:null};
+  const host=el('blufHost');
+  host.innerHTML = `
+    <div class="bluf" style="--tierc:var(${TIER_VAR[a.t]})">
+      <span class="modebadge">${S.lead.toUpperCase()}${S.mode==='auto'?' · AUTO':''}</span>
+      <div class="tier"><span class="dot"></span>${TIER_NAME[a.t]}</div>
+      <div class="sentence">${a.s}</div>
+      <div class="meta">${S.devices.filter(d=>d.present).length} devices present · updated ${new Date().toLocaleTimeString()}</div>
+    </div>`;
+}
+
+function modeControlHTML(autoCls){
+  return `<div class="seg ${autoCls}"><button data-m="auto" class="${S.mode==='auto'?'on':''}">Auto</button></div>
+    <div class="seg"><button data-m="hdcs" class="${S.mode==='hdcs'?'on':''}">HDCS</button>
+    <button data-m="wtcs" class="${S.mode==='wtcs'?'on':''}">WTCS</button></div>`;
+}
+function renderMode(){
+  const d=el('modeWrapD'); if(d) d.innerHTML=modeControlHTML(S.mode==='auto'?'auto':'');
+  const m=el('modeHostMobile');
+  if(m) m.innerHTML = `<div class="modewrap" style="justify-content:center">${modeControlHTML(S.mode==='auto'?'auto':'')}</div>`;
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ S.mode=b.dataset.m; recomputeBluf(); render(); });
+}
+
+function renderRadar(){
+  const r=el('radar'); if(!r)return;
+  r.querySelectorAll('.blip').forEach(b=>b.remove());
+  const pres=S.devices.filter(d=>d.present);
+  el('radarCount').textContent = pres.length+' near';
+  const R = r.clientWidth/2;
+  pres.forEach(d=>{
+    const rad = bandRadius(d.rssi)*R*0.92;
+    const ang = (d.bearing-90)*Math.PI/180;
+    const x = R + Math.cos(ang)*rad, y = R + Math.sin(ang)*rad;
+    const b=document.createElement('div'); b.className='blip';
+    b.style.left=x+'px'; b.style.top=y+'px';
+    b.style.background = d.withYou?'var(--action)':d.onRoute?'var(--purple)':d.knownBefore?'var(--clear)':'var(--warn)';
+    b.innerHTML = `<span class="lab">${d.name}</span>`;
+    b.onclick=()=>{ openDevice(d); };
+    r.appendChild(b);
+  });
+}
+
+function renderChanges(){
+  const c=el('changeList');
+  if(!S.changes.length){ c.innerHTML='<div class="empty">Nothing has changed since you arrived.</div>'; return; }
+  c.innerHTML = S.changes.map(ch=>{
+    const col = ch.kind==='with'?'--action':ch.kind==='route'?'--purple':'--warn';
+    return `<div class="evrow"><div class="ic" style="color:var(${col})">△</div>
+      <div><div class="et">${ch.text}</div></div>
+      <div class="ed">${new Date(ch.t).toLocaleTimeString()}</div></div>`;
+  }).join('');
+}
+
+function strengthHTML(n){ let s='<span class="strength">'; for(let i=0;i<3;i++) s+=`<i class="${i<n?'on':''}"></i>`; return s+'</span>'; }
+function renderRoster(){
+  const host=el('rost'); if(!host)return;
+  let list=[...S.devices];
+  if(S.sort==='near') list.sort((a,b)=>b.rssi-a.rssi);
+  else if(S.sort==='new') list.sort((a,b)=>b.firstSeen-a.firstSeen);
+  else list.sort((a,b)=>(b.knownBefore-a.knownBefore)||(b.rssi-a.rssi));
+  el('rosterCount').textContent=list.length;
+  host.innerHTML = list.map(d=>{
+    const [bn,rssi]=band(d.rssi);
+    const idName = (d.cls==='Unknown' && d.identity<2)?'Unknown':d.name;
+    let flags='';
+    if(d.withYou) flags+='<span class="tagf with">With you</span>';
+    if(d.onRoute) flags+='<span class="tagf route">On route</span>';
+    if(!d.knownBefore && !d.withYou && !d.onRoute) flags+='<span class="tagf">New</span>';
+    return `<div class="rrow" data-id="${d.id}">
+      <div class="glyph">${d.glyph}</div>
+      <div>
+        <div class="rname">${idName} ${flags}</div>
+        <div class="rsub">${d.cls} · ${strengthHTML(d.identity)} id · ${d.present?'present now':'last seen '+new Date(d.lastSeen).toLocaleTimeString()}</div>
+      </div>
+      <div class="band"><div class="d" style="color:${d.rssi>-66?'var(--ink)':'var(--mut)'}">${bn}</div><div class="s">${Math.round(rssi)} dBm</div></div>
+    </div>`;
+  }).join('');
+  host.querySelectorAll('.rrow').forEach(row=>row.onclick=()=>{
+    const d=S.devices.find(x=>x.id===row.dataset.id); if(d) openDevice(d);
+  });
+}
+document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-sort]').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); S.sort=b.dataset.sort; renderRoster();
+});
+
+/* ---------- navigation ---------- */
+function setView(v){
+  if(v==='capture'){ openCapture(S.capTarget); return; }
+  S.view=v;
+  document.querySelectorAll('[data-pane]').forEach(p=>p.classList.toggle('hidden',p.dataset.pane!==v));
+  document.querySelectorAll('.nav button[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  // overview-only elements
+  el('blufHost').classList.toggle('hidden', v!=='overview');
+  el('modeHostMobile').classList.toggle('hidden', v!=='overview');
+  if(v==='evidence') renderEvidence();
+}
+document.querySelectorAll('.nav button[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+
+/* ---------- tickers (ship cached, operable on first build) ---------- */
+const HDCS_FEED=[
+  {t:'New Bluetooth tracker models added to the AirGuard detection set.', src:'Coalition Against Stalkerware', date:'2026-09-28'},
+  {t:'Advisory. Trackers can be slipped into bags and vehicles; sweep after shared rides.', src:'Beverly Index Advisory', date:'2026-09-30'},
+  {t:'Stalkerware family found masquerading as a child-safety app.', src:'Coalition Against Stalkerware', date:'2026-09-22'},
+  {t:'Reminder. A device that follows you across two locations is the signal that matters.', src:'Beverly Index Advisory', date:'2026-10-01'}
+];
+const WTCS_FEED=[
+  {t:'CISA advisory. Spyware campaign targeting mobile devices through zero-click delivery.', src:'CISA', date:'2026-09-29'},
+  {t:'AI agent swarm observed probing exposed home networks.', src:'Beverly Index Advisory', date:'2026-09-27'},
+  {t:'Mercenary spyware vendor linked to new Android exploit chain.', src:'Beverly Index Advisory', date:'2026-09-25'},
+  {t:'Keep Lockdown Mode or Advanced Protection on when travelling.', src:'Beverly Index Advisory', date:'2026-10-01'}
+];
+function fillTicker(id, feed){
+  const items = feed.map(f=>`<span><b>${f.t}</b> <span class="date">${f.src} · ${f.date}</span></span>`).join('');
+  el(id).innerHTML = items+items; // doubled for seamless loop
+}
+
+/* ---------- evidence chain (SHA-256) ---------- */
+async function sha(str){
+  try{
+    const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(e){ // fallback hash if subtle unavailable
+    let h=0; for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; } return ('00000000'+h.toString(16)).slice(-16);
+  }
+}
+async function logEvidence(kind, text, extra){
+  const rec={ kind, text, t:Date.now(), prev:S.prevHash, extra:extra||null };
+  rec.hash = await sha(JSON.stringify(rec));
+  S.prevHash = rec.hash;
+  S.evidence.unshift(rec);
+  if(S.view==='evidence') renderEvidence();
+}
+function renderEvidence(){
+  const host=el('evList'); el('evCount').textContent=S.evidence.length;
+  if(!S.evidence.length){ host.innerHTML='<div class="empty">No records yet. Captures and changes are signed and chained here.</div>'; return; }
+  const ic={capture:'✛',change:'△',note:'⛓'};
+  host.innerHTML=S.evidence.map(r=>`<div class="evrow">
+    <div class="ic">${ic[r.kind]||'⛓'}</div>
+    <div><div class="et">${r.text}</div><div class="eh">sha256 ${r.hash.slice(0,32)}…</div></div>
+    <div class="ed">${new Date(r.t).toLocaleTimeString()}</div></div>`).join('');
+}
+el('evExport').onclick=()=>{
+  const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),chain:S.evidence},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='remiel-halo-evidence.json'; a.click();
+  toast('Signed log exported.');
+};
+
+/* ---------- Device Signature Card (the core intelligence view) ---------- */
+const devEl=el('device');
+function deviceThreat(d){
+  const c = d.identity;                 // confidence C1..C4 from how well identity is held
+  let s = 1;                            // severity S1..S4 from behaviour
+  if(d.withYou) s=4; else if(d.onRoute) s=3; else if(!d.knownBefore) s=2;
+  const tierIdx = Math.max(0, Math.min(3, Math.round(((c-1)+(s-1))/2)));
+  return {c, s, tierIdx};
+}
+function openDevice(d){
+  const idName = (d.cls==='Unknown' && d.identity<2) ? 'Unknown' : d.name;
+  el('devCall').textContent = (d.cls==='Unknown' && d.identity<2) ? 'Unidentified' : d.name;
+  const [bn,rssi]=band(d.rssi);
+  const th=deviceThreat(d); const tc=TIER_VAR[th.tierIdx];
+  let flags='';
+  if(d.withYou) flags+='<span class="tagf with">With you</span>';
+  if(d.onRoute) flags+='<span class="tagf route">On route</span>';
+  if(!d.knownBefore && !d.withYou && !d.onRoute) flags+='<span class="tagf">New</span>';
+  if(d.watched) flags+='<span class="tagf" style="color:var(--chrome2);border-color:var(--line2)">Watched</span>';
+  if(!flags) flags='<span class="tagf" style="color:var(--clear);border-color:rgba(74,232,138,.4)">Known</span>';
+  el('devBody').innerHTML = `
+    <div class="dev-hero">
+      <div class="glyph">${d.glyph}</div>
+      <div><div class="nm">${idName}</div>
+      <div class="cl">${d.cls} &middot; ${strengthHTML(d.identity)} identity</div>
+      <div class="flagrow">${flags}</div></div>
+    </div>
+    <div class="dev-threat" style="--tc:var(${tc})">
+      <div class="cell">C${th.c}&middot;S${th.s}</div>
+      <div><div class="tt">${TIER_NAME[th.tierIdx]}</div>
+      <div class="ts">Confidence ${th.c} of 4. Severity ${th.s} of 4.</div></div>
+    </div>
+    <div class="dsec"><h4>Proximity</h4><div class="kv">
+      <span class="k">Distance</span><span class="v">${bn}</span>
+      <span class="k">Signal</span><span class="v">${Math.round(rssi)} dBm</span>
+      <span class="k">Trend</span><span class="v ${d.trend==='Approaching'?'warnc':''}">${d.trend}</span>
+      <span class="k">Bearing</span><span class="v">${Math.round(d.bearing)}&deg;</span>
+    </div></div>
+    <div class="dsec"><h4>History</h4><div class="kv">
+      <span class="k">First seen</span><span class="v">${new Date(d.firstSeen).toLocaleString()}</span>
+      <span class="k">Last seen</span><span class="v">${d.present?'Present now':new Date(d.lastSeen).toLocaleTimeString()}</span>
+      <span class="k">Times seen</span><span class="v">${d.timesSeen}</span>
+      <span class="k">On this route</span><span class="v ${d.onRoute?'purplec':''}">${d.onRoute?'Seen here before':'Not on record'}</span>
+    </div></div>
+    <div class="dsec"><h4>Combination signature</h4><div class="kv">
+      <span class="k">Capability</span><span class="v">${d.sig.capability}</span>
+      <span class="k">Networks</span><span class="v">${d.sig.networks}</span>
+      <span class="k">Physical layer</span><span class="v">${d.sig.phys}</span>
+      <span class="k">Address</span><span class="v ${d.randomizes?'warnc':''}">${d.randomizes?'Randomizes, held by signature':'Stable'}</span>
+    </div></div>
+    <div class="dsec"><h4>Wi-Fi activity</h4><div class="kv">
+      <span class="k">Connects to</span><span class="v">${d.wifi.link}</span>
+      <span class="k">Stores data</span><span class="v ${d.wifi.stores?'warnc':''}">${d.wifi.stores?'Local storage seen':'None observed'}</span>
+      <span class="k">Relays</span><span class="v ${d.wifi.relay.indexOf('Relays')===0?'warnc':''}">${d.wifi.relay}</span>
+    </div></div>
+    <div class="dsec"><h4>Bluetooth behavior</h4><div class="kv">
+      <span class="k">Pattern</span><span class="v">${d.bt}</span>
+    </div></div>
+    <div class="dev-acts">
+      <button class="btn" id="devWatch">${d.watched?'Watching':'Watch'}</button>
+      <button class="btn" id="devNote">Add note to evidence</button>
+      <button class="btn primary" id="devCapture">Capture Now</button>
+    </div>`;
+  el('devWatch').onclick=()=>{ d.watched=!d.watched; toast(d.watched?('Watching '+idName):'Stopped watching'); openDevice(d); };
+  el('devNote').onclick=()=>{ logEvidence('note','Observed '+idName+' at '+bn+', '+d.trend.toLowerCase()+'.', {callsign:idName,rssi:Math.round(d.rssi),band:bn,bearing:Math.round(d.bearing)}); toast('Note added to evidence.'); };
+  el('devCapture').onclick=()=>{ closeDevice(); openCapture(d); };
+  devEl.classList.remove('hidden');
+}
+function closeDevice(){ devEl.classList.add('hidden'); }
+el('devClose').onclick=closeDevice;
+
+/* ---------- Capture Now ---------- */
+const capEl=el('capture');
+async function openCapture(target){
+  S.capTarget = target || S.devices.filter(d=>d.present).sort((a,b)=>b.rssi-a.rssi)[0] || null;
+  capEl.classList.remove('hidden');
+  el('capTarget').textContent = S.capTarget ? ('Target: '+(S.capTarget.cls==='Unknown'&&S.capTarget.identity<2?'Unknown':S.capTarget.name)) : 'No device selected';
+  // camera
+  try{
+    S.capStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    const v=el('capVideo'); v.srcObject=S.capStream; await v.play(); el('capSyn').classList.add('hidden');
+  }catch(e){ el('capSyn').classList.remove('hidden'); }
+  sizeOverlay(); capLoop();
+  // compass if available
+  if(window.DeviceOrientationEvent){ window.addEventListener('deviceorientation', onOrient); }
+}
+function closeCapture(){
+  capEl.classList.add('hidden');
+  if(S.capStream){ S.capStream.getTracks().forEach(t=>t.stop()); S.capStream=null; }
+  cancelAnimationFrame(S.capRAF);
+  window.removeEventListener('deviceorientation', onOrient);
+  setView(S.view==='capture'?'overview':S.view);
+}
+el('capClose').onclick=closeCapture;
+function onOrient(e){ if(e.alpha!=null){ S.capAim=Math.round(e.alpha)%360; el('capAim').value=S.capAim; } }
+el('capAim').addEventListener('input',e=>{ S.capAim=+e.target.value; });
+el('capPick').onclick=()=>{
+  const pres=S.devices.filter(d=>d.present).sort((a,b)=>b.rssi-a.rssi);
+  if(!pres.length) return toast('No devices present.');
+  const i=pres.indexOf(S.capTarget); S.capTarget=pres[(i+1)%pres.length];
+  el('capTarget').textContent='Target: '+(S.capTarget.cls==='Unknown'&&S.capTarget.identity<2?'Unknown':S.capTarget.name);
+  toast('Target set to '+S.capTarget.name);
+};
+function sizeOverlay(){ const c=el('capOverlay'),s=el('capture').querySelector('.cap-stage');
+  c.width=s.clientWidth; c.height=s.clientHeight; }
+window.addEventListener('resize',()=>{ if(!capEl.classList.contains('hidden')) sizeOverlay(); });
+
+function angDiff(a,b){ let d=Math.abs(((a-b+540)%360)-180); return d; }
+function capLoop(){
+  const c=el('capOverlay'); const ctx=c.getContext('2d'); const W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);
+  const cx=W/2, cy=H/2;
+  const t=S.capTarget;
+  let diff = t? angDiff(S.capAim, t.bearing) : 180;
+  const aligned = diff<10;
+  // confidence cone: narrower when aligned
+  const cone = Math.max(14, Math.min(90, diff)) * Math.PI/180;
+  const dir = -Math.PI/2; // cone points up (where you aim)
+  const rad = Math.min(W,H)*0.46;
+  // cone wedge
+  ctx.beginPath(); ctx.moveTo(cx,cy);
+  ctx.arc(cx,cy,rad, dir-cone/2, dir+cone/2);
+  ctx.closePath();
+  const g=ctx.createRadialGradient(cx,cy,10,cx,cy,rad);
+  const col = aligned? '74,232,138' : '74,163,255';
+  g.addColorStop(0,`rgba(${col},.28)`); g.addColorStop(1,`rgba(${col},0)`);
+  ctx.fillStyle=g; ctx.fill();
+  ctx.strokeStyle=`rgba(${col},.5)`; ctx.lineWidth=1.5; ctx.stroke();
+  // crosshair
+  ctx.strokeStyle=`rgba(${col},.9)`; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(cx,cy,26,0,Math.PI*2);
+  ctx.moveTo(cx-40,cy); ctx.lineTo(cx-10,cy); ctx.moveTo(cx+10,cy); ctx.lineTo(cx+40,cy);
+  ctx.moveTo(cx,cy-40); ctx.lineTo(cx,cy-10); ctx.moveTo(cx,cy+10); ctx.lineTo(cx,cy+40);
+  ctx.stroke();
+  // status text
+  const st=el('capStatus');
+  el('capAimVal').textContent=S.capAim+'°';
+  if(!t){ st.innerHTML='<span class="cold">Pick a device, then aim.</span>'; }
+  else if(aligned){ st.innerHTML='<span class="warm">Aligned. Lock and capture.</span>'; }
+  else if(diff<45){ st.innerHTML='<span class="warm">Warmer. Keep turning.</span>'; }
+  else { st.innerHTML='<span class="cold">Colder. Turn to find the signal.</span>'; }
+  S.capRAF=requestAnimationFrame(capLoop);
+}
+el('capShot').onclick=async ()=>{
+  const t=S.capTarget;
+  // compose frame
+  const c=document.createElement('canvas'); const stage=el('capture').querySelector('.cap-stage');
+  c.width=stage.clientWidth; c.height=stage.clientHeight; const ctx=c.getContext('2d');
+  const v=el('capVideo');
+  if(S.capStream && v.videoWidth){ ctx.drawImage(v,0,0,c.width,c.height); }
+  else { ctx.fillStyle='#070b14'; ctx.fillRect(0,0,c.width,c.height); ctx.fillStyle='#4aa3ff22';
+         for(let i=0;i<c.height;i+=22){ctx.fillRect(0,i,c.width,2);} }
+  ctx.drawImage(el('capOverlay'),0,0);
+  let geo=null;
+  try{ geo = await new Promise((res)=>navigator.geolocation.getCurrentPosition(
+      p=>res({lat:+p.coords.latitude.toFixed(5),lon:+p.coords.longitude.toFixed(5)}),()=>res(null),{timeout:2500})); }catch(e){}
+  const meta={
+    callsign: t? (t.cls==='Unknown'&&t.identity<2?'Unknown':t.name):'none',
+    deviceClass: t?t.cls:null, rssi: t?Math.round(t.rssi):null,
+    bearingEstimate: t?Math.round(t.bearing):null, aim:S.capAim,
+    distanceBand: t?band(t.rssi)[0]:null, location:geo, time:new Date().toISOString()
+  };
+  await logEvidence('capture', 'Signed capture. '+(meta.callsign)+' at '+(meta.distanceBand||'unknown band')+'.', meta);
+  toast('Capture signed and added to evidence.');
+  // offer the image
+  c.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b);
+    a.download='halo-capture-'+Date.now()+'.png'; a.click(); });
+};
+
+/* ---------- Bluetooth (use what the browser allows) ---------- */
+async function tryBluetooth(){
+  if(!navigator.bluetooth) return;
+  // continuous scan where supported (behind a flag in most browsers)
+  try{
+    if(navigator.bluetooth.requestLEScan){
+      const scan=await navigator.bluetooth.requestLEScan({acceptAllAdvertisements:true});
+      navigator.bluetooth.addEventListener('advertisementreceived', ev=>{
+        S.live=true;
+        let d=S.devices.find(x=>x.btId===ev.device.id);
+        if(!d){ d=makeDevice({rssi:ev.rssi||-80}); d.btId=ev.device.id; d.name=ev.device.name||d.name; S.devices.push(d); }
+        else { d.rssi=ev.rssi||d.rssi; d.lastSeen=Date.now(); d.present=true; }
+        render();
+      });
+    }
+  }catch(e){ /* user may decline; demo feed continues */ }
+}
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(m){ const t=el('toast'); t.textContent=m; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ---------- boot ---------- */
+function boot(){
+  seed();
+  fillTicker('trackHDCS', HDCS_FEED);
+  fillTicker('trackWTCS', WTCS_FEED);
+  recomputeBluf();
+  render();
+  setView('overview');
+  logEvidence('note','Session started. Remiel Halo active.');
+  setInterval(tick, 1600);
+  // offer real bluetooth on first interaction (requires user gesture)
+  document.addEventListener('click', function once(){ tryBluetooth(); document.removeEventListener('click',once); }, {once:true});
+}
+</script>
+</body>
+</html>
