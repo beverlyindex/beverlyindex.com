@@ -4708,6 +4708,9 @@
     border: 1px solid rgba(255,255,255,0.7); background: transparent; color: #fff;
     font: 600 13px 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer;
   }
+  .sc-tile.two-btn { align-items: flex-start; }
+  .sc-tile.two-btn .sc-tile-state { margin-top: 10px; }
+  .sc-tile-retry.sc-tile-link { bottom: 80px; border-color: rgba(255,210,77,0.8); color: #ffd24d; background: rgba(255,210,77,0.12); }
   .sc-group-note {
     margin: 14px auto 0; max-width: 420px; padding: 10px 14px; border-radius: 12px;
     background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.18);
@@ -13930,6 +13933,10 @@ const I18n = (function () {
     "magnet.saveSid": "Save this as {card}'s Sentinel ID? {name} answered your call link.",
     "magnet.save": "Save",
     "magnet.sidSaved": "Saved. Video now rings {name} directly.",
+    "magnet.saveSids": "Save Sentinel IDs for {names}? They answered your call links.",
+    "magnet.saveAll": "Save all",
+    "magnet.sidsSaved": "Saved. Video now rings {names} directly.",
+    "magnet.and": "and",
     "magnet.acceptFailed": "Could not accept right now. The request stays here; try again in a moment.",
     "magnet.requestSent": "Asked {name} to connect on Remiel Sentinel. Your message goes out as soon as they accept.",
     "magnet.awaiting": "Waiting for {name} to accept",
@@ -13990,6 +13997,10 @@ const I18n = (function () {
     "magnet.saveSid": "Salvare come Sentinel ID di {card}? {name} ha risposto al tuo link di chiamata.",
     "magnet.save": "Salva",
     "magnet.sidSaved": "Salvato. Ora Video chiama {name} direttamente.",
+    "magnet.saveSids": "Salvare i Sentinel ID di {names}? Hanno risposto ai tuoi link di chiamata.",
+    "magnet.saveAll": "Salva tutti",
+    "magnet.sidsSaved": "Salvato. Ora Video chiama {names} direttamente.",
+    "magnet.and": "e",
     "magnet.acceptFailed": "Impossibile accettare adesso. La richiesta resta qui; riprova tra poco.",
     "magnet.requestSent": "Hai chiesto a {name} di collegarsi su Remiel Sentinel. Il tuo messaggio parte appena accetta.",
     "magnet.awaiting": "In attesa che {name} accetti",
@@ -40127,8 +40138,8 @@ const SentinelCall = (function() {
     const grid = document.getElementById('scGrid');
     const tile = grid ? grid.querySelector('[data-peer="' + peerId + '"]') : null;
     if (!tile) return;
-    const old = tile.querySelector('.sc-tile-retry');
-    if (old) old.remove();
+    tile.querySelectorAll('.sc-tile-retry').forEach(x => x.remove());
+    tile.classList.remove('two-btn');
     const c = _group && _group.isHost && _group.targets ? _group.targets[peerId] : null;
     if (!c || !tile.classList.contains('gone')) return;
     const b = document.createElement('button');
@@ -40137,6 +40148,18 @@ const SentinelCall = (function() {
     b.textContent = _t('group.callAgain', 'Call again');
     b.addEventListener('click', (e) => { e.stopPropagation(); _callMember(c, true); });
     tile.appendChild(b);
+    /* Their app is closed or they did not answer: the link is one tap away */
+    const oldL = tile.querySelector('.sc-tile-link');
+    if (oldL) oldL.remove();
+    if (c.phone || c.email) {
+      const l = document.createElement('button');
+      l.type = 'button';
+      l.className = 'sc-tile-retry sc-tile-link';
+      l.textContent = _t('call.sendLink', 'Send a link');
+      l.addEventListener('click', (e) => { e.stopPropagation(); _linkInstead(peerId, c); });
+      tile.appendChild(l);
+      tile.classList.add('two-btn'); /* the reason moves to the top, clear of both buttons */
+    }
   }
   /* Under the tiles: when nobody is live or still being called, say so and
      say what to do. */
@@ -40190,7 +40213,7 @@ const SentinelCall = (function() {
           if (!ok) { _dropGroupPeer(peerId, _t('group.noMedia', 'Picture and sound could not get through')); return; }
           tile = _tileFor(peerId, entry.name, entry.contactId);
         }
-        if (tile) { tile.classList.remove('gone'); tile.classList.add('live'); const rb = tile.querySelector('.sc-tile-retry'); if (rb) rb.remove(); }
+        if (tile) { tile.classList.remove('gone'); tile.classList.add('live'); tile.classList.remove('two-btn'); tile.querySelectorAll('.sc-tile-retry').forEach(x => x.remove()); }
         if (entry.timer) { clearTimeout(entry.timer); entry.timer = null; }
         _renderGroupNote();
         const wasLive = entry.live;
@@ -40414,7 +40437,7 @@ const SentinelCall = (function() {
       if (old) { _group.peers.delete(target); if (old.timer) clearTimeout(old.timer); try { if (old.call) old.call.close(); } catch (e) {} try { if (old.conn) old.conn.close(); } catch (e) {} }
       const grid = document.getElementById('scGrid');
       const tile = grid ? grid.querySelector('[data-peer="' + target + '"]') : null;
-      if (tile) { tile.classList.remove('gone'); const rb = tile.querySelector('.sc-tile-retry'); if (rb) rb.remove(); }
+      if (tile) { tile.classList.remove('gone', 'two-btn'); tile.querySelectorAll('.sc-tile-retry').forEach(x => x.remove()); }
       _tileState(target, _t('group.calling', 'Calling'));
     }
     const meta = { room: _group.room, kind: 'group', callerName: _group.myName, callerId: _myId, viewName: _group.viewName, total: _group.total };
@@ -40485,6 +40508,13 @@ const SentinelCall = (function() {
   }
 
   async function _callGroup(view) {
+    /* Anyone in the view who already has a Remiel Sentinel account is found
+       first (one lookup, at most 4 seconds), so they are rung, not sent a link. */
+    try {
+      if (typeof Magnet !== 'undefined' && Magnet && Magnet.matchMany) {
+        await Promise.race([Magnet.matchMany(view.contactIds), new Promise(r => setTimeout(r, 4000))]);
+      }
+    } catch (e) {}
     const members = [];
     for (const id of view.contactIds) {
       let c = null;
@@ -40514,31 +40544,62 @@ const SentinelCall = (function() {
     const viewName = view.name || _t('views.type.unit', 'Unit');
     _startGroup({ room: room, hostPeer: _myPeerId(), isHost: true, viewName: viewName, total: members.length + 1, myName: myName });
     const link = _guestLink() + '&room=' + encodeURIComponent(room);
-    const memberLink = (c) => link + (c.id == null ? '' : '&m=' + encodeURIComponent(String(c.id))) + (c.first ? '&g=' + encodeURIComponent(String(c.first).trim().slice(0, 30)) : '');
+    /* Each member's link carries that card's token, so a Sentinel ID sent back
+       from it is offered for the right card after the call */
+    const tokens = {};
+    const memberLink = (c) => link + (c.id == null ? '' : '&m=' + encodeURIComponent(String(c.id))) + (c.first ? '&g=' + encodeURIComponent(String(c.first).trim().slice(0, 30)) : '')
+      + (c.id != null && tokens[String(c.id)] ? '&t=' + tokens[String(c.id)] : '');
+    _group.link = link; _group.memberLink = memberLink; _group.tokens = tokens;
     const pending = [];   /* members without a Sentinel ID whose link this device must send */
 
     for (const c of members) {
       if (!_group) return; /* hung up while a name loaded */
-      const name = _contactName(c);
       if (_isValidSid(c.sentinelId || '')) { _callMember(c, false); continue; }
-      const key = 'invite-' + String(c.id == null ? name : c.id);
-      _tileFor(key, name, c.id);
-      _group.invited[key] = { name: name, contactId: c.id == null ? null : c.id };
-      if (!c.phone && !c.email) {
-        _tileState(key, _t('group.noReach', 'No Sentinel ID, phone or email on their card'));
-        _removeTile(key);
-        continue;
-      }
-      _tileState(key, _tp('call.sendingInviteAny', 'Sending {first} the link.', { first: c.first || name }));
-      let sent = { ok: false };
-      try { sent = await _sendInviteText(c, memberLink(c), myName); } catch (e) { sent = { ok: false }; }
+      const sent = await _inviteGroupMember(c, room);
       if (!_group) return;
-      if (sent.ok) { _tileState(key, _t('group.invited', 'Link sent') + '. ' + _t('group.waitingTap', 'Waiting for the tap')); }
-      else { _tileState(key, _t('group.waitingTap', 'Waiting for the tap')); pending.push(c); }
-      /* A guest who never taps: the placeholder tile goes after the invite window */
-      setTimeout(() => { if (_group && _group.room === room && _group.invited[key]) { delete _group.invited[key]; _tileState(key, _t('group.noAnswer', 'No answer')); _removeTile(key); } }, _AWAIT_GUEST_MS);
+      if (sent === false) pending.push(c);
     }
     if (pending.length && _group) _offerGroupManualInvite(pending, link, memberLink, myName, viewName);
+  }
+
+  /* Host: send one member the room link and hold a placeholder tile for them.
+     Resolves true when the text or email went out, false when this device
+     must send it, null when the person cannot be reached at all. */
+  async function _inviteGroupMember(c, room) {
+    const g = _group;
+    if (!g || !g.isHost) return null;
+    const name = _contactName(c);
+    const key = 'invite-' + String(c.id == null ? name : c.id);
+    _tileFor(key, name, c.id);
+    g.invited[key] = { name: name, contactId: c.id == null ? null : c.id };
+    if (!c.phone && !c.email) {
+      _tileState(key, _t('group.noReach', 'No Sentinel ID, phone or email on their card'));
+      _removeTile(key);
+      return null;
+    }
+    _tileState(key, _tp('call.sendingInviteAny', 'Sending {first} the link.', { first: c.first || name }));
+    if (c.id != null && !g.tokens[String(c.id)]) { try { g.tokens[String(c.id)] = await _inviteToken(c); } catch (e) {} }
+    if (_group !== g) return null;
+    let sent = { ok: false };
+    try { sent = await _sendInviteText(c, g.memberLink(c), g.myName); } catch (e) { sent = { ok: false }; }
+    if (_group !== g) return null;
+    if (sent.ok) _tileState(key, _t('group.invited', 'Link sent') + '. ' + _t('group.waitingTap', 'Waiting for the tap'));
+    else _tileState(key, _t('group.waitingTap', 'Waiting for the tap'));
+    /* A guest who never taps: the placeholder tile goes after the invite window */
+    setTimeout(() => { if (_group === g && g.room === room && g.invited[key]) { delete g.invited[key]; _tileState(key, _t('group.noAnswer', 'No answer')); _removeTile(key); } }, _AWAIT_GUEST_MS);
+    return !!sent.ok;
+  }
+  /* Host: a member with a Sentinel ID who could not be rung gets the link instead */
+  async function _linkInstead(peerId, c) {
+    const g = _group;
+    if (!g || !g.isHost) return;
+    const old = g.peers.get(peerId);
+    if (old) { g.peers.delete(peerId); if (old.timer) clearTimeout(old.timer); try { if (old.call) old.call.close(); } catch (e) {} try { if (old.conn) old.conn.close(); } catch (e) {} }
+    delete g.targets[peerId];
+    _deleteTile(peerId);
+    const sent = await _inviteGroupMember(c, g.room);
+    if (_group === g && sent === false) _offerGroupManualInvite([c], g.link, g.memberLink, g.myName, g.viewName);
+    _renderGroupNote();
   }
 
   function _offerGroupManualInvite(pending, link, memberLink, myName, viewName) {
@@ -41108,7 +41169,7 @@ const SentinelCall = (function() {
       const _gb = document.getElementById('scGuestJoinBtn');
       const _gi = document.getElementById('scGuestName');
       /* After a call that connected, the card says so instead of "is calling you" */
-      const ended = _guestConnected && !_currentCall;
+      const ended = _guestConnected && !_currentCall && !_group;
       if (_gt) _gt.textContent = ended ? _t('guest.endedTitle', 'Call ended')
         : (_guestHostName ? _tp('guest.callingYou', '{name} is calling you', { name: _guestHostName }) : _t('guest.title', 'Video Call'));
       if (_gs) _gs.textContent = ended ? '' : _t('guest.sub', 'Enter your name to join the call');
@@ -41254,6 +41315,8 @@ const SentinelCall = (function() {
         /* Group room: the host answers, sends the roster, and this guest
            calls the other participants itself. */
         guestPeer.on('call', (c) => { if (!_onGroupCall(c)) { try { c.close(); } catch (e) {} } });
+        /* Picture and sound from the host: a signed-in person's Sentinel ID goes back */
+        call.on('stream', () => { if (!_guestConnected) { _guestConnected = true; _guestShareId(); } });
         _startGroup({ room: _guestRoom, hostPeer: remotePeerId, isHost: false, viewName: '', total: 0, myName: name, onLeave: destroyGuest });
         _addGroupPeer(remotePeerId, call, _guestTargetId, null);
         let conn = null;
@@ -41288,7 +41351,7 @@ const SentinelCall = (function() {
      sends it. Either way the caller confirms before it is saved on a card. */
   function _guestHostLabel() { return _guestHostName || _t('guest.theCaller', 'the caller'); }
   async function _guestShareId() {
-    if (_guestShared !== null || _guestRoom || !_signedIn()) return _guestShared;
+    if (_guestShared !== null || !_signedIn()) return _guestShared;
     if (typeof Magnet === 'undefined' || !Magnet || !Magnet.linkFromCall) return null;
     if (!_isValidSid(_guestTargetId || '') || String(_guestTargetId).toUpperCase() === String(_myId || '').toUpperCase()) return null;
     _guestShared = 'failed';
@@ -41300,7 +41363,7 @@ const SentinelCall = (function() {
   function _guestAfterCall() {
     const box = document.getElementById('scGuestAfter');
     if (!box) return;
-    if (!_guestConnected || _guestRoom) { box.hidden = true; return; }
+    if (!_guestConnected) { box.hidden = true; return; }
     const st = document.getElementById('scGuestStatus');
     if (st) st.textContent = '';
     try { if (_guestRelabel) _guestRelabel(); } catch (e) {}
@@ -41763,7 +41826,8 @@ var Magnet = (function () {
     opts = opts || {};
     if (!_authed()) return { skipped: 'auth', found: [] };
     var list = _contacts().filter(function (c) {
-      return !_validSid(c.sentinelId || '') && canFind(c) && (opts.contactId == null || String(c.id) === String(opts.contactId));
+      return !_validSid(c.sentinelId || '') && canFind(c) && (opts.contactId == null || String(c.id) === String(opts.contactId))
+        && (!opts.contactIds || opts.contactIds.indexOf(String(c.id)) !== -1);
     });
     var byHash = {};
     for (var i = 0; i < list.length; i++) {
@@ -41818,6 +41882,17 @@ var Magnet = (function () {
     if (!c || _validSid(c.sentinelId || '') || !canFind(c) || !_authed()) return false;
     var r = await matchContacts({ contactId: c.id, force: true }).catch(function () { return { found: [] }; });
     return (r.found || []).some(function (x) { return x.id === c.id; });
+  }
+
+  /* A Unit or Team about to be called: one lookup for every member with a
+     phone or email and no Sentinel ID. Resolves with how many were found. */
+  async function matchMany(ids) {
+    if (!_authed() || !Array.isArray(ids) || !ids.length) return 0;
+    var want = ids.map(String);
+    var need = _contacts().some(function (c) { return want.indexOf(String(c.id)) !== -1 && !_validSid(c.sentinelId || '') && canFind(c); });
+    if (!need) return 0;
+    var r = await matchContacts({ contactIds: want, force: true }).catch(function () { return { found: [] }; });
+    return (r.found || []).length;
   }
 
   /* "Find them" on the Sentinel ID banner */
@@ -41984,14 +42059,14 @@ var Magnet = (function () {
     return c;
   }
 
-  async function accept(req) {
+  async function accept(req, quiet) {
     hidePrompt();
     var party = req.other;
     if (req.id) {
       var me = await _myNames();
       var res;
       try { res = await SyncEngine.apiFetch('/link/' + encodeURIComponent(req.id) + '/accept', { method: 'PUT', body: JSON.stringify(me) }); } catch (e) { res = null; }
-      if (!res || !res.ok) { showToast(_t('magnet.acceptFailed')); return null; }
+      if (!res || !res.ok) { if (!quiet) showToast(_t('magnet.acceptFailed')); return null; }
       var data = await res.json().catch(function () { return {}; });
       party = data.from || party;
     }
@@ -42004,7 +42079,7 @@ var Magnet = (function () {
       if (card && req.invite_token) {
         try { delete _inviteMap[req.invite_token]; await RemielDB.putSetting(INVITE_KEY, _inviteMap); } catch (e) {}
       }
-      showToast(card ? _t('magnet.sidSaved', { name: _name(c) }) : _t('magnet.accepted', { name: _name(c) }));
+      if (!quiet) showToast(card ? _t('magnet.sidSaved', { name: _name(c) }) : _t('magnet.accepted', { name: _name(c) }));
       try { SentinelMessaging.flushAwaiting(c.id); } catch (e) {}
       try { SentinelMessaging.poll(); } catch (e) {}
       refreshPresence();
@@ -42071,10 +42146,70 @@ var Magnet = (function () {
     document.body.appendChild(el);
     try { if (typeof A11y !== 'undefined') A11y.announce(txt.textContent, 'assertive'); } catch (e) {}
   }
+  /* Sentinel IDs that came back on my call links and are waiting for my tap */
+  function _inviteWaiting() {
+    return _pending.filter(function (p) { return !_dismissed.has('r' + p.id) && _inviteCard(p); });
+  }
   function _showNextPrompt() {
     var busy = _callBusy();
+    /* Several at once (a Unit or Team call): one question with Save all */
+    var inv = busy ? [] : _inviteWaiting();
+    if (inv.length >= 2) { showBatchPrompt(inv); return; }
     var next = _pending.find(function (p) { return !_dismissed.has('r' + p.id) && !(busy && _inviteCard(p)); });
     if (next) showPrompt(next);
+  }
+  function _joinNames(names) {
+    if (names.length <= 1) return names.join('');
+    return names.slice(0, -1).join(', ') + ' ' + _t('magnet.and') + ' ' + names[names.length - 1];
+  }
+  function showBatchPrompt(reqs) {
+    var key = 'batch:' + reqs.map(function (r) { return r.id; }).join(',');
+    if (_promptFor === key) return;
+    hidePrompt();
+    _promptFor = key;
+    var names = reqs.map(function (r) { return _name(_inviteCard(r)); });
+    var el = document.createElement('div');
+    el.id = 'magnetPrompt';
+    el.className = 'magnet-prompt';
+    el.setAttribute('role', 'alertdialog');
+    el.setAttribute('aria-live', 'assertive');
+    el.setAttribute('data-adv-scope', '');
+    el.setAttribute('data-invite', String(reqs.length));
+    var av = document.createElement('div');
+    av.className = 'magnet-prompt-av';
+    av.textContent = String(reqs.length);
+    var txt = document.createElement('div');
+    txt.className = 'magnet-prompt-text';
+    txt.textContent = _t('magnet.saveSids', { names: _joinNames(names) });
+    var row = document.createElement('div');
+    row.className = 'magnet-prompt-row';
+    var ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'magnet-accept btn-lit btn-advance'; ok.textContent = _t('magnet.saveAll');
+    ok.addEventListener('click', function () { acceptAll(reqs); });
+    var later = document.createElement('button');
+    later.type = 'button'; later.className = 'magnet-later'; later.textContent = _t('magnet.notNow');
+    later.addEventListener('click', function () {
+      reqs.forEach(function (r) { _dismissed.add('r' + r.id); });
+      hidePrompt();
+      setTimeout(_showNextPrompt, 300);
+    });
+    row.appendChild(ok); row.appendChild(later);
+    el.appendChild(av); el.appendChild(txt); el.appendChild(row);
+    document.body.appendChild(el);
+    try { if (typeof A11y !== 'undefined') A11y.announce(txt.textContent, 'assertive'); } catch (e) {}
+  }
+  async function acceptAll(reqs) {
+    hidePrompt();
+    var saved = [], failed = 0;
+    for (var i = 0; i < reqs.length; i++) {
+      var c = null;
+      try { c = await accept(reqs[i], true); } catch (e) { c = null; }
+      if (c) saved.push(_name(c)); else { failed++; _dismissed.add('r' + reqs[i].id); }
+    }
+    if (saved.length) showToast(_t('magnet.sidsSaved', { names: _joinNames(saved) }));
+    else if (failed) showToast(_t('magnet.acceptFailed'));
+    setTimeout(_showNextPrompt, 300);
+    return saved.length;
   }
   /* An unknown sender goes through the same Accept prompt */
   function promptUnknown(sid, label) {
@@ -42096,7 +42231,8 @@ var Magnet = (function () {
         _pending = (data.requests || []).filter(function (r) { return r.other && _validSid(r.other.sentinel_id || ''); });
         /* Already linked on this device (accepted elsewhere): nothing to ask */
         _pending = _pending.filter(function (r) { var c = _bySid(r.other.sentinel_id); return !(c && c.linkState === 'accepted'); });
-        if (!document.getElementById('magnetPrompt')) _showNextPrompt();
+        var open = document.getElementById('magnetPrompt');
+        if (!open || (open.getAttribute('data-invite') && !_callBusy() && _inviteWaiting().length >= 2)) _showNextPrompt();
       }
       var since = 0;
       try { since = (await RemielDB.getSetting(CURSOR_KEY)) || 0; } catch (e) {}
@@ -42270,7 +42406,7 @@ var Magnet = (function () {
   return {
     normPhone: normPhone, normEmail: normEmail, sha256: sha256,
     isOnRs: isOnRs, isLinked: isLinked, needsLink: needsLink, isOnline: isOnline, canFind: canFind,
-    matchContacts: matchContacts, matchOne: matchOne, schedule: schedule, findFor: findFor, explainOnce: explainOnce,
+    matchContacts: matchContacts, matchOne: matchOne, matchMany: matchMany, schedule: schedule, findFor: findFor, explainOnce: explainOnce,
     requestLink: requestLink, linkFromCall: linkFromCall, accept: accept, answered: answered, poll: poll, promptUnknown: promptUnknown, hidePrompt: hidePrompt,
     ping: ping, refreshPresence: refreshPresence, drawBadges: drawBadges, badgeHtml: badgeHtml,
     renderAccount: renderAccount, setDiscoverable: setDiscoverable, savePhone: savePhone,
