@@ -130,6 +130,28 @@ select.inp{flex:none}
   display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .card h3 .n{color:var(--mut);font-weight:400;letter-spacing:.06em}
 .sub{color:var(--mut);font-size:13.5px;line-height:1.5;margin:0 0 12px}
+#mapFull{position:fixed;inset:0;z-index:70;background:#070b16}
+#mapFull > .mf-map,#mapFull > .mf-map.maplibregl-map{position:absolute;inset:0}
+.mf-top{position:absolute;left:0;right:0;top:0;z-index:3;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;background:linear-gradient(180deg,rgba(7,11,22,.94),rgba(7,11,22,0));pointer-events:none}
+.mf-top > *{pointer-events:auto}
+.mf-top b{font-family:var(--disp);letter-spacing:.06em;font-size:15px}
+.mf-top .mf-pos{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--mut);text-align:right;line-height:1.35;pointer-events:none}
+.mf-ctl{position:absolute;right:12px;top:calc(64px + env(safe-area-inset-top));z-index:3;display:flex;flex-direction:column;gap:8px}
+.mf-ctl button{width:46px;height:46px;border-radius:12px;border:1px solid var(--line2);background:rgba(10,16,32,.92);color:var(--ink);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.mf-ctl button.on{border-color:var(--watch);color:#9fc4ff;box-shadow:0 0 14px -4px var(--watch)}
+.mf-ctl button small{font-size:10px;font-family:var(--mono);letter-spacing:.06em}
+.mf-sheet{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:10px 12px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(0deg,rgba(7,11,22,.97) 62%,rgba(7,11,22,0))}
+.mf-sum{font-size:12.5px;color:var(--mut);margin:14px 0 8px;line-height:1.4}
+.mf-sum b{color:var(--ink)}
+.mf-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.mf-chip{flex:none;max-width:220px;border:1px solid var(--line2);border-left:3px solid var(--hc);border-radius:10px;background:rgba(10,16,32,.94);padding:7px 10px;font-size:12.5px;line-height:1.35;text-align:left;color:var(--ink)}
+.mf-chip.sel{background:rgba(40,70,140,.55);border-color:var(--watch)}
+.mf-chip span{display:block;font-family:var(--mono);font-size:10.5px;color:var(--mut)}
+.mf-info{border:1px solid var(--line2);border-radius:12px;background:rgba(10,16,32,.96);padding:10px 12px;margin-bottom:8px;font-size:13px;line-height:1.45}
+.mf-info .formrow{margin-top:8px}
+#mapFull .maplibregl-ctrl-bottom-left{bottom:150px}
+.you-dot .cone{position:absolute;left:50%;top:50%;width:0;height:0;margin:-34px 0 0 -13px;border-left:13px solid transparent;border-right:13px solid transparent;border-bottom:30px solid rgba(79,141,240,.42);transform-origin:13px 34px;pointer-events:none}
+.you-dot .cone.off{display:none}
 #report{position:fixed;inset:0;z-index:90;background:#e9e6df;overflow:auto;color:#1A1A2E;-webkit-overflow-scrolling:touch}
 .rp-bar{position:sticky;top:0;display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:10px 14px;background:#1A1A2E;z-index:2}
 .rp-bar span{margin-right:auto;color:#C5A55A;font-family:Georgia,serif;font-size:14px}
@@ -595,6 +617,7 @@ a.tk:hover b{text-decoration:underline}
                     <span class="sph-lab">Identification</span>
                   </div>
                 </div>
+                <div class="formrow" style="justify-content:center;margin-top:8px"><button class="btn sm primary" data-act="map-full">Open the full map</button></div>
                 <div id="walkBox"></div>
                 <div class="map-note" id="mapNote">Loading the map.</div>
                 <div class="macroline" id="macroLine"></div>
@@ -672,6 +695,10 @@ a.tk:hover b{text-decoration:underline}
 </div>
 
 <!-- ============ TERMS OF USE ============ -->
+<div id="mapFull" class="hidden"><div class="mf-map" id="mfMap"></div>
+  <div class="mf-top"><button class="btn sm" data-act="mf-close">&#8249; Back</button><b>Map</b><span class="mf-pos" id="mfPos"></span></div>
+  <div class="mf-ctl"><button data-act="mf-follow" id="mfFollow" class="on" title="Keep me in the centre">&#9678;</button><button data-act="mf-north" id="mfNorth" title="North up, or the way I face up"><small>N UP</small></button><button data-act="mf-zin" title="Closer">+</button><button data-act="mf-zout" title="Wider">&minus;</button></div>
+  <div class="mf-sheet"><div id="mfInfo"></div><div class="mf-sum" id="mfSum"></div><div class="mf-chips" id="mfChips"></div></div></div>
 <div id="report" class="hidden"><div class="rp-bar"><span id="rpTitle">Remiel Halo Full Report</span><button class="btn sm gold" data-act="report-print">Print or save as PDF</button><button class="btn sm" data-act="report-close">Close</button></div><div class="rp-paper" id="rpPaper"></div></div>
 <div id="terms" class="hidden">
   <div class="terms-card">
@@ -1595,7 +1622,7 @@ function viewRadius(){
 const inRadius = () => { const rs=radiusState(); return vis().devices.filter(d=>d.present && d.dist<=rs.r); };
 const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Math.round(d.dist)+' m';
 const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';          // placed, direction rough, or direction not known
-const dirNote = d => !d.live||d.fix ? '' : d.sector ? 'direction rough' : 'direction not known';
+const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'direction rough, '+whereWords(d) : 'direction not known';
 function renderVicinity(){
   const V=vis(), shown=V.mode==='live'||V.mode==='sim', rs=radiusState(), blocks=rs.r/BLOCK_M, sus=shown?inRadius():[];
   const pb=el('prevBtn'); pb.style.display = V.mode==='live' ? 'none' : ''; pb.textContent = S.preview ? 'Hide simulated preview' : 'Preview with simulated devices';
@@ -1972,13 +1999,14 @@ function placeMarkers(map, store, list, extra){
     if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
       e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
     else{ const m=document.createElement('div'); m.className=cls; m.style.setProperty('--mk',markerColor(d)); m.title=tip;
-      m.addEventListener('click',ev=>{ ev.stopPropagation(); selectDevice(d.id); }); store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); } });
+      m.addEventListener('click',ev=>{ ev.stopPropagation(); if(map===FULL){ MF.sel=d.id; mapFullTick(false); } else selectDevice(d.id); }); store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); } });
 }
 // Your own position. It feeds the placement of devices, so it does not wait for, or depend on, the map.
 let _geoOn=false;
 function geoFix(p){
   const la=p.coords.latitude, lo=p.coords.longitude;
   S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; trackPush(la, lo, p.coords.accuracy); walkPos();
+  if(typeof p.coords.heading==='number' && !isNaN(p.coords.heading) && p.coords.speed>0.8){ HEAD.gps=p.coords.heading; HEAD.gt=Date.now(); }
   if(MAP && MAP_CENTER){ const moved=Math.hypot((la-MAP_CENTER.lat)*111320, (lo-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
     if(!_centred || moved>6){ _centred=true; recentre(la, lo); } }      // ignore position jitter under 6 metres
   if(S.view==='overview'||S.view==='watchers') renderVicinity();
@@ -2091,7 +2119,7 @@ async function identSave(){
   g.fillStyle='#7f8bab'; g.font='14px system-ui, sans-serif';
   g.fillText('The name is a call sign given by Halo. It is not a person\'s name.', cx, 926);
   g.fillText('Saved '+new Date().toLocaleString()+'  ·  Beverly Index LLC', cx, 946);
-  c.toBlob(b=>{ if(!b) return toast('The card could not be saved.'); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='halo-'+devName(d).toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  c.toBlob(b=>{ if(!b) return toast('The card could not be saved.'); saveOut('halo-'+devName(d).toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.png','image/png',b);
     if(d.live && !d.sim) logEvidence('note','Identity card saved for '+d.name+' ('+d.id+').'); toast('Identity card saved.'); }, 'image/png');
 }
 function updateDeviceMarkers(){
@@ -2230,7 +2258,7 @@ el('capShot').onclick=async ()=>{
   ctx.drawImage(el('capOverlay'),0,0);
   if(t && t.live && !t.sim){ await logEvidence('capture','Capture of '+capName(t)+' ('+t.cls+'), '+distText(t)+'. Camera frame taken at '+new Date().toLocaleTimeString()+'.',{aim:S.capAim,sig:t.sig}); toast('Capture added to Evidence.'); }
   else toast('Capture saved to this device. Simulated and test targets are not added to Evidence.');
-  c.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='halo-capture-'+Date.now()+'.png'; a.click(); });
+  c.toBlob(b=>{ if(b) saveOut('halo-capture-'+Date.now()+'.png','image/png',b); });
 };
 
 /* ---------- Halo account: sign-in, device linking and encrypted sync ----------
@@ -2463,6 +2491,99 @@ function syncLine(){ const n=SY.devices.length;
     : SY.status==='offline' ? (SY.msg||'Backend not reached. Working on this device only')
     : SY.status==='out' ? (SY.msg||'Signed out')
     : SY.status==='off' ? SY.msg : 'Starting'; }
+/* ---------- Which way you face. A phone's compass when you stand still, the direction of travel when you walk.
+   It turns a compass bearing into words a person can act on: ahead, to your right, behind. ---------- */
+const HEAD={compass:null, gps:null, t:0};
+const heading = () => (HEAD.gps!=null && Date.now()-HEAD.gt<6000) ? HEAD.gps : (HEAD.compass!=null && Date.now()-HEAD.t<4000) ? HEAD.compass : null;
+function headInit(){ if(HEAD.on) return; HEAD.on=true;
+  const onAbs=e=>{ let h=null;
+    if(typeof e.webkitCompassHeading==='number') h=e.webkitCompassHeading;
+    else if(e.absolute && typeof e.alpha==='number') h=(360-e.alpha)%360;
+    if(h==null) return; const so=(screen.orientation&&screen.orientation.angle)||0;
+    HEAD.compass=(h+so+360)%360; HEAD.t=Date.now(); };
+  window.addEventListener('deviceorientationabsolute', onAbs, true); window.addEventListener('deviceorientation', onAbs, true); }
+function headAsk(){ try{ if(window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) DeviceOrientationEvent.requestPermission().then(()=>headInit()).catch(()=>{}); else headInit(); }catch(e){ headInit(); } }
+// A bearing as seen from the person: "ahead", "ahead, to your right", "to your left", "behind".
+function relWords(brg){ const h=heading(); if(h==null || brg==null) return '';
+  const r=((brg-h+540)%360)-180, a=Math.abs(r), side=r>0?'right':'left';
+  return a<=25?'ahead':a<=65?'ahead, to your '+side:a<=115?'to your '+side:a<=155?'behind, to your '+side:'behind'; }
+const whereWords = d => d.bearing==null ? '' : (relWords(d.bearing) || compass(d.bearing));
+
+/* ---------- The full map. Both spheres stay small and still; this one fills the screen, can be moved and zoomed,
+   follows you, and can turn so that the way you face is up. It draws only what Halo can place. ---------- */
+let FULL=null, FULL_YOU=null, FULL_HOME=null; const FULL_MARKERS={}; const MF={follow:true, headUp:false, sel:null, timer:0};
+const mfRingSteps=[25,50,100,200];
+function mfData(){ const f=[], g=gz(); if(!g) return {type:'FeatureCollection',features:f};
+  if(S.pos) f.push({type:'Feature',properties:{kind:'acc'},geometry:{type:'Polygon',coordinates:[circlePoly(g.lat,g.lon,Math.max(3,Math.min(150,S.pos.acc)))]}});
+  mfRingSteps.forEach(r=>f.push({type:'Feature',properties:{kind:'ring'},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,r)}}));
+  if(TRACK.length>1){ const step=Math.max(1,Math.floor(TRACK.length/600)), pts=[]; for(let i=0;i<TRACK.length;i+=step){ const q=toLL(TRACK[i].x,TRACK[i].y); pts.push([q.lon,q.lat]); }
+    const q=toLL(TRACK[TRACK.length-1].x,TRACK[TRACK.length-1].y); pts.push([q.lon,q.lat]); f.push({type:'Feature',properties:{kind:'track'},geometry:{type:'LineString',coordinates:pts}}); }
+  if(W.route && W.route.length>1 && (W.on || !W.closed)) f.push({type:'Feature',properties:{kind:'walk'},geometry:{type:'LineString',coordinates:W.route.map(q=>[q.lon,q.lat])}});
+  const V=vis(); if(V.mode==='live'||V.mode==='sim') V.devices.filter(d=>d.present!==false).forEach(d=>{
+    if(d.fix) f.push({type:'Feature',properties:{kind:'zone'},geometry:{type:'Polygon',coordinates:[circlePoly(d.fix.lat,d.fix.lon,d.fix.unc)]}});
+    else if(d.sector) f.push({type:'Feature',properties:{kind:'arc'},geometry:{type:'LineString',coordinates:arcLine(g.lat,g.lon,d.dist,d.sector.brg-d.sector.half,d.sector.brg+d.sector.half)}});
+    else if(d.id===MF.sel) f.push({type:'Feature',properties:{kind:'range'},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,d.dist)}}); });
+  heardDevs().forEach(d=>d.samples.forEach(sm=>{ const q=toLL(sm.x,sm.y); f.push({type:'Feature',properties:{kind:'heard',c:d.withYou?'#ff5a5a':'#2dd4ea'},geometry:{type:'Point',coordinates:[q.lon,q.lat]}}); }));
+  return {type:'FeatureCollection',features:f}; }
+// The ring labels live in their own source. Lettering needs a download, and a failed download must not take the rings and your route down with it.
+const mfLabels = () => { const g=gz(); return {type:'FeatureCollection',features:g?mfRingSteps.map(r=>({type:'Feature',properties:{t:r+' m'},geometry:{type:'Point',coordinates:[g.lon, g.lat+r/111320]}})):[]}; };
+const mfDevices = () => { const V=vis(); return (V.mode==='live'||V.mode==='sim') ? V.devices.filter(d=>d.present!==false && (V.mode==='sim'||!d.atHome)).sort(bySeverity) : []; };
+async function mapFullOpen(){
+  el('mapFull').classList.remove('hidden'); S.mapFull=true; NAVN++; try{ history.pushState(navSnap('map'),''); }catch(e){}
+  headAsk(); startGeo();
+  if(!FULL){ const ok=await loadMapLibre(); if(!ok){ setHTML(el('mfSum'),'The map needs a connection.'); return; }
+    await probeVector(); const g=gz()||{lat:34.0522,lon:-118.2437};
+    FULL=new window.maplibregl.Map({container:el('mfMap'), style:mapStyle(!!gz()), center:[g.lon,g.lat], zoom:17.2, attributionControl:false, fadeDuration:0, dragRotate:false, pitchWithRotate:false, touchPitch:false, maxZoom:20.5, minZoom:3});
+    FULL.addControl(new window.maplibregl.ScaleControl({maxWidth:110, unit:'metric'}), 'bottom-left');
+    FULL.on('dragstart',()=>{ MF.follow=false; el('mfFollow').classList.remove('on'); });
+    FULL.on('error', e=>{ S.mfErr=String((e&&e.error&&(e.error.message||e.error))||'map error').slice(0,200); });
+    FULL.once('style.load',()=>{
+      FULL.addSource('mf',{type:'geojson',data:mfData()});
+      const L=(id,type,kind,paint,layout)=>FULL.addLayer({id,type,source:'mf',filter:['==',['get','kind'],kind],paint,layout:layout||{}});
+      L('mf-acc','fill','acc',{'fill-color':'#3f74d6','fill-opacity':.14});
+      L('mf-ring','line','ring',{'line-color':'#8fb4ff','line-width':1,'line-opacity':.45,'line-dasharray':[2,3]});
+      L('mf-walk','line','walk',{'line-color':'#e7c45a','line-width':3,'line-opacity':.85},{'line-cap':'round','line-join':'round'});
+      L('mf-track','line','track',{'line-color':'#9fc4ff','line-width':3,'line-opacity':.9},{'line-cap':'round','line-join':'round'});
+      L('mf-zone','fill','zone',{'fill-color':'#e8a84a','fill-opacity':.14});
+      L('mf-zone-l','line','zone',{'line-color':'#e8a84a','line-width':1.2,'line-opacity':.7});
+      L('mf-arc','line','arc',{'line-color':'#e8a84a','line-width':2.5,'line-opacity':.85});
+      L('mf-range','line','range',{'line-color':'#dfe8ff','line-width':1.2,'line-opacity':.7,'line-dasharray':[1.5,2.5]});
+      FULL.addLayer({id:'mf-heard',type:'circle',source:'mf',filter:['==',['get','kind'],'heard'],paint:{'circle-radius':4,'circle-color':['get','c'],'circle-opacity':.85,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
+      if(VEC){ FULL.addSource('mfl',{type:'geojson',data:mfLabels()}); FULL.addLayer({id:'mf-ringlab',type:'symbol',source:'mfl',layout:{'text-field':['get','t'],'text-font':['Noto Sans Regular'],'text-size':10.5,'text-allow-overlap':true},paint:{'text-color':'#b9cdf5','text-halo-color':'#070b16','text-halo-width':1.4}}); }
+      const e=document.createElement('div'); e.className='you-dot'; e.innerHTML='<span class="cone off"></span>'; FULL_YOU=new window.maplibregl.Marker({element:e}).setLngLat([g.lon,g.lat]).addTo(FULL);
+      mapFullTick(true); });
+  } else setTimeout(()=>{ try{ FULL.resize(); }catch(e){} mapFullTick(true); },60);
+  clearInterval(MF.timer); MF.timer=setInterval(()=>mapFullTick(false), 1000);
+}
+function mapFullClose(viaBack){ if(!S.mapFull) return; S.mapFull=false; clearInterval(MF.timer); el('mapFull').classList.add('hidden'); if(!viaBack){ try{ history.back(); }catch(e){} } }
+function mapFullTick(force){
+  if(!S.mapFull || !FULL) return; const g=gz(), h=heading(), devs=mfDevices();
+  baseShow(FULL, !!g);
+  try{ const src=FULL.getSource('mf'); if(src) src.setData(mfData()); const sl=FULL.getSource('mfl'); if(sl) sl.setData(mfLabels()); }catch(e){}
+  if(g && FULL_YOU){ FULL_YOU.setLngLat([g.lon,g.lat]); const c=FULL_YOU.getElement().querySelector('.cone');
+    if(c){ c.classList.toggle('off', h==null); if(h!=null) c.style.transform='rotate('+(h-FULL.getBearing())+'deg)'; } }
+  const hm=P.home&&P.home.loc; if(okLL(hm)){ if(!FULL_HOME){ const e=document.createElement('div'); e.className='home-dot'; e.title='Home'; FULL_HOME=new window.maplibregl.Marker({element:e}).setLngLat([hm.lon,hm.lat]).addTo(FULL); } else FULL_HOME.setLngLat([hm.lon,hm.lat]); }
+  else if(FULL_HOME){ FULL_HOME.remove(); FULL_HOME=null; }
+  const save=MAP_CENTER; if(g) MAP_CENTER={lat:g.lat,lon:g.lon};                 // direction-only devices are drawn from where you are now
+  placeMarkers(FULL, FULL_MARKERS, g?devs.filter(d=>!noDir(d)):[], '');
+  Object.keys(FULL_MARKERS).forEach(id=>FULL_MARKERS[id].getElement().classList.toggle('sel', id===MF.sel));
+  MAP_CENTER=save;
+  if(g && MF.follow){ const o={center:[g.lon,g.lat], duration:force?0:600}; if(MF.headUp && h!=null) o.bearing=h; try{ FULL.easeTo(o); }catch(e){} }
+  else if(MF.headUp && h!=null){ try{ FULL.rotateTo(h,{duration:600}); }catch(e){} }
+  // words
+  setHTML(el('mfPos'), g ? (S.pos?'Position within '+Math.round(S.pos.acc)+' m':'Saved home location')+(h!=null?'<br>Facing '+compass(h):'') : 'No position');
+  const placed=devs.filter(d=>d.fix).length, rough=devs.filter(d=>!d.fix&&d.sector).length, nd=devs.filter(noDir).length, wy=devs.filter(d=>d.withYou).length, V=vis();
+  setHTML(el('mfSum'), !g ? '<b>The map needs your position.</b> <button class="btn sm primary" data-act="geo-ask" style="margin-left:6px">Share my position</button>'
+    : !(V.mode==='live'||V.mode==='sim') ? '<b>'+esc(stateWords(V.mode).count)+'.</b> Unknown, not Clear.'
+    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' no direction yet':'')+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
+  const chips=devs.slice(0,24).map(d=>{ const th=deviceThreat(d); return '<button class="mf-chip'+(MF.sel===d.id?' sel':'')+'" data-act="mf-dev" data-id="'+d.id+'" style="--hc:var('+TIER_VAR[th.tierIdx]+')">'+esc(devName(d))+'<span>'+esc(distText(d))+(d.bearing!=null?' · '+esc(whereWords(d)):' · no direction yet')+'</span></button>'; }).join('');
+  const ch=el('mfChips'); if(ch._h!==chips){ ch.innerHTML=chips; ch._h=chips; }
+  const sd=MF.sel && devs.find(d=>d.id===MF.sel);
+  setHTML(el('mfInfo'), sd ? '<div class="mf-info"><b>'+esc(devName(sd))+'</b> · '+esc(kindText(sd))+'<br>'+esc(distText(sd))+(sd.bearing!=null?', '+esc(whereWords(sd))+(heading()!=null?' ('+esc(compass(sd.bearing))+')':''):'. Direction not known yet: walk, and make a turn')+
+      (sd.fix?' · placed within '+Math.round(sd.fix.unc)+' m':sd.sector?' · direction only':'')+' · '+esc(flagOf(sd))+
+      '<div class="formrow"><button class="btn sm primary" data-act="mf-ident" data-id="'+sd.id+'">Identify</button><button class="btn sm" data-act="mf-dev" data-id="">Close</button></div></div>' : '');
+}
+
 /* ---------- Full Report: every current threat, explained, in one document. It follows the order of the NOUS Full Clinical Report:
    summary first, then the reason and scope, the findings, the detail behind the bottom line, every threat in the register,
    the risk assessment, the defence plan, the advisory, tracking over time, and the limits. ---------- */
@@ -2774,9 +2895,15 @@ function healthPull(){
   return h+'</div>';
 }
 
+// A file for the user. In a browser it downloads. In the Halo Android app it is written to Downloads, or handed to the share sheet.
+function saveOut(name, mime, data, share){
+  const N=NATIVE(), blob=(data instanceof Blob)?data:new Blob([data],{type:mime});
+  if(!N){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); return Promise.resolve(true); }
+  return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>{ const b64=String(fr.result).split(',')[1]||''; try{ share?N.shareFile(name,mime,b64):N.saveFile(name,mime,b64); res(true); }catch(e){ res(false); } }; fr.onerror=()=>res(false); fr.readAsDataURL(blob); }); }
+
 /* ---------- Install: Halo on the home screen, opening full screen like an app ---------- */
 let INSTALL=null;
-const installed = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
+const installed = () => !!NATIVE() || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
 const isAndroid = () => /Android/i.test(navigator.userAgent), isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Mac/.test(navigator.platform||'') && 'ontouchend' in document);
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); INSTALL=e; if(booted) rerender(); });
 window.addEventListener('appinstalled', ()=>{ INSTALL=null; S.justInstalled=true; if(booted){ toast('Halo is installed. Open it from your home screen.'); rerender(); } });
@@ -2784,6 +2911,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:' || /[?&]sw=1/.t
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
 function installSection(){
   let h='<div class="dsec" id="installSec"><h4>Install Halo on this device</h4>';
+  if(NATIVE()){ let v=''; try{ v=NATIVE().version(); }catch(e){} return h+'<div class="kv"><span class="k">Halo Android app</span><span class="v okc">Version '+esc(v)+'. The phone itself is the sensor</span></div></div>'; }
   if(installed()) return h+'<div class="kv"><span class="k">Installed</span><span class="v okc">Yes. This is the installed Halo</span></div></div>';
   if(S.justInstalled) return h+'<p>Installed. Close this tab and open Remiel Halo from your home screen. Your account and settings carry over.</p></div>';
   if(INSTALL) return h+'<p style="margin-bottom:10px">Puts Remiel Halo on your home screen and opens it full screen. Your account and settings carry over.</p>'+
@@ -2859,9 +2987,10 @@ const TRACK=[], GEO={o:null, seen:0};
 function toXY(lat,lon){ if(!GEO.o) GEO.o={lat,lon}; return {x:(lon-GEO.o.lon)*111320*Math.cos(GEO.o.lat*Math.PI/180), y:(lat-GEO.o.lat)*111320}; }
 function toLL(x,y){ return {lat:GEO.o.lat+y/111320, lon:GEO.o.lon+x/(111320*Math.cos(GEO.o.lat*Math.PI/180))}; }
 function reanchor(lat,lon){ GEO.o={lat,lon}; TRACK.length=0; LIVE.devs.forEach(d=>{ d.samples.length=0; d.fix=null; d.sector=null; d.fresh=0; }); }
-function trackPush(lat,lon,acc){
+function trackPush(lat,lon,acc,at){
   if(GEO.o && Math.hypot((lat-GEO.o.lat)*111320,(lon-GEO.o.lon)*111320*Math.cos(GEO.o.lat*Math.PI/180))>200000) reanchor(lat,lon);   // you are far from where the frame was set
-  const p=toXY(lat,lon), last=TRACK[TRACK.length-1], now=Date.now(); GEO.seen=now;
+  const p=toXY(lat,lon), last=TRACK[TRACK.length-1], now=at||Date.now(); GEO.seen=Date.now();
+  if(last && now<last.t2) return;
   if(last && Math.hypot(p.x-last.x,p.y-last.y)<2){ last.acc=acc; last.t2=now; return; }
   TRACK.push({t:now,t2:now,x:p.x,y:p.y,acc}); if(TRACK.length>4000) TRACK.splice(0,800); }
 // Where you were at a given moment: between the two track points either side of it. Nothing, if your position was not being reported then.
@@ -3027,8 +3156,31 @@ function liveStart(){ const loop=()=>{ if(document.visibilityState==='visible') 
 /* ---------- This phone as the sensor. Chrome on Android can scan Bluetooth from a web page once its experimental
    web features are switched on. What it hears stays on this phone and feeds the same engine as any other sensor.
    It listens only while Halo is on screen. ---------- */
-const PH={on:false, scan:null, buf:new Map(), heard:0, err:'', msg:'', lost:false, bound:false, timer:0};
-const phCan = () => !!(navigator.bluetooth && navigator.bluetooth.requestLEScan);
+const PH={on:false, scan:null, buf:new Map(), heard:0, err:'', msg:'', lost:false, bound:false, timer:0, native:false, nstat:null, busy:false, asked:0};
+// The Halo Android app gives the page a native ear: it keeps listening with the screen off and hands over what it heard.
+const NATIVE = () => { const n=window.HaloNative; return (n && typeof n.drain==='function' && typeof n.start==='function') ? n : null; };
+const nativeStatus = () => { try{ return JSON.parse(NATIVE().status()); }catch(e){ return null; } };
+const phCan = () => !!NATIVE() || !!(navigator.bluetooth && navigator.bluetooth.requestLEScan);
+const hexBytes = h => { h=String(h||''); const o=new Uint8Array(h.length>>1); for(let i=0;i<o.length;i++) o[i]=parseInt(h.substr(i*2,2),16)||0; return o; };
+const dv = b => new DataView(b.buffer, b.byteOffset, b.byteLength);
+async function nativeDrain(){
+  const N=NATIVE(); if(!N || PH.busy) return; PH.busy=true;
+  try{ PH.nstat=nativeStatus();
+    let batches=[]; try{ batches=JSON.parse(N.drain())||[]; }catch(e){ batches=[]; }
+    for(const b of batches){ if(!b || !Number.isFinite(b.t)) continue; const q=b.pos, live=Date.now()-b.t<8000;
+      if(okLL(q)){ const acc=typeof q.acc==='number'?q.acc:25;
+        if(live) geoFix({coords:{latitude:q.lat, longitude:q.lon, accuracy:acc, heading:q.heading, speed:q.speed}});
+        else { trackPush(q.lat,q.lon,acc,q.t||b.t); walkPos({lat:q.lat,lon:q.lon,acc}, b.t); } }
+      const list=[];
+      for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
+        const ev={device:{id:x.a,name:x.n||''}, rssi:x.r, uuids:x.u||[],
+          manufacturerData:new Map(Object.keys(x.m||{}).map(k=>[+k, dv(hexBytes(x.m[k]))])), serviceData:new Map(Object.keys(x.d||{}).map(k=>[k, dv(hexBytes(x.d[k]))]))};
+        try{ const d=await phDescribe(ev); list.push({id:d.id, rssi:x.r, band:'ble', cls:d.cls, name:d.name, hint:d.hint, conf:d.conf, flags:d.flags}); PH.heard++; }catch(e){} }
+      if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:okLL(q)?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew); }
+    if(batches.length) liveTick();
+    const lost = !!PH.nstat && !PH.nstat.listening && Date.now()-PH.asked>6000;
+    if(lost!==PH.lost){ PH.lost=lost; softRender(); renderVicinity(); }
+  } finally { PH.busy=false; } }
 const COMPANY={0x004C:'Apple',0x0006:'Microsoft',0x0075:'Samsung',0x00E0:'Google',0x0087:'Garmin',0x009E:'Bose',0x012D:'Sony',0x0057:'Harman',0x0171:'Amazon',0x038F:'Xiaomi',0x027D:'Huawei',0x00C4:'LG',0x0157:'Huami',0x02E5:'Espressif',0x0001:'Nokia',0x0002:'Intel',0x01AB:'Meta'};
 const PH_TRACKERS={feed:'Tile',feec:'Tile',fd5a:'Samsung SmartTag',fe33:'Chipolo',feaa:'Find My Device network or beacon',fd84:'Tile',fcb2:'DULT tracker'};
 const PH_APPLE={0x02:'beacon',0x05:'AirDrop',0x07:'AirPods or Beats',0x09:'AirPlay',0x0C:'Handoff',0x0F:'Nearby Action',0x10:'Nearby Info',0x12:'Find My network'};
@@ -3064,6 +3216,7 @@ function phAdv(ev){ if(!PH.on || typeof ev.rssi!=='number') return; PH.heard++;
   phDescribe(ev).then(x=>{ const b=PH.buf.get(x.id); if(b){ b.r.push(ev.rssi); b.x=x; } else PH.buf.set(x.id,{r:[ev.rssi], x}); }).catch(()=>{}); }
 function phFlush(){
   if(!PH.on) return;
+  if(PH.native) return void nativeDrain();
   if(PH.scan && PH.scan.active===false && !PH.lost){ PH.lost=true; if(W.on) wEvent('warn','This phone stopped listening. Press Resume listening.'); renderVicinity(); }
   if(!PH.buf.size) return;
   const list=[]; PH.buf.forEach((b,id)=>{ const x=b.x; list.push({id, rssi:Math.round(median(b.r)), band:'ble', cls:x.cls, name:x.name, hint:x.hint, conf:x.conf, flags:x.flags}); }); PH.buf.clear();
@@ -3073,6 +3226,8 @@ function phFlush(){
 }
 async function phStart(){
   PH.err=''; PH.msg='';
+  if(NATIVE()){ try{ NATIVE().start(); }catch(e){} PH.native=true; PH.on=true; PH.lost=false; PH.asked=Date.now(); if(!PH.timer) PH.timer=setInterval(phFlush, 2000);
+    if(W.on) wEvent('note','This phone is listening.'); softRender(); renderVicinity(); return; }
   if(!phCan()){ PH.err='nosupport'; renderVicinity(); return; }
   try{ PH.scan=await navigator.bluetooth.requestLEScan({acceptAllAdvertisements:true, keepRepeatedDevices:true}); }
   catch(e){ PH.on=false; PH.err=(e&&e.name)||'Error'; PH.msg=String((e&&e.message)||''); renderVicinity(); return; }
@@ -3081,10 +3236,17 @@ async function phStart(){
   if(W.on) wEvent('note','This phone is listening.');
   toast('This phone is listening for Bluetooth devices.'); softRender(); renderVicinity();
 }
-function phStop(){ try{ if(PH.scan) PH.scan.stop(); }catch(e){} PH.on=false; PH.scan=null; PH.lost=false; softRender(); renderVicinity(); }
+function phStop(){ try{ if(PH.native) NATIVE().stop(); else if(PH.scan) PH.scan.stop(); }catch(e){} PH.on=false; PH.scan=null; PH.lost=false; softRender(); renderVicinity(); }
 document.addEventListener('visibilitychange', ()=>{ if(PH.on && document.visibilityState==='visible' && PH.scan && PH.scan.active===false){ PH.lost=true; renderVicinity(); } });
 // The words for the phone's own listening, wherever it is offered.
 function phPanel(){
+  if(NATIVE()){ const st=PH.nstat||nativeStatus()||{};
+    if(PH.on && !PH.lost) return {ok:true, html:'This phone is listening, and keeps listening with the screen off.'+(st.screenOffFiltered?' With the screen off it hears the common makers and trackers only.':'')+' <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
+    const why = st.permission==='denied' ? 'Android has not allowed Halo to use Location and Nearby devices. Press the button: it opens the app\'s settings, where you allow both.'
+      : st.permission==='needed' ? 'Halo needs two permissions to listen: Location and Nearby devices. Press the button and allow both.'
+      : st.bluetooth===false ? 'Bluetooth is switched off. Switch it on, then press the button.'
+      : st.locationOn===false ? 'Location is switched off. Switch it on, then press the button.' : 'This phone can listen for Bluetooth devices by itself.';
+    return {ok:false, html:why+' <button class="btn sm primary" data-act="ph-start" style="margin:4px 0 0">'+(PH.on?'Try again':'Listen with this phone')+'</button>'}; }
   if(PH.on && !PH.lost) return {ok:true, html:'This phone is listening for Bluetooth devices. Keep Halo on screen. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
   if(PH.on && PH.lost) return {ok:false, html:'This phone stopped listening, because Halo left the screen. <button class="btn sm primary" data-act="ph-start" style="margin:4px 0 0">Resume listening</button>'};
   if(isIOS()) return {ok:false, html:'An iPhone browser cannot scan Bluetooth, so this phone cannot listen by itself.'};
@@ -3100,7 +3262,7 @@ function phPanel(){
 const W = (()=>{ try{ const j=JSON.parse(store.get('halo_walk')||'null'); if(j && j.t0 && Date.now()-j.t0<6*3600000) return j; }catch(e){} return {on:false}; })();
 let _wLock=null, _wSaved=0, _wHidden=0;
 const wSave = force => { const n=Date.now(); if(!force && n-_wSaved<8000) return; _wSaved=n; try{ store.set('halo_walk', JSON.stringify(W)); }catch(e){} };
-async function wLock(){ W.awake=false; try{ if('wakeLock' in navigator && document.visibilityState==='visible'){ _wLock=await navigator.wakeLock.request('screen'); W.awake=true; } }catch(e){} }
+async function wLock(){ W.awake=false; if(NATIVE()){ W.awake=true; return; } try{ if('wakeLock' in navigator && document.visibilityState==='visible'){ _wLock=await navigator.wakeLock.request('screen'); W.awake=true; } }catch(e){} }
 function wEvent(k, text, id){ W.events.push({t:Date.now(), k, text, id:id||''}); if(W.events.length>1500) W.events.splice(0, W.events.length-1500); }
 const walkDur = ms => { const s=Math.max(0,Math.round(ms/1000)); return s<90 ? s+' seconds' : Math.round(s/60)+' minutes'; };
 const walkName = d => devName(d)+' ('+[d.cls==='Unknown'?'unidentified':d.cls, d.hint].filter(Boolean).join(', ')+')';
@@ -3114,11 +3276,14 @@ function walkStop(){ if(!W.on) return; walkTick(); W.on=false; W.t1=Date.now(); 
 document.addEventListener('visibilitychange', ()=>{ if(!W.on) return;
   if(document.visibilityState==='hidden'){ _wHidden=Date.now(); wSave(true); }
   else { if(_wHidden){ const sec=Math.round((Date.now()-_wHidden)/1000); _wHidden=0;
-      if(sec>=8){ W.gaps+=sec; wEvent('gap','The screen was off, or Halo was behind another app, for '+walkDur(sec*1000)+'. Your position was not followed in that time.'); } }
+      if(sec>=8 && PH.native && PH.on) wEvent('note','Halo was off the screen for '+walkDur(sec*1000)+'. The app kept listening, and what it heard is added now.');
+      else if(sec>=8){ W.gaps+=sec; wEvent('gap','The screen was off, or Halo was behind another app, for '+walkDur(sec*1000)+'. Your position was not followed in that time.'); } }
+    if(PH.native && PH.on) nativeDrain();
     wLock(); } });
-function walkPos(){
-  if(!W.on || !S.pos) return; const now=Date.now();
-  { const l=W.route[W.route.length-1], dm=l?distLL(l.lat,l.lon,S.pos.lat,S.pos.lon):Infinity, good=S.pos.acc<=POS_MAX_ACC;
+function walkPos(q, at){
+  const sp=q||S.pos; if(!W.on || !sp) return; const now=at||Date.now();
+  { const S={pos:sp}, l=W.route[W.route.length-1], dm=l?distLL(l.lat,l.lon,S.pos.lat,S.pos.lon):Infinity, good=S.pos.acc<=POS_MAX_ACC;
+    if(l && now<l.t) return;
     if(!l || (good && dm>=8)){ if(l && dm<500) W.dist+=dm; W.route.push({t:now,lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6),acc:Math.round(S.pos.acc)}); if(W.route.length>4000) W.route.shift(); }
     if(!good && !W.rough){ W.rough=true; wEvent('warn','Your position is only good to '+Math.round(S.pos.acc)+' m. Devices heard now cannot be placed until it improves.'); }
     else if(good && W.rough){ W.rough=false; wEvent('note','Your position is good again, within '+Math.round(S.pos.acc)+' m.'); } }
@@ -3244,8 +3409,9 @@ async function walkFile(){
 }
 async function walkSave(share){
   const f=await walkFile();
+  if(share && NATIVE()){ await saveOut(f.name,'application/json',f.text,true); renderVicinity(); return; }
   if(share){ try{ const file=new File([f.text], f.name, {type:'application/json'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Remiel Halo walk report'}); renderVicinity(); return; } }catch(e){ if(e && e.name==='AbortError'){ renderVicinity(); return; } } }
-  const l=document.createElement('a'); l.href=URL.createObjectURL(new Blob([f.text],{type:'application/json'})); l.download=f.name; l.click();
+  saveOut(f.name,'application/json',f.text);
   toast(W.test?'Saved. It holds test data, so it is not entered in Evidence.':'Walk report saved, and recorded in Evidence.'); renderVicinity();
 }
 function renderWalk(){
@@ -3265,7 +3431,7 @@ function renderWalk(){
           '<br><span class="mono" style="font-size:11px;color:var(--mut)">'+(r.withYou&&!r.mine?'WITH YOU · ':'')+(r.mine?'yours · ':'')+(r.placed?'placed, within '+r.placed.unc+' m':r.rough?'direction rough':'not placed')+' · closest about '+r.min+' m · heard '+walkDur(r.last-r.first)+'</span></span></div>').join('')+
           (ds.length>10?'<div class="limit" style="margin-top:6px">'+(ds.length-10)+' more in the saved report.</div>':'')
         :'<div class="walk-c"><span class="t">No device was heard by a sensor with you during this walk. That reads Unknown, not Clear.</span></div>')+
-      '<div class="formrow"><button class="btn sm gold" data-act="walk-doc">Open walk report</button><button class="btn sm primary" data-act="walk-save">Save data file</button>'+(navigator.share?'<button class="btn sm" data-act="walk-share">Share data file</button>':'')+'<button class="btn sm" data-act="walk-start">New walk</button><button class="btn sm" data-act="walk-close">Close</button></div>'+
+      '<div class="formrow"><button class="btn sm gold" data-act="walk-doc">Open walk report</button><button class="btn sm primary" data-act="walk-save">Save data file</button>'+(navigator.share||NATIVE()?'<button class="btn sm" data-act="walk-share">Share data file</button>':'')+'<button class="btn sm" data-act="walk-start">New walk</button><button class="btn sm" data-act="walk-close">Close</button></div>'+
       '<div class="limit" style="margin-top:8px">The report and its data file hold your route and every device heard. They stay on this phone until you save or share them.'+(W.saved?' Saved, SHA-256 '+esc(W.saved.slice(0,16))+'.':'')+'</div>'+
       '<details style="margin-top:8px"><summary class="limit" style="cursor:pointer">Every change, in order ('+W.events.length+')</summary>'+evs(400)+'</details></div>';
   } else {
@@ -3399,6 +3565,7 @@ function closeRecord(id){
 window.addEventListener('popstate', e=>{
   if(el('app').classList.contains('hidden')) return;
   if(S.reportOpen) reportClose(true);
+  if(S.mapFull) mapFullClose(true);
   const st=(e.state&&e.state.halo)?e.state:{n:0,v:'overview',o:[],sh:'real'};
   _navPop=true; NAVN=st.n; S.open=new Set(st.o); S.shelf=st.sh;
   if(S.view!==st.v) setView(st.v); else { rerender(); if(el('rost')) renderRoster(); }
@@ -3507,9 +3674,17 @@ document.addEventListener('click', e=>{
     case 'sn-remove': sensorRemove(a.dataset.id); break;
     case 'sn-kind': { const sn=P.sensors[a.dataset.id]; if(!sn) break; sn.kind = sn.kind==='station' ? 'carried' : 'station'; save();
       toast(sn.kind==='station' ? sn.name+' is a Home listener again.' : sn.name+' is now carried with you. Its reports are placed along your route.'); softRender(); renderVicinity(); break; }
+    case 'map-full': mapFullOpen(); break;
+    case 'mf-close': mapFullClose(false); break;
+    case 'mf-follow': { MF.follow=!MF.follow; a.classList.toggle('on',MF.follow); mapFullTick(false); break; }
+    case 'mf-north': { MF.headUp=!MF.headUp; a.classList.toggle('on',MF.headUp); a.innerHTML='<small>'+(MF.headUp?'FACE UP':'N UP')+'</small>'; if(!MF.headUp && FULL){ try{ FULL.rotateTo(0,{duration:400}); }catch(e){} } headAsk(); mapFullTick(false); break; }
+    case 'mf-zin': if(FULL) FULL.zoomIn(); break;
+    case 'mf-zout': if(FULL) FULL.zoomOut(); break;
+    case 'mf-dev': { MF.sel=a.dataset.id||null; const d=MF.sel&&findDevice(MF.sel); if(d && d.fix && FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); try{ FULL.easeTo({center:[d.fix.lon,d.fix.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
+    case 'mf-ident': { const id=a.dataset.id; mapFullClose(false); setTimeout(()=>{ if(S.view!=='watchers') setView('watchers'); selectDevice(id); const c=el('identPanel'); if(c) c.scrollIntoView({block:'center'}); },120); break; }
     case 'report': reportOpen(); break;
     case 'report-close': reportClose(false); break;
-    case 'report-print': window.print(); break;
+    case 'report-print': { const N=NATIVE(); if(N && N.printPage){ try{ N.printPage(el('rpTitle').textContent||'Remiel Halo'); }catch(e){} } else window.print(); break; }
     case 'health-run': if(!S.healthBusy) healthGo(); break;
     case 'health-tick': { const t=healthTicks(), i=+a.dataset.i; t[i]=!t[i]; save(); if(t[i]) logEvidence('defence','Device health, confirmed on this '+HK_NAME[HK()]+': '+HEALTH_GUIDED[HK()][i][0]+'.'); rerender(); break; }
     case 'health-keep': { (navigator.storage&&navigator.storage.persist?navigator.storage.persist():Promise.resolve(false)).then(ok=>{ toast(ok?'The browser will keep Halo\'s data.':'The browser did not agree. Install Halo to the home screen, then try again.'); healthGo(); }).catch(()=>healthGo()); break; }
@@ -3533,7 +3708,7 @@ document.addEventListener('click', e=>{
       break; }
     case 'geo-ask': { geoAsk().then(()=>{ renderVicinity(); if(!S.pos) toast('Position not shared. The reason is beside the button.'); }); break; }
     case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),device:Y.name||null,chain:P.evidence,otherDevices:remoteEv()},null,2)],{type:'application/json'});
-      const l=document.createElement('a'); l.href=URL.createObjectURL(blob); l.download='remiel-halo-evidence.json'; l.click(); toast('Signed log exported.'); break; }
+      saveOut('remiel-halo-evidence.json','application/json',blob); toast('Signed log exported.'); break; }
     case 'h-padd': { const n=val('hpName'); if(!n) return toast('Enter the name.'); H.people.push({name:n,rel:val('hpRel'),consent:el('hpConsent').checked,watch:el('hpWatch').checked}); save(); rerender(); break; }
     case 'h-pdel': H.people.splice(+a.dataset.i,1); save(); rerender(); break;
     case 'h-radd': { const n=val('hrName'); if(!n) return toast('Enter the room.'); H.rooms.push({name:n,sensor:el('hrSensor').value}); save(); rerender(); break; }
@@ -3561,7 +3736,7 @@ function boot(){
   setView('overview'); navKeep();
   setInterval(tick, 1600);
   loadGlobal(); setInterval(loadGlobal, 10*60*1000); setInterval(fillTickers, 60000);
-  syncStart(); liveStart(); if(W.on) wLock();
+  syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit();
 }
 /* returning visit: unlock only after everything above is defined */
 if(codeOk(store.get('halo_key'))) openApp();
