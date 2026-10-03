@@ -1266,19 +1266,19 @@ function renderCoverage(){
   const ls=liveState(), fresh=b=>ls==='live' && LIVE.bands[b] && (Date.now()+LIVE.skew-LIVE.bands[b])<LIVE_SILENT, T=vis().test;
   const bandRow=(label,b)=>[label, fresh(b)?(T?'Test data':'Live from your sensor'):ls==='live'?'Not reported by your sensor':stateWords(ls).cov, fresh(b)?(T?'part':'live'):''];
   const rows=[bandRow('Bluetooth near you','ble'),bandRow('Wi-Fi near you','wifi'),bandRow('Cell towers','cell'),['Your devices','Not monitored',''],
-    ['Home','No station',''],['Your position',S.pos?'Live, within '+Math.round(S.pos.acc)+' m':'Not shared',S.pos?'live':''],
+    ['Home', !Object.keys(P.sensors||{}).some(k=>P.sensors[k].kind==='station')?'No listener':stationLive()?(T&&stationTest()?'Test data':'Listener reporting'):LIVE.seen.station?'Listener silent':'Listener added, no report yet', stationLive()?(T&&stationTest()?'part':'live'):''],['Your position',S.pos?'Live, within '+Math.round(S.pos.acc)+' m':'Not shared',S.pos?'live':''],
     ['Global feed', g?'Live, '+fmtDT(g.generated):(S.globalErr?'Not reached':'Reaching'), g?'live':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='connecting'?'Connecting':SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':SY.status==='offline'?'Not reached':'Starting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
   el('covCard').innerHTML='<h3>Coverage <span class="n">what is watched, and what is blind</span></h3>'+
     rows.map(r=>'<div class="cov"><span>'+r[0]+'</span><span class="st"><span class="dot '+r[2]+'"></span>'+r[1]+'</span></div>').join('')+
-    '<div class="limit" style="margin-top:10px">A blind channel reads Unknown. It never reads Clear. Live sensing arrives with the Halo Android app and the carried sensor.</div>';
+    '<div class="limit" style="margin-top:10px">A blind channel reads Unknown. It never reads Clear. Ground zero goes live with the Halo Android app. Home goes live with the home listener on your computer.</div>';
 }
 function renderHomeMini(){
   const n=P.home.people.length;
   el('homeMini').innerHTML='<h3>Responder <span class="n">the people at home while you are away</span></h3>'+
     '<div class="cov"><span>People listed</span><span class="st">'+n+'</span></div>'+
-    '<div class="cov"><span>Home station</span><span class="st"><span class="dot"></span>Not connected</span></div>'+
+    '<div class="cov"><span>Home listener</span><span class="st"><span class="dot '+(stationLive()?'live':'')+'"></span>'+(stationLive()?'Reporting':'Not reporting')+'</span></div>'+
     '<div class="cov"><span>Mode</span><span class="st"><span class="dot '+(P.home.armed?'part':'')+'"></span>'+(P.home.armed?'Away, waiting for a station':'Home')+'</span></div>'+
     '<div class="formrow"><button class="btn sm" data-act="go" data-v="responder">Open Responder</button></div>';
 }
@@ -1568,7 +1568,9 @@ function macroData(){ const f=[];
     beyond().forEach(d=>{ if(d.live && !d.fix && !d.sector) f.push({type:'Feature',properties:{kind:'range'},geometry:{type:'LineString',coordinates:circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,d.dist)}}); });
   }
   return {type:'FeatureCollection',features:f}; }
+const homeHeard = () => { const n=Date.now()+LIVE.skew; return [...LIVE.devs.values()].filter(d=>n-d.seenStation<LIVE_PRESENT).length; };
 function macroFit(){ if(!MACRO||!MAP_CENTER) return; const r=macroRadius(); if(r===_fitM) return; const first=!_fitM; _fitM=r; fitTo(MACRO,MAP_CENTER,r,!first); }
+const stationTest = () => { const ds=[...LIVE.devs.values()].filter(d=>d.seenStation>0); return ds.length>0 && ds.every(d=>d.sim); };
 const stationLive = () => LIVE.seen.station>0 && Date.now()+LIVE.skew-LIVE.seen.station<LIVE_SILENT;
 function macroUpdate(){
   const r=macroRadius(), h=P.home&&P.home.loc, far=beyond(), heard=heardDevs();
@@ -1580,7 +1582,7 @@ function macroUpdate(){
     let route=0; for(let i=1;i<TRACK.length;i++) route+=Math.hypot(TRACK[i].x-TRACK[i-1].x,TRACK[i].y-TRACK[i-1].y);
     line+='Route this session: '+miText(route)+'. ';
     if(okLL(h)){ const dh=distLL(S.pos.lat,S.pos.lon,h.lat,h.lon), bh=(Math.atan2((h.lon-S.pos.lon)*Math.cos(S.pos.lat*Math.PI/180),h.lat-S.pos.lat)*180/Math.PI+360)%360;
-      line+='Home: '+(dh<=HOME_NEAR?'you are there':miText(dh)+' '+compass(bh))+', station '+(stationLive()?'reporting':'not reporting, so home reads Unknown')+'. '; }
+      line+='Home: '+(dh<=HOME_NEAR?'you are there':miText(dh)+' '+compass(bh))+', listener '+(stationLive()?'reporting, '+homeHeard()+' devices in earshot':'not reporting, so home reads Unknown')+'. '; }
     else line+='Home: not set. Set it in Responder. ';
     const pts=heard.reduce((n,d)=>n+d.samples.length,0);
     if(heard.length) line+=heard.length+' flagged '+(heard.length===1?'device was':'devices were')+' heard at '+pts+' points on your route. ';
@@ -1755,7 +1757,7 @@ function tick(){
 }
 const band = d => d.dist<30?'Very near':d.dist<=BLOCK_M?'Within one block':d.dist<=BASE_R?'Within two blocks':'Beyond two blocks';
 const devName = d => (d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name;
-const flagOf = d => d.mine?'Yours':d.withYou?'With you':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
+const flagOf = d => d.mine?'Yours':d.withYou?'With you':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 function deviceThreat(d){ const c=d.identity; let s=1; if(d.withYou) s=4; else if(d.onRoute) s=3; else if(!d.knownBefore) s=2;
   return {c, s, tierIdx:Math.max(0,Math.min(3,Math.round(((c-1)+(s-1))/2)))}; }
@@ -2115,9 +2117,9 @@ const liveLast = () => Math.max(LIVE.seen.mobile, LIVE.seen.station);
 let LIVE_POLL=5000, LIVE_PRESENT=30000, LIVE_SILENT=60000;
 const FOLLOW_SPAN={ble:300, wifi:600}, FOLLOW_MIN=5, FIX_MIN_SAMPLES=5, FIX_MIN_BASELINE=25, FIX_MAX_UNC=60, FIX_MIN_UNC=12, FIX_MAX_RMS=9, FIT_S2_MIN=36, FIT_K=9, SECTOR_HALF=60;
 const SAMPLE_STEP=4, SAMPLE_AGE=30*60000, SAMPLE_MAX=80, POS_MAX_ACC=35, SOLVE_BUDGET_MS=40;
-const LIVE_KEEP=2*3600000, DEVS_MAX=600, ROSTER_MAX=60, HOME_NEAR=150, AUTOLOG_PER_HOUR=6;
+const AWAY_M=300, LIVE_KEEP=2*3600000, DEVS_MAX=600, ROSTER_MAX=60, HOME_NEAR=150, AUTOLOG_PER_HOUR=6;
 const CLS=['Phone','Wearable','Tag','Laptop','Vehicle','Access point','Cell tower','Unknown'];
-const SENSOR_KIND={ phone:'Phone app', carried:'Carried sensor', station:'Home station' };
+const SENSOR_KIND={ phone:'Phone app', carried:'Carried sensor', station:'Home listener' };
 const hasSensors = () => Object.keys(P.sensors||{}).length>0;
 const hash32 = s => { let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
 const callsign = (h,h2) => W1[h%W1.length]+' '+W2[(h>>>8)%W2.length]+' '+(10+h2%90);
@@ -2186,6 +2188,8 @@ function ingestReport(sid, rowT, p, off){
   if(okLL(p.pos)){ pos=toXY(p.pos.lat,p.pos.lon); pos.acc=(typeof p.pos.acc==='number'&&p.pos.acc>=0)?p.pos.acc:0; if(Math.hypot(pos.x,pos.y)>200000) pos=null; }   // the sensor knows where it is
   else if(station){ if(okLL(P.home.loc)){ pos=toXY(P.home.loc.lat,P.home.loc.lon); pos.acc=0; } }                 // a home station does not move
   else { const q=posAt(at-LIVE.skew); if(q) pos={x:q.x,y:q.y,acc:q.acc}; }                                         // carried with this device
+  let away=false;                                        // was this heard by a sensor that is with you, well away from home?
+  if(!station && pos && okLL(P.home.loc)){ const hq=toXY(P.home.loc.lat,P.home.loc.lon); away=Math.hypot(pos.x-hq.x,pos.y-hq.y)>AWAY_M; }
   for(const s of p.s.slice(0,150)){ if(!s || typeof s.id!=='string' || !s.id || s.id.length>80) continue;
     const band=['ble','wifi','cell'].indexOf(s.band)>=0?s.band:'ble';
     const rssi=(typeof s.rssi==='number'&&Number.isFinite(s.rssi))?Math.max(-120,Math.min(-10,s.rssi)):null;
@@ -2196,9 +2200,9 @@ function ingestReport(sid, rowT, p, off){
     if(!d){ if(LIVE.devs.size>=DEVS_MAX) continue;
       const hsh=hash32(s.id), h2=hash32('~'+s.id);
       d={ id:'L'+hsh.toString(36)+h2.toString(36), sig:s.id, live:true, name:callsign(hsh,h2), glyph:GLY[hsh%GLY.length], firstSeen:at, timesSeen:0, samples:[], hist:[], handleBrg:hsh%360, fix:null, sector:null, fresh:0, seenMobile:0, seenStation:0 }; LIVE.devs.set(s.id,d); }
-    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; d.adv=typeof s.name==='string'?s.name.slice(0,40):''; d.rssi=rssi!==null?rssi:rssiOf(reading);
+    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; d.adv=typeof s.name==='string'?s.name.slice(0,40):''; d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; d.rssi=rssi!==null?rssi:rssiOf(reading);
     d.lastSeen=Math.max(d.lastSeen||0, at); d.firstSeen=Math.min(d.firstSeen, at); d.timesSeen++; d.sensor=sid; d.identity=Math.max(1,Math.min(3,(s.conf|0)||2));
-    if(station) d.seenStation=Math.max(d.seenStation, at); else d.seenMobile=Math.max(d.seenMobile, at);
+    if(station) d.seenStation=Math.max(d.seenStation, at); else { d.seenMobile=Math.max(d.seenMobile, at); if(away) d.seenAway=Math.max(d.seenAway||0, at); }
     d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
     const fl=Array.isArray(s.flags)?s.flags:[]; d.fFollow=!station&&fl.indexOf('with_you')>=0; d.fRoute=fl.indexOf('route')>=0; d.fKnown=fl.indexOf('known')>=0; d.randomizes=fl.indexOf('randomized')>=0;
     if(pos && rssi!==null && !(pos.acc>POS_MAX_ACC)) addSample(d,pos,rssi,at);            // a poor position fix would mislead the placement
@@ -2236,10 +2240,11 @@ function liveDerive(d, nowS){
   d.need=followSpan(d);
   d.tested = d.span>=d.need && d.mins>=FOLLOW_MIN && d.steady && !d.fix;       // this console's own test
   d.withYou = !d.mine && d.present && (d.tested || d.fFollow);
-  d.onRoute = !d.mine && !!d.fRoute; d.knownBefore = d.mine || !!d.fKnown;
-  if(d.withYou && !d.sim) autoLog(d);
+  d.homeAway = !d.mine && d.seenStation>0 && (d.seenAway||0)>0;         // heard by your home listener, and by a sensor with you away from home
+  d.onRoute = !d.mine && (!!d.fRoute || d.homeAway); d.knownBefore = d.mine || !!d.fKnown;
+  if(!d.sim && (d.withYou || d.homeAway)) autoLog(d);
 }
-const followText = d => d.tested ? 'stayed in earshot for '+Math.round(d.mins)+' minutes across '+Math.round(d.span)+' m of your movement' : 'was reported as moving with you by '+((P.sensors[d.sensor]||{}).name||'a sensor');
+const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : d.tested ? 'stayed in earshot for '+Math.round(d.mins)+' minutes across '+Math.round(d.span)+' m of your movement' : 'was reported as moving with you by '+((P.sensors[d.sensor]||{}).name||'a sensor');
 // One Evidence entry per device per day, and only a few per hour, so a faulty sensor cannot bury the record.
 function autoLog(d){ const day=new Date().toISOString().slice(0,10); P.flagged=P.flagged||{};
   if(P.flagged[d.id]===day) return;
@@ -2292,7 +2297,7 @@ function stateWords(m){ const since=hhmm(liveLast()-LIVE.skew);
   return m==='silent' ? {count:'sensor silent', line:'sensor silent since '+since, long:'Your sensor has been silent since '+since+'.', note:'Sensor silent.', vic:'Vicinity: sensor silent', cov:'Sensor silent'}
     : m==='waiting' ? {count:'waiting for the sensor', line:'sensor added, no report yet', long:'Your sensor has not reported yet.', note:'Waiting for the first report from your sensor.', vic:'Vicinity: waiting for the sensor', cov:'Sensor added, no report yet'}
     : m==='offline' ? {count:'account not reached', line:'Halo account not reached, sensor reports cannot be read', long:'The Halo account was not reached, so sensor reports cannot be read.', note:'Halo account not reached.', vic:'Vicinity: account not reached', cov:'Account not reached'}
-    : m==='homeonly' ? {count:'no sensor with you', line:'home station reporting, no sensor with you', long:'Your home station is reporting, but no sensor is with you'+(okLL(P.home.loc)?'.':', and your home location is not set in Responder.'), note:'Home station only.', vic:'Vicinity: no sensor with you', cov:'No sensor with you'}
+    : m==='homeonly' ? {count:'no sensor with you', line:'home listener reporting, no sensor with you', long:'Your home listener is reporting, but no sensor is with you'+(okLL(P.home.loc)?'.':', and your home location is not set in Responder.'), note:'Home listener only.', vic:'Vicinity: no sensor with you', cov:'No sensor with you'}
     : {count:'not monitored', line:'no sensor connected', long:'', note:'Not monitored.', vic:'Vicinity: not monitored', cov:'No sensor'}; }
 function vis(){
   const st=liveState();
@@ -2316,7 +2321,7 @@ async function sensorRemove(id){ if(SY.confirm!=='sn:'+id){ SY.confirm='sn:'+id;
 async function loadSensors(){ const r=await api('GET','/sensors'); if(r.s!==200) return; SY.sensorSeen={}; SY.sensorKind={}; (r.j.sensors||[]).forEach(s=>{ SY.sensorSeen[s.id]=s.lastSeen; SY.sensorKind[s.id]=s.kind; }); softRender(); }
 function sensorsSection(){
   const ids=Object.keys(P.sensors||{});
-  let h='<div class="dsec"><h4>Sensors</h4><p style="margin-bottom:10px">A sensor listens for devices near you and reports to this account. The Halo Android app, the carried sensor and the home station will each ask for a sensor code. None of them exists yet, so there is nothing to enter a code into today.</p>';
+  let h='<div class="dsec"><h4>Sensors</h4><p style="margin-bottom:10px">A sensor listens for devices and reports to this account. Mobile comes first: the Halo Android app on your phone, then the carried sensor. Second is the home listener on the computer that stays at home. The home listener exists today. The Android app and the carried sensor do not yet.</p>';
   const lost=Object.keys(SY.sensorKind||{}).filter(id=>!P.sensors[id]);
   if(!ids.length && !lost.length) h+='<div class="empty" style="padding:8px">No sensors on this account.</div>';
   lost.forEach(id=>{ h+='<div class="rowline"><span><b>'+esc(SENSOR_KIND[SY.sensorKind[id]]||'Sensor')+'</b> <span class="chip real">No key on this device</span><br><span class="mono" style="font-size:11px;color:var(--mut)">Its reports cannot be read here. Remove it and add it again.</span></span>'+
@@ -2335,8 +2340,8 @@ function sensorsSection(){
 /* ----- a live device, opened ----- */
 function liveBody(d){
   const sn=(P.sensors[d.sensor]||{}).name||'a sensor';
-  const rel = d.fix && d.bearing!=null;
-  const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+Math.round(d.fix.unc)+' m' : 'about '+Math.round(d.dist)+' m, from signal strength alone. One reading can be off by a factor of 2 or more';
+  const rel = d.fix && d.bearing!=null, atStation=(P.sensors[d.sensor]||{}).kind==='station';
+  const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+Math.round(d.fix.unc)+' m' : 'about '+Math.round(d.dist)+' m'+(atStation?' from your home listener':'')+', from signal strength alone. One reading can be off by a factor of 2 or more';
   const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map. Your own position is not known, so there is no bearing from you' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side. Not placed' : (d.base>=FIX_MIN_BASELINE ? 'Not fixed. The readings fit more than one place. Keep moving and make a turn' : 'Not known. Direction comes from movement: walk at least '+FIX_MIN_BASELINE+' m and make a turn');
   const ft = d.mine ? 'Marked as yours. Not tested' : d.withYou ? 'With you' : (!isFinite(d.need) ? 'Not applied. A cell tower is heard over long distances' : d.span>=d.need && !d.steady ? 'Heard over a long stretch, but its strength rose and fell as a fixed transmitter does' : d.fix ? 'Stays in one place' : 'Not yet. Needs '+d.need+' m of your movement and '+FOLLOW_MIN+' minutes');
   return '<div class="dsec"><h4>Proximity</h4><div class="kv"><span class="k">Distance</span><span class="v">'+esc(where)+'</span><span class="k">Direction</span><span class="v '+(rel?'':'unkc')+'">'+esc(dir)+'</span>'+
@@ -2345,7 +2350,7 @@ function liveBody(d){
     '<div class="dsec"><h4>Follower test</h4><div class="kv"><span class="k">Result</span><span class="v '+(d.withYou?'warnc':'')+'">'+esc(ft)+'</span>'+
     '<span class="k">In earshot for</span><span class="v">'+(d.mins<1?'under a minute':Math.round(d.mins)+' min')+'</span><span class="k">While you moved</span><span class="v">'+Math.round(d.span||0)+' m</span></div></div>'+
     '<div class="dsec"><h4>History</h4><div class="kv"><span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span><span class="k">Reports</span><span class="v">'+d.timesSeen+'</span>'+
-    '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Advertised name</span><span class="v '+(d.adv?'':'unkc')+'">'+esc(d.adv||'None')+'</span>'+
+    '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Advertised name</span><span class="v '+(d.adv?'':'unkc')+'">'+esc(d.adv||'None')+'</span>'+(d.hint?'<span class="k">Maker hint</span><span class="v">'+esc(d.hint)+'</span>':'')+
     '<span class="k">Address</span><span class="v '+(d.randomizes?'warnc':'')+'">'+(d.randomizes?'Randomizes, held by signature':'Not reported as randomized')+'</span></div></div>'+
     '<div class="dev-acts"><button class="btn primary" data-act="capture" data-id="'+d.id+'">Capture Now</button>'+
     '<button class="btn" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Not mine':'This is mine')+'</button>'+
