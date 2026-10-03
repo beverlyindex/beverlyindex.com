@@ -7,6 +7,13 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Remiel Halo</title>
 <meta name="description" content="Remiel Halo. A stand-alone counter-surveillance instrument.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Halo">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -123,6 +130,8 @@ select.inp{flex:none}
   display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .card h3 .n{color:var(--mut);font-weight:400;letter-spacing:.06em}
 .sub{color:var(--mut);font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.instbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;border:1px solid rgba(79,141,240,.45);border-radius:12px;background:rgba(26,58,130,.22);font-size:13px;line-height:1.4}
+.instbar span{flex:1 1 180px}
 .backbar{position:sticky;top:0;z-index:30;display:flex;gap:8px;align-items:center;margin:-14px -16px 10px;padding:8px 16px;background:rgba(7,11,22,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .backbar .where{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
 .backbar .btn,.backrow .btn{min-height:40px;padding:8px 14px}
@@ -1467,6 +1476,9 @@ function renderOverview(){
   const real=THREATS.filter(t=>t.shelf==='real').length, pot=THREATS.length-real;
   const applies=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true).length;
   let h='<div style="--tierc:var('+tc+')">';
+  if(!installed() && !S.justInstalled && (INSTALL||isAndroid()||isIOS()) && !store.get('halo_inst_hide'))
+    h+='<div class="instbar"><span><b>Install Halo on this phone.</b> It opens full screen from your home screen.</span>'+
+       '<button class="btn sm primary" data-act="'+(INSTALL?'install':'go-install')+'">'+(INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
   h+= g ? '<div class="prelim live">Global scan live. Updated '+fmtDT(g.generated)+'. '+g.sources.filter(s=>s.ok).length+' of '+g.sources.length+' sources</div>'
         : '<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'The live feed was not reached':'Reaching the live feed')+'</div>';
   const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
@@ -2343,14 +2355,34 @@ function syncLine(){ const n=SY.devices.length;
     : SY.status==='offline' ? (SY.msg||'Backend not reached. Working on this device only')
     : SY.status==='out' ? (SY.msg||'Signed out')
     : SY.status==='off' ? SY.msg : 'Starting'; }
+/* ---------- Install: Halo on the home screen, opening full screen like an app ---------- */
+let INSTALL=null;
+const installed = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
+const isAndroid = () => /Android/i.test(navigator.userAgent), isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Mac/.test(navigator.platform||'') && 'ontouchend' in document);
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); INSTALL=e; if(booted) rerender(); });
+window.addEventListener('appinstalled', ()=>{ INSTALL=null; S.justInstalled=true; if(booted){ toast('Halo is installed. Open it from your home screen.'); rerender(); } });
+if('serviceWorker' in navigator && (location.protocol==='https:' || /[?&]sw=1/.test(location.search)))
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+function installSection(){
+  let h='<div class="dsec" id="installSec"><h4>Install Halo on this device</h4>';
+  if(installed()) return h+'<div class="kv"><span class="k">Installed</span><span class="v okc">Yes. This is the installed Halo</span></div></div>';
+  if(S.justInstalled) return h+'<p>Installed. Close this tab and open Remiel Halo from your home screen. Your account and settings carry over.</p></div>';
+  if(INSTALL) return h+'<p style="margin-bottom:10px">Puts Remiel Halo on your home screen and opens it full screen. Your account and settings carry over.</p>'+
+    '<div class="formrow" style="margin-top:0"><button class="btn primary" data-act="install">Install Remiel Halo</button></div>'+
+    '<div class="limit" style="margin-top:8px">The installed Halo is this same console. It does not yet listen for devices near the phone: that needs the Halo Android app.</div></div>';
+  h+= isIOS() ? '<p>In Safari: tap the Share button, then Add to Home Screen, then Add.</p>'
+     : isAndroid() ? '<p>In Chrome: tap the three dots at the top right, then Add to Home screen, then Install.</p>'
+     : '<p>On a computer Halo runs in the browser and needs no install. On an Android phone, open this page in Chrome and the Install button appears here.</p>';
+  return h+'</div>';
+}
 function devicesPull(){
   const open=S.open.has('devices'), on=SY.status==='on';
   let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(on?'--clear':SY.status==='out'?'--warn':'--mut')+')">'+
     '<div class="tp-head" data-act="pull" data-id="devices"><div class="tp-top"><span class="tp-lab">Devices and sync</span><span class="tp-i">i</span></div>'+
     '<div class="tp-sum">'+esc(syncLine())+'</div><span class="chev">&#9662;</span></div>';
   if(open){ h+='<div class="tp-body">';
-    if(SY.status==='off') h+='<div class="dsec"><p>'+esc(SY.msg)+'</p></div>';
-    else if(SY.status==='out') h+='<div class="dsec"><h4>Sync is not running</h4><p style="margin-bottom:10px">'+esc(SY.msg)+' Everything on this device is kept.</p>'+
+    if(SY.status==='off') h+='<div class="dsec"><p>'+esc(SY.msg)+'</p></div>'+installSection();
+    else if(SY.status==='out') h+=installSection()+'<div class="dsec"><h4>Sync is not running</h4><p style="margin-bottom:10px">'+esc(SY.msg)+' Everything on this device is kept.</p>'+
       '<div class="formrow"><button class="btn sm primary" data-act="sync-reconnect">Start a new account for this device</button></div></div>';
     else {
       h+='<div class="dsec"><h4>This device</h4><div class="formrow" style="margin-top:0"><input class="inp" id="devName" maxlength="60" value="'+esc(Y.name||'')+'" placeholder="Name of this device"><button class="btn sm" data-act="dev-name">Save name</button></div>'+
@@ -2365,6 +2397,7 @@ function devicesPull(){
         (d.current?'':'<button class="btn sm '+(SY.confirm==='rm:'+d.id?'red':'')+'" data-act="dev-remove" data-id="'+esc(d.id)+'">'+(SY.confirm==='rm:'+d.id?'Confirm remove':'Remove')+'</button>')+'</div>'; });
       h+='</div>';
       h+=sensorsSection();
+      h+=installSection();
       h+='<div class="dsec"><h4>Add another device</h4><p style="margin-bottom:10px">Create a link code here, then open Remiel Halo on the other device, unlock it, open Devices and sync, and enter the code under Join an existing account.</p>';
       if(SY.link && SY.link.exp>Date.now()) h+='<div class="linkcode" id="linkCode">'+esc(groupCode(SY.link.code))+'</div><div class="limit">Valid until '+hhmm(SY.link.exp)+'. It works once. Do not send it by text or email: read it across.</div>';
       h+='<div class="formrow"><button class="btn sm primary" data-act="link-start">'+(SY.link&&SY.link.exp>Date.now()?'Create a new code':'Create link code')+'</button></div></div>';
@@ -2733,6 +2766,9 @@ document.addEventListener('click', e=>{
     case 'terms-close': el('terms').classList.add('hidden'); break;
     case 'pull': { const id=a.dataset.id; if(S.open.has(id)){ closeRecord(id); break; }
       S.open.add(id); navPush(id); rerender(); if(el('rost')) renderRoster(); break; }
+    case 'install': { if(!INSTALL) break; const ev=INSTALL; INSTALL=null; ev.prompt(); (ev.userChoice||Promise.resolve({})).then(c=>{ if(!c||c.outcome!=='accepted') toast('Not installed. The steps to install from the browser menu are shown here.'); rerender(); }).catch(()=>rerender()); break; }
+    case 'go-install': { S.open.delete('profile'); S.open.add('devices'); navPush('devices'); rerender(); setTimeout(()=>{ const c=el('installSec'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
+    case 'inst-hide': store.set('halo_inst_hide','1'); rerender(); break;
     case 'pull-close': closeRecord(a.dataset.rid); break;
     case 'back': if(NAVN>0) history.back(); else setView('overview'); break;
     case 'home': { S.open.clear(); if(S.view!=='overview') setView('overview'); else { navPush(); rerender(); el('scroll').scrollTop=0; } break; }
