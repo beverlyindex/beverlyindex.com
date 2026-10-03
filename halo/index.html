@@ -1558,7 +1558,8 @@ function liveFeedA(){ const g=S.global; if(!g) return [];
   const k=(g.kev&&g.kev.recent||[]).slice(0,8).map(v=>({t:'Exploited now: '+v.vendor+' '+v.product+' ('+v.cve+').', src:'CISA · '+fmtD(v.added), u:v.u}));
   const c=(g.consumer||[]).slice(0,5).map(x=>({t:x.t, src:'FTC · '+fmtD(x.d), u:x.u}));
   const ai=(g.ai||[]).slice(0,8).map(x=>({t:x.t, src:x.src+' · '+fmtD(x.d)+' · unreviewed', u:x.u}));
-  return ai.slice(0,3).concat(k, ai.slice(3), c); }
+  const nw=(g.news||[]).slice(0,14).map(x=>({t:x.t, src:x.src+' · '+fmtD(x.d), u:x.u}));          // the latest hacking news, newest first
+  return nw.slice(0,4).concat(ai.slice(0,2), k.slice(0,4), nw.slice(4,9), ai.slice(2), k.slice(4), nw.slice(9), c); }
 function globalPull(){
   const g=S.global, open=S.open.has('global');
   const ok=g?g.sources.filter(s=>s.ok).length:0;
@@ -1576,8 +1577,8 @@ function globalPull(){
          (g.kev ? '<p style="margin-bottom:8px">'+g.kev.recentAll+' flaws joined the exploited list in the last '+g.kev.windowDays+' days. '+mine.length+' touch '+PLAT_NAME[plat()]+(pv('wifihome')!==false?' or home network equipment':'')+'.</p>'+
            (mine.length?mine.slice(0,8).map(kevRow).join(''):'<div class="empty" style="padding:8px">None for your platform in this window.</div>')+
            '<div class="formrow"><button class="btn sm" data-act="res" data-id="p_patch">Open Patch Clock</button></div>' : '<p>Connecting to the exploited list.</p>')+'</div>';
-      const lst=(k,title)=>{ const a=g[k]||[]; return a.length ? '<div class="dsec"><h4>'+title+'</h4>'+a.slice(0,6).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap">'+esc(fmtD(x.d))+'</span></div>').join('')+'</div>' : ''; };
-      h+=lst('ai','AI agents and AI misuse: unreviewed headlines')+lst('consumer','Consumer alerts, Federal Trade Commission')+lst('privacy','Surveillance and privacy, Electronic Frontier Foundation')+lst('advisories','Advisories, CISA');
+      const lst=(k,title,n)=>{ const a=g[k]||[]; return a.length ? '<div class="dsec"><h4>'+title+'</h4>'+a.slice(0,n||6).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a>'+(k==='news'&&x.src?' <span class="mono" style="font-size:11px;color:var(--mut)">'+esc(x.src)+'</span>':'')+'</span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap">'+esc(fmtD(x.d))+'</span></div>').join('')+'</div>' : ''; };
+      h+=lst('news','Latest hacking news',10)+lst('ai','AI agents and AI misuse: unreviewed headlines')+lst('consumer','Consumer alerts, Federal Trade Commission')+lst('privacy','Surveillance and privacy, Electronic Frontier Foundation')+lst('advisories','Advisories, CISA');
     }
     h+='</div>'; }
   return h+'</div>';
