@@ -58,6 +58,12 @@ a{color:var(--chrome2)}
   text-transform:uppercase;color:var(--ink);background:rgba(8,14,28,.7);border:1px solid var(--line2);
   border-radius:var(--r2);padding:14px 12px;outline:none}
 .field:focus{border-color:var(--chrome2);box-shadow:0 0 0 3px rgba(63,116,214,.22)}
+.gate-link{margin:12px 0 0;text-align:left;font-size:12.5px;color:var(--mut);line-height:1.5}
+.gate-link summary{cursor:pointer;color:var(--chrome2);text-align:center;list-style:none}
+.gate-link summary::-webkit-details-marker{display:none}
+.gate-link p{margin:8px 0}
+.acctbtn{width:38px;height:38px;border-radius:11px;border:1px solid var(--line2);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015));color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none}
+.acctbtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .gate-err{color:var(--action);font-size:12.5px;min-height:16px;margin:10px 0 0}
 .gate-foot{margin-top:22px;color:var(--dim);font-size:11px;letter-spacing:.02em}
 
@@ -580,6 +586,10 @@ a.tk:hover b{text-decoration:underline}
     <img class="gate-logo" src="halo-logo.png" alt="Remiel Halo">
     <p class="gate-sub">Stand-alone counter-surveillance instrument.<br>Enter your <b>access key</b> to continue.</p>
     <input id="gateKey" class="field" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RH-XXXX-2026" maxlength="14">
+    <details class="gate-link"><summary>Already use Halo on another device?</summary>
+      <p>On that device press the account button at the top, then Create link code. Enter the code here and this device joins your account.</p>
+      <input id="gateLink" class="field" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" maxlength="24">
+    </details>
     <p id="gateErr" class="gate-err"></p>
     <button id="gateGo" class="btn primary wide" style="margin-top:4px;padding:13px">Unlock</button>
     <div class="gate-terms">By unlocking you accept the <a href="#" data-act="terms">Terms of use</a>. You assume all liability for changes you make to your devices, accounts and software.</div>
@@ -603,11 +613,13 @@ a.tk:hover b{text-decoration:underline}
       <span class="tagline">Stand-alone instrument</span>
       <div class="spacer"></div>
       <span class="src-pill" id="srcPillD"></span>
+      <button class="acctbtn" data-act="go-account" title="Your account and devices" aria-label="Your account and devices"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg></button>
     </div>
     <div class="topbar">
       <img class="brand-logo" src="halo-logo.png" alt="Remiel Halo">
       <div class="spacer"></div>
       <span class="src-pill" id="srcPillM"></span>
+      <button class="acctbtn" data-act="go-account" title="Your account and devices" aria-label="Your account and devices"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg></button>
     </div>
 
     <div class="scroll" id="scroll">
@@ -749,7 +761,9 @@ const OWNER="RH-BEVR-2026", BETA="RH-HALO-2026";
 const codeOk = c => { c=(c||"").trim().toUpperCase(); return c===OWNER || c===BETA || /^RH-[A-Z0-9]{4}-2026$/.test(c); };
 function tryUnlock(){
   const v=el('gateKey').value, err=el('gateErr');
-  if(codeOk(v)){ store.set('halo_key', v.trim().toUpperCase()); err.textContent=''; openApp(); }
+  const lk=((el('gateLink')||{}).value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(lk && lk.length!==20){ err.textContent='The link code has 20 characters.'; return; }
+  if(codeOk(v)){ store.set('halo_key', v.trim().toUpperCase()); err.textContent=''; if(lk) S.pendingJoin=lk; openApp(); }
   else err.textContent='Key not recognised. Format RH-XXXX-2026.';
 }
 function openApp(){ el('gate').classList.add('hidden'); el('app').classList.remove('hidden'); boot(); }
@@ -1590,14 +1604,13 @@ function renderOverview(){
      '<div class="nd end"><span class="pl">Bottom line</span><b style="color:var(--tierc)">'+esc(a.t<0?'Unknown':TIER_NAME[a.t])+'</b><i>read below</i></div></div>';
   h+='<div class="verdict"><div class="ring">'+a.n+'</div><div><div class="vt">'+esc(a.title)+'</div><div class="vs">'+a.s+'</div><div class="vm">'+esc(a.meta)+'</div>'+
      '<div class="chips"><span class="chip '+(a.side==='Watchers'?'w':a.side==='Attackers'?'a':'')+'">'+esc(a.side)+'</span><span class="chip real">'+real+' Real &amp; Imminent</span><span class="chip pot">'+pot+' Potential</span></div></div></div>';
-  h+='<div class="modebar">'+modePills()+'</div>';
   h+='<div class="formrow" style="margin:0 0 12px"><button class="btn gold wide" data-act="report">Full report: every current threat, explained</button></div>';
-  const list=THREATS.filter(t=>t.shelf==='real' && scopeOf(t)!==false && (S.mode==='auto'||t.side===S.mode))
-    .sort((x,y)=>(isOpen(y)-isOpen(x)) || (scopeOf(y)===true)-(scopeOf(x)===true) || IMPACT_W(y.impact)-IMPACT_W(x.impact));
-  h+='<div class="stack">'+profilePull()+healthPull()+globalPull()+devicesPull()+list.map(threatPull).join('')+resourcesPull()+termsPull()+'</div>';
-  h+='<div class="formrow" style="margin-top:14px"><button class="btn primary" data-act="go" data-v="watchers" style="flex:1">All Watchers</button><button class="btn gold" data-act="go" data-v="attackers" style="flex:1">All Attackers</button></div></div>';
+  const list=THREATS.filter(t=>t.shelf==='real' && scopeOf(t)===true && isOpen(t)).sort((x,y)=>IMPACT_W(y.impact)-IMPACT_W(x.impact) || doneCount(x)-doneCount(y)).slice(0,3);
+  const cat=x=>'<div class="cat"><span>'+x+'</span></div>';
+  h+='<div class="stack">'+(list.length?cat('Start here')+list.map(threatPull).join(''):'')+cat('Your set-up')+profilePull()+sigPull()+healthPull()+devicesPull()+cat('The wider picture')+globalPull()+resourcesPull()+'</div>';
+  h+='<div class="limit" style="margin-top:16px;text-align:center"><a href="#" data-act="terms">Terms of use</a></div></div>';
   el('ovMain').innerHTML=h;
-  renderCoverage(); renderHomeMini(); renderVicinity();
+  renderCoverage(); el('homeMini').style.display='none'; renderVicinity();
 }
 function renderCoverage(){
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, g=S.global;
@@ -1684,7 +1697,7 @@ function renderVicinity(){
 function renderWatchers(){
   const list=THREATS.filter(t=>t.side==='w');
   el('wHead').innerHTML='<div class="pagehead"><h2>Watchers</h2><p>The devices around you, on a live map. Then every way a person or organisation watches you, each with its defence and its Special.</p></div>';
-  el('wMain').innerHTML='<div class="stack">'+grouped('w',list,'')+'</div>';
+  el('wMain').innerHTML='<div class="stack">'+grouped('w',list,sigPull())+'</div>';
   renderVicinity();
   if(el('rost')) renderRoster();
 }
@@ -2199,7 +2212,7 @@ const band = d => d.dist<30?'Very near':d.dist<=BLOCK_M?'Within one block':d.dis
 const labelOf = d => { const l=d && d.live && P.labels && P.labels[d.id]; return (typeof l==='string' && l) ? l : ''; };
 const devName = d => d.live ? (labelOf(d) || d.adv || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
 const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : d.cls+(d.hint?', '+d.hint:''))+(d.live && devName(d)!==d.name ? ' · '+d.name : '');
-const flagOf = d => d.mine?'Yours':d.withYou?'With you':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
+const flagOf = d => d.mine?'Yours':d.sigFit?'Fits your signature':d.withYou?'With you':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 function deviceThreat(d){ const c=d.identity; let s=1; if(d.withYou) s=4; else if(d.onRoute) s=3; else if(!d.knownBefore) s=2;
   return {c, s, tierIdx:Math.max(0,Math.min(3,Math.round(((c-1)+(s-1))/2)))}; }
@@ -2369,7 +2382,7 @@ async function api(method, path, body, auth){
 /* ----- what syncs: one section per subject, last edit wins ----- */
 const hashStr = s => { let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36)+':'+s.length; };
 function sectionsNow(){
-  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{}, labels:P.labels||{}, where:P.where||null };
+  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{}, labels:P.labels||{}, where:P.where||null, sig:P.sig||null };
   Object.keys(P.done||{}).forEach(id=>{ const d=P.done[id]; if(d && !Array.isArray(d)) o['done.'+id]=d; });
   Object.keys(P.hits||{}).forEach(id=>{ o['hits.'+id]=P.hits[id]|0; });
   return o; }
@@ -2381,6 +2394,7 @@ function applySection(k,v){
   else if(k==='sensors') P.sensors=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='mine') P.mine=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='labels') P.labels=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
+  else if(k==='sig') P.sig=(v&&typeof v==='object'&&!Array.isArray(v))?v:null;
   else if(k==='where') P.where=(v&&typeof v==='object'&&okLL(v)&&Number.isFinite(v.t))?v:null;
   else if(k==='home'){ const b=blank().home; P.home=Object.assign(b, (v&&typeof v==='object')?v:{}); P.home.rules=Object.assign(blank().home.rules,(v&&v.rules)||{}); }
   else if(k.indexOf('done.')===0) P.done[k.slice(5)]=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
@@ -2458,6 +2472,7 @@ async function sendName(){ return api('POST','/account/device/name',{name:await 
 async function syncInit(){
   if(!cryptoOk()) return setSync('off','This browser cannot encrypt, so sync is off.');
   if(Y.signedOut) return setSync('out', Y.off?'Sync is off on this device.':'This device is no longer signed in to the account.');
+  if(!Y.refresh && S.pendingJoin){ const c=S.pendingJoin; S.pendingJoin=null; setSync('connecting'); Y.name=Y.name||guessName(); await linkJoin(c); }
   if(!Y.refresh){
     setSync('connecting');
     try{
@@ -2482,8 +2497,8 @@ async function linkStart(){ if(SY.busy) return; if(SY.status!=='on') return toas
     if(r.s!==200){ toast(r.s===429?'Too many codes. Wait a minute.':'Could not create a code.'); return; }
     SY.link={code:r.j.code+secret, exp:r.j.expiresAt}; softRender();
   }catch(e){ toast('Could not create a code.'); } finally{ SY.busy=false; } }
-async function linkJoin(){ if(SY.busy) return;
-  const raw=val('joinCode').toUpperCase().replace(/[^A-Z0-9]/g,'');
+async function linkJoin(code){ if(SY.busy) return;
+  const raw=(typeof code==='string'&&code?code:val('joinCode')).toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(raw.length!==20) return toast('The link code has 20 characters.');
   SY.busy=true; toast('Joining the account.');
   try{
@@ -2932,6 +2947,53 @@ function aiPull(){
   return h+'</div>';
 }
 
+/* ---------- Your Signature. The devices that are yours, recorded once. A named device is known by its name.
+   A device that broadcasts no name is known by its maker and kind, and by how many of that kind you carry.
+   Halo sets your signature aside and flags whatever travels with you beyond it. ---------- */
+const sigKey = d => (makerOf(d)||'Unidentified')+'|'+d.cls;
+const sigKeyWords = k => { const [m,c]=k.split('|'); return (m==='Unidentified'?'Unidentified':m)+' '+(KIND_WORD[c]||'device'); };
+const sigGet = () => { const g=P.sig=P.sig||{}; g.names=g.names||[]; g.counts=g.counts||{}; g.by=g.by||{}; return g; };
+function sigAdd(d){ const g=sigGet(); if(g.by[d.id]) return;
+  if(d.adv){ if(g.names.indexOf(d.adv)<0) g.names.push(d.adv); g.by[d.id]='n:'+d.adv; } else { const k=sigKey(d); g.counts[k]=(g.counts[k]||0)+1; g.by[d.id]='c:'+k; }
+  const ks=Object.keys(g.by); if(ks.length>300) ks.slice(0,ks.length-300).forEach(k=>delete g.by[k]);
+  g.t=Date.now(); P.mine=P.mine||{}; P.mine[d.id]=1; }
+function sigDrop(d){ const g=sigGet(), b=g.by[d.id]; if(P.mine) delete P.mine[d.id]; if(!b) return; delete g.by[d.id];
+  if(b.slice(0,2)==='n:'){ const nm=b.slice(2); if(!Object.keys(g.by).some(k=>g.by[k]===b)) g.names=g.names.filter(x=>x!==nm); }
+  else { const k=b.slice(2); g.counts[k]=Math.max(0,(g.counts[k]||0)-1); if(!g.counts[k]) delete g.counts[k]; }
+  g.t=Date.now(); }
+const sigSize = () => { const g=sigGet(); return g.names.length+Object.keys(g.counts).reduce((n,k)=>n+g.counts[k],0); };
+// After every reading: a device with one of your names is yours. Unnamed devices fill the places your signature holds for their kind, longest heard first.
+function sigApply(){ const g=sigGet(); if(!g.names.length && !Object.keys(g.counts).length) return;
+  const left=Object.assign({},g.counts), devs=[...LIVE.devs.values()].filter(d=>d.present||d.atHome);
+  devs.forEach(d=>{ d.sigFit=false; if(d.adv && g.names.indexOf(d.adv)>=0){ d.mine=true; d.withYou=false; d.onRoute=false; d.knownBefore=true; }
+    else if(d.mine && g.by[d.id] && g.by[d.id][0]==='c'){ const k=g.by[d.id].slice(2); if(left[k]>0) left[k]--; } });
+  devs.filter(d=>!d.mine && left[sigKey(d)]>0).sort((a,b)=>((b.tested||b.fFollow)?1:0)-((a.tested||a.fFollow)?1:0) || (b.mins||0)-(a.mins||0) || b.rssi-a.rssi)
+    .forEach(d=>{ const k=sigKey(d); if(left[k]>0){ left[k]--; d.sigFit=true; d.withYou=false; d.knownBefore=true; } });
+}
+function sigPull(){
+  const open=S.open.has('sig'), g=sigGet(), n=sigSize(), V=vis(), live=V.mode==='live'||V.mode==='sim';
+  let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(n?'--clear':'--cyan')+')" id="tp-sig"><div class="tp-head" data-act="pull" data-id="sig"><div class="tp-top"><span class="tp-lab">Your Signature</span><span class="tp-i">i</span></div>'+
+    '<div class="tp-sum">'+(n?n+' of your own devices recorded · Halo sets them aside':'Mark what is yours once, and Halo knows your devices from everyone else\'s')+'</div><span class="chev">&#9662;</span></div>';
+  if(!open) return h+'</div>';
+  h+='<div class="tp-body"><div class="howto">How to Tell Your Own Devices from Everyone Else\'s</div>';
+  h+='<div class="dsec"><h4>Your signature <span class="spsub">'+(n?n+' recorded':'empty')+'</span></h4>'+
+    (n ? g.names.map(x=>'<div class="rowline"><span><b>'+esc(x)+'</b> <span class="chip pot">by name</span></span><button class="x" data-act="sig-name-del" data-n="'+esc(x)+'" title="Take it out">&times;</button></div>').join('')+
+         Object.keys(g.counts).map(k=>'<div class="rowline"><span><b>'+g.counts[k]+' &times; '+esc(sigKeyWords(k))+'</b> <span class="chip">by kind</span></span><button class="x" data-act="sig-count-del" data-k="'+esc(k)+'" title="Take one out">&times;</button></div>').join('')
+       : '<p>Your signature is the set of devices you own. Once Halo has it, your own devices read Yours wherever you go, and anything else that travels with you stands out at once.</p>')+'</div>';
+  h+='<div class="dsec"><h4>Add what is yours</h4>';
+  if(!live) h+='<p>'+esc(stateWords(V.mode).long)+'</p>'+(NATIVE()||isAndroid()?'<div class="formrow">'+(phPanel().html)+'</div>':'');
+  else { const ds=V.devices.filter(d=>d.present||d.atHome).sort((a,b)=>(b.rssi||-200)-(a.rssi||-200)).slice(0,14), top=ds[0];
+    h+='<p style="margin-bottom:8px">Hold this phone against a device you own. It rises to the top of the list. Press Mine. Three or four presses and your signature is done.</p>'+
+      (ds.length?ds.map((d,i)=>'<div class="rowline"><span><b>'+esc(devName(d))+'</b>'+(i===0&&top.rssi>=-58?' <span class="chip pot">closest to this phone now</span>':'')+
+          '<br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(kindText(d))+' · '+esc(distText(d))+(d.sigFit?' · fits your signature':'')+'</span></span>'+
+          '<button class="btn sm '+(d.mine?'':'primary')+'" data-act="sig-mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003;':'Mine')+'</button></div>').join('')
+        :'<p>Nothing is in earshot at this moment.</p>'); }
+  h+='</div><div class="dsec"><h4>A device with a name</h4><p>A computer, a headset or a phone often broadcasts its own name, such as DESKTOP-KS7PU98. Compare it with the name the device shows for itself, and you know at once whether it is yours.</p>'+
+    '<div class="kv" style="margin-top:8px"><span class="k">Windows</span><span class="v">Settings, System, About, Device name</span><span class="k">Mac</span><span class="v">System Settings, General, About, Name</span>'+
+    '<span class="k">Android</span><span class="v">Settings, About phone, Device name</span><span class="k">iPhone</span><span class="v">Settings, General, About, Name</span></div></div>';
+  return h+'<div class="limit">Your signature is encrypted and shared with your other devices. Take a device out at any time with the &times; beside it.</div></div></div>';
+}
+
 /* ---------- Device Health Check: what this browser can report about this device, and what only you can read.
    A web page cannot scan a device or read its settings, so a full pass is never proof that a device is clean. ---------- */
 const HK = () => isAndroid()?'android':isIOS()?'ios':/Win/i.test(navigator.platform||navigator.userAgent)?'windows':/Mac/i.test(navigator.platform||'')?'mac':'computer';
@@ -3286,7 +3348,6 @@ function liveDerive(d, nowS){
   d.withYou = !d.mine && d.present && (d.tested || d.fFollow);
   d.homeAway = !d.mine && d.seenStation>0 && (d.seenAway||0)>0;         // heard by your home listener, and by a sensor with you away from home
   d.onRoute = !d.mine && (!!d.fRoute || d.homeAway); d.knownBefore = d.mine || !!d.fKnown;
-  if(!d.sim && (d.withYou || d.homeAway)) autoLog(d);
 }
 const sensorName = id => id==='this-phone' ? 'this phone' : ((P.sensors[id]||{}).name||'a sensor');
 const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : d.tested ? 'stayed in earshot for '+Math.round(d.mins)+' minutes across '+Math.round(d.span)+' m of your movement' : 'was reported as moving with you by '+sensorName(d.sensor);
@@ -3312,6 +3373,8 @@ function liveTick(){
   const t0=performance.now();
   for(const d of [...LIVE.devs.values()].filter(d=>d.fresh>0 && d.samples.length>=FIX_MIN_SAMPLES).sort((a,b)=>b.fresh-a.fresh)){ if(performance.now()-t0>SOLVE_BUDGET_MS) break; solveFix(d); }
   LIVE.devs.forEach(d=>liveDerive(d,nowS));
+  sigApply();
+  LIVE.devs.forEach(d=>{ if(!d.sim && (d.withYou || d.homeAway)) autoLog(d); });
   tripAuto(); walkTick();
   if(!booted) return;
   if(S.view==='overview'||S.view==='watchers') renderVicinity();
@@ -3730,8 +3793,9 @@ function placeVicinity(v){ const host = v==='watchers' ? el('wVic') : el('ovVic'
 let NAVN=0, _navPop=false;
 const VIEW_NAME={overview:'Overview',watchers:'Watchers',attackers:'Attackers',responder:'Responder',evidence:'Evidence'};
 const navSnap = by => ({halo:1, n:NAVN, v:S.view, o:[...S.open], sh:S.shelf, by:by||''});
-function navPush(by){ if(_navPop) return; NAVN++; try{ history.pushState(navSnap(by),''); }catch(e){} backBar(); }
-function navKeep(){ if(_navPop) return; try{ history.replaceState(navSnap((history.state&&history.state.by)||''),''); }catch(e){} backBar(); }
+const navRemember = () => { try{ store.set('halo_last', JSON.stringify({v:S.view, o:[...S.open], sh:S.shelf, t:Date.now()})); }catch(e){} };
+function navPush(by){ if(_navPop) return; NAVN++; try{ history.pushState(navSnap(by),''); }catch(e){} backBar(); navRemember(); }
+function navKeep(){ if(_navPop) return; try{ history.replaceState(navSnap((history.state&&history.state.by)||''),''); }catch(e){} backBar(); navRemember(); }
 function backBar(){ const b=el('backBar'); if(!b) return; const show=S.view!=='overview'||NAVN>0;
   b.classList.toggle('hidden',!show); el('backWhere').textContent=VIEW_NAME[S.view]||'';
   const hb=b.querySelector('[data-act="home"]'); if(hb) hb.style.display=S.view==='overview'?'none':''; }
@@ -3790,7 +3854,8 @@ document.addEventListener('click', e=>{
   switch(act){
     case 'terms': e.preventDefault(); openTerms(); break;
     case 'link-start': linkStart(); break;
-    case 'link-join': linkJoin(); break;
+    case 'link-join': linkJoin(''); break;
+    case 'go-account': { S.open.delete('profile'); S.open.add('devices'); if(S.view!=='overview') setView('overview'); else { navPush('devices'); rerender(); } setTimeout(()=>{ const c=document.querySelector('.tp-head[data-id="devices"]'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
     case 'dev-name': deviceRename(); break;
     case 'dev-remove': deviceRemove(a.dataset.id); break;
     case 'acct-delete': accountDelete(); break;
@@ -3847,7 +3912,10 @@ document.addEventListener('click', e=>{
     case 'ident-photo-del': { const d=identPick(); if(d && P.photos && P.photos[d.id]){ delete P.photos[d.id]; save(); logEvidence('note','Photo removed from '+d.name+' ('+d.id+').'); renderVicinity(); } break; }
     case 'macro-r': { S.macroR=+a.dataset.m; _fitM=0; macroUpdate(); break; }
     case 'capture': { const d=findDevice(a.dataset.id); openCapture(d); break; }
-    case 'mine': { const d=findDevice(a.dataset.id); if(!d||!d.live) break; P.mine=P.mine||{}; if(P.mine[d.id]) delete P.mine[d.id]; else P.mine[d.id]=1; save(); liveTick(); S._rsig=''; if(el('rost')) renderRoster(); break; }
+    case 'mine': case 'sig-mine': { const d=findDevice(a.dataset.id); if(!d||!d.live) break; P.mine=P.mine||{}; if(P.mine[d.id]) sigDrop(d); else { sigAdd(d); if(!d.sim) logEvidence('note','Added to your signature: '+devName(d)+' ('+kindText(d)+').'); }
+      save(); liveTick(); S._rsig=''; rerender(); if(el('rost')) renderRoster(); break; }
+    case 'sig-name-del': { const g=sigGet(), nm=a.dataset.n; g.names=g.names.filter(x=>x!==nm); Object.keys(g.by).forEach(k=>{ if(g.by[k]==='n:'+nm){ delete g.by[k]; if(P.mine) delete P.mine[k]; } }); g.t=Date.now(); save(); liveTick(); rerender(); break; }
+    case 'sig-count-del': { const g=sigGet(), k=a.dataset.k; g.counts[k]=Math.max(0,(g.counts[k]||0)-1); if(!g.counts[k]) delete g.counts[k]; const id=Object.keys(g.by).find(x=>g.by[x]==='c:'+k); if(id){ delete g.by[id]; if(P.mine) delete P.mine[id]; } g.t=Date.now(); save(); liveTick(); rerender(); break; }
     case 'dev-log': { const d=findDevice(a.dataset.id); if(!d||!d.live||d.sim) break;
       logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+'), '+distText(d)+', '+flagOf(d).toLowerCase()+'. Heard '+d.timesSeen+' times since '+new Date(d.firstSeen).toLocaleTimeString()+'.',{sig:d.sig}); toast('Added to Evidence.'); break; }
     case 'sn-add': sensorAdd(); break;
@@ -3921,8 +3989,10 @@ function boot(){
   if(booted) return; booted=true;
   if(!P.terms){ P.terms={v:1, at:Date.now()}; save(); logEvidence('note','Terms of use accepted at unlock. The user assumes liability for changes made to devices, accounts and software.'); }
   applyGlobal();
-  if(PROFILE_Q.every(q=>pv(q.k)===null)) S.open.add('profile');
-  setView('overview'); navKeep();
+  let last=null; try{ last=JSON.parse(store.get('halo_last')||'null'); }catch(e){}
+  if(last && VIEW_NAME[last.v] && Date.now()-last.t<30*86400000){ S.shelf=last.sh==='potential'?'potential':'real'; (last.o||[]).forEach(x=>S.open.add(x)); setView(last.v); }
+  else { if(PROFILE_Q.every(q=>pv(q.k)===null)) S.open.add('profile'); setView('overview'); }
+  navKeep();
   setInterval(tick, 1600);
   loadGlobal(); setInterval(loadGlobal, 10*60*1000); setInterval(fillTickers, 60000);
   syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit(); startGeo();
