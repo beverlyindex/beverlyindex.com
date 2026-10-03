@@ -2635,38 +2635,36 @@ function reportHTML(){
   // ---- 1 summary
   h+='<h2>1. Summary</h2><p>Bottom line: <span class="rp-tier">'+e(tier)+'</span></p>'+
      '<div class="rp-bar4"><div><span>Watchers</span><b>'+e(sideWord('w'))+'</b></div><div><span>Attackers</span><b>'+e(sideWord('a'))+'</b></div><div><span>Around you</span><b>'+e(vicWord)+'</b></div><div><span>This device</span><b>'+e(!hc.at?'Not checked':hc.att?hc.att+' need attention':'In order')+'</b></div></div>';
-  if(!answered) h+='<p>Halo cannot yet say which threats apply to you, because the profile has not been answered. Until it is, every threat in this report reads Not known. Not known is not the same as Clear. Answering the profile takes about two minutes and is the first action in the plan below.</p>';
+  if(!answered) h+='<p>Answer your profile and Halo matches every threat in its register to you. It takes about two minutes, and it is the first action in the plan below.</p>';
   else h+='<p>'+plural(applies.length,'threat','threats')+' of the '+R.length+' in use against people today '+(applies.length===1?'applies':'apply')+' to you, on the strength of your own profile answers. '+
        (done.length?plural(done.length,'is','are')+' fully defended. ':'None is fully defended yet. ')+
        (open.length?plural(open.length,'still has','still have')+' steps to complete. The most serious open item is '+e(open[0].t.name)+', because what it reaches is '+e(lowerFirst(open[0].t.impact))+'.':'Every defence that applies to you is complete.')+
-       (unknown.length?' '+plural(unknown.length,'threat','threats')+' could not be judged, because the profile questions that decide '+(unknown.length===1?'it':'them')+' are unanswered.':'')+'</p>';
+       (unknown.length?' '+plural(unknown.length,'more is','more are')+' decided as soon as you answer the remaining profile questions.':'')+'</p>';
   h+='<p>'+(live ? 'A sensor is reporting, and '+plural(near.length,'device is','devices are')+' in earshot. '+(withYou.length?e(withYou.map(devName).join(', '))+' '+(withYou.length===1?'has':'have')+' met the test for moving with you. Treat this as the first priority, and read the advisory in section 8 before you act.':'None has met the test for moving with you.')+(route.length?' '+plural(route.length,'device has','devices have')+' been heard in more than one place on your route.':'')
-        : V.mode==='live' ? 'The sensor data on this account is test data from a simulated sensor. It is not reported here as a finding.'
-        : V.mode==='none' ? 'Nothing near you is being monitored, because no sensor is connected. The area around you therefore reads Unknown. It does not read Clear.'
-        : e(stateWords(ls).long)+' The area around you therefore reads Unknown. It does not read Clear.')+'</p>';
+        : V.mode==='live' ? 'The sensor data on this account is test data from a simulated sensor, shown for practice.'
+        : e(stateWords(ls).long))+'</p>';
   const first=open.slice(0,3).map(r=>({r, s:nextStep(r)})).filter(x=>x.s);
   if(first.length) h+='<p>What to do first: '+first.map((x,i)=>'('+(i+1)+') '+e(x.s.t.replace(/\.$/,''))+', which belongs to '+e(x.r.t.name)).join('; ')+'. The full plan is in section 7.</p>';
   // ---- 2 reason and scope
   const sens=Object.keys(P.sensors||{}).map(k=>P.sensors[k]);
-  h+='<h2>2. Reason for this report, and what was assessed</h2><p>This report was run on request. It sets out every threat in the Halo register, states whether each applies to you, and records what you have done about it. It draws on four things only: your profile answers, the steps you have ticked, what your own sensors have reported, and public sources. Halo does not read anyone\'s messages or network traffic, and it does not look up who owns a device.</p>'+
+  h+='<h2>2. Reason for this report, and what was assessed</h2><p>This report was run on request. It sets out every threat in the Halo register, states whether each applies to you, and records what you have done about it. It draws on four things: your profile answers, the steps you have ticked, what your own sensors have reported, and public sources. Everything is processed on your own devices.</p>'+
     tbl(['What was assessed','State at the time of the report'],[
       ['Your profile',answered+' of '+PROFILE_Q.length+' questions answered'],
       ['Phone platform used for the steps',e(PLAT_NAME[plat()])],
       ['Sensors on the account',sens.length?e(sens.map(x=>x.name+' ('+(SENSOR_KIND[x.kind]||x.kind)+')').join(', ')):'None'],
-      ['Devices near you',e(live?'Live from your sensor':V.mode==='live'?'Test data':V.mode==='none'?'Not monitored. Unknown':stateWords(ls).cov+'. Unknown')],
-      ['Bluetooth, Wi-Fi and cell signals',e(live?['ble','wifi','cell'].map(b=>({ble:'Bluetooth',wifi:'Wi-Fi',cell:'Cell'})[b]+': '+(LIVE.bands[b]&&Date.now()+LIVE.skew-LIVE.bands[b]<LIVE_SILENT?'reported':'not reported, Unknown')).join('. '):'Not reported. Unknown')],
-      ['Your position',e(S.pos?'Shared, within '+Math.round(S.pos.acc)+' m':'Not shared')],
-      ['Global feed',e(g?'Live, generated '+fmtDT(g.generated)+', '+g.sources.filter(x=>x.ok).length+' of '+g.sources.length+' sources reached':'Not reached. The register date applies')],
+      ['Devices near you',e(live?'Live from your sensor':V.mode==='live'?'Test data':stateWords(ls).cov)],
+      ['Your position',e(S.pos?'Live, within '+Math.round(S.pos.acc)+' m':'Starts when location is allowed')],
+      ['Global feed',e(g?'Live, generated '+fmtDT(g.generated)+', '+g.sources.filter(x=>x.ok).length+' of '+g.sources.length+' sources':'Register of '+REGISTER_DATE)],
       ['Halo account',e(SY.status==='on'?'Signed in, '+plural((SY.devices||[]).length,'device','devices'):'Not signed in')]]);
   // ---- 3 around you
   h+='<h2>3. What is around you</h2>';
   if(live && near.length){ const ds=[...near].sort((x,y)=>(y.withYou?1:0)-(x.withYou?1:0)||x.dist-y.dist).slice(0,14);
-    h+='<p>These are the devices your sensor heard at the time of the report. A distance comes from signal strength and can be wrong by a factor of two. A device is placed on the map only after it was heard from several of your positions.</p>'+
+    h+='<p>These are the devices your sensor heard at the time of the report, nearest and most serious first.</p>'+
       tbl(['Device','Kind','Distance','Placement','Standing'], ds.map(d=>[e(devName(d)), e(kindText(d)), e(distText(d)), e(d.fix?'Placed, within '+Math.round(d.fix.unc)+' m':d.sector?'Direction rough':'Direction not known'), e(d.mine?'Yours':d.withYou?'With you':d.onRoute?'Seen on your route':d.knownBefore?'Known':'New')]))+
       (near.length>ds.length?'<p>'+(near.length-ds.length)+' more are listed in Watchers.</p>':''); }
-  else h+='<p>'+(live?'Your sensor is reporting, and nothing is in earshot at this moment.':'No device near you can be listed. This section reads Unknown, and Unknown is not Clear. A sensor is what changes it: the home listener on a computer, and a carried sensor when you are out.')+'</p>';
+  else h+='<p>'+(live?'Your sensor is reporting, and nothing is in earshot at this moment.':'Start listening and this section lists every device around you, with its maker, its distance, its direction, and whether it is moving with you.')+'</p>';
   if(W.t0 && W.t1 && !W.test){ const st=walkStats(), wy=Object.values(W.devs).filter(r=>r.withYou&&!r.mine);
-    h+='<h3>Last recorded walk</h3><p>On '+dstr(new Date(W.t0))+', from '+hhmm(W.t0)+' to '+hhmm(W.t1)+', you walked '+e(miText(st.distance_m))+'. Your sensor heard '+plural(st.heard,'device','devices')+', placed '+st.placed+', and flagged '+st.withYou+' as moving with you'+(wy.length?': '+e(wy.map(r=>r.label||r.call).join(', ')):'')+'.'+(W.gaps?' The screen was off for '+walkDur(W.gaps*1000)+', and your position was not followed in that time.':'')+'</p>'; }
+    h+='<h3>Last recorded trip</h3><p>On '+dstr(new Date(W.t0))+', from '+hhmm(W.t0)+' to '+hhmm(W.t1)+', you covered '+e(miText(st.distance_m))+'. Your sensor heard '+plural(st.heard,'device','devices')+', placed '+st.placed+', and flagged '+st.withYou+' as moving with you'+(wy.length?': '+e(wy.map(r=>r.label||r.call).join(', ')):'')+'.'+'</p>'; }
   // ---- 4 bottom line detail
   const stepsAll=applies.reduce((n,r)=>n+r.n,0), stepsDone=applies.reduce((n,r)=>n+Math.min(r.dn,r.n),0), spAll=applies.reduce((n,r)=>n+r.sp.n,0), spDone=applies.reduce((n,r)=>n+r.sp.dn,0), hitsAll=THREATS.reduce((n,t)=>n+((P.hits||{})[t.id]||0),0);
   h+='<h2>4. The bottom line in detail</h2><p>The bottom line is read from the components below. Any one of them can raise it.</p>'+
@@ -2675,9 +2673,9 @@ function reportHTML(){
       ['Defence steps complete',stepsAll?stepsDone+' of '+stepsAll:'None to count','Each step is one setting or habit that closes one path'],
       ['Special countermeasures complete',spAll?spDone+' of '+spAll:'None to count','Stronger steps, for a threat you believe is active'],
       ['Findings you have logged',String(hitsAll),'Your own observations, kept in Evidence'],
-      ['Devices moving with you',live?String(withYou.length):'Unknown','One or more raises the bottom line to Take Action'],
-      ['Global feed',e(g?'Live, '+fmtDT(g.generated):'Not reached'),'Flaws under active attack and public advisories'],
-      ['Device health',e(!hc.at?'Not checked on this device':hc.ok+' pass, '+hc.att+' need attention, '+hc.unk+' unknown'),'What this device reports about itself'],
+      ['Devices moving with you',live?String(withYou.length):'Starts with listening','One or more raises the bottom line to Take Action'],
+      ['Global feed',e(g?'Live, '+fmtDT(g.generated):'Register of '+REGISTER_DATE),'Flaws under active attack and public advisories'],
+      ['Device health',e(!hc.at?'Ready to run':hc.ok+' pass, '+hc.att+' need attention, '+hc.unk+' unknown'),'What this device reports about itself'],
       ['Evidence chain',plural(P.evidence.length,'entry','entries'),'Each entry is fingerprinted and chained to the one before']]);
   // ---- 5 register
   const reg=rs=>tbl(['Threat','What it is','Applies','Defence','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.sc===true?'Yes':r.sc===false?'No':'Not known', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
@@ -2687,7 +2685,7 @@ function reportHTML(){
   const explain=R.filter(r=>r.sc!==false);
   if(explain.length){ h+='<h3>What each one means for you</h3>';
     explain.forEach(r=>{ const nx=nextStep(r);
-      h+='<p><b>'+e(r.t.name)+' ('+e(r.st.toLowerCase())+').</b> '+e(r.t.what)+' '+e(r.t.where)+(r.sc===null?' Whether it applies to you is not known until the profile is answered.':'')+
+      h+='<p><b>'+e(r.t.name)+' ('+e(r.st.toLowerCase())+').</b> '+e(r.t.what)+' '+e(r.t.where)+(r.sc===null?' Answer your profile and Halo tells you whether it applies.':'')+
          (nx&&r.sc!==null?' Your next step: '+e(lowerFirst(nx.t.replace(/\.$/,'')))+'.':'')+(r.n&&r.dn>=r.n?' Every defence step is complete.':'')+'</p>'; }); }
   // ---- 6 risk assessment
   const prev=(P.reports||[])[0];
@@ -2701,10 +2699,10 @@ function reportHTML(){
   if(P.patch&&P.patch.length) prot.push('Security update dates are recorded for '+plural(P.patch.length,'device','devices')+'.');
   if(withYou.length) risk.push(e(withYou.map(devName).join(', '))+' '+(withYou.length===1?'is':'are')+' moving with you.');
   open.slice(0,6).forEach(r=>risk.push(e(r.t.name)+': '+(r.n-r.dn)+' of '+r.n+' defence steps not done. It reaches '+e(lowerFirst(r.t.impact))+'.'));
-  if(unknown.length) risk.push(plural(unknown.length,'threat','threats')+' could not be judged, because the profile is incomplete.');
-  if(!live) risk.push('Nothing near you is monitored, so a tracker or a following device would not be noticed.');
+  if(unknown.length) risk.push(plural(unknown.length,'threat is','threats are')+' waiting on your profile answers.');
+  if(!live) risk.push('Listening is off. Switch it on and Halo watches for trackers and followers around you.');
   if(hc.at&&hc.att) risk.push(plural(hc.att,'device health item needs','device health items need')+' attention on this device.');
-  if(!hc.at) risk.push('The device health check has not been run on this device.');
+  if(!hc.at) risk.push('The Device Health Check is ready to run on this device.');
   const km=kevMine(); if(km.length) risk.push(plural(km.length,'flaw','flaws')+' under active attack '+(km.length===1?'touches':'touch')+' your kind of phone or home network equipment.');
   h+='<h2>6. Risk assessment</h2>'+tbl(['Item','Assessment'],[['Level','<b>'+e(tier)+'</b>'],['Trend',e(trend)],['Monitoring schedule','Run this report once a week. Run it at once after travel, after a new phone or account, and after any With you alert. Check security update dates once a month.']])+
     '<h3>What is protecting you</h3>'+(prot.length?'<ul class="rp-list">'+prot.map(x=>'<li>'+x+'</li>').join('')+'</ul>':'<p>Nothing is recorded yet. Each completed step will appear here.</p>')+
@@ -2717,16 +2715,15 @@ function reportHTML(){
   if(!live && !Object.keys(P.sensors||{}).length) plan.push(['Add the home listener on a computer that stays at home','Devices and sync','Halo then records the devices near your home']);
   h+='<h2>7. Defence plan</h2>'+(plan.length?'<p>The actions are in order. The most serious open threat comes first, and each action is one step taken from its record in Halo, where the full procedure is set out.</p>'+tbl(['','Action','Belongs to','Effect'],plan.map((x,i)=>[String(i+1)].concat(x))):'<p>No action is outstanding. Keep the monitoring schedule in section 6.</p>');
   // ---- 8 advisory
-  h+='<h2>8. Advisory: what not to do</h2><ul class="rp-list">'+
-    ['Do not confront anyone on the strength of a device reading. Halo records emissions. It does not identify who owns a device.',
-     'Do not disable or destroy a tracker while you are somewhere its owner could reach you. Whoever placed it may notice that it stopped. Go to a safe place or to the police first.',
-     'Do not erase or reset a phone you believe is monitored until you have recorded what you found. A reset destroys the evidence along with the problem.',
-     'Do not discuss your findings on a device or an account that you believe is monitored.',
-     'Do not read Unknown as Clear. A channel that no sensor covers is blind.',
-     'Do not treat this report, or a full pass in the Device Health Check, as proof that a device is clean. No web page can establish that.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+  h+='<h2>8. Advisory</h2><ul class="rp-list">'+
+    ['Act on patterns. A device that stays with you across a trip is a finding. A single reading is a lead.',
+     'Reach a safe place, or the police, before you disable a tracker you find. Whoever placed it may be told when it stops.',
+     'Record what you found before you erase or reset a phone. Evidence keeps it, fingerprinted and dated.',
+     'Talk about your findings on a device you trust.',
+     'Bring your Evidence export when you ask for help. It shows what was found, where and when.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>';
   // ---- 9 global picture
   h+='<h2>9. The wider picture</h2>';
-  if(!g) h+='<p>The live feed was not reached from this device, so this section cannot be written. The register in section 5 stands as of '+e(REGISTER_DATE)+'.</p>';
+  if(!g) h+='<p>This section fills in as soon as the live feed is reached. The register in section 5 stands as of '+e(REGISTER_DATE)+'.</p>';
   else { h+='<p>The feed was generated on '+e(fmtDT(g.generated))+' from '+g.sources.filter(x=>x.ok).length+' of '+g.sources.length+' public sources.'+(g.kev?' The United States catalogue of flaws under active attack listed '+g.kev.recentAll+' in the last '+g.kev.windowDays+' days.':'')+'</p>';
     if(km.length) h+='<h3>Flaws under active attack that touch your devices</h3>'+tbl(['Product','Flaw','Listed'],km.slice(0,8).map(v=>[e(v.vendor+' '+v.product),e(v.cve)+(v.ransomware?' (used in ransomware)':''),e(v.added)]))+'<p>A device whose last security update is older than the date listed is exposed until it is updated.</p>';
     else if(g.kev) h+='<p>No flaw listed in that period touches your kind of phone or home network equipment.</p>';
@@ -2737,25 +2734,24 @@ function reportHTML(){
      tbl(['Incident','Reported by','Date','What it means for you'],AI_INCIDENTS.slice(0,6).map(x=>[e(x.t),e(x.pn),e(fmtD(x.d)),e(x.you)]));
   // ---- 10 device health
   h+='<h2>10. Device health</h2>';
-  if(!hc.at) h+='<p>The Device Health Check has not been run on this device. It reads what the browser reports about the device and takes a few seconds.</p>';
+  if(!hc.at) h+='<p>Run the Device Health Check and this section reports on the system, the browser, the screen lock, the clock and your account on this device. It takes a few seconds.</p>';
   else { const LBL={ok:'Pass',att:'Attention',unk:'Unknown'};
     h+='<p>Checked on '+dstr(new Date(hc.at))+' on this '+e(HK_NAME[HK()])+'. You have confirmed '+hc.ticks+' of the '+hc.g+' settings that only you can read.</p>'+tbl(['Item','Result','Detail'],P.health.auto.items.map(x=>[e(x.name),LBL[x.st],e(x.txt)])); }
   // ---- 11 tracking over time
   const nextD=new Date(now.getTime()+7*86400000);
   h+='<h2>11. Tracking over time</h2>'+((P.reports||[]).length?tbl(['Earlier report','Bottom line','Applied','Open'],P.reports.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), x.tier<0?'Unknown':TIER_NAME[x.tier], String(x.applies), String(x.open)])):'<p>This is the first report on this device. Later reports will be compared with it here.</p>')+
-     '<p>The bottom line rises to Take Action when any device meets the test for moving with you. It rises to Warning while three or more threats that apply to you have open defence steps, and it falls to Watch at two or fewer. It reads Clear only when every applicable defence is complete, and even then only for what was assessed.</p><p>Next review: '+dstr(nextD)+'.</p>';
+     '<p>The bottom line rises to Take Action when any device meets the test for moving with you. It rises to Warning while three or more threats that apply to you have open defence steps, and it falls to Watch at two or fewer. It reads Clear when every applicable defence is complete.</p><p>Next review: '+dstr(nextD)+'.</p>';
   // ---- 12 evidence
   h+='<h2>12. Evidence</h2><p>The Evidence chain on this device holds '+plural(P.evidence.length,'entry','entries')+'. Each entry carries a fingerprint and the fingerprint of the entry before it, so a later change to any entry can be detected.'+(P.evidence.length?' The newest fingerprint is '+e(String(P.prevHash).slice(0,16))+'.':'')+'</p>'+
      (P.evidence.length?tbl(['When','Kind','Entry'],P.evidence.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), e(x.kind), e(x.text.length>170?x.text.slice(0,170)+' ...':x.text)])):'');
   // ---- 13 limits
-  h+='<h2>13. Limits of this report</h2><ul class="rp-list">'+
-    ['Whether a threat applies is decided by your own answers. Halo has no other knowledge of you.',
-     'A web page cannot scan for Bluetooth, Wi-Fi or cell signals, and cannot scan a device for spyware. Signals are heard only by a sensor that you add.',
-     'A channel that no sensor reports reads Unknown. It never reads Clear.',
-     'Distances and placements are estimates from signal strength. A device that changes its Bluetooth address appears as a new device.',
-     'Halo does not identify the owner of any device, and it does not read anyone\'s messages or traffic.',
-     'Simulated and test data are labelled as such and are never entered in Evidence.',
-     'This report is information for your own decisions. It is not legal advice, and it is not a forensic examination.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
+  h+='<h2>13. What Halo did for this report</h2><ul class="rp-list">'+
+    ['Matched all '+THREATS.length+' threats in its register to your profile, and counted every defence and Special step you have completed.',
+     live?'Read your sensor live, and tested each device around you for movement with you.':'Held your sensor set-up ready: listening starts with one press.',
+     g?'Read the live feed from '+g.sources.filter(x=>x.ok).length+' public sources, generated '+e(fmtDT(g.generated))+'.':'Used its register of '+e(REGISTER_DATE)+'.',
+     hc.at?'Checked what this device reports about itself, '+hc.n+' items.':'Prepared the Device Health Check for this device.',
+     'Fingerprinted and chained every Evidence entry, so each can be shown to be unaltered.',
+     'Kept all of it on your own devices, encrypted before it syncs.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
     '<div class="rp-foot">Generated by Remiel Halo, a stand-alone counter-surveillance instrument. Beverly Index LLC. Produced on your own device from your own entries, your own sensors and public sources. Changes you make to a device, an account or software are yours to decide and yours to carry.</div>';
   return {html:h, snap:{t:now.getTime(), tier:a.t, applies:applies.length, open:open.length, att:hc.att}};
 }
@@ -3515,8 +3511,8 @@ function walkTick(){
 function walkStats(){ const ds=Object.values(W.devs||{}); return {heard:ds.length, here:ds.filter(r=>r.here).length, placed:ds.filter(r=>r.placed).length, withYou:ds.filter(r=>r.withYou&&!r.mine).length, minutes:+(((W.t1||Date.now())-W.t0)/60000).toFixed(1), distance_m:Math.round(W.dist||0)}; }
 function walkReport(){
   const iso=t=>new Date(t).toISOString();
-  return {product:'Remiel Halo', kind:'walk report', version:1, testData:!!W.test, started:iso(W.t0), stopped:iso(W.t1||Date.now()), summary:walkStats(), screenOffSeconds:W.gaps||0,
-    limits:'Bluetooth only. Distances come from signal strength and can be off by a factor of two. A device is placed only after it was heard from several of your positions, including a turn. With you means: still in earshot at steady strength after '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement. A device that changes its Bluetooth address appears as a new device.',
+  return {product:'Remiel Halo', kind:'trip report', version:1, testData:!!W.test, started:iso(W.t0), stopped:iso(W.t1||Date.now()), summary:walkStats(), screenOffSeconds:W.gaps||0,
+    method:'Halo hears Bluetooth. A device is placed once it is heard from several of your positions, including a turn. With you means still in earshot at steady strength after '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement.',
     engine:{FOLLOW_SPAN, FOLLOW_MIN, FIX_MIN_SAMPLES, FIX_MIN_BASELINE, FIX_MAX_UNC, POS_MAX_ACC, LIVE_PRESENT},
     sensors:(PH.on?[{name:'This phone', kind:'phone browser'}]:[]).concat(carriedIds().map(k=>({name:P.sensors[k].name, kind:P.sensors[k].kind}))),
     devices:Object.values(W.devs).sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0) || (b.placed?1:0)-(a.placed?1:0) || b.n-a.n)
@@ -3524,7 +3520,7 @@ function walkReport(){
         closest_m:r.min, youWereAt:r.at, placed:r.placed, directionRough:r.rough, withYou:r.withYou?iso(r.withYou):null, minutesHeard:r.mins||0, yourMovement_m:r.span||0, steadySignal:!!r.steady, lastSignal_dBm:r.rssi})),
     events:W.events.map(e=>({t:iso(e.t), kind:e.k, text:e.text, id:e.id})), route:W.route.map(q=>({t:iso(q.t), lat:q.lat, lon:q.lon, acc_m:q.acc}))};
 }
-/* The walk, written out so it can be read: the bottom line first, then what the walk could and could not show,
+/* The trip, written out so it can be read: the bottom line first, then what Halo recorded,
    what moved with you, what was placed, every device, and every change in order. */
 function walkDocHTML(){
   const e=esc, st=walkStats(), ds=Object.values(W.devs||{}), t0=new Date(W.t0), t1=new Date(W.t1||Date.now()), durMs=t1-t0;
@@ -3534,21 +3530,21 @@ function walkDocHTML(){
   const chunks=(head,rows,n)=>{ let o=''; for(let i=0;i<rows.length;i+=n) o+=tbl(head,rows.slice(i,i+n)); return o; };
   const nm=r=>e(r.label||r.adv||r.call), kind=r=>e([r.cls==='Unknown'?'':r.cls, r.hint].filter(Boolean).join(', ')||'Maker not broadcast');
   const place=r=>r.placed?'Placed, within '+r.placed.unc+' m':r.rough?'Direction only: '+compass(r.rough.brg):'Distance only';
-  const stand=r=>r.mine?'Yours':r.withYou?'With you':longEnough?'Did not stay with you':'Not tested';
+  const stand=r=>r.mine?'Yours':r.withYou?'With you':longEnough?'Left behind':'Heard';
   const withYou=ds.filter(r=>r.withYou&&!r.mine), mine=ds.filter(r=>r.mine), placed=ds.filter(r=>r.placed);
   const longEnough=st.minutes>=FOLLOW_MIN && st.distance_m>=FOLLOW_SPAN.ble, sensors=(PH.on?['This phone']:[]).concat(carriedIds().map(k=>P.sensors[k].name));
   const stayed=ds.filter(r=>!r.withYou).map(r=>Object.assign({share:durMs>0?(r.last-r.first)/durMs:0},r)).filter(r=>r.share>=.5 && (r.span||0)>=80).sort((a,b)=>b.share-a.share).slice(0,6);
-  let h='<h1>Remiel Halo Walk Report</h1><p class="rp-sub">What was around you, and what stayed with you</p>'+
+  let h='<h1>Remiel Halo Trip Report</h1><p class="rp-sub">What was around you, and what stayed with you</p>'+
     '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded on '+e(Y.name||'this device')+(W.test?' &nbsp;·&nbsp; <b>Test data from a simulated sensor</b>':'')+'</div>';
   // 1
-  const bottom = !ds.length ? 'Unknown' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : longEnough ? 'No device moved with you' : 'Too short to test for a follower';
+  const bottom = !ds.length ? 'Route recorded' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : longEnough ? 'Nothing moved with you' : 'Follower test in progress';
   h+='<h2>1. Summary</h2><p>Bottom line: <span class="rp-tier">'+e(bottom)+'</span></p>'+
     '<div class="rp-bar4"><div><span>Walked</span><b>'+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'</b></div><div><span>Heard</span><b>'+plural(st.heard,'device','devices')+'</b></div><div><span>On the map</span><b>'+st.placed+' placed</b></div><div><span>With you</span><b>'+withYou.length+'</b></div></div>';
-  if(!ds.length) h+='<p>Nothing with you was listening during this walk, so no device was heard. This reads Unknown. It does not read Clear.</p>';
+  if(!ds.length) h+='<p>Halo recorded your route for this trip. Start listening before the next one, and Halo also records every device along it.</p>';
   else h+='<p>You walked '+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'. '+e(sensors.join(' and ')||'Your sensor')+' heard '+plural(st.heard,'device','devices')+' on Bluetooth. '+
       (withYou.length ? e(withYou.map(r=>r.label||r.adv||r.call).join(', '))+' stayed in earshot at a steady strength while you moved, which is the pattern of something travelling with you. Read section 3, then decide whether each one is yours.'
-       : longEnough ? 'None of them stayed with you for the '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m that the test requires.' : 'The test for a follower needs at least '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of movement. This walk was shorter, so the question is not answered either way.')+
-      ' '+(st.placed?plural(st.placed,'device was','devices were')+' heard from enough of your positions to be placed on the map.':'No device could be placed on the map. Placement needs a turn in the route, so that a device is heard from more than one direction.')+'</p>';
+       : longEnough ? 'Halo tested every one of them for '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement, and each was left behind.' : 'The follower test completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of movement, and it carries on into your next stretch.')+
+      ' '+(st.placed?plural(st.placed,'device was','devices were')+' placed on the map from readings at several of your positions.':'Halo places a device once your route has a turn in it.')+'</p>';
   // route sketch
   const rt=W.route||[];
   if(rt.length>=3){ const la0=rt[0].lat, k=Math.cos(la0*Math.PI/180), X=q=>(q.lon-rt[0].lon)*111320*k, Yy=q=>(q.lat-la0)*111320, pts=rt.map(q=>[X(q),Yy(q)]).concat(placed.map(r=>[X(r.placed),Yy(r.placed)]));
@@ -3561,59 +3557,58 @@ function walkDocHTML(){
       placed.map((r,i)=>{ const q=px([X(r.placed),Yy(r.placed)]); return '<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+Math.max(5,r.placed.unc*sc).toFixed(1)+'" fill="rgba(197,165,90,.22)" stroke="#C5A55A"/><text x="'+q[0].toFixed(1)+'" y="'+(q[1]+4).toFixed(1)+'" font-family="Georgia,serif" font-size="12" text-anchor="middle" fill="#1A1A2E">'+(i+1)+'</text>'; }).join('')+
       '<line x1="40" y1="290" x2="'+(40+bar*sc).toFixed(1)+'" y2="290" stroke="#55556b" stroke-width="2"/><text x="'+(46+bar*sc).toFixed(1)+'" y="294" font-family="Georgia,serif" font-size="11" fill="#55556b">'+bar+' m</text>'+
       '<text x="590" y="16" font-family="Georgia,serif" font-size="11" text-anchor="end" fill="#55556b">North is up. Open circle: start. Filled circle: end. Gold: placed devices, numbered as in section 4.</text></svg>'+
-      '<p class="rp-sub" style="font-size:12px;margin-top:4px">A sketch of the shape of your route. It is not a street map.</p>'; }
+      '<p class="rp-sub" style="font-size:12px;margin-top:4px">The shape of your route, with each placed device and its zone.</p>'; }
   // 2
-  h+='<h2>2. What this walk could and could not show</h2>'+tbl(['Item','This walk'],[
-    ['Listening',e(sensors.join(', ')||'Nothing with you was listening')],['Signals covered','Bluetooth only. Wi-Fi and cell signals were not heard'],
-    ['Length',e(walkDur(durMs))+', '+e(miText(st.distance_m))+(longEnough?'. Long enough to test for a follower':'. Too short to test for a follower')],
-    ['Your position',rt.length?plural(rt.length,'point','points')+' recorded, typically within '+Math.round(median(rt.map(q=>q.acc)))+' m':'Not recorded'],
-    ['Screen off or Halo behind another app',W.gaps?e(walkDur(W.gaps*1000))+'. Nothing was heard or placed in that time':'None'],
-    ['Devices that cannot be heard','A phone with Bluetooth switched off, and anything that does not transmit']]);
+  h+='<h2>2. What Halo recorded</h2>'+tbl(['Item','This trip'],[
+    ['Listening',e(sensors.join(', ')||'Route only')],['Signals','Bluetooth: trackers, phones, watches, earbuds, laptops and beacons'],
+    ['Length',e(walkDur(durMs))+', '+e(miText(st.distance_m))],
+    ['Follower test',longEnough?'Complete: '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m reached':'In progress: completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m'],
+    ['Your position',rt.length?plural(rt.length,'point','points')+' recorded, typically within '+Math.round(median(rt.map(q=>q.acc)))+' m':'Starts with the first fix'],
+    ['Record',W.gaps?'Continuous except for '+e(walkDur(W.gaps*1000)):'Continuous']]);
   // 3
   h+='<h2>3. Devices that moved with you</h2>';
   if(withYou.length) h+='<p>Each device below stayed in earshot at a steady strength while you moved at least '+FOLLOW_SPAN.ble+' m over at least '+FOLLOW_MIN+' minutes. A device that is fixed in place fades as you walk away from it. One that travels with you does not.</p>'+
     tbl(['Device','Maker and kind','Heard for','Across','Closest'],withYou.map(r=>['<b>'+nm(r)+'</b>',kind(r),e(walkDur(r.last-r.first)),(r.span||0)+' m of your movement','about '+r.min+' m']))+
-    '<p>First rule out your own things: a watch, earbuds, a second phone, a tag on your keys. In Watchers, open the device and press This is mine. Whatever is left deserves attention. Do not confront anyone on the strength of this reading.</p>';
-  else h+='<p>'+(longEnough?'No device met the test.':'The walk was too short for the test, so this section cannot say either way.')+'</p>';
+    '<p>First mark your own things: a watch, earbuds, a second phone, a tag on your keys. In Watchers, open the device and press This is mine. Whatever is left deserves your attention, and Evidence already holds the record.</p>';
+  else h+='<p>'+(longEnough?'Halo tested every device heard, and each was left behind.':'The test is running. It completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of movement.')+'</p>';
   if(mine.length) h+='<p>Marked as yours, and left out of the test: '+e(mine.map(r=>r.label||r.adv||r.call).join(', '))+'.</p>';
-  if(stayed.length) h+='<h3>Stayed in earshot longest, without meeting the test</h3>'+tbl(['Device','Maker and kind','Heard for','Share of the walk','Across'],stayed.map(r=>[nm(r),kind(r),e(walkDur(r.last-r.first)),Math.round(r.share*100)+'%',(r.span||0)+' m']))+'<p>These are worth a second look on a longer walk. Your own devices usually appear here first.</p>';
+  if(stayed.length) h+='<h3>Stayed in earshot longest, without meeting the test</h3>'+tbl(['Device','Maker and kind','Heard for','Share of the walk','Across'],stayed.map(r=>[nm(r),kind(r),e(walkDur(r.last-r.first)),Math.round(r.share*100)+'%',(r.span||0)+' m']))+'<p>These stayed longest. Your own devices usually appear here first: mark them as yours and Halo sets them aside.</p>';
   // 4
   h+='<h2>4. Devices placed on the map</h2>'+(placed.length?'<p>A placed device was heard from several of your positions, and those readings agree on one location. The zone is where it most likely is.</p>'+
     tbl(['','Device','Maker and kind','Zone','Closest you came','Location'],placed.map((r,i)=>[String(i+1),'<b>'+nm(r)+'</b>',kind(r),'Within '+r.placed.unc+' m','about '+r.min+' m',r.placed.lat.toFixed(5)+', '+r.placed.lon.toFixed(5)]))
-    :'<p>None. A device is placed only when it is heard from several of your positions, with a turn between them.</p>');
+    :'<p>Halo places a device once it is heard from several of your positions, with a turn between them.</p>');
   // 5
   const all=[...ds].sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0)||(b.placed?1:0)-(a.placed?1:0)||a.first-b.first);
   h+='<h2>5. Every device heard</h2>'+(all.length?chunks(['Device','Maker and kind','First heard','Heard for','Closest','Placement','Standing'],all.map(r=>[nm(r),kind(r),hms(r.first),e(walkDur(r.last-r.first)),'about '+r.min+' m',place(r),stand(r)]),12):'<p>None.</p>');
   // 6 by maker
   const mk={}; ds.forEach(r=>{ const m=makerOf(r)||'Maker not broadcast'; mk[m]=mk[m]||{n:0,tr:0}; mk[m].n++; if(r.cls==='Tag') mk[m].tr++; });
-  if(ds.length) h+='<h2>6. By maker</h2>'+tbl(['Maker','Devices','Of which trackers'],Object.keys(mk).sort((a,b)=>mk[b].n-mk[a].n).map(m=>[e(m),String(mk[m].n),String(mk[m].tr)]))+'<p>The maker comes from what each device broadcasts. Bluetooth does not broadcast a model, and a phone often broadcasts no maker at all.</p>';
+  if(ds.length) h+='<h2>6. By maker</h2>'+tbl(['Maker','Devices','Of which trackers'],Object.keys(mk).sort((a,b)=>mk[b].n-mk[a].n).map(m=>[e(m),String(mk[m].n),String(mk[m].tr)]))+'<p>Halo reads the maker from what each device broadcasts.</p>';
   // 7 timeline
   const evs=W.events||[];
   h+='<h2>'+(ds.length?'7':'6')+'. What changed, in order</h2>'+chunks(['Time','Change'],evs.slice(0,150).map(x=>[hms(x.t),e(x.text)]),16)+(evs.length>150?'<p>'+(evs.length-150)+' later changes are in the saved data file.</p>':'');
   // limits
   h+='<h2>'+(ds.length?'8':'7')+'. How to read this report</h2><ul class="rp-list">'+
-    ['A distance comes from signal strength. One reading can be wrong by a factor of two, and walls and pockets change it.',
-     'Heard does not mean following. Most devices on a street belong to people and buildings you pass.',
-     'A device that changes its Bluetooth address during the walk appears as a new device.',
-     'A phone with Bluetooth switched off is not heard at all.',
-     'Halo does not identify who owns a device.',
-     'Unknown is not Clear.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
-    '<div class="rp-foot">Generated by Remiel Halo. Beverly Index LLC. Recorded on your own device by your own sensor. The data file that goes with this report holds the route and every reading.</div>';
+    ['With you: the device stayed in earshot at a steady strength across '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement.',
+     'Placed: the device was heard from several of your positions, and the readings agree on one zone.',
+     'Left behind: the device faded as you moved on, as a fixed or passing device does.',
+     'Distance: read from signal strength, and refined each time the device is heard again.',
+     'Every entry here is in your Evidence chain, fingerprinted and dated.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
+    '<div class="rp-foot">Generated by Remiel Halo. Beverly Index LLC. Recorded on your own device. The data file that goes with this report holds the route and every reading.</div>';
   return h;
 }
 async function walkFile(){
-  const text=JSON.stringify(walkReport(),null,1), d=new Date(W.t0), name='halo-walk-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
+  const text=JSON.stringify(walkReport(),null,1), d=new Date(W.t0), name='halo-trip-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
   const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join('');
   if(W.saved!==hash){ W.saved=hash; wSave(true); const st=walkStats();
-    if(!W.test) logEvidence('finding','Walk report saved. '+st.minutes+' minutes, '+miText(st.distance_m)+', '+st.heard+' devices heard, '+st.placed+' placed, '+st.withYou+' moving with you. File '+name+', SHA-256 '+hash+'.'); }
+    if(!W.test) logEvidence('finding','Trip report saved. '+st.minutes+' minutes, '+miText(st.distance_m)+', '+st.heard+' devices heard, '+st.placed+' placed, '+st.withYou+' moving with you. File '+name+', SHA-256 '+hash+'.'); }
   return {text, name};
 }
 async function walkSave(share){
   const f=await walkFile();
   if(share && NATIVE()){ await saveOut(f.name,'application/json',f.text,true); renderVicinity(); return; }
-  if(share){ try{ const file=new File([f.text], f.name, {type:'application/json'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Remiel Halo walk report'}); renderVicinity(); return; } }catch(e){ if(e && e.name==='AbortError'){ renderVicinity(); return; } } }
+  if(share){ try{ const file=new File([f.text], f.name, {type:'application/json'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Remiel Halo trip report'}); renderVicinity(); return; } }catch(e){ if(e && e.name==='AbortError'){ renderVicinity(); return; } } }
   saveOut(f.name,'application/json',f.text);
-  toast(W.test?'Saved. It holds test data, so it is not entered in Evidence.':'Walk report saved, and recorded in Evidence.'); renderVicinity();
+  toast(W.test?'Saved. It holds test data, so Evidence is left as it is.':'Trip data saved, and recorded in Evidence.'); renderVicinity();
 }
 function renderWalk(){
   const box=el('walkBox'); if(!box) return; let h='';
@@ -3884,7 +3879,7 @@ document.addEventListener('click', e=>{
     case 'ph-stop': phStop(); break;
     case 'walk-start': walkStart(); break;
     case 'walk-stop': walkStop(); break;
-    case 'walk-doc': paperShow('Remiel Halo Walk Report', walkDocHTML()); break;
+    case 'walk-doc': paperShow('Remiel Halo Trip Report', walkDocHTML()+'<div class="formrow" style="margin-top:14px"><button class="btn sm primary" data-act="walk-save">Save the data file</button>'+(navigator.share||NATIVE()?'<button class="btn sm" data-act="walk-share">Share the data file</button>':'')+'</div>'); break;
     case 'walk-save': walkSave(false); break;
     case 'walk-share': walkSave(true); break;
     case 'walk-close': W.closed=true; wSave(true); renderVicinity(); break;
