@@ -633,7 +633,7 @@ el('gateGo').addEventListener('click', tryUnlock);
 el('gateKey').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
 
 /* ---------- persisted state (this device only) ---------- */
-function blank(){ return { profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, flagged:{}, photos:{},
+function blank(){ return { profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, labels:{}, flagged:{}, photos:{},
   home:{ armed:false, people:[], rooms:[], contacts:[], rules:{fall:true, still:45, upBy:'09:00', bath:30, night:true} },
   evidence:[], prevHash:'0'.repeat(16) }; }
 function loadState(){
@@ -1293,6 +1293,15 @@ function radiusState(){
   if(!inc) return {r:BASE_R, ext:null};
   return {r:Math.min(MAX_R, Math.ceil((inc.dist+15)/BLOCK_M)*BLOCK_M), ext:inc};
 }
+const VIEW_STEPS=[25,50,BLOCK_M,BASE_R];
+function viewRadius(){
+  const rs=radiusState(), V=vis(); if(rs.ext) return rs.r;
+  if(V.mode!=='live' && V.mode!=='sim') return BASE_R;
+  let far=0; V.devices.forEach(d=>{ if(d.present!==false && d.dist<=rs.r) far=Math.max(far, d.dist+(d.fix?d.fix.unc:0)); });
+  if(!far) return (S._view=BASE_R);
+  const cur=S._view||BASE_R;                              // a tighter view is taken only once everything sits well inside it
+  return (S._view = VIEW_STEPS.find(v=>far<=v*(v<cur?0.7:0.85)) || BASE_R);
+}
 const inRadius = () => { const rs=radiusState(); return vis().devices.filter(d=>d.present && d.dist<=rs.r); };
 const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Math.round(d.dist)+' m';
 const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';          // placed, direction rough, or direction not known
@@ -1303,15 +1312,15 @@ function renderVicinity(){
   el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : V.mode==='sim' ? sus.length+' simulated' : stateWords(V.mode).count;
   el('radLine').className='radline'+(rs.ext?' ext':'');
   el('sphMicro').classList.toggle('ext',!!rs.ext);
-  setHTML(el('microLab'), 'Micro<i> · '+blocks+' blocks'+(rs.ext?', extended':'')+'</i>');
+  const view=viewRadius();
+  setHTML(el('microLab'), 'Micro<i> · '+(view<BASE_R&&!rs.ext ? view+' m view' : blocks+' blocks'+(rs.ext?', extended':''))+'</i>');
   setHTML(el('microState'), shown ? '' : '<b>'+esc(stateWords(V.mode).count)+'</b><span>Unknown, not Clear</span>');
   el('radLine').innerHTML = rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
-    : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b> It extends when a known threat beyond it is incoming.';
+    : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b> It extends when a known threat beyond it is incoming.'+(shown && viewRadius()<BASE_R ? ' Micro is zoomed to '+viewRadius()+' m, because everything heard is inside that.' : '');
   const devLine = V.mode==='live' ? (V.test?'test data from a simulated sensor':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
     : V.mode==='sim' ? 'simulated, updated every 1.6 seconds' : stateWords(V.mode).line;
-  setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':'not shared, so the spheres show no street map')+' · Devices: '+esc(devLine)+
-    (S.pos?'':'<div class="formrow" style="margin-top:8px"><button class="btn sm primary" data-act="geo-ask">Share my position</button></div>'+(S.geoErr?'<div class="limit" style="margin-top:8px">'+esc(geoHelp())+'</div>':'')));
+  setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':'not shared, so the spheres show no street map')+' · Devices: '+esc(devLine));
   syncBase();
   const note=el('mapNote');
   if(MAP || !S.mapFail){ note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':(mobileLive()?'Live from your sensor.':'Live from your home listener.')+' Solid: placed. Ring with a centre dot: direction rough. Hollow on a dashed ring: somewhere on that ring.')
@@ -1322,7 +1331,7 @@ function renderVicinity(){
   else { const list=[...sus].sort((a,b)=>deviceThreat(b).tierIdx-deviceThreat(a).tierIdx || a.dist-b.dist).slice(0,8);
     html = list.length ? list.map(d=>{ const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
       return '<div class="sus'+(S.identId===d.id?' sel':'')+'" data-act="sus" data-id="'+d.id+'" style="--hc:var('+tc+')"><span class="sdot'+mkClass(d)+'" style="--mk:'+markerColor(d)+'"></span>'+
-        '<span class="sn"><b>'+esc(devName(d))+'</b> <span class="sm">'+(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+flagOf(d)+(dirNote(d)?' · '+dirNote(d):'')+(d.sim?' · test data':'')+'</span></span>'+
+        '<span class="sn"><b>'+esc(devName(d))+'</b> <span class="sm">'+esc(kindText(d))+' · '+flagOf(d)+(dirNote(d)?' · '+dirNote(d):'')+(d.sim?' · test data':'')+'</span></span>'+
         '<span class="sd">'+esc(distText(d))+'<br><span class="'+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></span></div>'; }).join('')
       : '<div class="empty" style="padding:14px 6px">'+(V.mode==='live'?'Your sensor is reporting. Nothing is in earshot inside the radius at this moment.':'No simulated devices inside the radius at this moment.')+'</div>'; }
   if(host._h!==html){ host.innerHTML=html; host._h=html; }          // leave the rows alone when nothing changed, so a tap is never lost
@@ -1482,7 +1491,7 @@ function arcLine(lat,lon,m,b0,b1){ const pts=[],dLat=m/111320,dLon=m/(111320*Mat
 function ringsData(){
   // The rim of the Micro sphere is the radius itself. When the radius is extended, the two-block line is drawn inside it.
   const rs=radiusState(), f=(r,kind)=>({type:'Feature',properties:{kind},geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,r)]}});
-  const feats=[f(BLOCK_M,'inner')]; if(rs.ext) feats.push(f(BASE_R,'base'));
+  const feats=[f((rs.ext?BASE_R:viewRadius())/2,'inner')]; if(rs.ext) feats.push(f(BASE_R,'base'));
   return {type:'FeatureCollection',features:feats};
 }
 function devLngLat(d){ if(d.fix) return [d.fix.lon,d.fix.lat];
@@ -1501,7 +1510,7 @@ function fitTo(map,c,r,animate){ const dLat=r/111320, dLon=r/(111320*Math.cos(c.
   try{ map.fitBounds([[c.lon-dLon,c.lat-dLat],[c.lon+dLon,c.lat+dLat]],{padding:8,duration:animate?700:0}); }catch(e){} }
 function fitRadius(force){
   if(!MAP||!MAP_CENTER) return;
-  const r=radiusState().r; if(!force && r===_fitR) return; _fitR=r; fitTo(MAP,MAP_CENTER,r,!force);
+  const r=viewRadius(); if(!force && r===_fitR) return; _fitR=r; fitTo(MAP,MAP_CENTER,r,!force);
 }
 function recentre(lat,lon){
   MAP_CENTER={lat,lon};
@@ -1583,9 +1592,9 @@ const stationLive = () => LIVE.seen.station>0 && Date.now()+LIVE.skew-LIVE.seen.
 function macroUpdate(){
   const r=macroRadius(), h=P.home&&P.home.loc, far=beyond(), heard=heardDevs();
   setHTML(el('macroLab'), 'Macro<i> · '+miText(r)+'</i>');
-  setHTML(el('macroState'), S.pos ? '' : '<b>Position not shared</b><span>The wider area cannot be drawn.</span>');
+  setHTML(el('macroState'), S.pos ? '' : '<b>Needs your position</b><span>Macro is a street map of the area around you.</span>');
   let line='<b>Macro: about '+miText(r)+' around you.</b> ';
-  if(!S.pos) line+='Your position is not shared, so your route and home cannot be placed.';
+  if(!S.pos) line+='Macro is a street map around you, so it needs your position. Micro does not: it shows what your sensor hears. <button class="btn sm primary" data-act="geo-ask" style="margin:4px 6px 4px 0">Share my position</button>'+(S.geoErr?'<span class="limit" style="display:block;margin:6px 0">'+esc(geoHelp())+'</span>':'');
   else {
     let route=0; for(let i=1;i<TRACK.length;i++) route+=Math.hypot(TRACK[i].x-TRACK[i-1].x,TRACK[i].y-TRACK[i-1].y);
     line+='Route this session: '+miText(route)+'. ';
@@ -1608,7 +1617,7 @@ function macroUpdate(){
   placeMarkers(MACRO, MACRO_MK, far.slice(0,20), ' sm');
 }
 const setHTML = (node,html) => { if(node && node._h!==html){ node.innerHTML=html; node._h=html; } };
-function selectDevice(id){ S.identId=id; S.identOpen=true; renderVicinity(); }
+function selectDevice(id){ S.identId=id; S.identOpen=true; S.renaming=false; renderVicinity(); }
 // Device markers on a sphere. A marker carries the tier colour and the placement state, at full contrast.
 function placeMarkers(map, store, list, extra){
   const ids=new Set(list.map(d=>d.id));
@@ -1661,7 +1670,7 @@ function identPick(){
 }
 const dirLine = d => !d.live ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : (d.fix && d.bearing!=null) ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.sector ? 'Roughly '+compass(d.sector.brg) : 'Not known';
 const originLine = d => d.live ? (d.sim ? 'Test data from a simulated sensor' : 'Heard by '+((P.sensors[d.sensor]||{}).name||'your sensor')) : 'Simulated preview';
-function renderIdent(){
+function renderIdent(force){
   const V=vis(), d=identPick(), face=el('idFace'), sp=el('sphIdent'); if(!face) return;
   if(!d){ sp.style.removeProperty('--hc'); face.className='id-face none'; face.style.backgroundImage='';
     setHTML(face, '<div class="g">&#9676;</div><div class="nm">'+((V.mode==='live'||V.mode==='sim')?'Nothing inside the radius':'Unknown')+'</div><div class="mt">'+((V.mode==='live'||V.mode==='sim')?'no threat to show':'not Clear')+'</div>');
@@ -1669,19 +1678,25 @@ function renderIdent(){
   const th=deviceThreat(d), ph=photoOf(d);
   sp.style.setProperty('--hc','var('+TIER_VAR[th.tierIdx]+')'); face.className='id-face'+(ph?' photo':''); face.style.backgroundImage=ph?'url("'+ph+'")':'';
   setHTML(face, '<div class="g">'+d.glyph+'</div><div class="nm">'+esc(devName(d))+'</div><div class="mt">'+esc(d.cls==='Unknown'?'Unidentified':d.cls)+' · '+TIER_NAME[th.tierIdx]+'</div>');
-  setHTML(el('identPanel'), S.identOpen ? identCard(d) : '');
+  if(!S.renaming || force) setHTML(el('identPanel'), S.identOpen ? identCard(d) : '');
 }
 function identCard(d){
   const th=deviceThreat(d), ph=photoOf(d), real=d.live&&!d.sim;
   return '<div class="idcard" style="--hc:var('+TIER_VAR[th.tierIdx]+')"><div class="idtop"><div class="idpic"'+(ph?' style="background-image:url(&quot;'+ph+'&quot;)"':'')+'>'+(ph?'':d.glyph)+'</div>'+
-    '<div><div class="idname">'+esc(devName(d))+'</div><div class="idsub">'+esc(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+TIER_NAME[th.tierIdx]+' · '+flagOf(d)+'</div><div class="idsub">'+esc(originLine(d))+'</div></div>'+
+    '<div style="min-width:0;flex:1">'+(S.renaming
+      ? '<div class="formrow" style="margin-top:0"><input class="inp" id="identLabel" maxlength="40" value="'+esc(labelOf(d))+'" placeholder="Your name for this device"><button class="btn sm primary" data-act="ident-rename-save">Save</button><button class="btn sm" data-act="ident-rename-cancel">Cancel</button></div>'
+      : '<div class="idname">'+esc(devName(d))+(d.live?' <button class="btn sm" data-act="ident-rename" style="margin-left:8px;vertical-align:middle">Rename</button>':'')+'</div>')+
+    '<div class="idsub">'+esc(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+TIER_NAME[th.tierIdx]+' · '+flagOf(d)+'</div><div class="idsub">'+esc(originLine(d))+'</div></div>'+
     '<button class="x" data-act="ident-close" aria-label="Close the identity card">&times;</button></div>'+
     '<div class="kv" style="margin-top:10px"><span class="k">Distance</span><span class="v">'+esc(distText(d))+(d.live&&d.present===false?', '+rosterState(d):'')+'</span>'+
     '<span class="k">Direction</span><span class="v '+(dirLine(d)==='Not known'?'unkc':'')+'">'+esc(dirLine(d))+'</span>'+
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span>'+
     '<span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span>'+
-    '<span class="k">Times heard</span><span class="v">'+d.timesSeen+'</span></div>'+
+    '<span class="k">Times heard</span><span class="v">'+d.timesSeen+'</span>'+
+    (d.live?'<span class="k">Call sign</span><span class="v">'+esc(d.name)+'</span><span class="k">Broadcast name</span><span class="v '+(d.adv?'':'unkc')+'">'+esc(d.adv||'None')+'</span><span class="k">Maker hint</span><span class="v '+(d.hint?'':'unkc')+'">'+esc(d.hint||'None')+'</span>':'')+'</div>'+
+    (real?'<div class="limit" style="margin-top:10px"><b>To find which device this is.</b> Switch Bluetooth off on the device you suspect. If this entry reads out of earshot within a minute, that is the one. Then rename it'+(d.randomizes?'. This kind of device changes its address every few minutes and will come back as a new entry':'')+'.</div>':'')+
     '<div class="dev-acts"><button class="btn primary" data-act="ident-save">Save identity card</button>'+
+    (real?'<button class="btn" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Not mine':'This is mine')+'</button>':'')+
     (real?'<button class="btn" data-act="ident-photo">'+(ph?'Replace your photo':'Attach your photo')+'</button>'+(ph?'<button class="btn" data-act="ident-photo-del">Remove photo</button>':''):'')+
     '<button class="btn" data-act="ident-roster">Open in Signal Roster</button>'+
     (S.identId?'<button class="btn" data-act="ident-auto">Follow the top threat</button>':'')+'</div>'+
@@ -1779,7 +1794,9 @@ function tick(){
   if(el('rost')) renderRoster();
 }
 const band = d => d.dist<30?'Very near':d.dist<=BLOCK_M?'Within one block':d.dist<=BASE_R?'Within two blocks':'Beyond two blocks';
-const devName = d => (d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name;
+const labelOf = d => { const l=d && d.live && P.labels && P.labels[d.id]; return (typeof l==='string' && l) ? l : ''; };
+const devName = d => d.live ? (labelOf(d) || d.adv || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
+const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Unidentified device') : d.cls+(d.hint?', '+d.hint:''))+(d.live && devName(d)!==d.name ? ' · '+d.name : '');
 const flagOf = d => d.mine?'Yours':d.withYou?'With you':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 function deviceThreat(d){ const c=d.identity; let s=1; if(d.withYou) s=4; else if(d.onRoute) s=3; else if(!d.knownBefore) s=2;
@@ -1795,14 +1812,14 @@ function renderRoster(){
     list.forEach(d=>{ const row=host.querySelector('.pull[data-dev="'+d.id+'"]'); if(!row) return;
       const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
       row.style.setProperty('--hc','var('+tc+')'); row.style.setProperty('--ht',TIER_TINT[th.tierIdx]);
-      const ps=row.querySelector('.psum'); if(ps) ps.textContent=d.cls+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'');
+      const ps=row.querySelector('.psum'); if(ps) ps.textContent=kindText(d)+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'');
       const pl=row.querySelector('.pill'); if(pl){ pl.textContent='C'+th.c+'·S'+th.s+' '+TIER_NAME[th.tierIdx]; pl.style.color='var('+tc+')'; pl.style.borderColor='var('+tc+')'; }
       if(d.live){ const pb=row.querySelector('.pull-body'); if(pb && S.openDevices.has(d.id)){ const hb=liveBody(d); if(pb._h!==hb){ pb.innerHTML=hb; pb._h=hb; } } }
       else { const lv=row.querySelector('[data-live]'); if(lv) lv.innerHTML=liveKV(d); } });
     return; }
   host.innerHTML=list.map(d=>{ const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
     return '<div class="pull '+(S.openDevices.has(d.id)?'open':'')+'" data-dev="'+d.id+'" style="--hc:var('+tc+');--ht:'+TIER_TINT[th.tierIdx]+'">'+
-      '<div class="pull-head" data-act="dev" data-id="'+d.id+'"><div class="glyph">'+d.glyph+'</div><div class="phd"><div class="plab">'+esc(devName(d))+'</div><div class="psum">'+d.cls+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'')+'</div></div>'+
+      '<div class="pull-head" data-act="dev" data-id="'+d.id+'"><div class="glyph">'+d.glyph+'</div><div class="phd"><div class="plab">'+esc(devName(d))+'</div><div class="psum">'+esc(kindText(d))+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'')+'</div></div>'+
       '<div class="pmeta"><span class="pill" style="color:var('+tc+');border-color:var('+tc+')">C'+th.c+'·S'+th.s+' '+TIER_NAME[th.tierIdx]+'</span><span class="chev">&#9662;</span></div></div>'+
       '<div class="pull-body">'+(S.openDevices.has(d.id)?(d.live?liveBody(d):deviceBody(d)):'')+'</div></div>'; }).join('')+
     (extra?'<div class="empty" style="padding:10px 6px">'+extra+' more devices were heard and are not listed. Sort by Nearest to see those closest to you.</div>':'');
@@ -1950,7 +1967,7 @@ async function api(method, path, body, auth){
 /* ----- what syncs: one section per subject, last edit wins ----- */
 const hashStr = s => { let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36)+':'+s.length; };
 function sectionsNow(){
-  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{} };
+  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{}, labels:P.labels||{} };
   Object.keys(P.done||{}).forEach(id=>{ const d=P.done[id]; if(d && !Array.isArray(d)) o['done.'+id]=d; });
   Object.keys(P.hits||{}).forEach(id=>{ o['hits.'+id]=P.hits[id]|0; });
   return o; }
@@ -1961,6 +1978,7 @@ function applySection(k,v){
   else if(k==='patch') P.patch=Array.isArray(v)?v:[];
   else if(k==='sensors') P.sensors=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='mine') P.mine=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
+  else if(k==='labels') P.labels=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='home'){ const b=blank().home; P.home=Object.assign(b, (v&&typeof v==='object')?v:{}); P.home.rules=Object.assign(blank().home.rules,(v&&v.rules)||{}); }
   else if(k.indexOf('done.')===0) P.done[k.slice(5)]=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k.indexOf('hits.')===0){ P.hits=P.hits||{}; P.hits[k.slice(5)]=v|0; } }
@@ -2464,15 +2482,22 @@ document.addEventListener('click', e=>{
     case 'sus': { const d=findDevice(a.dataset.id); if(d) selectDevice(d.id); break; }
     case 'sph': { const st=el('stage'), w=a.dataset.s; if(st.dataset.big!==w){ st.dataset.big=w; S.big=w; _fitR=0; _fitM=0; } break; }
     case 'ident-open': { S.identOpen=!S.identOpen; renderIdent(); break; }
-    case 'ident-close': { S.identOpen=false; renderIdent(); break; }
-    case 'ident-auto': { S.identId=null; renderVicinity(); break; }
+    case 'ident-close': { S.identOpen=false; S.renaming=false; renderIdent(); break; }
+    case 'ident-auto': { S.identId=null; S.renaming=false; renderVicinity(); break; }
+    case 'ident-rename': { S.renaming=true; renderIdent(true); const i=el('identLabel'); if(i){ i.focus(); i.select(); } break; }
+    case 'ident-rename-cancel': { S.renaming=false; renderIdent(true); break; }
+    case 'ident-rename-save': { const d=identPick(), v=val('identLabel').slice(0,40); S.renaming=false; if(!d||!d.live) break;
+      P.labels=P.labels||{}; const had=P.labels[d.id]||'';
+      if(v) P.labels[d.id]=v; else delete P.labels[d.id];
+      if(v!==had){ save(); if(!d.sim) logEvidence('note', v ? d.name+' ('+d.id+') was given the name "'+v+'" by the user.' : 'The user\'s name for '+d.name+' ('+d.id+') was removed.'); }
+      S._rsig=''; renderVicinity(); if(el('rost')) renderRoster(); break; }
     case 'ident-roster': { const d=identPick(); if(d) openDeviceInRoster(d); break; }
     case 'ident-save': identSave(); break;
     case 'ident-photo': { const f=el('identFile'); if(f){ f.value=''; f.click(); } break; }
     case 'ident-photo-del': { const d=identPick(); if(d && P.photos && P.photos[d.id]){ delete P.photos[d.id]; save(); logEvidence('note','Photo removed from '+d.name+' ('+d.id+').'); renderVicinity(); } break; }
     case 'macro-r': { S.macroR=+a.dataset.m; _fitM=0; macroUpdate(); break; }
     case 'capture': { const d=findDevice(a.dataset.id); openCapture(d); break; }
-    case 'mine': { const d=findDevice(a.dataset.id); if(!d||!d.live) break; P.mine=P.mine||{}; if(P.mine[d.id]) delete P.mine[d.id]; else P.mine[d.id]=1; save(); liveTick(); S._rsig=''; renderRoster(); break; }
+    case 'mine': { const d=findDevice(a.dataset.id); if(!d||!d.live) break; P.mine=P.mine||{}; if(P.mine[d.id]) delete P.mine[d.id]; else P.mine[d.id]=1; save(); liveTick(); S._rsig=''; if(el('rost')) renderRoster(); break; }
     case 'dev-log': { const d=findDevice(a.dataset.id); if(!d||!d.live||d.sim) break;
       logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+'), '+distText(d)+', '+flagOf(d).toLowerCase()+'. Heard '+d.timesSeen+' times since '+new Date(d.firstSeen).toLocaleTimeString()+'.',{sig:d.sig}); toast('Added to Evidence.'); break; }
     case 'sn-add': sensorAdd(); break;
@@ -2488,7 +2513,7 @@ document.addEventListener('click', e=>{
         else { P.home.loc={lat:S.pos.lat,lon:S.pos.lon,acc:S.pos.acc,t:Date.now()}; S.homeMsg=''; save(); toast('Home location set.'); }
         rerender(); });
       break; }
-    case 'geo-ask': { geoAsk().then(()=>{ renderVicinity(); if(!S.pos) toast('Position not shared. See the note under the map.'); }); break; }
+    case 'geo-ask': { geoAsk().then(()=>{ renderVicinity(); if(!S.pos) toast('Position not shared. The reason is beside the button.'); }); break; }
     case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),device:Y.name||null,chain:P.evidence,otherDevices:remoteEv()},null,2)],{type:'application/json'});
       const l=document.createElement('a'); l.href=URL.createObjectURL(blob); l.download='remiel-halo-evidence.json'; l.click(); toast('Signed log exported.'); break; }
     case 'h-padd': { const n=val('hpName'); if(!n) return toast('Enter the name.'); H.people.push({name:n,rel:val('hpRel'),consent:el('hpConsent').checked,watch:el('hpWatch').checked}); save(); rerender(); break; }
