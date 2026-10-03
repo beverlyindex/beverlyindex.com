@@ -184,6 +184,15 @@ select.inp{flex:none}
 .hrow .hs{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:7px;border:1px solid var(--line);align-self:start;white-space:nowrap;min-width:78px;text-align:center}
 .hrow .hs.ok{color:var(--clear);border-color:rgba(74,232,138,.5)} .hrow .hs.att{color:var(--warn);border-color:rgba(232,168,74,.6)} .hrow .hs.unk{color:var(--mut)}
 .hrow .hx{color:var(--mut);font-size:12.5px}
+.trip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:9px 12px;border-radius:12px;border:1px solid var(--line2);background:rgba(12,20,40,.7);font-size:12.5px;line-height:1.45}
+.trip.on{border-color:rgba(74,232,138,.55)}
+.trip .t{flex:1 1 200px;min-width:0}
+.trip .t b.hot{color:var(--action)}
+.trip .last{display:block;color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trip .x{margin-left:0}
+.listen{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(79,141,240,.5);background:rgba(26,58,130,.22);font-size:13px;line-height:1.45}
+.listen > span{flex:1 1 200px}
+.map-note:empty{display:none}
 .walk{border:1px solid rgba(79,141,240,.45);border-radius:12px;background:rgba(18,34,74,.35);padding:12px 12px 10px;margin-top:10px}
 .walk.on{border-color:var(--clear);background:rgba(20,60,44,.28)}
 .walk-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;line-height:1.4}
@@ -1651,10 +1660,10 @@ function renderVicinity(){
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(shown && viewRadius()<BASE_R ? ' Micro is zoomed to '+viewRadius()+' m.' : '');
   const devLine = V.mode==='live' ? (V.test?'test data from a simulated sensor':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
     : V.mode==='sim' ? 'simulated, updated every 1.6 seconds' : stateWords(V.mode).line;
-  setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':gz()?'your saved home location, because Responder is set to Home':'not shared, so the spheres show no street map')+' · Devices: '+esc(devLine));
+  setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'from your phone, '+Math.max(1,Math.round((Date.now()-P.where.t)/60000))+' min ago':gz()?'your saved home location':'allow location and your map appears')+' · Devices: '+esc(devLine));
   groundSync(); syncBase();
   const note=el('mapNote');
-  if(MAP || !S.mapFail){ note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':(mobileLive()?'Live from your sensor.':'Live from your home listener.')+' The map shows a device once Halo can place it. That takes movement: walk, and make a turn. Until then it is listed below by distance.')
+  if(MAP || !S.mapFail){ note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':'')
     : V.mode==='sim' ? 'Simulated preview. These are not real devices.' : stateWords(V.mode).long; }
   const host=el('suspects'); let html;
   if(!shown) html='<div class="empty" style="padding:14px 6px">'+esc(stateWords(V.mode).long)+'</div>';
@@ -1864,7 +1873,11 @@ function mapStyle(show){
 }
 // Ground zero for the maps is your live position. A map of anywhere else is never shown.
 // The one exception is a computer, which stays at home: it takes the saved home location while Responder is set to Home. A phone never does.
-const gz = () => S.pos || (!isAndroid() && !isIOS() && P.home && okLL(P.home.loc) && !P.home.armed ? {lat:P.home.loc.lat, lon:P.home.loc.lon, acc:P.home.loc.acc||30, home:true} : null);
+const whereFresh = () => (!isAndroid() && !isIOS() && !NATIVE() && P.where && okLL(P.where) && Date.now()-P.where.t<30*60000) ? {lat:P.where.lat, lon:P.where.lon, acc:P.where.acc||30, phone:true, t:P.where.t} : null;
+function whereTick(){ if(!(isAndroid()||isIOS()||NATIVE()) || !S.pos || S.pos.acc>100) return; const w=P.where, now=Date.now();
+  if(w && now-w.t<60000) return; if(w && now-w.t<600000 && distLL(w.lat,w.lon,S.pos.lat,S.pos.lon)<30) return;
+  P.where={lat:+S.pos.lat.toFixed(5), lon:+S.pos.lon.toFixed(5), acc:Math.round(S.pos.acc), t:now}; save(); }
+const gz = () => S.pos || whereFresh() || (!isAndroid() && !isIOS() && P.home && okLL(P.home.loc) && !P.home.armed ? {lat:P.home.loc.lat, lon:P.home.loc.lon, acc:P.home.loc.acc||30, home:true} : null);
 const BASE_IDS = map => (map.getStyle().layers||[]).map(l=>l.id).filter(id=>id.startsWith('b-')||id==='carto');
 const baseOn = map => { try{ const ids=BASE_IDS(map); return ids.length>0 && map.getLayoutProperty(ids[0],'visibility')!=='none'; }catch(e){ return false; } };
 function baseShow(map,on){ try{ BASE_IDS(map).forEach(id=>map.setLayoutProperty(id,'visibility',on?'visible':'none')); return true; }catch(e){ return false; } }
@@ -1979,22 +1992,15 @@ function macroUpdate(){
   const r=macroRadius(), h=P.home&&P.home.loc, far=beyond(), heard=heardDevs();
   setHTML(el('macroLab'), 'Macro<i> · '+miText(r)+'</i>');
   const G=gz();
-  setHTML(el('macroState'), G ? '' : '<b>Needs your position</b><span>Macro is a street map of the area around you.</span>');
+  setHTML(el('macroState'), G ? '' : '<b>Allow location</b>');
   let line='<b>Macro: about '+miText(r)+' around you.</b> ';
-  if(!G){ const gh=S.geoErr?geoHelp():'', cut=gh.indexOf('. ');
-    line+='The street map needs your position. Micro does not. <button class="btn sm primary" data-act="geo-ask" style="margin:4px 6px 4px 0">Share my position</button>'+
-      (gh?'<span class="limit" style="display:block;margin:6px 0">'+esc(cut>0?gh.slice(0,cut+1):gh)+(cut>0?' <details style="display:inline"><summary style="display:inline;cursor:pointer;color:var(--ink);text-decoration:underline">How to allow it</summary> '+esc(gh.slice(cut+2))+'</details>':'')+'</span>':'')+
-      '<span class="limit" style="display:block;margin:6px 0">No permission is needed on a home computer once home is set: on your phone, at home, open Responder and press Set to where I am now.</span>'; }
+  if(!G) line+=(S.geoErr ? esc(geoHelp())+' ' : 'Allow location and your map appears. ')+'<button class="btn sm primary" data-act="geo-ask" style="margin:4px 6px 4px 0">Allow location</button>';
   else {
-    let route=0; for(let i=1;i<TRACK.length;i++) route+=Math.hypot(TRACK[i].x-TRACK[i-1].x,TRACK[i].y-TRACK[i-1].y);
-    line+='Route this session: '+miText(route)+'. ';
     if(okLL(h)){ const dh=distLL(G.lat,G.lon,h.lat,h.lon), bh=(Math.atan2((h.lon-G.lon)*Math.cos(G.lat*Math.PI/180),h.lat-G.lat)*180/Math.PI+360)%360;
-      line+='Home: '+(dh<=HOME_NEAR?'you are there':miText(dh)+' '+compass(bh))+', listener '+(stationLive()?'reporting, '+homeHeard()+' devices in earshot':'not reporting, so home reads Unknown')+'. '; }
-    else line+='Home: not set. Set it in Responder. ';
-    const pts=heard.reduce((n,d)=>n+d.samples.length,0);
-    if(heard.length) line+=heard.length+' flagged '+(heard.length===1?'device was':'devices were')+' heard at '+pts+' points on your route. ';
+      line+='Home: '+(dh<=HOME_NEAR?'you are there':miText(dh)+' '+compass(bh))+(stationLive()?', '+homeHeard()+' devices in earshot of your listener':'')+'. '; }
     const inc=far.filter(d=>isKnownThreat(d));
-    line+= far.length ? far.length+' heard beyond your radius'+(inc.length?', '+inc.length+' of them a known threat':'')+'.' : 'Nothing is heard beyond your radius.';
+    if(heard.length) line+=heard.length+' flagged '+(heard.length===1?'device':'devices')+' on your route. ';
+    if(far.length) line+=far.length+' heard beyond your radius'+(inc.length?', '+inc.length+' a known threat':'')+'. ';
   }
   line+=' <span style="white-space:nowrap">'+MACRO_STEPS.map(m=>'<button class="chipbtn '+((S.macroR||MACRO_DEFAULT)===m?'on':'')+'" data-act="macro-r" data-m="'+m+'">'+miText(m)+'</button>').join(' ')+'</span>';
   setHTML(el('macroLine'), line);
@@ -2023,7 +2029,7 @@ function placeMarkers(map, store, list, extra){
 let _geoOn=false;
 function geoFix(p){
   const la=p.coords.latitude, lo=p.coords.longitude;
-  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; trackPush(la, lo, p.coords.accuracy); walkPos();
+  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; trackPush(la, lo, p.coords.accuracy); walkPos(); whereTick();
   if(typeof p.coords.heading==='number' && !isNaN(p.coords.heading) && p.coords.speed>0.8){ HEAD.gps=p.coords.heading; HEAD.gt=Date.now(); }
   if(MAP && MAP_CENTER){ const moved=Math.hypot((la-MAP_CENTER.lat)*111320, (lo-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
     if(!_centred || moved>6){ _centred=true; recentre(la, lo); } }      // ignore position jitter under 6 metres
@@ -2361,7 +2367,7 @@ async function api(method, path, body, auth){
 /* ----- what syncs: one section per subject, last edit wins ----- */
 const hashStr = s => { let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36)+':'+s.length; };
 function sectionsNow(){
-  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{}, labels:P.labels||{} };
+  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{}, labels:P.labels||{}, where:P.where||null };
   Object.keys(P.done||{}).forEach(id=>{ const d=P.done[id]; if(d && !Array.isArray(d)) o['done.'+id]=d; });
   Object.keys(P.hits||{}).forEach(id=>{ o['hits.'+id]=P.hits[id]|0; });
   return o; }
@@ -2373,6 +2379,7 @@ function applySection(k,v){
   else if(k==='sensors') P.sensors=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='mine') P.mine=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='labels') P.labels=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
+  else if(k==='where') P.where=(v&&typeof v==='object'&&okLL(v)&&Number.isFinite(v.t))?v:null;
   else if(k==='home'){ const b=blank().home; P.home=Object.assign(b, (v&&typeof v==='object')?v:{}); P.home.rules=Object.assign(blank().home.rules,(v&&v.rules)||{}); }
   else if(k.indexOf('done.')===0) P.done[k.slice(5)]=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k.indexOf('hits.')===0){ P.hits=P.hits||{}; P.hits[k.slice(5)]=v|0; } }
@@ -3307,7 +3314,7 @@ function liveTick(){
   const t0=performance.now();
   for(const d of [...LIVE.devs.values()].filter(d=>d.fresh>0 && d.samples.length>=FIX_MIN_SAMPLES).sort((a,b)=>b.fresh-a.fresh)){ if(performance.now()-t0>SOLVE_BUDGET_MS) break; solveFix(d); }
   LIVE.devs.forEach(d=>liveDerive(d,nowS));
-  walkTick();
+  tripAuto(); walkTick();
   if(!booted) return;
   if(S.view==='overview'||S.view==='watchers') renderVicinity();
   if(el('rost')) renderRoster();
@@ -3397,7 +3404,7 @@ function phAdv(ev){ if(!PH.on || typeof ev.rssi!=='number') return; PH.heard++;
 function phFlush(){
   if(!PH.on) return;
   if(PH.native) return void nativeDrain();
-  if(PH.scan && PH.scan.active===false && !PH.lost){ PH.lost=true; if(W.on) wEvent('warn','This phone stopped listening. Press Resume listening.'); renderVicinity(); }
+  if(PH.scan && PH.scan.active===false && !PH.lost){ PH.lost=true; if(W.on) wEvent('warn','Listening paused. Press Resume listening.'); renderVicinity(); }
   if(!PH.buf.size) return;
   const list=[]; PH.buf.forEach((b,id)=>{ const x=b.x; list.push({id, rssi:Math.round(median(b.r)), band:'ble', cls:x.cls, name:x.name, hint:x.hint, conf:x.conf, flags:x.flags}); }); PH.buf.clear();
   const now=Date.now();
@@ -3405,7 +3412,7 @@ function phFlush(){
   liveTick();
 }
 async function phStart(){
-  PH.err=''; PH.msg='';
+  PH.err=''; PH.msg=''; store.set('halo_listen','1');
   if(NATIVE()){ try{ NATIVE().start(); }catch(e){} PH.native=true; PH.on=true; PH.lost=false; PH.asked=Date.now(); if(!PH.timer) PH.timer=setInterval(phFlush, 2000);
     if(W.on) wEvent('note','This phone is listening.'); softRender(); renderVicinity(); return; }
   if(!phCan()){ PH.err='nosupport'; renderVicinity(); return; }
@@ -3416,26 +3423,25 @@ async function phStart(){
   if(W.on) wEvent('note','This phone is listening.');
   toast('This phone is listening for Bluetooth devices.'); softRender(); renderVicinity();
 }
-function phStop(){ try{ if(PH.native) NATIVE().stop(); else if(PH.scan) PH.scan.stop(); }catch(e){} PH.on=false; PH.scan=null; PH.lost=false; softRender(); renderVicinity(); }
+function phStop(){ store.set('halo_listen','0'); try{ if(PH.native) NATIVE().stop(); else if(PH.scan) PH.scan.stop(); }catch(e){} PH.on=false; PH.scan=null; PH.lost=false; softRender(); renderVicinity(); }
 document.addEventListener('visibilitychange', ()=>{ if(PH.on && document.visibilityState==='visible' && PH.scan && PH.scan.active===false){ PH.lost=true; renderVicinity(); } });
 // The words for the phone's own listening, wherever it is offered.
 function phPanel(){
+  const btn=(label,cls)=>'<button class="btn sm '+(cls||'primary')+'" data-act="ph-start">'+label+'</button>';
   if(NATIVE()){ const st=PH.nstat||nativeStatus()||{};
-    if(PH.on && !PH.lost) return {ok:true, html:'This phone is listening, and keeps listening with the screen off.'+(st.screenOffFiltered?' With the screen off it hears the common makers and trackers only.':'')+' <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
-    const why = st.permission==='denied' ? 'Android has not allowed Halo to use Location and Nearby devices. Press the button: it opens the app\'s settings, where you allow both.'
-      : st.permission==='needed' ? 'Halo needs two permissions to listen: Location and Nearby devices. Press the button and allow both.'
-      : st.bluetooth===false ? 'Bluetooth is switched off. Switch it on, then press the button.'
-      : st.locationOn===false ? 'Location is switched off. Switch it on, then press the button.' : 'This phone can listen for Bluetooth devices by itself.';
-    return {ok:false, html:why+' <button class="btn sm primary" data-act="ph-start" style="margin:4px 0 0">'+(PH.on?'Try again':'Listen with this phone')+'</button>'}; }
-  if(PH.on && !PH.lost) return {ok:true, html:'This phone is listening for Bluetooth devices. Keep Halo on screen. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
-  if(PH.on && PH.lost) return {ok:false, html:'This phone stopped listening, because Halo left the screen. <button class="btn sm primary" data-act="ph-start" style="margin:4px 0 0">Resume listening</button>'};
-  if(isIOS()) return {ok:false, html:'An iPhone browser cannot scan Bluetooth, so this phone cannot listen by itself.'};
-  if(!phCan()) return {ok:false, html: isAndroid()
-    ? 'This phone can listen by itself once one Chrome setting is on. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app (not Halo).</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Listen with this phone.</li></ol></details>'
-    : 'This browser cannot scan Bluetooth. On an Android phone, in Chrome, the phone can listen by itself.'};
-  const why = PH.err==='NotAllowedError' ? 'Chrome was not allowed to scan. Press the button again and allow it. If nothing is asked: Android Settings, Apps, Chrome, Permissions, allow Nearby devices and Location.'
-    : PH.err ? 'The scan did not start ('+esc(PH.err)+'). Check that Bluetooth and Location are switched on, then press the button again.' : '';
-  return {ok:false, html:(why?why+' ':'This phone can listen for Bluetooth devices by itself. ')+'<button class="btn sm primary" data-act="ph-start" style="margin:4px 0 0">Listen with this phone</button>'};
+    if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening, with the screen on or off.', html:'This phone is listening, with the screen on or off. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
+    const why = st.permission==='denied' ? 'Allow Location and Nearby devices for Halo, and this phone listens for you.'
+      : st.permission==='needed' ? 'Allow Location and Nearby devices, and this phone listens for you.'
+      : st.bluetooth===false ? 'Switch Bluetooth on, and this phone listens for you.'
+      : st.locationOn===false ? 'Switch Location on, and this phone listens for you.' : 'This phone hears the Bluetooth devices around you.';
+    return {ok:false, text:why, html:why+' '+btn(PH.on?'Try again':'Start listening')}; }
+  if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening.', html:'This phone is listening while Halo is on screen. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
+  if(PH.on && PH.lost) return {ok:false, text:'Listening paused while Halo was off the screen.', html:'Listening paused while Halo was off the screen. '+btn('Resume listening')};
+  if(!phCan()) return {ok:false, text:'', html: isAndroid()
+    ? 'The Halo Android app listens with the screen on or off. In Chrome, one setting gives the same ear while Halo is on screen. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the Chrome steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app.</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Start listening.</li></ol></details>'
+    : 'Listening runs in the Halo Android app, and on a computer at home.'};
+  const why = PH.err==='NotAllowedError' ? 'Allow the scan when Chrome asks, and this phone listens for you.' : PH.err ? 'Switch Bluetooth and Location on, then press the button.' : 'This phone hears the Bluetooth devices around you.';
+  return {ok:false, text:why, html:why+' '+btn('Start listening')};
 }
 
 /* ---------- Walk: a record of what changed around you as you moved, kept for review afterwards ---------- */
@@ -3447,17 +3453,32 @@ function wEvent(k, text, id){ W.events.push({t:Date.now(), k, text, id:id||''});
 const walkDur = ms => { const s=Math.max(0,Math.round(ms/1000)); return s<90 ? s+' seconds' : Math.round(s/60)+' minutes'; };
 const walkName = d => devName(d)+' ('+[d.cls==='Unknown'?'unidentified':d.cls, d.hint].filter(Boolean).join(', ')+')';
 const carriedIds = () => Object.keys(P.sensors||{}).filter(k=>P.sensors[k].kind!=='station');
+// A trip starts by itself when you move while Halo is listening, and ends by itself once you have stopped.
+// It makes no difference whether you walk, cycle or drive.
+const TRIP_START_M=60, TRIP_IDLE_MS=5*60000, TRIP={a:null};
 function walkStart(){
-  Object.assign(W,{on:true, t0:Date.now(), t1:0, events:[], devs:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false});
-  wEvent('start','Walk started.'+(S.pos?'':' Your position is not known yet.')+(mobileLive()?'':' No sensor with you is reporting yet.'));
+  if(W.t0 && W.t1 && Object.keys(W.devs||{}).length){ P.trips=P.trips||[]; const st=walkStats(); P.trips.unshift({t0:W.t0,t1:W.t1,m:st.distance_m,heard:st.heard,placed:st.placed,withYou:st.withYou}); P.trips.length=Math.min(P.trips.length,20); save(); }
+  const a=TRIP.a;
+  Object.assign(W,{on:true, t0:(a&&a.t)||Date.now(), t1:0, events:[], devs:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false});
+  if(a) W.route.push({t:a.t, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10});
+  wEvent('start','Trip started.');
   wLock(); wSave(true); walkTick(); renderVicinity();
 }
-function walkStop(){ if(!W.on) return; walkTick(); W.on=false; W.t1=Date.now(); wEvent('stop','Walk stopped.'); try{ if(_wLock) _wLock.release(); }catch(e){} _wLock=null; wSave(true); renderVicinity(); }
+function walkStop(){ if(!W.on) return; walkTick(); W.on=false; W.t1=Date.now(); wEvent('stop','Trip ended.'); try{ if(_wLock) _wLock.release(); }catch(e){} _wLock=null; TRIP.a=null; wSave(true); renderVicinity(); }
+function tripAuto(){
+  const now=Date.now();
+  if(!W.on){ if(!mobileLive() || !S.pos || S.pos.acc>POS_MAX_ACC) return;
+    if(!TRIP.a || now-TRIP.a.t>20*60000) TRIP.a={lat:S.pos.lat, lon:S.pos.lon, t:now};
+    if(distLL(TRIP.a.lat,TRIP.a.lon,S.pos.lat,S.pos.lon)>=TRIP_START_M) walkStart();
+    return; }
+  const l=W.route[W.route.length-1], moved=l?Math.max(l.t,W.t0):W.t0;
+  if(now-moved>TRIP_IDLE_MS) walkStop();
+}
 document.addEventListener('visibilitychange', ()=>{ if(!W.on) return;
   if(document.visibilityState==='hidden'){ _wHidden=Date.now(); wSave(true); }
   else { if(_wHidden){ const sec=Math.round((Date.now()-_wHidden)/1000); _wHidden=0;
       if(sec>=8 && PH.native && PH.on) wEvent('note','Halo was off the screen for '+walkDur(sec*1000)+'. The app kept listening, and what it heard is added now.');
-      else if(sec>=8){ W.gaps+=sec; wEvent('gap','The screen was off, or Halo was behind another app, for '+walkDur(sec*1000)+'. Your position was not followed in that time.'); } }
+      else if(sec>=8){ W.gaps+=sec; wEvent('gap','Halo was off the screen for '+walkDur(sec*1000)+'. The record resumes from here.'); } }
     if(PH.native && PH.on) nativeDrain();
     wLock(); } });
 function walkPos(q, at){
@@ -3465,14 +3486,14 @@ function walkPos(q, at){
   { const S={pos:sp}, l=W.route[W.route.length-1], dm=l?distLL(l.lat,l.lon,S.pos.lat,S.pos.lon):Infinity, good=S.pos.acc<=POS_MAX_ACC;
     if(l && now<l.t) return;
     if(!l || (good && dm>=8)){ if(l && dm<500) W.dist+=dm; W.route.push({t:now,lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6),acc:Math.round(S.pos.acc)}); if(W.route.length>4000) W.route.shift(); }
-    if(!good && !W.rough){ W.rough=true; wEvent('warn','Your position is only good to '+Math.round(S.pos.acc)+' m. Devices heard now cannot be placed until it improves.'); }
+    if(!good && !W.rough){ W.rough=true; wEvent('warn','Your position is good to '+Math.round(S.pos.acc)+' m just now. Placement resumes as it sharpens.'); }
     else if(good && W.rough){ W.rough=false; wEvent('note','Your position is good again, within '+Math.round(S.pos.acc)+' m.'); } }
 }
 function walkTick(){
   if(!W.on) return; const now=Date.now(), nowS=now+LIVE.skew; walkPos();
   const sen=mobileLive();
-  if(!sen && !W.silent && now-W.t0>20000){ W.silent=true; wEvent('warn','The sensor with you has gone silent. Check that it is awake and online.'); }
-  else if(sen && W.silent){ W.silent=false; wEvent('note','The sensor with you is reporting again.'); }
+  if(!sen && !W.silent && now-W.t0>20000){ W.silent=true; wEvent('warn','Listening paused. Halo resumes as soon as the sensor reports again.'); }
+  else if(sen && W.silent){ W.silent=false; wEvent('note','Listening again.'); }
   LIVE.devs.forEach(d=>{ const heard=nowS-d.seenMobile<LIVE_PRESENT; let r=W.devs[d.id];
     if(!r){ if(!heard) return;
       r=W.devs[d.id]={id:d.id, call:d.name, cls:d.cls, hint:d.hint||'', adv:d.adv||'', band:d.band, first:now, last:now, n:0, min:Math.round(d.dist), at:null, here:true, placed:null, rough:null, withYou:0, sim:!!d.sim};
@@ -3595,33 +3616,13 @@ async function walkSave(share){
   toast(W.test?'Saved. It holds test data, so it is not entered in Evidence.':'Walk report saved, and recorded in Evidence.'); renderVicinity();
 }
 function renderWalk(){
-  const box=el('walkBox'); if(!box) return;
-  const tm=t=>{ const d=new Date(t); return hhmm(t)+':'+String(d.getSeconds()).padStart(2,'0'); };
-  const evs=n=>'<div class="walk-e">'+W.events.slice(-n).reverse().map(e=>'<span class="tm">'+tm(e.t)+'</span><span class="'+e.k+'">'+esc(e.text)+'</span>').join('')+'</div>';
-  const stats=()=>{ const st=walkStats(); return '<div class="walk-st"><div><b>'+(st.minutes<100?st.minutes.toFixed(st.minutes<10?1:0):Math.round(st.minutes))+'</b>minutes</div><div><b>'+esc(miText(st.distance_m))+'</b>walked</div><div><b>'+st.heard+'</b>heard, '+st.placed+' placed</div><div class="'+(st.withYou?'hot':'')+'"><b>'+st.withYou+'</b>with you</div></div>'; };
-  let h='';
-  if(W.on){
-    h='<div class="walk on"><div class="walk-h"><b>Walk in progress</b><span>'+(W.awake?'Screen kept awake.':'Keep this screen on.')+' Now in earshot: '+walkStats().here+'</span><button class="btn sm red" data-act="walk-stop">Stop walk</button></div>'+stats()+
-      (PH.on&&PH.lost ? '<div class="walk-c"><span class="dot" style="background:var(--warn)"></span><span class="t">'+phPanel().html+'</span></div>'
-        : mobileLive()?'':'<div class="walk-c"><span class="dot" style="background:var(--warn)"></span><span class="t">Nothing with you is listening. Halo is following your position but hears nothing. '+(PH.on?'':phPanel().html)+'</span></div>')+evs(8)+'</div>';
-  } else if(W.t0 && W.t1 && !W.closed){
-    const ds=Object.values(W.devs).sort((a,b)=>(b.withYou&&!b.mine?1:0)-(a.withYou&&!a.mine?1:0) || (b.placed?1:0)-(a.placed?1:0) || b.n-a.n);
-    h='<div class="walk"><div class="walk-h"><b>Walk finished</b><span>'+hhmm(W.t0)+' to '+hhmm(W.t1)+(W.test?' · test data':'')+(W.gaps?' · screen off for '+walkDur(W.gaps*1000):'')+'</span></div>'+stats()+
-      (ds.length?ds.slice(0,10).map(r=>'<div class="walk-c"><span class="dot '+(r.withYou&&!r.mine?'':'live')+'" style="'+(r.withYou&&!r.mine?'background:var(--action);box-shadow:0 0 8px var(--action)':r.placed?'':'background:var(--mut);box-shadow:none')+'"></span><span class="t"><b>'+esc(r.label||r.call)+'</b> '+esc([r.cls==='Unknown'?'unidentified':r.cls, r.hint].filter(Boolean).join(', '))+
-          '<br><span class="mono" style="font-size:11px;color:var(--mut)">'+(r.withYou&&!r.mine?'WITH YOU · ':'')+(r.mine?'yours · ':'')+(r.placed?'placed, within '+r.placed.unc+' m':r.rough?'direction rough':'not placed')+' · closest about '+r.min+' m · heard '+walkDur(r.last-r.first)+'</span></span></div>').join('')+
-          (ds.length>10?'<div class="limit" style="margin-top:6px">'+(ds.length-10)+' more in the saved report.</div>':'')
-        :'<div class="walk-c"><span class="t">No device was heard by a sensor with you during this walk. That reads Unknown, not Clear.</span></div>')+
-      '<div class="formrow"><button class="btn sm gold" data-act="walk-doc">Open walk report</button><button class="btn sm primary" data-act="walk-save">Save data file</button>'+(navigator.share||NATIVE()?'<button class="btn sm" data-act="walk-share">Share data file</button>':'')+'<button class="btn sm" data-act="walk-start">New walk</button><button class="btn sm" data-act="walk-close">Close</button></div>'+
-      '<div class="limit" style="margin-top:8px">The report and its data file hold your route and every device heard. They stay on this phone until you save or share them.'+(W.saved?' Saved, SHA-256 '+esc(W.saved.slice(0,16))+'.':'')+'</div>'+
-      '<details style="margin-top:8px"><summary class="limit" style="cursor:pointer">Every change, in order ('+W.events.length+')</summary>'+evs(400)+'</details></div>';
-  } else {
-    const car=carriedIds(), sta=Object.keys(P.sensors||{}).filter(k=>P.sensors[k].kind==='station'), ml=mobileLive();
-    const row=(ok,t)=>'<div class="walk-c"><span class="dot '+(ok?'live':'')+'" style="'+(ok?'':'background:var(--warn);box-shadow:0 0 8px var(--warn)')+'"></span><span class="t">'+t+'</span></div>';
-    h='<div class="walk"><div class="walk-h"><b>Walk</b><span>Record what changes around you as you move, then review it.</span><button class="btn sm primary" data-act="walk-start">Start walk</button></div>'+
-      (()=>{ const ph=phPanel(); return row(ph.ok || ml, ph.ok || !ml ? ph.html : 'Sensor with you: reporting.'); })()+
-      row(!!S.pos && S.pos.acc<=POS_MAX_ACC, S.pos ? 'Your position: live, within '+Math.round(S.pos.acc)+' m.'+(S.pos.acc>POS_MAX_ACC?' Too rough to place devices. Step outside.':'') : 'Your position: not shared. <button class="btn sm" data-act="geo-ask" style="margin:4px 0 0">Share my position</button>')+
-      row('wakeLock' in navigator, 'wakeLock' in navigator ? 'Screen: Halo keeps it awake during the walk. Keep Halo in front.' : 'Screen: this browser cannot keep the screen awake. Set the screen timeout to 10 minutes or more, and keep Halo in front.')+'</div>';
-  }
+  const box=el('walkBox'); if(!box) return; let h='';
+  const phone=!!NATIVE() || isAndroid() || isIOS(), ml=mobileLive();
+  if(phone && !ml && vis().mode!=='sim'){ const ph=phPanel(); h+='<div class="listen"><span>'+ph.html+'</span></div>'; }
+  const st=W.t0?walkStats():null, last=W.events&&W.events.length?W.events.filter(e=>e.k!=='start'&&e.k!=='stop').slice(-1)[0]:null;
+  const line=()=>'<b>'+(W.on?'Trip':'Last trip')+'</b> '+(W.on?'':hhmm(W.t0)+' to '+hhmm(W.t1)+' · ')+esc(walkDur((W.t1||Date.now())-W.t0))+' · '+esc(miText(st.distance_m))+' · '+st.heard+' heard · '+st.placed+' placed · <b class="'+(st.withYou?'hot':'')+'">'+st.withYou+' with you</b>'+(W.test?' · test data':'');
+  if(W.on) h+='<div class="trip on"><span class="dot live"></span><span class="t">'+line()+(last?'<span class="last">'+esc(last.text)+'</span>':'')+'</span><button class="btn sm gold" data-act="walk-doc">Trip report</button></div>';
+  else if(W.t0 && W.t1 && !W.closed) h+='<div class="trip"><span class="t">'+line()+'</span><button class="btn sm gold" data-act="walk-doc">Trip report</button><button class="x" data-act="walk-close" title="Put away">&times;</button></div>';
   setHTML(box,h);
 }
 
@@ -3927,7 +3928,8 @@ function boot(){
   setView('overview'); navKeep();
   setInterval(tick, 1600);
   loadGlobal(); setInterval(loadGlobal, 10*60*1000); setInterval(fillTickers, 60000);
-  syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit();
+  syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit(); startGeo();
+  if(NATIVE() && store.get('halo_listen')==='1'){ const st=nativeStatus(); if(st && st.permission==='granted') phStart(); }
 }
 /* returning visit: unlock only after everything above is defined */
 if(codeOk(store.get('halo_key'))) openApp();
