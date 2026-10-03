@@ -224,9 +224,67 @@ select.inp{flex:none}
 .dot.part{background:var(--warn);box-shadow:0 0 10px var(--warn)}
 
 /* WHEREIS vicinity map (engine ported from Remiel Sentinel) */
-.halo-map{position:relative;width:100%;height:300px;border-radius:14px;overflow:hidden;border:1px solid var(--line2);background:#0a1020}
-.map-note{position:absolute;left:10px;right:10px;top:10px;z-index:2;text-align:center;padding:8px 10px;border-radius:9px;pointer-events:none;
-  color:var(--mut);font-size:11px;font-family:var(--mono);background:rgba(8,13,26,.82);border:1px solid var(--line2);line-height:1.45}
+/* Three spheres, after Remiel Sentinel's WHEREIS: Micro (your vicinity), Macro (the wider area), Identification (the selected threat).
+   The basemap fades into the background. Markers, tier colours and state words stay at full contrast. */
+.stage{position:relative;width:100%;max-width:600px;margin:6px auto 2px;aspect-ratio:1/.9}
+.sph{position:absolute;border-radius:50%;aspect-ratio:1;cursor:pointer;transition:left .45s cubic-bezier(.3,.8,.3,1),top .45s cubic-bezier(.3,.8,.3,1),width .45s cubic-bezier(.3,.8,.3,1);
+  --rim:#4f8df0; box-shadow:0 0 0 2px var(--rim),0 0 0 3px rgba(7,11,22,.9),0 0 34px -4px var(--rim),0 0 90px -30px var(--rim)}
+.sph.ext{--rim:var(--warn)}
+.sph > .sph-map,.sph > .sph-map.maplibregl-map{position:absolute;inset:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 42%,#0f1a34 0,#080d1b 72%)}
+.sph-map .maplibregl-canvas{outline:0}
+.sph::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(160,200,255,.22),inset 0 14px 34px -18px rgba(190,220,255,.28),inset 0 -26px 46px -22px rgba(4,8,18,.9)}
+.sph-lab{position:absolute;left:50%;top:-17px;transform:translateX(-50%);white-space:nowrap;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#9fc4ff;text-shadow:0 0 10px rgba(7,11,22,.9);pointer-events:none}
+.sph.ext .sph-lab{color:var(--warn)}
+.sph-lab i{font-style:normal}
+.stage .sph.macro .sph-lab,.stage[data-big="macro"] .sph.micro .sph-lab{top:auto;bottom:-17px}
+.stage[data-big="macro"] .sph.macro .sph-lab{top:-17px;bottom:auto}
+.stage[data-big="macro"] .sph.micro .sph-lab i{display:none}
+.stage[data-big="macro"] .sph.micro .dev-marker{width:11px;height:11px}
+.stage[data-big="macro"] .sph.micro .you-dot{width:10px;height:10px}
+.sph-state{position:absolute;inset:0;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14%;pointer-events:none;
+  font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;color:#fff;background:rgba(6,10,20,.62)}
+.sph-state:empty{display:none}
+.sph-state b{font-size:13px;font-weight:600}
+.sph-state span{display:block;margin-top:6px;font-size:9.5px;letter-spacing:.1em;color:var(--mut);text-transform:none;font-family:var(--sans);line-height:1.4}
+/* slots: the big sphere to the right, two small ones overlapping its left rim */
+.stage .sph.micro{width:80%;right:0;left:20%;top:5%;z-index:1}
+.stage .sph.macro{width:32%;left:3%;top:56%;z-index:3}
+.stage .sph.ident{width:32%;left:0;top:13%;z-index:4}
+.stage[data-big="macro"] .sph.macro{width:80%;left:20%;top:5%;z-index:1}
+.stage[data-big="macro"] .sph.micro{width:32%;left:3%;top:56%;z-index:3}
+.stage .sph.macro .sph-state b,.stage[data-big="macro"] .sph.micro .sph-state b{font-size:9px}
+.stage .sph.macro .sph-state span,.stage[data-big="macro"] .sph.micro .sph-state span{display:none}
+.stage[data-big="macro"] .sph.macro .sph-state b{font-size:13px}
+.stage[data-big="macro"] .sph.macro .sph-state span{display:block}
+/* the small spheres sit on the big one as glass: the map behind shows at the edge */
+.stage .sph.macro .sph-map,.stage[data-big="macro"] .sph.micro .sph-map{opacity:.94}
+.sph.ident{--rim:var(--hc,#4f8df0);background:radial-gradient(circle at 50% 38%,rgba(26,40,74,.9) 0,rgba(8,13,27,.9) 74%);backdrop-filter:blur(3px)}
+.id-face{position:absolute;inset:0;border-radius:50%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12%;background-size:cover;background-position:center}
+.id-face .g{font-size:clamp(20px,6vw,34px);line-height:1;color:var(--hc,#9fc4ff);text-shadow:0 0 16px var(--hc,#4f8df0)}
+.id-face .nm{margin-top:5px;font-weight:600;font-size:clamp(9.5px,2.4vw,12px);line-height:1.15;color:#fff}
+.id-face .mt{margin-top:3px;font-family:var(--mono);font-size:clamp(7.5px,1.9vw,9px);letter-spacing:.1em;text-transform:uppercase;color:var(--hc,#9fc4ff)}
+.id-face.photo{justify-content:flex-end;padding:0 0 13%}
+.id-face.photo .g{display:none}
+.id-face.photo .nm,.id-face.photo .mt{background:rgba(6,10,20,.72);padding:1px 7px;border-radius:6px}
+.id-face.none .nm{color:var(--mut);font-weight:500}
+.map-note{text-align:center;padding:8px 10px;border-radius:9px;margin-top:10px;
+  color:var(--mut);font-size:11px;font-family:var(--mono);background:rgba(8,13,26,.6);border:1px solid var(--line2);line-height:1.45}
+.macroline{font-size:12px;line-height:1.5;color:var(--mut);margin-top:8px}
+.macroline b{color:var(--ink);font-weight:600}
+.home-dot{width:16px;height:16px;border-radius:4px;transform:rotate(45deg);background:var(--hk,#9fc4ff);border:1px solid rgba(255,255,255,.6);box-shadow:0 0 12px var(--hk,#9fc4ff)}
+.you-dot.sm{width:12px;height:12px}
+.dev-marker.sm{width:13px;height:13px}
+.dev-marker.sel{outline:2px solid #fff;outline-offset:2px}
+.sus.sel{background:rgba(79,141,240,.09)}
+/* the identity card */
+.idcard{margin-top:12px;border:1px solid var(--hc,var(--line2));border-radius:12px;padding:12px 14px;background:rgba(10,16,32,.7);box-shadow:0 0 22px -12px var(--hc,transparent)}
+.idcard .idtop{display:flex;gap:12px;align-items:center}
+.idcard .idpic{flex:none;width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--hc);background:#0c1428 center/cover;box-shadow:0 0 0 2px var(--hc),0 0 18px -4px var(--hc)}
+.idcard .idname{font-weight:600;font-size:15px;color:#fff}
+.idcard .idsub{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-top:3px}
+.idcard .x{margin-left:auto;align-self:flex-start}
+@media(prefers-reduced-motion:reduce){ .sph{transition:none} }
 .maplibregl-ctrl-attrib{font-size:9px!important;opacity:.45}
 .you-dot{width:20px;height:20px;border-radius:50%;position:relative;
   background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.75), var(--watch) 58%, rgba(5,10,25,.5));
@@ -447,7 +505,26 @@ a.tk:hover b{text-decoration:underline}
               <div id="ovVic"><div class="card" id="vicCard">
                 <h3>Vicinity <span class="n" id="vicCount"></span></h3>
                 <div class="radline" id="radLine"></div>
-                <div class="halo-map" id="haloMap"><div class="map-note" id="mapNote">Loading the map.</div></div>
+                <div class="stage" id="stage" data-big="micro">
+                  <div class="sph micro" id="sphMicro" data-act="sph" data-s="micro">
+                    <div class="sph-map" id="haloMap"></div>
+                    <div class="sph-state" id="microState"></div>
+                    <span class="sph-lab" id="microLab">Micro</span>
+                  </div>
+                  <div class="sph macro" id="sphMacro" data-act="sph" data-s="macro">
+                    <div class="sph-map" id="macroMap"></div>
+                    <div class="sph-state" id="macroState"></div>
+                    <span class="sph-lab" id="macroLab">Macro</span>
+                  </div>
+                  <div class="sph ident" id="sphIdent" data-act="ident-open">
+                    <div class="id-face" id="idFace"></div>
+                    <span class="sph-lab">Identification</span>
+                  </div>
+                </div>
+                <div class="map-note" id="mapNote">Loading the map.</div>
+                <div class="macroline" id="macroLine"></div>
+                <div id="identPanel"></div>
+                <input type="file" id="identFile" accept="image/*" hidden>
                 <div class="legend">
                   <span><i style="background:var(--clear)"></i>Known</span>
                   <span><i style="background:var(--warn)"></i>New</span>
@@ -458,6 +535,7 @@ a.tk:hover b{text-decoration:underline}
                 </div>
                 <div id="suspects"></div>
                 <div class="posline" id="posLine"></div>
+                <div class="posline" style="margin-top:4px">Maps: &copy; OpenStreetMap contributors, &copy; CARTO</div>
                 <div class="formrow"><button class="btn sm" data-act="preview" id="prevBtn"></button></div>
               </div></div>
               <div class="card" id="covCard"></div>
@@ -555,7 +633,7 @@ el('gateGo').addEventListener('click', tryUnlock);
 el('gateKey').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
 
 /* ---------- persisted state (this device only) ---------- */
-function blank(){ return { profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, flagged:{},
+function blank(){ return { profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, flagged:{}, photos:{},
   home:{ armed:false, people:[], rooms:[], contacts:[], rules:{fall:true, still:45, upBy:'09:00', bath:30, night:true} },
   evidence:[], prevHash:'0'.repeat(16) }; }
 function loadState(){
@@ -1078,7 +1156,8 @@ const TERMS=[
   ['No warranty','Halo is provided as is, without warranty of any kind. Beverly Index LLC is not liable for damages that arise from its use.'],
   ['Limits of detection','No product detects every threat. A reading of Clear covers only what was assessed. A channel Halo cannot see reads Unknown.'],
   ['Not a medical device','Responder does not replace a medical alert service or emergency services. In an emergency, call the emergency number.'],
-  ['Other people','Use Halo only on devices, accounts and premises that are yours or that you are authorised to manage, and monitor only people who have agreed.'] ];
+  ['Other people','Use Halo only on devices, accounts and premises that are yours or that you are authorised to manage, and monitor only people who have agreed.'],
+  ['Photographs','Halo does not photograph anyone. A photo you attach is one you took or chose, and you are responsible for it. Laws on photographing people differ from place to place.'] ];
 function termsHTML(){ return TERMS.map((x,i)=>'<div class="term"><b>'+(i+1)+'. '+x[0]+'.</b> '+x[1]+'</div>').join(''); }
 function termsPull(){
   const open=S.open.has('terms'), at=P.terms&&P.terms.at;
@@ -1222,6 +1301,9 @@ function renderVicinity(){
   const pb=el('prevBtn'); pb.style.display = V.mode==='live' ? 'none' : ''; pb.textContent = S.preview ? 'Hide simulated preview' : 'Preview with simulated devices';
   el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : V.mode==='sim' ? sus.length+' simulated' : stateWords(V.mode).count;
   el('radLine').className='radline'+(rs.ext?' ext':'');
+  el('sphMicro').classList.toggle('ext',!!rs.ext);
+  setHTML(el('microLab'), 'Micro<i> · '+blocks+' blocks'+(rs.ext?', extended':'')+'</i>');
+  setHTML(el('microState'), shown ? '' : '<b>'+esc(stateWords(V.mode).count)+'</b><span>Unknown, not Clear</span>');
   el('radLine').innerHTML = rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b> It extends when a known threat beyond it is incoming.';
@@ -1229,18 +1311,19 @@ function renderVicinity(){
     : V.mode==='sim' ? 'simulated, updated every 1.6 seconds' : stateWords(V.mode).line;
   el('posLine').textContent = 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':'not shared, the map is not centred on you')+' · Devices: '+devLine;
   const note=el('mapNote');
-  if(MAP){ note.style.display=''; note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':'Live from your sensor. Solid: placed. Ring with a centre dot: direction rough. Hollow on a dashed ring: somewhere on that ring.')
+  if(MAP || !S.mapFail){ note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':'Live from your sensor. Solid: placed. Ring with a centre dot: direction rough. Hollow on a dashed ring: somewhere on that ring.')
     : V.mode==='sim' ? 'Simulated preview. These are not real devices.' : V.mode==='waiting' ? 'Waiting for the first report from your sensor.'
     : V.mode==='none' ? 'Not monitored. No sensor near you is connected, so no suspects are shown.' : stateWords(V.mode).note+' No suspects can be shown. This is Unknown, not Clear.'; }
   const host=el('suspects'); let html;
   if(!shown) html='<div class="empty" style="padding:14px 6px">'+(V.mode==='none'?'No suspects can be shown: no sensor is connected.':esc(stateWords(V.mode).long)+' No suspects can be shown.')+' This is Unknown, not Clear.</div>';
   else { const list=[...sus].sort((a,b)=>deviceThreat(b).tierIdx-deviceThreat(a).tierIdx || a.dist-b.dist).slice(0,8);
     html = list.length ? list.map(d=>{ const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
-      return '<div class="sus" data-act="sus" data-id="'+d.id+'" style="--hc:var('+tc+')"><span class="sdot'+mkClass(d)+'" style="--mk:'+markerColor(d)+'"></span>'+
+      return '<div class="sus'+(S.identId===d.id?' sel':'')+'" data-act="sus" data-id="'+d.id+'" style="--hc:var('+tc+')"><span class="sdot'+mkClass(d)+'" style="--mk:'+markerColor(d)+'"></span>'+
         '<span class="sn"><b>'+esc(devName(d))+'</b> <span class="sm">'+(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+flagOf(d)+(dirNote(d)?' · '+dirNote(d):'')+(d.sim?' · test data':'')+'</span></span>'+
         '<span class="sd">'+esc(distText(d))+'<br><span class="'+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></span></div>'; }).join('')
       : '<div class="empty" style="padding:14px 6px">'+(V.mode==='live'?'Your sensor is reporting. Nothing is in earshot inside the radius at this moment.':'No simulated devices inside the radius at this moment.')+'</div>'; }
   if(host._h!==html){ host.innerHTML=html; host._h=html; }          // leave the rows alone when nothing changed, so a tap is never lost
+  renderIdent(); macroUpdate();
   renderMap();
 }
 
@@ -1377,6 +1460,7 @@ function renderEvidence(){
 
 /* ---------- WHEREIS vicinity map. Engine ported from Remiel Sentinel: MapLibre GL and the CARTO dark basemap ---------- */
 let MAP=null, MAP_CENTER=null, MAP_MARKERS={}, YOU=null, _mlP=null, _mapInit=false, _fitR=0;
+let MACRO=null, MACRO_MK={}, YOU2=null, HOME_MK=null, _fitM=0;
 function loadMapLibre(){
   if(window.maplibregl) return Promise.resolve(true);
   if(_mlP) return _mlP;
@@ -1386,14 +1470,15 @@ function loadMapLibre(){
       s.onload=()=>{clearTimeout(to);res(true)}; s.onerror=()=>{clearTimeout(to);res(false)}; document.head.appendChild(s); }catch(e){ res(false); } });
   return _mlP;
 }
-const mapStyle=()=>({version:8,sources:{carto:{type:'raster',tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],tileSize:256,attribution:'&copy; OpenStreetMap &copy; CARTO'}},layers:[{id:'carto',type:'raster',source:'carto'}]});
+const mapStyle=()=>({version:8,sources:{carto:{type:'raster',tiles:window.HALO_TILES||['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],tileSize:256,attribution:'&copy; OpenStreetMap &copy; CARTO'}},layers:[{id:'carto',type:'raster',source:'carto'}]});
 function circlePoly(lat,lon,m){ const pts=[],dLat=m/111320,dLon=m/(111320*Math.cos(lat*Math.PI/180));
   for(let i=0;i<=64;i++){ const a=i/64*Math.PI*2; pts.push([lon+Math.cos(a)*dLon, lat+Math.sin(a)*dLat]); } return pts; }
 function arcLine(lat,lon,m,b0,b1){ const pts=[],dLat=m/111320,dLon=m/(111320*Math.cos(lat*Math.PI/180));
   for(let b=b0;b<=b1+0.01;b+=4){ const a=b*Math.PI/180; pts.push([lon+Math.sin(a)*dLon, lat+Math.cos(a)*dLat]); } return pts; }
 function ringsData(){
+  // The rim of the Micro sphere is the radius itself. When the radius is extended, the two-block line is drawn inside it.
   const rs=radiusState(), f=(r,kind)=>({type:'Feature',properties:{kind},geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,r)]}});
-  const feats=[f(BLOCK_M,'inner'), f(BASE_R,'base')]; if(rs.ext) feats.push(f(rs.r,'ext'));
+  const feats=[f(BLOCK_M,'inner')]; if(rs.ext) feats.push(f(BASE_R,'base'));
   return {type:'FeatureCollection',features:feats};
 }
 function devLngLat(d){ if(d.fix) return [d.fix.lon,d.fix.lat];
@@ -1407,39 +1492,123 @@ function zonesData(){ const f=[];
     else if(d.sector) f.push({type:'Feature',properties:{kind:'arc'},geometry:{type:'LineString',coordinates:arcLine(MAP_CENTER.lat,MAP_CENTER.lon,d.dist,d.sector.brg-d.sector.half,d.sector.brg+d.sector.half)}});
     else f.push({type:'Feature',properties:{kind:'range'},geometry:{type:'LineString',coordinates:circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,d.dist)}}); });
   return {type:'FeatureCollection',features:f}; }
+const distLL=(la1,lo1,la2,lo2)=>Math.hypot((la2-la1)*111320,(lo2-lo1)*111320*Math.cos(la1*Math.PI/180));
+function fitTo(map,c,r,animate){ const dLat=r/111320, dLon=r/(111320*Math.cos(c.lat*Math.PI/180));
+  try{ map.fitBounds([[c.lon-dLon,c.lat-dLat],[c.lon+dLon,c.lat+dLat]],{padding:8,duration:animate?700:0}); }catch(e){} }
 function fitRadius(force){
   if(!MAP||!MAP_CENTER) return;
-  const r=radiusState().r; if(!force && r===_fitR) return; _fitR=r;
-  const dLat=r/111320, dLon=r/(111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
-  try{ MAP.fitBounds([[MAP_CENTER.lon-dLon,MAP_CENTER.lat-dLat],[MAP_CENTER.lon+dLon,MAP_CENTER.lat+dLat]],{padding:22,duration:force?0:700}); }catch(e){}
+  const r=radiusState().r; if(!force && r===_fitR) return; _fitR=r; fitTo(MAP,MAP_CENTER,r,!force);
 }
 function recentre(lat,lon){
   MAP_CENTER={lat,lon};
   try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); if(YOU) YOU.setLngLat([lon,lat]); fitRadius(true); updateDeviceMarkers(); }catch(e){}
+  _fitM=0; macroUpdate();
 }
+function tintBase(map,op){ try{ map.setPaintProperty('carto','raster-opacity',op); map.setPaintProperty('carto','raster-contrast',.3); map.setPaintProperty('carto','raster-brightness-max',1);
+    map.addSource('tint',{type:'geojson',data:{type:'Feature',geometry:{type:'Polygon',coordinates:[[[-180,-85],[180,-85],[180,85],[-180,85],[-180,-85]]]}}});
+    map.addLayer({id:'tint',type:'fill',source:'tint',paint:{'fill-color':'#12306e','fill-opacity':.22}}); }catch(e){} }
 async function initMap(){
   if(_mapInit) return; _mapInit=true; startGeo();
-  const box=el('haloMap'), note=el('mapNote');
+  const note=el('mapNote');
   const ok=await loadMapLibre();
-  if(!ok){ note.textContent='The map needs a connection.'; _mapInit=false; return; }
+  if(!ok){ S.mapFail=true; note.textContent='The maps need a connection. The list below still works.'; _mapInit=false; return; }
+  S.mapFail=false;
   MAP_CENTER=S.pos ? {lat:S.pos.lat, lon:S.pos.lon} : {lat:34.0522, lon:-118.2437};   // placeholder until the device reports its position
   _centred=!!S.pos;
-  MAP=new window.maplibregl.Map({container:box, style:mapStyle(), center:[MAP_CENTER.lon,MAP_CENTER.lat], zoom:15.5, attributionControl:true, dragRotate:false, pitchWithRotate:false});
+  // Both spheres stay centred on you and do not pan, so a finger on the page always scrolls the page.
+  const opt=box=>({container:box, style:mapStyle(), center:[MAP_CENTER.lon,MAP_CENTER.lat], zoom:15.5, attributionControl:false, interactive:false, fadeDuration:0});
+  const mark=(map,cls)=>{ const e=document.createElement('div'); e.className=cls; return new window.maplibregl.Marker({element:e}).setLngLat([MAP_CENTER.lon,MAP_CENTER.lat]).addTo(map); };
+  MAP=new window.maplibregl.Map(opt(el('haloMap')));
   MAP.once('style.load',()=>{                          // the rings do not wait for the basemap tiles
+    tintBase(MAP,.8);                                    // the basemap sits back in Halo's own blue; what Halo draws on it does not
     MAP.addSource('rings',{type:'geojson',data:ringsData()});
-    MAP.addLayer({id:'rings-inner',type:'line',source:'rings',filter:['==',['get','kind'],'inner'],paint:{'line-color':'#3f74d6','line-width':1,'line-opacity':.3}});
-    MAP.addLayer({id:'rings-base',type:'line',source:'rings',filter:['==',['get','kind'],'base'],paint:{'line-color':'#4f7ae0','line-width':2,'line-opacity':.85}});
-    MAP.addLayer({id:'rings-ext',type:'line',source:'rings',filter:['==',['get','kind'],'ext'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.9,'line-dasharray':[2,2]}});
+    MAP.addLayer({id:'rings-inner',type:'line',source:'rings',filter:['==',['get','kind'],'inner'],paint:{'line-color':'#4f8df0','line-width':1,'line-opacity':.4}});
+    MAP.addLayer({id:'rings-base',type:'line',source:'rings',filter:['==',['get','kind'],'base'],paint:{'line-color':'#4f8df0','line-width':1.5,'line-opacity':.8}});
     MAP.addSource('zones',{type:'geojson',data:zonesData()});
     MAP.addLayer({id:'zone-me',type:'fill',source:'zones',filter:['==',['get','kind'],'me'],paint:{'fill-color':'#3f74d6','fill-opacity':.14}});
     MAP.addLayer({id:'zone-fix',type:'fill',source:'zones',filter:['==',['get','kind'],'fix'],paint:{'fill-color':'#e8a84a','fill-opacity':.12}});
     MAP.addLayer({id:'zone-fix-l',type:'line',source:'zones',filter:['==',['get','kind'],'fix'],paint:{'line-color':'#e8a84a','line-width':1,'line-opacity':.6}});
-    MAP.addLayer({id:'zone-range',type:'line',source:'zones',filter:['==',['get','kind'],'range'],paint:{'line-color':'#9aa6c4','line-width':1,'line-opacity':.45,'line-dasharray':[1.5,2.5]}});
-    MAP.addLayer({id:'zone-arc',type:'line',source:'zones',filter:['==',['get','kind'],'arc'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.75}});
-    const you=document.createElement('div'); you.className='you-dot';
-    YOU=new window.maplibregl.Marker({element:you}).setLngLat([MAP_CENTER.lon,MAP_CENTER.lat]).addTo(MAP);
+    MAP.addLayer({id:'zone-range',type:'line',source:'zones',filter:['==',['get','kind'],'range'],paint:{'line-color':'#9aa6c4','line-width':1,'line-opacity':.55,'line-dasharray':[1.5,2.5]}});
+    MAP.addLayer({id:'zone-arc',type:'line',source:'zones',filter:['==',['get','kind'],'arc'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.8}});
+    YOU=mark(MAP,'you-dot');
     fitRadius(true); renderVicinity();
   });
+  MACRO=new window.maplibregl.Map(opt(el('macroMap')));
+  MACRO.once('style.load',()=>{
+    tintBase(MACRO,.9);
+    MACRO.addSource('macro',{type:'geojson',data:macroData()});
+    MACRO.addLayer({id:'m-foot-f',type:'fill',source:'macro',filter:['==',['get','kind'],'foot'],paint:{'fill-color':'#4f8df0','fill-opacity':.16}});
+    MACRO.addLayer({id:'m-foot',type:'line',source:'macro',filter:['==',['get','kind'],'foot'],paint:{'line-color':'#4f8df0','line-width':1.5,'line-opacity':.9}});
+    MACRO.addLayer({id:'m-track',type:'line',source:'macro',filter:['==',['get','kind'],'track'],paint:{'line-color':'#9fc4ff','line-width':2,'line-opacity':.85}});
+    MACRO.addLayer({id:'m-range',type:'line',source:'macro',filter:['==',['get','kind'],'range'],paint:{'line-color':'#9aa6c4','line-width':1,'line-opacity':.55,'line-dasharray':[1.5,2.5]}});
+    MACRO.addLayer({id:'m-heard',type:'circle',source:'macro',filter:['==',['get','kind'],'heard'],paint:{'circle-radius':3.5,'circle-color':['get','c'],'circle-opacity':.85,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
+    YOU2=mark(MACRO,'you-dot sm');
+    macroUpdate();
+  });
+  if(window.ResizeObserver){ const ro=new ResizeObserver(()=>{ try{ MAP.resize(); MACRO.resize(); }catch(e){} _fitR=0; _fitM=0; fitRadius(true); macroFit(); });
+    ro.observe(el('haloMap')); ro.observe(el('macroMap')); }
+}
+
+/* ----- Macro: the wider area. Your route, home, where flagged devices were heard, and known threats beyond the radius ----- */
+const MILE=1609.344, MACRO_STEPS=[2*MILE,5*MILE,15*MILE], MACRO_DEFAULT=5*MILE;      // ground zero is always your own position
+function macroRadius(){
+  return Math.max(S.macroR||MACRO_DEFAULT, radiusState().r*2);
+}
+const miText = m => m>=160 ? (m/MILE).toFixed(m>=10*MILE?0:1).replace(/\.0$/,'')+' mi' : Math.round(m*3.28084/10)*10+' ft';
+const beyond = () => { const V=vis(), r=radiusState().r; return (V.mode==='live'||V.mode==='sim') ? V.devices.filter(d=>d.present!==false && d.dist>r && !d.mine) : []; };
+const heardDevs = () => { const V=vis(); return V.mode==='live' ? V.devices.filter(d=>(d.withYou||d.onRoute) && !d.mine).slice(0,12) : []; };
+function macroData(){ const f=[];
+  if(MAP_CENTER){
+    f.push({type:'Feature',properties:{kind:'foot'},geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,radiusState().r)]}});
+    if(TRACK.length>1){ const step=Math.max(1,Math.floor(TRACK.length/300)), pts=[];
+      for(let i=0;i<TRACK.length;i+=step){ const q=toLL(TRACK[i].x,TRACK[i].y); pts.push([q.lon,q.lat]); }
+      const q=toLL(TRACK[TRACK.length-1].x,TRACK[TRACK.length-1].y); pts.push([q.lon,q.lat]);
+      f.push({type:'Feature',properties:{kind:'track'},geometry:{type:'LineString',coordinates:pts}}); }
+    heardDevs().forEach(d=>d.samples.forEach(sm=>{ const q=toLL(sm.x,sm.y); f.push({type:'Feature',properties:{kind:'heard',c:d.withYou?'#ff5a5a':'#2dd4ea'},geometry:{type:'Point',coordinates:[q.lon,q.lat]}}); }));
+    beyond().forEach(d=>{ if(d.live && !d.fix && !d.sector) f.push({type:'Feature',properties:{kind:'range'},geometry:{type:'LineString',coordinates:circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,d.dist)}}); });
+  }
+  return {type:'FeatureCollection',features:f}; }
+function macroFit(){ if(!MACRO||!MAP_CENTER) return; const r=macroRadius(); if(r===_fitM) return; const first=!_fitM; _fitM=r; fitTo(MACRO,MAP_CENTER,r,!first); }
+const stationLive = () => LIVE.seen.station>0 && Date.now()+LIVE.skew-LIVE.seen.station<LIVE_SILENT;
+function macroUpdate(){
+  const r=macroRadius(), h=P.home&&P.home.loc, far=beyond(), heard=heardDevs();
+  setHTML(el('macroLab'), 'Macro<i> · '+miText(r)+'</i>');
+  setHTML(el('macroState'), S.pos ? '' : '<b>Position not shared</b><span>The wider area cannot be drawn.</span>');
+  let line='<b>Macro: about '+miText(r)+' around you.</b> ';
+  if(!S.pos) line+='Your position is not shared, so your route and home cannot be placed.';
+  else {
+    let route=0; for(let i=1;i<TRACK.length;i++) route+=Math.hypot(TRACK[i].x-TRACK[i-1].x,TRACK[i].y-TRACK[i-1].y);
+    line+='Route this session: '+miText(route)+'. ';
+    if(okLL(h)){ const dh=distLL(S.pos.lat,S.pos.lon,h.lat,h.lon), bh=(Math.atan2((h.lon-S.pos.lon)*Math.cos(S.pos.lat*Math.PI/180),h.lat-S.pos.lat)*180/Math.PI+360)%360;
+      line+='Home: '+(dh<=HOME_NEAR?'you are there':miText(dh)+' '+compass(bh))+', station '+(stationLive()?'reporting':'not reporting, so home reads Unknown')+'. '; }
+    else line+='Home: not set. Set it in Responder. ';
+    const pts=heard.reduce((n,d)=>n+d.samples.length,0);
+    if(heard.length) line+=heard.length+' flagged '+(heard.length===1?'device was':'devices were')+' heard at '+pts+' points on your route. ';
+    const inc=far.filter(d=>isKnownThreat(d));
+    line+= far.length ? far.length+' heard beyond your radius'+(inc.length?', '+inc.length+' of them a known threat':'')+'.' : 'Nothing is heard beyond your radius.';
+  }
+  line+=' <span style="white-space:nowrap">'+MACRO_STEPS.map(m=>'<button class="chipbtn '+((S.macroR||MACRO_DEFAULT)===m?'on':'')+'" data-act="macro-r" data-m="'+m+'">'+miText(m)+'</button>').join(' ')+'</span>';
+  setHTML(el('macroLine'), line);
+  if(!MACRO||!MAP_CENTER) return;
+  try{ const src=MACRO.getSource('macro'); if(src) src.setData(macroData()); if(YOU2) YOU2.setLngLat([MAP_CENTER.lon,MAP_CENTER.lat]); }catch(e){ return; }
+  macroFit();
+  if(okLL(h)){ if(!HOME_MK){ const e=document.createElement('div'); e.className='home-dot'; e.title='Home'; HOME_MK=new window.maplibregl.Marker({element:e}).setLngLat([h.lon,h.lat]).addTo(MACRO); }
+    HOME_MK.setLngLat([h.lon,h.lat]); HOME_MK.getElement().style.setProperty('--hk', stationLive()?'var(--clear)':'var(--mut)'); }
+  else if(HOME_MK){ HOME_MK.remove(); HOME_MK=null; }
+  placeMarkers(MACRO, MACRO_MK, far.slice(0,20), ' sm');
+}
+const setHTML = (node,html) => { if(node && node._h!==html){ node.innerHTML=html; node._h=html; } };
+function selectDevice(id){ S.identId=id; S.identOpen=true; renderVicinity(); }
+// Device markers on a sphere. A marker carries the tier colour and the placement state, at full contrast.
+function placeMarkers(map, store, list, extra){
+  const ids=new Set(list.map(d=>d.id));
+  Object.keys(store).forEach(id=>{ if(!ids.has(id)){ store[id].remove(); delete store[id]; } });
+  list.forEach(d=>{ const ll=devLngLat(d), mc=mkClass(d), cls='dev-marker'+extra+mc+(S.identId===d.id?' sel':'');
+    const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):' (simulated)');
+    if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
+      e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
+    else{ const m=document.createElement('div'); m.className=cls; m.style.setProperty('--mk',markerColor(d)); m.title=tip;
+      m.addEventListener('click',ev=>{ ev.stopPropagation(); selectDevice(d.id); }); store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); } });
 }
 // Your own position. It feeds the placement of devices, so it does not wait for, or depend on, the map.
 let _geoOn=false;
@@ -1454,19 +1623,97 @@ function startGeo(){
   }, ()=>{}, {enableHighAccuracy:true, timeout:12000, maximumAge:5000});
 }
 let _centred=false;
+/* ----- Identification: the selected threat. A call sign and what is known of the device, or the user's own photo of it ----- */
+const PHOTO_RE=/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/;
+const photoOf = d => { const p=d && P.photos && P.photos[d.id]; return p && typeof p.u==='string' && PHOTO_RE.test(p.u) ? p.u : ''; };
+const bySeverity = (a,b) => deviceThreat(b).tierIdx-deviceThreat(a).tierIdx || a.dist-b.dist;
+function identPick(){
+  const V=vis(); if(V.mode!=='live' && V.mode!=='sim') return null;
+  const chosen=S.identId ? V.devices.find(x=>x.id===S.identId) : null;
+  if(chosen) return chosen;
+  S.identId=null;                                          // nothing chosen, or the chosen device is gone: follow the top threat inside the radius
+  return [...inRadius()].sort(bySeverity)[0] || null;
+}
+const dirLine = d => !d.live ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : (d.fix && d.bearing!=null) ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.sector ? 'Roughly '+compass(d.sector.brg) : 'Not known';
+const originLine = d => d.live ? (d.sim ? 'Test data from a simulated sensor' : 'Heard by '+((P.sensors[d.sensor]||{}).name||'your sensor')) : 'Simulated preview';
+function renderIdent(){
+  const V=vis(), d=identPick(), face=el('idFace'), sp=el('sphIdent'); if(!face) return;
+  if(!d){ sp.style.removeProperty('--hc'); face.className='id-face none'; face.style.backgroundImage='';
+    setHTML(face, '<div class="g">&#9676;</div><div class="nm">'+((V.mode==='live'||V.mode==='sim')?'Nothing inside the radius':'Unknown')+'</div><div class="mt">'+((V.mode==='live'||V.mode==='sim')?'no threat to show':'not Clear')+'</div>');
+    setHTML(el('identPanel'), ''); return; }
+  const th=deviceThreat(d), ph=photoOf(d);
+  sp.style.setProperty('--hc','var('+TIER_VAR[th.tierIdx]+')'); face.className='id-face'+(ph?' photo':''); face.style.backgroundImage=ph?'url("'+ph+'")':'';
+  setHTML(face, '<div class="g">'+d.glyph+'</div><div class="nm">'+esc(devName(d))+'</div><div class="mt">'+esc(d.cls==='Unknown'?'Unidentified':d.cls)+' · '+TIER_NAME[th.tierIdx]+'</div>');
+  setHTML(el('identPanel'), S.identOpen ? identCard(d) : '');
+}
+function identCard(d){
+  const th=deviceThreat(d), ph=photoOf(d), real=d.live&&!d.sim;
+  return '<div class="idcard" style="--hc:var('+TIER_VAR[th.tierIdx]+')"><div class="idtop"><div class="idpic"'+(ph?' style="background-image:url(&quot;'+ph+'&quot;)"':'')+'>'+(ph?'':d.glyph)+'</div>'+
+    '<div><div class="idname">'+esc(devName(d))+'</div><div class="idsub">'+esc(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+TIER_NAME[th.tierIdx]+' · '+flagOf(d)+'</div><div class="idsub">'+esc(originLine(d))+'</div></div>'+
+    '<button class="x" data-act="ident-close" aria-label="Close the identity card">&times;</button></div>'+
+    '<div class="kv" style="margin-top:10px"><span class="k">Distance</span><span class="v">'+esc(distText(d))+(d.live&&d.present===false?', '+rosterState(d):'')+'</span>'+
+    '<span class="k">Direction</span><span class="v '+(dirLine(d)==='Not known'?'unkc':'')+'">'+esc(dirLine(d))+'</span>'+
+    '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span>'+
+    '<span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span>'+
+    '<span class="k">Times heard</span><span class="v">'+d.timesSeen+'</span></div>'+
+    '<div class="dev-acts"><button class="btn primary" data-act="ident-save">Save identity card</button>'+
+    (real?'<button class="btn" data-act="ident-photo">'+(ph?'Replace your photo':'Attach your photo')+'</button>'+(ph?'<button class="btn" data-act="ident-photo-del">Remove photo</button>':''):'')+
+    '<button class="btn" data-act="ident-roster">Open in Signal Roster</button>'+
+    (S.identId?'<button class="btn" data-act="ident-auto">Follow the top threat</button>':'')+'</div>'+
+    '<div class="limit" style="margin-top:10px">'+(real?'Halo cannot photograph anyone. A photo here is one you took or chose. It stays on this device, and its fingerprint is written to Evidence. ':'')+
+    'The name is a call sign Halo gives the device. It is not a person\'s name.</div></div>';
+}
+// The user's own photo: cut square, reduced, and re-encoded, which also strips the camera's location data.
+async function identPhoto(file){
+  const d=identPick(); if(!d || !d.live || d.sim || !file) return;
+  if(!/^image\//.test(file.type)) return toast('Choose a photo.');
+  try{
+    const url=URL.createObjectURL(file), img=new Image(); await new Promise((ok,no)=>{ img.onload=ok; img.onerror=no; img.src=url; });
+    const side=Math.min(img.naturalWidth,img.naturalHeight), c=document.createElement('canvas'); c.width=c.height=480;
+    c.getContext('2d').drawImage(img,(img.naturalWidth-side)/2,(img.naturalHeight-side)/2,side,side,0,0,480,480); URL.revokeObjectURL(url);
+    const u=c.toDataURL('image/jpeg',.8); if(!PHOTO_RE.test(u)) throw new Error('encode');
+    const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', b64.dec(u.split(',')[1])))].map(x=>x.toString(16).padStart(2,'0')).join('');
+    P.photos=P.photos||{}; const ids=Object.keys(P.photos); if(ids.length>=24 && !P.photos[d.id]) delete P.photos[ids.sort((a,b)=>P.photos[a].t-P.photos[b].t)[0]];
+    P.photos[d.id]={u,t:Date.now(),h:hash}; save();
+    logEvidence('note','Photo attached to '+d.name+' ('+d.id+'). SHA-256 '+hash+'. The photo is kept on this device.');
+    toast('Photo attached.'); renderVicinity();
+  }catch(e){ toast('That photo could not be read.'); }
+}
+// A picture of the identity card, to keep or to hand to someone. Test and simulated devices are stamped as such.
+async function identSave(){
+  const d=identPick(); if(!d) return;
+  const th=deviceThreat(d), ph=photoOf(d), W=720, H=960, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
+  const col=getComputedStyle(document.documentElement).getPropertyValue(TIER_VAR[th.tierIdx]).trim()||'#4f8df0';
+  const bg=g.createRadialGradient(W/2,300,40,W/2,300,760); bg.addColorStop(0,'#13203f'); bg.addColorStop(1,'#060a14'); g.fillStyle=bg; g.fillRect(0,0,W,H);
+  g.textAlign='center'; g.fillStyle='#9fc4ff'; g.font='600 20px system-ui, sans-serif'; g.fillText('R E M I E L   H A L O', W/2, 58);
+  g.fillStyle='#7f8bab'; g.font='15px system-ui, sans-serif'; g.fillText('IDENTITY CARD', W/2, 84);
+  const cx=W/2, cy=270, R=140;
+  g.save(); g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.closePath(); g.clip();
+  if(ph){ const im=new Image(); await new Promise(ok=>{ im.onload=ok; im.onerror=ok; im.src=ph; }); try{ g.drawImage(im,cx-R,cy-R,R*2,R*2); }catch(e){} }
+  else { const rg=g.createRadialGradient(cx,cy-30,10,cx,cy,R); rg.addColorStop(0,'#1a2a50'); rg.addColorStop(1,'#080d1b'); g.fillStyle=rg; g.fillRect(cx-R,cy-R,R*2,R*2);
+    g.fillStyle=col; g.font='110px system-ui, sans-serif'; g.textBaseline='middle'; g.fillText(d.glyph,cx,cy+6); g.textBaseline='alphabetic'; }
+  g.restore(); g.lineWidth=5; g.strokeStyle=col; g.shadowColor=col; g.shadowBlur=28; g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.stroke(); g.shadowBlur=0;
+  g.fillStyle='#fff'; g.font='600 38px system-ui, sans-serif'; g.fillText(devName(d), cx, 478);
+  g.fillStyle=col; g.font='600 19px system-ui, sans-serif'; g.fillText(((d.cls==='Unknown'?'Unidentified device':d.cls)+'  ·  '+TIER_NAME[th.tierIdx]+'  ·  '+flagOf(d)).toUpperCase(), cx, 514);
+  const rows=[['Source',originLine(d)],['Distance',distText(d)],['Direction',dirLine(d)],['Trend',d.trend],['First heard',new Date(d.firstSeen).toLocaleString()],['Times heard',String(d.timesSeen)]];
+  if(d.live) rows.push(['Halo reference',d.id]);
+  rows.forEach((r,i)=>{ const y=572+i*40; g.textAlign='left'; g.fillStyle='#7f8bab'; g.font='17px system-ui, sans-serif'; g.fillText(r[0],90,y); g.textAlign='right'; g.fillStyle='#e8eefc'; g.font='18px system-ui, sans-serif'; g.fillText(String(r[1]).slice(0,44),W-90,y);
+    g.strokeStyle='rgba(120,150,210,.18)'; g.lineWidth=1; g.beginPath(); g.moveTo(90,y+13); g.lineTo(W-90,y+13); g.stroke(); });
+  g.textAlign='center';
+  if(!d.live || d.sim){ g.fillStyle='rgba(255,90,90,.16)'; g.fillRect(0,860,W,44); g.fillStyle='#ff8a8a'; g.font='600 18px system-ui, sans-serif'; g.fillText(d.live?'TEST DATA. NOT A REAL DEVICE.':'SIMULATED PREVIEW. NOT A REAL DEVICE.', cx, 888); }
+  g.fillStyle='#7f8bab'; g.font='14px system-ui, sans-serif';
+  g.fillText('The name is a call sign given by Halo. It is not a person\'s name.', cx, 926);
+  g.fillText('Saved '+new Date().toLocaleString()+'  ·  Beverly Index LLC', cx, 946);
+  c.toBlob(b=>{ if(!b) return toast('The card could not be saved.'); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='halo-'+devName(d).toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    if(d.live && !d.sim) logEvidence('note','Identity card saved for '+d.name+' ('+d.id+').'); toast('Identity card saved.'); }, 'image/png');
+}
 function updateDeviceMarkers(){
   if(!MAP||!MAP_CENTER) return;
   try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); const z=MAP.getSource('zones'); if(z) z.setData(zonesData()); }catch(e){}
   fitRadius(false);
-  const V=vis(), pres=(V.mode==='live'||V.mode==='sim')?inRadius():[], ids=new Set(pres.map(d=>d.id));
-  Object.keys(MAP_MARKERS).forEach(id=>{ if(!ids.has(id)){ MAP_MARKERS[id].remove(); delete MAP_MARKERS[id]; } });
-  pres.forEach(d=>{ const ll=devLngLat(d), mc=mkClass(d);
-    const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):' (simulated)');
-    if(MAP_MARKERS[d.id]){ const m=MAP_MARKERS[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d)); e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.title=tip; }
-    else{ const m=document.createElement('div'); m.className='dev-marker'+mc; m.style.setProperty('--mk',markerColor(d)); m.title=tip;
-      m.onclick=()=>{ const x=findDevice(d.id); if(x) openDeviceInRoster(x); }; MAP_MARKERS[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(MAP); } });
+  const V=vis(); placeMarkers(MAP, MAP_MARKERS, (V.mode==='live'||V.mode==='sim')?inRadius():[], '');
 }
-function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else updateDeviceMarkers(); }
+function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else { updateDeviceMarkers(); macroUpdate(); } }
 
 /* ---------- simulated preview devices. Never logged to Evidence ---------- */
 const W1=['Amber','Iron','Silent','North','Grey','Hollow','Pale','Copper','Dusk','Quiet','Stone','Red','Low','Blue','Still','Far','Lone','Dim'];
@@ -2080,7 +2327,7 @@ function sensorsSection(){
   if(SY.cred) h+='<div class="linkcode" id="sensorCred" style="font-size:12.5px;letter-spacing:.02em;text-align:left">'+esc(SY.cred.text)+'</div>'+
     '<div class="limit" style="margin-bottom:8px">This sensor code is shown once. Enter it in the sensor. Anyone who holds it can send reports to your account and read that one sensor\'s reports.</div>'+
     '<div class="formrow" style="margin-top:0"><button class="btn sm" data-act="sn-copy">Copy the code</button><button class="btn sm" data-act="sn-hide">I have saved it</button></div>';
-  h+='<div class="formrow"><input class="inp" id="snName" maxlength="40" placeholder="Name, for example Carried sensor"><select class="inp" id="snKind">'+Object.keys(SENSOR_KIND).map(k=>'<option value="'+k+'"'+(k==='carried'?' selected':'')+'>'+SENSOR_KIND[k]+'</option>').join('')+'</select>'+
+  h+='<div class="formrow"><input class="inp" id="snName" maxlength="40" placeholder="Name, for example Carried sensor"><select class="inp" id="snKind">'+Object.keys(SENSOR_KIND).map(k=>'<option value="'+k+'"'+(k==='phone'?' selected':'')+'>'+SENSOR_KIND[k]+'</option>').join('')+'</select>'+
      '<button class="btn sm primary" data-act="sn-add">Add sensor</button></div></div>';
   return h;
 }
@@ -2183,7 +2430,16 @@ document.addEventListener('click', e=>{
     case 'preview': { if(vis().mode==='live') break; S.preview=!S.preview; if(S.preview && !S.devices.length) seedPreview(); if(!S.preview) S.openDevices.clear(); S._rsig=''; rerender(); if(S.view==='overview'||S.view==='watchers') renderVicinity(); if(el('rost')) renderRoster(); break; }
     case 'sort': S.sort=a.dataset.s; S._rsig=''; rerender(); renderRoster(); break;
     case 'dev': { const id=a.dataset.id; S.openDevices.has(id)?S.openDevices.delete(id):S.openDevices.add(id); renderRoster(); break; }
-    case 'sus': { const d=findDevice(a.dataset.id); if(d) openDeviceInRoster(d); break; }
+    case 'sus': { const d=findDevice(a.dataset.id); if(d) selectDevice(d.id); break; }
+    case 'sph': { const st=el('stage'), w=a.dataset.s; if(st.dataset.big!==w){ st.dataset.big=w; S.big=w; _fitR=0; _fitM=0; } break; }
+    case 'ident-open': { S.identOpen=!S.identOpen; renderIdent(); break; }
+    case 'ident-close': { S.identOpen=false; renderIdent(); break; }
+    case 'ident-auto': { S.identId=null; renderVicinity(); break; }
+    case 'ident-roster': { const d=identPick(); if(d) openDeviceInRoster(d); break; }
+    case 'ident-save': identSave(); break;
+    case 'ident-photo': { const f=el('identFile'); if(f){ f.value=''; f.click(); } break; }
+    case 'ident-photo-del': { const d=identPick(); if(d && P.photos && P.photos[d.id]){ delete P.photos[d.id]; save(); logEvidence('note','Photo removed from '+d.name+' ('+d.id+').'); renderVicinity(); } break; }
+    case 'macro-r': { S.macroR=+a.dataset.m; _fitM=0; macroUpdate(); break; }
     case 'capture': { const d=findDevice(a.dataset.id); openCapture(d); break; }
     case 'mine': { const d=findDevice(a.dataset.id); if(!d||!d.live) break; P.mine=P.mine||{}; if(P.mine[d.id]) delete P.mine[d.id]; else P.mine[d.id]=1; save(); liveTick(); S._rsig=''; renderRoster(); break; }
     case 'dev-log': { const d=findDevice(a.dataset.id); if(!d||!d.live||d.sim) break;
@@ -2209,7 +2465,8 @@ document.addEventListener('click', e=>{
     case 'h-clear': S.homeAlert=null; rerender(); break;
   }
 });
-document.addEventListener('change', e=>{ const k=e.target.dataset && e.target.dataset.rule; if(!k) return;
+document.addEventListener('change', e=>{ if(e.target.id==='identFile'){ identPhoto(e.target.files && e.target.files[0]); return; }
+  const k=e.target.dataset && e.target.dataset.rule; if(!k) return;
   P.home.rules[k]= e.target.type==='number' ? Math.max(1, +e.target.value||0) : e.target.value; save(); });
 
 /* ---------- boot ---------- */
