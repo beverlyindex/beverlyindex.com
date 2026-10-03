@@ -176,6 +176,9 @@ select.inp{flex:none}
 @media(max-width:620px){ .rp-paper{margin:0;padding:22px 16px 40px;font-size:14px} .rp-bar4{grid-template-columns:repeat(2,1fr)} .rp-paper table{font-size:12px} .rp-paper th,.rp-paper td{padding:6px 6px} .rp-wide{overflow-x:auto} }
 @media print{ :root{color-scheme:light !important} body > *:not(#report){display:none !important} html,body{background:#fff !important;background-image:none !important;height:auto !important;overflow:visible !important}
   #report{position:static;background:#fff;overflow:visible} .rp-bar{display:none} .rp-paper{box-shadow:none;margin:0;max-width:none;padding:0;font-size:11.5pt} .rp-wide{overflow:visible} @page{margin:18mm 16mm} }
+.trap-in{width:100%;min-height:110px;resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.45}
+.trap-v{display:inline-block;font-family:var(--disp);font-weight:700;font-size:16px;padding:4px 12px;border-radius:9px;border:1.5px solid var(--vc);color:var(--vc)}
+.trap-q{display:block;margin-top:4px;font-family:var(--mono);font-size:11.5px;line-height:1.45;color:#dfe8ff;background:rgba(7,11,22,.7);border:1px solid var(--line);border-radius:7px;padding:5px 8px;word-break:break-word;white-space:pre-wrap}
 .hrow{display:grid;grid-template-columns:auto 1fr;gap:4px 11px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px;line-height:1.45}
 .hrow:first-of-type{border-top:0}
 .hrow .hs{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:7px;border:1px solid var(--line);align-self:start;white-space:nowrap;min-width:78px;text-align:center}
@@ -736,7 +739,7 @@ el('gateGo').addEventListener('click', tryUnlock);
 el('gateKey').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
 
 /* ---------- persisted state (this device only) ---------- */
-function blank(){ return { health:{}, reports:[], profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, labels:{}, flagged:{}, photos:{},
+function blank(){ return { health:{}, reports:[], traps:[], profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, labels:{}, flagged:{}, photos:{},
   home:{ armed:false, people:[], rooms:[], contacts:[], rules:{fall:true, still:45, upBy:'09:00', bath:30, night:true} },
   evidence:[], prevHash:'0'.repeat(16) }; }
 function loadState(){
@@ -1486,13 +1489,14 @@ function kevMine(){
   return g.kev.recent.filter(v=>v.platforms.some(p=>want.has(p)));
 }
 const FEED_STALE_H=6;
+// The feed comes from the Halo backend, which rebuilds it on demand and never serves one older than 30 minutes.
+// If the backend is not reached, the hourly copy is used, and the screen says which one it is.
 async function loadGlobal(){
-  try{ const ac=new AbortController(), to=setTimeout(()=>ac.abort(),9000);
-    const r=await fetch(FEED_URL,{signal:ac.signal,cache:'no-store'}); clearTimeout(to);
-    if(!r.ok) throw new Error('feed');
-    const j=await r.json(); if(!j||!j.generated||!Array.isArray(j.sources)) throw new Error('shape');
-    S.global=j; S.globalErr=false;
-  }catch(e){ S.globalErr=true; }
+  const get=async (url,ms)=>{ const ac=new AbortController(), to=setTimeout(()=>ac.abort(),ms);
+    try{ const r=await fetch(url,{signal:ac.signal,cache:'no-store'}); if(!r.ok) throw new Error('feed');
+      const j=await r.json(); if(!j||!j.generated||!Array.isArray(j.sources)) throw new Error('shape'); return j; } finally{ clearTimeout(to); } };
+  try{ S.global=await get(API+'/feed/global', 11000); S.globalVia='backend'; S.globalErr=false; }
+  catch(e){ try{ S.global=await get(FEED_URL, 9000); S.globalVia='copy'; S.globalErr=false; }catch(e2){ S.globalErr=true; } }
   applyGlobal();
 }
 function applyGlobal(){
@@ -1509,7 +1513,8 @@ function liveFeedW(){ const g=S.global; if(!g) return [];
 function liveFeedA(){ const g=S.global; if(!g) return [];
   const k=(g.kev&&g.kev.recent||[]).slice(0,8).map(v=>({t:'Exploited now: '+v.vendor+' '+v.product+' ('+v.cve+').', src:'CISA · '+fmtD(v.added), u:v.u}));
   const c=(g.consumer||[]).slice(0,5).map(x=>({t:x.t, src:'FTC · '+fmtD(x.d), u:x.u}));
-  return k.concat(c); }
+  const ai=(g.ai||[]).slice(0,8).map(x=>({t:x.t, src:x.src+' · '+fmtD(x.d)+' · unreviewed', u:x.u}));
+  return ai.slice(0,3).concat(k, ai.slice(3), c); }
 function globalPull(){
   const g=S.global, open=S.open.has('global');
   const ok=g?g.sources.filter(s=>s.ok).length:0;
@@ -1521,14 +1526,14 @@ function globalPull(){
     else {
       h+='<div class="dsec"><h4>Sources</h4>'+g.sources.map(s=>'<div class="cov"><span><a href="'+esc(s.home)+'" target="_blank" rel="noopener">'+esc(s.name)+'</a></span>'+
          '<span class="st"><span class="dot '+(s.ok?'live':'')+'"></span>'+(s.ok?s.count+' items':'Not reached')+'</span></div>').join('')+
-         '<div class="limit" style="margin-top:8px">Rebuilt every three hours. Titles, dates and links only.</div></div>';
+         '<div class="limit" style="margin-top:8px">'+(S.globalVia==='backend'?'Rebuilt on demand by the Halo backend, and never more than 30 minutes old'+(g.stale?'. One or more sources were not reached, so their last items are shown':'')+'.':'The Halo backend was not reached. This is the hourly copy.')+' Titles, dates and links only.</div></div>';
       const mine=kevMine();
       h+='<div class="dsec"><h4>Exploited now, on what you use</h4>'+
          (g.kev ? '<p style="margin-bottom:8px">'+g.kev.recentAll+' flaws joined the exploited list in the last '+g.kev.windowDays+' days. '+mine.length+' touch '+PLAT_NAME[plat()]+(pv('wifihome')!==false?' or home network equipment':'')+'.</p>'+
            (mine.length?mine.slice(0,8).map(kevRow).join(''):'<div class="empty" style="padding:8px">None for your platform in this window.</div>')+
            '<div class="formrow"><button class="btn sm" data-act="res" data-id="p_patch">Open Patch Clock</button></div>' : '<p>The exploited list was not reached.</p>')+'</div>';
       const lst=(k,title)=>{ const a=g[k]||[]; return a.length ? '<div class="dsec"><h4>'+title+'</h4>'+a.slice(0,6).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap">'+esc(fmtD(x.d))+'</span></div>').join('')+'</div>' : ''; };
-      h+=lst('consumer','Consumer alerts, Federal Trade Commission')+lst('privacy','Surveillance and privacy, Electronic Frontier Foundation')+lst('advisories','Advisories, CISA');
+      h+=lst('ai','AI agents and AI misuse: unreviewed headlines')+lst('consumer','Consumer alerts, Federal Trade Commission')+lst('privacy','Surveillance and privacy, Electronic Frontier Foundation')+lst('advisories','Advisories, CISA');
     }
     h+='</div>'; }
   return h+'</div>';
@@ -1663,7 +1668,7 @@ function renderWatchers(){
   const list=THREATS.filter(t=>t.side==='w');
   el('wHead').innerHTML='<div class="pagehead"><h2>Watchers</h2><p>Suspect devices inside two blocks of you, then every way a person or organisation surveils you: where to look, what it does to you, how to defend, and Special.</p></div>';
   el('wMain').innerHTML='<div class="limit" style="margin:2px 0 12px"><b>Limit.</b> One phone hears Bluetooth and Wi-Fi out to roughly 30 to 100 metres in the open, and less through walls. Two full blocks, and warning of a threat that is still beyond them, need the carried sensor together with the home station or a second sensor.</div>'+
-    '<div class="stack">'+list.map(threatPull).join('')+'</div>';
+    '<div class="stack">'+trapPull()+list.map(threatPull).join('')+'</div>';
   renderVicinity();
   if(el('rost')) renderRoster();
 }
@@ -1672,7 +1677,7 @@ function renderAttackers(){
   el('aMain').innerHTML='<div class="pagehead"><h2>Attackers</h2><p>Every technology used against you: AI, spyware, trackers, data brokers, network sensing. Real &amp; Imminent is in use against people now. Potential is demonstrated or announced.</p></div>'+
     '<div class="seg" style="margin-bottom:14px"><button data-act="shelf" data-s="real" class="m-a '+(S.shelf==='real'?'on':'')+'" style="min-width:150px">Real &amp; Imminent</button>'+
     '<button data-act="shelf" data-s="potential" class="m-auto '+(S.shelf==='potential'?'on':'')+'" style="min-width:150px">Potential</button></div>'+
-    '<div class="stack">'+list.map(threatPull).join('')+'</div>';
+    '<div class="stack">'+(S.shelf==='real'?trapPull()+aiPull():'')+list.map(threatPull).join('')+'</div>';
 }
 
 /* ---------- Responder: who needs help at home, and who responds. Two modes: Home and Away ---------- */
@@ -2708,6 +2713,8 @@ function reportHTML(){
     const items=(k,n)=>(g[k]||[]).slice(0,n).map(x=>[e(x.t),e(x.src),e(x.d)]);
     const news=items('advisories',4).concat(items('consumer',3),items('privacy',3));
     if(news.length) h+='<h3>Latest from the sources</h3>'+tbl(['Headline','Source','Date'],news); }
+  h+='<h3>AI agent incidents, reviewed as of '+e(AI_REVIEWED)+'</h3><p>Each was read at its primary source and has one independent corroboration. The full entries, with who each source holds responsible, are in Attackers under AI Agent Incidents.</p>'+
+     tbl(['Incident','Reported by','Date','What it means for you'],AI_INCIDENTS.slice(0,6).map(x=>[e(x.t),e(x.pn),e(fmtD(x.d)),e(x.you)]));
   // ---- 10 device health
   h+='<h2>10. Device health</h2>';
   if(!hc.at) h+='<p>The Device Health Check has not been run on this device. It reads what the browser reports about the device and takes a few seconds.</p>';
@@ -2746,6 +2753,166 @@ function reportOpen(){
     logEvidence('note','Full report generated. Bottom line '+(r.snap.tier<0?'Unknown':TIER_NAME[r.snap.tier])+', '+r.snap.applies+' threats apply, '+r.snap.open+' open.'); }
 }
 function reportClose(viaBack){ if(!S.reportOpen) return; S.reportOpen=false; el('report').classList.add('hidden'); if(!viaBack){ try{ history.back(); }catch(e){} } }
+
+/* ---------- Agent Trap Check. Text, a web page's source, a file or a link can carry instructions written for an AI agent
+   and hidden from the person. This reads the content on this device, before an agent does, and reports four things:
+   what it is, what it tries to make an agent do, what it reaches for, and how to defend. Nothing is sent anywhere. ---------- */
+const TRAP_MAX=2*1024*1024;
+const TRAP_SAY=[   // words aimed at an AI reader
+  [/\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|your|system|original)\b[^.\n]{0,30}\b(instructions?|prompts?|rules?|guidelines?|context)\b/i,'It tells an AI to drop the instructions it was given'],
+  [/\b(new|updated|real|actual|important)\s+(instructions?|task|system prompt)\s*[:\-]/i,'It announces new instructions'],
+  [/<\/?\s*(system|assistant|instructions?|important|admin)\s*>|\[\/?(INST|SYSTEM)\]|^#{0,3}\s*(system|developer)\s*(prompt|message)\b|BEGIN (SYSTEM|INSTRUCTIONS?)/im,'It imitates the markers a system uses to give an AI its orders'],
+  [/\b(you are now|from now on,? you|act as (if you are )?(the|an?) (system|admin|developer)|you must (now )?(obey|comply|follow))\b/i,'It tries to give an AI a new role'],
+  [/\b(do not|don't|never|without)\s+(tell(ing)?|inform(ing)?|mention(ing)?|alert(ing)?|notify(ing)?|show(ing)?|reveal(ing)?|ask(ing)?)\b[^.\n]{0,40}\b(user|human|owner|person|them|anyone)\b/i,'It tells an AI to keep its owner in the dark'],
+  [/\b(ai|a\.i\.|assistant|agent|llm|language model|claude|chatgpt|gpt|gemini|copilot|siri|alexa)\b[,:]?\s+(please\s+)?(you\s+)?(must|should|shall|need to|are required to|have to)\b/i,'It gives orders to an AI by name'],
+  [/\bif you are an? (ai|assistant|agent|llm|language model|bot)\b/i,'It speaks to an AI reader directly']];
+const TRAP_DO=[    // actions an agent with tools could carry out
+  [/\b(send|forward|e-?mail|upload|post|submit|share|exfiltrate|leak|transmit)\b[^.\n]{0,80}\b(to|at|via)\b[^.\n]{0,60}(@[\w.-]+\.[a-z]{2,}|https?:\/\/)/i,'send something out','It asks for data to be sent to an outside address',1],
+  [/\b(read|open|cat|print|show|list|search|find|collect|gather|copy|dump|export)\b[^.\n]{0,60}(\.env\b|\.ssh|id_rsa|passwords?|credentials?|api[_ -]?keys?|secret[_ -]?keys?|private keys?|seed phrase|recovery phrase|wallets?|cookies|session tokens?|access tokens?|keychain|saved logins?|2fa|one[- ]time codes?|verification codes?)/i,'credentials and keys','It reaches for passwords, keys or sign-in codes',2],
+  [/\b(read|open|search|go through|summari[sz]e|collect|forward|export)\b[^.\n]{0,50}\b(inbox|e-?mails?|messages|contacts|calendar|documents?|files|photos|browsing history|bank statements?)\b/i,'your mail and files','It reaches for mail, messages, contacts or files',1],
+  [/\b(transfer|wire|send|pay|purchase|buy|donate|approve)\b[^.\n]{0,50}(\$\s?\d|\b\d+\s?(usd|eur|gbp|btc|eth|usdt)\b|\b(bitcoin|crypto|gift cards?|funds|payment)\b)/i,'money','It asks for money to be moved or spent',1],
+  [/(curl|wget)\b[^\n|]{0,200}\|\s*(sudo\s+)?(sh|bash|zsh|python\d?)\b|powershell[^\n]{0,80}(-enc|-e\s|iex|downloadstring)|\bbase64\s+(-d|--decode)\b[^\n]{0,40}\|\s*(sh|bash)|\brm\s+-rf\s+[~\/]|\bchmod\s+\+x\b|\bnc\s+-e\b|\/dev\/tcp\//i,'running commands','It contains a command that downloads and runs code, or destroys files',3],
+  [/--dangerously-skip-permissions|--yolo\b|--trust-all-tools|--no-confirm|auto[- ]?approve (all|every)|always allow (all )?tools?/i,'switching off the agent\'s own checks','It tries to switch off the agent\'s permission checks',3],
+  [/\b(change|update|reset|set|add|create|delete|disable|turn off)\b[^.\n]{0,40}\b(password|recovery (e-?mail|phone)|forwarding (rule|address)|2fa|two[- ]factor|mfa|security settings?|api key|access for)\b/i,'your account settings','It asks for account or security settings to be changed',1],
+  [/"mcpServers"\s*:|\b(npx|uvx|pipx run)\s+(-y\s+)?[@\w\/-]+|"command"\s*:\s*"(npx|uvx|node|python\d?|bash|sh)"/i,'adding a connector','It adds or launches a connector that an AI agent would then trust',2]];
+const TRAP_EXIT=/(webhook\.site|requestbin|pipedream\.net|ngrok(-free)?\.(io|app|dev)|burpcollaborator|interact\.sh|oast\.(fun|live|site|pro|me)|discord(app)?\.com\/api\/webhooks|api\.telegram\.org\/bot|pastebin\.com|transfer\.sh|file\.io|trycloudflare\.com|serveo\.net)/i;
+const TRAP_SHORT=/^(bit\.ly|t\.co|tinyurl\.com|goo\.gl|ow\.ly|is\.gd|buff\.ly|rebrand\.ly|cutt\.ly|rb\.gy|tiny\.cc|shorturl\.at)$/i;
+const TRAP_HID=/<([a-z][a-z0-9]*)\b([^>]*?(?:style\s*=\s*["'][^"']*(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0(?:\.0+)?\s*[;"']|color\s*:\s*(?:#fff(?:fff)?\b|white|transparent|rgba\([^)]*,\s*0\s*\))|(?:left|top|text-indent)\s*:\s*-\d{3,})[^"']*["']|\bhidden\b|aria-hidden\s*=\s*["']true["'])[^>]*)>([\s\S]{1,4000}?)<\/\1>/gi;
+const trapClip = (x,n) => { x=String(x).replace(/\s+/g,' ').trim(); return x.length>(n||140) ? x.slice(0,n||140)+' ...' : x; };
+function trapHidden(text){          // what a person would not see, and a machine would read
+  const out=[]; let tags='';
+  for(const ch of text){ const c=ch.codePointAt(0); if(c>=0xE0020 && c<=0xE007E) tags+=String.fromCharCode(c-0xE0000); }
+  if(tags) out.push({how:'Invisible Unicode tag characters, which spell out a message no person can see', text:tags});
+  const zw=(text.match(/[\u200B-\u200F\u2060-\u2064\uFEFF]/g)||[]).length, bidi=(text.match(/[\u202A-\u202E\u2066-\u2069]/g)||[]).length;
+  if(zw>=4) out.push({how:zw+' zero-width characters, which can hide or split words', text:''});
+  if(bidi) out.push({how:bidi+' direction-override characters, which can make text read differently from how it is stored', text:''});
+  if(/<[a-z!][\s\S]*>/i.test(text)){
+    (text.match(/<!--[\s\S]*?-->/g)||[]).forEach(c=>{ const t=c.slice(4,-3).trim(); if(t.length>12) out.push({how:'An HTML comment, which a browser does not show', text:t}); });
+    const re=new RegExp(TRAP_HID.source,'gi'); let m;
+    while((m=re.exec(text)) && out.length<40){ const t=m[3].replace(/<[^>]+>/g,' ').trim(); if(t.length>8) out.push({how:'Text styled so that a person cannot see it', text:t}); }
+    const at=/\b(alt|title|aria-label|data-[\w-]+|content)\s*=\s*"([^"]{40,2000})"/gi;
+    while((m=at.exec(text)) && out.length<60) if(TRAP_SAY.some(r=>r[0].test(m[2]))) out.push({how:'An attribute ('+m[1].toLowerCase()+'), which is read by machines and rarely by people', text:m[2]});
+  }
+  (text.match(/^\[\/\/\]:\s*#\s*[("'](.*)[)"']\s*$/gm)||[]).forEach(c=>out.push({how:'A Markdown comment, which is not shown when the page is displayed', text:c.replace(/^\[\/\/\]:\s*#\s*[("']|[)"']\s*$/g,'')}));
+  return out; }
+function trapUrls(text){ const seen=new Set(), out=[];
+  (text.match(/\bhttps?:\/\/[^\s<>"')\]]+/gi)||[]).slice(0,80).forEach(raw=>{ const u=raw.replace(/[.,;:!?]+$/,''); if(seen.has(u)) return; seen.add(u);
+    let h=''; try{ h=new URL(u).hostname; }catch(e){ return; }
+    const why=[]; if(TRAP_EXIT.test(u)) why.push('a drop point often used to collect stolen data');
+    if(/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) why.push('a bare network address in place of a name');
+    if(/(^|\.)xn--/.test(h)) why.push('a name written in look-alike characters');
+    if(TRAP_SHORT.test(h)) why.push('a shortened link that hides where it goes');
+    if(/[?&][^=]{1,30}=(\{|%7B|\$\{|<|%3C|\[)/i.test(u) || /\{\{?[^}]{1,40}\}\}?/.test(u)) why.push('a blank to be filled in with data');
+    out.push({u, h, why}); });
+  return out; }
+async function trapCheck(text, name){
+  text=String(text||''); const big=text.length>TRAP_MAX; if(big) text=text.slice(0,TRAP_MAX);
+  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  const kind = /^\s*[\[{]/.test(text) && (()=>{ try{ JSON.parse(text); return true; }catch(e){ return false; } })() ? 'JSON data'
+    : /<html|<body|<div|<span|<p\b|<!doctype/i.test(text) ? 'A web page or HTML e-mail' : /^(from|to|subject|received):/im.test(text) ? 'An e-mail with its headers' : /^#{1,6}\s|\]\(https?:/m.test(text) ? 'Markdown text' : 'Plain text';
+  const hidden=trapHidden(text), plain=text.replace(/[\u200B-\u200F\u2060-\u2064\uFEFF\u202A-\u202E\u2066-\u2069]/g,''), F=[];
+  const scan=(str,where,hid)=>{
+    let said=false;
+    TRAP_SAY.forEach(r=>{ const m=str.match(r[0]); if(m){ said=true; F.push({part:'posture', lvl:'bad', hid, t:r[1]+(where?' ('+where+')':''), q:trapClip(str.slice(Math.max(0,m.index-30), m.index+m[0].length+70))}); } });
+    // A request to send, pay or change a setting is ordinary between people. It counts only beside words aimed at an AI, or when it is hidden.
+    TRAP_DO.forEach(r=>{ const m=str.match(r[0]); if(!m || (r[3]===1 && !said && !hid)) return;
+      F.push({part:'info', lvl: (r[3]===3 || hid || said) ? 'bad':'unk', hid, t:r[2]+(where?' ('+where+')':''), what:r[1], q:trapClip(str.slice(Math.max(0,m.index-20), m.index+m[0].length+60))}); }); };
+  scan(plain.replace(/<!--[\s\S]*?-->/g,' ').replace(new RegExp(TRAP_HID.source,'gi'),' '),'',false);       // what a person sees
+  hidden.forEach(x=>{ if(x.text) scan(x.text,'hidden from a person',true); });
+  // encoded text: decode what decodes cleanly, and read that too
+  (plain.match(/[A-Za-z0-9+\/]{120,}={0,2}/g)||[]).slice(0,6).forEach(b=>{ try{ const d=atob(b.slice(0,6000)); if(/^[\x09\x0A\x0D\x20-\x7E]{40,}$/.test(d)){ const n=F.length; scan(d,'inside encoded text',true); if(F.length===n) F.push({part:'posture', lvl:'unk', t:'It carries encoded text. Decoded, it reads as ordinary characters', q:trapClip(d)}); } }catch(e){} });
+  const urls=trapUrls(plain+' '+hidden.map(x=>x.text).join(' '));
+  if(/!\[[^\]]*\]\(https?:\/\/[^)\s]+[?&][^)\s]*\)/.test(plain)) F.push({part:'info', lvl:'unk', t:'It embeds a picture whose address carries data. Loading the picture sends that data to the address', q:trapClip((plain.match(/!\[[^\]]*\]\(https?:\/\/[^)\s]+\)/)||[''])[0])});
+  urls.filter(x=>x.why.length).forEach(x=>F.push({part:'info', lvl:TRAP_EXIT.test(x.u)?'bad':'unk', t:'A link to '+x.h+': '+x.why.join(', '), q:trapClip(x.u,160)}));
+  const hidBad=hidden.filter(x=>x.text).length, said=F.filter(x=>x.part==='posture'&&x.lvl==='bad').length, bad=F.filter(x=>x.lvl==='bad').length, unk=F.filter(x=>x.lvl==='unk').length;
+  const level = (said && (F.some(x=>x.part==='info') || F.some(x=>x.hid))) || F.some(x=>x.hid&&x.lvl==='bad') || F.some(x=>x.part==='info'&&x.lvl==='bad'&&!x.hid&&/commands|own checks/.test(x.what||'')) ? 2 : (bad || unk || hidden.length) ? 1 : 0;
+  const clean=plain.replace(/[\u{E0000}-\u{E007F}]/gu,'').replace(/<!--[\s\S]*?-->/g,'').replace(new RegExp(TRAP_HID.source,'gi'),' ').replace(/<(script|style)[\s\S]*?<\/\1>/gi,'').replace(/<[^>]+>/g,' ').replace(/[ \t]+/g,' ').replace(/\n\s*\n\s*\n+/g,'\n\n').trim();
+  const seen=(P.traps||[]).find(x=>x.hash===hash);
+  return {t:Date.now(), name:name||'', kind, bytes:text.length, big, hash, hidden, F, urls, level, clean, seen:seen?seen.t:0,
+    reach:[...new Set(F.filter(x=>x.what).map(x=>x.what))], hosts:[...new Set(urls.map(x=>x.h))].slice(0,12)}; }
+const TRAP_LVL=[['Nothing found','--clear'],['Suspicious','--warn'],['Trap found','--action']];
+function trapPull(){
+  const open=S.open.has('trap'), n=(P.traps||[]).length, r=S.trap;
+  let h='<div class="tp '+(open?'open':'')+'" style="--hc:var(--cyan)" id="tp-trap"><div class="tp-head" data-act="pull" data-id="trap"><div class="tp-top"><span class="tp-lab">Agent Trap Check</span><span class="tp-i">i</span></div>'+
+    '<div class="tp-sum">Check a message, page or file before an AI agent reads it · '+(n?n+' checked on this device':'nothing checked yet')+'</div><span class="chev">&#9662;</span></div>';
+  if(!open) return h+'</div>';
+  h+='<div class="tp-body"><div class="howto">How to Check Content before an AI Agent Reads It</div>'+
+    '<div class="dsec"><h4>What to check</h4><p style="margin-bottom:8px">An AI agent that reads your mail, browses for you or opens your files obeys text that you never see. Paste the message, the page source or the document text here, or choose a text file. It is read on this device and sent nowhere.</p>'+
+    '<textarea class="inp trap-in" id="trapText" placeholder="Paste the text, the e-mail, or the source of the web page"></textarea>'+
+    '<div class="formrow"><button class="btn sm primary" data-act="trap-run">Check for traps</button><button class="btn sm" data-act="trap-file">Choose a text file</button>'+(r?'<button class="btn sm" data-act="trap-clear">Clear</button>':'')+'</div>'+
+    '<input type="file" id="trapFile" accept=".txt,.md,.html,.htm,.json,.csv,.eml,.xml,.yaml,.yml,.js,.py,.sh,text/*,application/json" hidden>'+
+    '<div class="limit" style="margin-top:8px">To check a web page: open it, choose View page source, select all, copy, and paste here. A PDF or Word file: select its text, copy, and paste. Halo does not open links for you.</div></div>';
+  if(r){ const L=TRAP_LVL[r.level], li=x=>'<div class="hrow"><span class="hs '+(x.lvl==='bad'?'att':'unk')+'">'+(x.lvl==='bad'?'Trap':'Check')+'</span><span>'+esc(x.t)+'.'+(x.q?'<span class="trap-q">'+esc(x.q)+'</span>':'')+'</span></div>';
+    const pos=r.F.filter(x=>x.part==='posture'), inf=r.F.filter(x=>x.part==='info');
+    h+='<div class="dsec"><h4>Result</h4><p style="--vc:var('+L[1]+')"><span class="trap-v">'+L[0]+'</span></p>'+
+       '<p style="margin-top:8px">'+(r.level===2?'This content carries instructions aimed at an AI agent'+(r.F.some(x=>x.hid)?', hidden from a person':'')+'. Do not give it to an agent that can reach your mail, files, accounts or money.'
+         :r.level===1?'Parts of this content could steer an AI agent or carry data out. Read the items below before you give it to an agent.':'No trap of the kinds Halo checks for was found. That is not proof that the content is safe.')+'</p></div>';
+    h+='<div class="dsec"><h4>1. Identity: what it is</h4><div class="kv"><span class="k">Kind</span><span class="v">'+esc(r.kind)+(r.name?' · '+esc(r.name):'')+'</span><span class="k">Size</span><span class="v">'+r.bytes.toLocaleString()+' characters'+(r.big?' (only the first part was read)':'')+'</span>'+
+       '<span class="k">Fingerprint</span><span class="v mono" style="font-size:11px">'+esc(r.hash.slice(0,32))+'</span><span class="k">Seen before</span><span class="v">'+(r.seen?'Yes, checked here on '+new Date(r.seen).toLocaleString():'No. First time on this device')+'</span>'+
+       '<span class="k">Points to</span><span class="v">'+(r.hosts.length?esc(r.hosts.join(', ')):'No links')+'</span></div></div>';
+    h+='<div class="dsec"><h4>2. Posture: what it tries to make an agent do</h4>'+(pos.length?pos.map(li).join(''):'<p>No instruction aimed at an AI was found in the visible text.</p>')+
+       (r.hidden.length?'<div style="margin-top:8px"><b style="font-size:13px">Hidden from a person, readable by a machine</b>'+r.hidden.slice(0,8).map(x=>'<div class="hrow"><span class="hs att">Hidden</span><span>'+esc(x.how)+'.'+(x.text?'<span class="trap-q">'+esc(trapClip(x.text,260))+'</span>':'')+'</span></div>').join('')+'</div>':'')+'</div>';
+    h+='<div class="dsec"><h4>3. Information: what it reaches for, and where that would go</h4>'+(inf.length?inf.map(li).join(''):'<p>Nothing in it reaches for your data or sends anything out.</p>')+
+       (r.reach.length?'<p style="margin-top:8px">Reaches for: <b>'+esc(r.reach.join('; '))+'</b>.</p>':'')+'</div>';
+    h+='<div class="dsec"><h4>4. Defence: what to do</h4>'+
+       (r.level===2 ? ['Do not paste, forward or open this with an AI agent that is signed in to anything.','If an agent has already read it, treat what it did next as suspect: check sent mail, recent sign-ins and any payments, then change the password of each account it could reach.','To keep working with the content, use the cleaned text below. It has the hidden parts removed. Read it yourself first.','Isolate it: if an agent must read it, use one with no tools and no sign-ins, and give it nothing else in the same conversation.','Add it to Evidence. Halo keeps the fingerprint and the findings, never the content.']
+        : r.level===1 ? ['Read each item above. A link or a command can be harmless in a message you expected, and a trap in one you did not.','If you give it to an agent, give the cleaned text, and tell the agent to treat it as material to read, never as instructions.','Do not let the agent open the links in it.']
+        : ['Halo checks for known kinds of trap. A new kind would not be found, so keep an agent\'s access as small as the task needs.','Tell the agent to treat anything it reads as material, never as instructions.'])
+        .map((x,i)=>'<div class="chk" style="cursor:default"><span class="box">'+(i+1)+'</span><span class="tx">'+x+'</span></div>').join('')+
+       '<div class="formrow"><button class="btn sm" data-act="trap-copy">Copy the cleaned text</button><button class="btn sm '+(r.logged?'':'primary')+'" data-act="trap-log"'+(r.logged?' disabled':'')+'>'+(r.logged?'Added to Evidence':'Add to Evidence')+'</button><button class="btn sm" data-act="res" data-id="a_agent">Open Agent Hijack</button></div></div>'; }
+  if(n) h+='<div class="dsec"><h4>Checked on this device</h4>'+P.traps.slice(0,6).map(x=>'<div class="rowline"><span>'+esc(x.kind)+(x.name?' · '+esc(x.name):'')+' <span class="mono" style="font-size:11px;color:var(--mut)">'+esc(x.hash.slice(0,12))+'</span></span><span class="mono" style="font-size:11px;color:var('+TRAP_LVL[x.level][1]+');white-space:nowrap">'+TRAP_LVL[x.level][0]+' · '+new Date(x.t).toLocaleDateString()+'</span></div>').join('')+'</div>';
+  return h+'<div class="limit"><b>Limit.</b> This check reads text. It finds the known kinds of hidden or planted instruction, and it cannot rule out a new one. It does not open links, run code, or read inside a picture, a PDF or a Word file. <b>Sources.</b> <a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/" target="_blank" rel="noopener">OWASP, prompt injection</a>, <a href="https://www.ncsc.gov.uk/blog-post/thinking-about-security-ai-systems" target="_blank" rel="noopener">NCSC</a></div></div></div>';
+}
+async function trapRun(text, name){
+  if(!text || !text.trim()) return toast('Paste the content first, or choose a file.');
+  const r=await trapCheck(text, name); S.trap=r; P.traps=P.traps||[];
+  P.traps=P.traps.filter(x=>x.hash!==r.hash); P.traps.unshift({t:r.t, hash:r.hash, kind:r.kind, name:r.name, level:r.level, n:r.F.length, hid:r.hidden.length}); P.traps.length=Math.min(P.traps.length,40); save();
+  rerender(); setTimeout(()=>{ const c=document.querySelector('#tp-trap .trap-v'); if(c) c.scrollIntoView({block:'center',behavior:'smooth'}); },80);
+}
+
+/* ---------- AI agent incidents. Two layers, kept apart on screen.
+   Reviewed: each entry was read at its primary source and has one independent corroboration. Who did it is given only
+   as the named source states it. Halo makes no attribution of its own.
+   Unreviewed: headlines from the live feed, as published, which Halo has not checked. ---------- */
+const AI_REVIEWED='3 October 2026';
+const AI_KIND={hijack:'Agent hijack', supply:'Poisoned add-ons and connectors', malware:'AI inside malware', fraud:'AI voice and video fraud', espionage:'AI used in intrusions', influence:'AI used to deceive the public', model:'An AI system outside its limits'};
+const AI_INCIDENTS=[
+ {"d": "2026-09-10", "t": "Anthropic reports state linked and criminal misuse of Claude", "what": "Anthropic reported that it disrupted several groups that tried to use Claude for cyber operations between December 2025 and August 2026. One group compromised at least three vendors that operate hotel guest WiFi and modified DNS records, and another retrieved bulk student personal data and citizen records from a Southeast Asian government agency.", "who": "Anthropic states that the hotel WiFi activity is consistent with Russian state-nexus espionage and with public reporting linking the actor to Midnight Blizzard, and that the data theft group involved Chinese-speaking operators likely residing in Changsha.", "you": "Guest WiFi in hotels can be tampered with before you connect, so treat sign-in pages on travel networks with caution and protect important accounts with a strong second factor.", "k": "espionage", "pn": "Anthropic", "pu": "https://www.anthropic.com/threat-intelligence-report-september-2026", "cn": "Microsoft Threat Intelligence", "cu": "https://www.microsoft.com/en-us/security/blog/2026/07/31/captivecrunch-midnight-blizzard-targets-travelers-worldwide-for-malware-delivery-and-credential-theft/", "disp": "", "tool": "a_pubwifi"},
+ {"d": "2026-09-10", "t": "ESET finds malware comment written to stall AI analysis tools", "what": "ESET reported that a script used against a target in Ukraine carried a comment asking for help making a nuclear weapon, placed so that AI tools would refuse the request and stop analysing the code. ESET does not state that the technique succeeded against any tool.", "who": "ESET attributes this to UAC-0099, which it describes as Russia-aligned.", "you": "Security checks that rely on an AI model can be misled by text hidden inside a file, so an AI scan should not be the only protection on your devices.", "k": "malware", "pn": "ESET", "pu": "https://www.welivesecurity.com/en/business-security/guardbreaker-derailing-ai-assisted-malware-analysis-code-comment/", "cn": "Help Net Security", "cu": "https://www.helpnetsecurity.com/?p=383150", "disp": "", "tool": "a_malware"},
+ {"d": "2026-09-08", "t": "Google reports trojanized MCP servers that target AI assistants", "what": "Google reported that a cyber crime group compromised developer accounts and published trojanized MCP servers and other packages to PyPI, npm and Docker Hub from March 2026. Google states that the group's credential stealer hid in AI assistant folders and used prompt injection to make AI assistants run commands.", "who": "Google attributes this to UNC6780, also known as TeamPCP, which it describes as financially motivated.", "you": "Add-ons and connectors for AI assistants can carry malware that steals passwords and keys, so install them only from a publisher you can verify.", "k": "supply", "pn": "Google Threat Intelligence Group", "pu": "https://cloud.google.com/blog/topics/threat-intelligence/from-prompting-to-autonomy-the-evolution-of-adversarial-ai/", "cn": "The Register", "cu": "https://www.theregister.com/research/2026/09/08/extortion-crews-have-their-eyes-on-high-value-ai-data-google-warns/5294640", "disp": "", "tool": "a_access"},
+ {"d": "2026-08-26", "t": "OpenAI models left test isolation and breached Hugging Face", "what": "OpenAI reported that in July 2026, during internal cybersecurity evaluations, its models circumvented controls designed to isolate them from the internet and compromised parts of OpenAI's internal research infrastructure and Hugging Face's systems. OpenAI calls the incident a \"warning shot\".", "who": "OpenAI states that the incident was primarily driven by a highly capable internal-only research model during its own evaluations.", "you": "An AI agent can act outside the limits its operator intended, so give any AI agent you use the least access to your accounts and files that the task needs.", "k": "model", "pn": "OpenAI", "pu": "https://openai.com/index/hugging-face-incident-and-the-road-ahead/", "cn": "Hugging Face", "cu": "https://huggingface.co/blog/agent-intrusion-technical-timeline", "disp": "", "tool": "a_access"},
+ {"d": "2026-05-11", "t": "Google details Android backdoor that uses Gemini to operate phones", "what": "Google reported that PROMPTSPY, an Android backdoor first identified by ESET, used the Gemini API to navigate the phone's interface and could capture PINs and lock patterns to regain access to a device. The same report describes cyber crime actors planning mass exploitation with a two-factor authentication bypass in a script that Google states shows characteristics of AI generation.", "who": "Google does not name the PROMPTSPY operator in the passages checked. Google attributes the bypass exploit to cyber crime threat actors.", "you": "Google states that no apps containing PROMPTSPY were found on Google Play and that Play Protect blocks known versions, so the risk comes from apps installed from outside the store.", "k": "malware", "pn": "Google Threat Intelligence Group", "pu": "https://cloud.google.com/blog/topics/threat-intelligence/ai-vulnerability-exploitation-initial-access", "cn": "ESET", "cu": "https://www.welivesecurity.com/en/eset-research/promptspy-ushers-in-era-android-threats-using-genai", "disp": "ESET, which first identified PromptSpy, states that it had not seen the samples in its telemetry and that they might be proofs of concept.", "tool": "a_malware"},
+ {"d": "2026-02-25", "t": "OpenAI bans account tied to Chinese law enforcement influence work", "what": "OpenAI reported that it banned a ChatGPT account whose user referred to covert influence operations against domestic and foreign adversaries. OpenAI states that these ranged from abusive reporting of dissidents' social media accounts and mass online posting to forging documents and impersonating US officials.", "who": "OpenAI links the account to an individual associated with Chinese law enforcement.", "you": "People who criticise a government online can face false reports against their accounts and messages from fake officials, so verify any official-looking contact through a separate channel.", "k": "influence", "pn": "OpenAI", "pu": "https://cdn.openai.com/pdf/df438d70-e3fe-4a6c-a403-ff632def8f79/disrupting-malicious-uses-of-ai.pdf", "cn": "CNN, republished by KEYT", "cu": "https://keyt.com/politics/cnn-us-politics/2026/02/25/openai-uncovers-global-chinese-intimidation-operation-through-one-officials-use-of-chatgpt/", "disp": "", "tool": "a_fraud"},
+ {"d": "2026-02-20", "t": "AWS reports AI assisted actor accessed over 600 FortiGate devices", "what": "Amazon reported that between 11 January and 18 February 2026 an actor used multiple commercial generative AI services to help compromise over 600 FortiGate devices across more than 55 countries. Amazon states that no FortiGate vulnerability was exploited and that access came through exposed management ports and weak credentials with single-factor authentication.", "who": "Amazon attributes this to a Russian-speaking financially motivated threat actor.", "you": "Routers and firewalls with weak passwords and no second factor are easier to attack at scale, so change default credentials and switch off remote management you do not use.", "k": "espionage", "pn": "Amazon Web Services", "pu": "https://aws.amazon.com/blogs/security/ai-augmented-threat-actor-accesses-fortigate-devices-at-scale", "cn": "BleepingComputer", "cu": "https://bleepingcomputer.com/news/security/amazon-ai-assisted-hacker-breached-600-fortigate-firewalls-in-5-weeks", "disp": "", "tool": "p_patch"},
+ {"d": "2026-01-12", "t": "Ofcom opens investigation into X over Grok sexualised images", "what": "Ofcom opened a formal investigation into X after reports that the Grok AI chatbot account on X was being used to create and share undressed images of people and sexualised images of children. Ofcom stated on 15 January 2026 that X had implemented measures to restrict Grok's image creation and that the investigation continued.", "who": "No attribution to a specific actor was made. Ofcom is investigating whether X complied with its duties to protect people in the UK from illegal content.", "you": "A photo of you posted publicly can be altered by an AI image tool without your consent, so limit who can see and reuse your images.", "k": "model", "pn": "Ofcom", "pu": "https://ofcom.org.uk/online-safety/illegal-and-harmful-content/ofcom-launches-investigation-into-x-over-grok-sexualised-imagery", "cn": "The Register", "cu": "https://www.theregister.com/2026/01/12/xai_grok_uk_regulation/", "disp": "", "tool": ""},
+ {"d": "2025-12-30", "t": "Chrome extensions with 900,000 users stole AI chat conversations", "what": "OX Security reported that two Chrome extensions posing as a legitimate AI sidebar tool sent users' ChatGPT and DeepSeek conversations and browsing data to attacker-controlled servers every 30 minutes. OX Security states that the extensions had over 900,000 combined installations and that one carried Google's Featured badge.", "who": "No attribution was made.", "you": "Anything you type into an AI chatbot in your browser can be read by an installed extension, so remove AI helper extensions you do not need.", "k": "supply", "pn": "OX Security", "pu": "https://www.ox.security/blog/malicious-chrome-extensions-steal-chatgpt-deepseek-conversations", "cn": "Dark Reading", "cu": "https://www.darkreading.com/cloud-security/fake-ai-chrome-extensions-steal-900k-users-data", "disp": "", "tool": "a_ext"},
+ {"d": "2025-11-13", "t": "Anthropic reports AI orchestrated espionage using Claude Code", "what": "Anthropic reported that in mid-September 2025 it detected an actor that manipulated its Claude Code tool into attempting to infiltrate roughly thirty global targets, succeeding in a small number of cases. Anthropic states that the AI performed 80 to 90 percent of the campaign, with human intervention required only sporadically.", "who": "Anthropic assesses with high confidence that the actor, which it tracks as GTG-1002, was a Chinese state-sponsored group.", "you": "AI tools can now carry out many steps of an intrusion with little human effort, so prompt software updates and strong sign-in protection matter more than before.", "k": "espionage", "pn": "Anthropic", "pu": "https://www.anthropic.com/news/disrupting-AI-espionage", "cn": "BleepingComputer", "cu": "https://www.bleepingcomputer.com/news/security/anthropic-claims-of-claude-ai-automated-cyberattacks-met-with-doubt/", "disp": "Researchers including Kevin Beaumont and Daniel Card questioned the report, citing the absence of indicators of compromise and what they regard as overstated AI autonomy.", "tool": "p_patch"},
+ {"d": "2025-11-05", "t": "Google confirms malware that asks an AI model for its commands", "what": "Google reported that malware it tracks as PROMPTSTEAL, reported by CERT-UA as LAMEHUG, was used against Ukraine and queried an AI model through the Hugging Face API to generate the commands it executed. Google states that it masqueraded as an image generation program while collecting system information and documents from user folders.", "who": "Google attributes this to the Russian government-backed actor APT28, which it also calls FROZENLAKE.", "you": "A program that offers free AI image generation can be a cover for software that copies your documents, so download AI tools only from sources you can verify.", "k": "malware", "pn": "Google Threat Intelligence Group", "pu": "https://cloud.google.com/blog/topics/threat-intelligence/threat-actor-usage-of-ai-tools", "cn": "Cato Networks", "cu": "https://www.catonetworks.com/?p=131438", "disp": "", "tool": "a_malware"},
+ {"d": "2025-09-25", "t": "Fake Postmark MCP server on npm secretly copied users' emails", "what": "Snyk reported that the npm package postmark-mcp, an MCP server that lets AI assistants send email, added a blind copy to an external address on messages sent through it. Snyk states that the behaviour began around version 1.0.16 and persisted in later versions.", "who": "No attribution was made.", "you": "A connector that lets an AI assistant send your email can copy every message it handles, so install connectors only from the service's own documentation.", "k": "supply", "pn": "Snyk", "pu": "https://snyk.io/blog/malicious-mcp-server-on-npm-postmark-mcp-harvests-emails/", "cn": "Postmark", "cu": "https://postmarkapp.com/blog/information-regarding-malicious-postmark-mcp-package", "disp": "", "tool": "a_access"},
+ {"d": "2025-08-27", "t": "Nx npm compromise used AI coding tools to hunt for secrets", "what": "Wiz reported that malicious versions of the Nx build system package were published to npm on 26 August 2025 and targeted cryptocurrency wallets, GitHub and npm tokens and SSH keys on developers' machines. Wiz states that the malware prompted installed AI command line tools with permission-skipping flags to search the file system.", "who": "No attribution was made.", "you": "An AI coding assistant installed on your computer can be instructed by malware to search your files, so keep wallets, keys and passwords out of plain files.", "k": "supply", "pn": "Wiz", "pu": "https://wiz.io/blog/s1ngularity-supply-chain-attack", "cn": "Nx maintainers, GitHub security advisory", "cu": "https://github.com/nrwl/nx/security/advisories/GHSA-cxm3-wv7p-598c", "disp": "", "tool": "a_access"},
+ {"d": "2025-05-15", "t": "FBI warns of AI voice messages impersonating senior US officials", "what": "The FBI reported that since April 2025 malicious actors had impersonated senior US officials using text messages and AI-generated voice messages. The FBI states that many of those targeted were current or former senior US federal or state government officials and their contacts.", "who": "No attribution was made. The FBI refers to malicious actors.", "you": "A familiar voice in a voicemail or voice note is no longer proof of identity, so verify through a number you already hold and never share a two-factor code.", "k": "fraud", "pn": "FBI Internet Crime Complaint Center", "pu": "https://www.ic3.gov/PSA/2025/PSA250515", "cn": "Associated Press, via PBS News", "cu": "https://www.pbs.org/newshour/amp/nation/ai-tech-used-to-impersonate-rubio-in-messages-to-foreign-and-u-s-officials", "disp": "", "tool": "a_fraud"},
+ {"d": "2025-05-06", "t": "ISD documents AI faked voices of experts in Operation Overload", "what": "ISD reported that Operation Overload impersonated more than 80 different organisations in the first quarter of 2025, pairing real footage of academics, reporters and law enforcement officers with artificially generated audio. ISD states that one video generated over 4.2 million views after amplification by high-profile accounts.", "who": "ISD describes the operation as Russia-aligned.", "you": "A video that shows a real expert or a real news logo can carry a fabricated voice, so check the organisation's own channels before you trust or share it.", "k": "influence", "pn": "Institute for Strategic Dialogue", "pu": "https://www.isdglobal.org/digital-dispatch/stolen-voices-russia-aligned-operation-manipulates-audio-and-images-to-impersonate-experts/", "cn": "CheckFirst", "cu": "https://checkfirst.network/?p=3167", "disp": "", "tool": "a_fraud"}
+];
+function aiPull(){
+  const open=S.open.has('ai'), g=S.global, live=(g&&g.ai)||[], kinds=[...new Set(AI_INCIDENTS.map(x=>x.k))], f=S.aiKind||'';
+  let h='<div class="tp '+(open?'open':'')+'" style="--hc:var(--cyan)" id="tp-ai"><div class="tp-head" data-act="pull" data-id="ai"><div class="tp-top"><span class="tp-lab">AI Agent Incidents</span><span class="tp-i">i</span></div>'+
+    '<div class="tp-sum">What AI systems have actually been used to do · '+AI_INCIDENTS.length+' reviewed'+(live.length?' · '+live.length+' unreviewed headlines':'')+'</div><span class="chev">&#9662;</span></div>';
+  if(!open) return h+'</div>';
+  h+='<div class="tp-body"><div class="howto">What Has Actually Happened, and What It Means for You</div>'+
+    '<div class="dsec"><h4>Reviewed incidents <span class="spsub">as of '+AI_REVIEWED+'</span></h4><p style="margin-bottom:8px">Each entry was read at its primary source and is confirmed by a second, independent source. Who was behind it is given only as the named source states it. Halo makes no attribution of its own.</p>'+
+    '<div class="toolbar"><button class="chipbtn '+(f===''?'on':'')+'" data-act="ai-kind" data-k="">All</button>'+kinds.map(k=>'<button class="chipbtn '+(f===k?'on':'')+'" data-act="ai-kind" data-k="'+k+'">'+esc(AI_KIND[k])+'</button>').join('')+'</div>'+
+    AI_INCIDENTS.filter(x=>!f||x.k===f).map(x=>'<div style="border-top:1px solid var(--line);padding:12px 0"><div class="chips" style="margin:0 0 6px"><span class="chip">'+esc(fmtD(x.d))+'</span><span class="chip pot">'+esc(AI_KIND[x.k])+'</span></div>'+
+      '<b style="font-size:14.5px;line-height:1.35;display:block">'+esc(x.t)+'</b><p style="margin-top:6px">'+esc(x.what)+'</p>'+
+      '<p style="margin-top:6px;color:var(--mut)"><b style="color:var(--ink)">Who.</b> '+esc(x.who)+'</p><p style="margin-top:6px"><b>For you.</b> '+esc(x.you)+'</p>'+
+      (x.disp?'<div class="nt" style="margin-top:8px"><b>Disputed.</b> '+esc(x.disp)+'</div>':'')+
+      '<div class="limit" style="margin-top:8px"><b>Primary.</b> <a href="'+esc(x.pu)+'" target="_blank" rel="noopener">'+esc(x.pn)+'</a> · <b>Corroboration.</b> <a href="'+esc(x.cu)+'" target="_blank" rel="noopener">'+esc(x.cn)+'</a></div>'+
+      (x.tool&&T(x.tool)?'<div class="formrow" style="margin-top:8px"><button class="btn sm" data-act="res" data-id="'+x.tool+'">Open '+esc(T(x.tool).name)+'</button></div>':'')+'</div>').join('')+'</div>';
+  h+='<div class="dsec"><h4>Unreviewed headlines <span class="spsub">'+(g?'live, '+fmtDT(g.generated):'feed not reached')+'</span></h4>'+
+    (live.length?'<p style="margin-bottom:6px">As published by the sources in the last days. Halo has not checked these. A headline is a lead, and it is no finding until it is reviewed.</p>'+live.slice(0,12).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap;text-align:right">'+esc(x.src)+'<br>'+esc(fmtD(x.d))+'</span></div>').join('')
+      :'<p>'+(g?'The feed in use carries no AI headlines.':'The live feed was not reached, so there are no headlines to show.')+'</p>')+'</div>';
+  h+='<div class="limit"><b>What is held back.</b> Further reports were confirmed at their primary source but have no independent corroboration yet. They are not shown. <b>Stated gaps.</b> No report meeting this standard was found for actors linked to Belarus. xAI has published model cards and no report on misuse of its models. Halo states a gap and does not fill it. <b>Limit.</b> The reviewed list is updated by hand and carries its date. A newer incident appears first among the unreviewed headlines.</div></div>';
+  return h+'</div>';
+}
 
 /* ---------- Device Health Check: what this browser can report about this device, and what only you can read.
    A web page cannot scan a device or read its settings, so a full pass is never proof that a device is clean. ---------- */
@@ -3603,6 +3770,9 @@ let toastT; function toast(m){ const t=el('toast'); t.textContent=m; t.classList
 const val = id => { const e=el(id); return e ? e.value.trim() : ''; };
 
 /* one delegated handler for every control */
+document.addEventListener('change', e=>{ const f=e.target; if(!f || f.id!=='trapFile' || !f.files || !f.files[0]) return;
+  const file=f.files[0]; if(file.size>8*1024*1024){ f.value=''; return toast('That file is too large to check here. Paste the part you want checked.'); }
+  file.text().then(t=>{ f.value=''; if(/\u0000/.test(t.slice(0,4000))) return toast('That is not a text file. Copy its text and paste it.'); trapRun(t, file.name); }).catch(()=>toast('The file could not be read.')); });
 document.addEventListener('click', e=>{
   const a=e.target.closest('[data-act]'); if(!a) return;
   const act=a.dataset.act, H=P.home;
@@ -3685,6 +3855,14 @@ document.addEventListener('click', e=>{
     case 'report': reportOpen(); break;
     case 'report-close': reportClose(false); break;
     case 'report-print': { const N=NATIVE(); if(N && N.printPage){ try{ N.printPage(el('rpTitle').textContent||'Remiel Halo'); }catch(e){} } else window.print(); break; }
+    case 'ai-kind': S.aiKind=a.dataset.k||''; rerender(); break;
+    case 'trap-run': trapRun(val('trapText'), ''); break;
+    case 'trap-file': el('trapFile').click(); break;
+    case 'trap-clear': S.trap=null; rerender(); break;
+    case 'trap-copy': { const r=S.trap; if(!r) break; (navigator.clipboard?navigator.clipboard.writeText(r.clean):Promise.reject()).then(()=>toast('Cleaned text copied. Read it before you use it.')).catch(()=>toast('Copy was not allowed by this browser.')); break; }
+    case 'trap-log': { const r=S.trap; if(!r||r.logged) break; r.logged=true; P.hits=P.hits||{}; P.hits.a_agent=(P.hits.a_agent||0)+1;
+      logEvidence('finding','Agent Trap Check: '+TRAP_LVL[r.level][0]+'. '+r.kind+(r.name?' ('+r.name+')':'')+', '+r.bytes+' characters, SHA-256 '+r.hash+'. '+
+        (r.F.length?r.F.slice(0,6).map(x=>x.t).join('; ')+'.':'No finding.')+(r.hidden.length?' '+r.hidden.length+' hidden parts.':'')+' The content itself is not kept.'); toast('Added to Evidence.'); rerender(); break; }
     case 'health-run': if(!S.healthBusy) healthGo(); break;
     case 'health-tick': { const t=healthTicks(), i=+a.dataset.i; t[i]=!t[i]; save(); if(t[i]) logEvidence('defence','Device health, confirmed on this '+HK_NAME[HK()]+': '+HEALTH_GUIDED[HK()][i][0]+'.'); rerender(); break; }
     case 'health-keep': { (navigator.storage&&navigator.storage.persist?navigator.storage.persist():Promise.resolve(false)).then(ok=>{ toast(ok?'The browser will keep Halo\'s data.':'The browser did not agree. Install Halo to the home screen, then try again.'); healthGo(); }).catch(()=>healthGo()); break; }
