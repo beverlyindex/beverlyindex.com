@@ -204,6 +204,13 @@ select.inp{flex:none}
 .q:first-child{border-top:0}
 .rowline{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line);font-size:13.5px}
 .rowline:first-child{border-top:0}
+.res{padding:12px 0;border-top:1px solid var(--line)}
+.res:first-child{border-top:0;padding-top:2px}
+.res-t{display:flex;gap:10px;align-items:baseline;font-size:14.5px;font-weight:600;line-height:1.35}
+.res-t a{color:var(--ink)}
+.res-n{flex:none;font-family:var(--mono);font-size:11px;color:var(--cyan);border:1px solid rgba(57,183,214,.5);border-radius:6px;padding:1px 6px}
+.res-m{font-family:var(--mono);font-size:11.5px;color:var(--mut);margin-top:5px;line-height:1.5}
+.res-note{font-size:13px;color:var(--mut);margin-top:6px;line-height:1.5}
 .x{border:0;background:transparent;color:var(--dim);font-size:16px;padding:2px 6px;border-radius:6px}
 .x:hover{color:var(--action)}
 .score{font-family:var(--disp);font-weight:700;font-size:15px}
@@ -517,6 +524,20 @@ const PROFILE_Q = [
 const anyOf = (...v) => v.some(x=>x===true) ? true : (v.every(x=>x===false) ? false : null);
 const pv = k => (P.profile[k]===true || P.profile[k]===false) ? P.profile[k] : null;
 
+/* ---------- resources: the videos this register answers. Read level states what was read from each page. ---------- */
+const RESOURCES = [
+  {n:1, t:'6G Can See You… Without Your Phone', ch:'Cybersecurity Learning', d:'23 Dec 2025', u:'https://youtu.be/fkBSlyJvl8s', tool:'p_6g', read:'Description and chapters read'},
+  {n:2, t:'How Employers Spy on You Completely Undetected', ch:'Proton', d:'5 Nov 2025', u:'https://youtu.be/jBsSLcK6h8A', tool:'w_work', read:'Description and chapters read'},
+  {n:3, t:'The Privacy Mistake That Makes Aliases Useless', ch:'Rob Braxman Tech', d:'2 Sep 2026', u:'https://youtu.be/gYpTULZaAwk', tool:'a_alias', read:'Description only. The specific mistake is not confirmed'},
+  {n:4, t:'This $50 Device lets anyone spy and track your phone!', ch:'Liron Segev', d:'6 Jul 2025', u:'https://youtu.be/PpkLts5fdII', tool:'w_tower', read:'Description read'},
+  {n:5, t:'Your Android Phone Tracking You And Listening. TURN THIS OFF', ch:'Trevor Nace', d:'20 Jun 2025', u:'https://youtu.be/Tw1wX9sbstw', tool:'a_android', read:'Description and chapters read. The exact switches are not confirmed'},
+  {n:6, t:'Counter-Surveillance Using Bluetooth!', ch:'Rob Braxman Tech', d:'24 Sep 2025', u:'https://youtu.be/gkTcLTSAsZQ', tool:'w_ble', read:'Description and chapters read'},
+  {n:7, t:'They\'re Watching You Through Wi-Fi… And You Have No Idea', ch:'Yaniv Hoffman, with OccupyTheWeb', d:'19 Jul 2025', u:'https://youtu.be/rH9oJJC79QI', tool:'w_wifi', read:'Description and chapters read'},
+  {n:8, t:'How Your Phone is Tracked in 2026, And How to Stop It', ch:'Rob Braxman Tech', d:'6 May 2026', u:'https://youtu.be/amenY5QoWjM', tool:'a_phone', read:'Description and chapters read. The specific advice is not confirmed',
+   note:'Chapters: identifiers and identity, managing the digital footprint, minimising cellular use, operating system surveillance, the contactless threat, the de-Googled phone, public location tracking, the two-factor privacy problem, phone number anonymity. The channel sells privacy phones and a VPN, so weigh its product advice against independent sources.'}
+];
+const resFor = id => RESOURCES.find(r=>r.tool===id);
+
 /* ---------- the threat register (Global step). Every entry carries a source. ---------- */
 const THREATS = [
  { id:'w_ble', side:'w', shelf:'real', name:'Signal Roster', short:'Bluetooth trackers and followers', impact:'Location',
@@ -583,6 +604,15 @@ const THREATS = [
    convert:'Canary aliases. A unique address per service means mail arriving there names the service that sold or leaked it.',
    limit:'Halo cannot read data broker databases. The source video\'s specific claim is not yet confirmed from its transcript.',
    src:{n:'Lermen and others, February 2026', u:'https://arxiv.org/html/2602.16800v2'} },
+ { id:'a_phone', side:'a', shelf:'real', name:'Phone Identity Check', short:'Your number and device identifiers', impact:'Identity and location',
+   needs:'Guided check now. Carrier and account steps are yours to take', scope:()=>anyOf(pv('android'),pv('iphone')),
+   where:'Five places hold your phone\'s identity: the carrier (the SIM identity and the towers you use), the Google or Apple account on the phone, the advertising ID, the Wi-Fi and Bluetooth radio addresses, and every account that holds your phone number for sign-in codes.',
+   what:'The carrier knows which towers your phone uses whenever the SIM is active. Apps and advertising networks collect location under the advertising ID. Your phone number, handed to accounts for sign-in codes, joins those accounts to you and to each other.',
+   defend:['Set a carrier account PIN, and ask the carrier for a number lock against transfer','Move sign-in codes off text message to a security key, a passkey or an authenticator app','List every account that holds your phone number, and remove it where a stronger sign-in exists','Review location permission for every app. Android: Settings, Location, App location permissions','Turn off Wi-Fi scanning and Bluetooth scanning. Android: Settings, Location, Location services','Turn Wi-Fi and Bluetooth off when you are out and do not need them'],
+   deflect:'A carrier PIN stops a number transfer made without you. A security key takes the phone number out of sign-in.',
+   convert:'A second number given to one service only is a tripwire. Any other caller on it names that service as the leak.',
+   limit:'No setting hides an active SIM from its carrier, and Halo cannot read carrier records. From the source video, only the title, date and chapter headings are confirmed. Its specific advice is not yet confirmed from the transcript.',
+   src:{n:'EFF Surveillance Self-Defense', u:'https://ssd.eff.org/module/mobile-phones-location-tracking'} },
  { id:'a_android', side:'a', shelf:'real', name:'Settings Sweep', short:'Android default tracking', impact:'Identity and location',
    needs:'Guided check now. One tap per setting on the Halo Android app', scope:()=>pv('android'),
    where:'Settings, Google, All services. Settings, Security & privacy, Privacy controls. Settings, Location.',
@@ -724,7 +754,9 @@ function threatBody(t){
   if(t.tool==='roster') h+=toolRoster();
   h+='<div class="dsec"><h4>Log a finding</h4><div class="formrow" style="margin-top:0"><input class="inp" id="note-'+t.id+'" placeholder="What you found, in your own words">'+
      '<button class="btn sm" data-act="note" data-id="'+t.id+'">Add to Evidence</button></div></div>';
-  h+='<div class="limit"><b>Limit.</b> '+esc(t.limit)+' <b>Source.</b> <a href="'+esc(t.src.u)+'" target="_blank" rel="noopener">'+esc(t.src.n)+'</a></div>';
+  const rv=resFor(t.id);
+  h+='<div class="limit"><b>Limit.</b> '+esc(t.limit)+' <b>Source.</b> <a href="'+esc(t.src.u)+'" target="_blank" rel="noopener">'+esc(t.src.n)+'</a>'+
+     (rv && rv.u!==t.src.u ? ' <b>Video.</b> <a href="'+esc(rv.u)+'" target="_blank" rel="noopener">'+esc(rv.ch)+', '+esc(rv.d)+'</a>' : '')+'</div>';
   return h;
 }
 
@@ -762,6 +794,22 @@ function toolRoster(){
     '<div class="rost" id="rost"></div></div>';
 }
 
+/* ---------- Resources ---------- */
+function resourcesPull(){
+  const open=S.open.has('resources');
+  let h='<div class="tp '+(open?'open':'')+'" style="--hc:var(--cyan)">'+
+    '<div class="tp-head" data-act="pull" data-id="resources"><div class="tp-top"><span class="tp-lab">Resources</span><span class="tp-i">i</span></div>'+
+    '<div class="tp-sum">'+RESOURCES.length+' videos · each one answered by a tool</div><span class="chev">&#9662;</span></div>';
+  if(open){ h+='<div class="tp-body"><div class="dsec">';
+    RESOURCES.forEach(r=>{ const t=T(r.tool);
+      h+='<div class="res"><div class="res-t"><span class="res-n">'+r.n+'</span><a href="'+esc(r.u)+'" target="_blank" rel="noopener">'+esc(r.t)+'</a></div>'+
+         '<div class="res-m">'+esc(r.ch)+' · '+esc(r.d)+' · '+esc(r.read)+'</div>'+
+         (r.note?'<div class="res-note">'+esc(r.note)+'</div>':'')+
+         '<div class="formrow" style="margin-top:8px"><button class="btn sm" data-act="res" data-id="'+t.id+'">Open '+esc(t.name)+'</button></div></div>'; });
+    h+='</div><div class="limit">Read level states what was read from each video page. A claim marked not confirmed waits on the transcript.</div></div>'; }
+  return h+'</div>';
+}
+
 /* ---------- Overview ---------- */
 function profilePull(){
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, open=S.open.has('profile');
@@ -788,7 +836,7 @@ function renderOverview(){
   h+='<div class="modebar">'+modePills()+'</div>';
   const list=THREATS.filter(t=>t.shelf==='real' && scopeOf(t)!==false && (S.mode==='auto'||t.side===S.mode))
     .sort((x,y)=>(isOpen(y)-isOpen(x)) || (scopeOf(y)===true)-(scopeOf(x)===true) || IMPACT_W(y.impact)-IMPACT_W(x.impact));
-  h+='<div class="stack">'+profilePull()+list.map(threatPull).join('')+'</div>';
+  h+='<div class="stack">'+profilePull()+list.map(threatPull).join('')+resourcesPull()+'</div>';
   h+='<div class="formrow" style="margin-top:14px"><button class="btn primary" data-act="go" data-v="watchers" style="flex:1">All Watchers</button><button class="btn gold" data-act="go" data-v="attackers" style="flex:1">All Attackers</button></div></div>';
   el('ovMain').innerHTML=h;
   renderCoverage(); renderHomeMini(); renderVicinity();
@@ -1120,6 +1168,7 @@ document.addEventListener('click', e=>{
     case 'mode': { const m=a.dataset.m; S.mode=(a.closest('.ticker') && S.mode===m)?'auto':m; if(S.view!=='overview') setView('overview'); else rerender(); break; }
     case 'shelf': S.shelf=a.dataset.s; rerender(); break;
     case 'go': setView(a.dataset.v); break;
+    case 'res': { const t=T(a.dataset.id); S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; setView(t.side==='w'?'watchers':'attackers'); break; }
     case 'note': { const t=T(a.dataset.id), x=val('note-'+t.id); if(!x) return toast('Write what you found first.'); logEvidence('finding',t.name+': '+x); toast('Added to Evidence.'); el('note-'+t.id).value=''; break; }
     case 'alias-add': { const n=val('aliasName'); if(!n) return toast('Enter the alias name.'); P.aliases.push({name:n,links:{}}); save(); rerender(); break; }
     case 'alias-del': P.aliases.splice(+a.dataset.i,1); save(); rerender(); break;
