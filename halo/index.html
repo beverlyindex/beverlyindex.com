@@ -63,6 +63,7 @@ a{color:var(--chrome2)}
 .gate-link summary::-webkit-details-marker{display:none}
 .gate-link p{margin:8px 0}
 .acctbtn{width:38px;height:38px;border-radius:11px;border:1px solid var(--line2);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015));color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none}
+.acctbtn.rep{color:var(--att2);border-color:rgba(197,165,90,.45)}
 .acctbtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .gate-err{color:var(--action);font-size:12.5px;min-height:16px;margin:10px 0 0}
 .gate-foot{margin-top:22px;color:var(--dim);font-size:11px;letter-spacing:.02em}
@@ -613,12 +614,14 @@ a.tk:hover b{text-decoration:underline}
       <span class="tagline">Stand-alone instrument</span>
       <div class="spacer"></div>
       <span class="src-pill" id="srcPillD"></span>
+      <button class="acctbtn rep" data-act="report" title="Full report" aria-label="Full report"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z"/><path d="M14 3.5V8h4M9.8 12.5h5.4M9.8 16h5.4"/></svg></button>
       <button class="acctbtn" data-act="go-account" title="Your account and devices" aria-label="Your account and devices"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg></button>
     </div>
     <div class="topbar">
       <img class="brand-logo" src="halo-logo.png" alt="Remiel Halo">
       <div class="spacer"></div>
       <span class="src-pill" id="srcPillM"></span>
+      <button class="acctbtn rep" data-act="report" title="Full report" aria-label="Full report"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z"/><path d="M14 3.5V8h4M9.8 12.5h5.4M9.8 16h5.4"/></svg></button>
       <button class="acctbtn" data-act="go-account" title="Your account and devices" aria-label="Your account and devices"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg></button>
     </div>
 
@@ -662,7 +665,7 @@ a.tk:hover b{text-decoration:underline}
                   <span><i style="background:var(--route)"></i>Seen on route</span>
                   <span><i style="background:var(--action)"></i>With you</span>
                   <span><i class="rgh"></i>Direction rough</span>
-                  <span><i class="hol"></i>Direction not known (list only)</span>
+                  <span><i class="hol"></i>Heard, direction pending (list only)</span>
                 </div>
                 <div id="suspects"></div>
                 <div class="posline" id="posLine"></div>
@@ -1348,7 +1351,7 @@ function assess(){
   const V=vis();
   const vic = V.mode==='live' ? (V.test?'Vicinity: test data from a simulated sensor':'Vicinity: live from your sensor') : V.mode==='sim' ? 'Vicinity: simulated preview'
     : stateWords(V.mode).vic;
-  const reg = S.global ? 'Global feed '+fmtDT(S.global.generated) : 'Register as of '+REGISTER_DATE;
+  const reg = S.global ? 'Global feed read '+feedAgo() : 'Register as of '+REGISTER_DATE;
   if(V.mode==='live'){ const w=V.devices.filter(d=>d.present&&d.withYou&&!d.sim);
     if(w.length) return { t:3, n:w.length, title:'Take Action', side:'Watchers',
       s:esc(w[0].name)+(w[0].tested?' is moving with you. It ':' ')+esc(followText(w[0]))+'. Open Watchers.', meta:reg+' · '+vic }; }
@@ -1356,7 +1359,7 @@ function assess(){
   if(answered===0) return { t:-1, n:'?', title:'Unknown', side,
     s:'Answer your profile and Halo shows the threats that apply to you.',
     meta:reg+' · '+vic };
-  const meta=reg+' · '+vic+(unknown.length?' · '+unknown.length+' not known yet':'');
+  const meta=reg+' · '+vic+(unknown.length?' · '+unknown.length+' waiting on your profile':'');
   if(!open.length) return { t:0, n:0, title:'Clear, for what is assessed', side,
     s:'Every defence is complete for the '+applies.length+' real threats that apply to you. '+(V.mode==='live'&&!V.test?'A sensor is reporting, and no device is moving with you.':'Start listening and Halo also watches the devices around you.'), meta, applies, open };
   return { t: open.length<=2?1:2, n:open.length, title: open.length<=2?'Watch':'Warning', side,
@@ -1377,7 +1380,7 @@ function threatPull(t){
   if(t.shelf==='potential'){ bar='--cyan'; sum='Potential · '+t.imminence; }
   else if(sc===false){ bar='--dim'; sum='Does not apply, from your profile'; }
   else if(n && dn>=n){ bar='--clear'; sum='Defended · '+dn+' of '+n+' done'; }
-  else { bar = sc===null?'--mut':'--warn'; sum=(sc===null?'Not known yet':'Applies to you')+' · '+dn+' of '+n+' defences done'; }
+  else { bar = sc===null?'--mut':'--warn'; sum=(sc===null?'Answer your profile':'Applies to you')+' · '+dn+' of '+n+' defences done'; }
   if(sc!==false){ const q=spCount(t); if(q.n) sum+=' · Special '+q.dn+' of '+q.n; }
   const gold = !!ex && spCount(t).n>0 && !(n && dn>=n && spCount(t).dn>=spCount(t).n);
   if(gold) bar='--att2';
@@ -1390,7 +1393,7 @@ function threatPull(t){
 }
 function threatBody(t){
   const sc=scopeOf(t), d=doneMap(t), steps=stepsOf(t), ex=experiencing(t);
-  const exp = sc===true?['Applies to you','warnc']:sc===false?['Does not apply, from your profile','okc']:['Not known yet. Answer your profile','unkc'];
+  const exp = sc===true?['Applies to you','warnc']:sc===false?['Does not apply, from your profile','okc']:['Answer your profile and Halo decides','unkc'];
   const hits=(P.hits||{})[t.id]||0;
   let h='<div class="howto">'+esc(t.how)+'</div><div class="chips" style="margin-top:0">'+
     '<span class="chip '+t.side+'">'+(t.side==='w'?'Watchers':'Attackers')+'</span>'+
@@ -1456,8 +1459,8 @@ function toolPatch(){
   h+='<div class="formrow"><input class="inp" id="patchName" placeholder="Device, for example Pixel phone or home router"><input class="inp" type="date" id="patchDate" style="flex:none">'+
      '<button class="btn sm primary" data-act="patch-add">Add device</button></div></div>';
   const g=S.global, mine=kevMine();
-  h+='<div class="dsec"><h4>Exploited now <span class="chip '+(g?'pot':'')+'" style="margin-left:6px">'+(g?'Live · '+fmtDT(g.generated):'Feed not reached')+'</span></h4>';
-  if(!g||!g.kev) h+='<p>The live exploited list was not reached from this device.</p>';
+  h+='<div class="dsec"><h4>Exploited now <span class="chip '+(g?'pot':'')+'" style="margin-left:6px">'+(g?'Live · read '+feedAgo():'Connecting')+'</span></h4>';
+  if(!g||!g.kev) h+='<p>Halo is connecting to the live exploited list.</p>';
   else h+='<p style="margin-bottom:8px">Flaws under active attack, from the CISA catalogue, that touch '+PLAT_NAME[plat()]+(pv('wifihome')!==false?' or home network equipment':'')+'. A device older than the date shown is exposed until it is updated.</p>'+
     (mine.length?mine.slice(0,10).map(kevRow).join(''):'<div class="empty" style="padding:8px">None for your platform in the last '+g.kev.windowDays+' days.</div>');
   h+='</div>';
@@ -1514,6 +1517,9 @@ function openTerms(){ el('termsBody').innerHTML=termsHTML(); el('terms').classLi
 const FEED_URL='https://raw.githubusercontent.com/beverlyindex/beverlyindex.com/halo-feed/global.json';
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function fmtD(iso){ const m=/^(\d{4})-(\d\d)-(\d\d)/.exec(iso||''); return m ? (+m[3])+' '+MON[+m[2]-1]+' '+m[1] : ''; }
+// How long ago the feed's sources were read. The screen counts in minutes; documents keep the full date and time.
+function feedAgo(){ const g=S.global; if(!g) return ''; const m=Math.max(0,Math.round((Date.now()-new Date(g.generated).getTime())/60000)); return m<1?'just now':m<60?m+' min ago':m<120?'1 h '+(m-60)+' min ago':Math.round(m/60)+' h ago'; }
+const fmtLT = iso => { const d=new Date(iso); return isNaN(d)?'':String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
 function fmtDT(iso){ const d=new Date(iso); if(isNaN(d)) return ''; return d.getUTCDate()+' '+MON[d.getUTCMonth()]+', '+String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')+' UTC'; }
 const KEV_FOR={android:['android','browser'], iphone:['apple']};
 function kevMine(){
@@ -1530,14 +1536,15 @@ async function loadGlobal(){
       const j=await r.json(); if(!j||!j.generated||!Array.isArray(j.sources)) throw new Error('shape'); return j; } finally{ clearTimeout(to); } };
   try{ S.global=await get(API+'/feed/global', 11000); S.globalVia='backend'; S.globalErr=false; }
   catch(e){ try{ S.global=await get(FEED_URL, 9000); S.globalVia='copy'; S.globalErr=false; }catch(e2){ S.globalErr=true; } }
-  applyGlobal();
+  S.globalAt=Date.now(); applyGlobal();
 }
-function applyGlobal(){
+function applyGlobal(quiet){
   const g=S.global;
   const ageH = g ? (Date.now()-new Date(g.generated).getTime())/3600000 : 0, fresh = g && ageH<FEED_STALE_H;      // a feed that has stopped updating must not read live
-  el('srcPillD').textContent = !g ? 'REGISTER '+REGISTER_DATE.toUpperCase() : fresh ? 'GLOBAL FEED LIVE · '+fmtDT(g.generated).toUpperCase() : 'GLOBAL FEED '+Math.round(ageH)+' HOURS OLD · '+fmtDT(g.generated).toUpperCase();
-  el('srcPillM').textContent = !g ? 'REGISTER 3 OCT' : fresh ? 'LIVE '+fmtDT(g.generated).toUpperCase() : Math.round(ageH)+' H OLD · '+fmtDT(g.generated).toUpperCase();
+  el('srcPillD').textContent = !g ? 'REGISTER '+REGISTER_DATE.toUpperCase() : fresh ? 'GLOBAL FEED LIVE · SOURCES READ '+feedAgo().toUpperCase() : 'GLOBAL FEED '+Math.round(ageH)+' HOURS OLD · '+fmtDT(g.generated).toUpperCase();
+  el('srcPillM').textContent = !g ? 'REGISTER 3 OCT' : fresh ? 'LIVE · '+feedAgo().toUpperCase() : Math.round(ageH)+' H OLD · '+fmtDT(g.generated).toUpperCase();
   [el('srcPillD'),el('srcPillM')].forEach(x=>x.classList.toggle('live',!!fresh));
+  if(quiet){ if(booted && S.view==='overview' && !document.querySelector('input:focus,textarea:focus,select:focus')) softRender(); return; }
   fillTickers();
   if(booted) rerender();
 }
@@ -1553,18 +1560,18 @@ function globalPull(){
   const ok=g?g.sources.filter(s=>s.ok).length:0;
   let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(g?'--clear':'--mut')+')">'+
     '<div class="tp-head" data-act="pull" data-id="global"><div class="tp-top"><span class="tp-lab">Global scan</span><span class="tp-i">i</span></div>'+
-    '<div class="tp-sum">'+(g ? ok+' of '+g.sources.length+' sources live · updated '+fmtDT(g.generated) : (S.globalErr?'Feed not reached. Showing the register of '+REGISTER_DATE:'Reaching the feed'))+'</div><span class="chev">&#9662;</span></div>';
+    '<div class="tp-sum">'+(g ? ok+' of '+g.sources.length+' sources live · read '+feedAgo() : (S.globalErr?'Showing the register of '+REGISTER_DATE+'. Halo keeps trying the live feed':'Reaching the feed'))+'</div><span class="chev">&#9662;</span></div>';
   if(open){ h+='<div class="tp-body">';
-    if(!g) h+='<div class="dsec"><p>The live feed was not reached from this device. Halo is showing the register of '+REGISTER_DATE+'. It will try again.</p></div>';
+    if(!g) h+='<div class="dsec"><p>Halo is showing the register of '+REGISTER_DATE+', and switches to the live feed as soon as it connects.</p></div>';
     else {
       h+='<div class="dsec"><h4>Sources</h4>'+g.sources.map(s=>'<div class="cov"><span><a href="'+esc(s.home)+'" target="_blank" rel="noopener">'+esc(s.name)+'</a></span>'+
          '<span class="st"><span class="dot '+(s.ok?'live':'')+'"></span>'+(s.ok?s.count+' items':'Not reached')+'</span></div>').join('')+
-         '<div class="limit" style="margin-top:8px">'+(S.globalVia==='backend'?'Rebuilt on demand by the Halo backend, and never more than 30 minutes old'+(g.stale?'. One or more sources were not reached, so their last items are shown':'')+'.':'The Halo backend was not reached. This is the hourly copy.')+' Titles, dates and links only.</div></div>';
+         '<div class="limit" style="margin-top:8px">'+(S.globalVia==='backend'?'Read from the sources by the Halo backend every 15 minutes, last at '+fmtLT(g.generated)+' your time'+(g.stale?'. A source that is slow to answer shows its last items':'')+'.':'This is the hourly copy of the feed. Halo switches back to the 15 minute feed as soon as it connects.')+' Titles, dates and links only.</div></div>';
       const mine=kevMine();
       h+='<div class="dsec"><h4>Exploited now, on what you use</h4>'+
          (g.kev ? '<p style="margin-bottom:8px">'+g.kev.recentAll+' flaws joined the exploited list in the last '+g.kev.windowDays+' days. '+mine.length+' touch '+PLAT_NAME[plat()]+(pv('wifihome')!==false?' or home network equipment':'')+'.</p>'+
            (mine.length?mine.slice(0,8).map(kevRow).join(''):'<div class="empty" style="padding:8px">None for your platform in this window.</div>')+
-           '<div class="formrow"><button class="btn sm" data-act="res" data-id="p_patch">Open Patch Clock</button></div>' : '<p>The exploited list was not reached.</p>')+'</div>';
+           '<div class="formrow"><button class="btn sm" data-act="res" data-id="p_patch">Open Patch Clock</button></div>' : '<p>Connecting to the exploited list.</p>')+'</div>';
       const lst=(k,title)=>{ const a=g[k]||[]; return a.length ? '<div class="dsec"><h4>'+title+'</h4>'+a.slice(0,6).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap">'+esc(fmtD(x.d))+'</span></div>').join('')+'</div>' : ''; };
       h+=lst('ai','AI agents and AI misuse: unreviewed headlines')+lst('consumer','Consumer alerts, Federal Trade Commission')+lst('privacy','Surveillance and privacy, Electronic Frontier Foundation')+lst('advisories','Advisories, CISA');
     }
@@ -1595,8 +1602,7 @@ function renderOverview(){
   if(!installed() && !S.justInstalled && (INSTALL||isAndroid()||isIOS()) && !store.get('halo_inst_hide'))
     h+='<div class="instbar"><span><b>Install Halo on this phone.</b> It opens full screen from your home screen.</span>'+
        '<button class="btn sm primary" data-act="'+(INSTALL?'install':'go-install')+'">'+(INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
-  h+= g ? '<div class="prelim live">Global scan live. Updated '+fmtDT(g.generated)+'. '+g.sources.filter(s=>s.ok).length+' of '+g.sources.length+' sources</div>'
-        : '<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'The live feed was not reached':'Reaching the live feed')+'</div>';
+  if(!g) h+='<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'Halo keeps trying the live feed':'Reaching the live feed')+'</div>';
   const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const openN=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true&&isOpen(t)).length;
   h+='<div class="pipe-h">Threat Funnel<span>every tracked threat, narrowed to yours</span></div><div class="pipe">'+
@@ -1623,7 +1629,7 @@ function renderCoverage(){
     ['This device', !hcv.at?'Health check ready':hcv.att?hcv.att+' to attend to':hcv.ok+' checks pass', !hcv.at?'':hcv.att?'part':'live'],
     ['Home', !hasSt?'Add a home listener':stationLive()?(T&&stationTest()?'Test data':'Listener reporting'):'Listener paused', stationLive()?(T&&stationTest()?'part':'live'):''],
     ['Your position', S.pos?'Live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'From your phone':gz()?'Home location':'Allow location', S.pos?'live':gz()?'part':''],
-    ['Global feed', g?'Live, '+fmtDT(g.generated):'Connecting', g?'live':''],
+    ['Global feed', g?'Live, sources read '+feedAgo():'Connecting', g?'live':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':'Connecting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
   el('covCard').innerHTML='<h3>Coverage <span class="n">what Halo is watching for you</span></h3>'+
@@ -1661,7 +1667,7 @@ const quietAp = d => d.band==='wifi' && !d.withYou && !d.onRoute && !d.mine;
 const inRadius = () => { const rs=radiusState(); return vis().devices.filter(d=>d.present && d.dist<=rs.r && !quietAp(d)); };
 const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Math.round(d.dist)+' m';
 const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';          // placed, direction rough, or direction not known
-const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'direction rough, '+whereWords(d) : 'direction not known';
+const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'direction rough, '+whereWords(d) : 'direction pending';
 function renderVicinity(){
   const V=vis(), shown=V.mode==='live'||V.mode==='sim', rs=radiusState(), blocks=rs.r/BLOCK_M, sus=shown?inRadius():[];
   const pb=el('prevBtn'); pb.style.display = V.mode==='live' ? 'none' : ''; pb.textContent = S.preview ? 'Hide simulated preview' : 'Preview with simulated devices';
@@ -1672,7 +1678,7 @@ function renderVicinity(){
   setHTML(el('microLab'), 'Micro<i> · '+(view<BASE_R&&!rs.ext ? view+' m view' : blocks+' blocks'+(rs.ext?', extended':''))+'</i>');
   setHTML(el('microState'), shown ? '' : '<b>'+esc(stateWords(V.mode).count)+'</b>');
   { const nd=shown?sus.filter(noDir).length:0, pl=shown?sus.length-nd:0;
-    setHTML(el('microNote'), nd ? (pl?'+':'')+nd+' heard, no direction yet' : ''); }
+    setHTML(el('microNote'), nd ? (pl?'+':'')+nd+' heard, direction pending' : ''); }
   el('radLine').innerHTML = rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(shown && viewRadius()<BASE_R ? ' Micro is zoomed to '+viewRadius()+' m.' : '');
@@ -2085,7 +2091,7 @@ function identPick(){
   S.identId=null;                                          // nothing chosen, or the chosen device is gone: follow the top threat inside the radius
   return [...inRadius()].sort(bySeverity)[0] || null;
 }
-const dirLine = d => !d.live ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : (d.fix && d.bearing!=null) ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.sector ? 'Roughly '+compass(d.sector.brg) : 'Not known';
+const dirLine = d => !d.live ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : (d.fix && d.bearing!=null) ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.sector ? 'Roughly '+compass(d.sector.brg) : 'Pending';
 const originLine = d => d.live ? (d.sim ? 'Test data from a simulated sensor' : 'Heard by '+(d.sensor==='this-phone'?'this phone':(P.sensors[d.sensor]||{}).name||'your sensor')) : 'Simulated preview';
 function renderIdent(force){
   const V=vis(), d=identPick(), face=el('idFace'), sp=el('sphIdent'); S._identShown=d?d.id:null; if(!face) return;
@@ -2106,7 +2112,7 @@ function identCard(d){
     '<div class="idsub">'+esc(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+TIER_NAME[th.tierIdx]+' · '+flagOf(d)+'</div><div class="idsub">'+esc(originLine(d))+'</div></div>'+
     '<button class="x" data-act="ident-close" aria-label="Close the identity card">&times;</button></div>'+
     '<div class="kv" style="margin-top:10px"><span class="k">Distance</span><span class="v">'+esc(distText(d))+(d.live&&d.present===false?', '+rosterState(d):'')+'</span>'+
-    '<span class="k">Direction</span><span class="v '+(dirLine(d)==='Not known'?'unkc':'')+'">'+esc(dirLine(d))+'</span>'+
+    '<span class="k">Direction</span><span class="v '+(dirLine(d)==='Pending'?'unkc':'')+'">'+esc(dirLine(d))+'</span>'+
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span>'+
     '<span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span>'+
     '<span class="k">Times heard</span><span class="v">'+d.timesSeen+'</span>'+
@@ -2290,7 +2296,7 @@ function capLoop(){
   ctx.strokeStyle='rgba('+col+',.9)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,26,0,Math.PI*2);
   ctx.moveTo(cx-40,cy); ctx.lineTo(cx-10,cy); ctx.moveTo(cx+10,cy); ctx.lineTo(cx+40,cy); ctx.moveTo(cx,cy-40); ctx.lineTo(cx,cy-10); ctx.moveTo(cx,cy+10); ctx.lineTo(cx,cy+40); ctx.stroke();
   el('capAimVal').textContent=S.capAim+'°';
-  el('capStatus').innerHTML=!t?'<span class="cold">Pick a device, then aim.</span>':!hasB?'<span class="cold">Direction not known for this device. Walk and turn to fix it, or capture what is in front of you.</span>':aligned?'<span class="warm">Aligned. Lock and capture.</span>':diff<45?'<span class="warm">Warmer. Keep turning.</span>':'<span class="cold">Colder. Turn to find the signal.</span>';
+  el('capStatus').innerHTML=!t?'<span class="cold">Pick a device, then aim.</span>':!hasB?'<span class="cold">Move and make a turn, and Halo finds the direction of this device. You can also capture what is in front of you now.</span>':aligned?'<span class="warm">Aligned. Lock and capture.</span>':diff<45?'<span class="warm">Warmer. Keep turning.</span>':'<span class="cold">Colder. Turn to find the signal.</span>';
   S.capRAF=requestAnimationFrame(capLoop);
 }
 el('capShot').onclick=async ()=>{
@@ -2533,7 +2539,7 @@ function syncReconnect(){ ['access','refresh','accountId','deviceId','cursor','e
 function syncLine(){ const n=SY.devices.length;
   return SY.status==='on' ? 'Signed in'+(n?' · '+n+' device'+(n===1?'':'s'):'')+' · synced '+hhmm(SY.at)
     : SY.status==='connecting' ? 'Connecting to the Halo backend'
-    : SY.status==='offline' ? (SY.msg||'Backend not reached. Working on this device only')
+    : SY.status==='offline' ? (SY.msg||'Working on this device. Halo syncs as soon as it connects')
     : SY.status==='out' ? (SY.msg||'Signed out')
     : SY.status==='off' ? SY.msg : 'Starting'; }
 /* ---------- Which way you face. A phone's compass when you stand still, the direction of travel when you walk.
@@ -2620,11 +2626,11 @@ function mapFullTick(force){
   const placed=devs.filter(d=>d.fix).length, rough=devs.filter(d=>!d.fix&&d.sector).length, nd=devs.filter(noDir).length, wy=devs.filter(d=>d.withYou).length, V=vis();
   setHTML(el('mfSum'), !g ? '<b>The map needs your position.</b> <button class="btn sm primary" data-act="geo-ask" style="margin-left:6px">Share my position</button>'
     : !(V.mode==='live'||V.mode==='sim') ? '<b>'+esc(stateWords(V.mode).count)+'.</b> Unknown, not Clear.'
-    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' no direction yet':'')+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
-  const chips=devs.slice(0,24).map(d=>{ const th=deviceThreat(d); return '<button class="mf-chip'+(MF.sel===d.id?' sel':'')+'" data-act="mf-dev" data-id="'+d.id+'" style="--hc:var('+TIER_VAR[th.tierIdx]+')">'+esc(devName(d))+'<span>'+esc(distText(d))+(d.bearing!=null?' · '+esc(whereWords(d)):' · no direction yet')+'</span></button>'; }).join('');
+    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
+  const chips=devs.slice(0,24).map(d=>{ const th=deviceThreat(d); return '<button class="mf-chip'+(MF.sel===d.id?' sel':'')+'" data-act="mf-dev" data-id="'+d.id+'" style="--hc:var('+TIER_VAR[th.tierIdx]+')">'+esc(devName(d))+'<span>'+esc(distText(d))+(d.bearing!=null?' · '+esc(whereWords(d)):' · direction pending')+'</span></button>'; }).join('');
   const ch=el('mfChips'); if(ch._h!==chips){ ch.innerHTML=chips; ch._h=chips; }
   const sd=MF.sel && devs.find(d=>d.id===MF.sel);
-  setHTML(el('mfInfo'), sd ? '<div class="mf-info"><b>'+esc(devName(sd))+'</b> · '+esc(kindText(sd))+'<br>'+esc(distText(sd))+(sd.bearing!=null?', '+esc(whereWords(sd))+(heading()!=null?' ('+esc(compass(sd.bearing))+')':''):'. Direction not known yet: walk, and make a turn')+
+  setHTML(el('mfInfo'), sd ? '<div class="mf-info"><b>'+esc(devName(sd))+'</b> · '+esc(kindText(sd))+'<br>'+esc(distText(sd))+(sd.bearing!=null?', '+esc(whereWords(sd))+(heading()!=null?' ('+esc(compass(sd.bearing))+')':''):'. Move and make a turn, and Halo finds its direction')+
       (sd.fix?' · placed within '+Math.round(sd.fix.unc)+' m':sd.sector?' · direction only':'')+' · '+esc(flagOf(sd))+
       '<div class="formrow"><button class="btn sm primary" data-act="mf-ident" data-id="'+sd.id+'">Identify</button><button class="btn sm" data-act="mf-dev" data-id="">Close</button></div></div>' : '');
 }
@@ -2637,7 +2643,7 @@ function reportHTML(){
   const dstr=d=>d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear(), tstr=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   const tier=a.t<0?'Unknown':TIER_NAME[a.t];
   const row=t=>{ const n=stepsOf(t).length, dn=doneCount(t), sc=scopeOf(t), sp=spCount(t);
-    return {t, sc, n, dn, sp, hits:(P.hits||{})[t.id]||0, st: t.shelf!=='real'?'Potential':sc===false?'Does not apply':sc===null?'Not known':(!n?'No action available':dn>=n?'Defended':dn>0?'Partly defended':'Open')}; };
+    return {t, sc, n, dn, sp, hits:(P.hits||{})[t.id]||0, st: t.shelf!=='real'?'Potential':sc===false?'Does not apply':sc===null?'Profile to answer':(!n?'No action available':dn>=n?'Defended':dn>0?'Partly defended':'Open')}; };
   const R=THREATS.filter(t=>t.shelf==='real').map(row), POT=THREATS.filter(t=>t.shelf!=='real').map(row);
   const applies=R.filter(r=>r.sc===true), unknown=R.filter(r=>r.sc===null), open=applies.filter(r=>r.n&&r.dn<r.n).sort((x,y)=>IMPACT_W(y.t.impact)-IMPACT_W(x.t.impact)||x.dn-y.dn), done=applies.filter(r=>r.n&&r.dn>=r.n);
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
@@ -2646,7 +2652,7 @@ function reportHTML(){
   const lowerFirst=x=>x.charAt(0).toLowerCase()+x.slice(1), plural=(n,one,many)=>n+' '+(n===1?one:many);
   const tbl=(head,rows)=>'<div class="rp-wide"><table><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+'</table></div>';
   const vicWord = live ? (withYou.length?plural(withYou.length,'device','devices')+' with you':plural(near.length,'device','devices')+' in earshot') : V.mode==='live' ? 'Test data only' : 'Unknown';
-  const sideWord = side=>{ const xs=applies.filter(r=>r.t.side===side), o=xs.filter(r=>r.n&&r.dn<r.n).length; return !answered?'Not known':!xs.length?'None apply':o?o+' of '+xs.length+' open':'Defended'; };
+  const sideWord = side=>{ const xs=applies.filter(r=>r.t.side===side), o=xs.filter(r=>r.n&&r.dn<r.n).length; return !answered?'Profile to answer':!xs.length?'None apply':o?o+' of '+xs.length+' open':'Defended'; };
   let h='';
   // ---- title
   h+='<h1>Remiel Halo Full Report</h1><p class="rp-sub">All current threats, and where you stand against each</p>'+
@@ -2681,7 +2687,7 @@ function reportHTML(){
   h+='<h2>3. What is around you</h2>';
   if(live && near.length){ const ds=[...near].sort((x,y)=>(y.withYou?1:0)-(x.withYou?1:0)||x.dist-y.dist).slice(0,14);
     h+='<p>These are the devices your sensor heard at the time of the report, nearest and most serious first.</p>'+
-      tbl(['Device','Kind','Distance','Placement','Standing'], ds.map(d=>[e(devName(d)), e(kindText(d)), e(distText(d)), e(d.fix?'Placed, within '+Math.round(d.fix.unc)+' m':d.sector?'Direction rough':'Direction not known'), e(d.mine?'Yours':d.withYou?'With you':d.onRoute?'Seen on your route':d.knownBefore?'Known':'New')]))+
+      tbl(['Device','Kind','Distance','Placement','Standing'], ds.map(d=>[e(devName(d)), e(kindText(d)), e(distText(d)), e(d.fix?'Placed, within '+Math.round(d.fix.unc)+' m':d.sector?'Direction rough':'Direction pending'), e(d.mine?'Yours':d.withYou?'With you':d.onRoute?'Seen on your route':d.knownBefore?'Known':'New')]))+
       (near.length>ds.length?'<p>'+(near.length-ds.length)+' more are listed in Watchers.</p>':''); }
   else h+='<p>'+(live?'Your sensor is reporting, and nothing is in earshot at this moment.':'Start listening and this section lists every device around you, with its maker, its distance, its direction, and whether it is moving with you.')+'</p>';
   if(W.t0 && W.t1 && !W.test){ const st=walkStats(), wy=Object.values(W.devs).filter(r=>r.withYou&&!r.mine);
@@ -2690,7 +2696,7 @@ function reportHTML(){
   const stepsAll=applies.reduce((n,r)=>n+r.n,0), stepsDone=applies.reduce((n,r)=>n+Math.min(r.dn,r.n),0), spAll=applies.reduce((n,r)=>n+r.sp.n,0), spDone=applies.reduce((n,r)=>n+r.sp.dn,0), hitsAll=THREATS.reduce((n,t)=>n+((P.hits||{})[t.id]||0),0);
   h+='<h2>4. The bottom line in detail</h2><p>The bottom line is read from the components below. Any one of them can raise it.</p>'+
     tbl(['Component','Reading','What it means'],[
-      ['Threats that apply to you',answered?applies.length+' of '+R.length:'Not known','Decided by your profile answers alone'],
+      ['Threats that apply to you',answered?applies.length+' of '+R.length:'Profile to answer','Decided by your profile answers alone'],
       ['Defence steps complete',stepsAll?stepsDone+' of '+stepsAll:'None to count','Each step is one setting or habit that closes one path'],
       ['Special countermeasures complete',spAll?spDone+' of '+spAll:'None to count','Stronger steps, for a threat you believe is active'],
       ['Findings you have logged',String(hitsAll),'Your own observations, kept in Evidence'],
@@ -2699,7 +2705,7 @@ function reportHTML(){
       ['Device health',e(!hc.at?'Ready to run':hc.ok+' pass, '+hc.att+' to attend to'),'What this device reports about itself'],
       ['Evidence chain',plural(P.evidence.length,'entry','entries'),'Each entry is fingerprinted and chained to the one before']]);
   // ---- 5 register
-  const reg=rs=>tbl(['Threat','What it is','Applies','Defence','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.sc===true?'Yes':r.sc===false?'No':'Not known', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
+  const reg=rs=>tbl(['Threat','What it is','Applies','Defence','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.sc===true?'Yes':r.sc===false?'No':'To answer', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
   h+='<h2>5. The threat register, in full</h2><p>Every threat Halo tracks is listed, whether or not it applies to you. Watchers are those who observe where you are and what you do. Attackers are those who take over a device, an account or an identity.</p>'+
      '<h3>Watchers, in use today</h3>'+reg(R.filter(r=>r.t.side==='w'))+'<h3>Attackers, in use today</h3>'+reg(R.filter(r=>r.t.side==='a'))+
      (POT.length?'<h3>Potential: not in use against people yet</h3>'+tbl(['Threat','What it is','When','Defence'],POT.map(r=>['<b>'+e(r.t.name)+'</b>',e(r.t.short),e(r.t.imminence||'Not known'),r.n?r.dn+' of '+r.n:'None available yet'])):'');
@@ -2944,9 +2950,9 @@ function aiPull(){
       (x.disp?'<div class="nt" style="margin-top:8px"><b>Disputed.</b> '+esc(x.disp)+'</div>':'')+
       '<div class="limit" style="margin-top:8px"><b>Primary.</b> <a href="'+esc(x.pu)+'" target="_blank" rel="noopener">'+esc(x.pn)+'</a> · <b>Corroboration.</b> <a href="'+esc(x.cu)+'" target="_blank" rel="noopener">'+esc(x.cn)+'</a></div>'+
       (x.tool&&T(x.tool)?'<div class="formrow" style="margin-top:8px"><button class="btn sm" data-act="res" data-id="'+x.tool+'">Open '+esc(T(x.tool).name)+'</button></div>':'')+'</div>').join('')+'</div>';
-  h+='<div class="dsec"><h4>Unreviewed headlines <span class="spsub">'+(g?'live, '+fmtDT(g.generated):'feed not reached')+'</span></h4>'+
+  h+='<div class="dsec"><h4>Unreviewed headlines <span class="spsub">'+(g?'live, read '+feedAgo():'connecting')+'</span></h4>'+
     (live.length?'<p style="margin-bottom:6px">As published by the sources in the last days. These are leads. Each becomes a finding once it is reviewed.</p>'+live.slice(0,12).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap;text-align:right">'+esc(x.src)+'<br>'+esc(fmtD(x.d))+'</span></div>').join('')
-      :'<p>'+(g?'The feed in use carries no AI headlines.':'The live feed was not reached, so there are no headlines to show.')+'</p>')+'</div>';
+      :'<p>'+(g?'The feed in use carries no AI headlines.':'Headlines appear here as soon as the live feed connects.')+'</p>')+'</div>';
   h+='<div class="limit"><b>The standard.</b> Every reviewed entry is confirmed at its primary source and by a second, independent source, and carries its date. A report waiting for its second source joins the list as soon as it has one. <b>Coverage.</b> The list covers actors linked to China and Russia, criminal groups, and the AI developers themselves. For Belarus, and for xAI, the sources have published nothing that meets the standard so far. New incidents appear first among the unreviewed headlines.</div></div>';
   return h+'</div>';
 }
@@ -2974,6 +2980,9 @@ function sigApply(){ const g=sigGet(); if(!g.names.length && !Object.keys(g.coun
   devs.filter(d=>!d.mine && left[sigKey(d)]>0).sort((a,b)=>((b.tested||b.fFollow)?1:0)-((a.tested||a.fFollow)?1:0) || (b.mins||0)-(a.mins||0) || b.rssi-a.rssi)
     .forEach(d=>{ const k=sigKey(d); if(left[k]>0){ left[k]--; d.sigFit=true; d.withYou=false; d.knownBefore=true; } });
 }
+// The open list follows what the phone hears: hold it against a device and that device rises to the top.
+function sigRefresh(force){ const box=el('tp-sig'); if(!box || !S.open.has('sig')) return; const now=Date.now(); if(!force && now-(S._sigT||0)<2500) return;
+  const h=sigPull(); if(h===S._sigH) return; S._sigH=h; S._sigT=now; box.outerHTML=h; }
 function sigPull(){
   const open=S.open.has('sig'), g=sigGet(), n=sigSize(), V=vis(), live=V.mode==='live'||V.mode==='sim';
   let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(n?'--clear':'--cyan')+')" id="tp-sig"><div class="tp-head" data-act="pull" data-id="sig"><div class="tp-top"><span class="tp-lab">Your Signature</span><span class="tp-i">i</span></div>'+
@@ -3383,6 +3392,7 @@ function liveTick(){
   if(!booted) return;
   if(S.view==='overview'||S.view==='watchers') renderVicinity();
   if(el('rost')) renderRoster();
+  sigRefresh();
   const st=liveState()+':'+[...LIVE.devs.values()].filter(d=>d.present&&d.withYou&&!d.sim).length;
   if(st!==LIVE._st){ LIVE._st=st; softRender(); }
   fillTickers();
@@ -3421,7 +3431,8 @@ function cellIngest(list, t, pos){
   if(!sv) return; const id=cellId(sv), gen=CELL_GEN[sv.k]||'';
   if(CELL.serving && CELL.serving.id!==id){ const moved=(pos && CELL.serving.pos) ? distLL(pos.lat,pos.lon,CELL.serving.pos.lat,CELL.serving.pos.lon) : null;
     CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved}); if(CELL.changes.length>200) CELL.changes.shift();
-    if(W.on && gen==='2G' && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone dropped from '+CELL.serving.gen+' to 2G.'); }
+    if(W.on && gen==='2G' && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone dropped from '+CELL.serving.gen+' to 2G.','',t); }
+  if(W.on){ W.cells=W.cells||{}; W.cells[id]=1; if(gen==='2G') W.g2=true; }
   if(gen==='2G' && (!CELL.serving || CELL.serving.gen!=='2G') && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; save(); }
   CELL.serving={id, gen, c:sv, pos:pos?{lat:pos.lat,lon:pos.lon}:(CELL.serving&&CELL.serving.pos)||null, since:(CELL.serving&&CELL.serving.id===id)?CELL.serving.since:t};
 }
@@ -3436,7 +3447,7 @@ function toolTower(){
     (flaps>=3?'<div class="hrow"><span class="hs att">Attention</span><span><b>The tower changed '+flaps+' times while you stood still.</b> Halo has the times. Move a few streets and see whether it settles.</span></div>':'')+
     (!two&&flaps<3?'<div class="hrow"><span class="hs ok">Steady</span><span>Your phone is on '+esc(sv.gen)+', and the tower is holding.</span></div>':'')+
     '<div class="kv" style="margin-top:10px"><span class="k">In use</span><span class="v">'+esc(sv.gen)+' · network '+esc((c.mcc||'')+'-'+(c.mnc||''))+'</span><span class="k">Cell</span><span class="v mono" style="font-size:12px">'+esc(String(c.ci||'')||('PCI '+(c.pci==null?'':c.pci)))+(c.tac!=null?' · area '+c.tac:'')+'</span>'+
-    '<span class="k">Signal</span><span class="v">'+(c.r==null?'':c.r+' dBm')+(c.ta!=null?' · about '+Math.round(c.ta*78)+' m by timing':'')+'</span><span class="k">Since</span><span class="v">'+hhmm(sv.since)+'</span>'+
+    '<span class="k">Signal</span><span class="v">'+(c.r==null?'':c.r+' dBm')+(c.ta!=null&&(c.k==='lte'||c.k==='gsm')?' · about '+Math.round(c.ta*(c.k==='lte'?78:554))+' m by timing':'')+'</span><span class="k">Since</span><span class="v">'+hhmm(sv.since)+'</span>'+
     '<span class="k">Neighbours</span><span class="v">'+(CELL.list.length-1)+' in earshot</span><span class="k">Changes, last 10 min</span><span class="v">'+ch10+'</span></div></div>';
 }
 /* ----- Wi-Fi: every access point in earshot. Public Wi-Fi Guard reads them for open networks and for a name that appears twice with different locks. ----- */
@@ -3465,7 +3476,7 @@ async function nativeDrain(){
     for(const b of batches){ if(!b || !Number.isFinite(b.t)) continue; const q=b.pos, live=Date.now()-b.t<8000;
       if(okLL(q)){ const acc=typeof q.acc==='number'?q.acc:25;
         if(live) geoFix({coords:{latitude:q.lat, longitude:q.lon, accuracy:acc, heading:q.heading, speed:q.speed}});
-        else { trackPush(q.lat,q.lon,acc,q.t||b.t); walkPos({lat:q.lat,lon:q.lon,acc}, b.t); } }
+        else { trackPush(q.lat,q.lon,acc,q.t||b.t); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc}, b.t); } }
       const list=[];
       for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
         const ev={device:{id:x.a,name:x.n||''}, rssi:x.r, uuids:x.u||[],
@@ -3474,8 +3485,9 @@ async function nativeDrain(){
       (b.w||[]).slice(0,120).forEach(x=>{ if(!x || !x.b || typeof x.r!=='number') return; const open=!/WPA|WEP|SAE|RSN|EAP|OWE|PSK/i.test(x.c||'');
         list.push({id:'ap:'+String(x.b).toLowerCase(), rssi:x.r, band:'wifi', cls:'Access point', name:String(x.s||'').slice(0,40), hint:(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
       if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:okLL(q)?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew);
+      if(!live && W.on && list.length) walkTick(b.t, list.map(x=>x.id), okLL(q)?q:null);
       if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
-    if(batches.length) liveTick();
+    if(batches.length){ liveTick(); walkSettle(); }
     const lost = !!PH.nstat && !PH.nstat.listening && Date.now()-PH.asked>6000;
     if(lost!==PH.lost){ PH.lost=lost; softRender(); renderVicinity(); }
   } finally { PH.busy=false; } }
@@ -3560,31 +3572,42 @@ const W = (()=>{ try{ const j=JSON.parse(store.get('halo_walk')||'null'); if(j &
 let _wLock=null, _wSaved=0, _wHidden=0;
 const wSave = force => { const n=Date.now(); if(!force && n-_wSaved<8000) return; _wSaved=n; try{ store.set('halo_walk', JSON.stringify(W)); }catch(e){} };
 async function wLock(){ W.awake=false; if(NATIVE()){ W.awake=true; return; } try{ if('wakeLock' in navigator && document.visibilityState==='visible'){ _wLock=await navigator.wakeLock.request('screen'); W.awake=true; } }catch(e){} }
-function wEvent(k, text, id){ W.events.push({t:Date.now(), k, text, id:id||''}); if(W.events.length>1500) W.events.splice(0, W.events.length-1500); }
+let _wAt=0;
+function wEvent(k, text, id, t){ W.events.push({t:t||_wAt||Date.now(), k, text, id:id||''}); if(W.events.length>1500) W.events.splice(0, W.events.length-1500); }
 const walkDur = ms => { const s=Math.max(0,Math.round(ms/1000)); return s<90 ? s+' seconds' : Math.round(s/60)+' minutes'; };
 const walkName = d => devName(d)+' ('+[d.cls==='Unknown'?'unidentified':d.cls, d.hint].filter(Boolean).join(', ')+')';
 const carriedIds = () => Object.keys(P.sensors||{}).filter(k=>P.sensors[k].kind!=='station');
 // A trip starts by itself when you move while Halo is listening, and ends by itself once you have stopped.
 // It makes no difference whether you walk, cycle or drive.
-const TRIP_START_M=60, TRIP_IDLE_MS=5*60000, TRIP={a:null};
-function walkStart(){
-  if(W.t0 && W.t1 && Object.keys(W.devs||{}).length){ P.trips=P.trips||[]; const st=walkStats(); P.trips.unshift({t0:W.t0,t1:W.t1,m:st.distance_m,heard:st.heard,placed:st.placed,withYou:st.withYou}); P.trips.length=Math.min(P.trips.length,20); save(); }
-  const a=TRIP.a;
-  Object.assign(W,{on:true, t0:(a&&a.t)||Date.now(), t1:0, events:[], devs:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false});
-  if(a) W.route.push({t:a.t, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10});
-  wEvent('start','Trip started.');
-  wLock(); wSave(true); walkTick(); renderVicinity();
+let TRIP_START_M=60, TRIP_IDLE_MS=5*60000; const TRIP={a:null}, TRIP_STILL_M=25, TRIP_MOVE_M=40;
+const tripKeep = () => { if(!(W.t0 && W.t1) || W.kept) return; const st=walkStats(); if(!st.heard && !st.distance_m) return; W.kept=true;
+  P.trips=P.trips||[]; P.trips.unshift({t0:W.t0,t1:W.t1,m:st.distance_m,heard:st.heard,placed:st.placed,withYou:st.withYou}); P.trips.length=Math.min(P.trips.length,20); save(); };
+function walkStart(t0, a, at){
+  tripKeep(); const back=!!at;
+  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false});
+  if(a) W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10});
+  wEvent('start','Trip started.','',W.t0);
+  if(back) walkTick(at, [...LIVE.devs.keys()]); else { wLock(); walkTick(); }
+  wSave(true); renderVicinity();
 }
-function walkStop(){ if(!W.on) return; walkTick(); W.on=false; W.t1=Date.now(); wEvent('stop','Trip ended.'); try{ if(_wLock) _wLock.release(); }catch(e){} _wLock=null; TRIP.a=null; wSave(true); renderVicinity(); }
-function tripAuto(){
-  const now=Date.now();
-  if(!W.on){ if(!mobileLive() || !S.pos || S.pos.acc>POS_MAX_ACC) return;
-    if(!TRIP.a || now-TRIP.a.t>20*60000) TRIP.a={lat:S.pos.lat, lon:S.pos.lon, t:now};
-    if(distLL(TRIP.a.lat,TRIP.a.lon,S.pos.lat,S.pos.lon)>=TRIP_START_M) walkStart();
+function walkStop(t1){ if(!W.on) return; if(!t1) walkTick(); W.on=false; W.t1=Math.max(W.t0+1000, t1||Date.now()); wEvent('stop','Trip ended.','',W.t1); try{ if(_wLock) _wLock.release(); }catch(e){} _wLock=null; TRIP.a=null; tripKeep(); wSave(true); renderVicinity(); }
+// Positions in time order, live or from the app's own record. A trip taken with the screen off is recognised and recorded in full.
+function tripStep(q, t, hearing, back){
+  if(!q || !(q.acc<=POS_MAX_ACC)) return;
+  if(!W.on){ const a=TRIP.a;
+    if(!hearing) return;
+    if(!a || t<a.t-1000){ TRIP.a={lat:q.lat, lon:q.lon, t, left:t}; return; }
+    const dm=distLL(a.lat,a.lon,q.lat,q.lon);
+    if(dm<TRIP_STILL_M){ a.left=t; return; }
+    if(dm>=TRIP_START_M){ TRIP.a=null; walkStart(a.left, a, back?t:0); return; }
+    if(t-a.left>10*60000) TRIP.a={lat:q.lat, lon:q.lon, t, left:t};
     return; }
-  const l=W.route[W.route.length-1], moved=l?Math.max(l.t,W.t0):W.t0;
-  if(now-moved>TRIP_IDLE_MS) walkStop();
+  const i=W.idle;
+  if(!i || distLL(i.lat,i.lon,q.lat,q.lon)>=TRIP_MOVE_M){ W.idle={lat:q.lat, lon:q.lon, t}; return; }
+  if(t-i.t>TRIP_IDLE_MS){ walkStop(back?i.t+TRIP_IDLE_MS:0); TRIP.a={lat:q.lat, lon:q.lon, t, left:t}; }
 }
+function tripAuto(){ if(!W.on && TRIP.a && S.pos && S.pos.t<TRIP.a.t) return;      // the app's record is ahead of the last live fix: wait for the next one
+  tripStep(S.pos, Date.now(), mobileLive(), false); }
 document.addEventListener('visibilitychange', ()=>{ if(!W.on) return;
   if(document.visibilityState==='hidden'){ _wHidden=Date.now(); wSave(true); }
   else { if(_wHidden){ const sec=Math.round((Date.now()-_wHidden)/1000); _wHidden=0;
@@ -3600,29 +3623,39 @@ function walkPos(q, at){
     if(!good && !W.rough){ W.rough=true; wEvent('warn','Your position is good to '+Math.round(S.pos.acc)+' m just now. Placement resumes as it sharpens.'); }
     else if(good && W.rough){ W.rough=false; wEvent('note','Your position is good again, within '+Math.round(S.pos.acc)+' m.'); } }
 }
-function walkTick(){
-  if(!W.on) return; const now=Date.now(), nowS=now+LIVE.skew; walkPos();
-  const sen=mobileLive();
-  if(!sen && !W.silent && now-W.t0>20000){ W.silent=true; wEvent('warn','Listening paused. Halo resumes as soon as the sensor reports again.'); }
-  else if(sen && W.silent){ W.silent=false; wEvent('note','Listening again.'); }
-  LIVE.devs.forEach(d=>{ const heard=nowS-d.seenMobile<(d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT); let r=W.devs[d.id];
+function walkTick(at, only, q){
+  if(!W.on) return; const back=!!at, now=at||Date.now(), nowS=now+LIVE.skew, here=q||S.pos; _wAt=back?now:0;
+  if(!back){ walkPos();
+    const sen=mobileLive();
+    if(!sen && !W.silent && now-W.t0>20000){ W.silent=true; wEvent('warn','Listening paused. Halo resumes as soon as the sensor reports again.'); }
+    else if(sen && W.silent){ W.silent=false; wEvent('note','Listening again.'); } }
+  const each=d=>{ const heard=nowS-d.seenMobile<(d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT); let r=W.devs[d.id];
     if(!r){ if(!heard) return; if(quietAp(d)){ W.aps=W.aps||{}; W.aps[d.id]=1; return; }
       r=W.devs[d.id]={id:d.id, call:d.name, cls:d.cls, hint:d.hint||'', adv:d.adv||'', band:d.band, first:now, last:now, n:0, min:Math.round(d.dist), at:null, here:true, placed:null, rough:null, withYou:0, sim:!!d.sim};
       if(d.sim) W.test=true;
       wEvent('new','New: '+walkName(d)+', '+distText(d), d.id); }
-    if(!heard){ if(r.here){ r.here=false; if(r.n>=3) wEvent('gone','Gone: '+(r.label||r.call)+', heard for '+walkDur(r.last-r.first)+(r.span?' across '+r.span+' m of your movement':''), d.id); } return; }
+    if(!heard){ if(r.here){ r.here=false; if(r.n>=3) wEvent('gone','Gone: '+(r.label||r.call)+', heard for '+walkDur(r.last-r.first)+(r.span?' across '+r.span+' m of your movement':''), d.id, Math.min(now, r.last+LIVE_PRESENT)); } return; }
     r.last=Math.min(now, Math.round(d.seenMobile-LIVE.skew)); r.n++; r.label=labelOf(d)||''; r.call=d.name; r.cls=d.cls; r.hint=d.hint||''; r.adv=d.adv||''; r.mine=!!d.mine; r.sim=r.sim&&!!d.sim;
     if(!r.here){ r.here=true; wEvent('back','Back in earshot: '+walkName(d)+', '+distText(d), d.id); }
-    if(d.dist<=r.min || !r.at){ r.min=Math.round(Math.min(r.min,d.dist)); if(S.pos) r.at={lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6)}; }
+    if(d.dist<=r.min || !r.at){ r.min=Math.round(Math.min(r.min,d.dist)); if(here) r.at={lat:+here.lat.toFixed(6),lon:+here.lon.toFixed(6)}; }
     if(d.fix){ const first=!r.placed; r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n};
       if(first) wEvent('placed','Placed: '+walkName(d)+', '+Math.round(d.dist)+' m'+(d.bearing!=null?' '+compass(d.bearing):'')+', likely within '+Math.round(d.fix.unc)+' m', d.id); }
     else if(d.sector && !r.rough && !r.placed){ r.rough={brg:Math.round(d.sector.brg)}; wEvent('rough','Direction found: '+walkName(d)+', roughly '+compass(d.sector.brg), d.id); }
     if(d.withYou && !r.withYou){ r.withYou=now; wEvent('with','With you: '+walkName(d)+' '+followText(d), d.id); }
-    r.mins=+(d.mins||0).toFixed(1); r.span=Math.round(d.span||0); r.steady=!!d.steady; r.rssi=Math.round(d.rssi); r.tested=!!d.tested; });
-  Object.keys(W.devs).forEach(id=>{ const r=W.devs[id];           // a device the engine no longer holds
-    if(r.here && now-r.last>2*LIVE_PRESENT){ r.here=false; if(r.n>=3) wEvent('gone','Gone: '+(r.label||r.call)+', heard for '+walkDur(r.last-r.first), id); } });
-  wSave(false);
+    r.mins=+(d.mins||0).toFixed(1); r.span=Math.round(d.span||0); r.steady=!!d.steady; r.rssi=Math.round(d.rssi); r.tested=!!d.tested; };
+  if(back) (only||[]).forEach(sig=>{ const d=LIVE.devs.get(sig); if(d){ liveDerive(d,nowS); each(d); } });      // the app's own record: each device is entered at the time the app heard it
+  else { LIVE.devs.forEach(each);
+    Object.keys(W.devs).forEach(id=>{ const r=W.devs[id];           // a device the engine no longer holds
+      if(r.here && now-r.last>2*LIVE_PRESENT){ r.here=false; if(r.n>=3) wEvent('gone','Gone: '+(r.label||r.call)+', heard for '+walkDur(r.last-r.first), id, r.last+LIVE_PRESENT); } }); }
+  _wAt=0; wSave(false);
 }
+// A trip that ended inside the app's own record: what Halo placed from those readings is entered once the record has been read.
+function walkSettle(){ if(W.on || !W.t1 || W.settled || !W.devs) return; W.settled=true; const by={}; LIVE.devs.forEach(d=>{ by[d.id]=d; });
+  Object.values(W.devs).forEach(r=>{ const d=by[r.id]; if(!d || r.placed) return;
+    if(d.fix){ r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n}; wEvent('placed','Placed: '+walkName(d)+', likely within '+Math.round(d.fix.unc)+' m', d.id, W.t1-1); }
+    else if(d.sector && !r.rough){ r.rough={brg:Math.round(d.sector.brg)}; wEvent('rough','Direction found: '+walkName(d)+', roughly '+compass(d.sector.brg), d.id, W.t1-1); } });
+  W.kept=false; if(P.trips && P.trips[0] && P.trips[0].t0===W.t0) P.trips.shift(); tripKeep(); wSave(true); renderVicinity(); }
+const wEvents = () => [...(W.events||[])].sort((a,b)=>a.t-b.t);
 function walkStats(){ const ds=Object.values(W.devs||{}); return {heard:ds.length, here:ds.filter(r=>r.here).length, placed:ds.filter(r=>r.placed).length, withYou:ds.filter(r=>r.withYou&&!r.mine).length, minutes:+(((W.t1||Date.now())-W.t0)/60000).toFixed(1), distance_m:Math.round(W.dist||0)}; }
 function walkReport(){
   const iso=t=>new Date(t).toISOString();
@@ -3633,7 +3666,7 @@ function walkReport(){
     devices:Object.values(W.devs).sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0) || (b.placed?1:0)-(a.placed?1:0) || b.n-a.n)
       .map(r=>({id:r.id, callSign:r.call, yourName:r.label||'', markedMine:!!r.mine, class:r.cls, maker:r.hint, broadcastName:r.adv, band:r.band, testData:!!r.sim, firstHeard:iso(r.first), lastHeard:iso(r.last), reports:r.n,
         closest_m:r.min, youWereAt:r.at, placed:r.placed, directionRough:r.rough, withYou:r.withYou?iso(r.withYou):null, minutesHeard:r.mins||0, yourMovement_m:r.span||0, steadySignal:!!r.steady, lastSignal_dBm:r.rssi})),
-    events:W.events.map(e=>({t:iso(e.t), kind:e.k, text:e.text, id:e.id})), route:W.route.map(q=>({t:iso(q.t), lat:q.lat, lon:q.lon, acc_m:q.acc}))};
+    events:wEvents().map(e=>({t:iso(e.t), kind:e.k, text:e.text, id:e.id})), route:W.route.map(q=>({t:iso(q.t), lat:q.lat, lon:q.lon, acc_m:q.acc}))};
 }
 /* The trip, written out so it can be read: the bottom line first, then what Halo recorded,
    what moved with you, what was placed, every device, and every change in order. */
@@ -3654,9 +3687,9 @@ function walkDocHTML(){
   // 1
   const bottom = !ds.length ? 'Route recorded' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : longEnough ? 'Nothing moved with you' : 'Follower test in progress';
   h+='<h2>1. Summary</h2><p>Bottom line: <span class="rp-tier">'+e(bottom)+'</span></p>'+
-    '<div class="rp-bar4"><div><span>Walked</span><b>'+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'</b></div><div><span>Heard</span><b>'+plural(st.heard,'device','devices')+'</b></div><div><span>On the map</span><b>'+st.placed+' placed</b></div><div><span>With you</span><b>'+withYou.length+'</b></div></div>';
+    '<div class="rp-bar4"><div><span>Travelled</span><b>'+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'</b></div><div><span>Heard</span><b>'+plural(st.heard,'device','devices')+'</b></div><div><span>On the map</span><b>'+st.placed+' placed</b></div><div><span>With you</span><b>'+withYou.length+'</b></div></div>';
   if(!ds.length) h+='<p>Halo recorded your route for this trip. Start listening before the next one, and Halo also records every device along it.</p>';
-  else h+='<p>You walked '+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'. '+e(sensors.join(' and ')||'Your sensor')+' heard '+plural(st.heard,'device','devices')+' on Bluetooth. '+
+  else h+='<p>You travelled '+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'. '+e(sensors.join(' and ')||'Your sensor')+' heard '+plural(st.heard,'device','devices')+' on Bluetooth. '+
       (withYou.length ? e(withYou.map(r=>r.label||r.adv||r.call).join(', '))+' stayed in earshot at a steady strength while you moved, which is the pattern of something travelling with you. Read section 3, then decide whether each one is yours.'
        : longEnough ? 'Halo tested every one of them for '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement, and each was left behind.' : 'The follower test completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of movement, and it carries on into your next stretch.')+
       ' '+(st.placed?plural(st.placed,'device was','devices were')+' placed on the map from readings at several of your positions.':'Halo places a device once your route has a turn in it.')+'</p>';
@@ -3675,19 +3708,19 @@ function walkDocHTML(){
       '<p class="rp-sub" style="font-size:12px;margin-top:4px">The shape of your route, with each placed device and its zone.</p>'; }
   // 2
   h+='<h2>2. What Halo recorded</h2>'+tbl(['Item','This trip'],[
-    ['Listening',e(sensors.join(', ')||'Route only')],['Signals','Bluetooth: trackers, phones, watches, earbuds, laptops and beacons'+(W.aps&&Object.keys(W.aps).length?'. Wi-Fi: '+Object.keys(W.aps).length+' access points':'')+(CELL.changes.filter(x=>x.t>=W.t0).length||cellLive()?'. Cell: '+(CELL.changes.filter(x=>x.t>=W.t0&&x.t<=(W.t1||Date.now())).length+1)+' towers used'+(CELL.changes.some(x=>x.t>=W.t0&&x.to==='2G')?', with a drop to 2G':''):'')],
+    ['Listening',e(sensors.join(', ')||'Route only')],['Signals','Bluetooth: trackers, phones, watches, earbuds, laptops and beacons'+(W.aps&&Object.keys(W.aps).length?'. Wi-Fi: '+Object.keys(W.aps).length+' access points':'')+(W.cells&&Object.keys(W.cells).length?'. Cell: '+plural(Object.keys(W.cells).length,'tower','towers')+' used'+(W.g2?', with a drop to 2G':''):'')],
     ['Length',e(walkDur(durMs))+', '+e(miText(st.distance_m))],
     ['Follower test',longEnough?'Complete: '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m reached':'In progress: completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m'],
     ['Your position',rt.length?plural(rt.length,'point','points')+' recorded, typically within '+Math.round(median(rt.map(q=>q.acc)))+' m':'Starts with the first fix'],
     ['Record',W.gaps?'Continuous except for '+e(walkDur(W.gaps*1000)):'Continuous']]);
   // 3
   h+='<h2>3. Devices that moved with you</h2>';
-  if(withYou.length) h+='<p>Each device below stayed in earshot at a steady strength while you moved at least '+FOLLOW_SPAN.ble+' m over at least '+FOLLOW_MIN+' minutes. A device that is fixed in place fades as you walk away from it. One that travels with you does not.</p>'+
+  if(withYou.length) h+='<p>Each device below stayed in earshot at a steady strength while you moved at least '+FOLLOW_SPAN.ble+' m over at least '+FOLLOW_MIN+' minutes. A device that is fixed in place fades as you move away from it. One that travels with you does not.</p>'+
     tbl(['Device','Maker and kind','Heard for','Across','Closest'],withYou.map(r=>['<b>'+nm(r)+'</b>',kind(r),e(walkDur(r.last-r.first)),(r.span||0)+' m of your movement','about '+r.min+' m']))+
     '<p>First mark your own things: a watch, earbuds, a second phone, a tag on your keys. In Watchers, open the device and press This is mine. Whatever is left deserves your attention, and Evidence already holds the record.</p>';
   else h+='<p>'+(longEnough?'Halo tested every device heard, and each was left behind.':'The test is running. It completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of movement.')+'</p>';
   if(mine.length) h+='<p>Marked as yours, and left out of the test: '+e(mine.map(r=>r.label||r.adv||r.call).join(', '))+'.</p>';
-  if(stayed.length) h+='<h3>Stayed in earshot longest, without meeting the test</h3>'+tbl(['Device','Maker and kind','Heard for','Share of the walk','Across'],stayed.map(r=>[nm(r),kind(r),e(walkDur(r.last-r.first)),Math.round(r.share*100)+'%',(r.span||0)+' m']))+'<p>These stayed longest. Your own devices usually appear here first: mark them as yours and Halo sets them aside.</p>';
+  if(stayed.length) h+='<h3>Stayed in earshot longest, without meeting the test</h3>'+tbl(['Device','Maker and kind','Heard for','Share of the trip','Across'],stayed.map(r=>[nm(r),kind(r),e(walkDur(r.last-r.first)),Math.round(r.share*100)+'%',(r.span||0)+' m']))+'<p>These stayed longest. Your own devices usually appear here first: mark them as yours and Halo sets them aside.</p>';
   // 4
   h+='<h2>4. Devices placed on the map</h2>'+(placed.length?'<p>A placed device was heard from several of your positions, and those readings agree on one location. The zone is where it most likely is.</p>'+
     tbl(['','Device','Maker and kind','Zone','Closest you came','Location'],placed.map((r,i)=>[String(i+1),'<b>'+nm(r)+'</b>',kind(r),'Within '+r.placed.unc+' m','about '+r.min+' m',r.placed.lat.toFixed(5)+', '+r.placed.lon.toFixed(5)]))
@@ -3699,7 +3732,7 @@ function walkDocHTML(){
   const mk={}; ds.forEach(r=>{ const m=makerOf(r)||'Maker not broadcast'; mk[m]=mk[m]||{n:0,tr:0}; mk[m].n++; if(r.cls==='Tag') mk[m].tr++; });
   if(ds.length) h+='<h2>6. By maker</h2>'+tbl(['Maker','Devices','Of which trackers'],Object.keys(mk).sort((a,b)=>mk[b].n-mk[a].n).map(m=>[e(m),String(mk[m].n),String(mk[m].tr)]))+'<p>Halo reads the maker from what each device broadcasts.</p>';
   // 7 timeline
-  const evs=W.events||[];
+  const evs=wEvents();
   h+='<h2>'+(ds.length?'7':'6')+'. What changed, in order</h2>'+chunks(['Time','Change'],evs.slice(0,150).map(x=>[hms(x.t),e(x.text)]),16)+(evs.length>150?'<p>'+(evs.length-150)+' later changes are in the saved data file.</p>':'');
   // limits
   h+='<h2>'+(ds.length?'8':'7')+'. How to read this report</h2><ul class="rp-list">'+
@@ -3729,7 +3762,7 @@ function renderWalk(){
   const box=el('walkBox'); if(!box) return; let h='';
   const phone=!!NATIVE() || isAndroid() || isIOS(), ml=mobileLive();
   if(phone && !ml && vis().mode!=='sim'){ const ph=phPanel(); h+='<div class="listen"><span>'+ph.html+'</span></div>'; }
-  const st=W.t0?walkStats():null, last=W.events&&W.events.length?W.events.filter(e=>e.k!=='start'&&e.k!=='stop').slice(-1)[0]:null;
+  const st=W.t0?walkStats():null, last=W.events&&W.events.length?wEvents().filter(e=>e.k!=='start'&&e.k!=='stop').slice(-1)[0]:null;
   const line=()=>'<b>'+(W.on?'Trip':'Last trip')+'</b> '+(W.on?'':hhmm(W.t0)+' to '+hhmm(W.t1)+' · ')+esc(walkDur((W.t1||Date.now())-W.t0))+' · '+esc(miText(st.distance_m))+' · '+st.heard+' heard · '+st.placed+' placed · <b class="'+(st.withYou?'hot':'')+'">'+st.withYou+' with you</b>'+(W.test?' · test data':'');
   if(W.on) h+='<div class="trip on"><span class="dot live"></span><span class="t">'+line()+(last?'<span class="last">'+esc(last.text)+'</span>':'')+'</span><button class="btn sm gold" data-act="walk-doc">Trip report</button></div>';
   else if(W.t0 && W.t1 && !W.closed) h+='<div class="trip"><span class="t">'+line()+'</span><button class="btn sm gold" data-act="walk-doc">Trip report</button><button class="x" data-act="walk-close" title="Put away">&times;</button></div>';
@@ -3767,7 +3800,7 @@ async function loadSensors(){ const r=await api('GET','/sensors'); if(r.s!==200)
 function sensorsSection(){
   const ids=Object.keys(P.sensors||{});
   let h='<div class="dsec" id="sensorsSec"><h4>Sensors</h4><p style="margin-bottom:10px">Your phone listens for Bluetooth, Wi-Fi and cell signals with the Halo Android app. A computer at home listens too, and Halo then watches your home while you are out.</p>';
-  h+='<div class="rowline"><span><b>This phone</b> <span class="chip '+(PH.on&&!PH.lost?'pot':'')+'">'+(PH.on&&!PH.lost?'Listening':'Not listening')+'</span><br><span class="mono" style="font-size:11px;color:var(--mut)">What it hears stays on this phone.</span><div style="font-size:12.5px;line-height:1.45;margin-top:6px">'+phPanel().html+'</div></span></div>';
+  h+='<div class="rowline"><span><b>This phone</b> <span class="chip '+(PH.on&&!PH.lost?'pot':'')+'">'+(PH.on&&!PH.lost?'Listening':'Ready')+'</span><br><span class="mono" style="font-size:11px;color:var(--mut)">What it hears stays on this phone.</span><div style="font-size:12.5px;line-height:1.45;margin-top:6px">'+phPanel().html+'</div></span></div>';
   const lost=Object.keys(SY.sensorKind||{}).filter(id=>!P.sensors[id]);
   if(!ids.length && !lost.length) h+='<div class="empty" style="padding:8px">No sensors on this account.</div>';
   lost.forEach(id=>{ h+='<div class="rowline"><span><b>'+esc(SENSOR_KIND[SY.sensorKind[id]]||'Sensor')+'</b> <span class="chip real">No key on this device</span><br><span class="mono" style="font-size:11px;color:var(--mut)">Its reports cannot be read here. Remove it and add it again.</span></span>'+
@@ -3829,7 +3862,7 @@ function myFindings(side){
   if(side==='w'){ const V=vis();
     if(V.mode==='live'){ const pres=V.devices.filter(d=>d.present&&!d.sim), fl=pres.filter(d=>d.withYou||d.homeAway);
       if(pres.length || !V.test) out.push({t:'Now: '+pres.length+' device'+(pres.length===1?'':'s')+' in earshot'+(fl.length?', '+fl.length+' flagged. Open Watchers':', none flagged')+'.', src:(mobileLive()?'your sensor':'your home listener')+' · '+hhmm(liveLast()-LIVE.skew), mine:true}); }
-    else if(V.mode!=='sim') out.push({t:'Your vicinity: '+stateWords(V.mode).count+'. Unknown, not Clear.', src:'your sensors', mine:true}); }
+    else if(V.mode!=='sim') out.push({t:'Your vicinity: '+stateWords(V.mode).count+'.', src:'your sensors', mine:true}); }
   else kevMine().slice(0,3).forEach(v=>out.push({t:'In your own devices: '+v.vendor+' '+v.product+' is under attack ('+v.cve+'). Update it.', src:'CISA · '+fmtD(v.added), u:v.u, mine:true}));
   P.evidence.filter(r=>r.kind==='finding' && r.t>week && names.some(n=>r.text.indexOf(n)===0)).slice(0,4)
     .forEach(r=>out.push({t:'Your finding: '+r.text.slice(0,140), src:'Evidence · '+new Date(r.t).toLocaleDateString()+' '+hhmm(r.t), mine:true}));
@@ -3909,7 +3942,7 @@ document.addEventListener('click', e=>{
     case 'dev-name': deviceRename(); break;
     case 'dev-remove': deviceRemove(a.dataset.id); break;
     case 'acct-delete': accountDelete(); break;
-    case 'sync-now': syncNow().then(()=>toast(SY.status==='on'?'Synced.':'Backend not reached.')); break;
+    case 'sync-now': syncNow().then(()=>toast(SY.status==='on'?'Synced.':'Halo syncs as soon as it connects.')); break;
     case 'sync-reconnect': syncReconnect(); break;
     case 'terms-close': el('terms').classList.add('hidden'); break;
     case 'pull': { const id=a.dataset.id; if(S.open.has(id)){ closeRecord(id); break; }
@@ -3997,8 +4030,6 @@ document.addEventListener('click', e=>{
     case 'health-keep': { (navigator.storage&&navigator.storage.persist?navigator.storage.persist():Promise.resolve(false)).then(ok=>{ toast(ok?'The browser will keep Halo\'s data.':'The browser did not agree. Install Halo to the home screen, then try again.'); healthGo(); }).catch(()=>healthGo()); break; }
     case 'ph-start': phStart(); break;
     case 'ph-stop': phStop(); break;
-    case 'walk-start': walkStart(); break;
-    case 'walk-stop': walkStop(); break;
     case 'walk-doc': paperShow('Remiel Halo Trip Report', walkDocHTML()+'<div class="formrow" style="margin-top:14px"><button class="btn sm primary" data-act="walk-save">Save the data file</button>'+(navigator.share||NATIVE()?'<button class="btn sm" data-act="walk-share">Share the data file</button>':'')+'</div>'); break;
     case 'walk-save': walkSave(false); break;
     case 'walk-share': walkSave(true); break;
@@ -4044,7 +4075,9 @@ function boot(){
   else { if(PROFILE_Q.every(q=>pv(q.k)===null)) S.open.add('profile'); setView('overview'); }
   navKeep();
   setInterval(tick, 1600);
-  loadGlobal(); setInterval(loadGlobal, 10*60*1000); setInterval(fillTickers, 60000);
+  loadGlobal(); setInterval(loadGlobal, 5*60*1000); setInterval(fillTickers, 60000);
+  setInterval(()=>{ if(S.global && document.visibilityState==='visible') applyGlobal(true); }, 60000);          // the age on screen counts up by the minute
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-(S.globalAt||0)>120000) loadGlobal(); });
   syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit(); startGeo();
   if(NATIVE() && store.get('halo_listen')==='1'){ const st=nativeStatus(); if(st && st.permission==='granted') phStart(); }
 }
