@@ -388,6 +388,9 @@ a.tk:hover b{text-decoration:underline}
 .terms-card{width:100%;max-width:560px;max-height:86vh;overflow:auto;background:var(--panel2);border:1px solid var(--line2);border-radius:var(--r);padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
 .terms-card h3{margin:0 0 8px;font-family:var(--mono);font-weight:600;letter-spacing:.16em;text-transform:uppercase;font-size:12px;color:#fff}
 .gate-terms{margin-top:14px;color:var(--mut);font-size:11.5px;line-height:1.5}
+.linkcode{font-family:var(--mono);font-size:clamp(15px,4.6vw,22px);letter-spacing:.08em;color:#fff;text-align:center;padding:14px 10px;margin-bottom:8px;border-radius:var(--r2);
+  border:1px solid rgba(57,183,214,.6);background:linear-gradient(180deg,rgba(57,183,214,.12),rgba(57,183,214,.03));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 20px -8px var(--cyan);user-select:all;word-break:break-all}
+.inp.mono{font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -460,7 +463,7 @@ a.tk:hover b{text-decoration:underline}
         <section data-pane="responder" class="hidden"><div id="hMain"></div></section>
 
         <section data-pane="evidence" class="hidden">
-          <div class="pagehead"><h2>Evidence</h2><p>Every action you record is hashed and chained on this device. Simulated previews never enter this log.</p></div>
+          <div class="pagehead"><h2>Evidence</h2><p>Every action you record is hashed and chained on this device, then encrypted before it syncs to your other devices. Simulated previews never enter this log.</p></div>
           <div class="card">
             <h3>Evidence chain <span class="n" id="evCount"></span></h3>
             <div class="toolbar"><button class="btn sm" data-act="ev-export">Export signed log</button></div>
@@ -553,7 +556,7 @@ function loadState(){
   return blank();
 }
 const P = loadState();
-function save(){ store.set('halo_v2', JSON.stringify(P)); }
+function save(){ store.set('halo_v2', JSON.stringify(P)); onLocalChange(); }
 
 /* ---------- session state ---------- */
 const S = { view:'overview', mode:'auto', shelf:'real', open:new Set(), preview:false, devices:[], sort:'near',
@@ -1158,7 +1161,7 @@ function renderOverview(){
   h+='<div class="modebar">'+modePills()+'</div>';
   const list=THREATS.filter(t=>t.shelf==='real' && scopeOf(t)!==false && (S.mode==='auto'||t.side===S.mode))
     .sort((x,y)=>(isOpen(y)-isOpen(x)) || (scopeOf(y)===true)-(scopeOf(x)===true) || IMPACT_W(y.impact)-IMPACT_W(x.impact));
-  h+='<div class="stack">'+profilePull()+globalPull()+list.map(threatPull).join('')+resourcesPull()+termsPull()+'</div>';
+  h+='<div class="stack">'+profilePull()+globalPull()+devicesPull()+list.map(threatPull).join('')+resourcesPull()+termsPull()+'</div>';
   h+='<div class="formrow" style="margin-top:14px"><button class="btn primary" data-act="go" data-v="watchers" style="flex:1">All Watchers</button><button class="btn gold" data-act="go" data-v="attackers" style="flex:1">All Attackers</button></div></div>';
   el('ovMain').innerHTML=h;
   renderCoverage(); renderHomeMini(); renderVicinity();
@@ -1168,6 +1171,7 @@ function renderCoverage(){
   const rows=[['Bluetooth near you','No sensor',''],['Wi-Fi near you','No sensor',''],['Cell towers','No sensor',''],['Your devices','Not monitored',''],
     ['Home','No station',''],['Your position',S.pos?'Live, within '+Math.round(S.pos.acc)+' m':'Not shared',S.pos?'live':''],
     ['Global feed', g?'Live, '+fmtDT(g.generated):(S.globalErr?'Not reached':'Reaching'), g?'live':''],
+    ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='connecting'?'Connecting':SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':SY.status==='offline'?'Not reached':'Starting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
   el('covCard').innerHTML='<h3>Coverage <span class="n">what is watched, and what is blind</span></h3>'+
     rows.map(r=>'<div class="cov"><span>'+r[0]+'</span><span class="st"><span class="dot '+r[2]+'"></span>'+r[1]+'</span></div>').join('')+
@@ -1253,7 +1257,7 @@ function renderResponder(){
   let h='<div class="pagehead"><h2>Responder</h2><p>Know the moment someone at home needs help, and who responds. No cameras and no microphones: movement, stillness and falls only.</p></div>';
   h+='<div class="seg" style="margin-bottom:8px"><button data-act="h-arm" data-v="n" class="m-auto '+(!away?'on':'')+'">Home</button><button data-act="h-arm" data-v="y" class="m-w '+(away?'on':'')+'">Away</button></div>';
   h+='<div class="limit" style="margin-bottom:14px">'+(away
-      ? '<b>Away.</b> You are out. Halo watches the home and raises an alert on your phone. That needs a home station and the Halo backend. Neither is connected yet, so the home reads Unknown.'
+      ? '<b>Away.</b> You are out. Halo watches the home and raises an alert on your phone. That needs a home station. None is connected yet, so the home reads Unknown.'
       : '<b>Home.</b> You are in. Alerts to your phone are off. Set up the people, the rooms, the rules and the response chain here.')+'</div>';
   if(S.homeAlert){
     h+='<div class="alertbar"><div class="at">Take Action <span class="chip real" style="vertical-align:middle;margin-left:6px">Simulated preview</span></div>'+
@@ -1311,7 +1315,7 @@ function renderResponder(){
      '<li><b>A fall-detecting watch on the person at risk.</b> It works today, at home and outside. An Apple Watch calls emergency services after about a minute without a response. <a href="https://support.apple.com/en-us/108896" target="_blank" rel="noopener">Apple Support</a></li>'+
      '<li><b>A ceiling radar sensor in the bathroom and the bedroom.</b> It detects a fall with no camera. The Aqara FP2 is one. Its maker states it is not a medical device. <a href="https://www.aqara.com/en/product/presence-sensor-fp2/" target="_blank" rel="noopener">Aqara</a></li>'+
      '<li><b>Wi-Fi motion nodes in the other rooms.</b> About 10 euros each. They see movement and stillness. They do not see a fall. <a href="https://github.com/francescopace/espectre" target="_blank" rel="noopener">ESPectre</a></li>'+
-     '<li><b>The Halo home station and backend</b> carry those events to your phone. Not connected yet.</li></ol>'+
+     '<li><b>The Halo home station</b> carries those events to the backend and on to your phone. No station is connected yet.</li></ol>'+
      '<div class="limit" style="margin-top:8px">Responder is not a medical device and does not replace a medical alert service. For a person at high risk, step 1 comes first. <a href="#" data-act="terms">Terms of use</a></div></div>';
   h+='</div></div>';
   el('hMain').innerHTML=h;
@@ -1323,17 +1327,22 @@ async function sha(str){
     return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
   catch(e){ let h=0; for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; } return ('00000000'+h.toString(16)).slice(-16); }
 }
-async function logEvidence(kind, text, extra){
-  const rec={ kind, text, t:Date.now(), prev:P.prevHash, extra:extra||null };
+let _evQ=Promise.resolve();
+function logEvidence(kind, text, extra){ _evQ=_evQ.then(()=>writeEvidence(kind,text,extra)).catch(()=>{}); return _evQ; }   // one entry at a time keeps the chain unbroken
+async function writeEvidence(kind, text, extra){
+  P.evSeq=(P.evSeq||P.evidence.length||0)+1;
+  const rec={ kind, text, t:Date.now(), prev:P.prevHash, extra:extra||null, seq:P.evSeq };
   rec.hash=await sha(JSON.stringify(rec)); P.prevHash=rec.hash;
   P.evidence.unshift(rec); if(P.evidence.length>500) P.evidence.length=500;
   save(); if(S.view==='evidence') renderEvidence();
 }
 function renderEvidence(){
-  el('evCount').textContent=P.evidence.length+' records';
-  if(!P.evidence.length){ el('evList').innerHTML='<div class="empty">No records yet. Completed defences, logged findings and captures are chained here with their time.</div>'; return; }
+  const rem=remoteEv(), all=P.evidence.map(r=>Object.assign({mine:true},r)).concat(rem.map(r=>Object.assign({mine:false},r))).sort((a,b)=>b.t-a.t);
+  el('evCount').textContent=P.evidence.length+' records'+(rem.length?' · '+rem.length+' from your other devices':'');
+  if(!all.length){ el('evList').innerHTML='<div class="empty">No records yet. Completed steps, logged findings and captures are chained here with their time.</div>'; return; }
   const ic={defence:'D',finding:'F',capture:'C',note:'N'};
-  el('evList').innerHTML=P.evidence.map(r=>'<div class="evrow"><div class="ic">'+(ic[r.kind]||'N')+'</div><div><div class="et">'+esc(r.text)+'</div><div class="eh">sha256 '+esc(String(r.hash).slice(0,32))+'</div></div>'+
+  el('evList').innerHTML=all.map(r=>'<div class="evrow"><div class="ic">'+(ic[r.kind]||'N')+'</div><div><div class="et">'+esc(r.text)+'</div><div class="eh">sha256 '+esc(String(r.hash).slice(0,32))+
+    (r.mine?'':' · <span class="chip pot">'+esc(devName2(r.dev))+'</span>'+(r.linked===false?' <span class="chip real">chain break recorded</span>':''))+'</div></div>'+
     '<div class="ed">'+new Date(r.t).toLocaleDateString()+'<br>'+new Date(r.t).toLocaleTimeString()+'</div></div>').join('');
 }
 
@@ -1527,6 +1536,266 @@ el('capShot').onclick=async ()=>{
   c.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='halo-capture-'+Date.now()+'.png'; a.click(); });
 };
 
+/* ---------- Halo account: sign-in, device linking and encrypted sync ----------
+   Content is encrypted on this device with a key that never goes to the server.
+   A second device receives that key inside a one-time link code, wrapped with a secret the server never sees. */
+const API = (typeof window.HALO_API==='string' && window.HALO_API) || 'https://remiel-halo-api.vercel.app';
+const Y = (()=>{ try{ return JSON.parse(store.get('halo_sync')||'null')||{}; }catch(e){ return {}; } })();
+function ysave(){ try{ const f=JSON.parse(store.get('halo_sync')||'null'); if(f && f.accountId===Y.accountId && (f.rot||0)>(Y.rot||0)){ Y.access=f.access; Y.refresh=f.refresh; Y.rot=f.rot; } }catch(e){}
+  store.set('halo_sync', JSON.stringify(Y)); }
+const SY = { status:'idle', msg:'', at:0, devices:[], link:null, busy:false, confirm:'' };
+const cryptoOk = () => !!(window.crypto && crypto.subtle && window.fetch && window.TextEncoder);
+const te = cryptoOk()?new TextEncoder():null, td = cryptoOk()?new TextDecoder():null;
+const b64 = {
+  enc(u8){ let s=''; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null, u8.subarray(i,i+0x8000)); return btoa(s); },
+  dec(s){ const b=atob(s), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
+};
+let _dk=null;
+async function dataKey(){ if(!_dk) _dk=await crypto.subtle.importKey('raw', b64.dec(Y.key), 'AES-GCM', false, ['encrypt','decrypt']); return _dk; }
+// Each sealed value is bound to its place (aad), so the server cannot move a value under another name.
+async function seal(str, aad){ const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:te.encode(aad)}, await dataKey(), te.encode(str)));
+  return 'v1.'+b64.enc(iv)+'.'+b64.enc(ct); }
+async function unseal(blob, aad){ const p=String(blob).split('.'); if(p[0]!=='v1'||p.length!==3) throw new Error('format');
+  return td.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64.dec(p[1]),additionalData:te.encode(aad)}, await dataKey(), b64.dec(p[2]))); }
+async function wrapSecretKey(secret, salt){ const base=await crypto.subtle.importKey('raw', te.encode(secret), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'}, base, {name:'AES-GCM',length:256}, false, ['encrypt','decrypt']); }
+async function wrapKey(secret){ const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv}, await wrapSecretKey(secret,salt), b64.dec(Y.key)));
+  return 'w1.'+b64.enc(salt)+'.'+b64.enc(iv)+'.'+b64.enc(ct); }
+async function unwrapKey(blob, secret){ const p=String(blob).split('.'); if(p[0]!=='w1'||p.length!==4) throw new Error('format');
+  const raw=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64.dec(p[2])}, await wrapSecretKey(secret,b64.dec(p[1])), b64.dec(p[3])));
+  if(raw.length!==32) throw new Error('key'); return b64.enc(raw); }
+// Section names and evidence chain values go to the server as keyed tokens, so it can match them without learning them.
+let _mk=null, _tok={};
+async function macKey(){ if(!_mk){ const raw=b64.dec(Y.key), tag=te.encode('halo-names-v1'), buf=new Uint8Array(tag.length+raw.length); buf.set(tag); buf.set(raw,tag.length);
+  _mk=await crypto.subtle.importKey('raw', await crypto.subtle.digest('SHA-256',buf), {name:'HMAC',hash:'SHA-256'}, false, ['sign']); } return _mk; }
+async function token(kind, v){ const k=kind+'|'+v; if(_tok[k]) return _tok[k];
+  const sig=new Uint8Array(await crypto.subtle.sign('HMAC', await macKey(), te.encode(k))); let h=''; for(let i=0;i<16;i++) h+=sig[i].toString(16).padStart(2,'0'); return (_tok[k]=h); }
+const sectionId = async name => 'k.'+await token('sec', name);
+function resetKeys(){ _dk=null; _mk=null; _tok={}; }
+const LINK_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randCode(n){ const u=crypto.getRandomValues(new Uint8Array(n)); let s=''; for(let i=0;i<n;i++) s+=LINK_ALPHABET[u[i]%32]; return s; }
+const groupCode = c => c.replace(/(.{4})(?=.)/g,'$1-');
+function guessName(){ const u=navigator.userAgent;
+  const os=/Android/.test(u)?'Android phone':/iPhone/.test(u)?'iPhone':/iPad/.test(u)?'iPad':/Mac/.test(u)?'Mac':/Windows/.test(u)?'Windows computer':/Linux/.test(u)?'Linux computer':'Device';
+  const br=/Edg\//.test(u)?'Edge':/Firefox\//.test(u)?'Firefox':/Chrome\//.test(u)?'Chrome':/Safari\//.test(u)?'Safari':'browser';
+  return os+', '+br; }
+const hhmm = t => { const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+function setSync(status, msg){ SY.status=status; SY.msg=msg||''; if(booted) softRender(); }
+// Re-render without discarding what the user is typing.
+function softRender(){ const a=document.activeElement;
+  if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest('#scroll')){ S._pendingRender=true; return; }
+  S._pendingRender=false; rerender(); if(el('rost')) renderRoster(); }
+document.addEventListener('focusout', ()=>{ if(S._pendingRender) setTimeout(()=>{ if(S._pendingRender) softRender(); },50); });
+window.addEventListener('storage', e=>{
+  if(e.key==='halo_sync' && e.newValue){ try{ const f=JSON.parse(e.newValue);
+      if(f.accountId!==Y.accountId || f.key!==Y.key || !!f.signedOut!==!!Y.signedOut) return location.reload();   // another tab joined, left or reset the account
+      if((f.rot||0)>(Y.rot||0)){ Y.access=f.access; Y.refresh=f.refresh; Y.rot=f.rot; } }catch(x){} }
+  if(e.key==='halo_v2' && e.newValue && booted){ try{ Object.assign(P, loadState()); softRender(); }catch(x){} } });
+
+/* ----- transport ----- */
+let _refP=null;
+function adoptFromOtherTab(){ try{ const f=JSON.parse(store.get('halo_sync')||'{}'); if(f.refresh && !f.signedOut && f.accountId===Y.accountId && (f.rot||0)>(Y.rot||0)){ Y.access=f.access; Y.refresh=f.refresh; Y.rot=f.rot; return true; } }catch(e){} return false; }
+function refreshTokens(){ if(_refP) return _refP;
+  const run=async()=>{
+    if(adoptFromOtherTab()) return true;
+    const r=await fetch(API+'/auth/refresh',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({refreshToken:Y.refresh})});
+    if(r.status===200){ const j=await r.json(); Y.access=j.accessToken; Y.refresh=j.refreshToken; Y.rot=(Y.rot||0)+1; store.set('halo_sync', JSON.stringify(Y)); return true; }
+    if(r.status===401){ await new Promise(z=>setTimeout(z,700)); if(adoptFromOtherTab()) return true;
+      Y.signedOut=true; ysave(); setSync('out','This device is no longer signed in to the account.'); }
+    return false; };
+  _refP=((navigator.locks&&navigator.locks.request)?navigator.locks.request('halo-refresh', run):run()).finally(()=>{ _refP=null; });
+  return _refP; }
+async function api(method, path, body, auth){
+  const go=()=>fetch(API+path,{method,headers:Object.assign({'content-type':'application/json'}, auth!==false&&Y.access?{authorization:'Bearer '+Y.access}:{}),body:body?JSON.stringify(body):undefined});
+  let r=await go();
+  if(r.status===401 && auth!==false && Y.refresh){ if(await refreshTokens()) r=await go(); }
+  let j=null; try{ j=await r.json(); }catch(e){}
+  return {s:r.status, j:j||{}};
+}
+
+/* ----- what syncs: one section per subject, last edit wins ----- */
+const hashStr = s => { let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36)+':'+s.length; };
+function sectionsNow(){
+  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home };
+  Object.keys(P.done||{}).forEach(id=>{ const d=P.done[id]; if(d && !Array.isArray(d)) o['done.'+id]=d; });
+  Object.keys(P.hits||{}).forEach(id=>{ o['hits.'+id]=P.hits[id]|0; });
+  return o; }
+function applySection(k,v){
+  if(k==='profile') P.profile=(v&&typeof v==='object')?v:{};
+  else if(k==='platform') P.platform=(v==='android'||v==='iphone')?v:null;
+  else if(k==='aliases') P.aliases=Array.isArray(v)?v:[];
+  else if(k==='patch') P.patch=Array.isArray(v)?v:[];
+  else if(k==='home'){ const b=blank().home; P.home=Object.assign(b, (v&&typeof v==='object')?v:{}); P.home.rules=Object.assign(blank().home.rules,(v&&v.rules)||{}); }
+  else if(k.indexOf('done.')===0) P.done[k.slice(5)]=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
+  else if(k.indexOf('hits.')===0){ P.hits=P.hits||{}; P.hits[k.slice(5)]=v|0; } }
+// Compare each section with what was last seen. A changed section is stamped with the time of the edit.
+function trackLocal(ts){ const o=sectionsNow(); Y.local=Y.local||{}; let changed=false;
+  Object.keys(o).forEach(k=>{ const hsh=hashStr(JSON.stringify(o[k])), L=Y.local[k];
+    if(!L){ Y.local[k]={h:hsh,t:ts!=null?ts:Date.now(),d:true}; changed=true; }
+    else if(L.h!==hsh){ L.h=hsh; L.t=Date.now(); L.d=true; changed=true; } });
+  return changed; }
+function onLocalChange(){ if(!Y.refresh||Y.signedOut) return; const sec=trackLocal(), ev=(P.evSeq||0)>(Y.pushedSeq||0); if(sec) ysave(); if(sec||ev) schedulePush(); }
+let _pushT=0; function schedulePush(){ clearTimeout(_pushT); _pushT=setTimeout(()=>syncNow(), 1200); }
+
+/* ----- evidence from the account's other devices ----- */
+function remoteEv(){ try{ return JSON.parse(store.get('halo_ev_remote')||'[]'); }catch(e){ return []; } }
+function ensureSeq(){ if(P.evidence.length && P.evidence.some(r=>!r.seq)){ const n=P.evidence.length; P.evidence.forEach((r,i)=>{ r.seq=n-i; }); P.evSeq=n; store.set('halo_v2', JSON.stringify(P)); }
+  if(!P.evSeq) P.evSeq=P.evidence.length?Math.max.apply(null,P.evidence.map(r=>r.seq||0)):0; }
+
+/* ----- the sync cycle: pull, apply, push. One cycle at a time ----- */
+let _syncP=Promise.resolve();
+function syncNow(){ _syncP=_syncP.then(cycle).catch(()=>{ setSync('offline'); }); return _syncP; }
+async function cycle(){
+  if(!Y.refresh||Y.signedOut) return;
+  ensureSeq();
+  const r=await api('GET','/sync/pull?since='+Math.max(0,(Y.cursor||0)-15000)+'&evAfter='+(Y.evCursor||0));
+  if(r.s===401) return;                                   // refreshTokens has already set the state
+  if(r.s!==200) return setSync('offline');
+  let changed=false; Y.local=Y.local||{};
+  for(const s of r.j.sections||[]){
+    Y.cursor=Math.max(Y.cursor||0, s.updatedAt||0);
+    let rec; try{ rec=JSON.parse(await unseal(s.value,'section:'+s.key)); }catch(e){ continue; }
+    if(!rec || typeof rec.k!=='string' || await sectionId(rec.k)!==s.key) continue;
+    const L=Y.local[rec.k];
+    if(L && L.d && L.t>=s.editedAt) continue;             // an unsent edit here is newer: keep it, it is pushed below
+    if(L && !L.d && L.t===s.editedAt) continue;           // this device already holds this version
+    applySection(rec.k,rec.v); Y.local[rec.k]={h:'',t:s.editedAt,d:false}; changed=true; }
+  if(changed){ const o=sectionsNow(); Object.keys(Y.local).forEach(k=>{ if(Y.local[k].h===''&&k in o) Y.local[k].h=hashStr(JSON.stringify(o[k])); }); store.set('halo_v2', JSON.stringify(P)); }
+  const evIn=r.j.evidence||[];
+  if(evIn.length){ const list=remoteEv(), seen=new Set(list.map(x=>x.rid));
+    for(const e of evIn){ Y.evCursor=Math.max(Y.evCursor||0, e.rid); if(seen.has(e.rid)) continue;
+      try{ const p=JSON.parse(await unseal(e.payload,'ev:'+e.deviceId+':'+e.seq)); list.push({rid:e.rid,dev:e.deviceId,seq:e.seq,kind:p.kind,text:p.text,t:p.t||e.t,hash:p.hash||'',linked:e.linked}); }catch(x){} }
+    list.sort((a,b)=>b.t-a.t); if(list.length>400) list.length=400; store.set('halo_ev_remote', JSON.stringify(list)); changed=true; }
+  const mySeq=r.j.mySeq|0; if(mySeq>(P.evSeq||0)){ P.evSeq=mySeq; store.set('halo_v2', JSON.stringify(P)); }
+  Y.pushedSeq=mySeq; ysave();
+  // push what this device changed
+  trackLocal();
+  const o=sectionsNow(), dirty=Object.keys(Y.local).filter(k=>Y.local[k].d && k in o), snap={}, names={};
+  const sections=[]; for(const k of dirty){ const id=await sectionId(k); snap[k]=Y.local[k].t; names[id]=k;
+    sections.push({key:id, value:await seal(JSON.stringify({k, v:o[k]}),'section:'+id), editedAt:Y.local[k].t}); }
+  const pend=P.evidence.filter(x=>x.seq>Y.pushedSeq).sort((a,b)=>a.seq-b.seq).slice(0,200), evidence=[];
+  for(const x of pend) evidence.push({seq:x.seq, t:x.t, hash:await token('ev',x.hash), prev:x.prev?await token('ev',x.prev):null,
+    payload:await seal(JSON.stringify({kind:x.kind,text:x.text,t:x.t,extra:x.extra||null,hash:x.hash,prev:x.prev||null}),'ev:'+Y.deviceId+':'+x.seq)});
+  let again=false;
+  if(sections.length||evidence.length){
+    const w=await api('POST','/sync/push',{sections,evidence});
+    if(w.s===401) return;
+    if(w.s!==200){ ysave(); return setSync('offline'); }
+    (w.j.sections||[]).forEach(x=>{ const k=names[x.key], L=k&&Y.local[k]; if(!L || L.t!==snap[k]) return;       // edited again while sending: it stays unsent
+      if(x.accepted){ L.d=false; L.t=x.editedAt; }
+      else { L.d=false; L.t=0; Y.cursor=0; again=true; } });                                                       // the account holds a newer edit: take it on the next pull
+    Y.pushedSeq=w.j.mySeq|0; if(pend.length===200) again=true; }
+  ysave(); SY.at=Date.now();
+  if(SY.status!=='on'||changed) { SY.status='on'; SY.msg=''; softRender(); } else renderCoverage();
+  if(again) setTimeout(syncNow, 400);
+  if(!SY.devices.length || Date.now()-(SY.devAt||0)>5*60000) loadDevices();
+}
+async function loadDevices(){ const r=await api('GET','/account'); if(r.s!==200) return; SY.devAt=Date.now();
+  const out=[]; for(const d of r.j.devices||[]){ let name='Unnamed device'; try{ if(d.name) name=await unseal(d.name,'devname:'+d.id); }catch(e){} out.push({id:d.id,name,createdAt:d.createdAt,lastSeen:d.lastSeen,current:d.current}); }
+  SY.devices=out; softRender(); }
+const devName2 = id => { const d=SY.devices.find(x=>x.id===id); return d?d.name:'Another device'; };
+
+/* ----- sign-in ----- */
+function adoptTokens(j){ Y.access=j.accessToken; Y.refresh=j.refreshToken; Y.accountId=j.accountId; Y.deviceId=j.deviceId; Y.tier=j.tier; Y.signedOut=false; Y.rot=(Y.rot||0)+1; }
+async function sendName(){ return api('POST','/account/device/name',{name:await seal(Y.name,'devname:'+Y.deviceId)}); }
+async function syncInit(){
+  if(!cryptoOk()) return setSync('off','This browser cannot encrypt, so sync is off.');
+  if(Y.signedOut) return setSync('out', Y.off?'Sync is off on this device.':'This device is no longer signed in to the account.');
+  if(!Y.refresh){
+    setSync('connecting');
+    try{
+      if(!Y.key){ Y.key=b64.enc(crypto.getRandomValues(new Uint8Array(32))); resetKeys(); }
+      Y.name=Y.name||guessName();
+      const r=await api('POST','/auth/register',{code:store.get('halo_key')}, false);
+      if(r.s!==200) return setSync('offline', r.s===403?'The backend did not accept this access key.':'');
+      adoptTokens(r.j); Y.cursor=0; Y.evCursor=0; Y.pushedSeq=0; Y.local={}; trackLocal(Date.now()); ysave();
+      await sendName();
+    }catch(e){ return setSync('offline'); }
+  }
+  await syncNow();
+}
+function syncStart(){ syncInit();
+  setInterval(()=>{ if(document.visibilityState==='visible' && Y.refresh && !Y.signedOut) syncNow(); }, 45000);
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Y.refresh && !Y.signedOut) syncNow(); });
+  window.addEventListener('online', ()=>{ if(Y.refresh && !Y.signedOut) syncNow(); else if(!Y.refresh) syncInit(); }); }
+
+/* ----- actions ----- */
+async function linkStart(){ if(SY.busy) return; if(SY.status!=='on') return toast('This device is not signed in yet.'); SY.busy=true;
+  try{ const secret=randCode(12), r=await api('POST','/auth/link/start',{wrappedKey:await wrapKey(secret)});
+    if(r.s!==200){ toast(r.s===429?'Too many codes. Wait a minute.':'Could not create a code.'); return; }
+    SY.link={code:r.j.code+secret, exp:r.j.expiresAt}; softRender();
+  }catch(e){ toast('Could not create a code.'); } finally{ SY.busy=false; } }
+async function linkJoin(){ if(SY.busy) return;
+  const raw=val('joinCode').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(raw.length!==20) return toast('The link code has 20 characters.');
+  SY.busy=true; toast('Joining the account.');
+  try{
+    const r=await api('POST','/auth/link/claim',{linkCode:raw.slice(0,8), code:store.get('halo_key')}, false);
+    if(r.s!==200){ toast(r.s===429?'Too many attempts. Wait a few minutes.':'That code is not valid. Create a new one on the other device.'); return; }
+    let key; try{ key=await unwrapKey(r.j.wrappedKey, raw.slice(8)); }
+    catch(e){ fetch(API+'/account/device/remove',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+r.j.accessToken},body:JSON.stringify({deviceId:r.j.deviceId})}).catch(()=>{});
+      toast('That code is not valid. Create a new one on the other device.'); return; }
+    // leave the account this device opened for itself: delete it if this was its only device
+    if(Y.refresh && !Y.signedOut){ try{ const a=await api('GET','/account'); if(a.s===200 && (a.j.devices||[]).length===1) await api('POST','/account/delete',{confirm:'DELETE'}); else if(a.s===200) await api('POST','/account/device/remove',{deviceId:Y.deviceId}); }catch(e){} }
+    await (_syncP=_syncP.catch(()=>{}).then(()=>{
+      Y.key=key; resetKeys(); adoptTokens(r.j); Y.off=false; Y.cursor=0; Y.evCursor=0; Y.pushedSeq=0; Y.local={}; store.set('halo_ev_remote','[]');
+      trackLocal(1);                                        // where both sides hold a section, the account's copy wins
+      Y.name=Y.name||guessName(); ysave(); SY.devices=[]; SY.link=null; }));
+    await sendName();
+    await syncNow(); toast('This device has joined the account.');
+  }catch(e){ toast('Could not reach the backend.'); } finally{ SY.busy=false; softRender(); } }
+async function deviceRename(){ const n=val('devName'); if(!n) return toast('Enter a name for this device.'); Y.name=n.slice(0,60); ysave();
+  const r=await sendName(); toast(r.s===200?'Device name saved.':'Could not save the name.'); loadDevices(); }
+async function deviceRemove(id){ if(SY.confirm!=='rm:'+id){ SY.confirm='rm:'+id; return softRender(); } SY.confirm='';
+  const r=await api('POST','/account/device/remove',{deviceId:id}); toast(r.s===200?'Device removed.':'Could not remove the device.'); loadDevices(); }
+async function accountDelete(){ if(SY.confirm!=='del'){ SY.confirm='del'; return softRender(); } SY.confirm='';
+  const r=await api('POST','/account/delete',{confirm:'DELETE'}); if(r.s!==200) return toast('Could not delete the account.');
+  ['access','refresh','accountId','deviceId','cursor','evCursor','pushedSeq','local'].forEach(k=>{ delete Y[k]; }); Y.signedOut=true; Y.off=true; ysave(); store.set('halo_ev_remote','[]');
+  SY.devices=[]; SY.link=null; setSync('out','Sync is off on this device.'); toast('Account deleted from the server. Your data stays on this device.'); }
+function syncReconnect(){ ['access','refresh','accountId','deviceId','cursor','evCursor','pushedSeq','local'].forEach(k=>{ delete Y[k]; }); Y.signedOut=false; Y.off=false; ysave(); syncInit(); }
+
+/* ----- the Devices and sync pull ----- */
+function syncLine(){ const n=SY.devices.length;
+  return SY.status==='on' ? 'Signed in'+(n?' · '+n+' device'+(n===1?'':'s'):'')+' · synced '+hhmm(SY.at)
+    : SY.status==='connecting' ? 'Connecting to the Halo backend'
+    : SY.status==='offline' ? (SY.msg||'Backend not reached. Working on this device only')
+    : SY.status==='out' ? (SY.msg||'Signed out')
+    : SY.status==='off' ? SY.msg : 'Starting'; }
+function devicesPull(){
+  const open=S.open.has('devices'), on=SY.status==='on';
+  let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(on?'--clear':SY.status==='out'?'--warn':'--mut')+')">'+
+    '<div class="tp-head" data-act="pull" data-id="devices"><div class="tp-top"><span class="tp-lab">Devices and sync</span><span class="tp-i">i</span></div>'+
+    '<div class="tp-sum">'+esc(syncLine())+'</div><span class="chev">&#9662;</span></div>';
+  if(open){ h+='<div class="tp-body">';
+    if(SY.status==='off') h+='<div class="dsec"><p>'+esc(SY.msg)+'</p></div>';
+    else if(SY.status==='out') h+='<div class="dsec"><h4>Sync is not running</h4><p style="margin-bottom:10px">'+esc(SY.msg)+' Everything on this device is kept.</p>'+
+      '<div class="formrow"><button class="btn sm primary" data-act="sync-reconnect">Start a new account for this device</button></div></div>';
+    else {
+      h+='<div class="dsec"><h4>This device</h4><div class="formrow" style="margin-top:0"><input class="inp" id="devName" maxlength="60" value="'+esc(Y.name||'')+'" placeholder="Name of this device"><button class="btn sm" data-act="dev-name">Save name</button></div>'+
+         '<div class="kv" style="margin-top:12px"><span class="k">Account</span><span class="v '+(on?'okc':'unkc')+'">'+esc(on?'Signed in':syncLine())+'</span>'+
+         '<span class="k">Last sync</span><span class="v">'+(SY.at?hhmm(SY.at):'Not yet')+'</span>'+
+         '<span class="k">Encryption</span><span class="v okc">On. The key stays on your devices</span></div>'+
+         '<div class="formrow"><button class="btn sm" data-act="sync-now">Sync now</button></div></div>';
+      h+='<div class="dsec"><h4>Devices on this account</h4>';
+      if(!SY.devices.length) h+='<div class="empty" style="padding:8px">'+(on?'Loading the device list.':'The device list appears once the backend is reached.')+'</div>';
+      SY.devices.forEach(d=>{ h+='<div class="rowline"><span><b>'+esc(d.name)+'</b> '+(d.current?'<span class="chip pot">This device</span>':'')+
+        '<br><span class="mono" style="font-size:11px;color:var(--mut)">added '+new Date(d.createdAt).toLocaleDateString()+' · last seen '+new Date(d.lastSeen).toLocaleDateString()+'</span></span>'+
+        (d.current?'':'<button class="btn sm '+(SY.confirm==='rm:'+d.id?'red':'')+'" data-act="dev-remove" data-id="'+esc(d.id)+'">'+(SY.confirm==='rm:'+d.id?'Confirm remove':'Remove')+'</button>')+'</div>'; });
+      h+='</div>';
+      h+='<div class="dsec"><h4>Add another device</h4><p style="margin-bottom:10px">Create a link code here, then open Remiel Halo on the other device, unlock it, open Devices and sync, and enter the code under Join an existing account.</p>';
+      if(SY.link && SY.link.exp>Date.now()) h+='<div class="linkcode" id="linkCode">'+esc(groupCode(SY.link.code))+'</div><div class="limit">Valid until '+hhmm(SY.link.exp)+'. It works once. Do not send it by text or email: read it across.</div>';
+      h+='<div class="formrow"><button class="btn sm primary" data-act="link-start">'+(SY.link&&SY.link.exp>Date.now()?'Create a new code':'Create link code')+'</button></div></div>';
+      h+='<div class="dsec"><h4>Join an existing account</h4><p style="margin-bottom:10px">Enter the 20 character code shown on your other device. This device then shares that account. Where both hold the same section, the account\'s copy replaces this device\'s.</p>'+
+         '<div class="formrow" style="margin-top:0"><input class="inp mono" id="joinCode" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"><button class="btn sm primary" data-act="link-join">Join</button></div></div>';
+      h+='<div class="limit"><b>What is stored.</b> Your profile, completed steps, findings, Responder set-up and Evidence are encrypted on this device before they are sent. The server stores them without being able to read them. It can see that an account exists, how many devices and stored items it has, and when they sync. <b>Limit.</b> If every device is lost or its browser data is cleared, the synced data cannot be recovered, because only your devices hold the key.</div>'+
+         '<div class="formrow"><button class="btn sm '+(SY.confirm==='del'?'red':'')+'" data-act="acct-delete">'+(SY.confirm==='del'?'Confirm: delete the account from the server':'Delete this account from the server')+'</button></div>';
+    }
+    h+='</div>'; }
+  return h+'</div>';
+}
+
 /* ---------- tickers. Live items come from the Global feed. The rest are dated, sourced entries from the register ---------- */
 const FEED_W=[
   {t:'Android 16 warns when a network requests identifiers or drops encryption, on supported phones.', src:'Android Open Source Project'},
@@ -1576,6 +1845,13 @@ document.addEventListener('click', e=>{
   const act=a.dataset.act, H=P.home;
   switch(act){
     case 'terms': e.preventDefault(); openTerms(); break;
+    case 'link-start': linkStart(); break;
+    case 'link-join': linkJoin(); break;
+    case 'dev-name': deviceRename(); break;
+    case 'dev-remove': deviceRemove(a.dataset.id); break;
+    case 'acct-delete': accountDelete(); break;
+    case 'sync-now': syncNow().then(()=>toast(SY.status==='on'?'Synced.':'Backend not reached.')); break;
+    case 'sync-reconnect': syncReconnect(); break;
     case 'terms-close': el('terms').classList.add('hidden'); break;
     case 'pull': { const id=a.dataset.id; S.open.has(id)?S.open.delete(id):S.open.add(id); rerender(); if(el('rost')) renderRoster(); break; }
     case 'def': { const t=T(a.dataset.id), i=+a.dataset.i; let d=P.done[t.id]; if(!d||Array.isArray(d)) d=P.done[t.id]={}; d[i]=!d[i]; save();
@@ -1600,7 +1876,7 @@ document.addEventListener('click', e=>{
     case 'dev': { const id=a.dataset.id; S.openDevices.has(id)?S.openDevices.delete(id):S.openDevices.add(id); renderRoster(); break; }
     case 'sus': { const d=S.devices.find(x=>x.id===a.dataset.id); if(d) openDeviceInRoster(d); break; }
     case 'capture': { const d=S.devices.find(x=>x.id===a.dataset.id); openCapture(d); break; }
-    case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),chain:P.evidence},null,2)],{type:'application/json'});
+    case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),device:Y.name||null,chain:P.evidence,otherDevices:remoteEv()},null,2)],{type:'application/json'});
       const l=document.createElement('a'); l.href=URL.createObjectURL(blob); l.download='remiel-halo-evidence.json'; l.click(); toast('Signed log exported.'); break; }
     case 'h-padd': { const n=val('hpName'); if(!n) return toast('Enter the name.'); H.people.push({name:n,rel:val('hpRel'),consent:el('hpConsent').checked,watch:el('hpWatch').checked}); save(); rerender(); break; }
     case 'h-pdel': H.people.splice(+a.dataset.i,1); save(); rerender(); break;
@@ -1628,6 +1904,7 @@ function boot(){
   setView('overview');
   setInterval(tick, 1600);
   loadGlobal(); setInterval(loadGlobal, 15*60*1000);
+  syncStart();
 }
 /* returning visit: unlock only after everything above is defined */
 if(codeOk(store.get('halo_key'))) openApp();
