@@ -22,3 +22,14 @@ self.addEventListener('fetch', e => {
     }).catch(() => caches.match(page ? './' : req).then(hit => hit || Response.error()))
   );
 });
+
+/* A tap on a Halo alert banner brings Halo to the front and tells the page which alert it was. */
+self.addEventListener('notificationclick', e => {
+  const key = (e.notification.data && e.notification.data.key) || e.notification.tag || '';
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const home = new URL('./', self.location).href, c = list.find(x => x.url.indexOf(home) === 0);
+    if (c) { c.postMessage({ haloOpen: key }); return c.focus(); }
+    return self.clients.openWindow(home);
+  }));
+});

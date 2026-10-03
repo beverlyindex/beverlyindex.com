@@ -215,6 +215,9 @@ select.inp{flex:none}
 .walk-e{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12.5px;line-height:1.45;margin-top:8px}
 .walk-e .tm{font-family:var(--mono);font-size:10.5px;color:var(--dim);padding-top:2px}
 .walk-e .with{color:var(--action);font-weight:600} .walk-e .placed{color:var(--clear)} .walk-e .gone,.walk-e .gap{color:var(--mut)} .walk-e .warn{color:var(--warn)}
+.alertb{display:flex;align-items:flex-start;gap:10px;margin:0 0 10px;padding:11px 12px;border:1px solid rgba(255,90,90,.6);border-left:5px solid var(--action);border-radius:12px;background:linear-gradient(180deg,rgba(120,22,30,.5),rgba(60,12,20,.5));box-shadow:0 8px 22px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);font-size:13.5px;line-height:1.4}
+.alertb .tx{flex:1;min-width:0} .alertb .tx b{display:block;color:#fff;font-size:14.5px;margin-bottom:2px} .alertb .more{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:4px;display:block}
+.alertb .x{background:none;border:0;color:var(--mut);font-size:20px;line-height:1;padding:2px 4px}
 .instbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;border:1px solid rgba(79,141,240,.45);border-radius:12px;background:rgba(26,58,130,.22);font-size:13px;line-height:1.4}
 .instbar span{flex:1 1 180px}
 .backbar{position:sticky;top:0;z-index:30;display:flex;gap:8px;align-items:center;margin:-14px -16px 10px;padding:8px 16px;background:rgba(7,11,22,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
@@ -627,6 +630,7 @@ a.tk:hover b{text-decoration:underline}
 
     <div class="scroll" id="scroll">
       <div class="wrap">
+        <div id="alertBar"></div>
         <div class="backbar hidden" id="backBar"><button class="btn sm" data-act="back">&#8249; Back</button><button class="btn sm" data-act="home">Overview</button><span class="where" id="backWhere"></span></div>
 
         <section data-pane="overview">
@@ -1536,7 +1540,7 @@ async function loadGlobal(){
       const j=await r.json(); if(!j||!j.generated||!Array.isArray(j.sources)) throw new Error('shape'); return j; } finally{ clearTimeout(to); } };
   try{ S.global=await get(API+'/feed/global', 11000); S.globalVia='backend'; S.globalErr=false; }
   catch(e){ try{ S.global=await get(FEED_URL, 9000); S.globalVia='copy'; S.globalErr=false; }catch(e2){ S.globalErr=true; } }
-  S.globalAt=Date.now(); applyGlobal();
+  S.globalAt=Date.now(); if(S.global && !S.globalErr) alertFeed(); applyGlobal();
 }
 function applyGlobal(quiet){
   const g=S.global;
@@ -1630,6 +1634,7 @@ function renderCoverage(){
     ['Home', !hasSt?'Add a home listener':stationLive()?(T&&stationTest()?'Test data':'Listener reporting'):'Listener paused', stationLive()?(T&&stationTest()?'part':'live'):''],
     ['Your position', S.pos?'Live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'From your phone':gz()?'Home location':'Allow location', S.pos?'live':gz()?'part':''],
     ['Global feed', g?'Live, sources read '+feedAgo():'Connecting', g?'live':''],
+    ['Alerts', (as=>as==='granted'?'On, banners on this device':as==='screen'?'On, inside Halo':as==='denied'?'Allow in Settings':'<button class="btn sm primary" data-act="alert-ask" style="margin:0">Turn on</button>')(alertState()), alertState()==='granted'||alertState()==='screen'?'live':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':'Connecting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
   el('covCard').innerHTML='<h3>Coverage <span class="n">what Halo is watching for you</span></h3>'+
@@ -2962,12 +2967,14 @@ function aiPull(){
    Halo sets your signature aside and flags whatever travels with you beyond it. ---------- */
 const sigKey = d => (makerOf(d)||'Unidentified')+'|'+d.cls;
 const sigKeyWords = k => { const [m,c]=k.split('|'); return (m==='Unidentified'?'Unidentified':m)+' '+(KIND_WORD[c]||'device'); };
-const sigGet = () => { const g=P.sig=P.sig||{}; g.names=g.names||[]; g.counts=g.counts||{}; g.by=g.by||{}; return g; };
+const sigGet = () => { const g=P.sig=P.sig||{}; g.names=g.names||[]; g.counts=g.counts||{}; g.by=g.by||{}; g.keys=g.keys||{}; return g; };
+const sigKeysDrop = id => { const g=sigGet(); Object.keys(g.keys).forEach(k=>{ if(g.keys[k]===id) delete g.keys[k]; }); };
 function sigAdd(d){ const g=sigGet(); if(g.by[d.id]) return;
   if(d.adv){ if(g.names.indexOf(d.adv)<0) g.names.push(d.adv); g.by[d.id]='n:'+d.adv; } else { const k=sigKey(d); g.counts[k]=(g.counts[k]||0)+1; g.by[d.id]='c:'+k; }
   const ks=Object.keys(g.by); if(ks.length>300) ks.slice(0,ks.length-300).forEach(k=>delete g.by[k]);
+  if(/^(fm|sd):/.test(d.sig||'')){ g.keys[d.sig]=d.id; const ks2=Object.keys(g.keys); if(ks2.length>300) ks2.slice(0,ks2.length-300).forEach(k=>delete g.keys[k]); }
   g.t=Date.now(); P.mine=P.mine||{}; P.mine[d.id]=1; }
-function sigDrop(d){ const g=sigGet(), b=g.by[d.id]; if(P.mine) delete P.mine[d.id]; if(!b) return; delete g.by[d.id];
+function sigDrop(d){ const g=sigGet(), b=g.by[d.id]; if(P.mine) delete P.mine[d.id]; sigKeysDrop(d.id); if(!b) return; delete g.by[d.id];
   if(b.slice(0,2)==='n:'){ const nm=b.slice(2); if(!Object.keys(g.by).some(k=>g.by[k]===b)) g.names=g.names.filter(x=>x!==nm); }
   else { const k=b.slice(2); g.counts[k]=Math.max(0,(g.counts[k]||0)-1); if(!g.counts[k]) delete g.counts[k]; }
   g.t=Date.now(); }
@@ -3388,6 +3395,7 @@ function liveTick(){
   LIVE.devs.forEach(d=>liveDerive(d,nowS));
   sigApply();
   LIVE.devs.forEach(d=>{ if(!d.sim && (d.withYou || d.homeAway)) autoLog(d); });
+  alertScan();
   tripAuto(); walkTick();
   if(!booted) return;
   if(S.view==='overview'||S.view==='watchers') renderVicinity();
@@ -3433,7 +3441,8 @@ function cellIngest(list, t, pos){
     CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved}); if(CELL.changes.length>200) CELL.changes.shift();
     if(W.on && gen==='2G' && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone dropped from '+CELL.serving.gen+' to 2G.','',t); }
   if(W.on){ W.cells=W.cells||{}; W.cells[id]=1; if(gen==='2G') W.g2=true; }
-  if(gen==='2G' && (!CELL.serving || CELL.serving.gen!=='2G') && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; save(); }
+  if(gen==='2G' && (!CELL.serving || CELL.serving.gen!=='2G') && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; save();
+    alertRaise('2g', 'Your phone dropped to 2G', 'A 2G connection gives the phone no way to check that a tower is genuine. Tower Watch has the steps, and Evidence has the record.', {res:'w_tower'}); }
   CELL.serving={id, gen, c:sv, pos:pos?{lat:pos.lat,lon:pos.lon}:(CELL.serving&&CELL.serving.pos)||null, since:(CELL.serving&&CELL.serving.id===id)?CELL.serving.since:t};
 }
 const cellLive = () => CELL.t>0 && Date.now()-CELL.t<60000;
@@ -3488,6 +3497,7 @@ async function nativeDrain(){
       if(!live && W.on && list.length) walkTick(b.t, list.map(x=>x.id), okLL(q)?q:null);
       if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
     if(batches.length){ liveTick(); walkSettle(); }
+    alertNativeTick();
     const lost = !!PH.nstat && !PH.nstat.listening && Date.now()-PH.asked>6000;
     if(lost!==PH.lost){ PH.lost=lost; softRender(); renderVicinity(); }
   } finally { PH.busy=false; } }
@@ -3769,6 +3779,64 @@ function renderWalk(){
   setHTML(box,h);
 }
 
+/* ---------- Alerts: a banner on the device the moment a new threat appears ----------
+   Each alert is raised once per day per subject. It shows at the top of Halo, and as a system banner:
+   through the Halo Android app, or through the browser's own notifications where the app is not in use. */
+const alertNative = () => { const N=NATIVE(); return (N && typeof N.banner==='function') ? 'banner' : (N && typeof N.takeOpen==='function') ? 'notify' : ''; };
+const alertMode = () => alertNative() ? 'app' : (!NATIVE() && 'Notification' in window) ? 'web' : 'screen';
+function alertState(){ const m=alertMode();
+  if(m==='app'){ const st=PH.nstat||nativeStatus()||{}; return st.notifications||'needed'; }
+  if(m==='web') return Notification.permission==='granted'?'granted':Notification.permission==='denied'?'denied':'needed';
+  return 'screen'; }
+async function alertAsk(){ const m=alertMode();
+  try{ if(m==='app'){ NATIVE().askNotifications(); setTimeout(()=>{ PH.nstat=nativeStatus(); softRender(); },1500); }
+    else if(m==='web'){ await Notification.requestPermission(); if(Notification.permission==='granted') alertSystem('halo:on','Halo alerts are on','A banner like this one appears the moment a new threat does.'); } }catch(e){}
+  softRender(); }
+function alertSystem(key, title, text){
+  try{ const f=alertNative(); if(f){ NATIVE()[f](String(title), String(text), String(key)); return; }
+    if(alertMode()!=='web' || Notification.permission!=='granted') return;
+    const opt={body:text, tag:key, icon:'icon-192.png', badge:'icon-192.png', data:{key}};
+    if(navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.ready.then(r=>r.showNotification(title,opt)).catch(()=>{ try{ new Notification(title,opt); }catch(e){} });
+    else new Notification(title,opt); }catch(e){} }
+function alertRaise(key, title, text, go, quiet){
+  const day=new Date().toISOString().slice(0,10); P.alerted=P.alerted||{};
+  if(P.alerted[key]===day) return false; P.alerted[key]=day;
+  const ks=Object.keys(P.alerted); if(ks.length>300) ks.filter(k=>P.alerted[k]!==day).slice(0,ks.length-200).forEach(k=>delete P.alerted[k]);
+  save();
+  S.banners=(S.banners||[]).filter(b=>b.key!==key); S.banners.unshift({key, title, text, go:go||null, t:Date.now()}); S.banners.length=Math.min(S.banners.length,6);
+  renderAlerts(); if(!quiet) alertSystem(key, title, text);
+  return true; }
+function renderAlerts(){ const box=el('alertBar'); if(!box) return; const bs=S.banners||[], b=bs[0];
+  setHTML(box, b ? '<div class="alertb" role="alert"><span class="dot" style="background:var(--action);margin-top:5px"></span><span class="tx"><b>'+esc(b.title)+'</b>'+esc(b.text)+(bs.length>1?'<span class="more">'+(bs.length-1)+' more after this one</span>':'')+'</span>'+
+    (b.go?'<button class="btn sm primary" data-act="alert-open">Open</button>':'')+'<button class="x" data-act="alert-x" title="Put away" aria-label="Put away">&times;</button></div>' : ''); }
+function alertGo(key){ const bs=S.banners||[], b=key?bs.find(x=>x.key===key):bs[0]; if(!b) return; S.banners=bs.filter(x=>x!==b); renderAlerts(); const g=b.go; if(!g) return;
+  if(g.dev){ const d=findDevice(g.dev); if(d){ openDeviceInRoster(d); return; } setView('watchers'); return; }
+  if(g.res){ const t=T(g.res); if(t){ S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; setView(t.side==='w'?'watchers':'attackers'); const c=el('tp-'+t.id); if(c) c.scrollIntoView({block:'start'}); return; } }
+  if(g.view) setView(g.view); }
+// What the live engine found: a device travelling with you, a device from home near you again, a copied network name.
+function alertScan(){
+  LIVE.devs.forEach(d=>{ if(d.sim || d.mine || d.sigFit || !d.present) return;
+    if(d.withYou) alertRaise('with:'+d.sig, d.cls==='Tag'?'A tracker is travelling with you':d.band==='wifi'?'A hotspot is travelling with you':'A device is travelling with you', devName(d)+' '+followText(d)+'. Open it and decide whether it is yours.', {dev:d.id});
+    else if(d.homeAway) alertRaise('route:'+d.sig, 'A device from your home is near you again', devName(d)+' '+followText(d)+'.', {dev:d.id}); });
+  const by={}; wifiNow().forEach(d=>{ if(d.adv && !d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
+  Object.keys(by).forEach(n=>{ const x=by[n]; if(x.length>1 && x.some(d=>/^Open/.test(d.hint)) && x.some(d=>/^Secured/.test(d.hint)))
+    alertRaise('twin:'+n, 'A copied Wi-Fi network is in range', n+' appears both locked and open. Join only the locked one, or use mobile data.', {res:'a_pubwifi'}); });
+  const fl=cellLive()?cellFlaps():0; if(fl>=3) alertRaise('flap', 'Your cell tower is changing while you stand still', 'It changed '+fl+' times in ten minutes. Tower Watch has the times and the steps.', {res:'w_tower'});
+}
+// What the feed brought: a flaw under active attack in a product you told Halo you use. The first reading sets the baseline.
+function alertFeed(){ let list=[]; try{ list=kevMine(); }catch(e){ return; }
+  const first=!P.kevSeen; P.kevSeen=P.kevSeen||{}; let n=0;
+  list.forEach(v=>{ if(P.kevSeen[v.cve]) return; P.kevSeen[v.cve]=1; n++; if(!first) alertRaise('kev:'+v.cve, v.vendor+' '+v.product+' is under attack', 'A flaw in it is being used against people now ('+v.cve+'). Update it today. Patch Clock has the steps.', {res:'p_patch'}); });
+  if(n) save(); }
+// What the app itself raised while the screen was off, and which banner you tapped.
+function alertNativeTick(){ const N=NATIVE(); if(!N) return;
+  try{ if(typeof N.takeAlerts==='function'){ const xs=JSON.parse(N.takeAlerts()||'[]')||[];
+      xs.forEach(a=>{ if(!a || !a.key) return; const title='A tracker is travelling with you', text=String(a.label||'A tracker')+' stayed with you for '+Math.round(a.minutes||0)+' minutes across '+Math.round(a.metres||0)+' m. Open it and decide whether it is yours.';
+        const d=LIVE.devs.get(a.key);
+        if(alertRaise('with:'+a.key, title, text, d?{dev:d.id}:{view:'watchers'}, true)) logEvidence('finding','Alert raised by the Halo app with the screen off: '+String(a.label||'a tracker')+' stayed with you for '+Math.round(a.minutes||0)+' minutes across '+Math.round(a.metres||0)+' m.'); }); }
+    if(typeof N.takeOpen==='function'){ const k=N.takeOpen(); if(k) alertGo(k); } }catch(e){} }
+function nativeMine(){ const N=NATIVE(); if(!N || typeof N.setMine!=='function') return; try{ N.setMine(JSON.stringify(Object.keys(sigGet().keys||{}).slice(0,300))); }catch(e){} }
+
 /* ----- which devices the screen shows: live from a sensor, the simulated preview, or nothing ----- */
 // The words for each state in which nothing near you can be shown. None of them reads Clear.
 function stateWords(m){ const since=hhmm(liveLast()-LIVE.skew);
@@ -3963,6 +4031,9 @@ document.addEventListener('click', e=>{
     case 'prof': { const k=a.dataset.k, v=a.dataset.v==='y'; if(P.profile[k]===v) delete P.profile[k]; else P.profile[k]=v; save(); rerender(); break; }
     case 'mode': { const m=a.dataset.m; S.mode=m;
       if(m==='w') setView('watchers'); else if(m==='a') setView('attackers'); else if(S.view!=='overview') setView('overview'); else rerender(); break; }
+    case 'alert-open': alertGo(); break;
+    case 'alert-x': S.banners=(S.banners||[]).slice(1); renderAlerts(); break;
+    case 'alert-ask': alertAsk(); break;
     case 'shelf': S.shelf=a.dataset.s; rerender(); break;
     case 'go': setView(a.dataset.v); break;
     case 'res': { const t=T(a.dataset.id), was=S.view; S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; setView(t.side==='w'?'watchers':'attackers'); if(was===S.view) navPush(t.id);
@@ -3996,9 +4067,9 @@ document.addEventListener('click', e=>{
     case 'macro-r': { S.macroR=+a.dataset.m; _fitM=0; macroUpdate(); break; }
     case 'capture': { const d=findDevice(a.dataset.id); openCapture(d); break; }
     case 'mine': case 'sig-mine': { const d=findDevice(a.dataset.id); if(!d||!d.live) break; P.mine=P.mine||{}; if(P.mine[d.id]) sigDrop(d); else { sigAdd(d); if(!d.sim) logEvidence('note','Added to your signature: '+devName(d)+' ('+kindText(d)+').'); }
-      save(); liveTick(); S._rsig=''; rerender(); if(el('rost')) renderRoster(); break; }
-    case 'sig-name-del': { const g=sigGet(), nm=a.dataset.n; g.names=g.names.filter(x=>x!==nm); Object.keys(g.by).forEach(k=>{ if(g.by[k]==='n:'+nm){ delete g.by[k]; if(P.mine) delete P.mine[k]; } }); g.t=Date.now(); save(); liveTick(); rerender(); break; }
-    case 'sig-count-del': { const g=sigGet(), k=a.dataset.k; g.counts[k]=Math.max(0,(g.counts[k]||0)-1); if(!g.counts[k]) delete g.counts[k]; const id=Object.keys(g.by).find(x=>g.by[x]==='c:'+k); if(id){ delete g.by[id]; if(P.mine) delete P.mine[id]; } g.t=Date.now(); save(); liveTick(); rerender(); break; }
+      save(); nativeMine(); liveTick(); S._rsig=''; rerender(); if(el('rost')) renderRoster(); break; }
+    case 'sig-name-del': { const g=sigGet(), nm=a.dataset.n; g.names=g.names.filter(x=>x!==nm); Object.keys(g.by).forEach(k=>{ if(g.by[k]==='n:'+nm){ delete g.by[k]; sigKeysDrop(k); if(P.mine) delete P.mine[k]; } }); g.t=Date.now(); save(); nativeMine(); liveTick(); rerender(); break; }
+    case 'sig-count-del': { const g=sigGet(), k=a.dataset.k; g.counts[k]=Math.max(0,(g.counts[k]||0)-1); if(!g.counts[k]) delete g.counts[k]; const id=Object.keys(g.by).find(x=>g.by[x]==='c:'+k); if(id){ delete g.by[id]; sigKeysDrop(id); if(P.mine) delete P.mine[id]; } g.t=Date.now(); save(); nativeMine(); liveTick(); rerender(); break; }
     case 'dev-log': { const d=findDevice(a.dataset.id); if(!d||!d.live||d.sim) break;
       logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+'), '+distText(d)+', '+flagOf(d).toLowerCase()+'. Heard '+d.timesSeen+' times since '+new Date(d.firstSeen).toLocaleTimeString()+'.',{sig:d.sig}); toast('Added to Evidence.'); break; }
     case 'sn-add': sensorAdd(); break;
@@ -4079,6 +4150,9 @@ function boot(){
   setInterval(()=>{ if(S.global && document.visibilityState==='visible') applyGlobal(true); }, 60000);          // the age on screen counts up by the minute
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-(S.globalAt||0)>120000) loadGlobal(); });
   syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit(); startGeo();
+  nativeMine(); alertNativeTick();
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') alertNativeTick(); });
+  if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.haloOpen) alertGo(e.data.haloOpen); });
   if(NATIVE() && store.get('halo_listen')==='1'){ const st=nativeStatus(); if(st && st.permission==='granted') phStart(); }
 }
 /* returning visit: unlock only after everything above is defined */
