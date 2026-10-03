@@ -77,7 +77,7 @@ export function shapeKev(j, now = Date.now()) {
     recentAll: recent.length, recent: personal.slice(0, 60), byPlatform: count };
 }
 
-const SURV = /(surveil|track|location|stalk|spy|license plate|alpr|facial|face recognition|biometric|police|cell-site|stingray|data broker|wiretap|camera|drone|geofence|privacy)/i;
+const SURV = /(surveil|tracking|tracker|location data|stalk|spyware|license plate|alpr|facial|face recognition|biometric|cell-site|stingray|data broker|wiretap|camera|drone|geofence)/i;
 
 const SOURCES = [
   { id: 'kev', name: 'CISA Known Exploited Vulnerabilities', home: 'https://www.cisa.gov/known-exploited-vulnerabilities-catalog',
@@ -92,7 +92,7 @@ const SOURCES = [
     shape: text => { const a = parseRss(text, 12).map(({ cats, ...x }) => ({ ...x, src: 'FTC' })); return { data: a, count: a.length }; } },
   { id: 'privacy', name: 'EFF Deeplinks', home: 'https://www.eff.org/deeplinks',
     urls: ['https://www.eff.org/rss/updates.xml'],
-    shape: text => { const a = parseRss(text, 40).filter(x => SURV.test(x.t) || x.cats.some(c => SURV.test(c))).slice(0, 12).map(({ cats, ...x }) => ({ ...x, src: 'EFF' })); return { data: a, count: a.length }; } }
+    shape: text => { const a = parseRss(text, 40).filter(x => SURV.test(x.t) || x.cats.some(c => /surveillance|biometric|face recognition|location/i.test(c))).slice(0, 12).map(({ cats, ...x }) => ({ ...x, src: 'EFF' })); return { data: a, count: a.length }; } }
 ];
 
 export async function build() {
