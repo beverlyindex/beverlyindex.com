@@ -627,6 +627,8 @@ function hdcsAssess(){
   return {t:0, s:'Nothing around you has changed.', d:null};
 }
 function wtcsAssess(){
+  // No sensor watches the devices yet. An unmonitored channel reads Unknown, never Clear.
+  if(!S.wtcsLive) return {t:-1, s:'Not monitored. No sensor is watching your devices yet.', d:null};
   const sev = Math.max(0, ...S.wtcs.map(w=>w.sev));
   const w = S.wtcs.find(x=>x.sev===sev);
   const s = sev===0 ? 'No attack recorded on your devices.' : (w?w.text:'Activity recorded on your devices.');
@@ -657,11 +659,11 @@ function renderBluf(){
   const a=S.bluf||{t:0,s:'',d:null};
   const host=el('blufHost');
   host.innerHTML = `
-    <div class="bluf" style="--tierc:var(${TIER_VAR[a.t]})">
+    <div class="bluf" style="--tierc:var(${a.t<0?'--mut':TIER_VAR[a.t]})">
       <span class="modebadge">${S.lead.toUpperCase()}${S.mode==='auto'?' · AUTO':''}</span>
-      <div class="tier"><span class="dot"></span>${TIER_NAME[a.t]}</div>
+      <div class="tier"><span class="dot"></span>${a.t<0?'Unknown':TIER_NAME[a.t]}</div>
       <div class="sentence">${a.s}</div>
-      <div class="meta">${S.devices.filter(d=>d.present).length} devices present · updated ${new Date().toLocaleTimeString()}</div>
+      <div class="meta">${S.live?'':'Simulated feed · '}${S.devices.filter(d=>d.present).length} devices present · updated ${new Date().toLocaleTimeString()}</div>
     </div>`;
 }
 
