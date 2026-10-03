@@ -28,13 +28,17 @@ jobs:
           node-version: 20
       - name: Build the feed
         run: node .github/halo-feed/build.mjs out/global.json
-      - name: Publish to the halo-data branch
+      - name: Publish as the halo-feed tag
+        # A tag, not a branch: the hosting project builds every branch it sees, and this commit holds data only.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd out
           printf 'Remiel Halo global feed. Built by a scheduled job. Do not edit by hand.\n' > README.txt
-          git init -q -b halo-data
+          mkdir -p collector
+          printf '{"git":{"deploymentEnabled":false}}\n' > collector/vercel.json
+          git init -q -b feed
           git add .
           git -c user.name="Randolph R Beverly Jr" -c user.email="rrbjr@beverlyindexai.com" commit -q -m "Remiel Halo: global feed update" -m "Beverly Index LLC"
-          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" halo-data
+          git tag -f halo-feed
+          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" refs/tags/halo-feed
