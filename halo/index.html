@@ -130,6 +130,11 @@ select.inp{flex:none}
   display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .card h3 .n{color:var(--mut);font-weight:400;letter-spacing:.06em}
 .sub{color:var(--mut);font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.hrow{display:grid;grid-template-columns:auto 1fr;gap:4px 11px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px;line-height:1.45}
+.hrow:first-of-type{border-top:0}
+.hrow .hs{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:7px;border:1px solid var(--line);align-self:start;white-space:nowrap;min-width:78px;text-align:center}
+.hrow .hs.ok{color:var(--clear);border-color:rgba(74,232,138,.5)} .hrow .hs.att{color:var(--warn);border-color:rgba(232,168,74,.6)} .hrow .hs.unk{color:var(--mut)}
+.hrow .hx{color:var(--mut);font-size:12.5px}
 .walk{border:1px solid rgba(79,141,240,.45);border-radius:12px;background:rgba(18,34,74,.35);padding:12px 12px 10px;margin-top:10px}
 .walk.on{border-color:var(--clear);background:rgba(20,60,44,.28)}
 .walk-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;line-height:1.4}
@@ -675,7 +680,7 @@ el('gateGo').addEventListener('click', tryUnlock);
 el('gateKey').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
 
 /* ---------- persisted state (this device only) ---------- */
-function blank(){ return { profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, labels:{}, flagged:{}, photos:{},
+function blank(){ return { health:{}, profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, labels:{}, flagged:{}, photos:{},
   home:{ armed:false, people:[], rooms:[], contacts:[], rules:{fall:true, still:45, upBy:'09:00', bath:30, night:true} },
   evidence:[], prevHash:'0'.repeat(16) }; }
 function loadState(){
@@ -1511,7 +1516,7 @@ function renderOverview(){
   h+='<div class="modebar">'+modePills()+'</div>';
   const list=THREATS.filter(t=>t.shelf==='real' && scopeOf(t)!==false && (S.mode==='auto'||t.side===S.mode))
     .sort((x,y)=>(isOpen(y)-isOpen(x)) || (scopeOf(y)===true)-(scopeOf(x)===true) || IMPACT_W(y.impact)-IMPACT_W(x.impact));
-  h+='<div class="stack">'+profilePull()+globalPull()+devicesPull()+list.map(threatPull).join('')+resourcesPull()+termsPull()+'</div>';
+  h+='<div class="stack">'+profilePull()+healthPull()+globalPull()+devicesPull()+list.map(threatPull).join('')+resourcesPull()+termsPull()+'</div>';
   h+='<div class="formrow" style="margin-top:14px"><button class="btn primary" data-act="go" data-v="watchers" style="flex:1">All Watchers</button><button class="btn gold" data-act="go" data-v="attackers" style="flex:1">All Attackers</button></div></div>';
   el('ovMain').innerHTML=h;
   renderCoverage(); renderHomeMini(); renderVicinity();
@@ -1520,7 +1525,7 @@ function renderCoverage(){
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, g=S.global;
   const ls=liveState(), fresh=b=>ls==='live' && LIVE.bands[b] && (Date.now()+LIVE.skew-LIVE.bands[b])<LIVE_SILENT, T=vis().test;
   const bandRow=(label,b)=>[label, fresh(b)?(T?'Test data':'Live from your sensor'):ls==='live'?'Not reported by your sensor':stateWords(ls).cov, fresh(b)?(T?'part':'live'):''];
-  const rows=[bandRow('Bluetooth near you','ble'),bandRow('Wi-Fi near you','wifi'),bandRow('Cell towers','cell'),['Your devices','Not monitored',''],
+  const rows=[bandRow('Bluetooth near you','ble'),bandRow('Wi-Fi near you','wifi'),bandRow('Cell towers','cell'),['This device', (()=>{ const c=healthCount(); return !c.at?'Health check not run':c.att?c.att+' need attention':'Health check: '+c.ok+' pass'; })(), (()=>{ const c=healthCount(); return !c.at?'':c.att?'part':'live'; })()],
     ['Home', !Object.keys(P.sensors||{}).some(k=>P.sensors[k].kind==='station')?'No listener':stationLive()?(T&&stationTest()?'Test data':'Listener reporting'):LIVE.seen.station?'Listener silent':'Listener added, no report yet', stationLive()?(T&&stationTest()?'part':'live'):''],['Your position',S.pos?'Live, within '+Math.round(S.pos.acc)+' m':gz()?'Saved home location':'Not shared',S.pos?'live':gz()?'part':''],
     ['Global feed', g?'Live, '+fmtDT(g.generated):(S.globalErr?'Not reached':'Reaching'), g?'live':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='connecting'?'Connecting':SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':SY.status==='offline'?'Not reached':'Starting', SY.status==='on'?'live':''],
@@ -2437,6 +2442,154 @@ function syncLine(){ const n=SY.devices.length;
     : SY.status==='offline' ? (SY.msg||'Backend not reached. Working on this device only')
     : SY.status==='out' ? (SY.msg||'Signed out')
     : SY.status==='off' ? SY.msg : 'Starting'; }
+/* ---------- Device Health Check: what this browser can report about this device, and what only you can read.
+   A web page cannot scan a device or read its settings, so a full pass is never proof that a device is clean. ---------- */
+const HK = () => isAndroid()?'android':isIOS()?'ios':/Win/i.test(navigator.platform||navigator.userAgent)?'windows':/Mac/i.test(navigator.platform||'')?'mac':'computer';
+const HK_NAME={android:'Android phone', ios:'iPhone or iPad', windows:'Windows computer', mac:'Mac', computer:'Computer'};
+const HEALTH_GUIDED={
+ android:[
+  ['Play Protect is on, and its last scan found nothing','Open the Play Store. Tap your picture at the top right, then Play Protect. It should read that no harmful apps were found. Press Scan.'],
+  ['The security update is less than 90 days old','Settings, Security and privacy, Updates, Security update. Install anything that is waiting. Then record the date in the Patch Clock.'],
+  ['No app may install other apps, unless you chose it','Settings, Apps, Special app access, Install unknown apps. Every entry should read Not allowed, except a store you use on purpose.'],
+  ['No app you do not recognise has Accessibility access','Settings, Accessibility, Downloaded apps (Installed apps on some phones). Accessibility lets an app read the screen and press buttons. Turn off anything you did not set up yourself.'],
+  ['No app you do not recognise is a device admin','Settings, Security and privacy, More security settings, Device admin apps. Only Find My Device should be on, and a work app if your employer manages the phone.'],
+  ['The screen lock is a PIN of six digits or more, or a password','Settings, Security and privacy, Device unlock, Screen lock.'],
+  ['Find My Device is on','Settings, Security and privacy, Device finders, Find My Device. Newer phones call it Find Hub.'],
+  ['USB debugging is off','Settings, System, Developer options. If Developer options is not in the list, it is already off.'],
+  ['Your Google Account has 2-Step Verification or a passkey','Settings, Google, your name, Manage your Google Account, Security.']],
+ ios:[
+  ['iOS is up to date, and automatic updates are on','Settings, General, Software Update. Open Automatic Updates and turn on every switch, including Security Responses.'],
+  ['No profile is installed that you did not install','Settings, General, VPN and Device Management. A profile can route or read your traffic. If the page lists nothing, there is none. Remove any you do not recognise.'],
+  ['Safety Check shows no sharing you did not set up','Settings, Privacy and Security, Safety Check, Manage Sharing and Access. Review people, apps and devices.'],
+  ['Your Apple Account lists only devices you own','Settings, your name, then scroll to the device list. Remove any you do not recognise, then change your password.'],
+  ['Stolen Device Protection is on','Settings, Face ID and Passcode, Stolen Device Protection.'],
+  ['The passcode is six digits or more','Settings, Face ID and Passcode, Change Passcode.'],
+  ['Find My iPhone is on','Settings, your name, Find My, Find My iPhone.'],
+  ['Your Apple Account has two-factor authentication','Settings, your name, Sign-In and Security.']],
+ mac:[
+  ['macOS is up to date, and automatic updates are on','Apple menu, System Settings, General, Software Update. Press the i beside Automatic Updates and turn on every switch.'],
+  ['FileVault is on','System Settings, Privacy and Security, FileVault. It encrypts the disk, so a stolen Mac cannot be read.'],
+  ['The firewall is on','System Settings, Network, Firewall.'],
+  ['A password is required straight after sleep','System Settings, Lock Screen. Set Require password to Immediately.'],
+  ['No login item or background item you do not recognise','System Settings, General, Login Items and Extensions. Turn off anything you did not install.'],
+  ['No profile is installed that you did not install','System Settings, Privacy and Security, Profiles. If Profiles is not shown, there is none.'],
+  ['Screen sharing and remote login are off, unless you use them','System Settings, General, Sharing.'],
+  ['Every browser extension is one you chose','Safari: Settings, Extensions. Chrome: the three dots, Extensions, Manage Extensions. Remove the rest.']],
+ windows:[
+  ['Windows is up to date','Settings, Windows Update, Check for updates.'],
+  ['Virus and threat protection is on, with a recent scan','Windows Security, Virus and threat protection. Run a Quick scan.'],
+  ['Device encryption or BitLocker is on','Settings, Privacy and security, Device encryption.'],
+  ['The firewall is on for every network','Windows Security, Firewall and network protection.'],
+  ['Sign-in is required when the PC wakes','Settings, Accounts, Sign-in options.'],
+  ['No startup app you do not recognise','Settings, Apps, Startup. Turn off anything you did not install.'],
+  ['Remote Desktop is off, unless you use it','Settings, System, Remote Desktop.'],
+  ['Every browser extension is one you chose','In the browser: the three dots, Extensions, Manage Extensions. Remove the rest.']],
+ computer:[
+  ['The system is up to date, and updates install by themselves','Open the system settings and find Software Update.'],
+  ['The disk is encrypted','Look for disk encryption in the security settings.'],
+  ['A password is required when the computer wakes','Look for the lock screen settings.'],
+  ['Every browser extension is one you chose','In the browser menu, open Extensions and remove the rest.']]
+};
+function browserInfo(){ const u=navigator.userAgent; let m;
+  if((m=u.match(/Edg(?:A|iOS)?\/(\d+)/))) return {n:'Edge',v:+m[1]};
+  if((m=u.match(/SamsungBrowser\/(\d+)/))) return {n:'Samsung Internet',v:+m[1]};
+  if((m=u.match(/Firefox\/(\d+)/))) return {n:'Firefox',v:+m[1]};
+  if((m=u.match(/(?:Chrome|CriOS)\/(\d+)/))) return {n:'Chrome',v:+m[1]};
+  if((m=u.match(/Version\/(\d+).*Safari/))) return {n:'Safari',v:+m[1]};
+  return {n:'This browser',v:0}; }
+// The newest release, from the live feed when it carries one, otherwise worked out from each browser's published release rhythm.
+function browserNewest(n){ const g=S.global&&S.global.browsers, k=n.toLowerCase(), day=86400000, d=Date.now();
+  if(g && g[k]) return {v:g[k], sure:true};
+  if(n==='Chrome'||n==='Edge') return {v:Math.floor(140+(d-Date.UTC(2025,8,2))/(32*day)), sure:false};
+  if(n==='Firefox') return {v:Math.floor(143+(d-Date.UTC(2025,8,16))/(28.5*day)), sure:false};
+  return null; }
+async function healthRun(){
+  const out=[], add=(id,name,st,txt,fix)=>out.push({id,name,st,txt,fix:fix||''}), k=HK(), b=browserInfo();
+  let hv=null; try{ if(navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) hv=await navigator.userAgentData.getHighEntropyValues(['platformVersion','model']); }catch(e){}
+  const pvn = hv && hv.platformVersion ? parseInt(hv.platformVersion,10) : null;
+  // the system
+  if(k==='android'){
+    if(!pvn) add('os','Android version','unk','This browser does not report the Android version.','Settings, About phone, Android version.');
+    else if(pvn<=12) add('os','Android version','att','Android '+pvn+'. Google no longer writes security patches for it.','Check the maker\'s page for an update. If there is none, this phone stays exposed to every new flaw.');
+    else if(pvn===13) add('os','Android version','att','Android 13. It is at or near the end of Google\'s security patches.','Settings, System, Software update. Install a newer Android if the maker offers one.');
+    else add('os','Android version','ok','Android '+pvn+'. A generation that still receives security patches.','The patch date still matters: see the Patch Clock.');
+  } else if(k==='ios'){ const m=navigator.userAgent.match(/OS (\d+)_/), v=m?+m[1]:0;
+    if(v && v<17) add('os','iOS version','att','iOS '+v+'. Apple no longer patches it fully.','Settings, General, Software Update.');
+    else add('os','iOS version','unk','The browser reports iOS '+(v||'')+' or later, not the exact update.','Settings, General, Software Update. It should read that iOS is up to date.');
+  } else if(k==='windows'){
+    if(!pvn && pvn!==0) add('os','Windows version','unk','This browser does not report the Windows version.','Settings, System, About.');
+    else if(pvn>=13) add('os','Windows version','ok','Windows 11.','Keep Windows Update on.');
+    else add('os','Windows version','att','Windows 10 or older. Free security updates for Windows 10 ended in October 2025.','Move to Windows 11, or enrol in Extended Security Updates.');
+  } else add('os',k==='mac'?'macOS version':'System version','unk','A browser does not report the '+(k==='mac'?'macOS':'system')+' version.', k==='mac'?'Apple menu, About This Mac. Then System Settings, General, Software Update.':'Check the system settings for updates.');
+  // the browser
+  const nw=browserNewest(b.n), inApp=/; wv\)|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
+  if(inApp) add('br','Browser','att','Halo is open inside another app\'s built-in browser.','Open it in Chrome or Safari instead, so that the other app cannot see the page.');
+  else if(b.n==='Safari') add('br','Browser', b.v&&b.v<18?'att':'ok', 'Safari '+(b.v||'')+'. Safari updates with the system.', b.v&&b.v<18?'Update the system to update Safari.':'');
+  else if(!b.v || !nw) add('br','Browser','unk',b.n+(b.v?' '+b.v:'')+'. Halo has no release calendar for it.','Update it in the app store.');
+  else { const gap=nw.v-b.v, tol=nw.sure?1:3;
+    if(gap<=tol) add('br','Browser','ok',b.n+' '+b.v+'. Current, or close to it'+(nw.sure?'':', by the release calendar')+'.','');
+    else add('br','Browser','att',b.n+' '+b.v+'. About '+gap+' releases behind'+(nw.sure?'':', by the release calendar')+'. Old browsers carry known flaws.', k==='android'?'Play Store, search for '+b.n+', Update.':k==='ios'?'App Store, your picture, Update.':'In the browser: the three dots, Help, About. It updates there.'); }
+  // the connection
+  add('tls','Connection to Halo', location.protocol==='https:'?'ok':'att', location.protocol==='https:'?'Encrypted.':'This page is not on an encrypted connection.', location.protocol==='https:'?'':'Open Halo at its https address.');
+  // a screen lock
+  let uv=null; try{ if(window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) uv=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); }catch(e){}
+  if(uv===true) add('lock','Screen lock','ok','A fingerprint, face or PIN sign-in is set up on this device.','');
+  else if(uv===false && (k==='android'||k==='ios')) add('lock','Screen lock','att','No screen lock was reported.','Set a PIN of six digits or more. Without one, anyone holding the phone holds everything on it.');
+  else add('lock','Screen lock','unk','This browser cannot tell whether the device asks for a password.','Confirm it in the checks below.');
+  // Halo's own data on this device
+  let kept=null; try{ if(navigator.storage && navigator.storage.persisted) kept=await navigator.storage.persisted(); }catch(e){}
+  if(kept===true) add('keep','Halo\'s data on this device','ok','The browser has agreed to keep it.','');
+  else add('keep','Halo\'s data on this device', kept===false?'att':'unk', 'The browser may clear it by itself, and a private window clears it when closed. Your account key lives in this data.', 'Press Ask the browser to keep it. Install Halo, and do not use a private window.');
+  const nd=(SY.devices||[]).length;
+  if(SY.status==='on' && nd>=2) add('acct','Your Halo account','ok','Held on '+nd+' devices, so one lost device does not lose it.','');
+  else if(SY.status==='on') add('acct','Your Halo account','att','Only this device holds your account key. If its browser data is cleared, the account cannot be recovered.','Link a second device in Devices and sync.');
+  else add('acct','Your Halo account','unk','Not signed in, so Halo cannot count your devices.','Open Devices and sync.');
+  // the clock
+  if(LIVE.polledAt){ const off=Math.abs(LIVE.skew); if(off<120000) add('clock','Device clock','ok','Within '+Math.max(1,Math.round(off/1000))+' seconds of Halo\'s server.','');
+    else add('clock','Device clock','att','Off by about '+Math.round(off/60000)+' minutes. A wrong clock breaks secure connections and the times in Evidence.','Set the date and time to automatic.'); }
+  else add('clock','Device clock','unk','Not compared yet. It is checked once a sensor is on the account.','Keep date and time set to automatic.');
+  // flaws under attack, and the patch date
+  const g=S.global;
+  if(g && g.kev){ const want = k==='android'?['android','browser'] : k==='ios'||k==='mac'?['apple','browser'] : k==='windows'?['windows','microsoft','browser'] : ['browser'];
+    const hit=g.kev.recent.filter(v=>v.platforms.some(x=>want.indexOf(x)>=0));
+    if(hit.length) add('kev','Flaws under attack','att',hit.length+' in the last '+g.kev.windowDays+' days touch this kind of device. The newest: '+hit[0].vendor+' '+hit[0].product+'.','Install every waiting update today. The full list is in the Patch Clock.');
+    else add('kev','Flaws under attack','ok','None listed for this kind of device in the last '+g.kev.windowDays+' days.',''); }
+  else add('kev','Flaws under attack','unk','The live list was not reached.','Try again when the feed is live.');
+  const pd=(P.patch||[]).map(x=>daysSince(x.date)).filter(n=>n!==null).sort((a,b)=>a-b)[0];
+  if(pd===undefined) add('patch','Security update date','unk','No date recorded. A browser cannot read it.','Record it in the Patch Clock.');
+  else add('patch','Security update date', pd<=90?'ok':'att', 'The newest date in your Patch Clock is '+pd+' days old.', pd<=90?'':'Install the waiting update, then record the new date.');
+  return out;
+}
+const healthTicks = () => { const k=HK(); P.health=P.health||{}; P.health.done=P.health.done||{}; return P.health.done[k]||(P.health.done[k]={}); };
+function healthCount(){ const a=(P.health&&P.health.auto)||null, g=HEALTH_GUIDED[HK()], t=healthTicks(); const it=a?a.items:[];
+  return {ok:it.filter(x=>x.st==='ok').length, att:it.filter(x=>x.st==='att').length, unk:it.filter(x=>x.st==='unk').length, n:it.length, ticks:g.filter((x,i)=>t[i]).length, g:g.length, at:a?a.t:0}; }
+async function healthGo(){ S.healthBusy=true; rerender();
+  let items=[]; try{ items=await healthRun(); }catch(e){}
+  P.health=P.health||{}; P.health.auto={t:Date.now(), kind:HK(), items}; S.healthBusy=false; save();
+  const c=healthCount(); logEvidence('note','Device health check run on this '+HK_NAME[HK()]+': '+c.ok+' pass, '+c.att+' need attention, '+c.unk+' unknown.');
+  rerender(); }
+function healthPull(){
+  const open=S.open.has('health'), c=healthCount(), LBL={ok:'Pass',att:'Attention',unk:'Unknown'};
+  const sum = !c.at ? 'Not run on this device yet' : c.ok+' pass · '+c.att+' need attention · '+c.unk+' unknown · '+c.ticks+' of '+c.g+' confirmed by you';
+  let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(!c.at?'--mut':c.att?'--warn':'--clear')+')" id="tp-health">'+
+    '<div class="tp-head" data-act="pull" data-id="health"><div class="tp-top"><span class="tp-lab">Device Health Check</span><span class="tp-i">i</span></div>'+
+    '<div class="tp-sum">This '+esc(HK_NAME[HK()])+' · '+sum+'</div><span class="chev">&#9662;</span></div>';
+  if(open){ const a=P.health&&P.health.auto, t=healthTicks();
+    h+='<div class="tp-body"><div class="dsec"><h4>What this device reports '+(a?'<span class="spsub">checked '+new Date(a.t).toLocaleString()+'</span>':'')+'</h4>'+
+      (a ? a.items.map(x=>'<div class="hrow"><span class="hs '+x.st+'">'+LBL[x.st]+'</span><span><b>'+esc(x.name)+'.</b> '+esc(x.txt)+(x.fix?'<br><span class="hx">'+esc(x.fix)+'</span>':'')+
+            (x.id==='keep'&&x.st!=='ok'?'<br><button class="btn sm" data-act="health-keep" style="margin-top:6px">Ask the browser to keep it</button>':'')+
+            (x.id==='patch'||x.id==='kev'?'<br><button class="btn sm" data-act="res" data-id="p_patch" style="margin-top:6px">Open Patch Clock</button>':'')+
+            (x.id==='acct'&&x.st==='att'?'<br><button class="btn sm" data-act="go-sensors" style="margin-top:6px">Open Devices and sync</button>':'')+'</span></div>').join('')
+         : '<p>Halo reads what this browser reports about the device: the system and browser versions, the screen lock, the clock, how safe your Halo data is here, and whether flaws under attack touch it. It takes a few seconds.</p>')+
+      '<div class="formrow"><button class="btn sm primary" data-act="health-run"'+(S.healthBusy?' disabled':'')+'>'+(S.healthBusy?'Checking':a?'Run the check again':'Run the check')+'</button></div></div>';
+    h+='<div class="dsec"><h4>What only you can read <span class="spsub">'+c.ticks+' of '+c.g+' confirmed</span></h4><p style="margin-bottom:8px">A web page cannot see these settings. Open each one, then tick it once it is true.</p>'+
+      HEALTH_GUIDED[HK()].map((x,i)=>'<div class="chk '+(t[i]?'on':'')+'" data-act="health-tick" data-i="'+i+'"><span class="box">'+(t[i]?'&#10003;':(i+1))+'</span><span class="tx">'+esc(x[0])+'<span class="nt">'+esc(x[1])+'</span></span></div>').join('')+'</div>';
+    h+='<div class="dsec"><h4>Deeper checks</h4><p style="margin-bottom:8px">Each opens a step-by-step tool.</p><div class="formrow" style="margin-top:0">'+
+      ['w_stalk','a_android','a_phone','p_patch'].map(id=>T(id)?'<button class="btn sm" data-act="res" data-id="'+id+'">'+esc(T(id).name)+'</button>':'').join('')+'</div></div>';
+    h+='<div class="limit"><b>Limit.</b> A web page cannot scan a device for spyware or read its settings. This check reads what the browser reports and what you confirm. A full pass means these items are in order. It is not proof that the device is clean. Run it on each device you own: the result stays on that device.</div></div>'; }
+  return h+'</div>';
+}
+
 /* ---------- Install: Halo on the home screen, opening full screen like an app ---------- */
 let INSTALL=null;
 const installed = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
@@ -3013,6 +3166,9 @@ document.addEventListener('click', e=>{
     case 'sn-remove': sensorRemove(a.dataset.id); break;
     case 'sn-kind': { const sn=P.sensors[a.dataset.id]; if(!sn) break; sn.kind = sn.kind==='station' ? 'carried' : 'station'; save();
       toast(sn.kind==='station' ? sn.name+' is a Home listener again.' : sn.name+' is now carried with you. Its reports are placed along your route.'); softRender(); renderVicinity(); break; }
+    case 'health-run': if(!S.healthBusy) healthGo(); break;
+    case 'health-tick': { const t=healthTicks(), i=+a.dataset.i; t[i]=!t[i]; save(); if(t[i]) logEvidence('defence','Device health, confirmed on this '+HK_NAME[HK()]+': '+HEALTH_GUIDED[HK()][i][0]+'.'); rerender(); break; }
+    case 'health-keep': { (navigator.storage&&navigator.storage.persist?navigator.storage.persist():Promise.resolve(false)).then(ok=>{ toast(ok?'The browser will keep Halo\'s data.':'The browser did not agree. Install Halo to the home screen, then try again.'); healthGo(); }).catch(()=>healthGo()); break; }
     case 'walk-start': walkStart(); break;
     case 'walk-stop': walkStop(); break;
     case 'walk-save': walkSave(false); break;
