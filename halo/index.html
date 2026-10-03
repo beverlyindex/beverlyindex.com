@@ -311,6 +311,9 @@ select.inp{flex:none}
 .sph-state{position:absolute;inset:0;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14%;pointer-events:none;
   font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;color:#fff;background:rgba(6,10,20,.62)}
 .sph-state:empty{display:none}
+.sph-note{position:absolute;left:54%;top:9%;transform:translateX(-50%);z-index:3;pointer-events:none;white-space:nowrap;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:#dfe8ff;background:rgba(7,11,22,.78);border:1px solid var(--line2);border-radius:999px;padding:4px 10px}
+.sph-note:empty{display:none}
+.stage[data-big="macro"] .sph.micro .sph-note{display:none}
 .sph-state b{font-size:13px;font-weight:600}
 .sph-state span{display:block;margin-top:6px;font-size:9.5px;letter-spacing:.1em;color:var(--mut);text-transform:none;font-family:var(--sans);line-height:1.4}
 /* slots: the big sphere to the right, two small ones overlapping its left rim */
@@ -579,6 +582,7 @@ a.tk:hover b{text-decoration:underline}
                   <div class="sph micro" id="sphMicro" data-act="sph" data-s="micro">
                     <div class="sph-map" id="haloMap"></div>
                     <div class="sph-state" id="microState"></div>
+                    <span class="sph-note" id="microNote"></span>
                     <span class="sph-lab" id="microLab">Micro</span>
                   </div>
                   <div class="sph macro" id="sphMacro" data-act="sph" data-s="macro">
@@ -602,7 +606,7 @@ a.tk:hover b{text-decoration:underline}
                   <span><i style="background:var(--route)"></i>Seen on route</span>
                   <span><i style="background:var(--action)"></i>With you</span>
                   <span><i class="rgh"></i>Direction rough</span>
-                  <span><i class="hol"></i>Direction not known</span>
+                  <span><i class="hol"></i>Direction not known (list only)</span>
                 </div>
                 <div id="suspects"></div>
                 <div class="posline" id="posLine"></div>
@@ -668,7 +672,7 @@ a.tk:hover b{text-decoration:underline}
 </div>
 
 <!-- ============ TERMS OF USE ============ -->
-<div id="report" class="hidden"><div class="rp-bar"><span>Remiel Halo Full Report</span><button class="btn sm gold" data-act="report-print">Print or save as PDF</button><button class="btn sm" data-act="report-close">Close</button></div><div class="rp-paper" id="rpPaper"></div></div>
+<div id="report" class="hidden"><div class="rp-bar"><span id="rpTitle">Remiel Halo Full Report</span><button class="btn sm gold" data-act="report-print">Print or save as PDF</button><button class="btn sm" data-act="report-close">Close</button></div><div class="rp-paper" id="rpPaper"></div></div>
 <div id="terms" class="hidden">
   <div class="terms-card">
     <h3>Terms of use</h3>
@@ -1601,6 +1605,8 @@ function renderVicinity(){
   const view=viewRadius();
   setHTML(el('microLab'), 'Micro<i> · '+(view<BASE_R&&!rs.ext ? view+' m view' : blocks+' blocks'+(rs.ext?', extended':''))+'</i>');
   setHTML(el('microState'), shown ? '' : '<b>'+esc(stateWords(V.mode).count)+'</b><span>Unknown, not Clear</span>');
+  { const nd=shown?sus.filter(noDir).length:0, pl=shown?sus.length-nd:0;
+    setHTML(el('microNote'), nd ? (pl?'+':'')+nd+' heard, no direction yet' : ''); }
   el('radLine').innerHTML = rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(shown && viewRadius()<BASE_R ? ' Micro is zoomed to '+viewRadius()+' m.' : '');
@@ -1609,7 +1615,7 @@ function renderVicinity(){
   setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':gz()?'your saved home location, because Responder is set to Home':'not shared, so the spheres show no street map')+' · Devices: '+esc(devLine));
   groundSync(); syncBase();
   const note=el('mapNote');
-  if(MAP || !S.mapFail){ note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':(mobileLive()?'Live from your sensor.':'Live from your home listener.')+' Tap a device to identify it.')
+  if(MAP || !S.mapFail){ note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':(mobileLive()?'Live from your sensor.':'Live from your home listener.')+' The map shows a device once Halo can place it. That takes movement: walk, and make a turn. Until then it is listed below by distance.')
     : V.mode==='sim' ? 'Simulated preview. These are not real devices.' : V.mode==='waiting' ? 'Waiting for the first report from your sensor.'
     : V.mode==='none' ? 'Not monitored. No sensor near you is connected, so no suspects are shown.' : stateWords(V.mode).note+' No suspects can be shown. This is Unknown, not Clear.'; }
   const host=el('suspects'); let html;
@@ -1830,19 +1836,8 @@ function ringsData(){
   return {type:'FeatureCollection',features:feats};
 }
 const noDir = d => d.live && !d.fix && !d.sector && d.bearing==null;
-// A device with no known direction keeps its own angle from one report to the next. Where two would overlap, the later one is moved along.
-// Those closer than a fifth of the view sit on one or two inner rings, so none covers your own dot.
-function spreadHollow(list){
-  const hs=list.filter(noDir).sort((a,b)=>a.id<b.id?-1:1), view=viewRadius(), near=view*.2, two=hs.filter(d=>d.dist<near).length>5, put=[], sp={}; let k=0;
-  hs.forEach(d=>{ let r=d.dist<near ? (two && (k++%2) ? .36 : .2) : Math.min(.96,d.dist/view), a=(d.handleBrg||0)%360, x=0, y=0, ok=false;
-    for(let lap=0; lap<5 && !ok; lap++, r=Math.min(.96,r+.1)) for(let t=0;t<36;t++){ x=r*Math.sin(a*Math.PI/180); y=r*Math.cos(a*Math.PI/180);
-      if(!put.some(q=>Math.hypot(q[0]-x,q[1]-y)<.16)){ ok=true; break; } a=(a+10)%360; }
-    put.push([x,y]); sp[d.id]={a, m:Math.hypot(x,y)*view}; });
-  S._spread=sp;
-}
-function devLngLat(d, micro){ if(d.fix) return [d.fix.lon,d.fix.lat];
-  const sp=micro && noDir(d) && S._spread ? S._spread[d.id] : null;
-  const m=sp ? sp.m : d.dist, a=(d.bearing!=null?d.bearing:sp?sp.a:d.handleBrg||0)*Math.PI/180, lat=MAP_CENTER.lat;
+function devLngLat(d){ if(d.fix) return [d.fix.lon,d.fix.lat];
+  const m=d.dist, a=(d.bearing!=null?d.bearing:d.handleBrg||0)*Math.PI/180, lat=MAP_CENTER.lat;
   return [MAP_CENTER.lon+Math.sin(a)*m/(111320*Math.cos(lat*Math.PI/180)), MAP_CENTER.lat+Math.cos(a)*m/111320]; }
 const markerColor = d => d.withYou?'var(--action)':d.onRoute?'var(--route)':d.knownBefore?'var(--clear)':'var(--warn)';
 function zonesData(){ const f=[];
@@ -1972,8 +1967,7 @@ function selectDevice(id){ S.identId=id; S.identOpen=true; S.renaming=false; ren
 function placeMarkers(map, store, list, extra){
   const ids=new Set(list.map(d=>d.id));
   Object.keys(store).forEach(id=>{ if(!ids.has(id)){ store[id].remove(); delete store[id]; } });
-  if(map===MAP) spreadHollow(list);
-  list.forEach(d=>{ const ll=devLngLat(d, map===MAP), mc=mkClass(d), cls='dev-marker'+extra+mc+(S.identId===d.id?' sel':'');
+  list.forEach(d=>{ const ll=devLngLat(d), mc=mkClass(d), cls='dev-marker'+extra+mc+(S.identId===d.id?' sel':'');
     const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):' (simulated)');
     if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
       e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
@@ -2022,7 +2016,7 @@ function identPick(){
   return [...inRadius()].sort(bySeverity)[0] || null;
 }
 const dirLine = d => !d.live ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : (d.fix && d.bearing!=null) ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.sector ? 'Roughly '+compass(d.sector.brg) : 'Not known';
-const originLine = d => d.live ? (d.sim ? 'Test data from a simulated sensor' : 'Heard by '+((P.sensors[d.sensor]||{}).name||'your sensor')) : 'Simulated preview';
+const originLine = d => d.live ? (d.sim ? 'Test data from a simulated sensor' : 'Heard by '+(d.sensor==='this-phone'?'this phone':(P.sensors[d.sensor]||{}).name||'your sensor')) : 'Simulated preview';
 function renderIdent(force){
   const V=vis(), d=identPick(), face=el('idFace'), sp=el('sphIdent'); S._identShown=d?d.id:null; if(!face) return;
   if(!d){ sp.style.removeProperty('--hc'); face.className='id-face none'; face.style.backgroundImage='';
@@ -2104,7 +2098,8 @@ function updateDeviceMarkers(){
   if(!MAP||!MAP_CENTER) return;
   try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); const z=MAP.getSource('zones'); if(z) z.setData(zonesData()); }catch(e){}
   fitRadius(false);
-  const V=vis(); placeMarkers(MAP, MAP_MARKERS, (V.mode==='live'||V.mode==='sim')?inRadius():[], '');
+  // A device whose direction is not known has no place on a map. It is counted on the sphere and listed by distance below.
+  const V=vis(); placeMarkers(MAP, MAP_MARKERS, (V.mode==='live'||V.mode==='sim')?inRadius().filter(d=>!noDir(d)):[], '');
 }
 function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else { updateDeviceMarkers(); macroUpdate(); } }
 
@@ -2149,7 +2144,7 @@ function tick(){
 const band = d => d.dist<30?'Very near':d.dist<=BLOCK_M?'Within one block':d.dist<=BASE_R?'Within two blocks':'Beyond two blocks';
 const labelOf = d => { const l=d && d.live && P.labels && P.labels[d.id]; return (typeof l==='string' && l) ? l : ''; };
 const devName = d => d.live ? (labelOf(d) || d.adv || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
-const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Unidentified device') : d.cls+(d.hint?', '+d.hint:''))+(d.live && devName(d)!==d.name ? ' · '+d.name : '');
+const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : d.cls+(d.hint?', '+d.hint:''))+(d.live && devName(d)!==d.name ? ' · '+d.name : '');
 const flagOf = d => d.mine?'Yours':d.withYou?'With you':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 function deviceThreat(d){ const c=d.identity; let s=1; if(d.withYou) s=4; else if(d.onRoute) s=3; else if(!d.knownBefore) s=2;
@@ -2616,15 +2611,18 @@ function reportHTML(){
     '<div class="rp-foot">Generated by Remiel Halo, a stand-alone counter-surveillance instrument. Beverly Index LLC. Produced on your own device from your own entries, your own sensors and public sources. Changes you make to a device, an account or software are yours to decide and yours to carry.</div>';
   return {html:h, snap:{t:now.getTime(), tier:a.t, applies:applies.length, open:open.length, att:hc.att}};
 }
-function reportOpen(){
-  const r=reportHTML(), paper=el('rpPaper'); paper.innerHTML=r.html; el('report').classList.remove('hidden'); el('report').scrollTop=0;
+function paperShow(title, html){
+  const paper=el('rpPaper'); el('rpTitle').textContent=title; paper.innerHTML=html; el('report').classList.remove('hidden'); el('report').scrollTop=0;
   // a heading stays on the same page as the table or list it introduces
   [...paper.querySelectorAll('h2,h3')].forEach(hd=>{ const run=[hd]; let n=hd.nextElementSibling;
     while(n && run.length<4 && !/^H[23]$/.test(n.tagName)){ run.push(n); if(n.classList.contains('rp-wide')||n.tagName==='UL'||n.classList.contains('rp-bar4')) break; n=n.nextElementSibling; }
     if(run.length>1 && !hd.parentNode.classList.contains('rp-keep')){ const w=document.createElement('div'); w.className='rp-keep'; hd.parentNode.insertBefore(w,hd); run.forEach(x=>w.appendChild(x)); } });
+  if(!S.reportOpen){ S.reportOpen=true; NAVN++; try{ history.pushState(navSnap('report'),''); }catch(e){} }
+}
+function reportOpen(){
+  const r=reportHTML(); paperShow('Remiel Halo Full Report', r.html);
   P.reports=P.reports||[]; if(!P.reports.length || r.snap.t-P.reports[0].t>60000){ P.reports.unshift(r.snap); P.reports.length=Math.min(P.reports.length,12); save();
     logEvidence('note','Full report generated. Bottom line '+(r.snap.tier<0?'Unknown':TIER_NAME[r.snap.tier])+', '+r.snap.applies+' threats apply, '+r.snap.open+' open.'); }
-  S.reportOpen=true; NAVN++; try{ history.pushState(navSnap('report'),''); }catch(e){}
 }
 function reportClose(viaBack){ if(!S.reportOpen) return; S.reportOpen=false; el('report').classList.add('hidden'); if(!viaBack){ try{ history.back(); }catch(e){} } }
 
@@ -2843,9 +2841,15 @@ const SAMPLE_STEP=4, SAMPLE_AGE=30*60000, SAMPLE_MAX=80, POS_MAX_ACC=35, SOLVE_B
 const AWAY_M=300, LIVE_KEEP=2*3600000, DEVS_MAX=600, ROSTER_MAX=60, HOME_NEAR=150, AUTOLOG_PER_HOUR=6;
 const CLS=['Phone','Wearable','Tag','Laptop','Vehicle','Access point','Cell tower','Unknown'];
 const SENSOR_KIND={ phone:'Phone app', carried:'Carried sensor', station:'Home listener' };
-const hasSensors = () => Object.keys(P.sensors||{}).length>0;
+const hasSensors = () => Object.keys(P.sensors||{}).length>0 || PH.on;
 const hash32 = s => { let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
-const callsign = (h,h2) => W1[h%W1.length]+' '+W2[(h>>>8)%W2.length]+' '+(10+h2%90);
+const callsign = (h,h2) => W1[h%W1.length]+' '+W2[(h>>>8)%W2.length]+' '+(10+h2%90);      // simulated preview only
+// A real device is named by its maker and what kind of thing it is. The short code only tells two alike apart.
+const MAKERS=['Apple','Microsoft','Samsung','Google','Tile','Chipolo','Garmin','Bose','Sony','Harman','Amazon','Xiaomi','Huawei','LG','Huami','Espressif','Nokia','Intel','Meta','Fitbit','Tesla'];
+const KIND_WORD={Phone:'phone',Wearable:'wearable',Tag:'tracker',Laptop:'computer',Vehicle:'vehicle','Access point':'Wi-Fi access point','Cell tower':'cell tower',Unknown:'device'};
+const makerOf = d => { const w=(d.hint||'').split(/[ ,]/)[0]; return MAKERS.indexOf(w)>=0 ? w : ''; };
+const autoName = d => { const m=makerOf(d), code=' #'+d.id.slice(-3).toUpperCase();
+  return (m ? m+' '+KIND_WORD[d.cls] : d.cls!=='Unknown' ? 'Unidentified '+KIND_WORD[d.cls] : d.hint ? d.hint.split(',')[0] : 'Unidentified device')+code; };
 // One reading: rough. Walls and the device's own power move it a great deal. Bluetooth transmits more weakly than Wi-Fi.
 const distOf = (rssi,band) => band==='ble' ? Math.pow(10, (-55-rssi)/25) : Math.pow(10, (-40-rssi)/27);
 const compass = b => ['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round(b/45)%8];
@@ -2926,7 +2930,7 @@ function ingestReport(sid, rowT, p, off){
     if(!d){ if(LIVE.devs.size>=DEVS_MAX) continue;
       const hsh=hash32(s.id), h2=hash32('~'+s.id);
       d={ id:'L'+hsh.toString(36)+h2.toString(36), sig:s.id, live:true, name:callsign(hsh,h2), glyph:GLY[hsh%GLY.length], firstSeen:at, timesSeen:0, samples:[], hist:[], handleBrg:hsh%360, fix:null, sector:null, fresh:0, seenMobile:0, seenStation:0 }; LIVE.devs.set(s.id,d); }
-    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; d.adv=typeof s.name==='string'?s.name.slice(0,40):''; d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; d.rssi=rssi!==null?rssi:rssiOf(reading);
+    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; d.adv=typeof s.name==='string'?s.name.slice(0,40):''; d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; d.name=autoName(d); d.rssi=rssi!==null?rssi:rssiOf(reading);
     d.lastSeen=Math.max(d.lastSeen||0, at); d.firstSeen=Math.min(d.firstSeen, at); d.timesSeen++; d.sensor=sid; d.identity=Math.max(1,Math.min(3,(s.conf|0)||2));
     if(station) d.seenStation=Math.max(d.seenStation, at); else { d.seenMobile=Math.max(d.seenMobile, at); if(away) d.seenAway=Math.max(d.seenAway||0, at); }
     d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
@@ -2970,7 +2974,8 @@ function liveDerive(d, nowS){
   d.onRoute = !d.mine && (!!d.fRoute || d.homeAway); d.knownBefore = d.mine || !!d.fKnown;
   if(!d.sim && (d.withYou || d.homeAway)) autoLog(d);
 }
-const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : d.tested ? 'stayed in earshot for '+Math.round(d.mins)+' minutes across '+Math.round(d.span)+' m of your movement' : 'was reported as moving with you by '+((P.sensors[d.sensor]||{}).name||'a sensor');
+const sensorName = id => id==='this-phone' ? 'this phone' : ((P.sensors[id]||{}).name||'a sensor');
+const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : d.tested ? 'stayed in earshot for '+Math.round(d.mins)+' minutes across '+Math.round(d.span)+' m of your movement' : 'was reported as moving with you by '+sensorName(d.sensor);
 // One Evidence entry per device per day, and only a few per hour, so a faulty sensor cannot bury the record.
 function autoLog(d){ const day=new Date().toISOString().slice(0,10); P.flagged=P.flagged||{};
   if(P.flagged[d.id]===day) return;
@@ -3019,6 +3024,78 @@ async function livePoll(){
   }catch(e){ LIVE.err=true; } finally{ _liveBusy=false; liveTick(); } }
 function liveStart(){ const loop=()=>{ if(document.visibilityState==='visible') livePoll(); setTimeout(loop, LIVE_POLL); }; setTimeout(loop, 1500); setInterval(()=>{ if(hasSensors()) liveTick(); }, 2000); }
 
+/* ---------- This phone as the sensor. Chrome on Android can scan Bluetooth from a web page once its experimental
+   web features are switched on. What it hears stays on this phone and feeds the same engine as any other sensor.
+   It listens only while Halo is on screen. ---------- */
+const PH={on:false, scan:null, buf:new Map(), heard:0, err:'', msg:'', lost:false, bound:false, timer:0};
+const phCan = () => !!(navigator.bluetooth && navigator.bluetooth.requestLEScan);
+const COMPANY={0x004C:'Apple',0x0006:'Microsoft',0x0075:'Samsung',0x00E0:'Google',0x0087:'Garmin',0x009E:'Bose',0x012D:'Sony',0x0057:'Harman',0x0171:'Amazon',0x038F:'Xiaomi',0x027D:'Huawei',0x00C4:'LG',0x0157:'Huami',0x02E5:'Espressif',0x0001:'Nokia',0x0002:'Intel',0x01AB:'Meta'};
+const PH_TRACKERS={feed:'Tile',feec:'Tile',fd5a:'Samsung SmartTag',fe33:'Chipolo',feaa:'Find My Device network or beacon',fd84:'Tile',fcb2:'DULT tracker'};
+const PH_APPLE={0x02:'beacon',0x05:'AirDrop',0x07:'AirPods or Beats',0x09:'AirPlay',0x0C:'Handoff',0x0F:'Nearby Action',0x10:'Nearby Info',0x12:'Find My network'};
+const phShort = u => { u=String(u).toLowerCase(); return (u.length===36 && u.slice(8)==='-0000-1000-8000-00805f9b34fb') ? u.slice(4,8) : u; };
+const phBytes = v => v ? new Uint8Array(v.buffer, v.byteOffset, v.byteLength) : new Uint8Array(0);
+const _phHash=new Map();
+async function phSha(parts){                                       // the same fingerprint the home listener makes, so one tracker reads as one device on both
+  const enc=new TextEncoder(), bufs=parts.map(x=>typeof x==='string'?enc.encode(x):x), len=bufs.reduce((n,b)=>n+b.length,0)+bufs.length-1, all=new Uint8Array(len); let o=0;
+  bufs.forEach((b,i)=>{ if(i){ all[o++]=124; } all.set(b,o); o+=b.length; });
+  const key=Array.from(all).join(','); let h=_phHash.get(key);
+  if(!h){ h=[...new Uint8Array(await crypto.subtle.digest('SHA-256',all))].map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,20); if(_phHash.size>4000) _phHash.clear(); _phHash.set(key,h); }
+  return h; }
+async function phDescribe(ev){
+  const name=((ev.device&&ev.device.name)||ev.name||'').trim(), low=name.toLowerCase(), local='mx:p'+hash32(String(ev.device&&ev.device.id)).toString(36);
+  const sdata={}; try{ ev.serviceData && ev.serviceData.forEach((v,k)=>{ sdata[phShort(k)]=phBytes(v); }); }catch(e){}
+  const services=(ev.uuids||[]).map(phShort).sort(), mfr={}; try{ ev.manufacturerData && ev.manufacturerData.forEach((v,k)=>{ mfr[k]=phBytes(v); }); }catch(e){}
+  for(const sv of Object.keys(sdata).concat(services)) if(PH_TRACKERS[sv])
+    return {id:'sd:'+await phSha([sv, sdata[sv]||new Uint8Array(0)]), cls:'Tag', hint:PH_TRACKERS[sv], conf:2, flags:['fd5a','feaa','fcb2'].indexOf(sv)>=0?['randomized']:[], name};
+  if(mfr[0x004C]){ const pb=mfr[0x004C], t=pb.length?pb[0]:-1;
+    if(t===0x12) return {id:'fm:'+await phSha([pb]), cls:'Tag', hint:'Apple, Find My network', conf:2, flags:['randomized'], name};
+    if(t===0x02 && pb.length>=22) return {id:'ib:'+await phSha([pb.slice(0,22)]), cls:'Unknown', hint:'Beacon', conf:3, flags:[], name};
+    return {id:local, cls:t===0x07?'Wearable':/iphone/.test(low)?'Phone':/mac/.test(low)?'Laptop':'Unknown', hint:'Apple, '+(PH_APPLE[t]||'device'), conf:1, flags:['randomized'], name}; }
+  if(mfr[0x0006]) return {id:local, cls:'Laptop', hint:'Microsoft, Windows device', conf:1, flags:['randomized'], name};
+  let cls='Unknown';
+  for(const [words,c] of [[['watch','garmin','whoop','fitbit','buds','airpods','headphone','bose','jbl','sony wh','sony wf','beats'],'Wearable'],[['iphone','galaxy','pixel'],'Phone'],[['macbook','laptop','thinkpad','surface'],'Laptop'],[['tesla','toyota','honda','uconnect','obd'],'Vehicle'],[['tracker','chipolo','smarttag','airtag'],'Tag']])
+    if(words.some(w=>low.indexOf(w)>=0)){ cls=c; break; }
+  if(sdata.fe2c || services.indexOf('fe2c')>=0) cls = cls==='Unknown' ? 'Wearable' : cls;                    // Fast Pair: earbuds and the like
+  if(services.indexOf('180d')>=0 || services.indexOf('1814')>=0) cls='Wearable';
+  const mk=Object.keys(mfr).map(k=>COMPANY[+k]).filter(Boolean)[0] || '';
+  return {id:local, cls, hint:mk + (sdata.fe2c&&!mk?'Fast Pair accessory':''), conf:name?3:2, flags:[], name};
+}
+function phAdv(ev){ if(!PH.on || typeof ev.rssi!=='number') return; PH.heard++;
+  phDescribe(ev).then(x=>{ const b=PH.buf.get(x.id); if(b){ b.r.push(ev.rssi); b.x=x; } else PH.buf.set(x.id,{r:[ev.rssi], x}); }).catch(()=>{}); }
+function phFlush(){
+  if(!PH.on) return;
+  if(PH.scan && PH.scan.active===false && !PH.lost){ PH.lost=true; if(W.on) wEvent('warn','This phone stopped listening. Press Resume listening.'); renderVicinity(); }
+  if(!PH.buf.size) return;
+  const list=[]; PH.buf.forEach((b,id)=>{ const x=b.x; list.push({id, rssi:Math.round(median(b.r)), band:'ble', cls:x.cls, name:x.name, hint:x.hint, conf:x.conf, flags:x.flags}); }); PH.buf.clear();
+  const now=Date.now();
+  ingestReport('this-phone', now+LIVE.skew, {t:now, pos:S.pos?{lat:S.pos.lat,lon:S.pos.lon,acc:S.pos.acc}:undefined, s:list}, LIVE.skew);
+  liveTick();
+}
+async function phStart(){
+  PH.err=''; PH.msg='';
+  if(!phCan()){ PH.err='nosupport'; renderVicinity(); return; }
+  try{ PH.scan=await navigator.bluetooth.requestLEScan({acceptAllAdvertisements:true, keepRepeatedDevices:true}); }
+  catch(e){ PH.on=false; PH.err=(e&&e.name)||'Error'; PH.msg=String((e&&e.message)||''); renderVicinity(); return; }
+  if(!PH.bound){ navigator.bluetooth.addEventListener('advertisementreceived', phAdv); PH.bound=true; }
+  PH.on=true; PH.lost=false; if(!PH.timer) PH.timer=setInterval(phFlush, 2000);
+  if(W.on) wEvent('note','This phone is listening.');
+  toast('This phone is listening for Bluetooth devices.'); softRender(); renderVicinity();
+}
+function phStop(){ try{ if(PH.scan) PH.scan.stop(); }catch(e){} PH.on=false; PH.scan=null; PH.lost=false; softRender(); renderVicinity(); }
+document.addEventListener('visibilitychange', ()=>{ if(PH.on && document.visibilityState==='visible' && PH.scan && PH.scan.active===false){ PH.lost=true; renderVicinity(); } });
+// The words for the phone's own listening, wherever it is offered.
+function phPanel(){
+  if(PH.on && !PH.lost) return {ok:true, html:'This phone is listening for Bluetooth devices. Keep Halo on screen. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
+  if(PH.on && PH.lost) return {ok:false, html:'This phone stopped listening, because Halo left the screen. <button class="btn sm primary" data-act="ph-start" style="margin:4px 0 0">Resume listening</button>'};
+  if(isIOS()) return {ok:false, html:'An iPhone browser cannot scan Bluetooth, so this phone cannot listen by itself.'};
+  if(!phCan()) return {ok:false, html: isAndroid()
+    ? 'This phone can listen by itself once one Chrome setting is on. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app (not Halo).</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Listen with this phone.</li></ol></details>'
+    : 'This browser cannot scan Bluetooth. On an Android phone, in Chrome, the phone can listen by itself.'};
+  const why = PH.err==='NotAllowedError' ? 'Chrome was not allowed to scan. Press the button again and allow it. If nothing is asked: Android Settings, Apps, Chrome, Permissions, allow Nearby devices and Location.'
+    : PH.err ? 'The scan did not start ('+esc(PH.err)+'). Check that Bluetooth and Location are switched on, then press the button again.' : '';
+  return {ok:false, html:(why?why+' ':'This phone can listen for Bluetooth devices by itself. ')+'<button class="btn sm primary" data-act="ph-start" style="margin:4px 0 0">Listen with this phone</button>'};
+}
+
 /* ---------- Walk: a record of what changed around you as you moved, kept for review afterwards ---------- */
 const W = (()=>{ try{ const j=JSON.parse(store.get('halo_walk')||'null'); if(j && j.t0 && Date.now()-j.t0<6*3600000) return j; }catch(e){} return {on:false}; })();
 let _wLock=null, _wSaved=0, _wHidden=0;
@@ -3057,7 +3134,7 @@ function walkTick(){
       if(d.sim) W.test=true;
       wEvent('new','New: '+walkName(d)+', '+distText(d), d.id); }
     if(!heard){ if(r.here){ r.here=false; if(r.n>=3) wEvent('gone','Gone: '+(r.label||r.call)+', heard for '+walkDur(r.last-r.first)+(r.span?' across '+r.span+' m of your movement':''), d.id); } return; }
-    r.last=Math.min(now, Math.round(d.seenMobile-LIVE.skew)); r.n++; r.label=labelOf(d)||''; r.mine=!!d.mine; r.sim=r.sim&&!!d.sim;
+    r.last=Math.min(now, Math.round(d.seenMobile-LIVE.skew)); r.n++; r.label=labelOf(d)||''; r.call=d.name; r.cls=d.cls; r.hint=d.hint||''; r.adv=d.adv||''; r.mine=!!d.mine; r.sim=r.sim&&!!d.sim;
     if(!r.here){ r.here=true; wEvent('back','Back in earshot: '+walkName(d)+', '+distText(d), d.id); }
     if(d.dist<=r.min || !r.at){ r.min=Math.round(Math.min(r.min,d.dist)); if(S.pos) r.at={lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6)}; }
     if(d.fix){ const first=!r.placed; r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n};
@@ -3075,11 +3152,88 @@ function walkReport(){
   return {product:'Remiel Halo', kind:'walk report', version:1, testData:!!W.test, started:iso(W.t0), stopped:iso(W.t1||Date.now()), summary:walkStats(), screenOffSeconds:W.gaps||0,
     limits:'Bluetooth only. Distances come from signal strength and can be off by a factor of two. A device is placed only after it was heard from several of your positions, including a turn. With you means: still in earshot at steady strength after '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement. A device that changes its Bluetooth address appears as a new device.',
     engine:{FOLLOW_SPAN, FOLLOW_MIN, FIX_MIN_SAMPLES, FIX_MIN_BASELINE, FIX_MAX_UNC, POS_MAX_ACC, LIVE_PRESENT},
-    sensors:carriedIds().map(k=>({name:P.sensors[k].name, kind:P.sensors[k].kind})),
+    sensors:(PH.on?[{name:'This phone', kind:'phone browser'}]:[]).concat(carriedIds().map(k=>({name:P.sensors[k].name, kind:P.sensors[k].kind}))),
     devices:Object.values(W.devs).sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0) || (b.placed?1:0)-(a.placed?1:0) || b.n-a.n)
       .map(r=>({id:r.id, callSign:r.call, yourName:r.label||'', markedMine:!!r.mine, class:r.cls, maker:r.hint, broadcastName:r.adv, band:r.band, testData:!!r.sim, firstHeard:iso(r.first), lastHeard:iso(r.last), reports:r.n,
         closest_m:r.min, youWereAt:r.at, placed:r.placed, directionRough:r.rough, withYou:r.withYou?iso(r.withYou):null, minutesHeard:r.mins||0, yourMovement_m:r.span||0, steadySignal:!!r.steady, lastSignal_dBm:r.rssi})),
     events:W.events.map(e=>({t:iso(e.t), kind:e.k, text:e.text, id:e.id})), route:W.route.map(q=>({t:iso(q.t), lat:q.lat, lon:q.lon, acc_m:q.acc}))};
+}
+/* The walk, written out so it can be read: the bottom line first, then what the walk could and could not show,
+   what moved with you, what was placed, every device, and every change in order. */
+function walkDocHTML(){
+  const e=esc, st=walkStats(), ds=Object.values(W.devs||{}), t0=new Date(W.t0), t1=new Date(W.t1||Date.now()), durMs=t1-t0;
+  const dstr=d=>d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear(), hms=t=>{ const d=new Date(t); return hhmm(t)+':'+String(d.getSeconds()).padStart(2,'0'); };
+  const plural=(n,one,many)=>n+' '+(n===1?one:many);
+  const tbl=(head,rows)=>'<div class="rp-wide"><table><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+'</table></div>';
+  const chunks=(head,rows,n)=>{ let o=''; for(let i=0;i<rows.length;i+=n) o+=tbl(head,rows.slice(i,i+n)); return o; };
+  const nm=r=>e(r.label||r.adv||r.call), kind=r=>e([r.cls==='Unknown'?'':r.cls, r.hint].filter(Boolean).join(', ')||'Maker not broadcast');
+  const place=r=>r.placed?'Placed, within '+r.placed.unc+' m':r.rough?'Direction only: '+compass(r.rough.brg):'Distance only';
+  const stand=r=>r.mine?'Yours':r.withYou?'With you':longEnough?'Did not stay with you':'Not tested';
+  const withYou=ds.filter(r=>r.withYou&&!r.mine), mine=ds.filter(r=>r.mine), placed=ds.filter(r=>r.placed);
+  const longEnough=st.minutes>=FOLLOW_MIN && st.distance_m>=FOLLOW_SPAN.ble, sensors=(PH.on?['This phone']:[]).concat(carriedIds().map(k=>P.sensors[k].name));
+  const stayed=ds.filter(r=>!r.withYou).map(r=>Object.assign({share:durMs>0?(r.last-r.first)/durMs:0},r)).filter(r=>r.share>=.5 && (r.span||0)>=80).sort((a,b)=>b.share-a.share).slice(0,6);
+  let h='<h1>Remiel Halo Walk Report</h1><p class="rp-sub">What was around you, and what stayed with you</p>'+
+    '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded on '+e(Y.name||'this device')+(W.test?' &nbsp;·&nbsp; <b>Test data from a simulated sensor</b>':'')+'</div>';
+  // 1
+  const bottom = !ds.length ? 'Unknown' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : longEnough ? 'No device moved with you' : 'Too short to test for a follower';
+  h+='<h2>1. Summary</h2><p>Bottom line: <span class="rp-tier">'+e(bottom)+'</span></p>'+
+    '<div class="rp-bar4"><div><span>Walked</span><b>'+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'</b></div><div><span>Heard</span><b>'+plural(st.heard,'device','devices')+'</b></div><div><span>On the map</span><b>'+st.placed+' placed</b></div><div><span>With you</span><b>'+withYou.length+'</b></div></div>';
+  if(!ds.length) h+='<p>Nothing with you was listening during this walk, so no device was heard. This reads Unknown. It does not read Clear.</p>';
+  else h+='<p>You walked '+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'. '+e(sensors.join(' and ')||'Your sensor')+' heard '+plural(st.heard,'device','devices')+' on Bluetooth. '+
+      (withYou.length ? e(withYou.map(r=>r.label||r.adv||r.call).join(', '))+' stayed in earshot at a steady strength while you moved, which is the pattern of something travelling with you. Read section 3, then decide whether each one is yours.'
+       : longEnough ? 'None of them stayed with you for the '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m that the test requires.' : 'The test for a follower needs at least '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of movement. This walk was shorter, so the question is not answered either way.')+
+      ' '+(st.placed?plural(st.placed,'device was','devices were')+' heard from enough of your positions to be placed on the map.':'No device could be placed on the map. Placement needs a turn in the route, so that a device is heard from more than one direction.')+'</p>';
+  // route sketch
+  const rt=W.route||[];
+  if(rt.length>=3){ const la0=rt[0].lat, k=Math.cos(la0*Math.PI/180), X=q=>(q.lon-rt[0].lon)*111320*k, Yy=q=>(q.lat-la0)*111320, pts=rt.map(q=>[X(q),Yy(q)]).concat(placed.map(r=>[X(r.placed),Yy(r.placed)]));
+    const xs=pts.map(q=>q[0]), ys=pts.map(q=>q[1]), x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys), sc=Math.min(520/Math.max(20,x1-x0), 240/Math.max(20,y1-y0));
+    const px=q=>[40+(q[0]-x0)*sc, 270-(q[1]-y0)*sc], rp=rt.map(q=>px([X(q),Yy(q)]));
+    const bar=Math.max(10,Math.round(100/sc/10)*10);
+    h+='<h3>The route, and what was placed</h3><svg viewBox="0 0 600 300" style="width:100%;height:auto;border:1px solid #d9d4c5;break-inside:avoid" role="img" aria-label="Route sketch">'+
+      '<polyline points="'+rp.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')+'" fill="none" stroke="#1A1A2E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'+
+      '<circle cx="'+rp[0][0].toFixed(1)+'" cy="'+rp[0][1].toFixed(1)+'" r="6" fill="#fff" stroke="#1A1A2E" stroke-width="2"/><circle cx="'+rp[rp.length-1][0].toFixed(1)+'" cy="'+rp[rp.length-1][1].toFixed(1)+'" r="6" fill="#1A1A2E"/>'+
+      placed.map((r,i)=>{ const q=px([X(r.placed),Yy(r.placed)]); return '<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+Math.max(5,r.placed.unc*sc).toFixed(1)+'" fill="rgba(197,165,90,.22)" stroke="#C5A55A"/><text x="'+q[0].toFixed(1)+'" y="'+(q[1]+4).toFixed(1)+'" font-family="Georgia,serif" font-size="12" text-anchor="middle" fill="#1A1A2E">'+(i+1)+'</text>'; }).join('')+
+      '<line x1="40" y1="290" x2="'+(40+bar*sc).toFixed(1)+'" y2="290" stroke="#55556b" stroke-width="2"/><text x="'+(46+bar*sc).toFixed(1)+'" y="294" font-family="Georgia,serif" font-size="11" fill="#55556b">'+bar+' m</text>'+
+      '<text x="590" y="16" font-family="Georgia,serif" font-size="11" text-anchor="end" fill="#55556b">North is up. Open circle: start. Filled circle: end. Gold: placed devices, numbered as in section 4.</text></svg>'+
+      '<p class="rp-sub" style="font-size:12px;margin-top:4px">A sketch of the shape of your route. It is not a street map.</p>'; }
+  // 2
+  h+='<h2>2. What this walk could and could not show</h2>'+tbl(['Item','This walk'],[
+    ['Listening',e(sensors.join(', ')||'Nothing with you was listening')],['Signals covered','Bluetooth only. Wi-Fi and cell signals were not heard'],
+    ['Length',e(walkDur(durMs))+', '+e(miText(st.distance_m))+(longEnough?'. Long enough to test for a follower':'. Too short to test for a follower')],
+    ['Your position',rt.length?plural(rt.length,'point','points')+' recorded, typically within '+Math.round(median(rt.map(q=>q.acc)))+' m':'Not recorded'],
+    ['Screen off or Halo behind another app',W.gaps?e(walkDur(W.gaps*1000))+'. Nothing was heard or placed in that time':'None'],
+    ['Devices that cannot be heard','A phone with Bluetooth switched off, and anything that does not transmit']]);
+  // 3
+  h+='<h2>3. Devices that moved with you</h2>';
+  if(withYou.length) h+='<p>Each device below stayed in earshot at a steady strength while you moved at least '+FOLLOW_SPAN.ble+' m over at least '+FOLLOW_MIN+' minutes. A device that is fixed in place fades as you walk away from it. One that travels with you does not.</p>'+
+    tbl(['Device','Maker and kind','Heard for','Across','Closest'],withYou.map(r=>['<b>'+nm(r)+'</b>',kind(r),e(walkDur(r.last-r.first)),(r.span||0)+' m of your movement','about '+r.min+' m']))+
+    '<p>First rule out your own things: a watch, earbuds, a second phone, a tag on your keys. In Watchers, open the device and press This is mine. Whatever is left deserves attention. Do not confront anyone on the strength of this reading.</p>';
+  else h+='<p>'+(longEnough?'No device met the test.':'The walk was too short for the test, so this section cannot say either way.')+'</p>';
+  if(mine.length) h+='<p>Marked as yours, and left out of the test: '+e(mine.map(r=>r.label||r.adv||r.call).join(', '))+'.</p>';
+  if(stayed.length) h+='<h3>Stayed in earshot longest, without meeting the test</h3>'+tbl(['Device','Maker and kind','Heard for','Share of the walk','Across'],stayed.map(r=>[nm(r),kind(r),e(walkDur(r.last-r.first)),Math.round(r.share*100)+'%',(r.span||0)+' m']))+'<p>These are worth a second look on a longer walk. Your own devices usually appear here first.</p>';
+  // 4
+  h+='<h2>4. Devices placed on the map</h2>'+(placed.length?'<p>A placed device was heard from several of your positions, and those readings agree on one location. The zone is where it most likely is.</p>'+
+    tbl(['','Device','Maker and kind','Zone','Closest you came','Location'],placed.map((r,i)=>[String(i+1),'<b>'+nm(r)+'</b>',kind(r),'Within '+r.placed.unc+' m','about '+r.min+' m',r.placed.lat.toFixed(5)+', '+r.placed.lon.toFixed(5)]))
+    :'<p>None. A device is placed only when it is heard from several of your positions, with a turn between them.</p>');
+  // 5
+  const all=[...ds].sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0)||(b.placed?1:0)-(a.placed?1:0)||a.first-b.first);
+  h+='<h2>5. Every device heard</h2>'+(all.length?chunks(['Device','Maker and kind','First heard','Heard for','Closest','Placement','Standing'],all.map(r=>[nm(r),kind(r),hms(r.first),e(walkDur(r.last-r.first)),'about '+r.min+' m',place(r),stand(r)]),12):'<p>None.</p>');
+  // 6 by maker
+  const mk={}; ds.forEach(r=>{ const m=makerOf(r)||'Maker not broadcast'; mk[m]=mk[m]||{n:0,tr:0}; mk[m].n++; if(r.cls==='Tag') mk[m].tr++; });
+  if(ds.length) h+='<h2>6. By maker</h2>'+tbl(['Maker','Devices','Of which trackers'],Object.keys(mk).sort((a,b)=>mk[b].n-mk[a].n).map(m=>[e(m),String(mk[m].n),String(mk[m].tr)]))+'<p>The maker comes from what each device broadcasts. Bluetooth does not broadcast a model, and a phone often broadcasts no maker at all.</p>';
+  // 7 timeline
+  const evs=W.events||[];
+  h+='<h2>'+(ds.length?'7':'6')+'. What changed, in order</h2>'+chunks(['Time','Change'],evs.slice(0,150).map(x=>[hms(x.t),e(x.text)]),16)+(evs.length>150?'<p>'+(evs.length-150)+' later changes are in the saved data file.</p>':'');
+  // limits
+  h+='<h2>'+(ds.length?'8':'7')+'. How to read this report</h2><ul class="rp-list">'+
+    ['A distance comes from signal strength. One reading can be wrong by a factor of two, and walls and pockets change it.',
+     'Heard does not mean following. Most devices on a street belong to people and buildings you pass.',
+     'A device that changes its Bluetooth address during the walk appears as a new device.',
+     'A phone with Bluetooth switched off is not heard at all.',
+     'Halo does not identify who owns a device.',
+     'Unknown is not Clear.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
+    '<div class="rp-foot">Generated by Remiel Halo. Beverly Index LLC. Recorded on your own device by your own sensor. The data file that goes with this report holds the route and every reading.</div>';
+  return h;
 }
 async function walkFile(){
   const text=JSON.stringify(walkReport(),null,1), d=new Date(W.t0), name='halo-walk-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
@@ -3102,7 +3256,8 @@ function renderWalk(){
   let h='';
   if(W.on){
     h='<div class="walk on"><div class="walk-h"><b>Walk in progress</b><span>'+(W.awake?'Screen kept awake.':'Keep this screen on.')+' Now in earshot: '+walkStats().here+'</span><button class="btn sm red" data-act="walk-stop">Stop walk</button></div>'+stats()+
-      (mobileLive()?'':'<div class="walk-c"><span class="dot"></span><span class="t warnc">No sensor with you is reporting. Halo is following your position but hears nothing.</span></div>')+evs(8)+'</div>';
+      (PH.on&&PH.lost ? '<div class="walk-c"><span class="dot" style="background:var(--warn)"></span><span class="t">'+phPanel().html+'</span></div>'
+        : mobileLive()?'':'<div class="walk-c"><span class="dot" style="background:var(--warn)"></span><span class="t">Nothing with you is listening. Halo is following your position but hears nothing. '+(PH.on?'':phPanel().html)+'</span></div>')+evs(8)+'</div>';
   } else if(W.t0 && W.t1 && !W.closed){
     const ds=Object.values(W.devs).sort((a,b)=>(b.withYou&&!b.mine?1:0)-(a.withYou&&!a.mine?1:0) || (b.placed?1:0)-(a.placed?1:0) || b.n-a.n);
     h='<div class="walk"><div class="walk-h"><b>Walk finished</b><span>'+hhmm(W.t0)+' to '+hhmm(W.t1)+(W.test?' · test data':'')+(W.gaps?' · screen off for '+walkDur(W.gaps*1000):'')+'</span></div>'+stats()+
@@ -3110,16 +3265,14 @@ function renderWalk(){
           '<br><span class="mono" style="font-size:11px;color:var(--mut)">'+(r.withYou&&!r.mine?'WITH YOU · ':'')+(r.mine?'yours · ':'')+(r.placed?'placed, within '+r.placed.unc+' m':r.rough?'direction rough':'not placed')+' · closest about '+r.min+' m · heard '+walkDur(r.last-r.first)+'</span></span></div>').join('')+
           (ds.length>10?'<div class="limit" style="margin-top:6px">'+(ds.length-10)+' more in the saved report.</div>':'')
         :'<div class="walk-c"><span class="t">No device was heard by a sensor with you during this walk. That reads Unknown, not Clear.</span></div>')+
-      '<div class="formrow"><button class="btn sm primary" data-act="walk-save">Save walk report</button>'+(navigator.share?'<button class="btn sm" data-act="walk-share">Share it</button>':'')+'<button class="btn sm" data-act="walk-start">New walk</button><button class="btn sm" data-act="walk-close">Close</button></div>'+
-      '<div class="limit" style="margin-top:8px">The report holds your route and every device heard. It stays on this phone until you save or share it.'+(W.saved?' Saved, SHA-256 '+esc(W.saved.slice(0,16))+'.':'')+'</div>'+
+      '<div class="formrow"><button class="btn sm gold" data-act="walk-doc">Open walk report</button><button class="btn sm primary" data-act="walk-save">Save data file</button>'+(navigator.share?'<button class="btn sm" data-act="walk-share">Share data file</button>':'')+'<button class="btn sm" data-act="walk-start">New walk</button><button class="btn sm" data-act="walk-close">Close</button></div>'+
+      '<div class="limit" style="margin-top:8px">The report and its data file hold your route and every device heard. They stay on this phone until you save or share them.'+(W.saved?' Saved, SHA-256 '+esc(W.saved.slice(0,16))+'.':'')+'</div>'+
       '<details style="margin-top:8px"><summary class="limit" style="cursor:pointer">Every change, in order ('+W.events.length+')</summary>'+evs(400)+'</details></div>';
   } else {
     const car=carriedIds(), sta=Object.keys(P.sensors||{}).filter(k=>P.sensors[k].kind==='station'), ml=mobileLive();
     const row=(ok,t)=>'<div class="walk-c"><span class="dot '+(ok?'live':'')+'" style="'+(ok?'':'background:var(--warn);box-shadow:0 0 8px var(--warn)')+'"></span><span class="t">'+t+'</span></div>';
     h='<div class="walk"><div class="walk-h"><b>Walk</b><span>Record what changes around you as you move, then review it.</span><button class="btn sm primary" data-act="walk-start">Start walk</button></div>'+
-      row(ml, ml ? 'Sensor with you: reporting.' : car.length ? 'Sensor with you: added, but silent. Check that it is awake and online.'
-        : sta.length ? 'Your listener is set as a Home listener. A phone cannot hear devices by itself, so carry the listener\'s computer with you. <button class="btn sm" data-act="sn-kind" data-id="'+esc(sta[0])+'" style="margin:4px 0 0">Carry it with me</button>'
-        : 'No sensor. A phone cannot hear devices by itself. Add a sensor in Devices and sync.')+
+      (()=>{ const ph=phPanel(); return row(ph.ok || ml, ph.ok || !ml ? ph.html : 'Sensor with you: reporting.'); })()+
       row(!!S.pos && S.pos.acc<=POS_MAX_ACC, S.pos ? 'Your position: live, within '+Math.round(S.pos.acc)+' m.'+(S.pos.acc>POS_MAX_ACC?' Too rough to place devices. Step outside.':'') : 'Your position: not shared. <button class="btn sm" data-act="geo-ask" style="margin:4px 0 0">Share my position</button>')+
       row('wakeLock' in navigator, 'wakeLock' in navigator ? 'Screen: Halo keeps it awake during the walk. Keep Halo in front.' : 'Screen: this browser cannot keep the screen awake. Set the screen timeout to 10 minutes or more, and keep Halo in front.')+'</div>';
   }
@@ -3157,6 +3310,7 @@ async function loadSensors(){ const r=await api('GET','/sensors'); if(r.s!==200)
 function sensorsSection(){
   const ids=Object.keys(P.sensors||{});
   let h='<div class="dsec" id="sensorsSec"><h4>Sensors</h4><p style="margin-bottom:10px">A sensor listens for devices and reports to this account. Mobile comes first: the Halo Android app on your phone, then the carried sensor. Second is the home listener on the computer that stays at home. The home listener exists today, and a laptop that runs it can be carried: press Carry it with me before a walk. The Android app does not exist yet.</p>';
+  h+='<div class="rowline"><span><b>This phone</b> <span class="chip '+(PH.on&&!PH.lost?'pot':'')+'">'+(PH.on&&!PH.lost?'Listening':'Not listening')+'</span><br><span class="mono" style="font-size:11px;color:var(--mut)">What it hears stays on this phone.</span><div style="font-size:12.5px;line-height:1.45;margin-top:6px">'+phPanel().html+'</div></span></div>';
   const lost=Object.keys(SY.sensorKind||{}).filter(id=>!P.sensors[id]);
   if(!ids.length && !lost.length) h+='<div class="empty" style="padding:8px">No sensors on this account.</div>';
   lost.forEach(id=>{ h+='<div class="rowline"><span><b>'+esc(SENSOR_KIND[SY.sensorKind[id]]||'Sensor')+'</b> <span class="chip real">No key on this device</span><br><span class="mono" style="font-size:11px;color:var(--mut)">Its reports cannot be read here. Remove it and add it again.</span></span>'+
@@ -3175,7 +3329,7 @@ function sensorsSection(){
 
 /* ----- a live device, opened ----- */
 function liveBody(d){
-  const sn=(P.sensors[d.sensor]||{}).name||'a sensor';
+  const sn=sensorName(d.sensor);
   const rel = d.fix && d.bearing!=null, atStation=(P.sensors[d.sensor]||{}).kind==='station';
   const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+Math.round(d.fix.unc)+' m' : 'about '+Math.round(d.dist)+' m'+(atStation?' from your home listener':'')+', from signal strength alone. One reading can be off by a factor of 2 or more';
   const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map. Your own position is not known, so there is no bearing from you' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side. Not placed' : (d.base>=FIX_MIN_BASELINE ? 'Not fixed. The readings fit more than one place. Keep moving and make a turn' : 'Not known. Direction comes from movement: walk at least '+FIX_MIN_BASELINE+' m and make a turn');
@@ -3359,8 +3513,11 @@ document.addEventListener('click', e=>{
     case 'health-run': if(!S.healthBusy) healthGo(); break;
     case 'health-tick': { const t=healthTicks(), i=+a.dataset.i; t[i]=!t[i]; save(); if(t[i]) logEvidence('defence','Device health, confirmed on this '+HK_NAME[HK()]+': '+HEALTH_GUIDED[HK()][i][0]+'.'); rerender(); break; }
     case 'health-keep': { (navigator.storage&&navigator.storage.persist?navigator.storage.persist():Promise.resolve(false)).then(ok=>{ toast(ok?'The browser will keep Halo\'s data.':'The browser did not agree. Install Halo to the home screen, then try again.'); healthGo(); }).catch(()=>healthGo()); break; }
+    case 'ph-start': phStart(); break;
+    case 'ph-stop': phStop(); break;
     case 'walk-start': walkStart(); break;
     case 'walk-stop': walkStop(); break;
+    case 'walk-doc': paperShow('Remiel Halo Walk Report', walkDocHTML()); break;
     case 'walk-save': walkSave(false); break;
     case 'walk-share': walkSave(true); break;
     case 'walk-close': W.closed=true; wSave(true); renderVicinity(); break;
