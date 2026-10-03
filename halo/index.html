@@ -373,7 +373,13 @@ select.inp{flex:none}
 #suspects{margin-top:10px}
 .sus{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 6px 9px 12px;border-top:1px solid var(--line);cursor:pointer;font-size:13px}
 .sus::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:2px;background:var(--hc);box-shadow:0 0 10px var(--hc)}
-.sdot{width:10px;height:10px;border-radius:50%;box-shadow:0 0 8px currentColor}
+.sdot{width:10px;height:10px;border-radius:50%;background:var(--mk);box-shadow:0 0 8px var(--mk)}
+.sdot.hollow{background:transparent;box-shadow:inset 0 0 0 2px var(--mk)}
+.dev-marker.hollow{background:rgba(7,11,22,.55) !important;box-shadow:inset 0 0 0 3px var(--mk),0 0 10px -2px var(--mk) !important;border-color:transparent}
+.legend i.hol{background:transparent;box-shadow:inset 0 0 0 2px var(--mut)}
+.legend i.rgh{background:radial-gradient(circle,var(--mut) 0 28%,transparent 32%);box-shadow:inset 0 0 0 2px var(--mut)}
+.sdot.rough{background:radial-gradient(circle,var(--mk) 0 28%,transparent 32%);box-shadow:inset 0 0 0 2px var(--mk)}
+.dev-marker.rough{background:radial-gradient(circle,var(--mk) 0 26%,rgba(7,11,22,.55) 30%) !important;box-shadow:inset 0 0 0 3px var(--mk),0 0 10px -2px var(--mk) !important;border-color:transparent}
 .sm{color:var(--mut);font-size:11.5px}
 .sd{text-align:right;font-family:var(--mono);font-size:11px;color:var(--mut);line-height:1.4}
 .sd .warnc{color:var(--warn)}
@@ -447,6 +453,8 @@ a.tk:hover b{text-decoration:underline}
                   <span><i style="background:var(--warn)"></i>New</span>
                   <span><i style="background:var(--route)"></i>Seen on route</span>
                   <span><i style="background:var(--action)"></i>With you</span>
+                  <span><i class="rgh"></i>Direction rough</span>
+                  <span><i class="hol"></i>Direction not known</span>
                 </div>
                 <div id="suspects"></div>
                 <div class="posline" id="posLine"></div>
@@ -547,7 +555,7 @@ el('gateGo').addEventListener('click', tryUnlock);
 el('gateKey').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
 
 /* ---------- persisted state (this device only) ---------- */
-function blank(){ return { profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[],
+function blank(){ return { profile:{}, done:{}, hits:{}, platform:null, terms:null, aliases:[], patch:[], sensors:{}, mine:{}, flagged:{},
   home:{ armed:false, people:[], rooms:[], contacts:[], rules:{fall:true, still:45, upBy:'09:00', bath:30, night:true} },
   evidence:[], prevHash:'0'.repeat(16) }; }
 function loadState(){
@@ -921,15 +929,20 @@ function assess(){
   const pool = THREATS.filter(t=>t.shelf==='real' && (S.mode==='auto' || t.side===S.mode));
   const applies = pool.filter(t=>scopeOf(t)===true), unknown = pool.filter(t=>scopeOf(t)===null);
   const open = applies.filter(isOpen).sort((a,b)=>IMPACT_W(b.impact)-IMPACT_W(a.impact) || doneCount(a)-doneCount(b));
-  const vic = S.preview ? 'Vicinity: simulated preview' : 'Vicinity: not monitored';
+  const V=vis();
+  const vic = V.mode==='live' ? (V.test?'Vicinity: test data from a simulated sensor':'Vicinity: live from your sensor') : V.mode==='sim' ? 'Vicinity: simulated preview'
+    : stateWords(V.mode).vic;
   const reg = S.global ? 'Global feed '+fmtDT(S.global.generated) : 'Register as of '+REGISTER_DATE;
+  if(V.mode==='live'){ const w=V.devices.filter(d=>d.present&&d.withYou&&!d.sim);
+    if(w.length) return { t:3, n:w.length, title:'Take Action', side:'Watchers',
+      s:esc(w[0].name)+(w[0].tested?' is moving with you. It ':' ')+esc(followText(w[0]))+'. Open Watchers.', meta:reg+' · '+vic }; }
   const side = S.mode==='w'?'Watchers':S.mode==='a'?'Attackers':'Auto';
   if(answered===0) return { t:-1, n:'?', title:'Unknown', side,
     s:'Answer your profile. Halo cannot yet tell which threats apply to you.',
     meta:reg+' · '+vic };
   const meta=reg+' · '+vic+(unknown.length?' · '+unknown.length+' not known yet':'');
   if(!open.length) return { t:0, n:0, title:'Clear, for what is assessed', side,
-    s:'Every defence is complete for the '+applies.length+' real threats that apply to you. That is not the same as nothing near you: the vicinity is not monitored.', meta, applies, open };
+    s:'Every defence is complete for the '+applies.length+' real threats that apply to you. '+(V.mode==='live'&&!V.test?'A sensor is reporting, and no device is moving with you.':'That is not the same as nothing near you: the vicinity is not monitored.'), meta, applies, open };
   return { t: open.length<=2?1:2, n:open.length, title: open.length<=2?'Watch':'Warning', side,
     s: applies.length+' real threats apply to you. '+open.length+' still '+(open.length===1?'has':'have')+' defences to complete. Start with '+open[0].name+'.',
     meta, applies, open };
@@ -1031,10 +1044,13 @@ function toolPatch(){
   return h;
 }
 function toolRoster(){
-  if(!S.preview) return '<div class="dsec"><h4>Signal Roster</h4><p style="margin-bottom:10px">No sensor is connected, so there are no real devices to list. A preview with simulated devices shows how the roster and the follower test read.</p><button class="btn sm" data-act="preview">Show preview with simulated devices</button></div>';
-  return '<div class="dsec"><h4>Signal Roster <span class="chip real" style="margin-left:6px">Simulated preview</span></h4>'+
+  const V=vis();
+  if(V.mode==='none') return '<div class="dsec"><h4>Signal Roster</h4><p style="margin-bottom:10px">No sensor is connected, so there are no real devices to list. A preview with simulated devices shows how the roster and the follower test read.</p><button class="btn sm" data-act="preview">Show preview with simulated devices</button></div>';
+  if(V.mode!=='live'&&V.mode!=='sim') return '<div class="dsec"><h4>Signal Roster</h4><p style="margin-bottom:10px">'+esc(stateWords(V.mode).long)+' No devices can be listed. This is Unknown, not Clear.</p><button class="btn sm" data-act="preview">Show preview with simulated devices</button></div>';
+  const chip = V.mode==='live' ? '<span class="chip pot" style="margin-left:6px">Live</span>'+(V.test?'<span class="chip real" style="margin-left:6px">Test data, simulated sensor</span>':'') : '<span class="chip real" style="margin-left:6px">Simulated preview</span>';
+  return '<div class="dsec"><h4>Signal Roster '+chip+'</h4>'+
     '<div class="toolbar"><button class="chipbtn '+(S.sort==='near'?'on':'')+'" data-act="sort" data-s="near">Nearest</button><button class="chipbtn '+(S.sort==='new'?'on':'')+'" data-act="sort" data-s="new">Newest</button>'+
-    '<button class="chipbtn '+(S.sort==='seen'?'on':'')+'" data-act="sort" data-s="seen">Seen before</button><button class="btn sm" data-act="preview" style="margin-left:auto">Hide preview</button></div>'+
+    '<button class="chipbtn '+(S.sort==='seen'?'on':'')+'" data-act="sort" data-s="seen">Seen before</button>'+(V.mode==='sim'?'<button class="btn sm" data-act="preview" style="margin-left:auto">Hide preview</button>':'')+'</div>'+
     '<div class="rost" id="rost"></div></div>';
 }
 
@@ -1168,7 +1184,9 @@ function renderOverview(){
 }
 function renderCoverage(){
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, g=S.global;
-  const rows=[['Bluetooth near you','No sensor',''],['Wi-Fi near you','No sensor',''],['Cell towers','No sensor',''],['Your devices','Not monitored',''],
+  const ls=liveState(), fresh=b=>ls==='live' && LIVE.bands[b] && (Date.now()+LIVE.skew-LIVE.bands[b])<LIVE_SILENT, T=vis().test;
+  const bandRow=(label,b)=>[label, fresh(b)?(T?'Test data':'Live from your sensor'):ls==='live'?'Not reported by your sensor':stateWords(ls).cov, fresh(b)?(T?'part':'live'):''];
+  const rows=[bandRow('Bluetooth near you','ble'),bandRow('Wi-Fi near you','wifi'),bandRow('Cell towers','cell'),['Your devices','Not monitored',''],
     ['Home','No station',''],['Your position',S.pos?'Live, within '+Math.round(S.pos.acc)+' m':'Not shared',S.pos?'live':''],
     ['Global feed', g?'Live, '+fmtDT(g.generated):(S.globalErr?'Not reached':'Reaching'), g?'live':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='connecting'?'Connecting':SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':SY.status==='offline'?'Not reached':'Starting', SY.status==='on'?'live':''],
@@ -1190,31 +1208,39 @@ function renderHomeMini(){
 const BLOCK_M=100, BASE_R=2*BLOCK_M, MAX_R=8*BLOCK_M;
 const isKnownThreat = d => d.withYou || d.onRoute;
 function radiusState(){
-  if(!S.preview) return {r:BASE_R, ext:null};
-  const inc=S.devices.filter(d=>d.present && isKnownThreat(d) && d.dist>BASE_R && d.vel<-0.3).sort((a,b)=>b.dist-a.dist)[0];
+  const V=vis(); if(V.mode!=='live' && V.mode!=='sim') return {r:BASE_R, ext:null};
+  const inc=V.devices.filter(d=>d.present && isKnownThreat(d) && d.dist>BASE_R && d.vel<-0.3).sort((a,b)=>b.dist-a.dist)[0];
   if(!inc) return {r:BASE_R, ext:null};
   return {r:Math.min(MAX_R, Math.ceil((inc.dist+15)/BLOCK_M)*BLOCK_M), ext:inc};
 }
-const inRadius = () => { const rs=radiusState(); return S.devices.filter(d=>d.present && d.dist<=rs.r); };
+const inRadius = () => { const rs=radiusState(); return vis().devices.filter(d=>d.present && d.dist<=rs.r); };
+const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Math.round(d.dist)+' m';
+const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';          // placed, direction rough, or direction not known
+const dirNote = d => !d.live||d.fix ? '' : d.sector ? 'direction rough' : 'direction not known';
 function renderVicinity(){
-  const rs=radiusState(), blocks=rs.r/BLOCK_M, sus=S.preview?inRadius():[];
-  el('prevBtn').textContent = S.preview ? 'Hide simulated preview' : 'Preview with simulated devices';
-  el('vicCount').textContent = S.preview ? sus.length+' simulated' : 'not monitored';
+  const V=vis(), shown=V.mode==='live'||V.mode==='sim', rs=radiusState(), blocks=rs.r/BLOCK_M, sus=shown?inRadius():[];
+  const pb=el('prevBtn'); pb.style.display = V.mode==='live' ? 'none' : ''; pb.textContent = S.preview ? 'Hide simulated preview' : 'Preview with simulated devices';
+  el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : V.mode==='sim' ? sus.length+' simulated' : stateWords(V.mode).count;
   el('radLine').className='radline'+(rs.ext?' ext':'');
   el('radLine').innerHTML = rs.ext
-    ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+Math.round(rs.ext.dist)+' m out and closing.'
+    ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b> It extends when a known threat beyond it is incoming.';
-  el('posLine').textContent = 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':'not shared, the map is not centred on you')+' · Devices: '+(S.preview?'simulated, updated every 1.6 seconds':'no sensor connected');
+  const devLine = V.mode==='live' ? (V.test?'test data from a simulated sensor':'live from your sensor, last report '+hhmm(liveLast()-LIVE.skew))
+    : V.mode==='sim' ? 'simulated, updated every 1.6 seconds' : stateWords(V.mode).line;
+  el('posLine').textContent = 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':'not shared, the map is not centred on you')+' · Devices: '+devLine;
   const note=el('mapNote');
-  if(MAP){ note.style.display=''; note.textContent = S.preview ? 'Simulated preview. These are not real devices.' : 'Not monitored. No sensor near you is connected, so no suspects are shown.'; }
-  const host=el('suspects');
-  if(!S.preview) host.innerHTML='<div class="empty" style="padding:14px 6px">No suspects can be shown: no sensor is connected. This is Unknown, not Clear.</div>';
+  if(MAP){ note.style.display=''; note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':'Live from your sensor. Solid: placed. Ring with a centre dot: direction rough. Hollow on a dashed ring: somewhere on that ring.')
+    : V.mode==='sim' ? 'Simulated preview. These are not real devices.' : V.mode==='waiting' ? 'Waiting for the first report from your sensor.'
+    : V.mode==='none' ? 'Not monitored. No sensor near you is connected, so no suspects are shown.' : stateWords(V.mode).note+' No suspects can be shown. This is Unknown, not Clear.'; }
+  const host=el('suspects'); let html;
+  if(!shown) html='<div class="empty" style="padding:14px 6px">'+(V.mode==='none'?'No suspects can be shown: no sensor is connected.':esc(stateWords(V.mode).long)+' No suspects can be shown.')+' This is Unknown, not Clear.</div>';
   else { const list=[...sus].sort((a,b)=>deviceThreat(b).tierIdx-deviceThreat(a).tierIdx || a.dist-b.dist).slice(0,8);
-    host.innerHTML = list.length ? list.map(d=>{ const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
-      return '<div class="sus" data-act="sus" data-id="'+d.id+'" style="--hc:var('+tc+')"><span class="sdot" style="background:'+markerColor(d)+'"></span>'+
-        '<span class="sn"><b>'+esc(devName(d))+'</b> <span class="sm">'+(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+flagOf(d)+'</span></span>'+
-        '<span class="sd">'+Math.round(d.dist)+' m<br><span class="'+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></span></div>'; }).join('')
-      : '<div class="empty" style="padding:14px 6px">No simulated devices inside the radius at this moment.</div>'; }
+    html = list.length ? list.map(d=>{ const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
+      return '<div class="sus" data-act="sus" data-id="'+d.id+'" style="--hc:var('+tc+')"><span class="sdot'+mkClass(d)+'" style="--mk:'+markerColor(d)+'"></span>'+
+        '<span class="sn"><b>'+esc(devName(d))+'</b> <span class="sm">'+(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+flagOf(d)+(dirNote(d)?' · '+dirNote(d):'')+(d.sim?' · test data':'')+'</span></span>'+
+        '<span class="sd">'+esc(distText(d))+'<br><span class="'+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></span></div>'; }).join('')
+      : '<div class="empty" style="padding:14px 6px">'+(V.mode==='live'?'Your sensor is reporting. Nothing is in earshot inside the radius at this moment.':'No simulated devices inside the radius at this moment.')+'</div>'; }
+  if(host._h!==html){ host.innerHTML=html; host._h=html; }          // leave the rows alone when nothing changed, so a tap is never lost
   renderMap();
 }
 
@@ -1282,6 +1308,9 @@ function renderResponder(){
        '<div class="formrow"><button class="btn sm" data-act="h-prev">'+(S.homePreview?'Hide preview':'Preview with simulated data')+'</button>'+
        (S.homePreview?'<button class="btn sm red" data-act="h-fall">Simulate a fall</button>':'')+'</div></div>';
   } else {
+    h+='<div class="card"><h3>Home location</h3><div class="kv"><span class="k">Position</span><span class="v '+(H.loc?'okc':'unkc')+'" id="homeLocV">'+(H.loc?'Set '+new Date(H.loc.t).toLocaleDateString()+', within '+Math.round(H.loc.acc)+' m':'Not set')+'</span></div>'+
+       '<div class="formrow"><button class="btn sm primary" data-act="home-loc">Set to where I am now</button>'+(H.loc?'<button class="btn sm" data-act="home-loc-clear">Clear</button>':'')+'</div>'+
+       '<div class="limit" style="margin-top:10px">Do this while you are at home. It places what a home station hears, and tells Halo when you are away. It is stored sealed in your account.</div></div>';
     h+='<div class="card"><h3>People at home <span class="n">'+H.people.length+'</span></h3>'+peopleBoard(true)+
        '<div class="formrow"><input class="inp" id="hpName" placeholder="Name"><input class="inp" id="hpRel" placeholder="Relation, for example Father"></div>'+
        '<div class="formrow"><label class="lbl"><input type="checkbox" id="hpConsent"> They know and agree</label><label class="lbl"><input type="checkbox" id="hpWatch"> Wears a fall-detecting watch</label>'+
@@ -1360,14 +1389,24 @@ function loadMapLibre(){
 const mapStyle=()=>({version:8,sources:{carto:{type:'raster',tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],tileSize:256,attribution:'&copy; OpenStreetMap &copy; CARTO'}},layers:[{id:'carto',type:'raster',source:'carto'}]});
 function circlePoly(lat,lon,m){ const pts=[],dLat=m/111320,dLon=m/(111320*Math.cos(lat*Math.PI/180));
   for(let i=0;i<=64;i++){ const a=i/64*Math.PI*2; pts.push([lon+Math.cos(a)*dLon, lat+Math.sin(a)*dLat]); } return pts; }
+function arcLine(lat,lon,m,b0,b1){ const pts=[],dLat=m/111320,dLon=m/(111320*Math.cos(lat*Math.PI/180));
+  for(let b=b0;b<=b1+0.01;b+=4){ const a=b*Math.PI/180; pts.push([lon+Math.sin(a)*dLon, lat+Math.cos(a)*dLat]); } return pts; }
 function ringsData(){
   const rs=radiusState(), f=(r,kind)=>({type:'Feature',properties:{kind},geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,r)]}});
   const feats=[f(BLOCK_M,'inner'), f(BASE_R,'base')]; if(rs.ext) feats.push(f(rs.r,'ext'));
   return {type:'FeatureCollection',features:feats};
 }
-function devLngLat(d){ const m=d.dist, a=d.bearing*Math.PI/180, lat=MAP_CENTER.lat;
+function devLngLat(d){ if(d.fix) return [d.fix.lon,d.fix.lat];
+  const m=d.dist, a=(d.bearing!=null?d.bearing:d.handleBrg||0)*Math.PI/180, lat=MAP_CENTER.lat;
   return [MAP_CENTER.lon+Math.sin(a)*m/(111320*Math.cos(lat*Math.PI/180)), MAP_CENTER.lat+Math.cos(a)*m/111320]; }
 const markerColor = d => d.withYou?'var(--action)':d.onRoute?'var(--route)':d.knownBefore?'var(--clear)':'var(--warn)';
+function zonesData(){ const f=[];
+  if(S.pos && MAP_CENTER) f.push({type:'Feature',properties:{kind:'me'},geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,Math.max(3,Math.min(150,S.pos.acc)))]}});
+  const V=vis(); if(V.mode==='live' && MAP_CENTER) inRadius().forEach(d=>{
+    if(d.fix) f.push({type:'Feature',properties:{kind:'fix'},geometry:{type:'Polygon',coordinates:[circlePoly(d.fix.lat,d.fix.lon,d.fix.unc)]}});
+    else if(d.sector) f.push({type:'Feature',properties:{kind:'arc'},geometry:{type:'LineString',coordinates:arcLine(MAP_CENTER.lat,MAP_CENTER.lon,d.dist,d.sector.brg-d.sector.half,d.sector.brg+d.sector.half)}});
+    else f.push({type:'Feature',properties:{kind:'range'},geometry:{type:'LineString',coordinates:circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,d.dist)}}); });
+  return {type:'FeatureCollection',features:f}; }
 function fitRadius(force){
   if(!MAP||!MAP_CENTER) return;
   const r=radiusState().r; if(!force && r===_fitR) return; _fitR=r;
@@ -1379,38 +1418,53 @@ function recentre(lat,lon){
   try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); if(YOU) YOU.setLngLat([lon,lat]); fitRadius(true); updateDeviceMarkers(); }catch(e){}
 }
 async function initMap(){
-  if(_mapInit) return; _mapInit=true;
+  if(_mapInit) return; _mapInit=true; startGeo();
   const box=el('haloMap'), note=el('mapNote');
   const ok=await loadMapLibre();
   if(!ok){ note.textContent='The map needs a connection.'; _mapInit=false; return; }
-  MAP_CENTER={lat:34.0522, lon:-118.2437};            // placeholder until the device reports its position
+  MAP_CENTER=S.pos ? {lat:S.pos.lat, lon:S.pos.lon} : {lat:34.0522, lon:-118.2437};   // placeholder until the device reports its position
+  _centred=!!S.pos;
   MAP=new window.maplibregl.Map({container:box, style:mapStyle(), center:[MAP_CENTER.lon,MAP_CENTER.lat], zoom:15.5, attributionControl:true, dragRotate:false, pitchWithRotate:false});
   MAP.once('style.load',()=>{                          // the rings do not wait for the basemap tiles
     MAP.addSource('rings',{type:'geojson',data:ringsData()});
     MAP.addLayer({id:'rings-inner',type:'line',source:'rings',filter:['==',['get','kind'],'inner'],paint:{'line-color':'#3f74d6','line-width':1,'line-opacity':.3}});
     MAP.addLayer({id:'rings-base',type:'line',source:'rings',filter:['==',['get','kind'],'base'],paint:{'line-color':'#4f7ae0','line-width':2,'line-opacity':.85}});
     MAP.addLayer({id:'rings-ext',type:'line',source:'rings',filter:['==',['get','kind'],'ext'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.9,'line-dasharray':[2,2]}});
+    MAP.addSource('zones',{type:'geojson',data:zonesData()});
+    MAP.addLayer({id:'zone-me',type:'fill',source:'zones',filter:['==',['get','kind'],'me'],paint:{'fill-color':'#3f74d6','fill-opacity':.14}});
+    MAP.addLayer({id:'zone-fix',type:'fill',source:'zones',filter:['==',['get','kind'],'fix'],paint:{'fill-color':'#e8a84a','fill-opacity':.12}});
+    MAP.addLayer({id:'zone-fix-l',type:'line',source:'zones',filter:['==',['get','kind'],'fix'],paint:{'line-color':'#e8a84a','line-width':1,'line-opacity':.6}});
+    MAP.addLayer({id:'zone-range',type:'line',source:'zones',filter:['==',['get','kind'],'range'],paint:{'line-color':'#9aa6c4','line-width':1,'line-opacity':.45,'line-dasharray':[1.5,2.5]}});
+    MAP.addLayer({id:'zone-arc',type:'line',source:'zones',filter:['==',['get','kind'],'arc'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.75}});
     const you=document.createElement('div'); you.className='you-dot';
     YOU=new window.maplibregl.Marker({element:you}).setLngLat([MAP_CENTER.lon,MAP_CENTER.lat]).addTo(MAP);
     fitRadius(true); renderVicinity();
   });
-  if(navigator.geolocation) navigator.geolocation.watchPosition(p=>{
-    const first=!S.pos; S.pos={acc:p.coords.accuracy, t:Date.now()};
-    const moved=Math.hypot((p.coords.latitude-MAP_CENTER.lat)*111320, (p.coords.longitude-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
-    if(first || moved>6) recentre(p.coords.latitude, p.coords.longitude);   // ignore position jitter under 6 metres
+}
+// Your own position. It feeds the placement of devices, so it does not wait for, or depend on, the map.
+let _geoOn=false;
+function startGeo(){
+  if(_geoOn || !navigator.geolocation) return; _geoOn=true;
+  navigator.geolocation.watchPosition(p=>{
+    const la=p.coords.latitude, lo=p.coords.longitude;
+    S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; trackPush(la, lo, p.coords.accuracy);
+    if(MAP && MAP_CENTER){ const moved=Math.hypot((la-MAP_CENTER.lat)*111320, (lo-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
+      if(!_centred || moved>6){ _centred=true; recentre(la, lo); } }      // ignore position jitter under 6 metres
     if(S.view==='overview'||S.view==='watchers') renderVicinity();
   }, ()=>{}, {enableHighAccuracy:true, timeout:12000, maximumAge:5000});
 }
+let _centred=false;
 function updateDeviceMarkers(){
   if(!MAP||!MAP_CENTER) return;
-  try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); }catch(e){}
+  try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); const z=MAP.getSource('zones'); if(z) z.setData(zonesData()); }catch(e){}
   fitRadius(false);
-  const pres=S.preview?inRadius():[], ids=new Set(pres.map(d=>d.id));
+  const V=vis(), pres=(V.mode==='live'||V.mode==='sim')?inRadius():[], ids=new Set(pres.map(d=>d.id));
   Object.keys(MAP_MARKERS).forEach(id=>{ if(!ids.has(id)){ MAP_MARKERS[id].remove(); delete MAP_MARKERS[id]; } });
-  pres.forEach(d=>{ const ll=devLngLat(d);
-    if(MAP_MARKERS[d.id]){ MAP_MARKERS[d.id].setLngLat(ll); MAP_MARKERS[d.id].getElement().style.setProperty('--mk',markerColor(d)); }
-    else{ const m=document.createElement('div'); m.className='dev-marker'; m.style.setProperty('--mk',markerColor(d)); m.title=d.name+' (simulated)';
-      m.onclick=()=>openDeviceInRoster(d); MAP_MARKERS[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(MAP); } });
+  pres.forEach(d=>{ const ll=devLngLat(d), mc=mkClass(d);
+    const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):' (simulated)');
+    if(MAP_MARKERS[d.id]){ const m=MAP_MARKERS[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d)); e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.title=tip; }
+    else{ const m=document.createElement('div'); m.className='dev-marker'+mc; m.style.setProperty('--mk',markerColor(d)); m.title=tip;
+      m.onclick=()=>{ const x=findDevice(d.id); if(x) openDeviceInRoster(x); }; MAP_MARKERS[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(MAP); } });
 }
 function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else updateDeviceMarkers(); }
 
@@ -1448,33 +1502,38 @@ function tick(){
     if(d.present) d.lastSeen=now; if(Math.random()<0.012) d.present=!d.present; });
   if(Math.random()<0.04 && S.devices.length<10){ const nd=makeDevice({dist:rnd(180,320),vel:rnd(-1.4,-0.3)}); if(Math.random()<0.3) nd.onRoute=true; S.devices.push(nd); }
   S.devices.filter(d=>d.present&&d.onRoute&&d.dist<25&&!d.withYou).forEach(d=>{ if(Math.random()<0.15) d.withYou=true; });
+  if(vis().mode!=='sim') return;
   if(S.view==='overview'||S.view==='watchers') renderVicinity();
   if(el('rost')) renderRoster();
 }
 const band = d => d.dist<30?'Very near':d.dist<=BLOCK_M?'Within one block':d.dist<=BASE_R?'Within two blocks':'Beyond two blocks';
 const devName = d => (d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name;
-const flagOf = d => d.withYou?'With you':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
+const flagOf = d => d.mine?'Yours':d.withYou?'With you':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 function deviceThreat(d){ const c=d.identity; let s=1; if(d.withYou) s=4; else if(d.onRoute) s=3; else if(!d.knownBefore) s=2;
   return {c, s, tierIdx:Math.max(0,Math.min(3,Math.round(((c-1)+(s-1))/2)))}; }
+const rosterState = d => !d.live||d.present ? d.trend : d.atHome ? 'heard at home' : 'out of earshot';
 function renderRoster(){
   const host=el('rost'); if(!host) return;
-  let list=[...S.devices];
-  if(S.sort==='near') list.sort((a,b)=>a.dist-b.dist); else if(S.sort==='new') list.sort((a,b)=>b.firstSeen-a.firstSeen); else list.sort((a,b)=>(b.knownBefore-a.knownBefore)||(a.dist-b.dist));
-  const sig=list.map(d=>d.id+(S.openDevices.has(d.id)?'o':'')).join(',');
+  let list=[...vis().devices];
+  if(S.sort==='near') list.sort((a,b)=>((b.present!==false)-(a.present!==false))||(a.dist-b.dist)); else if(S.sort==='new') list.sort((a,b)=>b.firstSeen-a.firstSeen); else list.sort((a,b)=>(b.knownBefore-a.knownBefore)||(a.dist-b.dist));
+  const extra=Math.max(0,list.length-ROSTER_MAX); list=list.slice(0,ROSTER_MAX);
+  const sig=list.map(d=>d.id+(S.openDevices.has(d.id)?'o':'')).join(',')+'+'+extra;
   if(sig===S._rsig && host.children.length){            // same rows in the same order: refresh the live figures only
     list.forEach(d=>{ const row=host.querySelector('.pull[data-dev="'+d.id+'"]'); if(!row) return;
       const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
       row.style.setProperty('--hc','var('+tc+')'); row.style.setProperty('--ht',TIER_TINT[th.tierIdx]);
-      const ps=row.querySelector('.psum'); if(ps) ps.textContent=d.cls+' · '+Math.round(d.dist)+' m · '+d.trend+' · '+flagOf(d);
+      const ps=row.querySelector('.psum'); if(ps) ps.textContent=d.cls+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'');
       const pl=row.querySelector('.pill'); if(pl){ pl.textContent='C'+th.c+'·S'+th.s+' '+TIER_NAME[th.tierIdx]; pl.style.color='var('+tc+')'; pl.style.borderColor='var('+tc+')'; }
-      const lv=row.querySelector('[data-live]'); if(lv) lv.innerHTML=liveKV(d); });
+      if(d.live){ const pb=row.querySelector('.pull-body'); if(pb && S.openDevices.has(d.id)){ const hb=liveBody(d); if(pb._h!==hb){ pb.innerHTML=hb; pb._h=hb; } } }
+      else { const lv=row.querySelector('[data-live]'); if(lv) lv.innerHTML=liveKV(d); } });
     return; }
   host.innerHTML=list.map(d=>{ const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
     return '<div class="pull '+(S.openDevices.has(d.id)?'open':'')+'" data-dev="'+d.id+'" style="--hc:var('+tc+');--ht:'+TIER_TINT[th.tierIdx]+'">'+
-      '<div class="pull-head" data-act="dev" data-id="'+d.id+'"><div class="glyph">'+d.glyph+'</div><div class="phd"><div class="plab">'+esc(devName(d))+'</div><div class="psum">'+d.cls+' · '+Math.round(d.dist)+' m · '+d.trend+' · '+flagOf(d)+'</div></div>'+
+      '<div class="pull-head" data-act="dev" data-id="'+d.id+'"><div class="glyph">'+d.glyph+'</div><div class="phd"><div class="plab">'+esc(devName(d))+'</div><div class="psum">'+d.cls+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'')+'</div></div>'+
       '<div class="pmeta"><span class="pill" style="color:var('+tc+');border-color:var('+tc+')">C'+th.c+'·S'+th.s+' '+TIER_NAME[th.tierIdx]+'</span><span class="chev">&#9662;</span></div></div>'+
-      '<div class="pull-body">'+(S.openDevices.has(d.id)?deviceBody(d):'')+'</div></div>'; }).join('');
+      '<div class="pull-body">'+(S.openDevices.has(d.id)?(d.live?liveBody(d):deviceBody(d)):'')+'</div></div>'; }).join('')+
+    (extra?'<div class="empty" style="padding:10px 6px">'+extra+' more devices were heard and are not listed. Sort by Nearest to see those closest to you.</div>':'');
   S._rsig=sig;
 }
 const liveKV = d => '<span class="k">Distance</span><span class="v">'+Math.round(d.dist)+' m · '+band(d)+'</span><span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm</span>'+
@@ -1495,9 +1554,10 @@ function openDeviceInRoster(d){ S.openDevices.add(d.id); S.open.add('w_ble'); if
 /* ---------- Capture Now (preview targets only until a sensor is connected) ---------- */
 const capEl=el('capture');
 const capName = t => t ? ((t.cls==='Unknown'&&t.identity<2)?'Unknown':t.name) : '';
+const capTag = t => !t ? '' : !t.live ? ' (simulated)' : t.sim ? ' (test data)' : '';
 async function openCapture(target){
-  S.capTarget=target||S.devices.filter(d=>d.present).sort((a,b)=>b.rssi-a.rssi)[0]||null;
-  capEl.classList.remove('hidden'); el('capTarget').textContent=S.capTarget?('Target: '+capName(S.capTarget)+' (simulated)'):'No device selected';
+  S.capTarget=target||vis().devices.filter(d=>d.present).sort((a,b)=>b.rssi-a.rssi)[0]||null;
+  capEl.classList.remove('hidden'); el('capTarget').textContent=S.capTarget?('Target: '+capName(S.capTarget)+capTag(S.capTarget)):'No device selected';
   try{ S.capStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false}); const v=el('capVideo'); v.srcObject=S.capStream; await v.play(); el('capSyn').classList.add('hidden'); }
   catch(e){ el('capSyn').classList.remove('hidden'); }
   sizeOverlay(); capLoop(); if(window.DeviceOrientationEvent) window.addEventListener('deviceorientation', onOrient);
@@ -1507,15 +1567,15 @@ function closeCapture(){ capEl.classList.add('hidden'); if(S.capStream){ S.capSt
 el('capClose').onclick=closeCapture;
 function onOrient(e){ if(e.alpha!=null){ S.capAim=Math.round(e.alpha)%360; el('capAim').value=S.capAim; } }
 el('capAim').addEventListener('input',e=>{ S.capAim=+e.target.value; });
-el('capPick').onclick=()=>{ const pres=S.devices.filter(d=>d.present).sort((a,b)=>b.rssi-a.rssi); if(!pres.length) return toast('No devices present.');
-  S.capTarget=pres[(pres.indexOf(S.capTarget)+1)%pres.length]; el('capTarget').textContent='Target: '+capName(S.capTarget)+' (simulated)'; };
+el('capPick').onclick=()=>{ const pres=vis().devices.filter(d=>d.present).sort((a,b)=>b.rssi-a.rssi); if(!pres.length) return toast('No devices present.');
+  S.capTarget=pres[(pres.indexOf(S.capTarget)+1)%pres.length]; el('capTarget').textContent='Target: '+capName(S.capTarget)+capTag(S.capTarget); };
 function sizeOverlay(){ const c=el('capOverlay'), s=capEl.querySelector('.cap-stage'); c.width=s.clientWidth; c.height=s.clientHeight; }
 window.addEventListener('resize',()=>{ if(!capEl.classList.contains('hidden')) sizeOverlay(); });
 const angDiff=(a,b)=>Math.abs(((a-b+540)%360)-180);
 function capLoop(){
   const c=el('capOverlay'), ctx=c.getContext('2d'), W=c.width, H=c.height, cx=W/2, cy=H/2, t=S.capTarget;
   ctx.clearRect(0,0,W,H);
-  const diff=t?angDiff(S.capAim,t.bearing):180, aligned=diff<10, cone=Math.max(14,Math.min(90,diff))*Math.PI/180, dir=-Math.PI/2, rad=Math.min(W,H)*0.46;
+  const hasB=!!t&&t.bearing!=null&&(!t.live||!!t.fix), diff=hasB?angDiff(S.capAim,t.bearing):180, aligned=hasB&&diff<10, cone=Math.max(14,Math.min(90,diff))*Math.PI/180, dir=-Math.PI/2, rad=Math.min(W,H)*0.46;
   const col=aligned?'74,232,138':'63,116,214';
   ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rad,dir-cone/2,dir+cone/2); ctx.closePath();
   const g=ctx.createRadialGradient(cx,cy,10,cx,cy,rad); g.addColorStop(0,'rgba('+col+',.28)'); g.addColorStop(1,'rgba('+col+',0)');
@@ -1523,7 +1583,7 @@ function capLoop(){
   ctx.strokeStyle='rgba('+col+',.9)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,26,0,Math.PI*2);
   ctx.moveTo(cx-40,cy); ctx.lineTo(cx-10,cy); ctx.moveTo(cx+10,cy); ctx.lineTo(cx+40,cy); ctx.moveTo(cx,cy-40); ctx.lineTo(cx,cy-10); ctx.moveTo(cx,cy+10); ctx.lineTo(cx,cy+40); ctx.stroke();
   el('capAimVal').textContent=S.capAim+'°';
-  el('capStatus').innerHTML=!t?'<span class="cold">Pick a device, then aim.</span>':aligned?'<span class="warm">Aligned. Lock and capture.</span>':diff<45?'<span class="warm">Warmer. Keep turning.</span>':'<span class="cold">Colder. Turn to find the signal.</span>';
+  el('capStatus').innerHTML=!t?'<span class="cold">Pick a device, then aim.</span>':!hasB?'<span class="cold">Direction not known for this device. Walk and turn to fix it, or capture what is in front of you.</span>':aligned?'<span class="warm">Aligned. Lock and capture.</span>':diff<45?'<span class="warm">Warmer. Keep turning.</span>':'<span class="cold">Colder. Turn to find the signal.</span>';
   S.capRAF=requestAnimationFrame(capLoop);
 }
 el('capShot').onclick=async ()=>{
@@ -1531,8 +1591,8 @@ el('capShot').onclick=async ()=>{
   const ctx=c.getContext('2d'), v=el('capVideo');
   if(S.capStream && v.videoWidth) ctx.drawImage(v,0,0,c.width,c.height); else { ctx.fillStyle='#070b14'; ctx.fillRect(0,0,c.width,c.height); }
   ctx.drawImage(el('capOverlay'),0,0);
-  await logEvidence('capture','Preview capture of a simulated target. Camera frame signed at '+new Date().toLocaleTimeString()+'.',{simulated:true,aim:S.capAim});
-  toast('Capture signed and added to Evidence.');
+  if(t && t.live && !t.sim){ await logEvidence('capture','Capture of '+capName(t)+' ('+t.cls+'), '+distText(t)+'. Camera frame taken at '+new Date().toLocaleTimeString()+'.',{aim:S.capAim,sig:t.sig}); toast('Capture added to Evidence.'); }
+  else toast('Capture saved to this device. Simulated and test targets are not added to Evidence.');
   c.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='halo-capture-'+Date.now()+'.png'; a.click(); });
 };
 
@@ -1618,7 +1678,7 @@ async function api(method, path, body, auth){
 /* ----- what syncs: one section per subject, last edit wins ----- */
 const hashStr = s => { let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36)+':'+s.length; };
 function sectionsNow(){
-  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home };
+  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{} };
   Object.keys(P.done||{}).forEach(id=>{ const d=P.done[id]; if(d && !Array.isArray(d)) o['done.'+id]=d; });
   Object.keys(P.hits||{}).forEach(id=>{ o['hits.'+id]=P.hits[id]|0; });
   return o; }
@@ -1627,6 +1687,8 @@ function applySection(k,v){
   else if(k==='platform') P.platform=(v==='android'||v==='iphone')?v:null;
   else if(k==='aliases') P.aliases=Array.isArray(v)?v:[];
   else if(k==='patch') P.patch=Array.isArray(v)?v:[];
+  else if(k==='sensors') P.sensors=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
+  else if(k==='mine') P.mine=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='home'){ const b=blank().home; P.home=Object.assign(b, (v&&typeof v==='object')?v:{}); P.home.rules=Object.assign(blank().home.rules,(v&&v.rules)||{}); }
   else if(k.indexOf('done.')===0) P.done[k.slice(5)]=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k.indexOf('hits.')===0){ P.hits=P.hits||{}; P.hits[k.slice(5)]=v|0; } }
@@ -1694,7 +1756,7 @@ async function cycle(){
 }
 async function loadDevices(){ const r=await api('GET','/account'); if(r.s!==200) return; SY.devAt=Date.now();
   const out=[]; for(const d of r.j.devices||[]){ let name='Unnamed device'; try{ if(d.name) name=await unseal(d.name,'devname:'+d.id); }catch(e){} out.push({id:d.id,name,createdAt:d.createdAt,lastSeen:d.lastSeen,current:d.current}); }
-  SY.devices=out; softRender(); }
+  SY.devices=out; softRender(); loadSensors(); }
 const devName2 = id => { const d=SY.devices.find(x=>x.id===id); return d?d.name:'Another device'; };
 
 /* ----- sign-in ----- */
@@ -1784,6 +1846,7 @@ function devicesPull(){
         '<br><span class="mono" style="font-size:11px;color:var(--mut)">added '+new Date(d.createdAt).toLocaleDateString()+' · last seen '+new Date(d.lastSeen).toLocaleDateString()+'</span></span>'+
         (d.current?'':'<button class="btn sm '+(SY.confirm==='rm:'+d.id?'red':'')+'" data-act="dev-remove" data-id="'+esc(d.id)+'">'+(SY.confirm==='rm:'+d.id?'Confirm remove':'Remove')+'</button>')+'</div>'; });
       h+='</div>';
+      h+=sensorsSection();
       h+='<div class="dsec"><h4>Add another device</h4><p style="margin-bottom:10px">Create a link code here, then open Remiel Halo on the other device, unlock it, open Devices and sync, and enter the code under Join an existing account.</p>';
       if(SY.link && SY.link.exp>Date.now()) h+='<div class="linkcode" id="linkCode">'+esc(groupCode(SY.link.code))+'</div><div class="limit">Valid until '+hhmm(SY.link.exp)+'. It works once. Do not send it by text or email: read it across.</div>';
       h+='<div class="formrow"><button class="btn sm primary" data-act="link-start">'+(SY.link&&SY.link.exp>Date.now()?'Create a new code':'Create link code')+'</button></div></div>';
@@ -1794,6 +1857,252 @@ function devicesPull(){
     }
     h+='</div>'; }
   return h+'</div>';
+}
+
+/* ---------- Live sensing: sensors report what they hear, the console places it ----------
+   A sensor is the Halo phone app, a carried sensor or a home station. Each seals its reports with its own key.
+   Placement uses, in order of reliability: that a device is heard at all; how far (from signal strength, rough);
+   which direction (only from movement: the same device heard from many of your positions); and whether it keeps up with you. */
+const LIVE={ after:0, started:false, seen:{mobile:0,station:0}, devs:new Map(), err:false, skew:0, bands:{}, polledAt:0, autoLog:[], home:false };
+const liveLast = () => Math.max(LIVE.seen.mobile, LIVE.seen.station);
+let LIVE_POLL=5000, LIVE_PRESENT=30000, LIVE_SILENT=60000;
+const FOLLOW_SPAN={ble:300, wifi:600}, FOLLOW_MIN=5, FIX_MIN_SAMPLES=5, FIX_MIN_BASELINE=25, FIX_MAX_UNC=60, FIX_MIN_UNC=12, FIX_MAX_RMS=9, FIT_S2_MIN=36, FIT_K=9, SECTOR_HALF=60;
+const SAMPLE_STEP=4, SAMPLE_AGE=30*60000, SAMPLE_MAX=80, POS_MAX_ACC=35, SOLVE_BUDGET_MS=40;
+const LIVE_KEEP=2*3600000, DEVS_MAX=600, ROSTER_MAX=60, HOME_NEAR=150, AUTOLOG_PER_HOUR=6;
+const CLS=['Phone','Wearable','Tag','Laptop','Vehicle','Access point','Cell tower','Unknown'];
+const SENSOR_KIND={ phone:'Phone app', carried:'Carried sensor', station:'Home station' };
+const hasSensors = () => Object.keys(P.sensors||{}).length>0;
+const hash32 = s => { let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
+const callsign = (h,h2) => W1[h%W1.length]+' '+W2[(h>>>8)%W2.length]+' '+(10+h2%90);
+// One reading: rough. Walls and the device's own power move it a great deal. Bluetooth transmits more weakly than Wi-Fi.
+const distOf = (rssi,band) => band==='ble' ? Math.pow(10, (-55-rssi)/25) : Math.pow(10, (-40-rssi)/27);
+const compass = b => ['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round(b/45)%8];
+
+/* ----- your own track: where this device was, and when ----- */
+const TRACK=[], GEO={o:null, seen:0};
+function toXY(lat,lon){ if(!GEO.o) GEO.o={lat,lon}; return {x:(lon-GEO.o.lon)*111320*Math.cos(GEO.o.lat*Math.PI/180), y:(lat-GEO.o.lat)*111320}; }
+function toLL(x,y){ return {lat:GEO.o.lat+y/111320, lon:GEO.o.lon+x/(111320*Math.cos(GEO.o.lat*Math.PI/180))}; }
+function reanchor(lat,lon){ GEO.o={lat,lon}; TRACK.length=0; LIVE.devs.forEach(d=>{ d.samples.length=0; d.fix=null; d.sector=null; d.fresh=0; }); }
+function trackPush(lat,lon,acc){
+  if(GEO.o && Math.hypot((lat-GEO.o.lat)*111320,(lon-GEO.o.lon)*111320*Math.cos(GEO.o.lat*Math.PI/180))>200000) reanchor(lat,lon);   // you are far from where the frame was set
+  const p=toXY(lat,lon), last=TRACK[TRACK.length-1], now=Date.now(); GEO.seen=now;
+  if(last && Math.hypot(p.x-last.x,p.y-last.y)<2){ last.acc=acc; last.t2=now; return; }
+  TRACK.push({t:now,t2:now,x:p.x,y:p.y,acc}); if(TRACK.length>4000) TRACK.splice(0,800); }
+// Where you were at a given moment: between the two track points either side of it. Nothing, if your position was not being reported then.
+function posAt(t){ if(!TRACK.length) return null;
+  let i=TRACK.length-1; while(i>=0 && TRACK[i].t>t) i--;
+  if(i<0) return TRACK[0].t-t<30000 ? TRACK[0] : null;
+  const a=TRACK[i], b=TRACK[i+1];
+  if(b && b.t-a.t2<=20000){ if(t<=a.t2) return a; const f=(t-a.t2)/Math.max(1,b.t-a.t2); return {x:a.x+(b.x-a.x)*f, y:a.y+(b.y-a.y)*f, acc:Math.max(a.acc||0,b.acc||0), t}; }
+  return t-a.t2<=30000 ? a : null; }                               // a gap: the phone was locked, or position was off
+const posNow = () => TRACK.length?TRACK[TRACK.length-1]:null;
+const okLL = q => !!q && typeof q.lat==='number' && typeof q.lon==='number' && Math.abs(q.lat)<=85 && Math.abs(q.lon)<=180 && !(q.lat===0 && q.lon===0);
+const nearHome = () => { const h=P.home&&P.home.loc, me=posNow(); if(!okLL(h)||!me) return false; const q=toXY(h.lat,h.lon); return Math.hypot(q.x-me.x,q.y-me.y)<=HOME_NEAR; };
+
+/* ----- placing an emitter from many readings: the place that best fits all of them ----- */
+function locateXY(samples, me){
+  const N=samples.length, cx=samples.reduce((a,s)=>a+s.x,0)/N, cy=samples.reduce((a,s)=>a+s.y,0)/N;
+  let best=null; const cells=[];
+  const scan=(x0,y0,sp,st,keep)=>{
+    for(let x=x0-sp;x<=x0+sp;x+=st) for(let y=y0-sp;y<=y0+sp;y+=st){ let cell=Infinity;
+      for(const n of [2.0,2.7,3.4]){ let sum=0; const L=new Array(N);
+        for(let i=0;i<N;i++){ L[i]=-10*n*Math.log10(Math.max(2,Math.hypot(samples[i].x-x,samples[i].y-y))); sum+=samples[i].rssi-L[i]; }
+        const p0=sum/N; let cost=0; for(let i=0;i<N;i++){ const e=samples[i].rssi-(p0+L[i]); cost+=e*e; }
+        if(cost<cell) cell=cost; if(!best||cost<best.cost) best={x,y,cost}; }
+      if(keep) cells.push([x,y,cell]); } };
+  scan(cx,cy,320,8,true); const c=best; scan(c.x,c.y,12,2,false);
+  // Every place that fits the readings nearly as well as the best one is kept. The zone must hold all of them,
+  // so a mirror image on the other side of your path counts. The margin is wide because nearby readings err together.
+  const s2=Math.max(FIT_S2_MIN, c.cost/Math.max(1,N-4)), lim=c.cost+FIT_K*s2; let unc=FIX_MIN_UNC, sx=0, sy=0, near=false; const bs=[];
+  for(const k of cells) if(k[2]<=lim){ unc=Math.max(unc, Math.hypot(k[0]-best.x,k[1]-best.y));
+    if(me){ const dx=k[0]-me.x, dy=k[1]-me.y; if(Math.hypot(dx,dy)<10) near=true; const b=Math.atan2(dx,dy); bs.push(b); sx+=Math.sin(b); sy+=Math.cos(b); } }
+  // direction only: do all the fitting places lie in one sector, seen from where you stand now?
+  let brg=null, dev=180;
+  if(me && bs.length && !near){ const mean=Math.atan2(sx,sy); dev=0; for(const b of bs) dev=Math.max(dev, Math.abs(((b-mean)*180/Math.PI+540)%360-180)); brg=(mean*180/Math.PI+360)%360; }
+  return {x:best.x, y:best.y, unc:Math.min(400,unc), rms:Math.sqrt(best.cost/N), brg, dev};
+}
+const baselineOf = s => { let m=0; for(let i=0;i<s.length;i+=Math.max(1,Math.floor(s.length/12))) for(let j=0;j<s.length;j+=Math.max(1,Math.floor(s.length/12))) m=Math.max(m,Math.hypot(s[i].x-s[j].x,s[i].y-s[j].y)); return m; };
+const median = a => { const s=[...a].sort((x,y)=>x-y); return s.length?s[Math.floor(s.length/2)]:0; };
+
+/* ----- sensor reports ----- */
+const _sk={};
+async function unsealSensor(id, blob){ const p=String(blob).split('.'); if(p[0]!=='v1'||p.length!==3) throw new Error('format');
+  if(!_sk[id]) _sk[id]=await crypto.subtle.importKey('raw', b64.dec(P.sensors[id].key), 'AES-GCM', false, ['decrypt']);
+  return td.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64.dec(p[1]),additionalData:te.encode('sight:'+id)}, _sk[id], b64.dec(p[2]))); }
+function ingestReport(sid, rowT, p, off){
+  if(!p || !Array.isArray(p.s)) return;
+  const station=(P.sensors[sid]||{}).kind==='station', who=station?'station':'mobile';
+  // The row time is the server's. The sensor's own clock is used only to order its reports, shifted onto the server's clock.
+  const at=Number.isFinite(p.t) ? Math.min(rowT, Math.max(rowT-600000, p.t+(off||0))) : rowT;
+  LIVE.seen[who]=Math.max(LIVE.seen[who], at);
+  let pos=null;
+  if(okLL(p.pos)){ pos=toXY(p.pos.lat,p.pos.lon); pos.acc=(typeof p.pos.acc==='number'&&p.pos.acc>=0)?p.pos.acc:0; if(Math.hypot(pos.x,pos.y)>200000) pos=null; }   // the sensor knows where it is
+  else if(station){ if(okLL(P.home.loc)){ pos=toXY(P.home.loc.lat,P.home.loc.lon); pos.acc=0; } }                 // a home station does not move
+  else { const q=posAt(at-LIVE.skew); if(q) pos={x:q.x,y:q.y,acc:q.acc}; }                                         // carried with this device
+  for(const s of p.s.slice(0,150)){ if(!s || typeof s.id!=='string' || !s.id || s.id.length>80) continue;
+    const band=['ble','wifi','cell'].indexOf(s.band)>=0?s.band:'ble';
+    const rssi=(typeof s.rssi==='number'&&Number.isFinite(s.rssi))?Math.max(-120,Math.min(-10,s.rssi)):null;
+    const reading=(typeof s.dist==='number'&&Number.isFinite(s.dist)&&s.dist>0)?Math.min(s.dist,50000):(rssi!==null?distOf(rssi,band):null);
+    if(reading===null) continue;
+    LIVE.bands[band]=Math.max(LIVE.bands[band]||0, at);
+    let d=LIVE.devs.get(s.id);
+    if(!d){ if(LIVE.devs.size>=DEVS_MAX) continue;
+      const hsh=hash32(s.id), h2=hash32('~'+s.id);
+      d={ id:'L'+hsh.toString(36)+h2.toString(36), sig:s.id, live:true, name:callsign(hsh,h2), glyph:GLY[hsh%GLY.length], firstSeen:at, timesSeen:0, samples:[], hist:[], handleBrg:hsh%360, fix:null, sector:null, fresh:0, seenMobile:0, seenStation:0 }; LIVE.devs.set(s.id,d); }
+    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; d.adv=typeof s.name==='string'?s.name.slice(0,40):''; d.rssi=rssi!==null?rssi:rssiOf(reading);
+    d.lastSeen=Math.max(d.lastSeen||0, at); d.firstSeen=Math.min(d.firstSeen, at); d.timesSeen++; d.sensor=sid; d.identity=Math.max(1,Math.min(3,(s.conf|0)||2));
+    if(station) d.seenStation=Math.max(d.seenStation, at); else d.seenMobile=Math.max(d.seenMobile, at);
+    d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
+    const fl=Array.isArray(s.flags)?s.flags:[]; d.fFollow=!station&&fl.indexOf('with_you')>=0; d.fRoute=fl.indexOf('route')>=0; d.fKnown=fl.indexOf('known')>=0; d.randomizes=fl.indexOf('randomized')>=0;
+    if(pos && rssi!==null && !(pos.acc>POS_MAX_ACC)) addSample(d,pos,rssi,at);            // a poor position fix would mislead the placement
+    d.hist.push(reading); if(d.hist.length>12) d.hist.shift();
+  }
+}
+// One sample per place you stood: readings taken within a few metres are averaged, old ones are dropped.
+function addSample(d,pos,rssi,t){ const sm=d.samples, l=sm[sm.length-1];
+  if(l && Math.hypot(pos.x-l.x,pos.y-l.y)<SAMPLE_STEP){ l.rssi=(l.rssi*l.k+rssi)/(l.k+1); l.k=Math.min(l.k+1,8); l.t=t; return; }
+  sm.push({x:pos.x,y:pos.y,rssi,t,k:1}); d.fresh++;
+  while(sm.length && t-sm[0].t>SAMPLE_AGE) sm.shift();
+  if(sm.length>SAMPLE_MAX){ const keep=sm.filter((s,i)=>i>=SAMPLE_MAX/2||i%2===0); sm.length=0; keep.forEach(s=>sm.push(s)); } }
+function solveFix(d){ d.fresh=0; d.base=baselineOf(d.samples);
+  d.fix=null; d.sector=null; if(d.base<FIX_MIN_BASELINE) return;
+  const e=locateXY(d.samples, posNow()); d.fixUnc=e.unc; d.fitRms=e.rms;
+  if(e.rms>FIX_MAX_RMS) return;                                    // the readings do not fit a device standing still
+  if(e.unc<=FIX_MAX_UNC){ const ll=toLL(e.x,e.y); d.fix={x:e.x,y:e.y,lat:ll.lat,lon:ll.lon,unc:e.unc,n:d.samples.length}; }
+  else if(e.brg!==null && e.dev<=SECTOR_HALF) d.sector={brg:e.brg, half:SECTOR_HALF, n:d.samples.length}; }
+const followSpan = d => d.cls==='Cell tower'||d.band==='cell' ? Infinity : (d.band==='wifi'||d.cls==='Access point') ? FOLLOW_SPAN.wifi : FOLLOW_SPAN.ble;
+function liveDerive(d, nowS){
+  const mob=nowS-d.seenMobile<LIVE_PRESENT, sta=nowS-d.seenStation<LIVE_PRESENT;
+  d.present = mob || (sta && LIVE.home);                 // near you. What only the home station hears is near you only when you are home
+  d.atHome = sta && !d.present;
+  d.mine = !!(P.mine && P.mine[d.id]);
+  const me=posNow();
+  if(d.fix && me){ d.dist=Math.max(1,Math.hypot(d.fix.x-me.x,d.fix.y-me.y)); d.bearing=(Math.atan2(d.fix.x-me.x,d.fix.y-me.y)*180/Math.PI+360)%360; }
+  else { d.dist=Math.max(1,median(d.hist.slice(-3))); d.bearing=d.sector?d.sector.brg:null; }
+  const h=d.hist, a=h.length>=4?median(h.slice(0,Math.floor(h.length/2))):null, b=h.length>=4?median(h.slice(Math.floor(h.length/2))):null;
+  d.vel = (a===null)?0:((b-a)/a < -0.35 ? -1 : (b-a)/a > 0.5 ? 1 : 0); d.trend=trendOf(d.vel);       // a clear change only: single readings jump about
+  // follower test: still in earshot, at steady strength, after you have moved a long way
+  const sm=d.samples; d.span=0; d.steady=false;
+  if(sm.length>1){ for(const s of sm) d.span=Math.max(d.span, Math.hypot(s.x-sm[0].x,s.y-sm[0].y));
+    const mean=sm.reduce((x,s)=>x+s.rssi,0)/sm.length, sd=Math.sqrt(sm.reduce((x,s)=>x+(s.rssi-mean)*(s.rssi-mean),0)/sm.length); d.rssiSd=sd; d.steady = sd<=9 && mean>=-88; }
+  d.mins=(d.lastSeen-d.firstSeen)/60000;
+  d.need=followSpan(d);
+  d.tested = d.span>=d.need && d.mins>=FOLLOW_MIN && d.steady && !d.fix;       // this console's own test
+  d.withYou = !d.mine && d.present && (d.tested || d.fFollow);
+  d.onRoute = !d.mine && !!d.fRoute; d.knownBefore = d.mine || !!d.fKnown;
+  if(d.withYou && !d.sim) autoLog(d);
+}
+const followText = d => d.tested ? 'stayed in earshot for '+Math.round(d.mins)+' minutes across '+Math.round(d.span)+' m of your movement' : 'was reported as moving with you by '+((P.sensors[d.sensor]||{}).name||'a sensor');
+// One Evidence entry per device per day, and only a few per hour, so a faulty sensor cannot bury the record.
+function autoLog(d){ const day=new Date().toISOString().slice(0,10); P.flagged=P.flagged||{};
+  if(P.flagged[d.id]===day) return;
+  const now=Date.now(); LIVE.autoLog=LIVE.autoLog.filter(t=>now-t<3600000); if(LIVE.autoLog.length>=AUTOLOG_PER_HOUR) return;
+  Object.keys(P.flagged).forEach(k=>{ if(P.flagged[k]!==day) delete P.flagged[k]; });
+  P.flagged[d.id]=day; LIVE.autoLog.push(now);
+  logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+', '+d.id+') '+followText(d)+'.'); }
+function liveState(){
+  if(!hasSensors()) return 'none';
+  const nowS=Date.now()+LIVE.skew, mob=LIVE.seen.mobile>0 && nowS-LIVE.seen.mobile<LIVE_SILENT, sta=LIVE.seen.station>0 && nowS-LIVE.seen.station<LIVE_SILENT;
+  if(mob || (sta && nearHome())) return 'live';
+  if(LIVE.err) return 'offline';                         // the account was not reached, so nothing can be said about the sensor
+  if(sta) return 'homeonly';                             // the home station reports, but nothing is with you
+  return liveLast() ? 'silent' : 'waiting';
+}
+function liveTick(){
+  const nowS=Date.now()+LIVE.skew; LIVE.home=nearHome();
+  LIVE.devs.forEach((d,k)=>{ if(nowS-d.lastSeen>LIVE_KEEP && !d.mine) LIVE.devs.delete(k); });
+  // place devices, once you have moved enough for the readings to disagree usefully. Within a time budget, the most changed first
+  const t0=performance.now();
+  for(const d of [...LIVE.devs.values()].filter(d=>d.fresh>0 && d.samples.length>=FIX_MIN_SAMPLES).sort((a,b)=>b.fresh-a.fresh)){ if(performance.now()-t0>SOLVE_BUDGET_MS) break; solveFix(d); }
+  LIVE.devs.forEach(d=>liveDerive(d,nowS));
+  if(!booted) return;
+  if(S.view==='overview'||S.view==='watchers') renderVicinity();
+  if(el('rost')) renderRoster();
+  const st=liveState()+':'+[...LIVE.devs.values()].filter(d=>d.present&&d.withYou&&!d.sim).length;
+  if(st!==LIVE._st){ LIVE._st=st; softRender(); }
+}
+let _liveBusy=false;
+async function livePoll(){
+  if(_liveBusy || !hasSensors() || !Y.refresh || Y.signedOut || !cryptoOk()) return; _liveBusy=true;
+  try{ for(let turn=0, more=true; more && turn<4; turn++){
+      const r=await api('GET','/sightings'+(LIVE.after?'?after='+LIVE.after:'?recent=180'));
+      if(r.s!==200){ LIVE.err=true; return; }
+      LIVE.err=false; LIVE.polledAt=Date.now(); LIVE.skew=(r.j.serverTime||Date.now())-Date.now();
+      const rows=r.j.sightings||[], open=[], off={};
+      for(const row of rows){ LIVE.after=Math.max(LIVE.after,row.rid); if(!P.sensors[row.sensorId]) continue;
+        let p; try{ p=JSON.parse(await unsealSensor(row.sensorId,row.payload)); }catch(e){ continue; }
+        if(p && Number.isFinite(p.t)){ const o=row.t-p.t; if(off[row.sensorId]===undefined || o<off[row.sensorId]) off[row.sensorId]=o; }   // the sensor's clock against the server's
+        open.push([row,p]); }
+      for(const [row,p] of open) ingestReport(row.sensorId,row.t,p,off[row.sensorId]);
+      if(!LIVE.after && r.j.head) LIVE.after=r.j.head;
+      more=!!r.j.more && rows.length>0; }
+  }catch(e){ LIVE.err=true; } finally{ _liveBusy=false; liveTick(); } }
+function liveStart(){ const loop=()=>{ if(document.visibilityState==='visible') livePoll(); setTimeout(loop, LIVE_POLL); }; setTimeout(loop, 1500); setInterval(()=>{ if(hasSensors()) liveTick(); }, 2000); }
+
+/* ----- which devices the screen shows: live from a sensor, the simulated preview, or nothing ----- */
+// The words for each state in which nothing near you can be shown. None of them reads Clear.
+function stateWords(m){ const since=hhmm(liveLast()-LIVE.skew);
+  return m==='silent' ? {count:'sensor silent', line:'sensor silent since '+since, long:'Your sensor has been silent since '+since+'.', note:'Sensor silent.', vic:'Vicinity: sensor silent', cov:'Sensor silent'}
+    : m==='waiting' ? {count:'waiting for the sensor', line:'sensor added, no report yet', long:'Your sensor has not reported yet.', note:'Waiting for the first report from your sensor.', vic:'Vicinity: waiting for the sensor', cov:'Sensor added, no report yet'}
+    : m==='offline' ? {count:'account not reached', line:'Halo account not reached, sensor reports cannot be read', long:'The Halo account was not reached, so sensor reports cannot be read.', note:'Halo account not reached.', vic:'Vicinity: account not reached', cov:'Account not reached'}
+    : m==='homeonly' ? {count:'no sensor with you', line:'home station reporting, no sensor with you', long:'Your home station is reporting, but no sensor is with you'+(okLL(P.home.loc)?'.':', and your home location is not set in Responder.'), note:'Home station only.', vic:'Vicinity: no sensor with you', cov:'No sensor with you'}
+    : {count:'not monitored', line:'no sensor connected', long:'', note:'Not monitored.', vic:'Vicinity: not monitored', cov:'No sensor'}; }
+function vis(){
+  const st=liveState();
+  if(st==='live'){ const devs=[...LIVE.devs.values()], pres=devs.filter(d=>d.present); return {mode:'live', test:pres.length>0&&pres.every(d=>d.sim), devices:devs}; }
+  if(S.preview) return {mode:'sim', devices:S.devices};
+  return {mode:st, devices:[]};
+}
+const findDevice = id => vis().devices.find(x=>x.id===id) || S.devices.find(x=>x.id===id) || null;
+
+/* ----- sensors on the account ----- */
+async function sensorAdd(){
+  if(SY.status!=='on') return toast('This device is not signed in yet.');
+  const name=val('snName')||'Sensor', kind=(el('snKind')||{}).value||'carried';
+  const r=await api('POST','/sensors',{kind}); if(r.s!==200) return toast(r.s===413?'This account has the most sensors it can hold.':'Could not add the sensor.');
+  const raw=crypto.getRandomValues(new Uint8Array(32)), key=b64.enc(raw);
+  P.sensors=P.sensors||{}; P.sensors[r.j.id]={name:name.slice(0,40),kind,key,createdAt:Date.now()}; save();
+  SY.cred={id:r.j.id, text:'halo1.'+r.j.id+'.'+r.j.secret+'.'+key.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}; softRender(); loadSensors(); }
+async function sensorRemove(id){ if(SY.confirm!=='sn:'+id){ SY.confirm='sn:'+id; return softRender(); } SY.confirm='';
+  const r=await api('POST','/sensors/remove',{id}); if(r.s!==200 && r.s!==404) return toast('Could not remove the sensor.');
+  delete P.sensors[id]; delete _sk[id]; if(SY.sensorKind) delete SY.sensorKind[id]; if(SY.cred&&SY.cred.id===id) SY.cred=null; save(); [...LIVE.devs.values()].filter(d=>d.sensor===id).forEach(d=>LIVE.devs.delete(d.sig)); toast('Sensor removed.'); softRender(); }
+async function loadSensors(){ const r=await api('GET','/sensors'); if(r.s!==200) return; SY.sensorSeen={}; SY.sensorKind={}; (r.j.sensors||[]).forEach(s=>{ SY.sensorSeen[s.id]=s.lastSeen; SY.sensorKind[s.id]=s.kind; }); softRender(); }
+function sensorsSection(){
+  const ids=Object.keys(P.sensors||{});
+  let h='<div class="dsec"><h4>Sensors</h4><p style="margin-bottom:10px">A sensor listens for devices near you and reports to this account. The Halo Android app, the carried sensor and the home station will each ask for a sensor code. None of them exists yet, so there is nothing to enter a code into today.</p>';
+  const lost=Object.keys(SY.sensorKind||{}).filter(id=>!P.sensors[id]);
+  if(!ids.length && !lost.length) h+='<div class="empty" style="padding:8px">No sensors on this account.</div>';
+  lost.forEach(id=>{ h+='<div class="rowline"><span><b>'+esc(SENSOR_KIND[SY.sensorKind[id]]||'Sensor')+'</b> <span class="chip real">No key on this device</span><br><span class="mono" style="font-size:11px;color:var(--mut)">Its reports cannot be read here. Remove it and add it again.</span></span>'+
+      '<button class="btn sm '+(SY.confirm==='sn:'+id?'red':'')+'" data-act="sn-remove" data-id="'+esc(id)+'">'+(SY.confirm==='sn:'+id?'Confirm remove':'Remove')+'</button></div>'; });
+  ids.forEach(id=>{ const s=P.sensors[id], seen=(SY.sensorSeen||{})[id];
+    h+='<div class="rowline"><span><b>'+esc(s.name)+'</b> <span class="chip">'+esc(SENSOR_KIND[s.kind]||s.kind)+'</span><br><span class="mono" style="font-size:11px;color:var(--mut)">'+(seen?'last report '+new Date(seen).toLocaleString():'no report yet')+'</span></span>'+
+      '<button class="btn sm '+(SY.confirm==='sn:'+id?'red':'')+'" data-act="sn-remove" data-id="'+esc(id)+'">'+(SY.confirm==='sn:'+id?'Confirm remove':'Remove')+'</button></div>'; });
+  if(SY.cred) h+='<div class="linkcode" id="sensorCred" style="font-size:12.5px;letter-spacing:.02em;text-align:left">'+esc(SY.cred.text)+'</div>'+
+    '<div class="limit" style="margin-bottom:8px">This sensor code is shown once. Enter it in the sensor. Anyone who holds it can send reports to your account and read that one sensor\'s reports.</div>'+
+    '<div class="formrow" style="margin-top:0"><button class="btn sm" data-act="sn-copy">Copy the code</button><button class="btn sm" data-act="sn-hide">I have saved it</button></div>';
+  h+='<div class="formrow"><input class="inp" id="snName" maxlength="40" placeholder="Name, for example Carried sensor"><select class="inp" id="snKind">'+Object.keys(SENSOR_KIND).map(k=>'<option value="'+k+'"'+(k==='carried'?' selected':'')+'>'+SENSOR_KIND[k]+'</option>').join('')+'</select>'+
+     '<button class="btn sm primary" data-act="sn-add">Add sensor</button></div></div>';
+  return h;
+}
+
+/* ----- a live device, opened ----- */
+function liveBody(d){
+  const sn=(P.sensors[d.sensor]||{}).name||'a sensor';
+  const rel = d.fix && d.bearing!=null;
+  const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+Math.round(d.fix.unc)+' m' : 'about '+Math.round(d.dist)+' m, from signal strength alone. One reading can be off by a factor of 2 or more';
+  const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map. Your own position is not known, so there is no bearing from you' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side. Not placed' : (d.base>=FIX_MIN_BASELINE ? 'Not fixed. The readings fit more than one place. Keep moving and make a turn' : 'Not known. Direction comes from movement: walk at least '+FIX_MIN_BASELINE+' m and make a turn');
+  const ft = d.mine ? 'Marked as yours. Not tested' : d.withYou ? 'With you' : (!isFinite(d.need) ? 'Not applied. A cell tower is heard over long distances' : d.span>=d.need && !d.steady ? 'Heard over a long stretch, but its strength rose and fell as a fixed transmitter does' : d.fix ? 'Stays in one place' : 'Not yet. Needs '+d.need+' m of your movement and '+FOLLOW_MIN+' minutes');
+  return '<div class="dsec"><h4>Proximity</h4><div class="kv"><span class="k">Distance</span><span class="v">'+esc(where)+'</span><span class="k">Direction</span><span class="v '+(rel?'':'unkc')+'">'+esc(dir)+'</span>'+
+    '<span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm · '+esc(d.band==='wifi'?'Wi-Fi':d.band==='cell'?'Cellular':'Bluetooth')+'</span>'+
+    '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></div></div>'+
+    '<div class="dsec"><h4>Follower test</h4><div class="kv"><span class="k">Result</span><span class="v '+(d.withYou?'warnc':'')+'">'+esc(ft)+'</span>'+
+    '<span class="k">In earshot for</span><span class="v">'+(d.mins<1?'under a minute':Math.round(d.mins)+' min')+'</span><span class="k">While you moved</span><span class="v">'+Math.round(d.span||0)+' m</span></div></div>'+
+    '<div class="dsec"><h4>History</h4><div class="kv"><span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span><span class="k">Reports</span><span class="v">'+d.timesSeen+'</span>'+
+    '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Advertised name</span><span class="v '+(d.adv?'':'unkc')+'">'+esc(d.adv||'None')+'</span>'+
+    '<span class="k">Address</span><span class="v '+(d.randomizes?'warnc':'')+'">'+(d.randomizes?'Randomizes, held by signature':'Not reported as randomized')+'</span></div></div>'+
+    '<div class="dev-acts"><button class="btn primary" data-act="capture" data-id="'+d.id+'">Capture Now</button>'+
+    '<button class="btn" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Not mine':'This is mine')+'</button>'+
+    (d.sim?'':'<button class="btn" data-act="dev-log" data-id="'+d.id+'">Log to Evidence</button>')+'</div>';
 }
 
 /* ---------- tickers. Live items come from the Global feed. The rest are dated, sourced entries from the register ---------- */
@@ -1871,11 +2180,20 @@ document.addEventListener('click', e=>{
     case 'alias-link': { const al=P.aliases[+a.dataset.i]; al.links=al.links||{}; al.links[a.dataset.k]=!al.links[a.dataset.k]; save(); rerender(); break; }
     case 'patch-add': { const n=val('patchName'); if(!n) return toast('Enter the device.'); P.patch.push({name:n,date:val('patchDate')}); save(); rerender(); break; }
     case 'patch-del': P.patch.splice(+a.dataset.i,1); save(); rerender(); break;
-    case 'preview': { S.preview=!S.preview; if(S.preview && !S.devices.length) seedPreview(); if(!S.preview) S.openDevices.clear(); S._rsig=''; rerender(); if(S.view==='overview'||S.view==='watchers') renderVicinity(); if(el('rost')) renderRoster(); break; }
+    case 'preview': { if(vis().mode==='live') break; S.preview=!S.preview; if(S.preview && !S.devices.length) seedPreview(); if(!S.preview) S.openDevices.clear(); S._rsig=''; rerender(); if(S.view==='overview'||S.view==='watchers') renderVicinity(); if(el('rost')) renderRoster(); break; }
     case 'sort': S.sort=a.dataset.s; S._rsig=''; rerender(); renderRoster(); break;
     case 'dev': { const id=a.dataset.id; S.openDevices.has(id)?S.openDevices.delete(id):S.openDevices.add(id); renderRoster(); break; }
-    case 'sus': { const d=S.devices.find(x=>x.id===a.dataset.id); if(d) openDeviceInRoster(d); break; }
-    case 'capture': { const d=S.devices.find(x=>x.id===a.dataset.id); openCapture(d); break; }
+    case 'sus': { const d=findDevice(a.dataset.id); if(d) openDeviceInRoster(d); break; }
+    case 'capture': { const d=findDevice(a.dataset.id); openCapture(d); break; }
+    case 'mine': { const d=findDevice(a.dataset.id); if(!d||!d.live) break; P.mine=P.mine||{}; if(P.mine[d.id]) delete P.mine[d.id]; else P.mine[d.id]=1; save(); liveTick(); S._rsig=''; renderRoster(); break; }
+    case 'dev-log': { const d=findDevice(a.dataset.id); if(!d||!d.live||d.sim) break;
+      logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+'), '+distText(d)+', '+flagOf(d).toLowerCase()+'. Heard '+d.timesSeen+' times since '+new Date(d.firstSeen).toLocaleTimeString()+'.',{sig:d.sig}); toast('Added to Evidence.'); break; }
+    case 'sn-add': sensorAdd(); break;
+    case 'sn-remove': sensorRemove(a.dataset.id); break;
+    case 'sn-hide': SY.cred=null; softRender(); break;
+    case 'sn-copy': { const t=SY.cred&&SY.cred.text; if(t && navigator.clipboard) navigator.clipboard.writeText(t).then(()=>toast('Sensor code copied.'),()=>toast('Could not copy. Select the code and copy it by hand.')); else toast('Select the code and copy it by hand.'); break; }
+    case 'home-loc-clear': { delete P.home.loc; save(); rerender(); toast('Home location cleared.'); break; }
+    case 'home-loc': { if(!S.pos) return toast('Share your position first. Open Watchers and allow location.'); if(S.pos.acc>50) return toast('Your position is only known to within '+Math.round(S.pos.acc)+' m. Move near a window or step outside, then try again.'); P.home.loc={lat:S.pos.lat,lon:S.pos.lon,acc:S.pos.acc,t:Date.now()}; save(); rerender(); toast('Home location set.'); break; }
     case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),device:Y.name||null,chain:P.evidence,otherDevices:remoteEv()},null,2)],{type:'application/json'});
       const l=document.createElement('a'); l.href=URL.createObjectURL(blob); l.download='remiel-halo-evidence.json'; l.click(); toast('Signed log exported.'); break; }
     case 'h-padd': { const n=val('hpName'); if(!n) return toast('Enter the name.'); H.people.push({name:n,rel:val('hpRel'),consent:el('hpConsent').checked,watch:el('hpWatch').checked}); save(); rerender(); break; }
@@ -1904,7 +2222,7 @@ function boot(){
   setView('overview');
   setInterval(tick, 1600);
   loadGlobal(); setInterval(loadGlobal, 15*60*1000);
-  syncStart();
+  syncStart(); liveStart();
 }
 /* returning visit: unlock only after everything above is defined */
 if(codeOk(store.get('halo_key'))) openApp();
