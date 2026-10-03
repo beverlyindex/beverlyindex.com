@@ -123,6 +123,10 @@ select.inp{flex:none}
   display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .card h3 .n{color:var(--mut);font-weight:400;letter-spacing:.06em}
 .sub{color:var(--mut);font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.backbar{position:sticky;top:0;z-index:30;display:flex;gap:8px;align-items:center;margin:-14px -16px 10px;padding:8px 16px;background:rgba(7,11,22,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.backbar .where{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.backbar .btn,.backrow .btn{min-height:40px;padding:8px 14px}
+.backrow{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
 .pagehead{margin:2px 0 12px}
 .pagehead h2{font-family:var(--disp);font-weight:700;font-size:22px;margin:0;letter-spacing:.02em}
 .pagehead p{margin:4px 0 0;color:var(--mut);font-size:13.5px;line-height:1.45}
@@ -508,6 +512,7 @@ a.tk:hover b{text-decoration:underline}
 
     <div class="scroll" id="scroll">
       <div class="wrap">
+        <div class="backbar hidden" id="backBar"><button class="btn sm" data-act="back">&#8249; Back</button><button class="btn sm" data-act="home">Overview</button><span class="where" id="backWhere"></span></div>
 
         <section data-pane="overview">
           <div class="ov">
@@ -2660,7 +2665,35 @@ function fillTickers(){ if(!el('trackW')) return; fillTicker('trackW', myFinding
 
 /* ---------- navigation and rendering ---------- */
 function placeVicinity(v){ const host = v==='watchers' ? el('wVic') : el('ovVic'), card=el('vicCard'); if(card.parentNode!==host) host.appendChild(card); }
+/* ---------- Back: every screen and every open record can be left the way it was entered ---------- */
+let NAVN=0, _navPop=false;
+const VIEW_NAME={overview:'Overview',watchers:'Watchers',attackers:'Attackers',responder:'Responder',evidence:'Evidence'};
+const navSnap = by => ({halo:1, n:NAVN, v:S.view, o:[...S.open], sh:S.shelf, by:by||''});
+function navPush(by){ if(_navPop) return; NAVN++; try{ history.pushState(navSnap(by),''); }catch(e){} backBar(); }
+function navKeep(){ if(_navPop) return; try{ history.replaceState(navSnap((history.state&&history.state.by)||''),''); }catch(e){} backBar(); }
+function backBar(){ const b=el('backBar'); if(!b) return; const show=S.view!=='overview'||NAVN>0;
+  b.classList.toggle('hidden',!show); el('backWhere').textContent=VIEW_NAME[S.view]||'';
+  const hb=b.querySelector('[data-act="home"]'); if(hb) hb.style.display=S.view==='overview'?'none':''; }
+function closeRecord(id){
+  if(history.state && history.state.halo && history.state.by===id && NAVN>0){ history.back(); return; }
+  S.open.delete(id); navKeep(); rerender(); if(el('rost')) renderRoster();
+  const c=document.querySelector('.tp-head[data-id="'+id+'"]'); if(c) c.scrollIntoView({block:'nearest'});
+}
+window.addEventListener('popstate', e=>{
+  if(el('app').classList.contains('hidden')) return;
+  const st=(e.state&&e.state.halo)?e.state:{n:0,v:'overview',o:[],sh:'real'};
+  _navPop=true; NAVN=st.n; S.open=new Set(st.o); S.shelf=st.sh;
+  if(S.view!==st.v) setView(st.v); else { rerender(); if(el('rost')) renderRoster(); }
+  _navPop=false; backBar();
+});
+// every open record ends with a way out, so nobody has to scroll back up to leave it
+function backRows(){ document.querySelectorAll('.tp.open > .tp-body').forEach(b=>{ if(b.querySelector(':scope > .backrow')) return;
+  const hd=b.parentNode.querySelector(':scope > .tp-head[data-id]'); if(!hd) return;
+  const r=document.createElement('div'); r.className='backrow';
+  r.innerHTML='<button class="btn sm" data-act="pull-close" data-rid="'+hd.dataset.id+'">&#8249; Back to the list</button>'+(S.view!=='overview'?'<button class="btn sm" data-act="home">Overview</button>':'');
+  b.appendChild(r); }); }
 function setView(v){
+  const was=S.view;
   S.view=v;
   document.querySelectorAll('[data-pane]').forEach(p=>p.classList.toggle('hidden',p.dataset.pane!==v));
   document.querySelectorAll('.nav button[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
@@ -2668,6 +2701,7 @@ function setView(v){
   ({overview:['wMain','aMain','hMain'], watchers:['ovMain','aMain','hMain'], attackers:['ovMain','wMain','hMain'], responder:['ovMain','wMain','aMain'], evidence:['ovMain','wMain','aMain','hMain']}[v]||[]).forEach(id=>{ el(id).innerHTML=''; });   // one live copy of each record, so ids stay unique
   render(); el('scroll').scrollTop=0;
   if((v==='overview'||v==='watchers') && MAP) setTimeout(()=>{ try{ MAP.resize(); fitRadius(true); }catch(e){} },60);
+  if(was!==v) navPush(); else backBar();
 }
 function render(){
   if(S.view==='overview') renderOverview();
@@ -2676,6 +2710,7 @@ function render(){
   else if(S.view==='responder') renderResponder();
   else renderEvidence();
   document.querySelectorAll('.ticker [data-m]').forEach(b=>b.classList.toggle('on', (b.dataset.m==='w'&&S.view==='watchers')||(b.dataset.m==='a'&&S.view==='attackers')));
+  backRows();
 }
 function rerender(){ const sc=el('scroll'), y=sc.scrollTop; render(); sc.scrollTop=y; }
 document.querySelectorAll('.nav button[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
@@ -2696,11 +2731,15 @@ document.addEventListener('click', e=>{
     case 'sync-now': syncNow().then(()=>toast(SY.status==='on'?'Synced.':'Backend not reached.')); break;
     case 'sync-reconnect': syncReconnect(); break;
     case 'terms-close': el('terms').classList.add('hidden'); break;
-    case 'pull': { const id=a.dataset.id; S.open.has(id)?S.open.delete(id):S.open.add(id); rerender(); if(el('rost')) renderRoster(); break; }
+    case 'pull': { const id=a.dataset.id; if(S.open.has(id)){ closeRecord(id); break; }
+      S.open.add(id); navPush(id); rerender(); if(el('rost')) renderRoster(); break; }
+    case 'pull-close': closeRecord(a.dataset.rid); break;
+    case 'back': if(NAVN>0) history.back(); else setView('overview'); break;
+    case 'home': { S.open.clear(); if(S.view!=='overview') setView('overview'); else { navPush(); rerender(); el('scroll').scrollTop=0; } break; }
     case 'def': { const t=T(a.dataset.id), i=+a.dataset.i; let d=P.done[t.id]; if(!d||Array.isArray(d)) d=P.done[t.id]={}; d[i]=!d[i]; save();
       if(d[i]) logEvidence('defence','Step completed, '+t.name+': '+t.steps[i][1]); rerender(); if(el('rost')) renderRoster(); break; }
     case 'pipe': { const k=a.dataset.k; if(k==='real'){ S.shelf='real'; setView('attackers'); break; }
-      S.open.add(k==='global'?'global':'profile'); rerender(); setTimeout(()=>{ const n=document.querySelector('#ovMain .tp-head[data-id="'+(k==='global'?'global':'profile')+'"]'); if(n) n.scrollIntoView({block:'start',behavior:'smooth'}); },80); break; }
+      S.open.add(k==='global'?'global':'profile'); navPush(k==='global'?'global':'profile'); rerender(); setTimeout(()=>{ const n=document.querySelector('#ovMain .tp-head[data-id="'+(k==='global'?'global':'profile')+'"]'); if(n) n.scrollIntoView({block:'start',behavior:'smooth'}); },80); break; }
     case 'spdef': { const t=T(a.dataset.id), k=a.dataset.k; let d=P.done[t.id]; if(!d||Array.isArray(d)) d=P.done[t.id]={}; d[k]=!d[k]; save();
       if(d[k]){ const x=spSteps(t,a.dataset.g)[+a.dataset.n]; logEvidence('defence','Special step completed, '+t.name+', '+(a.dataset.g==='d'?'Deflect':'Convert')+': '+(x?x.t:k)); } rerender(); if(el('rost')) renderRoster(); break; }
     case 'plat': P.platform=a.dataset.p; save(); rerender(); if(el('rost')) renderRoster(); break;
@@ -2709,7 +2748,7 @@ document.addEventListener('click', e=>{
       if(m==='w') setView('watchers'); else if(m==='a') setView('attackers'); else if(S.view!=='overview') setView('overview'); else rerender(); break; }
     case 'shelf': S.shelf=a.dataset.s; rerender(); break;
     case 'go': setView(a.dataset.v); break;
-    case 'res': { const t=T(a.dataset.id); S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; setView(t.side==='w'?'watchers':'attackers');
+    case 'res': { const t=T(a.dataset.id), was=S.view; S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; setView(t.side==='w'?'watchers':'attackers'); if(was===S.view) navPush(t.id);
       const c=el('tp-'+t.id); if(c) c.scrollIntoView({block:'start'}); break; }
     case 'note': { const t=T(a.dataset.id), x=val('note-'+t.id); if(!x) return toast('Write what you found first.');
       P.hits=P.hits||{}; P.hits[t.id]=(P.hits[t.id]||0)+1; logEvidence('finding',t.name+': '+x); toast('Added to Evidence.'); rerender(); if(el('rost')) renderRoster(); break; }
@@ -2743,7 +2782,7 @@ document.addEventListener('click', e=>{
     case 'dev-log': { const d=findDevice(a.dataset.id); if(!d||!d.live||d.sim) break;
       logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+'), '+distText(d)+', '+flagOf(d).toLowerCase()+'. Heard '+d.timesSeen+' times since '+new Date(d.firstSeen).toLocaleTimeString()+'.',{sig:d.sig}); toast('Added to Evidence.'); break; }
     case 'sn-add': sensorAdd(); break;
-    case 'go-sensors': { S.open.delete('profile'); S.open.add('devices'); if(S.view!=='overview') setView('overview'); else rerender(); setTimeout(()=>{ const c=el('sensorsSec'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
+    case 'go-sensors': { S.open.delete('profile'); S.open.add('devices'); if(S.view!=='overview') setView('overview'); else { navPush('devices'); rerender(); } setTimeout(()=>{ const c=el('sensorsSec'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
     case 'sn-remove': sensorRemove(a.dataset.id); break;
     case 'sn-hide': SY.cred=null; softRender(); break;
     case 'sn-copy': { const t=SY.cred&&SY.cred.text; if(t && navigator.clipboard) navigator.clipboard.writeText(t).then(()=>toast('Sensor code copied.'),()=>toast('Could not copy. Select the code and copy it by hand.')); else toast('Select the code and copy it by hand.'); break; }
@@ -2782,7 +2821,7 @@ function boot(){
   if(!P.terms){ P.terms={v:1, at:Date.now()}; save(); logEvidence('note','Terms of use accepted at unlock. The user assumes liability for changes made to devices, accounts and software.'); }
   applyGlobal();
   if(PROFILE_Q.every(q=>pv(q.k)===null)) S.open.add('profile');
-  setView('overview');
+  setView('overview'); navKeep();
   setInterval(tick, 1600);
   loadGlobal(); setInterval(loadGlobal, 10*60*1000); setInterval(fillTickers, 60000);
   syncStart(); liveStart();
