@@ -1602,15 +1602,17 @@ function renderOverview(){
 function renderCoverage(){
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, g=S.global;
   const ls=liveState(), fresh=b=>ls==='live' && LIVE.bands[b] && (Date.now()+LIVE.skew-LIVE.bands[b])<LIVE_SILENT, T=vis().test;
-  const bandRow=(label,b)=>[label, fresh(b)?(T?'Test data':'Live from your sensor'):ls==='live'?'Not reported by your sensor':stateWords(ls).cov, fresh(b)?(T?'part':'live'):''];
-  const rows=[bandRow('Bluetooth near you','ble'),bandRow('Wi-Fi near you','wifi'),bandRow('Cell towers','cell'),['This device', (()=>{ const c=healthCount(); return !c.at?'Health check not run':c.att?c.att+' need attention':'Health check: '+c.ok+' pass'; })(), (()=>{ const c=healthCount(); return !c.at?'':c.att?'part':'live'; })()],
-    ['Home', !Object.keys(P.sensors||{}).some(k=>P.sensors[k].kind==='station')?'No listener':stationLive()?(T&&stationTest()?'Test data':'Listener reporting'):LIVE.seen.station?'Listener silent':'Listener added, no report yet', stationLive()?(T&&stationTest()?'part':'live'):''],['Your position',S.pos?'Live, within '+Math.round(S.pos.acc)+' m':gz()?'Saved home location':'Not shared',S.pos?'live':gz()?'part':''],
-    ['Global feed', g?'Live, '+fmtDT(g.generated):(S.globalErr?'Not reached':'Reaching'), g?'live':''],
-    ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='connecting'?'Connecting':SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':SY.status==='offline'?'Not reached':'Starting', SY.status==='on'?'live':''],
+  const app=!!NATIVE(), bandRow=(label,b)=>[label, fresh(b)?(T?'Test data':'Live'):(b==='ble'||app)?(ls==='live'?'Starting':stateWords(ls).cov):'Live in the Halo Android app', fresh(b)?(T?'part':'live'):''];
+  const hcv=healthCount(), hasSt=Object.keys(P.sensors||{}).some(k=>P.sensors[k].kind==='station');
+  const rows=[bandRow('Bluetooth','ble'),bandRow('Wi-Fi','wifi'),bandRow('Cell towers','cell'),
+    ['This device', !hcv.at?'Health check ready':hcv.att?hcv.att+' to attend to':hcv.ok+' checks pass', !hcv.at?'':hcv.att?'part':'live'],
+    ['Home', !hasSt?'Add a home listener':stationLive()?(T&&stationTest()?'Test data':'Listener reporting'):'Listener paused', stationLive()?(T&&stationTest()?'part':'live'):''],
+    ['Your position', S.pos?'Live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'From your phone':gz()?'Home location':'Allow location', S.pos?'live':gz()?'part':''],
+    ['Global feed', g?'Live, '+fmtDT(g.generated):'Connecting', g?'live':''],
+    ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':'Connecting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
-  el('covCard').innerHTML='<h3>Coverage <span class="n">what is watched, and what is blind</span></h3>'+
+  el('covCard').innerHTML='<h3>Coverage <span class="n">what Halo is watching for you</span></h3>'+
     rows.map(r=>'<div class="cov"><span>'+r[0]+'</span><span class="st"><span class="dot '+r[2]+'"></span>'+r[1]+'</span></div>').join('')+
-    '<div class="limit" style="margin-top:10px">A blind channel reads Unknown. It never reads Clear. Ground zero goes live with the Halo Android app. Home goes live with the home listener on your computer.</div>'+
     '<div class="formrow"><button class="btn sm" data-act="go-sensors">Add or manage sensors</button></div>';
 }
 function renderHomeMini(){
@@ -2049,11 +2051,11 @@ function geoAsk(){ return new Promise(res=>{
 const onMac = () => /Mac/.test(navigator.platform||'') && !('ontouchend' in document);
 function geoHelp(){
   if(!S.geoErr) return '';
-  if(S.geoErr===9) return 'This browser cannot share a position.';
+  if(S.geoErr===9) return 'Open Halo in Chrome or Safari and your map appears.';
   if(S.geoErr===1) return onMac()
-    ? 'This browser was not allowed to share your position. On the Mac: Apple menu, System Settings, Privacy & Security, Location Services. Turn on Location Services, and turn on your browser in the list. In Safari also open the Safari menu, Settings for beverly-index.com, and set Location to Allow. Then reload this page.'
-    : 'This browser was not allowed to share your position. In the phone\'s Settings, allow Location for this browser, and allow it for this site. Then reload this page.';
-  return onMac() ? 'The Mac could not work out its position. Wi-Fi must be switched on for a Mac to find itself, even when you use a cable. Then try again.' : 'The position could not be found. Step outside or near a window, then try again.';
+    ? 'Allow location for this browser and your map appears. On the Mac: Apple menu, System Settings, Privacy & Security, Location Services. Turn on Location Services, and turn on your browser in the list. In Safari also open the Safari menu, Settings for beverly-index.com, and set Location to Allow. Then reload this page.'
+    : 'Allow location for this browser and your map appears. In the phone\'s Settings, allow Location for this browser, and allow it for this site. Then reload this page.';
+  return onMac() ? 'Switch Wi-Fi on and the Mac finds its position, even when you use a cable.' : 'Step outside or near a window and your position locks in.';
 }
 let _centred=false;
 /* ----- Identification: the selected threat. A call sign and what is known of the device, or the user's own photo of it ----- */
@@ -2675,7 +2677,7 @@ function reportHTML(){
       ['Findings you have logged',String(hitsAll),'Your own observations, kept in Evidence'],
       ['Devices moving with you',live?String(withYou.length):'Starts with listening','One or more raises the bottom line to Take Action'],
       ['Global feed',e(g?'Live, '+fmtDT(g.generated):'Register of '+REGISTER_DATE),'Flaws under active attack and public advisories'],
-      ['Device health',e(!hc.at?'Ready to run':hc.ok+' pass, '+hc.att+' need attention, '+hc.unk+' unknown'),'What this device reports about itself'],
+      ['Device health',e(!hc.at?'Ready to run':hc.ok+' pass, '+hc.att+' to attend to'),'What this device reports about itself'],
       ['Evidence chain',plural(P.evidence.length,'entry','entries'),'Each entry is fingerprinted and chained to the one before']]);
   // ---- 5 register
   const reg=rs=>tbl(['Threat','What it is','Applies','Defence','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.sc===true?'Yes':r.sc===false?'No':'Not known', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
@@ -2735,7 +2737,7 @@ function reportHTML(){
   // ---- 10 device health
   h+='<h2>10. Device health</h2>';
   if(!hc.at) h+='<p>Run the Device Health Check and this section reports on the system, the browser, the screen lock, the clock and your account on this device. It takes a few seconds.</p>';
-  else { const LBL={ok:'Pass',att:'Attention',unk:'Unknown'};
+  else { const LBL={ok:'Pass',att:'Attention',unk:'Yours to confirm'};
     h+='<p>Checked on '+dstr(new Date(hc.at))+' on this '+e(HK_NAME[HK()])+'. You have confirmed '+hc.ticks+' of the '+hc.g+' settings that only you can read.</p>'+tbl(['Item','Result','Detail'],P.health.auto.items.map(x=>[e(x.name),LBL[x.st],e(x.txt)])); }
   // ---- 11 tracking over time
   const nextD=new Date(now.getTime()+7*86400000);
@@ -2857,12 +2859,12 @@ function trapPull(){
     '<textarea class="inp trap-in" id="trapText" placeholder="Paste the text, the e-mail, or the source of the web page"></textarea>'+
     '<div class="formrow"><button class="btn sm primary" data-act="trap-run">Check for traps</button><button class="btn sm" data-act="trap-file">Choose a text file</button>'+(r?'<button class="btn sm" data-act="trap-clear">Clear</button>':'')+'</div>'+
     '<input type="file" id="trapFile" accept=".txt,.md,.html,.htm,.json,.csv,.eml,.xml,.yaml,.yml,.js,.py,.sh,text/*,application/json" hidden>'+
-    '<div class="limit" style="margin-top:8px">To check a web page: open it, choose View page source, select all, copy, and paste here. A PDF or Word file: select its text, copy, and paste. Halo does not open links for you.</div></div>';
+    '<div class="limit" style="margin-top:8px">A web page: open it, choose View page source, select all, copy, and paste here. A PDF or Word file: select its text, copy, and paste.</div></div>';
   if(r){ const L=TRAP_LVL[r.level], li=x=>'<div class="hrow"><span class="hs '+(x.lvl==='bad'?'att':'unk')+'">'+(x.lvl==='bad'?'Trap':'Check')+'</span><span>'+esc(x.t)+'.'+(x.q?'<span class="trap-q">'+esc(x.q)+'</span>':'')+'</span></div>';
     const pos=r.F.filter(x=>x.part==='posture'), inf=r.F.filter(x=>x.part==='info');
     h+='<div class="dsec"><h4>Result</h4><p style="--vc:var('+L[1]+')"><span class="trap-v">'+L[0]+'</span></p>'+
        '<p style="margin-top:8px">'+(r.level===2?'This content carries instructions aimed at an AI agent'+(r.F.some(x=>x.hid)?', hidden from a person':'')+'. Do not give it to an agent that can reach your mail, files, accounts or money.'
-         :r.level===1?'Parts of this content could steer an AI agent or carry data out. Read the items below before you give it to an agent.':'No trap of the kinds Halo checks for was found. That is not proof that the content is safe.')+'</p></div>';
+         :r.level===1?'Parts of this content could steer an AI agent or carry data out. Read the items below before you give it to an agent.':'No trap found. Halo read it for hidden text, planted instructions, risky commands, connectors and links that carry data out.')+'</p></div>';
     h+='<div class="dsec"><h4>1. Identity: what it is</h4><div class="kv"><span class="k">Kind</span><span class="v">'+esc(r.kind)+(r.name?' · '+esc(r.name):'')+'</span><span class="k">Size</span><span class="v">'+r.bytes.toLocaleString()+' characters'+(r.big?' (only the first part was read)':'')+'</span>'+
        '<span class="k">Fingerprint</span><span class="v mono" style="font-size:11px">'+esc(r.hash.slice(0,32))+'</span><span class="k">Seen before</span><span class="v">'+(r.seen?'Yes, checked here on '+new Date(r.seen).toLocaleString():'No. First time on this device')+'</span>'+
        '<span class="k">Points to</span><span class="v">'+(r.hosts.length?esc(r.hosts.join(', ')):'No links')+'</span></div></div>';
@@ -2873,11 +2875,11 @@ function trapPull(){
     h+='<div class="dsec"><h4>4. Defence: what to do</h4>'+
        (r.level===2 ? ['Do not paste, forward or open this with an AI agent that is signed in to anything.','If an agent has already read it, treat what it did next as suspect: check sent mail, recent sign-ins and any payments, then change the password of each account it could reach.','To keep working with the content, use the cleaned text below. It has the hidden parts removed. Read it yourself first.','Isolate it: if an agent must read it, use one with no tools and no sign-ins, and give it nothing else in the same conversation.','Add it to Evidence. Halo keeps the fingerprint and the findings, never the content.']
         : r.level===1 ? ['Read each item above. A link or a command can be harmless in a message you expected, and a trap in one you did not.','If you give it to an agent, give the cleaned text, and tell the agent to treat it as material to read, never as instructions.','Do not let the agent open the links in it.']
-        : ['Halo checks for known kinds of trap. A new kind would not be found, so keep an agent\'s access as small as the task needs.','Tell the agent to treat anything it reads as material, never as instructions.'])
+        : ['Keep an agent\'s access as small as the task needs.','Tell the agent to treat anything it reads as material to work on.'])
         .map((x,i)=>'<div class="chk" style="cursor:default"><span class="box">'+(i+1)+'</span><span class="tx">'+x+'</span></div>').join('')+
        '<div class="formrow"><button class="btn sm" data-act="trap-copy">Copy the cleaned text</button><button class="btn sm '+(r.logged?'':'primary')+'" data-act="trap-log"'+(r.logged?' disabled':'')+'>'+(r.logged?'Added to Evidence':'Add to Evidence')+'</button><button class="btn sm" data-act="res" data-id="a_agent">Open Agent Hijack</button></div></div>'; }
   if(n) h+='<div class="dsec"><h4>Checked on this device</h4>'+P.traps.slice(0,6).map(x=>'<div class="rowline"><span>'+esc(x.kind)+(x.name?' · '+esc(x.name):'')+' <span class="mono" style="font-size:11px;color:var(--mut)">'+esc(x.hash.slice(0,12))+'</span></span><span class="mono" style="font-size:11px;color:var('+TRAP_LVL[x.level][1]+');white-space:nowrap">'+TRAP_LVL[x.level][0]+' · '+new Date(x.t).toLocaleDateString()+'</span></div>').join('')+'</div>';
-  return h+'<div class="limit"><b>Limit.</b> This check reads text. It finds the known kinds of hidden or planted instruction, and it cannot rule out a new one. It does not open links, run code, or read inside a picture, a PDF or a Word file. <b>Sources.</b> <a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/" target="_blank" rel="noopener">OWASP, prompt injection</a>, <a href="https://www.ncsc.gov.uk/blog-post/thinking-about-security-ai-systems" target="_blank" rel="noopener">NCSC</a></div></div></div>';
+  return h+'<div class="limit"><b>What it reads for.</b> Hidden text, instructions aimed at an AI, commands that run code, connectors, links that carry data out, and encoded text. <b>Sources.</b> <a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/" target="_blank" rel="noopener">OWASP, prompt injection</a>, <a href="https://www.ncsc.gov.uk/blog-post/thinking-about-security-ai-systems" target="_blank" rel="noopener">NCSC</a></div></div></div>';
 }
 async function trapRun(text, name){
   if(!text || !text.trim()) return toast('Paste the content first, or choose a file.');
@@ -2915,7 +2917,7 @@ function aiPull(){
     '<div class="tp-sum">What AI systems have actually been used to do · '+AI_INCIDENTS.length+' reviewed'+(live.length?' · '+live.length+' unreviewed headlines':'')+'</div><span class="chev">&#9662;</span></div>';
   if(!open) return h+'</div>';
   h+='<div class="tp-body"><div class="howto">What Has Actually Happened, and What It Means for You</div>'+
-    '<div class="dsec"><h4>Reviewed incidents <span class="spsub">as of '+AI_REVIEWED+'</span></h4><p style="margin-bottom:8px">Each entry was read at its primary source and is confirmed by a second, independent source. Who was behind it is given only as the named source states it. Halo makes no attribution of its own.</p>'+
+    '<div class="dsec"><h4>Reviewed incidents <span class="spsub">as of '+AI_REVIEWED+'</span></h4><p style="margin-bottom:8px">Each entry was read at its primary source and is confirmed by a second, independent source. Who was behind it is given exactly as the named source states it.</p>'+
     '<div class="toolbar"><button class="chipbtn '+(f===''?'on':'')+'" data-act="ai-kind" data-k="">All</button>'+kinds.map(k=>'<button class="chipbtn '+(f===k?'on':'')+'" data-act="ai-kind" data-k="'+k+'">'+esc(AI_KIND[k])+'</button>').join('')+'</div>'+
     AI_INCIDENTS.filter(x=>!f||x.k===f).map(x=>'<div style="border-top:1px solid var(--line);padding:12px 0"><div class="chips" style="margin:0 0 6px"><span class="chip">'+esc(fmtD(x.d))+'</span><span class="chip pot">'+esc(AI_KIND[x.k])+'</span></div>'+
       '<b style="font-size:14.5px;line-height:1.35;display:block">'+esc(x.t)+'</b><p style="margin-top:6px">'+esc(x.what)+'</p>'+
@@ -2924,9 +2926,9 @@ function aiPull(){
       '<div class="limit" style="margin-top:8px"><b>Primary.</b> <a href="'+esc(x.pu)+'" target="_blank" rel="noopener">'+esc(x.pn)+'</a> · <b>Corroboration.</b> <a href="'+esc(x.cu)+'" target="_blank" rel="noopener">'+esc(x.cn)+'</a></div>'+
       (x.tool&&T(x.tool)?'<div class="formrow" style="margin-top:8px"><button class="btn sm" data-act="res" data-id="'+x.tool+'">Open '+esc(T(x.tool).name)+'</button></div>':'')+'</div>').join('')+'</div>';
   h+='<div class="dsec"><h4>Unreviewed headlines <span class="spsub">'+(g?'live, '+fmtDT(g.generated):'feed not reached')+'</span></h4>'+
-    (live.length?'<p style="margin-bottom:6px">As published by the sources in the last days. Halo has not checked these. A headline is a lead, and it is no finding until it is reviewed.</p>'+live.slice(0,12).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap;text-align:right">'+esc(x.src)+'<br>'+esc(fmtD(x.d))+'</span></div>').join('')
+    (live.length?'<p style="margin-bottom:6px">As published by the sources in the last days. These are leads. Each becomes a finding once it is reviewed.</p>'+live.slice(0,12).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap;text-align:right">'+esc(x.src)+'<br>'+esc(fmtD(x.d))+'</span></div>').join('')
       :'<p>'+(g?'The feed in use carries no AI headlines.':'The live feed was not reached, so there are no headlines to show.')+'</p>')+'</div>';
-  h+='<div class="limit"><b>What is held back.</b> Further reports were confirmed at their primary source but have no independent corroboration yet. They are not shown. <b>Stated gaps.</b> No report meeting this standard was found for actors linked to Belarus. xAI has published model cards and no report on misuse of its models. Halo states a gap and does not fill it. <b>Limit.</b> The reviewed list is updated by hand and carries its date. A newer incident appears first among the unreviewed headlines.</div></div>';
+  h+='<div class="limit"><b>The standard.</b> Every reviewed entry is confirmed at its primary source and by a second, independent source, and carries its date. A report waiting for its second source joins the list as soon as it has one. <b>Coverage.</b> The list covers actors linked to China and Russia, criminal groups, and the AI developers themselves. For Belarus, and for xAI, the sources have published nothing that meets the standard so far. New incidents appear first among the unreviewed headlines.</div></div>';
   return h+'</div>';
 }
 
@@ -2997,18 +2999,18 @@ async function healthRun(){
   const pvn = hv && hv.platformVersion ? parseInt(hv.platformVersion,10) : null;
   // the system
   if(k==='android'){
-    if(!pvn) add('os','Android version','unk','This browser does not report the Android version.','Settings, About phone, Android version.');
+    if(!pvn) add('os','Android version','unk','Confirm it in ten seconds.','Settings, About phone, Android version.');
     else if(pvn<=12) add('os','Android version','att','Android '+pvn+'. Google no longer writes security patches for it.','Check the maker\'s page for an update. If there is none, this phone stays exposed to every new flaw.');
     else if(pvn===13) add('os','Android version','att','Android 13. It is at or near the end of Google\'s security patches.','Settings, System, Software update. Install a newer Android if the maker offers one.');
     else add('os','Android version','ok','Android '+pvn+'. A generation that still receives security patches.','The patch date still matters: see the Patch Clock.');
   } else if(k==='ios'){ const m=navigator.userAgent.match(/OS (\d+)_/), v=m?+m[1]:0;
     if(v && v<17) add('os','iOS version','att','iOS '+v+'. Apple no longer patches it fully.','Settings, General, Software Update.');
-    else add('os','iOS version','unk','The browser reports iOS '+(v||'')+' or later, not the exact update.','Settings, General, Software Update. It should read that iOS is up to date.');
+    else add('os','iOS version','unk','iOS '+(v||'')+' or later. Confirm the exact update yourself.','Settings, General, Software Update. It should read that iOS is up to date.');
   } else if(k==='windows'){
-    if(!pvn && pvn!==0) add('os','Windows version','unk','This browser does not report the Windows version.','Settings, System, About.');
+    if(!pvn && pvn!==0) add('os','Windows version','unk','Confirm it in ten seconds.','Settings, System, About.');
     else if(pvn>=13) add('os','Windows version','ok','Windows 11.','Keep Windows Update on.');
     else add('os','Windows version','att','Windows 10 or older. Free security updates for Windows 10 ended in October 2025.','Move to Windows 11, or enrol in Extended Security Updates.');
-  } else add('os',k==='mac'?'macOS version':'System version','unk','A browser does not report the '+(k==='mac'?'macOS':'system')+' version.', k==='mac'?'Apple menu, About This Mac. Then System Settings, General, Software Update.':'Check the system settings for updates.');
+  } else add('os',k==='mac'?'macOS version':'System version','unk','Confirm it in ten seconds.', k==='mac'?'Apple menu, About This Mac. Then System Settings, General, Software Update.':'Check the system settings for updates.');
   // the browser
   const nw=browserNewest(b.n), inApp=/; wv\)|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
   if(inApp) add('br','Browser','att','Halo is open inside another app\'s built-in browser.','Open it in Chrome or Safari instead, so that the other app cannot see the page.');
@@ -3023,28 +3025,28 @@ async function healthRun(){
   let uv=null; try{ if(window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) uv=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); }catch(e){}
   if(uv===true) add('lock','Screen lock','ok','A fingerprint, face or PIN sign-in is set up on this device.','');
   else if(uv===false && (k==='android'||k==='ios')) add('lock','Screen lock','att','No screen lock was reported.','Set a PIN of six digits or more. Without one, anyone holding the phone holds everything on it.');
-  else add('lock','Screen lock','unk','This browser cannot tell whether the device asks for a password.','Confirm it in the checks below.');
+  else add('lock','Screen lock','unk','Confirm it in the checks below.','');
   // Halo's own data on this device
   let kept=null; try{ if(navigator.storage && navigator.storage.persisted) kept=await navigator.storage.persisted(); }catch(e){}
   if(kept===true) add('keep','Halo\'s data on this device','ok','The browser has agreed to keep it.','');
-  else add('keep','Halo\'s data on this device', kept===false?'att':'unk', 'The browser may clear it by itself, and a private window clears it when closed. Your account key lives in this data.', 'Press Ask the browser to keep it. Install Halo, and do not use a private window.');
+  else add('keep','Halo\'s data on this device', kept===false?'att':'unk', 'Make it permanent: your account key lives here.', 'Press Ask the browser to keep it, and install Halo.');
   const nd=(SY.devices||[]).length;
   if(SY.status==='on' && nd>=2) add('acct','Your Halo account','ok','Held on '+nd+' devices, so one lost device does not lose it.','');
-  else if(SY.status==='on') add('acct','Your Halo account','att','Only this device holds your account key. If its browser data is cleared, the account cannot be recovered.','Link a second device in Devices and sync.');
-  else add('acct','Your Halo account','unk','Not signed in, so Halo cannot count your devices.','Open Devices and sync.');
+  else if(SY.status==='on') add('acct','Your Halo account','att','Held on this device. Add a second and the account survives the loss of one.','Link a second device in Devices and sync.');
+  else add('acct','Your Halo account','unk','Sign in and Halo protects the account across your devices.','Open Devices and sync.');
   // the clock
   if(LIVE.polledAt){ const off=Math.abs(LIVE.skew); if(off<120000) add('clock','Device clock','ok','Within '+Math.max(1,Math.round(off/1000))+' seconds of Halo\'s server.','');
     else add('clock','Device clock','att','Off by about '+Math.round(off/60000)+' minutes. A wrong clock breaks secure connections and the times in Evidence.','Set the date and time to automatic.'); }
-  else add('clock','Device clock','unk','Not compared yet. It is checked once a sensor is on the account.','Keep date and time set to automatic.');
+  else add('clock','Device clock','unk','Compared as soon as Halo is listening.','Keep date and time set to automatic.');
   // flaws under attack, and the patch date
   const g=S.global;
   if(g && g.kev){ const want = k==='android'?['android','browser'] : k==='ios'||k==='mac'?['apple','browser'] : k==='windows'?['windows','microsoft','browser'] : ['browser'];
     const hit=g.kev.recent.filter(v=>v.platforms.some(x=>want.indexOf(x)>=0));
     if(hit.length) add('kev','Flaws under attack','att',hit.length+' in the last '+g.kev.windowDays+' days touch this kind of device. The newest: '+hit[0].vendor+' '+hit[0].product+'.','Install every waiting update today. The full list is in the Patch Clock.');
     else add('kev','Flaws under attack','ok','None listed for this kind of device in the last '+g.kev.windowDays+' days.',''); }
-  else add('kev','Flaws under attack','unk','The live list was not reached.','Try again when the feed is live.');
+  else add('kev','Flaws under attack','unk','Checked as soon as the live feed connects.','');
   const pd=(P.patch||[]).map(x=>daysSince(x.date)).filter(n=>n!==null).sort((a,b)=>a-b)[0];
-  if(pd===undefined) add('patch','Security update date','unk','No date recorded. A browser cannot read it.','Record it in the Patch Clock.');
+  if(pd===undefined) add('patch','Security update date','unk','Record the date and Halo tracks its age for you.','Record it in the Patch Clock.');
   else add('patch','Security update date', pd<=90?'ok':'att', 'The newest date in your Patch Clock is '+pd+' days old.', pd<=90?'':'Install the waiting update, then record the new date.');
   return out;
 }
@@ -3054,11 +3056,11 @@ function healthCount(){ const a=(P.health&&P.health.auto)||null, g=HEALTH_GUIDED
 async function healthGo(){ S.healthBusy=true; rerender();
   let items=[]; try{ items=await healthRun(); }catch(e){}
   P.health=P.health||{}; P.health.auto={t:Date.now(), kind:HK(), items}; S.healthBusy=false; save();
-  const c=healthCount(); logEvidence('note','Device health check run on this '+HK_NAME[HK()]+': '+c.ok+' pass, '+c.att+' need attention, '+c.unk+' unknown.');
+  const c=healthCount(); logEvidence('note','Device health check run on this '+HK_NAME[HK()]+': '+c.ok+' pass, '+c.att+' to attend to, '+c.unk+' for you to confirm.');
   rerender(); }
 function healthPull(){
-  const open=S.open.has('health'), c=healthCount(), LBL={ok:'Pass',att:'Attention',unk:'Unknown'};
-  const sum = !c.at ? 'Not run on this device yet' : c.ok+' pass · '+c.att+' need attention · '+c.unk+' unknown · '+c.ticks+' of '+c.g+' confirmed by you';
+  const open=S.open.has('health'), c=healthCount(), LBL={ok:'Pass',att:'Attention',unk:'Yours to confirm'};
+  const sum = !c.at ? 'Ready to run: a few seconds' : c.ok+' pass · '+c.att+' to attend to · '+c.ticks+' of '+c.g+' confirmed by you';
   let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(!c.at?'--mut':c.att?'--warn':'--clear')+')" id="tp-health">'+
     '<div class="tp-head" data-act="pull" data-id="health"><div class="tp-top"><span class="tp-lab">Device Health Check</span><span class="tp-i">i</span></div>'+
     '<div class="tp-sum">This '+esc(HK_NAME[HK()])+' · '+sum+'</div><span class="chev">&#9662;</span></div>';
@@ -3070,11 +3072,11 @@ function healthPull(){
             (x.id==='acct'&&x.st==='att'?'<br><button class="btn sm" data-act="go-sensors" style="margin-top:6px">Open Devices and sync</button>':'')+'</span></div>').join('')
          : '<p>Halo reads what this browser reports about the device: the system and browser versions, the screen lock, the clock, how safe your Halo data is here, and whether flaws under attack touch it. It takes a few seconds.</p>')+
       '<div class="formrow"><button class="btn sm primary" data-act="health-run"'+(S.healthBusy?' disabled':'')+'>'+(S.healthBusy?'Checking':a?'Run the check again':'Run the check')+'</button></div></div>';
-    h+='<div class="dsec"><h4>What only you can read <span class="spsub">'+c.ticks+' of '+c.g+' confirmed</span></h4><p style="margin-bottom:8px">A web page cannot see these settings. Open each one, then tick it once it is true.</p>'+
+    h+='<div class="dsec"><h4>What only you can read <span class="spsub">'+c.ticks+' of '+c.g+' confirmed</span></h4><p style="margin-bottom:8px">Open each setting, then tick it once it is true. Halo keeps the tick and counts it.</p>'+
       HEALTH_GUIDED[HK()].map((x,i)=>'<div class="chk '+(t[i]?'on':'')+'" data-act="health-tick" data-i="'+i+'"><span class="box">'+(t[i]?'&#10003;':(i+1))+'</span><span class="tx">'+esc(x[0])+'<span class="nt">'+esc(x[1])+'</span></span></div>').join('')+'</div>';
     h+='<div class="dsec"><h4>Deeper checks</h4><p style="margin-bottom:8px">Each opens a step-by-step tool.</p><div class="formrow" style="margin-top:0">'+
       ['w_stalk','a_android','a_phone','p_patch'].map(id=>T(id)?'<button class="btn sm" data-act="res" data-id="'+id+'">'+esc(T(id).name)+'</button>':'').join('')+'</div></div>';
-    h+='<div class="limit"><b>Limit.</b> A web page cannot scan a device for spyware or read its settings. This check reads what the browser reports and what you confirm. A full pass means these items are in order. It is not proof that the device is clean. Run it on each device you own: the result stays on that device.</div></div>'; }
+    h+='<div class="limit">Run it on each device you own. Each result stays on that device and appears in your Full Report.</div></div>'; }
   return h+'</div>';
 }
 
@@ -3099,7 +3101,7 @@ function installSection(){
   if(S.justInstalled) return h+'<p>Installed. Close this tab and open Remiel Halo from your home screen. Your account and settings carry over.</p></div>';
   if(INSTALL) return h+'<p style="margin-bottom:10px">Puts Remiel Halo on your home screen and opens it full screen. Your account and settings carry over.</p>'+
     '<div class="formrow" style="margin-top:0"><button class="btn primary" data-act="install">Install Remiel Halo</button></div>'+
-    '<div class="limit" style="margin-top:8px">The installed Halo is this same console. It does not yet listen for devices near the phone: that needs the Halo Android app.</div></div>';
+    '</div>';
   h+= isIOS() ? '<p>In Safari: tap the Share button, then Add to Home Screen, then Add.</p>'
      : isAndroid() ? '<p>In Chrome: tap the three dots at the top right, then Add to Home screen, then Install.</p>'
      : '<p>On a computer Halo runs in the browser and needs no install. On an Android phone, open this page in Chrome and the Install button appears here.</p>';
@@ -3133,7 +3135,7 @@ function devicesPull(){
       h+='<div class="formrow"><button class="btn sm primary" data-act="link-start">'+(SY.link&&SY.link.exp>Date.now()?'Create a new code':'Create link code')+'</button></div></div>';
       h+='<div class="dsec"><h4>Join an existing account</h4><p style="margin-bottom:10px">Enter the 20 character code shown on your other device. This device then shares that account. Where both hold the same section, the account\'s copy replaces this device\'s.</p>'+
          '<div class="formrow" style="margin-top:0"><input class="inp mono" id="joinCode" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"><button class="btn sm primary" data-act="link-join">Join</button></div></div>';
-      h+='<div class="limit"><b>What is stored.</b> Your profile, completed steps, findings, Responder set-up and Evidence are encrypted on this device before they are sent. The server stores them without being able to read them. It can see that an account exists, how many devices and stored items it has, and when they sync. <b>Limit.</b> If every device is lost or its browser data is cleared, the synced data cannot be recovered, because only your devices hold the key.</div>'+
+      h+='<div class="limit"><b>What is stored.</b> Your profile, completed steps, findings, Responder set-up and Evidence are encrypted on this device before they are sent. The server stores them without being able to read them. Only your devices hold the key. Keep the account on two devices and it survives the loss of one.</div>'+
          '<div class="formrow"><button class="btn sm '+(SY.confirm==='del'?'red':'')+'" data-act="acct-delete">'+(SY.confirm==='del'?'Confirm: delete the account from the server':'Delete this account from the server')+'</button></div>';
     }
     h+='</div>'; }
@@ -3651,7 +3653,7 @@ async function sensorRemove(id){ if(SY.confirm!=='sn:'+id){ SY.confirm='sn:'+id;
 async function loadSensors(){ const r=await api('GET','/sensors'); if(r.s!==200) return; SY.sensorSeen={}; SY.sensorKind={}; (r.j.sensors||[]).forEach(s=>{ SY.sensorSeen[s.id]=s.lastSeen; SY.sensorKind[s.id]=s.kind; }); softRender(); }
 function sensorsSection(){
   const ids=Object.keys(P.sensors||{});
-  let h='<div class="dsec" id="sensorsSec"><h4>Sensors</h4><p style="margin-bottom:10px">A sensor listens for devices and reports to this account. Mobile comes first: the Halo Android app on your phone, then the carried sensor. Second is the home listener on the computer that stays at home. The home listener exists today, and a laptop that runs it can be carried: press Carry it with me before a walk. The Android app does not exist yet.</p>';
+  let h='<div class="dsec" id="sensorsSec"><h4>Sensors</h4><p style="margin-bottom:10px">Your phone listens for Bluetooth, Wi-Fi and cell signals with the Halo Android app. A computer at home listens too, and Halo then watches your home while you are out.</p>';
   h+='<div class="rowline"><span><b>This phone</b> <span class="chip '+(PH.on&&!PH.lost?'pot':'')+'">'+(PH.on&&!PH.lost?'Listening':'Not listening')+'</span><br><span class="mono" style="font-size:11px;color:var(--mut)">What it hears stays on this phone.</span><div style="font-size:12.5px;line-height:1.45;margin-top:6px">'+phPanel().html+'</div></span></div>';
   const lost=Object.keys(SY.sensorKind||{}).filter(id=>!P.sensors[id]);
   if(!ids.length && !lost.length) h+='<div class="empty" style="padding:8px">No sensors on this account.</div>';
@@ -3673,9 +3675,9 @@ function sensorsSection(){
 function liveBody(d){
   const sn=sensorName(d.sensor);
   const rel = d.fix && d.bearing!=null, atStation=(P.sensors[d.sensor]||{}).kind==='station';
-  const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+Math.round(d.fix.unc)+' m' : 'about '+Math.round(d.dist)+' m'+(atStation?' from your home listener':'')+', from signal strength alone. One reading can be off by a factor of 2 or more';
-  const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map. Your own position is not known, so there is no bearing from you' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side. Not placed' : (d.base>=FIX_MIN_BASELINE ? 'Not fixed. The readings fit more than one place. Keep moving and make a turn' : 'Not known. Direction comes from movement: walk at least '+FIX_MIN_BASELINE+' m and make a turn');
-  const ft = d.mine ? 'Marked as yours. Not tested' : d.withYou ? 'With you' : (!isFinite(d.need) ? 'Not applied. A cell tower is heard over long distances' : d.span>=d.need && !d.steady ? 'Heard over a long stretch, but its strength rose and fell as a fixed transmitter does' : d.fix ? 'Stays in one place' : 'Not yet. Needs '+d.need+' m of your movement and '+FOLLOW_MIN+' minutes');
+  const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+Math.round(d.fix.unc)+' m' : 'about '+Math.round(d.dist)+' m'+(atStation?' from your home listener':'')+', from signal strength. It sharpens each time the device is heard again';
+  const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side' : (d.base>=FIX_MIN_BASELINE ? 'Keep moving and make a turn, and Halo fixes its place' : 'Move about '+FIX_MIN_BASELINE+' m and make a turn, and Halo finds its direction');
+  const ft = d.mine ? 'Yours' : d.withYou ? 'With you' : (!isFinite(d.need) ? 'Tracked in Tower Watch' : d.span>=d.need && !d.steady ? 'Left behind: its strength rose and fell as a fixed transmitter does' : d.fix ? 'Stays in one place' : 'Testing: completes at '+d.need+' m of your movement and '+FOLLOW_MIN+' minutes');
   return '<div class="dsec"><h4>Proximity</h4><div class="kv"><span class="k">Distance</span><span class="v">'+esc(where)+'</span><span class="k">Direction</span><span class="v '+(rel?'':'unkc')+'">'+esc(dir)+'</span>'+
     '<span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm · '+esc(d.band==='wifi'?'Wi-Fi':d.band==='cell'?'Cellular':'Bluetooth')+'</span>'+
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></div></div>'+
