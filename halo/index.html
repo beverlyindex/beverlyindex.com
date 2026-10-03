@@ -1272,7 +1272,8 @@ function renderCoverage(){
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
   el('covCard').innerHTML='<h3>Coverage <span class="n">what is watched, and what is blind</span></h3>'+
     rows.map(r=>'<div class="cov"><span>'+r[0]+'</span><span class="st"><span class="dot '+r[2]+'"></span>'+r[1]+'</span></div>').join('')+
-    '<div class="limit" style="margin-top:10px">A blind channel reads Unknown. It never reads Clear. Ground zero goes live with the Halo Android app. Home goes live with the home listener on your computer.</div>';
+    '<div class="limit" style="margin-top:10px">A blind channel reads Unknown. It never reads Clear. Ground zero goes live with the Halo Android app. Home goes live with the home listener on your computer.</div>'+
+    '<div class="formrow"><button class="btn sm" data-act="go-sensors">Add or manage sensors</button></div>';
 }
 function renderHomeMini(){
   const n=P.home.people.length;
@@ -1307,11 +1308,13 @@ function renderVicinity(){
   el('radLine').innerHTML = rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b> It extends when a known threat beyond it is incoming.';
-  const devLine = V.mode==='live' ? (V.test?'test data from a simulated sensor':'live from your sensor, last report '+hhmm(liveLast()-LIVE.skew))
+  const devLine = V.mode==='live' ? (V.test?'test data from a simulated sensor':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
     : V.mode==='sim' ? 'simulated, updated every 1.6 seconds' : stateWords(V.mode).line;
-  el('posLine').textContent = 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':'not shared, the map is not centred on you')+' · Devices: '+devLine;
+  setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':'not shared, so the spheres show no street map')+' · Devices: '+esc(devLine)+
+    (S.pos?'':'<div class="formrow" style="margin-top:8px"><button class="btn sm primary" data-act="geo-ask">Share my position</button></div>'+(S.geoErr?'<div class="limit" style="margin-top:8px">'+esc(geoHelp())+'</div>':'')));
+  syncBase();
   const note=el('mapNote');
-  if(MAP || !S.mapFail){ note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':'Live from your sensor. Solid: placed. Ring with a centre dot: direction rough. Hollow on a dashed ring: somewhere on that ring.')
+  if(MAP || !S.mapFail){ note.textContent = V.mode==='live' ? (V.test?'Test data from a simulated sensor. These are not real devices.':(mobileLive()?'Live from your sensor.':'Live from your home listener.')+' Solid: placed. Ring with a centre dot: direction rough. Hollow on a dashed ring: somewhere on that ring.')
     : V.mode==='sim' ? 'Simulated preview. These are not real devices.' : V.mode==='waiting' ? 'Waiting for the first report from your sensor.'
     : V.mode==='none' ? 'Not monitored. No sensor near you is connected, so no suspects are shown.' : stateWords(V.mode).note+' No suspects can be shown. This is Unknown, not Clear.'; }
   const host=el('suspects'); let html;
@@ -1367,11 +1370,11 @@ function renderResponder(){
   h+='<div class="seg" style="margin-bottom:8px"><button data-act="h-arm" data-v="n" class="m-auto '+(!away?'on':'')+'">Home</button><button data-act="h-arm" data-v="y" class="m-w '+(away?'on':'')+'">Away</button></div>';
   h+='<div class="limit" style="margin-bottom:14px">'+(away
       ? '<b>Away.</b> You are out. Halo watches the home and raises an alert on your phone. That needs a home station. None is connected yet, so the home reads Unknown.'
-      : '<b>Home.</b> You are in. Alerts to your phone are off. Set up the people, the rooms, the rules and the response chain here.')+'</div>';
+      : '<b>Home.</b> You are in. Alerts to your phone are off. Set up the people, the rooms, the rules and the emergency numbers here.')+'</div>';
   if(S.homeAlert){
     h+='<div class="alertbar"><div class="at">Take Action <span class="chip real" style="vertical-align:middle;margin-left:6px">Simulated preview</span></div>'+
-       '<p>Possible fall: <b>'+esc(S.homeAlert.who)+'</b>, '+esc(S.homeAlert.room)+', '+new Date(S.homeAlert.t).toLocaleTimeString()+'. No movement since. Work down the response chain.</p><div class="dev-acts">'+
-       (H.contacts.length ? H.contacts.map((c,i)=>'<a class="btn red" style="text-decoration:none;text-align:center" href="tel:'+esc(c.phone)+'">'+(i+1)+'. Call '+esc(c.name)+'</a>').join('') : '<span class="limit">Add people to the response chain so their call buttons appear here.</span>')+
+       '<p>Possible fall: <b>'+esc(S.homeAlert.who)+'</b>, '+esc(S.homeAlert.room)+', '+new Date(S.homeAlert.t).toLocaleTimeString()+'. No movement since. Call an emergency number.</p><div class="dev-acts">'+
+       (H.contacts.length ? H.contacts.map((c,i)=>'<a class="btn red" style="text-decoration:none;text-align:center" href="tel:'+esc(c.phone)+'">Call '+esc(c.name)+'</a>').join('') : '<span class="limit">Add emergency numbers so their call buttons appear here.</span>')+
        '<button class="btn" data-act="h-clear">Clear the preview</button></div></div>';
   }
   const radar=H.rooms.filter(r=>r.sensor==='radar').length, watches=H.people.filter(p=>p.watch).length;
@@ -1379,9 +1382,9 @@ function renderResponder(){
 
   if(away){
     h+='<div class="card"><h3>People at home <span class="n">'+H.people.length+'</span>'+(S.homePreview?'<span class="chip real">Simulated preview</span>':'')+'</h3>'+peopleBoard(false)+'</div>';
-    h+='<div class="card"><h3>Response chain <span class="n">called in this order</span></h3>';
-    if(!H.contacts.length) h+='<div class="empty">No one is listed yet. Switch to Home to add the response chain.</div>';
-    H.contacts.forEach((c,i)=>{ h+='<div class="rowline"><span><b>'+(i+1)+'. '+esc(c.name)+'</b> <span class="mono" style="font-size:11.5px;color:var(--mut)">'+esc(c.phone)+'</span></span><a class="btn sm primary" style="text-decoration:none" href="tel:'+esc(c.phone)+'">Call</a></div>'; });
+    h+='<div class="card"><h3>Emergency numbers</h3>';
+    if(!H.contacts.length) h+='<div class="empty">No numbers listed yet. Switch to Home to add them.</div>';
+    H.contacts.forEach((c,i)=>{ h+='<div class="rowline"><span><b>'+esc(c.name)+'</b> <span class="mono" style="font-size:11.5px;color:var(--mut)">'+esc(c.phone)+'</span></span><a class="btn sm primary" style="text-decoration:none" href="tel:'+esc(c.phone)+'">Call</a></div>'; });
     h+='</div>';
     h+='</div><div class="stack" style="gap:14px">';
     h+='<div class="card"><h3>Watch status</h3><div class="kv"><span class="k">Home station</span><span class="v unkc">Not connected</span><span class="k">Home status</span><span class="v unkc">Unknown</span>'+
@@ -1393,7 +1396,8 @@ function renderResponder(){
   } else {
     h+='<div class="card"><h3>Home location</h3><div class="kv"><span class="k">Position</span><span class="v '+(H.loc?'okc':'unkc')+'" id="homeLocV">'+(H.loc?'Set '+new Date(H.loc.t).toLocaleDateString()+', within '+Math.round(H.loc.acc)+' m':'Not set')+'</span></div>'+
        '<div class="formrow"><button class="btn sm primary" data-act="home-loc">Set to where I am now</button>'+(H.loc?'<button class="btn sm" data-act="home-loc-clear">Clear</button>':'')+'</div>'+
-       '<div class="limit" style="margin-top:10px">Do this while you are at home. It places what a home station hears, and tells Halo when you are away. It is stored sealed in your account.</div></div>';
+       (S.homeMsg?'<div class="limit" style="margin-top:10px;color:#ffdfae">'+esc(S.homeMsg)+'</div>':'')+
+       '<div class="limit" style="margin-top:10px">Do this while you are at home. It lets Halo tell from your position when you are home and when you are away. Until it is set, Halo goes by the Home and Away switch above. It is stored sealed in your account.</div></div>';
     h+='<div class="card"><h3>People at home <span class="n">'+H.people.length+'</span></h3>'+peopleBoard(true)+
        '<div class="formrow"><input class="inp" id="hpName" placeholder="Name"><input class="inp" id="hpRel" placeholder="Relation, for example Father"></div>'+
        '<div class="formrow"><label class="lbl"><input type="checkbox" id="hpConsent"> They know and agree</label><label class="lbl"><input type="checkbox" id="hpWatch"> Wears a fall-detecting watch</label>'+
@@ -1417,10 +1421,10 @@ function renderResponder(){
        '<div class="q"><span><b>Station goes silent.</b> Home reads Unknown, never Clear</span><span class="chip">Always on</span></div></div>';
     h+='</div><div class="stack" style="gap:14px">';
 
-    h+='<div class="card"><h3>Response chain <span class="n">called in this order</span></h3>';
-    if(!H.contacts.length) h+='<div class="empty">No one is listed yet. Start with the person at home, then a neighbour, then the emergency number.</div>';
-    H.contacts.forEach((c,i)=>{ h+='<div class="rowline"><span><b>'+(i+1)+'. '+esc(c.name)+'</b></span><span><a class="mono" style="font-size:12px" href="tel:'+esc(c.phone)+'">'+esc(c.phone)+'</a> <button class="x" data-act="h-cdel" data-i="'+i+'">&times;</button></span></div>'; });
-    h+='<div class="formrow"><input class="inp" id="hcName" placeholder="Name"><input class="inp" id="hcPhone" placeholder="Phone" inputmode="tel"><button class="btn sm primary" data-act="h-cadd">Add</button></div></div>';
+    h+='<div class="card"><h3>Emergency numbers</h3>';
+    if(!H.contacts.length) h+='<div class="empty">No numbers listed yet. Add each number and say whose it is.</div>';
+    H.contacts.forEach((c,i)=>{ h+='<div class="rowline"><span><b>'+esc(c.name)+'</b></span><span><a class="mono" style="font-size:12px" href="tel:'+esc(c.phone)+'">'+esc(c.phone)+'</a> <button class="x" data-act="h-cdel" data-i="'+i+'">&times;</button></span></div>'; });
+    h+='<div class="formrow"><input class="inp" id="hcPhone" placeholder="Phone number" inputmode="tel"><input class="inp" id="hcName" placeholder="Whose number is this"><button class="btn sm primary" data-act="h-cadd">Add</button></div></div>';
   }
 
   h+='<div class="card"><h3>What makes this real</h3><ol class="steps">'+
@@ -1504,6 +1508,9 @@ function recentre(lat,lon){
   try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); if(YOU) YOU.setLngLat([lon,lat]); fitRadius(true); updateDeviceMarkers(); }catch(e){}
   _fitM=0; macroUpdate();
 }
+function syncBase(){ if(!MAP||!MACRO) return; const on=!!S.pos;
+  if(on===S._base) return; S._base=on;
+  try{ MAP.setPaintProperty('carto','raster-opacity',on?.8:0); MACRO.setPaintProperty('carto','raster-opacity',on?.9:0); }catch(e){ S._base=null; } }
 function tintBase(map,op){ try{ map.setPaintProperty('carto','raster-opacity',op); map.setPaintProperty('carto','raster-contrast',.3); map.setPaintProperty('carto','raster-brightness-max',1);
     map.addSource('tint',{type:'geojson',data:{type:'Feature',geometry:{type:'Polygon',coordinates:[[[-180,-85],[180,-85],[180,85],[-180,85],[-180,-85]]]}}});
     map.addLayer({id:'tint',type:'fill',source:'tint',paint:{'fill-color':'#12306e','fill-opacity':.22}}); }catch(e){} }
@@ -1571,6 +1578,7 @@ function macroData(){ const f=[];
 const homeHeard = () => { const n=Date.now()+LIVE.skew; return [...LIVE.devs.values()].filter(d=>n-d.seenStation<LIVE_PRESENT).length; };
 function macroFit(){ if(!MACRO||!MAP_CENTER) return; const r=macroRadius(); if(r===_fitM) return; const first=!_fitM; _fitM=r; fitTo(MACRO,MAP_CENTER,r,!first); }
 const stationTest = () => { const ds=[...LIVE.devs.values()].filter(d=>d.seenStation>0); return ds.length>0 && ds.every(d=>d.sim); };
+const mobileLive = () => LIVE.seen.mobile>0 && Date.now()+LIVE.skew-LIVE.seen.mobile<LIVE_SILENT;
 const stationLive = () => LIVE.seen.station>0 && Date.now()+LIVE.skew-LIVE.seen.station<LIVE_SILENT;
 function macroUpdate(){
   const r=macroRadius(), h=P.home&&P.home.loc, far=beyond(), heard=heardDevs();
@@ -1614,15 +1622,30 @@ function placeMarkers(map, store, list, extra){
 }
 // Your own position. It feeds the placement of devices, so it does not wait for, or depend on, the map.
 let _geoOn=false;
+function geoFix(p){
+  const la=p.coords.latitude, lo=p.coords.longitude;
+  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; trackPush(la, lo, p.coords.accuracy);
+  if(MAP && MAP_CENTER){ const moved=Math.hypot((la-MAP_CENTER.lat)*111320, (lo-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
+    if(!_centred || moved>6){ _centred=true; recentre(la, lo); } }      // ignore position jitter under 6 metres
+  if(S.view==='overview'||S.view==='watchers') renderVicinity();
+}
+function geoFail(e){ S.geoErr=(e&&e.code)||2; if(S.view==='overview'||S.view==='watchers') renderVicinity(); }
 function startGeo(){
   if(_geoOn || !navigator.geolocation) return; _geoOn=true;
-  navigator.geolocation.watchPosition(p=>{
-    const la=p.coords.latitude, lo=p.coords.longitude;
-    S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; trackPush(la, lo, p.coords.accuracy);
-    if(MAP && MAP_CENTER){ const moved=Math.hypot((la-MAP_CENTER.lat)*111320, (lo-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
-      if(!_centred || moved>6){ _centred=true; recentre(la, lo); } }      // ignore position jitter under 6 metres
-    if(S.view==='overview'||S.view==='watchers') renderVicinity();
-  }, ()=>{}, {enableHighAccuracy:true, timeout:12000, maximumAge:5000});
+  navigator.geolocation.watchPosition(geoFix, geoFail, {enableHighAccuracy:true, timeout:12000, maximumAge:5000});
+}
+// Asked for by a button press, so the browser shows its own permission question.
+function geoAsk(){ return new Promise(res=>{
+  if(!navigator.geolocation){ S.geoErr=9; return res(false); }
+  navigator.geolocation.getCurrentPosition(p=>{ geoFix(p); _geoOn=false; startGeo(); res(true); }, e=>{ geoFail(e); res(false); }, {enableHighAccuracy:true, timeout:15000, maximumAge:0}); }); }
+const onMac = () => /Mac/.test(navigator.platform||'') && !('ontouchend' in document);
+function geoHelp(){
+  if(!S.geoErr) return '';
+  if(S.geoErr===9) return 'This browser cannot share a position.';
+  if(S.geoErr===1) return onMac()
+    ? 'This browser was not allowed to share your position. On the Mac: Apple menu, System Settings, Privacy & Security, Location Services. Turn on Location Services, and turn on your browser in the list. In Safari also open the Safari menu, Settings for beverly-index.com, and set Location to Allow. Then reload this page.'
+    : 'This browser was not allowed to share your position. In the phone\'s Settings, allow Location for this browser, and allow it for this site. Then reload this page.';
+  return onMac() ? 'The Mac could not work out its position. Wi-Fi must be switched on for a Mac to find itself, even when you use a cable. Then try again.' : 'The position could not be found. Step outside or near a window, then try again.';
 }
 let _centred=false;
 /* ----- Identification: the selected threat. A call sign and what is known of the device, or the user's own photo of it ----- */
@@ -2146,7 +2169,10 @@ function posAt(t){ if(!TRACK.length) return null;
   return t-a.t2<=30000 ? a : null; }                               // a gap: the phone was locked, or position was off
 const posNow = () => TRACK.length?TRACK[TRACK.length-1]:null;
 const okLL = q => !!q && typeof q.lat==='number' && typeof q.lon==='number' && Math.abs(q.lat)<=85 && Math.abs(q.lon)<=180 && !(q.lat===0 && q.lon===0);
-const nearHome = () => { const h=P.home&&P.home.loc, me=posNow(); if(!okLL(h)||!me) return false; const q=toXY(h.lat,h.lon); return Math.hypot(q.x-me.x,q.y-me.y)<=HOME_NEAR; };
+const homeByPos = () => okLL(P.home&&P.home.loc) && !!posNow();
+const nearHome = () => { const h=P.home&&P.home.loc, me=posNow();
+  if(okLL(h) && me){ const q=toXY(h.lat,h.lon); return Math.hypot(q.x-me.x,q.y-me.y)<=Math.max(HOME_NEAR,(h.acc||0)+(me.acc||0)+60); }
+  return !P.home.armed; };                               // no positions to compare: go by Responder, which you set to Home or Away
 
 /* ----- placing an emitter from many readings: the place that best fits all of them ----- */
 function locateXY(samples, me){
@@ -2297,7 +2323,7 @@ function stateWords(m){ const since=hhmm(liveLast()-LIVE.skew);
   return m==='silent' ? {count:'sensor silent', line:'sensor silent since '+since, long:'Your sensor has been silent since '+since+'.', note:'Sensor silent.', vic:'Vicinity: sensor silent', cov:'Sensor silent'}
     : m==='waiting' ? {count:'waiting for the sensor', line:'sensor added, no report yet', long:'Your sensor has not reported yet.', note:'Waiting for the first report from your sensor.', vic:'Vicinity: waiting for the sensor', cov:'Sensor added, no report yet'}
     : m==='offline' ? {count:'account not reached', line:'Halo account not reached, sensor reports cannot be read', long:'The Halo account was not reached, so sensor reports cannot be read.', note:'Halo account not reached.', vic:'Vicinity: account not reached', cov:'Account not reached'}
-    : m==='homeonly' ? {count:'no sensor with you', line:'home listener reporting, no sensor with you', long:'Your home listener is reporting, but no sensor is with you'+(okLL(P.home.loc)?'.':', and your home location is not set in Responder.'), note:'Home listener only.', vic:'Vicinity: no sensor with you', cov:'No sensor with you'}
+    : m==='homeonly' ? {count:'no sensor with you', line:'home listener reporting, no sensor with you', long:'Your home listener is reporting, but no sensor is with you'+(homeByPos()?', and you are away from home.':', and Responder is set to Away.'), note:'Home listener only.', vic:'Vicinity: no sensor with you', cov:'No sensor with you'}
     : {count:'not monitored', line:'no sensor connected', long:'', note:'Not monitored.', vic:'Vicinity: not monitored', cov:'No sensor'}; }
 function vis(){
   const st=liveState();
@@ -2314,14 +2340,14 @@ async function sensorAdd(){
   const r=await api('POST','/sensors',{kind}); if(r.s!==200) return toast(r.s===413?'This account has the most sensors it can hold.':'Could not add the sensor.');
   const raw=crypto.getRandomValues(new Uint8Array(32)), key=b64.enc(raw);
   P.sensors=P.sensors||{}; P.sensors[r.j.id]={name:name.slice(0,40),kind,key,createdAt:Date.now()}; save();
-  SY.cred={id:r.j.id, text:'halo1.'+r.j.id+'.'+r.j.secret+'.'+key.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}; softRender(); loadSensors(); }
+  SY.cred={id:r.j.id, text:'halo1.'+r.j.id+'.'+r.j.secret+'.'+key.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}; softRender(); loadSensors(); setTimeout(()=>{ const c=el('sensorCred'); if(c) c.scrollIntoView({block:'center',behavior:'smooth'}); },120); }
 async function sensorRemove(id){ if(SY.confirm!=='sn:'+id){ SY.confirm='sn:'+id; return softRender(); } SY.confirm='';
   const r=await api('POST','/sensors/remove',{id}); if(r.s!==200 && r.s!==404) return toast('Could not remove the sensor.');
   delete P.sensors[id]; delete _sk[id]; if(SY.sensorKind) delete SY.sensorKind[id]; if(SY.cred&&SY.cred.id===id) SY.cred=null; save(); [...LIVE.devs.values()].filter(d=>d.sensor===id).forEach(d=>LIVE.devs.delete(d.sig)); toast('Sensor removed.'); softRender(); }
 async function loadSensors(){ const r=await api('GET','/sensors'); if(r.s!==200) return; SY.sensorSeen={}; SY.sensorKind={}; (r.j.sensors||[]).forEach(s=>{ SY.sensorSeen[s.id]=s.lastSeen; SY.sensorKind[s.id]=s.kind; }); softRender(); }
 function sensorsSection(){
   const ids=Object.keys(P.sensors||{});
-  let h='<div class="dsec"><h4>Sensors</h4><p style="margin-bottom:10px">A sensor listens for devices and reports to this account. Mobile comes first: the Halo Android app on your phone, then the carried sensor. Second is the home listener on the computer that stays at home. The home listener exists today. The Android app and the carried sensor do not yet.</p>';
+  let h='<div class="dsec" id="sensorsSec"><h4>Sensors</h4><p style="margin-bottom:10px">A sensor listens for devices and reports to this account. Mobile comes first: the Halo Android app on your phone, then the carried sensor. Second is the home listener on the computer that stays at home. The home listener exists today. The Android app and the carried sensor do not yet.</p>';
   const lost=Object.keys(SY.sensorKind||{}).filter(id=>!P.sensors[id]);
   if(!ids.length && !lost.length) h+='<div class="empty" style="padding:8px">No sensors on this account.</div>';
   lost.forEach(id=>{ h+='<div class="rowline"><span><b>'+esc(SENSOR_KIND[SY.sensorKind[id]]||'Sensor')+'</b> <span class="chip real">No key on this device</span><br><span class="mono" style="font-size:11px;color:var(--mut)">Its reports cannot be read here. Remove it and add it again.</span></span>'+
@@ -2450,21 +2476,29 @@ document.addEventListener('click', e=>{
     case 'dev-log': { const d=findDevice(a.dataset.id); if(!d||!d.live||d.sim) break;
       logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+'), '+distText(d)+', '+flagOf(d).toLowerCase()+'. Heard '+d.timesSeen+' times since '+new Date(d.firstSeen).toLocaleTimeString()+'.',{sig:d.sig}); toast('Added to Evidence.'); break; }
     case 'sn-add': sensorAdd(); break;
+    case 'go-sensors': { S.open.delete('profile'); S.open.add('devices'); if(S.view!=='overview') setView('overview'); else rerender(); setTimeout(()=>{ const c=el('sensorsSec'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
     case 'sn-remove': sensorRemove(a.dataset.id); break;
     case 'sn-hide': SY.cred=null; softRender(); break;
     case 'sn-copy': { const t=SY.cred&&SY.cred.text; if(t && navigator.clipboard) navigator.clipboard.writeText(t).then(()=>toast('Sensor code copied.'),()=>toast('Could not copy. Select the code and copy it by hand.')); else toast('Select the code and copy it by hand.'); break; }
     case 'home-loc-clear': { delete P.home.loc; save(); rerender(); toast('Home location cleared.'); break; }
-    case 'home-loc': { if(!S.pos) return toast('Share your position first. Open Watchers and allow location.'); if(S.pos.acc>50) return toast('Your position is only known to within '+Math.round(S.pos.acc)+' m. Move near a window or step outside, then try again.'); P.home.loc={lat:S.pos.lat,lon:S.pos.lon,acc:S.pos.acc,t:Date.now()}; save(); rerender(); toast('Home location set.'); break; }
+    case 'home-loc': { S.homeMsg='Finding your position.'; rerender();
+      (S.pos && Date.now()-S.pos.t<20000 ? Promise.resolve(true) : geoAsk()).then(ok=>{
+        if(!ok || !S.pos) S.homeMsg=geoHelp()||'The position could not be found.';
+        else if(S.pos.acc>200) S.homeMsg='Your position is only known to within '+Math.round(S.pos.acc)+' m, which is too rough to mark home. Switch Wi-Fi on, or do this on your phone at home.';
+        else { P.home.loc={lat:S.pos.lat,lon:S.pos.lon,acc:S.pos.acc,t:Date.now()}; S.homeMsg=''; save(); toast('Home location set.'); }
+        rerender(); });
+      break; }
+    case 'geo-ask': { geoAsk().then(()=>{ renderVicinity(); if(!S.pos) toast('Position not shared. See the note under the map.'); }); break; }
     case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),device:Y.name||null,chain:P.evidence,otherDevices:remoteEv()},null,2)],{type:'application/json'});
       const l=document.createElement('a'); l.href=URL.createObjectURL(blob); l.download='remiel-halo-evidence.json'; l.click(); toast('Signed log exported.'); break; }
     case 'h-padd': { const n=val('hpName'); if(!n) return toast('Enter the name.'); H.people.push({name:n,rel:val('hpRel'),consent:el('hpConsent').checked,watch:el('hpWatch').checked}); save(); rerender(); break; }
     case 'h-pdel': H.people.splice(+a.dataset.i,1); save(); rerender(); break;
     case 'h-radd': { const n=val('hrName'); if(!n) return toast('Enter the room.'); H.rooms.push({name:n,sensor:el('hrSensor').value}); save(); rerender(); break; }
     case 'h-rdel': H.rooms.splice(+a.dataset.i,1); save(); rerender(); break;
-    case 'h-cadd': { const n=val('hcName'), ph=val('hcPhone'); if(!n||!ph) return toast('Enter a name and a phone number.'); H.contacts.push({name:n,phone:ph}); save(); rerender(); break; }
+    case 'h-cadd': { const n=val('hcName'), ph=val('hcPhone'); if(!n||!ph) return toast('Enter the number and say whose it is.'); H.contacts.push({name:n,phone:ph}); save(); rerender(); break; }
     case 'h-cdel': H.contacts.splice(+a.dataset.i,1); save(); rerender(); break;
     case 'h-rule': H.rules[a.dataset.k]=a.dataset.v==='y'; save(); rerender(); break;
-    case 'h-arm': H.armed=a.dataset.v==='y'; save(); rerender(); break;
+    case 'h-arm': H.armed=a.dataset.v==='y'; save(); liveTick(); rerender(); break;
     case 'h-prev': S.homePreview=!S.homePreview; if(!S.homePreview) S.homeAlert=null; rerender(); break;
     case 'h-fall': { const p=H.people[0]; S.homeAlert={i:0, who:p?p.name:'Sample resident', room:(H.rooms.find(r=>r.sensor==='radar')||H.rooms[0]||{name:'Bathroom'}).name, t:Date.now()}; rerender(); el('scroll').scrollTop=0; break; }
     case 'h-clear': S.homeAlert=null; rerender(); break;
