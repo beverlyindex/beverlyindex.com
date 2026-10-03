@@ -1422,6 +1422,8 @@ function threatBody(t){
   if(t.tool==='alias') h+=toolAlias();
   if(t.tool==='patch') h+=toolPatch();
   if(t.tool==='roster') h+=toolRoster();
+  if(t.id==='w_tower') h+=toolTower();
+  if(t.id==='a_pubwifi') h+=toolWifi();
   h+='<div class="dsec"><h4>Log a finding</h4><div class="formrow" style="margin-top:0"><input class="inp" id="note-'+t.id+'" placeholder="What you found, in your own words">'+
      '<button class="btn sm" data-act="note" data-id="'+t.id+'">Add to Evidence</button></div></div>';
   h+='<div class="limit"><b>'+(t.src.length>1?'Sources.':'Source.')+'</b> '+
@@ -1615,7 +1617,7 @@ function renderOverview(){
 function renderCoverage(){
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, g=S.global;
   const ls=liveState(), fresh=b=>ls==='live' && LIVE.bands[b] && (Date.now()+LIVE.skew-LIVE.bands[b])<LIVE_SILENT, T=vis().test;
-  const app=!!NATIVE(), bandRow=(label,b)=>[label, fresh(b)?(T?'Test data':'Live'):(b==='ble'||app)?(ls==='live'?'Starting':stateWords(ls).cov):'Live in the Halo Android app', fresh(b)?(T?'part':'live'):''];
+  const app=!!NATIVE(), extra={wifi:()=>wifiNow().length+' in earshot', cell:()=>cellWords(), ble:()=>''}, bandRow=(label,b)=>[label, fresh(b)?(T?'Test data':'Live'+(extra[b]()?', '+extra[b]():'')):(b==='ble'||app)?(ls==='live'?'Starting':stateWords(ls).cov):'Live in the Halo Android app', fresh(b)?(T?'part':'live'):''];
   const hcv=healthCount(), hasSt=Object.keys(P.sensors||{}).some(k=>P.sensors[k].kind==='station');
   const rows=[bandRow('Bluetooth','ble'),bandRow('Wi-Fi','wifi'),bandRow('Cell towers','cell'),
     ['This device', !hcv.at?'Health check ready':hcv.att?hcv.att+' to attend to':hcv.ok+' checks pass', !hcv.at?'':hcv.att?'part':'live'],
@@ -1655,7 +1657,8 @@ function viewRadius(){
   const cur=S._view||BASE_R;                              // a tighter view is taken only once everything sits well inside it
   return (S._view = VIEW_STEPS.find(v=>far<=v*(v<cur?0.7:0.85)) || BASE_R);
 }
-const inRadius = () => { const rs=radiusState(); return vis().devices.filter(d=>d.present && d.dist<=rs.r); };
+const quietAp = d => d.band==='wifi' && !d.withYou && !d.onRoute && !d.mine;
+const inRadius = () => { const rs=radiusState(); return vis().devices.filter(d=>d.present && d.dist<=rs.r && !quietAp(d)); };
 const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Math.round(d.dist)+' m';
 const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';          // placed, direction rough, or direction not known
 const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'direction rough, '+whereWords(d) : 'direction not known';
@@ -2569,7 +2572,7 @@ function mfData(){ const f=[], g=gz(); if(!g) return {type:'FeatureCollection',f
   return {type:'FeatureCollection',features:f}; }
 // The ring labels live in their own source. Lettering needs a download, and a failed download must not take the rings and your route down with it.
 const mfLabels = () => { const g=gz(); return {type:'FeatureCollection',features:g?mfRingSteps.map(r=>({type:'Feature',properties:{t:r+' m'},geometry:{type:'Point',coordinates:[g.lon, g.lat+r/111320]}})):[]}; };
-const mfDevices = () => { const V=vis(); return (V.mode==='live'||V.mode==='sim') ? V.devices.filter(d=>d.present!==false && (V.mode==='sim'||!d.atHome)).sort(bySeverity) : []; };
+const mfDevices = () => { const V=vis(); return (V.mode==='live'||V.mode==='sim') ? V.devices.filter(d=>d.present!==false && (V.mode==='sim'||!d.atHome) && !quietAp(d)).sort(bySeverity) : []; };
 async function mapFullOpen(){
   el('mapFull').classList.remove('hidden'); S.mapFull=true; NAVN++; try{ history.pushState(navSnap('map'),''); }catch(e){}
   headAsk(); startGeo();
@@ -2670,6 +2673,7 @@ function reportHTML(){
       ['Phone platform used for the steps',e(PLAT_NAME[plat()])],
       ['Sensors on the account',sens.length?e(sens.map(x=>x.name+' ('+(SENSOR_KIND[x.kind]||x.kind)+')').join(', ')):'None'],
       ['Devices near you',e(live?'Live from your sensor':V.mode==='live'?'Test data':stateWords(ls).cov)],
+      ['Bluetooth, Wi-Fi and cell signals',e(['ble','wifi','cell'].map(b=>({ble:'Bluetooth',wifi:'Wi-Fi',cell:'Cell'})[b]+': '+(LIVE.bands[b]&&Date.now()+LIVE.skew-LIVE.bands[b]<3*LIVE_SILENT?'reported'+(b==='wifi'?', '+wifiNow().length+' access points':b==='cell'&&cellWords()?', '+cellWords():''):(b==='ble'||NATIVE()?'reports when listening':'reported by the Halo Android app'))).join('. '))],
       ['Your position',e(S.pos?'Live, within '+Math.round(S.pos.acc)+' m':'Starts when location is allowed')],
       ['Global feed',e(g?'Live, generated '+fmtDT(g.generated)+', '+g.sources.filter(x=>x.ok).length+' of '+g.sources.length+' sources':'Register of '+REGISTER_DATE)],
       ['Halo account',e(SY.status==='on'?'Signed in, '+plural((SY.devices||[]).length,'device','devices'):'Not signed in')]]);
@@ -3329,7 +3333,7 @@ function solveFix(d){ d.fresh=0; d.base=baselineOf(d.samples);
   else if(e.brg!==null && e.dev<=SECTOR_HALF) d.sector={brg:e.brg, half:SECTOR_HALF, n:d.samples.length}; }
 const followSpan = d => d.cls==='Cell tower'||d.band==='cell' ? Infinity : (d.band==='wifi'||d.cls==='Access point') ? FOLLOW_SPAN.wifi : FOLLOW_SPAN.ble;
 function liveDerive(d, nowS){
-  const mob=nowS-d.seenMobile<LIVE_PRESENT, sta=nowS-d.seenStation<LIVE_PRESENT;
+  const keep=d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT, mob=nowS-d.seenMobile<keep, sta=nowS-d.seenStation<keep;      // Wi-Fi is scanned every 30 seconds
   d.present = mob || (sta && LIVE.home);                 // near you. What only the home station hears is near you only when you are home
   d.atHome = sta && !d.present;
   d.mine = !!(P.mine && P.mine[d.id]);
@@ -3406,6 +3410,49 @@ function liveStart(){ const loop=()=>{ if(document.visibilityState==='visible') 
    It listens only while Halo is on screen. ---------- */
 const PH={on:false, scan:null, buf:new Map(), heard:0, err:'', msg:'', lost:false, bound:false, timer:0, native:false, nstat:null, busy:false, asked:0};
 // The Halo Android app gives the page a native ear: it keeps listening with the screen off and hands over what it heard.
+/* ----- cell towers: the one your phone is using, and its neighbours. Tower Watch reads them for two patterns:
+   a drop to 2G, and a tower that keeps changing while you stand still. ----- */
+const CELL={t:0, list:[], serving:null, changes:[], seen:{}, low:0};
+const CELL_GEN={gsm:'2G',cdma:'2G',wcdma:'3G',tdscdma:'3G',lte:'4G',nr:'5G'};
+const cellId = c => c.k+':'+(c.mcc||'')+'-'+(c.mnc||'')+':'+(c.tac==null?'':c.tac)+':'+(c.ci||('p'+(c.pci==null?'':c.pci)+'/'+(c.ch==null?'':c.ch)));
+function cellIngest(list, t, pos){
+  const sv=list.find(c=>c && c.reg) || null, at=t+LIVE.skew; CELL.t=t; CELL.list=list.filter(Boolean).slice(0,40); LIVE.bands.cell=Math.max(LIVE.bands.cell||0, at); LIVE.seen.mobile=Math.max(LIVE.seen.mobile, at);
+  CELL.list.forEach(c=>{ CELL.seen[cellId(c)]=t; });
+  if(!sv) return; const id=cellId(sv), gen=CELL_GEN[sv.k]||'';
+  if(CELL.serving && CELL.serving.id!==id){ const moved=(pos && CELL.serving.pos) ? distLL(pos.lat,pos.lon,CELL.serving.pos.lat,CELL.serving.pos.lon) : null;
+    CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved}); if(CELL.changes.length>200) CELL.changes.shift();
+    if(W.on && gen==='2G' && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone dropped from '+CELL.serving.gen+' to 2G.'); }
+  if(gen==='2G' && (!CELL.serving || CELL.serving.gen!=='2G') && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; save(); }
+  CELL.serving={id, gen, c:sv, pos:pos?{lat:pos.lat,lon:pos.lon}:(CELL.serving&&CELL.serving.pos)||null, since:(CELL.serving&&CELL.serving.id===id)?CELL.serving.since:t};
+}
+const cellLive = () => CELL.t>0 && Date.now()-CELL.t<60000;
+const cellFlaps = () => CELL.changes.filter(x=>Date.now()-x.t<10*60000 && x.moved!==null && x.moved<50).length;
+const cellWords = () => { const sv=CELL.serving; return !cellLive()||!sv ? '' : sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', '+(CELL.list.length-1)+' neighbours'; };
+function toolTower(){
+  if(!cellLive() || !CELL.serving) return '<div class="dsec"><h4>Your towers, live</h4><p>'+(NATIVE()?'Start listening and Halo shows the tower your phone is using, its neighbours, and every change.':'The Halo Android app shows the tower your phone is using, its neighbours, and every change, live.')+'</p></div>';
+  const sv=CELL.serving, c=sv.c, flaps=cellFlaps(), ch10=CELL.changes.filter(x=>Date.now()-x.t<10*60000).length, two=sv.gen==='2G';
+  return '<div class="dsec"><h4>Your towers, live <span class="chip pot" style="margin-left:6px">Live</span></h4>'+
+    (two?'<div class="hrow"><span class="hs att">Attention</span><span><b>Your phone is on 2G.</b> A 2G connection gives the phone no way to check that a tower is genuine. Switch 2G off in the steps above, and Halo records the moment in Evidence.</span></div>':'')+
+    (flaps>=3?'<div class="hrow"><span class="hs att">Attention</span><span><b>The tower changed '+flaps+' times while you stood still.</b> Halo has the times. Move a few streets and see whether it settles.</span></div>':'')+
+    (!two&&flaps<3?'<div class="hrow"><span class="hs ok">Steady</span><span>Your phone is on '+esc(sv.gen)+', and the tower is holding.</span></div>':'')+
+    '<div class="kv" style="margin-top:10px"><span class="k">In use</span><span class="v">'+esc(sv.gen)+' · network '+esc((c.mcc||'')+'-'+(c.mnc||''))+'</span><span class="k">Cell</span><span class="v mono" style="font-size:12px">'+esc(String(c.ci||'')||('PCI '+(c.pci==null?'':c.pci)))+(c.tac!=null?' · area '+c.tac:'')+'</span>'+
+    '<span class="k">Signal</span><span class="v">'+(c.r==null?'':c.r+' dBm')+(c.ta!=null?' · about '+Math.round(c.ta*78)+' m by timing':'')+'</span><span class="k">Since</span><span class="v">'+hhmm(sv.since)+'</span>'+
+    '<span class="k">Neighbours</span><span class="v">'+(CELL.list.length-1)+' in earshot</span><span class="k">Changes, last 10 min</span><span class="v">'+ch10+'</span></div></div>';
+}
+/* ----- Wi-Fi: every access point in earshot. Public Wi-Fi Guard reads them for open networks and for a name that appears twice with different locks. ----- */
+const wifiNow = () => [...LIVE.devs.values()].filter(d=>d.band==='wifi' && d.present).sort((a,b)=>b.rssi-a.rssi);
+function toolWifi(){
+  const aps=wifiNow(); if(!aps.length) return '<div class="dsec"><h4>Networks around you, live</h4><p>'+(NATIVE()?'Start listening and Halo lists every Wi-Fi network in earshot, marks the open ones, and spots a copied name.':'The Halo Android app lists every Wi-Fi network in earshot, marks the open ones, and spots a copied name, live.')+'</p></div>';
+  const by={}; aps.forEach(d=>{ if(d.adv){ (by[d.adv]=by[d.adv]||[]).push(d); } });
+  const copied=Object.keys(by).filter(n=>{ const x=by[n]; return x.length>1 && x.some(d=>/^Open/.test(d.hint)) && x.some(d=>/^Secured/.test(d.hint)); });
+  const open=aps.filter(d=>/^Open/.test(d.hint)), wy=aps.filter(d=>d.withYou);
+  return '<div class="dsec"><h4>Networks around you, live <span class="chip pot" style="margin-left:6px">'+aps.length+' in earshot</span></h4>'+
+    (copied.length?'<div class="hrow"><span class="hs att">Attention</span><span><b>'+esc(copied.join(', '))+'</b> appears both locked and open. That is the pattern of a copied network. Join only the locked one, or use mobile data.</span></div>':'')+
+    (wy.length?'<div class="hrow"><span class="hs att">Attention</span><span><b>'+esc(wy.map(devName).join(', '))+'</b> '+(wy.length===1?'is a hotspot':'are hotspots')+' travelling with you.</span></div>':'')+
+    (!copied.length&&!wy.length?'<div class="hrow"><span class="hs ok">Clear</span><span>No copied name and no hotspot travelling with you among the '+aps.length+' networks in earshot.</span></div>':'')+
+    aps.slice(0,10).map(d=>'<div class="rowline"><span><b>'+esc(d.adv||'Hidden network')+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(d.hint)+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:var('+(/^Open/.test(d.hint)?'--warn':'--mut')+')">'+(/^Open/.test(d.hint)?'Open':'Locked')+' · '+Math.round(d.rssi)+' dBm</span></div>').join('')+
+    (open.length?'<div class="limit" style="margin-top:8px">'+open.length+' open '+(open.length===1?'network':'networks')+' in earshot. On an open network, everything not encrypted by the app itself can be read by others on it.</div>':'')+'</div>';
+}
 const NATIVE = () => { const n=window.HaloNative; return (n && typeof n.drain==='function' && typeof n.start==='function') ? n : null; };
 const nativeStatus = () => { try{ return JSON.parse(NATIVE().status()); }catch(e){ return null; } };
 const phCan = () => !!NATIVE() || !!(navigator.bluetooth && navigator.bluetooth.requestLEScan);
@@ -3424,7 +3471,10 @@ async function nativeDrain(){
         const ev={device:{id:x.a,name:x.n||''}, rssi:x.r, uuids:x.u||[],
           manufacturerData:new Map(Object.keys(x.m||{}).map(k=>[+k, dv(hexBytes(x.m[k]))])), serviceData:new Map(Object.keys(x.d||{}).map(k=>[k, dv(hexBytes(x.d[k]))]))};
         try{ const d=await phDescribe(ev); list.push({id:d.id, rssi:x.r, band:'ble', cls:d.cls, name:d.name, hint:d.hint, conf:d.conf, flags:d.flags}); PH.heard++; }catch(e){} }
-      if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:okLL(q)?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew); }
+      (b.w||[]).slice(0,120).forEach(x=>{ if(!x || !x.b || typeof x.r!=='number') return; const open=!/WPA|WEP|SAE|RSN|EAP|OWE|PSK/i.test(x.c||'');
+        list.push({id:'ap:'+String(x.b).toLowerCase(), rssi:x.r, band:'wifi', cls:'Access point', name:String(x.s||'').slice(0,40), hint:(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
+      if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:okLL(q)?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew);
+      if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
     if(batches.length) liveTick();
     const lost = !!PH.nstat && !PH.nstat.listening && Date.now()-PH.asked>6000;
     if(lost!==PH.lost){ PH.lost=lost; softRender(); renderVicinity(); }
@@ -3490,7 +3540,7 @@ document.addEventListener('visibilitychange', ()=>{ if(PH.on && document.visibil
 function phPanel(){
   const btn=(label,cls)=>'<button class="btn sm '+(cls||'primary')+'" data-act="ph-start">'+label+'</button>';
   if(NATIVE()){ const st=PH.nstat||nativeStatus()||{};
-    if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening, with the screen on or off.', html:'This phone is listening, with the screen on or off. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
+    if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening to Bluetooth, Wi-Fi and cell, with the screen on or off.', html:'This phone is listening to Bluetooth, Wi-Fi and cell, with the screen on or off. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
     const why = st.permission==='denied' ? 'Allow Location and Nearby devices for Halo, and this phone listens for you.'
       : st.permission==='needed' ? 'Allow Location and Nearby devices, and this phone listens for you.'
       : st.bluetooth===false ? 'Switch Bluetooth on, and this phone listens for you.'
@@ -3555,8 +3605,8 @@ function walkTick(){
   const sen=mobileLive();
   if(!sen && !W.silent && now-W.t0>20000){ W.silent=true; wEvent('warn','Listening paused. Halo resumes as soon as the sensor reports again.'); }
   else if(sen && W.silent){ W.silent=false; wEvent('note','Listening again.'); }
-  LIVE.devs.forEach(d=>{ const heard=nowS-d.seenMobile<LIVE_PRESENT; let r=W.devs[d.id];
-    if(!r){ if(!heard) return;
+  LIVE.devs.forEach(d=>{ const heard=nowS-d.seenMobile<(d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT); let r=W.devs[d.id];
+    if(!r){ if(!heard) return; if(quietAp(d)){ W.aps=W.aps||{}; W.aps[d.id]=1; return; }
       r=W.devs[d.id]={id:d.id, call:d.name, cls:d.cls, hint:d.hint||'', adv:d.adv||'', band:d.band, first:now, last:now, n:0, min:Math.round(d.dist), at:null, here:true, placed:null, rough:null, withYou:0, sim:!!d.sim};
       if(d.sim) W.test=true;
       wEvent('new','New: '+walkName(d)+', '+distText(d), d.id); }
@@ -3625,7 +3675,7 @@ function walkDocHTML(){
       '<p class="rp-sub" style="font-size:12px;margin-top:4px">The shape of your route, with each placed device and its zone.</p>'; }
   // 2
   h+='<h2>2. What Halo recorded</h2>'+tbl(['Item','This trip'],[
-    ['Listening',e(sensors.join(', ')||'Route only')],['Signals','Bluetooth: trackers, phones, watches, earbuds, laptops and beacons'],
+    ['Listening',e(sensors.join(', ')||'Route only')],['Signals','Bluetooth: trackers, phones, watches, earbuds, laptops and beacons'+(W.aps&&Object.keys(W.aps).length?'. Wi-Fi: '+Object.keys(W.aps).length+' access points':'')+(CELL.changes.filter(x=>x.t>=W.t0).length||cellLive()?'. Cell: '+(CELL.changes.filter(x=>x.t>=W.t0&&x.t<=(W.t1||Date.now())).length+1)+' towers used'+(CELL.changes.some(x=>x.t>=W.t0&&x.to==='2G')?', with a drop to 2G':''):'')],
     ['Length',e(walkDur(durMs))+', '+e(miText(st.distance_m))],
     ['Follower test',longEnough?'Complete: '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m reached':'In progress: completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m'],
     ['Your position',rt.length?plural(rt.length,'point','points')+' recorded, typically within '+Math.round(median(rt.map(q=>q.acc)))+' m':'Starts with the first fix'],
