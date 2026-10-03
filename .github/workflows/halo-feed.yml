@@ -1,0 +1,40 @@
+name: Remiel Halo global feed
+
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/halo-feed/**'
+      - '.github/workflows/halo-feed.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: halo-feed
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build the feed
+        run: node .github/halo-feed/build.mjs out/global.json
+      - name: Publish to the halo-data branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd out
+          printf 'Remiel Halo global feed. Built by a scheduled job. Do not edit by hand.\n' > README.txt
+          git init -q -b halo-data
+          git add .
+          git -c user.name="Randolph R Beverly Jr" -c user.email="rrbjr@beverlyindexai.com" commit -q -m "Remiel Halo: global feed update" -m "Beverly Index LLC"
+          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" halo-data
