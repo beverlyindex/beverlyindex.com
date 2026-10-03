@@ -312,6 +312,8 @@ select.inp{flex:none}
   padding:0 34px 0 12px;background:linear-gradient(90deg,#080d1a 86%,rgba(8,13,26,0))}
 .ticker .track{display:flex;gap:40px;white-space:nowrap;padding-left:158px;animation:marq 60s linear infinite;font-size:12.5px;color:var(--mut)}
 .ticker .track b{color:var(--ink);font-weight:600}
+.ticker .track .tk.mine b{color:#ffdfae}
+.ticker .track .tk.mine::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);box-shadow:0 0 8px var(--warn);margin-right:8px;vertical-align:middle}
 .ticker .track .date{color:var(--dim);font-family:var(--mono);font-size:11px}
 @keyframes marq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
@@ -1391,6 +1393,7 @@ function kevMine(){
   const want=new Set(KEV_FOR[plat()]); if(pv('wifihome')!==false) want.add('router');
   return g.kev.recent.filter(v=>v.platforms.some(p=>want.has(p)));
 }
+const FEED_STALE_H=6;
 async function loadGlobal(){
   try{ const ac=new AbortController(), to=setTimeout(()=>ac.abort(),9000);
     const r=await fetch(FEED_URL,{signal:ac.signal,cache:'no-store'}); clearTimeout(to);
@@ -1402,10 +1405,11 @@ async function loadGlobal(){
 }
 function applyGlobal(){
   const g=S.global;
-  el('srcPillD').textContent = g ? 'GLOBAL FEED LIVE · '+fmtDT(g.generated).toUpperCase() : 'REGISTER '+REGISTER_DATE.toUpperCase();
-  el('srcPillM').textContent = g ? 'LIVE '+fmtDT(g.generated).toUpperCase() : 'REGISTER 3 OCT';
-  [el('srcPillD'),el('srcPillM')].forEach(x=>x.classList.toggle('live',!!g));
-  fillTicker('trackW', liveFeedW().concat(FEED_W)); fillTicker('trackA', liveFeedA().concat(FEED_A));
+  const ageH = g ? (Date.now()-new Date(g.generated).getTime())/3600000 : 0, fresh = g && ageH<FEED_STALE_H;      // a feed that has stopped updating must not read live
+  el('srcPillD').textContent = !g ? 'REGISTER '+REGISTER_DATE.toUpperCase() : fresh ? 'GLOBAL FEED LIVE · '+fmtDT(g.generated).toUpperCase() : 'GLOBAL FEED '+Math.round(ageH)+' HOURS OLD · '+fmtDT(g.generated).toUpperCase();
+  el('srcPillM').textContent = !g ? 'REGISTER 3 OCT' : fresh ? 'LIVE '+fmtDT(g.generated).toUpperCase() : Math.round(ageH)+' H OLD · '+fmtDT(g.generated).toUpperCase();
+  [el('srcPillD'),el('srcPillM')].forEach(x=>x.classList.toggle('live',!!fresh));
+  fillTickers();
   if(booted) rerender();
 }
 function liveFeedW(){ const g=S.global; if(!g) return [];
@@ -1676,7 +1680,7 @@ async function writeEvidence(kind, text, extra){
   const rec={ kind, text, t:Date.now(), prev:P.prevHash, extra:extra||null, seq:P.evSeq };
   rec.hash=await sha(JSON.stringify(rec)); P.prevHash=rec.hash;
   P.evidence.unshift(rec); if(P.evidence.length>500) P.evidence.length=500;
-  save(); if(S.view==='evidence') renderEvidence();
+  save(); if(S.view==='evidence') renderEvidence(); if(booted) fillTickers();
 }
 function renderEvidence(){
   const rem=remoteEv(), all=P.evidence.map(r=>Object.assign({mine:true},r)).concat(rem.map(r=>Object.assign({mine:false},r))).sort((a,b)=>b.t-a.t);
@@ -2535,6 +2539,7 @@ function liveTick(){
   if(el('rost')) renderRoster();
   const st=liveState()+':'+[...LIVE.devs.values()].filter(d=>d.present&&d.withYou&&!d.sim).length;
   if(st!==LIVE._st){ LIVE._st=st; softRender(); }
+  fillTickers();
 }
 let _liveBusy=false;
 async function livePoll(){
@@ -2635,9 +2640,23 @@ const FEED_A=[
   {t:'6G sensing: ETSI lists 15 privacy and security issues.', src:'The Deep Dive · 29 Jul 2026'} ];
 function fillTicker(id, feed){
   const items=feed.map(f=>{ const inner='<b>'+esc(f.t)+'</b> <span class="date">'+esc(f.src)+'</span>';
-    return f.u ? '<a class="tk" href="'+esc(f.u)+'" target="_blank" rel="noopener">'+inner+'</a>' : '<span class="tk">'+inner+'</span>'; }).join('');
-  const tr=el(id); tr.innerHTML=items+items; tr.style.animationDuration=Math.max(60, feed.length*9)+'s';
+    return f.u ? '<a class="tk'+(f.mine?' mine':'')+'" href="'+esc(f.u)+'" target="_blank" rel="noopener">'+inner+'</a>' : '<span class="tk'+(f.mine?' mine':'')+'">'+inner+'</span>'; }).join('');
+  const tr=el(id); if(tr._h===items) return;              // unchanged: leave the scroll where it is
+  tr._h=items; tr.innerHTML=items+items; tr.style.animationDuration=Math.max(60, feed.length*9)+'s';
 }
+// Each ticker leads with what concerns this user now: their own sensors and findings, then flaws under attack in their own devices. World news follows.
+function myFindings(side){
+  const names=THREATS.filter(t=>t.side===side).map(t=>t.name), week=Date.now()-7*86400000, out=[];
+  if(side==='w'){ const V=vis();
+    if(V.mode==='live'){ const pres=V.devices.filter(d=>d.present&&!d.sim), fl=pres.filter(d=>d.withYou||d.homeAway);
+      if(pres.length || !V.test) out.push({t:'Now: '+pres.length+' device'+(pres.length===1?'':'s')+' in earshot'+(fl.length?', '+fl.length+' flagged. Open Watchers':', none flagged')+'.', src:(mobileLive()?'your sensor':'your home listener')+' · '+hhmm(liveLast()-LIVE.skew), mine:true}); }
+    else if(V.mode!=='sim') out.push({t:'Your vicinity: '+stateWords(V.mode).count+'. Unknown, not Clear.', src:'your sensors', mine:true}); }
+  else kevMine().slice(0,3).forEach(v=>out.push({t:'In your own devices: '+v.vendor+' '+v.product+' is under attack ('+v.cve+'). Update it.', src:'CISA · '+fmtD(v.added), u:v.u, mine:true}));
+  P.evidence.filter(r=>r.kind==='finding' && r.t>week && names.some(n=>r.text.indexOf(n)===0)).slice(0,4)
+    .forEach(r=>out.push({t:'Your finding: '+r.text.slice(0,140), src:'Evidence · '+new Date(r.t).toLocaleDateString()+' '+hhmm(r.t), mine:true}));
+  return out;
+}
+function fillTickers(){ if(!el('trackW')) return; fillTicker('trackW', myFindings('w').concat(liveFeedW(), FEED_W)); fillTicker('trackA', myFindings('a').concat(liveFeedA(), FEED_A)); }
 
 /* ---------- navigation and rendering ---------- */
 function placeVicinity(v){ const host = v==='watchers' ? el('wVic') : el('ovVic'), card=el('vicCard'); if(card.parentNode!==host) host.appendChild(card); }
@@ -2765,7 +2784,7 @@ function boot(){
   if(PROFILE_Q.every(q=>pv(q.k)===null)) S.open.add('profile');
   setView('overview');
   setInterval(tick, 1600);
-  loadGlobal(); setInterval(loadGlobal, 15*60*1000);
+  loadGlobal(); setInterval(loadGlobal, 10*60*1000); setInterval(fillTickers, 60000);
   syncStart(); liveStart();
 }
 /* returning visit: unlock only after everything above is defined */
