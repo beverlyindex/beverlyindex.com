@@ -130,13 +130,17 @@ select.inp{flex:none}
 /* ---------- NOUS-style pipeline strip, verdict card, pulls ---------- */
 .prelim{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--warn);
   border:1px solid rgba(232,168,74,.5);background:rgba(232,168,74,.06);padding:6px 10px;border-radius:7px;margin-bottom:10px;line-height:1.5}
-.pipe{display:flex;align-items:center;margin-bottom:12px}
+.pipe{display:flex;align-items:stretch;margin-bottom:12px}
 .pipe .nd{flex:1;min-width:0;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#bff3fb;
   padding:8px 6px;border-radius:9px;border:1px solid rgba(57,183,214,.6);background:linear-gradient(180deg,rgba(57,183,214,.10),rgba(57,183,214,.02));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 16px -8px var(--cyan)}
 .pipe .nd b{display:block;font-family:var(--disp);font-size:17px;letter-spacing:.02em;color:#fff;margin-top:1px;font-weight:600}
-.pipe .ln{width:16px;height:1px;background:rgba(57,183,214,.6);flex:none}
-.pipe .nd.end{flex:1.55}
+.pipe .ln{width:16px;height:1px;background:rgba(57,183,214,.6);flex:none;align-self:center}
+.pipe .nd.end{flex:1.3}
+.pipe .nd[data-act]{cursor:pointer}
+.pipe .nd .pl{display:block;line-height:1.25;min-height:2.5em;display:flex;align-items:center;justify-content:center}
+.pipe .nd i{display:block;font-style:normal;font-family:var(--sans);text-transform:none;letter-spacing:0;font-size:10px;line-height:1.25;color:var(--mut);margin-top:2px;min-height:2.5em}
+.pipenote{font-size:11.5px;line-height:1.45;color:var(--mut);margin:-4px 2px 12px}
 .pipe .nd.end b{text-transform:none;letter-spacing:0;white-space:nowrap;font-size:clamp(13px,3.5vw,17px)}
 @media(max-width:520px){ .pipe .ln{width:8px} .pipe .nd{padding:8px 3px;letter-spacing:.1em} }
 .pipe .nd.end{border-color:var(--tierc);color:var(--tierc);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 18px -6px var(--tierc)}
@@ -197,6 +201,11 @@ select.inp{flex:none}
   background:linear-gradient(180deg,rgba(217,168,38,.10),rgba(217,168,38,.02));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 22px -14px var(--att)}
 .special h4{margin:0 0 6px;font-family:var(--mono);font-weight:600;letter-spacing:.16em;text-transform:uppercase;font-size:11px;color:var(--att2)}
 .sp{display:grid;grid-template-columns:74px 1fr;gap:10px;font-size:13.5px;line-height:1.5;padding:6px 0}
+.sphd{display:grid;grid-template-columns:88px 1fr;gap:10px;font-size:13.5px;line-height:1.5;padding:10px 0 6px;margin-top:6px;border-top:1px solid rgba(217,168,38,.28);color:#fff}
+.sphd:first-of-type{border-top:0;margin-top:0}
+.sphd .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--att2);padding-top:2px}
+.special .chk{border-top-color:rgba(217,168,38,.16)}
+.special .dhead h4{margin:0}
 .sp .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--att2);padding-top:2px}
 .limit{font-size:12.5px;color:var(--mut);line-height:1.5}
 .limit b{color:var(--ink);font-weight:600}
@@ -987,6 +996,206 @@ function platPills(){
     '<button data-act="plat" data-p="iphone" class="m-auto '+(p==='iphone'?'on':'')+'">iPhone</button></div>';
 }
 
+/* ---------- Special, step by step. Each countermeasure is a short procedure the user can tick off.
+   A step is [who, text, effect, note, ref]. who: 'x' everyone, 'a' Android, 'i' iPhone.
+   ref points at a Defend step that is the same action, so one tick marks both. ---------- */
+const LOGIT='Log it in the box below marked Log a finding';
+const SPECIAL = {
+ w_ble:{ d:[
+   ['x','Do this only once you are somewhere safe','The tag\'s owner stops receiving its location and may notice that it stopped. If that could put you at risk, go to a safe place or to the police first.'],
+   ['x','AirTag: press down on the polished steel back and turn it counterclockwise. Lift the cover off and take out the battery'],
+   ['x','Another make of tag: open its battery cover, usually a coin slot or a slide, and take out the battery. If the battery cannot be removed, put the tag in a metal tin and take it to the police'] ],
+  c:[
+   ['x','Before you touch it, photograph the tag exactly where you found it'],
+   ['x','AirTag: hold its white side against the top of your phone until a notification appears, then tap it. A page opens with the serial number, and the last four digits of the owner\'s phone number','','Works on iPhone, and on Android phones with NFC switched on.'],
+   ['x','Take a screenshot of that page'],
+   ['x',LOGIT+': where you found it, when, and the serial number'],
+   ['x','Keep the tag. Take it and the serial number to the police. Apple answers law enforcement requests on that serial'] ] },
+ w_tower:{ d:[
+   ['a','Block 2G: Settings, Network & internet, SIMs, then your SIM. On Android 16 turn on 2G network protection. On Android 15 and earlier turn off Allow 2G','The phone will not connect where only 2G coverage exists. Emergency calls still work over 2G.','',0],
+   ['i','Turn on Lockdown Mode, which switches 2G and 3G off: Settings, Privacy & Security, Lockdown Mode, Turn On & Restart','Lockdown Mode also blocks most message attachments and link previews, FaceTime calls from people you have not contacted in 30 days, and accessory connections while locked. The phone restarts.','',2] ],
+  c:[
+   ['x','On every alert, note the time and exactly where you are standing'],
+   ['x',LOGIT],
+   ['x','With a Rayhunter hotspot: open its web page as its guide describes and download the capture for that time','','Needs the carried sensor.'],
+   ['x','After a few weeks, open Evidence and read your entries in order. Alerts that repeat at one place mark where interception operates. Give the capture files to a security analyst'] ] },
+ w_stalk:{ d:[
+   ['x','Do the Convert steps first. Removing the app destroys the evidence'],
+   ['a','Settings, Accessibility. Tap the service you do not recognise and switch it off','The app can no longer read your screen. The person who installed it may notice.'],
+   ['a','Search Settings for Device admin apps and switch off the app you did not install. Then Settings, Apps, the app, Uninstall','The app and everything it stored on the phone are deleted.'],
+   ['i','Settings, your name. Tap a device you do not recognise, then Remove from Account','That device is signed out of iCloud and Find My.'],
+   ['i','Settings, General, VPN & Device Management. Tap a profile you did not install, then Remove Profile','Everything that profile installed is removed with it.'],
+   ['x','Change the phone passcode and the account password from a different device you trust','','',7] ],
+  c:[
+   ['a','Settings, Apps, See all apps, the app. Photograph the whole page with a second device: name, icon, Permissions, and the line at the bottom that says where it was installed from'],
+   ['i','Photograph each unknown device\'s page under Settings, your name, and each unknown profile under VPN & Device Management'],
+   ['x',LOGIT+': the app or device name and what it could reach'],
+   ['x','Keep the photographs off this phone. Send them to a person you trust, or to a new email account opened from a different device'] ] },
+ w_work:{ d:[
+   ['x','Sign out of personal mail, messaging, banking and cloud storage on the work device','Signing out removes that account\'s mail, files and passwords from the device. Confirm they are saved elsewhere first.','',6],
+   ['x','Use your own phone or computer for anything personal'],
+   ['x','Keep that device off the work Wi-Fi. Use mobile data or your home network','','An employer can see which sites are visited over its own network.'] ],
+  c:[
+   ['x','Photograph each screen you checked in Defend: profiles, admin apps, certificates'],
+   ['x','Write the list in the box below marked Log a finding. Halo records the date'],
+   ['x','Ask HR or IT in writing what is monitored on the device, and keep the reply','','Many places require an employer to give notice of monitoring. This is not legal advice.'] ] },
+ w_wifi:{ d:[
+   ['x','Choose the one room that matters most, usually the bedroom'],
+   ['x','Cover its outside walls and windows with a radio-attenuating material: foil-backed insulation board, shielding paint, or metallised window film','Mobile signal and Wi-Fi in that room drop as well.'],
+   ['x','Check it worked: with the door and windows closed, your phone should show at least one bar less mobile signal in that room'],
+   ['x','Do not use a jammer. Jamming is unlawful in the United States'] ],
+  c:[
+   ['x','Open Responder and choose Home'],
+   ['x','List each room and choose a sensor for it: a ceiling radar for the bathroom and bedroom, a Wi-Fi motion node elsewhere'],
+   ['x','Add each person at home and record that they agree','','Monitoring starts when a home station is connected. That is not built yet.'] ] },
+ a_agent:{ d:[
+   ['x','Open the agent\'s settings and find the list of sites it may act on. It may be called site permissions, allowed sites or site access'],
+   ['x','Remove every site, then add back only the ones you want it to work on'],
+   ['x','Leave mail, banking and any site with saved payment details off that list','The agent cannot read or act on those sites until you add them.'] ],
+  c:[
+   ['x','On a computer, open canarytokens.org'],
+   ['x','From the list of token types choose Microsoft Word document'],
+   ['x','Enter the email address that should receive the alert, and a reminder of where this file will sit, for example: canary in my Gmail','','Use an address the agent cannot reach.'],
+   ['x','Create the token and download the file'],
+   ['x','Rename the file to something an intruder would open, for example Passwords 2026.docx'],
+   ['x','Email the file to yourself and leave that message in the mailbox. Do not open the file','Opening it yourself sets off the alert.'],
+   ['x','If an alert arrives, something opened the file. '+LOGIT+', then change that mailbox\'s password and sign out its other sessions','','No alert does not prove that nobody looked. Some readers never open an attachment in Word.'] ] },
+ a_access:{ d:[
+   ['x','When an assistant asks for access, read the whole request before you accept'],
+   ['x','Choose the smallest option offered: one folder in place of the whole drive, read only in place of edit, this time only in place of always'],
+   ['x','If only a broad option is offered, decline, and do that task by hand'] ],
+  c:[
+   ['x','Open the assistant\'s settings and find its record of actions. It may be called activity, history or action log'],
+   ['x','Read the last 7 days. Look for anything you did not ask for: a file opened, a message sent, a purchase'],
+   ['x','If you find one, '+LOGIT.charAt(0).toLowerCase()+LOGIT.slice(1)],
+   ['x','Put a weekly reminder in your calendar to read it again'] ] },
+ a_phish:{ d:[
+   ['x','Start with your main email account. Whoever holds it can reset every other account'],
+   ['x','Google account: open myaccount.google.com, Security, Passkeys and security keys, Create a passkey'],
+   ['x','Microsoft account: open account.microsoft.com, Security, Manage how I sign in, add a new way to sign in, then Face, fingerprint, PIN or security key'],
+   ['x','Any other account: open its Security settings and look for Passkeys'],
+   ['x','Save the backup codes before you rely on the passkey','Losing the phone or key without the backup codes can lock you out of the account.','',1] ],
+  c:[
+   ['x','Do not click anything in the message'],
+   ['x','Save the full headers. Gmail: the three dots beside Reply, Show original, Download original. Outlook on the web: the three dots, View, View message source. Apple Mail on a Mac: View, Message, All Headers, then File, Save As'],
+   ['x','Report it: forward the email to reportphishing@apwg.org, and forward a phishing text to 7726','','',7],
+   ['x',LOGIT+': the sender, the time and what it asked for'],
+   ['x','If money moved, call your bank at once, then report at ReportFraud.ftc.gov'] ] },
+ a_alias:{ d:[
+   ['x','Run the Alias Integrity Check below and read which anchors it marks as shared'],
+   ['x','Recovery: open the alias account\'s security settings. Replace the recovery phone and recovery email with ones used for that alias only','Recovery messages for that account go to the new address from then on.'],
+   ['x','Payment: remove any card in your legal name. Pay with a prepaid or virtual card kept for that alias only'],
+   ['x','Browser: use the alias only inside its own browser profile'],
+   ['x','Run the check again. The score rises as each shared anchor goes'] ],
+  c:[
+   ['i','Create an address for one service: Settings, your name, iCloud, Hide My Email, Create New Address. Label it with the service\'s name','','Needs iCloud+.'],
+   ['x','In Gmail, add a plus sign and the service name before the @, for example yourname+shopname@gmail.com. The mail still arrives in your inbox','','A sender can strip the plus part. A dedicated alias service is stronger.'],
+   ['x','Give each service its own address, and note which address went to which service'],
+   ['x','When mail reaches an address from anyone but that service, that service sold or leaked it. '+LOGIT] ] },
+ a_phone:{ d:[
+   ['x','Call your carrier or open its app. Ask for two things by name: an account PIN, and a number lock, also called port-out protection or SIM protection','Keep the PIN somewhere safe. Without it, changes to your own account take longer.','',0],
+   ['x','Add a passkey or a security key to your main email account, under its Security settings','Save the backup codes first. Losing the key or the phone without them can lock you out of the account.','',1],
+   ['x','Then remove your phone number as a way to sign in to that account','You can no longer recover the account by text message. Keep the backup codes.'] ],
+  c:[
+   ['x','Get a second number: a Google Voice number in the United States, or a second line from your carrier'],
+   ['x','Give that number to one service only, and write down which'],
+   ['x','A call or text to that number from anyone else means that service passed it on. '+LOGIT] ] },
+ a_android:{ d:[
+   ['a','Delete the advertising ID: open Settings and type Ads in the search bar at the top. Open Ads, then press Delete advertising ID and confirm. On most phones Ads sits under Privacy, or under Security & privacy','Apps receive a string of zeros in place of the ID. Adverts continue but are not tied to it.','',0],
+   ['a','Check it worked: the same screen now offers Get new advertising ID in place of Delete'],
+   ['i','Stop cross-app tracking: Settings, Privacy & Security, Tracking, turn off Allow Apps to Request to Track. If the phone asks, choose Ask Apps to Stop Tracking','','',4] ],
+  c:[
+   ['a','Open the Privacy dashboard: Settings, Security & privacy, Privacy, Privacy dashboard','','',3],
+   ['a','Tap Microphone, then Camera, then Location. Each shows a timeline of the apps that used it'],
+   ['i','Turn on App Privacy Report: Settings, Privacy & Security, App Privacy Report','','It shows the last 7 days from the moment you turn it on.',7],
+   ['i','Under Data & Sensor Access, tap each app to see when it used the microphone, camera or location'],
+   ['x','Look for use at a time when you were not using that app. '+LOGIT+': the app, the sensor and the time'],
+   ['x','Remove that permission from the app','The app loses that feature until you grant it again.'] ] },
+ a_theft:{ d:[
+   ['a','From any browser open android.com/lock. Enter your phone number and complete the check. The screen locks','','Needs Remote Lock switched on beforehand, in Defend.'],
+   ['a','Then open android.com/find, sign in, choose the phone and press Secure device'],
+   ['i','From any browser open icloud.com/find and sign in. Choose the phone, then Mark As Lost, and enter a number where you can be reached','Payment cards on the phone are suspended.'],
+   ['x','Call your carrier and ask them to suspend the SIM','Calls and texts to your number stop until you have a new SIM.'] ],
+  c:[
+   ['x','On that same page, take a screenshot of the position shown. Take another when it moves'],
+   ['x','Report the theft to the police. Give them the IMEI you wrote down and the screenshots, and ask for the report number'],
+   ['x','Give the report number to your insurer and to your carrier'],
+   ['x','Do not go to the location yourself'],
+   ['i','Leave the phone in Find My, even after erasing it','','Removing it switches off Activation Lock.'] ] },
+ a_pubwifi:{ d:[
+   ['a','Stop the phone joining networks by itself: Settings, Network & internet, Internet, Network preferences, turn off Turn on Wi-Fi automatically','','',0],
+   ['i','Stop the phone joining hotspots by itself: Settings, Wi-Fi, Auto-Join Hotspot, Never','','',3],
+   ['x','Forget public networks you no longer use, from the saved networks list in the Wi-Fi settings','','',5] ],
+  c:[
+   ['x','Where you are now, open the Wi-Fi list and read the names'],
+   ['x','A name that should not be there, such as your home or office network at an airport, is a copy. Do not join it'],
+   ['x','Take a screenshot of the list'],
+   ['x',LOGIT+': the network name, the place and the time'] ] },
+ a_ext:{ d:[
+   ['x','Chrome or Edge: menu, Extensions, Manage Extensions. Press Details on an extension. Under Site access choose On click','The extension stops working by itself. Click its icon on a page when you want it.','',1],
+   ['x','Safari on a Mac: Safari, Settings, Extensions. Select the extension, press Edit Websites, and set Other Websites to Ask or Deny'],
+   ['x','Firefox: menu, Add-ons and themes. Open the extension, then Permissions. Where Firefox offers it, switch off access to all websites'] ],
+  c:[
+   ['x','Take a screenshot of the full extension list today'],
+   ['x','Write the names in the box below marked Log a finding. Halo records the date'],
+   ['x','Repeat each month. A name you did not add is a finding'] ] },
+ a_fraud:{ d:[
+   ['x','When anyone asks for money, codes or identity details, stop the conversation'],
+   ['x','Contact that person or organisation yourself, through a number or address you already had. Never use one given in the message','','',0],
+   ['x','On an urgent call from family, ask for the code word','','',1],
+   ['x','If they cannot be confirmed, or they press you to hurry, do not pay and do not reply'] ],
+  c:[
+   ['x','Take screenshots of the conversation, the profile and any payment details they gave'],
+   ['x','Report it at ReportFraud.ftc.gov. For online fraud also report at ic3.gov'],
+   ['x',LOGIT+': who contacted you, and the report number'],
+   ['x','If you paid, call your bank or card issuer at once and ask them to reverse it'] ] },
+ a_malware:{ d:[
+   ['a','Turn on Advanced Protection: Settings, Security & privacy, Advanced Protection','It blocks apps from outside the Play Store, 2G, and USB data while locked, and restarts the phone after 72 hours locked. Individual protections cannot be switched off while it is on.','Android 16 and later.',1],
+   ['i','Turn on Lockdown Mode: Settings, Privacy & Security, Lockdown Mode, Turn On & Restart','It blocks most message attachments and link previews, FaceTime calls from people you have not contacted in 30 days, and accessory connections while locked. The phone restarts.','',3] ],
+  c:[
+   ['x','Note anything unusual: the battery draining fast, the phone hot when idle, a setting that changed, an app you did not install'],
+   ['x',LOGIT+', with the time. Halo hashes each entry, so a later change to it would show'],
+   ['x','If findings repeat, open Evidence, press Export signed log, and take the file to a security specialist'] ] },
+ a_breach:{ d:[
+   ['x','Freeze your file at each of the three United States bureaus. It is free: equifax.com/personal/credit-report-services, experian.com/freeze, transunion.com/credit-freeze','Nobody can open new credit in your name while the freeze is on, including you. Lift it before you apply for credit.','',1],
+   ['x','Each bureau gives you a PIN or an account. Keep them: you need them to lift the freeze'],
+   ['x','Outside the United States, ask your national credit bureau for a freeze or a fraud alert'] ],
+  c:[
+   ['i','Create an address for one organisation: Settings, your name, iCloud, Hide My Email, Create New Address. Label it with the organisation\'s name','','Needs iCloud+.'],
+   ['x','In Gmail, add a plus sign and the organisation\'s name before the @, for example yourname+bankname@gmail.com','','',2],
+   ['x','When mail reaches that address from anyone else, that organisation leaked or sold it. '+LOGIT] ] },
+ p_patch:{ d:[
+   ['a','Settings, System, Software update. Install anything offered','The phone restarts.'],
+   ['i','Settings, General, Software Update. Install anything offered','The phone restarts.'],
+   ['x','Router: open the router\'s app or its admin page and find Firmware update or Software update. Install it','The internet drops for a few minutes.'],
+   ['x','Record each date in the Patch Clock below','','',2] ],
+  c:[
+   ['x','Switch on automatic updates on every device that offers them, so patches install the day they arrive'],
+   ['x','Each week, read the Exploited now list in the Patch Clock below. It names products under attack'],
+   ['x','Replace any device that no longer receives updates','','',4] ] },
+ p_whofi:{ d:[
+   ['x','List every Wi-Fi transmitter in your home: router, extenders, smart speakers, cameras'],
+   ['x','Switch off any motion or sensing feature in the router app'],
+   ['x','In the one room that matters, move out or unplug every transmitter and use cable','Wireless devices in that room go offline.','',2] ],
+  c:[
+   ['x','At home, open your phone\'s Wi-Fi list and note the network names that are always there'],
+   ['x','A strong new name that appears and stays is worth recording. '+LOGIT+': the name, the time and the number of signal bars'],
+   ['x','At a workplace or venue, send a written question: is Wi-Fi sensing or identification of people in use here, and on what legal basis. Keep the reply','','This is not legal advice.',4] ] },
+ p_6g:{ d:[
+   ['x','Nothing is needed today. This technology is not deployed'],
+   ['x','To prepare one room: fit metallised window film, and shielding paint or foil-backed board on its outside walls','Mobile signal and Wi-Fi in that room drop as well.'] ],
+  c:[
+   ['x','Open Responder and set up the people and rooms at home. The same sensing, on your own equipment, watches over them'] ] }
+};
+const spSteps = (t,k) => (((SPECIAL[t.id]||{})[k])||[]).map((x,i)=>({key:(x[4]!=null?String(x[4]):'s'+k+i), p:x[0], t:x[1], fx:x[2]||'', note:x[3]||''})).filter(x=>x.p==='x'||PK[x.p]===plat());
+const spAll = t => spSteps(t,'d').concat(spSteps(t,'c'));
+const spCount = t => { const d=doneMap(t), all=spAll(t); return {n:all.length, dn:all.filter(x=>d[x.key]).length}; };
+const spHasPlat = t => ['d','c'].some(k=>(((SPECIAL[t.id]||{})[k])||[]).some(x=>x[0]!=='x'));
+function spBlock(t,k,num,title,lead){ const d=doneMap(t), st=spSteps(t,k);
+  return '<div class="sphd"><span class="k">'+num+' '+title+'</span><span>'+esc(lead)+'</span></div>'+
+    st.map((x,n)=>{ const on=!!d[x.key]; return '<div class="chk '+(on?'on':'')+'" data-act="spdef" data-id="'+t.id+'" data-k="'+x.key+'" data-g="'+k+'" data-n="'+n+'"><span class="box">'+(on?'&#10003;':(n+1))+'</span><span class="tx">'+esc(x.t)+
+      (x.fx?'<span class="fx"><b>Effect.</b> '+esc(x.fx)+'</span>':'')+(x.note?'<span class="nt"><b>Note.</b> '+esc(x.note)+'</span>':'')+'</span></div>'; }).join(''); }
+
 /* ---------- Special: shown on any real threat the user is exposed to, or has logged a finding against ---------- */
 function experiencing(t){
   if(t.shelf!=='real') return null;
@@ -1040,8 +1249,9 @@ function threatPull(t){
   else if(sc===false){ bar='--dim'; sum='Does not apply, from your profile'; }
   else if(n && dn>=n){ bar='--clear'; sum='Defended · '+dn+' of '+n+' done'; }
   else { bar = sc===null?'--mut':'--warn'; sum=(sc===null?'Not known yet':'Applies to you')+' · '+dn+' of '+n+' defences done'; }
+  if(sc!==false){ const q=spCount(t); if(q.n) sum+=' · Special '+q.dn+' of '+q.n; }
   const ban = (ex && !open) ? '<div class="spban '+ex.lvl+'" data-act="pull" data-id="'+t.id+'"><span class="spk">Special</span>'+
-      '<span class="spt"><b>'+esc(ex.txt)+'.</b> Countermeasure: '+esc(t.deflect)+' Then: '+esc(t.convert)+'</span></div>' : '';
+      '<span class="spt"><b>'+esc(ex.txt)+'.</b> '+spCount(t).dn+' of '+spCount(t).n+' countermeasure steps done. '+esc(t.deflect)+' <b>Open for the steps.</b></span></div>' : '';
   return '<div class="tp '+(open?'open':'')+'" style="--hc:var('+bar+')" id="tp-'+t.id+'">'+
     '<div class="tp-head" data-act="pull" data-id="'+t.id+'">'+
       '<div class="tp-top"><span class="tp-lab">'+esc(t.name)+'</span><span class="tp-i">i</span></div>'+
@@ -1074,10 +1284,11 @@ function threatBody(t){
   if(steps.some(s=>s.fx)) h+='<div class="liab">'+LIAB_LINE+' <a href="#" data-act="terms">Terms of use</a></div>';
   if(hasPlat(t)) h+='<div class="limit" style="margin-top:8px">Paths follow '+(plat()==='android'?'Pixel-style Android 15 and 16. Other makers name some menus differently: search Settings for the term.':'iOS 18 and iOS 26.')+'</div>';
   h+='</div>';
-  h+='<div class="special'+(ex&&ex.lvl==='conf'?' conf':'')+'"><h4>Special <span class="spsub">countermeasures'+(ex?' · '+esc(ex.txt):'')+'</span></h4>'+
-     '<div class="sp"><span class="k">1 Deflect</span><span>'+esc(t.deflect)+'</span></div>'+
-     '<div class="sp"><span class="k">2 Convert</span><span>'+esc(t.convert)+'</span></div>'+
-     (t.spfx?'<div class="fx" style="margin-top:6px"><b>Effect.</b> '+esc(t.spfx)+'</div>':'')+
+  const spc=spCount(t);
+  h+='<div class="special'+(ex&&ex.lvl==='conf'?' conf':'')+'"><div class="dhead"><h4>Special <span class="spsub">countermeasures, step by step · '+spc.dn+' of '+spc.n+' done'+(ex?' · '+esc(ex.txt):'')+'</span></h4>'+(spHasPlat(t)&&!hasPlat(t)?platPills():'')+'</div>'+
+     (t.spfx?'<div class="fx" style="margin:2px 0 8px"><b>Before you start.</b> '+esc(t.spfx)+'</div>':'')+
+     spBlock(t,'d',1,'Deflect',t.deflect)+spBlock(t,'c',2,'Convert',t.convert)+
+     '<div class="limit" style="margin-top:10px">Tick each step as you finish it. Halo keeps the tick, records it in Evidence, and counts it toward your protection.</div>'+
      '<div class="liab" style="margin-top:8px">A countermeasure that changes a device, account or software is yours to decide and yours to carry. <a href="#" data-act="terms">Terms of use</a></div></div>';
   if(t.tool==='alias') h+=toolAlias();
   if(t.tool==='patch') h+=toolPatch();
@@ -1234,7 +1445,7 @@ function profilePull(){
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, open=S.open.has('profile');
   let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(answered===PROFILE_Q.length?'--clear':'--cyan')+')">'+
     '<div class="tp-head" data-act="pull" data-id="profile"><div class="tp-top"><span class="tp-lab">Your profile</span><span class="tp-i">i</span></div>'+
-    '<div class="tp-sum">'+answered+' of '+PROFILE_Q.length+' answered · this is the You step</div><span class="chev">&#9662;</span></div>';
+    '<div class="tp-sum">'+answered+' of '+PROFILE_Q.length+' answered · this decides what applies to you</div><span class="chev">&#9662;</span></div>';
   if(open){ h+='<div class="tp-body"><div class="dsec">';
     PROFILE_Q.forEach(q=>{ const v=pv(q.k);
       h+='<div class="q"><span>'+q.q+'</span><span class="yn"><button class="y '+(v===true?'on':'')+'" data-act="prof" data-k="'+q.k+'" data-v="y">Yes</button>'+
@@ -1249,8 +1460,14 @@ function renderOverview(){
   let h='<div style="--tierc:var('+tc+')">';
   h+= g ? '<div class="prelim live">Global scan live. Updated '+fmtDT(g.generated)+'. '+g.sources.filter(s=>s.ok).length+' of '+g.sources.length+' sources</div>'
         : '<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'The live feed was not reached':'Reaching the live feed')+'</div>';
-  h+='<div class="pipe"><div class="nd">Global<b>'+(THREATS.length+(g&&g.kev?g.kev.recent.length:0))+'</b></div><div class="ln"></div><div class="nd">Assess<b>'+real+' + '+pot+'</b></div><div class="ln"></div>'+
-     '<div class="nd">You<b>'+applies+'</b></div><div class="ln"></div><div class="nd end">BLUF<b style="color:var(--tierc)">'+esc(a.t<0?'Unknown':TIER_NAME[a.t])+'</b></div></div>';
+  const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
+  const openN=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true&&isOpen(t)).length;
+  h+='<div class="pipe">'+
+     '<div class="nd" data-act="pipe" data-k="global" title="Open the Global scan"><span class="pl">Tracked worldwide</span><b>'+(THREATS.length+kevN)+'</b><i>'+THREATS.length+' threats'+(kevN?', '+kevN+' flaws under attack':'')+'</i></div><div class="ln"></div>'+
+     '<div class="nd" data-act="pipe" data-k="real" title="Open Attackers"><span class="pl">In use today</span><b>'+real+'</b><i>'+pot+' more are not here yet</i></div><div class="ln"></div>'+
+     '<div class="nd" data-act="pipe" data-k="you" title="Open Your profile"><span class="pl">Apply to you</span><b>'+(answered?applies:'?')+'</b><i>'+(answered?(openN?openN+' still to defend':'all defended'):'answer Your profile')+'</i></div><div class="ln"></div>'+
+     '<div class="nd end"><span class="pl">Bottom line</span><b style="color:var(--tierc)">'+esc(a.t<0?'Unknown':TIER_NAME[a.t])+'</b><i>read below</i></div></div>'+
+     '<div class="pipenote">Read left to right: what Halo tracks worldwide, how much of it is in use against people today, how much of that applies to you, and the bottom line.</div>';
   h+='<div class="verdict"><div class="ring">'+a.n+'</div><div><div class="vt">'+esc(a.title)+'</div><div class="vs">'+a.s+'</div><div class="vm">'+esc(a.meta)+'</div>'+
      '<div class="chips"><span class="chip '+(a.side==='Watchers'?'w':a.side==='Attackers'?'a':'')+'">'+esc(a.side)+'</span><span class="chip real">'+real+' Real &amp; Imminent</span><span class="chip pot">'+pot+' Potential</span></div></div></div>';
   h+='<div class="modebar">'+modePills()+'</div>';
@@ -1646,7 +1863,9 @@ function startGeo(){
 // Asked for by a button press, so the browser shows its own permission question.
 function geoAsk(){ return new Promise(res=>{
   if(!navigator.geolocation){ S.geoErr=9; return res(false); }
-  navigator.geolocation.getCurrentPosition(p=>{ geoFix(p); _geoOn=false; startGeo(); res(true); }, e=>{ geoFail(e); res(false); }, {enableHighAccuracy:true, timeout:15000, maximumAge:0}); }); }
+  let done=false; const fin=ok=>{ if(!done){ done=true; res(ok); } };
+  setTimeout(()=>{ if(!done){ if(S.pos) fin(true); else { geoFail({code:3}); fin(false); } } }, 16000);      // never leave the user waiting on a browser that does not answer
+  navigator.geolocation.getCurrentPosition(p=>{ geoFix(p); _geoOn=false; startGeo(); fin(true); }, e=>{ geoFail(e); fin(false); }, {enableHighAccuracy:true, timeout:15000, maximumAge:60000}); }); }
 const onMac = () => /Mac/.test(navigator.platform||'') && !('ontouchend' in document);
 function geoHelp(){
   if(!S.geoErr) return '';
@@ -2461,6 +2680,10 @@ document.addEventListener('click', e=>{
     case 'pull': { const id=a.dataset.id; S.open.has(id)?S.open.delete(id):S.open.add(id); rerender(); if(el('rost')) renderRoster(); break; }
     case 'def': { const t=T(a.dataset.id), i=+a.dataset.i; let d=P.done[t.id]; if(!d||Array.isArray(d)) d=P.done[t.id]={}; d[i]=!d[i]; save();
       if(d[i]) logEvidence('defence','Step completed, '+t.name+': '+t.steps[i][1]); rerender(); if(el('rost')) renderRoster(); break; }
+    case 'pipe': { const k=a.dataset.k; if(k==='real'){ S.shelf='real'; setView('attackers'); break; }
+      S.open.add(k==='global'?'global':'profile'); rerender(); setTimeout(()=>{ const n=document.querySelector('#ovMain .tp-head[data-id="'+(k==='global'?'global':'profile')+'"]'); if(n) n.scrollIntoView({block:'start',behavior:'smooth'}); },80); break; }
+    case 'spdef': { const t=T(a.dataset.id), k=a.dataset.k; let d=P.done[t.id]; if(!d||Array.isArray(d)) d=P.done[t.id]={}; d[k]=!d[k]; save();
+      if(d[k]){ const x=spSteps(t,a.dataset.g)[+a.dataset.n]; logEvidence('defence','Special step completed, '+t.name+', '+(a.dataset.g==='d'?'Deflect':'Convert')+': '+(x?x.t:k)); } rerender(); if(el('rost')) renderRoster(); break; }
     case 'plat': P.platform=a.dataset.p; save(); rerender(); if(el('rost')) renderRoster(); break;
     case 'prof': { const k=a.dataset.k, v=a.dataset.v==='y'; if(P.profile[k]===v) delete P.profile[k]; else P.profile[k]=v; save(); rerender(); break; }
     case 'mode': { const m=a.dataset.m; S.mode=m;
@@ -2507,7 +2730,7 @@ document.addEventListener('click', e=>{
     case 'sn-copy': { const t=SY.cred&&SY.cred.text; if(t && navigator.clipboard) navigator.clipboard.writeText(t).then(()=>toast('Sensor code copied.'),()=>toast('Could not copy. Select the code and copy it by hand.')); else toast('Select the code and copy it by hand.'); break; }
     case 'home-loc-clear': { delete P.home.loc; save(); rerender(); toast('Home location cleared.'); break; }
     case 'home-loc': { S.homeMsg='Finding your position.'; rerender();
-      (S.pos && Date.now()-S.pos.t<20000 ? Promise.resolve(true) : geoAsk()).then(ok=>{
+      (S.pos && !S.geoErr ? Promise.resolve(true) : geoAsk()).then(ok=>{       // a position already held is current: the browser reports again only when you move
         if(!ok || !S.pos) S.homeMsg=geoHelp()||'The position could not be found.';
         else if(S.pos.acc>200) S.homeMsg='Your position is only known to within '+Math.round(S.pos.acc)+' m, which is too rough to mark home. Switch Wi-Fi on, or do this on your phone at home.';
         else { P.home.loc={lat:S.pos.lat,lon:S.pos.lon,acc:S.pos.acc,t:Date.now()}; S.homeMsg=''; save(); toast('Home location set.'); }
