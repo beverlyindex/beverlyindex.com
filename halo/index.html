@@ -81,6 +81,12 @@ a{color:var(--chrome2)}
 .btn.red{background:linear-gradient(180deg,#ff6b6b,#b81f2c);color:#fff;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -3px 8px rgba(0,0,0,.35),0 10px 24px -8px rgba(255,90,90,.6),inset 0 0 0 1px #ff8d8d}
 .btn.wide{width:100%}
+#splash{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity .85s ease}
+#splash.out{opacity:0}
+#splash video{width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .7s ease;background:#000}
+#splash video.on{opacity:1}
+#splash .sbtn{position:absolute;bottom:calc(22px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.28);background:rgba(8,12,24,.6);color:rgba(255,255,255,.86);font-size:12.5px;font-weight:600;letter-spacing:.06em;padding:9px 16px;border-radius:999px}
+#splash #splashSkip{right:22px} #splash #splashSound{left:22px} #splash #splashSound.on{border-color:var(--clear);color:#c9efd9}
 body.calm .you-dot::after,body.calm .ticker .track{animation:none}      /* a warm or saving phone draws nothing that moves on its own */
 /* A choice that is made stays visibly made: a button that holds a state turns green while that state holds. */
 .btn.on{background:linear-gradient(180deg,#1f7a4d,#0f4a2e);color:#eafff3;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px var(--clear),0 6px 16px -8px rgba(74,232,138,.6)}
@@ -657,6 +663,13 @@ a.tk:hover b{text-decoration:underline}
 </head>
 <body>
 
+<!-- ============ SPLASH: shown once, after a successful unlock ============ -->
+<div id="splash" class="hidden" aria-label="Beverly Index, then Remiel">
+  <video id="splashVideo" playsinline muted preload="auto"></video>
+  <button class="sbtn" id="splashSound" type="button">Sound on</button>
+  <button class="sbtn" id="splashSkip" type="button">Skip</button>
+</div>
+
 <!-- ============ GATE ============ -->
 <div id="gate">
   <div class="gate-card">
@@ -853,10 +866,30 @@ function tryUnlock(){
   const v=el('gateKey').value, err=el('gateErr');
   const lk=((el('gateLink')||{}).value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(lk && lk.length!==20){ err.textContent='The link code has 20 characters.'; return; }
-  if(codeOk(v)){ store.set('halo_key', v.trim().toUpperCase()); err.textContent=''; if(lk) S.pendingJoin=lk; openApp(); }
+  if(codeOk(v)){ store.set('halo_key', v.trim().toUpperCase()); err.textContent=''; if(lk) S.pendingJoin=lk;
+    const show=splashWanted(); if(show) splashRun();                 // started inside the tap, so the browser lets the film play
+    openApp(); if(show && S.view!=='overview') setView('overview'); }
   else err.textContent='Key not recognised. Format RH-XXXX-2026.';
 }
 function openApp(){ el('gate').classList.add('hidden'); el('app').classList.remove('hidden'); boot(); }
+/* The splash: the Beverly Index film, a fade to black, the Remiel film, then a fade to Halo's first screen. It plays after a
+   successful unlock and at no other time. Halo starts behind it, so the first screen is ready when the film ends. A film that
+   will not start is passed over, and Skip ends it at once. */
+const SPLASH=['../videos/BI-FINAL-Mystic-Space-Walker-Intro_720p.mp4','../videos/REMIEL-FINAL-Energy-Vortex-Intro_720p.mp4'];
+const splashWanted = () => (window.HALO_SPLASH===true || (window.HALO_SPLASH!==false && !window.HALO_API)) && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function splashRun(){ return new Promise(done=>{
+  const box=el('splash'), v=el('splashVideo'), snd=el('splashSound'); let i=-1, over=false, guard=0, wait=0;
+  const finish=()=>{ if(over) return; over=true; clearTimeout(guard); clearTimeout(wait); box.classList.add('out');
+    setTimeout(()=>{ try{ v.pause(); }catch(e){} box.classList.add('hidden'); box.classList.remove('out'); v.classList.remove('on'); v.removeAttribute('src'); try{ v.load(); }catch(e){} S.splash=null; done(); }, 880); };
+  const start=()=>{ if(over) return; i++; S.splash={i, src:SPLASH[i]}; v.src=SPLASH[i]; guard=setTimeout(next, 7000);            // a film that does not start within 7 seconds is passed over
+    const pr=v.play(); if(pr && pr.catch) pr.catch(()=>{ if(over) return; if(!v.muted){ v.muted=true; snd.textContent='Sound on'; snd.classList.remove('on'); const p2=v.play(); if(p2 && p2.catch) p2.catch(next); } else next(); }); };
+  const next=()=>{ if(over) return; clearTimeout(guard); if(i+1>=SPLASH.length) return finish();          // the last film fades straight into Halo
+    v.classList.remove('on'); wait=setTimeout(start, i<0?0:760); };                                           // fade to black, then the next film
+  v.onplaying=()=>{ if(over) return; clearTimeout(guard); v.classList.add('on'); guard=setTimeout(next, ((isFinite(v.duration)&&v.duration>0?v.duration:12)+3)*1000); };
+  v.onended=next; v.onerror=next;
+  el('splashSkip').onclick=finish;
+  snd.onclick=()=>{ v.muted=!v.muted; snd.textContent=v.muted?'Sound on':'Sound off'; snd.classList.toggle('on',!v.muted); };
+  v.muted=true; snd.textContent='Sound on'; snd.classList.remove('on'); box.classList.remove('hidden'); next(); }); }
 el('gateGo').addEventListener('click', tryUnlock);
 el('gateKey').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
 
