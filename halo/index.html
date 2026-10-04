@@ -453,7 +453,15 @@ select.inp{flex:none}
   background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.6), var(--mk,#4ae88a) 58%, rgba(5,10,25,.45));
   box-shadow:0 0 13px -1px var(--mk,#4ae88a),0 2px 6px rgba(0,0,0,.55);transition:transform .12s}
 .legend{display:flex;gap:14px;margin-top:12px;font-size:11px;color:var(--mut);flex-wrap:wrap}
-.layers{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.layers{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.layers .layall{font-size:11.5px;font-weight:600;color:var(--ink);background:rgba(63,116,214,.16);border:1px solid var(--chrome2);border-radius:999px;padding:5px 12px}
+.layers .layall.off{background:rgba(74,232,138,.14);border-color:var(--clear);color:#c9efd9}
+.layers .laycap{flex-basis:100%;font-size:11px;color:var(--dim);font-family:var(--mono)}
+.sph-zoom{position:absolute;right:0;bottom:1%;z-index:6;display:flex;flex-direction:column;gap:8px}
+.sph-zoom button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line2);background:rgba(10,16,32,.92);color:var(--ink);font-size:20px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px -6px rgba(0,0,0,.8)}
+.radline .steps{display:block;margin-top:6px;font-size:11.5px;color:var(--dim)}
+#mfLayers{margin:0 0 8px}
+.mf-fit{background:rgba(255,138,60,.14);border:1px solid #ff8a3c;color:#ffd9bf;border-radius:999px;font-size:12px;font-weight:600;padding:4px 11px;margin:3px 0}
 .layers .lay{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink);background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:999px;padding:4px 11px 4px 5px}
 .layers .lay i{width:18px;height:18px;border-radius:50%;background:var(--lc);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:10px;font-weight:700;color:#0a0f1e}
 .layers .lay.off{opacity:.45} .layers .lay.off i{background:transparent;box-shadow:inset 0 0 0 2px var(--lc);color:var(--lc)}
@@ -713,6 +721,7 @@ a.tk:hover b{text-decoration:underline}
                     <div class="id-face" id="idFace"></div>
                     <span class="sph-lab">Identification</span>
                   </div>
+                  <div class="sph-zoom"><button data-act="sph-zoom" data-d="in" title="Closer" aria-label="Closer">+</button><button data-act="sph-zoom" data-d="out" title="Wider" aria-label="Wider">&minus;</button></div>
                 </div>
                 <div class="formrow" style="justify-content:center;margin-top:8px"><button class="btn sm primary" data-act="map-full">Open the full map</button></div>
                 <div id="walkBox"></div>
@@ -803,7 +812,7 @@ a.tk:hover b{text-decoration:underline}
 <div id="mapFull" class="hidden"><div class="mf-map" id="mfMap"></div>
   <div class="mf-top"><button class="btn sm" data-act="mf-close">&#8249; Back</button><b>Map</b><span class="mf-pos" id="mfPos"></span></div>
   <div class="mf-ctl"><button data-act="mf-follow" id="mfFollow" class="on" title="Keep me in the centre">&#9678;</button><button data-act="mf-north" id="mfNorth" title="North up, or the way I face up"><small>N UP</small></button><button data-act="mf-zin" title="Closer">+</button><button data-act="mf-zout" title="Wider">&minus;</button></div>
-  <div class="mf-sheet"><div id="mfInfo"></div><div class="mf-sum" id="mfSum"></div><div class="mf-chips" id="mfChips"></div></div></div>
+  <div class="mf-sheet"><div id="mfInfo"></div><div class="mf-sum" id="mfSum"></div><div class="layers" id="mfLayers"></div><div class="mf-chips" id="mfChips"></div></div></div>
 <div id="report" class="hidden"><div class="rp-bar"><span><span id="rpTitle">Remiel Halo Full Report</span><i id="rpMeta"></i></span><button class="btn sm gold" data-act="report-new">New report</button><button class="btn sm" data-act="report-print">Print or save as PDF</button><button class="btn sm" data-act="report-close">Close</button></div><div class="rp-paper" id="rpPaper"></div></div>
 <div id="terms" class="hidden">
   <div class="terms-card">
@@ -1895,9 +1904,10 @@ function radiusState(){
   if(!inc) return {r:BASE_R, ext:null};
   return {r:Math.min(MAX_R, Math.ceil((inc.dist+15)/BLOCK_M)*BLOCK_M), ext:inc};
 }
-const VIEW_STEPS=[25,50,BLOCK_M,BASE_R];
+const VIEW_STEPS=[25,50,BLOCK_M,BASE_R], MICRO_VIEWS=[50,BLOCK_M,BASE_R,2*BASE_R,4*BASE_R];      // the views you can set by hand; the radius itself stays two blocks
 function viewRadius(){
-  const rs=radiusState(), V=vis(); if(rs.ext) return rs.r;
+  const rs=radiusState(), V=vis(); if(S.microV) return rs.ext ? Math.max(rs.r, S.microV) : S.microV;      // a view set by hand holds until Auto is chosen
+  if(rs.ext) return rs.r;
   if(V.mode!=='live' && V.mode!=='sim') return BASE_R;
   let far=0; V.devices.forEach(d=>{ if(d.present!==false && d.dist<=rs.r) far=Math.max(far, d.dist+(d.fix?d.fix.unc:0)); });
   if(layerOn('cam')) camsNear().forEach(c=>{ if(c.d<=rs.r) far=Math.max(far, c.d); });      // a plate camera inside your two blocks stays in view
@@ -1916,13 +1926,14 @@ function renderVicinity(){
   el('radLine').className='radline'+(rs.ext?' ext':'');
   el('sphMicro').classList.toggle('ext',!!rs.ext);
   const view=viewRadius();
-  setHTML(el('microLab'), 'Micro<i> · '+(view<BASE_R&&!rs.ext ? view+' m view' : blocks+' blocks'+(rs.ext?', extended':''))+'</i>');
+  setHTML(el('microLab'), 'Micro<i> · '+(view!==BASE_R&&!rs.ext ? view+' m view' : blocks+' blocks'+(rs.ext?', extended':''))+'</i>');
   setHTML(el('microState'), '');            // the map is never covered by words: the state is read on the line above it
   { const nd=shown?sus.filter(noDir).length:0, pl=shown?sus.length-nd:0;
     setHTML(el('microNote'), nd ? (pl?'+':'')+nd+' heard, direction pending' : ''); }
-  el('radLine').innerHTML = rs.ext
+  setHTML(el('radLine'), (rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
-    : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(shown && viewRadius()<BASE_R ? ' Micro is zoomed to '+viewRadius()+' m.' : '');
+    : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(view<BASE_R ? (shown||S.microV?' Micro is zoomed to '+view+' m.':'') : view>BASE_R ? ' Micro is widened to '+view+' m; the inner line is your radius.' : ''))+
+    ' <span class="steps">Micro view '+[0].concat(MICRO_VIEWS).map(m=>'<button class="chipbtn '+((S.microV||0)===m?'on':'')+'" data-act="micro-v" data-m="'+m+'">'+(m?m+' m':'Auto')+'</button>').join(' ')+'</span>');
   const devLine = V.mode==='live' ? (V.test?'test data':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
     : stateWords(V.mode).line;
   setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'from your phone, '+Math.max(1,Math.round((Date.now()-P.where.t)/60000))+' min ago':gz()?'your saved home location':'allow location and your map appears')+' · Devices: '+esc(devLine));
@@ -2168,7 +2179,7 @@ function arcLine(lat,lon,m,b0,b1){ const pts=[],dLat=m/111320,dLon=m/(111320*Mat
 function ringsData(){
   // The rim of the Micro sphere is the radius itself. When the radius is extended, the two-block line is drawn inside it.
   const rs=radiusState(), f=(r,kind)=>({type:'Feature',properties:{kind},geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,r)]}});
-  const feats=[f((rs.ext?BASE_R:viewRadius())/2,'inner')]; if(rs.ext) feats.push(f(BASE_R,'base'));
+  const wide=!!rs.ext || viewRadius()>BASE_R, feats=[f((wide?BASE_R:viewRadius())/2,'inner')]; if(wide) feats.push(f(BASE_R,'base'));      // in a wider view the two-block radius is drawn inside it
   return {type:'FeatureCollection',features:feats};
 }
 const noDir = d => d.live && !d.fix && !d.sector && d.bearing==null;
@@ -2266,14 +2277,14 @@ function poiImage(kind){ const n=44, cv=document.createElement('canvas'); cv.wid
 function poiAttach(map){ if(!map || map._poi) return; map._poi=true;
   if(!map._quiet){ map._quiet=true; map.on('error',()=>{}); }          // a map square that is slow to arrive is asked for again by the map itself
   try{ ['cam','cctv','speed','gun','site','tower','towerbad'].forEach(k=>{ if(!map.hasImage('poi-'+k)) map.addImage('poi-'+k, poiImage(k), {pixelRatio:2}); });
-    const on=k=>layerOn(k)?'visible':'none', size=['interpolate',['linear'],['zoom'],8,.3,11,.5,14,.8,17,1.05], sym=(id,flt,img,key,more)=>map.addLayer({id,type:'symbol',source:'pts',filter:flt,...(more||{}),layout:{'icon-image':img,'icon-size':size,'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:on(key)}});
+    const on=k=>layerOn(k)?'visible':'none', size=['interpolate',['linear'],['zoom'],8,.22,11,.36,13,.6,15,.85,17,1.05], sym=(id,flt,img,key,more)=>map.addLayer({id,type:'symbol',source:'pts',filter:flt,...(more||{}),layout:{'icon-image':img,'icon-size':size,'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:on(key)}});
     map.addSource('pts',{type:'geojson',data:ptsData()}); map._ptsVer=PTS.ver;
-    map.addLayer({id:'pts-site-dot',type:'circle',source:'pts',maxzoom:15,filter:['==',['get','k'],'site'],layout:{visibility:on('site')},paint:{'circle-radius':['interpolate',['linear'],['zoom'],8,1.2,12,2.4,15,4.2],'circle-color':POI_C.site,'circle-opacity':.9,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
-    sym('pts-site',['==',['get','k'],'site'],'poi-site','site',{minzoom:15});
+    map.addLayer({id:'pts-site-dot',type:'circle',source:'pts',maxzoom:14,filter:['==',['get','k'],'site'],layout:{visibility:on('site')},paint:{'circle-radius':['interpolate',['linear'],['zoom'],8,1.6,11,2.8,13,4.6,14,6],'circle-color':POI_C.site,'circle-opacity':.95,'circle-stroke-width':1.2,'circle-stroke-color':'#070b16'}});
+    sym('pts-site',['==',['get','k'],'site'],'poi-site','site',{minzoom:14});
     sym('pts-cctv',['in',['get','k'],['literal',['cam','gun']]],['case',['==',['get','k'],'gun'],'poi-gun','poi-cctv'],'cctv');
     sym('pts-speed',['==',['get','k'],'speed'],'poi-speed','speed');
     sym('pts-plate',['==',['get','k'],'plate'],'poi-cam','cam');
-    if(map===FULL) PT_LAYERS.forEach(l=>map.on('click',l,e=>{ const f=e.features&&e.features[0]; if(!f) return; const q=f.properties||{}; MF.sel=null; MF.pt={k:q.k, n:q.n||'', op:q.op||'', dir:q.dir||'', zone:q.zone||'', t:q.t||'', p:q.p||'', lon:f.geometry.coordinates[0], lat:f.geometry.coordinates[1]}; mapFullTick(false); }));
+    if(map===FULL) PT_LAYERS.forEach(l=>map.on('click',l,e=>{ const f=e.features&&e.features[0]; if(!f) return; const q=f.properties||{}; MF.sel=null; MF.pt={k:q.k, n:q.n||'', op:q.op||'', dir:q.dir||'', zone:q.zone||'', t:q.t||'', p:q.p||'', c:Number(q.c)||0, lon:f.geometry.coordinates[0], lat:f.geometry.coordinates[1]}; mapFullTick(false); }));
     map.addSource('poi',{type:'geojson',data:poiData()});
     map.addLayer({id:'poi-ring',type:'line',source:'poi',filter:['==',['get','kind'],'taring'],layout:{visibility:layerOn('tower')?'visible':'none'},paint:{'line-color':POI_C.tower,'line-width':1.5,'line-opacity':.8,'line-dasharray':[2,2.5]}});
     map.addLayer({id:'poi-tower',type:'symbol',source:'poi',filter:['in',['get','kind'],['literal',['tower','towerbad']]],
@@ -2289,7 +2300,7 @@ function poiSources(){ const now=Date.now(); if(S.alprTJ || now-(S._alprAt||0)<6
 function poiCams(map){ if(!map || !map._poi || map._cams || !S.alprTJ) return; map._cams=true;
   try{ S.alprTJ.forEach((tj,i)=>{ if(!tj) return; map.addSource('alpr'+i,{type:'vector',tiles:tj.tiles,minzoom:tj.minzoom,maxzoom:tj.maxzoom,attribution:'Cameras: &copy; OpenStreetMap contributors, DeFlock'});
       map.addLayer({id:'alpr'+i, type:'symbol', source:'alpr'+i, 'source-layer':'cameras', minzoom:8,
-        layout:{'icon-image':'poi-cam','icon-size':['interpolate',['linear'],['zoom'],8,.3,11,.5,14,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('cam')?'visible':'none'}}, map.getLayer('poi-ring')?'poi-ring':undefined);
+        layout:{'icon-image':'poi-cam','icon-size':['interpolate',['linear'],['zoom'],8,.22,11,.36,13,.6,15,.85,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('cam')?'visible':'none'}}, map.getLayer('poi-ring')?'poi-ring':undefined);
       if(map===FULL) map.on('click','alpr'+i,e=>{ const f=e.features&&e.features[0]; if(!f) return; const q=f.properties||{}; MF.sel=null; MF.pt={k:'plate', n:String(q.brand||''), op:String(q.operator||''), dir:String(q.directionCardinal||''), zone:String(q.surveillanceZone||''), lon:f.geometry.coordinates[0], lat:f.geometry.coordinates[1]}; mapFullTick(false); }); });
   }catch(e){ map._cams=false; } }
 const camsReady = m => !!(m && m._cams);
@@ -2320,7 +2331,7 @@ function ptsReach(){ const g=gz(); if(!g) return 0; const c=ptTile(g.lat,g.lon),
   return reach; }
 function ptsData(){ if(PTS.data && PTS.dataVer===PTS.ver) return PTS.data; const f=[], seen={};
   Object.keys(PTS.sq).forEach(k=>PTS.sq[k].items.forEach(i=>{ if(seen[i.id]) return; seen[i.id]=1;
-    f.push({type:'Feature',properties:{k:i.k, n:i.n||'', op:i.op||'', dir:i.dir||'', zone:i.zone||'', t:i.t||'', p:i.p||''},geometry:{type:'Point',coordinates:[i.lon,i.lat]}}); }));
+    f.push({type:'Feature',properties:{k:i.k, n:i.n||'', op:i.op||'', dir:i.dir||'', zone:i.zone||'', t:i.t||'', p:i.p||'', c:i.c||0},geometry:{type:'Point',coordinates:[i.lon,i.lat]}}); }));
   PTS.dataVer=PTS.ver; return PTS.data={type:'FeatureCollection',features:f}; }
 function ptsShow(){ [MAP,MACRO,FULL].forEach(m=>{ if(!m || !m._poi || m._ptsVer===PTS.ver) return; try{ const src=m.getSource('pts'); if(src){ src.setData(ptsData()); m._ptsVer=PTS.ver; } }catch(e){} }); }
 // Every loaded point with its distance and bearing from you, nearest first.
@@ -2334,7 +2345,7 @@ const ptsOf = (layer, r) => layerOn(layer) ? ptsNear().filter(i=>PT_KIND[i.k]===
 const ptsHas = layer => Object.keys(PTS.sq).some(k=>PTS.sq[k].items.some(i=>PT_KIND[i.k]===layer));
 const ptsCredit = () => { const out=[]; Object.keys(PTS.sq).forEach(k=>PTS.sq[k].credit.forEach(c=>{ if(out.indexOf(c)<0) out.push(c); })); return out; };
 const faces = d => !d ? '' : 'faces '+(/^-?\d+(\.\d+)?$/.test(String(d)) ? compass(((Number(d)%360)+360)%360) : String(d));
-const ptLine = i => [i.op && i.op!==i.n ? i.op : '', i.t||'', i.p||'', faces(i.dir), i.zone||''].filter(Boolean).join(' · ');
+const ptLine = i => [i.op && i.op!==i.n ? i.op : '', i.t||'', i.c>1 ? i.c+' installations' : '', i.p||'', faces(i.dir), i.zone||''].filter(Boolean).join(' · ');
 function poiData(){ const f=[], g=gz(), sv=cellLive()?CELL.serving:null, bad=sv&&towerSigns().level==='suspect';
   Object.keys(P.cells||{}).forEach(id=>{ const r=P.cells[id].reg; if(r && r.found && okLL(r)) f.push({type:'Feature',properties:{kind:(bad&&sv.reg===id)?'towerbad':'tower',id},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}); });
   if(g && sv && sv.c.ta!=null && (sv.c.k==='lte'||sv.c.k==='gsm')){ const m=Math.max(60, sv.c.ta*(sv.c.k==='lte'?78:554)); f.push({type:'Feature',properties:{kind:'taring'},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,m)}}); }
@@ -2355,14 +2366,15 @@ function camsNear(){ const g=gz(); if(!g || !ptsReady()) return [];
   ptsNear().forEach(i=>{ if(i.k!=='plate') return; const id=String(i.id).replace(/^n/,''); if(seen[id]) return; seen[id]=1; out.push({id, lat:i.lat, lon:i.lon, d:i.d, brg:i.brg, brand:String(i.n||''), op:String(i.op||''), dir:faces(i.dir).replace(/^faces /,''), zone:String(i.zone||'')}); });
   out.sort((a,b)=>a.d-b.d); S._cams={t:Date.now(), k:g.lat.toFixed(4)+','+g.lon.toFixed(4), v:out}; return out; }
 const poiCount = k => k==='alpr' ? (layerOn('cam') ? camsNear().filter(c=>c.d<=MILE).length : 0) : 0;
-function renderLayers(){ const box=el('mapLayers'); if(!box) return; poiSources(); const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r).length, tw=Object.keys(P.cells||{}).filter(id=>(P.cells[id].reg||{}).found).length;
+function renderLayers(){ const box=el('mapLayers'); if(!box) return; poiSources(); const anyOn=['cam','cctv','speed','site','tower'].some(layerOn); const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r).length, tw=Object.keys(P.cells||{}).filter(id=>(P.cells[id].reg||{}).found).length;
   const lay=(k,ch,name,note)=>'<button class="lay'+(layerOn(k)?'':' off')+'" data-act="layer" data-k="'+k+'" style="--lc:'+POI_C[k]+'"><i>'+ch+'</i>'+name+(note?' <b>'+note+'</b>':'')+'</button>';
   const pr=ptsR(r), more=(k,ch,name)=>ptsHas(k) ? lay(k,ch,name, g ? ptsOf(k,pr).length+' within '+miText(pr) : '') : '';
   { const cr=ptsCredit(), ce=el('ptsCredit'); if(ce) setHTML(ce, cr.length ? 'Threat points: '+cr.map(esc).join(' ') : ''); }
-  setHTML(box, lay('cam','&#9679;','Plate cameras', g&&ptsReady() ? cams.filter(c=>c.d<=(camsReady(MACRO)?r:pr)).length+' within '+miText(camsReady(MACRO)?r:pr) : '')+more('cctv','&#9670;','Cameras')+more('speed','&#9673;','Speed cameras')+more('site','&#9652;','Tower sites')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''))); }
+  const keyHTML=(cap)=>(cap?'<span class="laycap">Tap a kind to show or hide it on every map.</span>':'')+'<button class="layall'+(anyOn?'':' off')+'" data-act="layer-all">'+(anyOn?'Hide all':'Show all')+'</button>'+lay('cam','&#9679;','Plate cameras', g&&ptsReady() ? cams.filter(c=>c.d<=(camsReady(MACRO)?r:pr)).length+' within '+miText(camsReady(MACRO)?r:pr) : '')+more('cctv','&#9670;','Cameras')+more('speed','&#9673;','Speed cameras')+more('site','&#9652;','Tower sites')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''));
+  setHTML(box, keyHTML(true)); setHTML(el('mfLayers'), keyHTML(false)); }
 
 /* ----- Macro: the wider area. Your route, home, where flagged devices were heard, and known threats beyond the radius ----- */
-const MILE=1609.344, MACRO_STEPS=[2*MILE,5*MILE,15*MILE], MACRO_DEFAULT=5*MILE;      // ground zero is always your own position
+const MILE=1609.344, MACRO_STEPS=[0.5*MILE,MILE,2*MILE,5*MILE,15*MILE], MACRO_DEFAULT=5*MILE;      // ground zero is always your own position
 function macroRadius(){
   return Math.max(S.macroR||MACRO_DEFAULT, radiusState().r*2);
 }
@@ -2971,7 +2983,9 @@ function mapFullTick(force){
   const placed=devs.filter(d=>d.fix).length, rough=devs.filter(d=>!d.fix&&d.sector).length, nd=devs.filter(noDir).length, wy=devs.filter(d=>d.withYou).length, V=vis();
   setHTML(el('mfSum'), !g ? '<b>The map needs your position.</b> <button class="btn sm primary" data-act="geo-ask" style="margin-left:6px">Share my position</button>'
     : !(V.mode==='live'||V.mode==='sim') ? '<b>'+esc(stateWords(V.mode).count)+'.</b> Unknown, not Clear.'
-    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+((cs=>cs?' · <b style="color:#ff8a3c">'+cs+' plate '+(cs===1?'camera':'cameras')+' within 1 mi</b>':'')(poiCount('alpr')))+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
+    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+((parts=>parts.length?' · <button class="mf-fit" data-act="mf-fit">Within 1 mi: '+parts.join(', ')+'. Show them</button>':'')((()=>{ const pr=ptsR(MILE), out=[], cs=poiCount('alpr'); if(cs) out.push(cs+' plate '+(cs===1?'camera':'cameras'));
+      [['cctv','camera','cameras'],['speed','speed camera','speed cameras'],['site','tower site','tower sites']].forEach(x=>{ const n=ptsOf(x[0],pr).length; if(n) out.push(n+' '+(n===1?x[1]:x[2])); }); return out; })()))+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
+  renderLayers();
   const chips=devs.slice(0,24).map(d=>{ const th=deviceThreat(d); return '<button class="mf-chip'+(MF.sel===d.id?' sel':'')+'" data-act="mf-dev" data-id="'+d.id+'" style="--hc:var('+TIER_VAR[th.tierIdx]+')">'+esc(devName(d))+'<span>'+esc(distText(d))+(d.bearing!=null?' · '+esc(whereWords(d)):' · direction pending')+'</span></button>'; }).join('');
   const ch=el('mfChips'); if(ch._h!==chips){ ch.innerHTML=chips; ch._h=chips; }
   const sd=MF.sel && devs.find(d=>d.id===MF.sel);
@@ -3875,7 +3889,7 @@ function rayRow(){ const on=!!(P.ray&&P.ray.on), can=rayCan(), log=(P.rayLog||[]
   return h+'</div>'; }
 function towerSites(){ const g=gz(); if(!g || !ptsHas('site')) return ''; const pr=ptsR(MILE), near=ptsNear().filter(i=>i.k==='site' && i.d<=pr);
   return '<div class="dsec"><h4>Tower sites on the public record <span class="chip pot" style="margin-left:6px">'+near.length+' within '+miText(pr)+'</span></h4>'+
-    (near.length ? '<p>These are the licensed sites around you. A tower your phone uses that stands where the record has a site is one more reason to trust it.</p>'+near.slice(0,6).map(i=>'<div class="rowline"><span><b>'+esc(i.n||'Tower site')+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc([i.t||'', i.p||''].filter(Boolean).join(' · ')||'on the map')+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.site+'">'+esc(miText(i.d))+' '+compass(i.brg)+'</span></div>').join('')+
+    (near.length ? '<p>These are the licensed sites on the public record, each a real mast or small cell, shown on the maps in blue. A fake tower is portable and stands on no record: Halo finds one by testing the tower your phone is using against the signs listed here, and a Rayhunter reads the tower itself.</p>'+near.slice(0,6).map(i=>'<div class="rowline"><span><b>'+esc(i.n||'Tower site')+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc([i.t||'', i.c>1?i.c+' installations':'', i.p||''].filter(Boolean).join(' · ')||'on the map')+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.site+'">'+esc(miText(i.d))+' '+compass(i.brg)+'</span></div>').join('')+
       (near.length>6?'<div class="limit" style="margin-top:6px">'+(near.length-6)+' more are on the map in blue.</div>':'')
       : '<p>The record holds no site within '+miText(pr)+' of you.</p>')+
     '<div class="formrow"><button class="btn sm" data-act="map-full">Open the full map</button></div></div>'; }
@@ -4528,7 +4542,7 @@ document.addEventListener('click', e=>{
     case 'prof': { const k=a.dataset.k, v=a.dataset.v==='y'; if(P.profile[k]===v) delete P.profile[k]; else P.profile[k]=v; save(); rerender(); break; }
     case 'mode': { const m=a.dataset.m; S.mode=m;
       if(m==='w') setView('watchers'); else if(m==='a') setView('attackers'); else if(S.view!=='overview') setView('overview'); else rerender(); break; }
-    case 'layer': { P.layers=P.layers||{}; const k=a.dataset.k; P.layers[k]=!layerOn(k); save(); poiLayers(); S._cams=null; renderVicinity(); break; }
+    case 'layer': { P.layers=P.layers||{}; const k=a.dataset.k; P.layers[k]=!layerOn(k); save(); poiLayers(); S._cams=null; renderVicinity(); if(S.mapFull) mapFullTick(false); break; }
     case 'ray-on': { const N=NATIVE(); P.ray={on:true, base:''}; save(); try{ if(N && typeof N.rayStart==='function') N.rayStart(''); }catch(e){} RAY.state='searching'; rayTick(); rerender(); break; }
     case 'ray-off': { const N=NATIVE(); P.ray={on:false, base:''}; save(); try{ if(N && typeof N.rayStop==='function') N.rayStop(); }catch(e){} RAY.state='off'; rerender(); break; }
     case 'cell-reg': { P.cellCheck=!P.cellCheck; save(); if(P.cellCheck && CELL.serving && cellLive()){ _cellAsk=0; cellAsk(CELL.serving); } rerender(); break; }
@@ -4565,7 +4579,15 @@ document.addEventListener('click', e=>{
     case 'ident-save': identSave(); break;
     case 'ident-photo': { const f=el('identFile'); if(f){ f.value=''; f.click(); } break; }
     case 'ident-photo-del': { const d=identPick(); if(d && P.photos && P.photos[d.id]){ delete P.photos[d.id]; save(); logEvidence('note','Photo removed from '+d.name+' ('+d.id+').'); renderVicinity(); } break; }
-    case 'macro-r': { S.macroR=+a.dataset.m; _fitM=0; macroUpdate(); break; }
+    case 'macro-r': { S.macroR=+a.dataset.m; _fitM=0; macroUpdate(); renderLayers(); break; }
+    case 'micro-v': { S.microV=+a.dataset.m||0; S._view=null; _fitR=0; renderVicinity(); break; }
+    case 'sph-zoom': { const big=el('stage').dataset.big==='macro', inn=a.dataset.d==='in', list=big?MACRO_STEPS:MICRO_VIEWS, cur=big?(S.macroR||MACRO_DEFAULT):viewRadius();
+      const nx = inn ? [...list].reverse().find(v=>v<cur-1) : list.find(v=>v>cur+1);
+      if(!nx){ toast(inn ? 'This is the closest view here. Open the full map to go closer.' : 'This is the widest view here.'); break; }
+      if(big){ S.macroR=nx; _fitM=0; macroUpdate(); renderLayers(); } else { S.microV=nx; S._view=null; _fitR=0; renderVicinity(); }
+      toast((big?'Macro: '+miText(nx):'Micro: '+nx+' m')+' around you.'); break; }
+    case 'layer-all': { const ks=['cam','cctv','speed','site','tower'], any=ks.some(layerOn); P.layers={}; ks.forEach(k=>P.layers[k]=!any); save(); poiLayers(); S._cams=null; renderVicinity(); if(S.mapFull) mapFullTick(false);
+      toast(any ? 'Every mark is hidden. The street map is clear.' : 'Every mark is shown.'); break; }
     case 'capture': { const d=findDevice(a.dataset.id); openCapture(d); break; }
     case 'mine': case 'sig-mine': { const d=findDevice(a.dataset.id); if(!d||!d.live) break; P.mine=P.mine||{}; if(P.mine[d.id]) sigDrop(d); else { sigAdd(d); if(!d.sim) logEvidence('note','Added to your signature: '+devName(d)+' ('+kindText(d)+').'); }
       save(); nativeMine(); liveTick(); S._rsig=''; rerender(); if(el('rost')) renderRoster(); break; }
@@ -4582,6 +4604,7 @@ document.addEventListener('click', e=>{
     case 'mf-close': mapFullClose(false); break;
     case 'mf-follow': { MF.follow=!MF.follow; a.classList.toggle('on',MF.follow); mapFullTick(false); break; }
     case 'mf-north': { MF.headUp=!MF.headUp; a.classList.toggle('on',MF.headUp); a.innerHTML='<small>'+(MF.headUp?'FACE UP':'N UP')+'</small>'; if(!MF.headUp && FULL){ try{ FULL.rotateTo(0,{duration:400}); }catch(e){} } headAsk(); mapFullTick(false); break; }
+    case 'mf-fit': { const g=gz(); if(!FULL || !g) break; MF.follow=false; el('mfFollow').classList.remove('on'); fitTo(FULL, g, MILE, true); toast('The map now shows 1 mile around you. The round button brings it back to you.'); break; }
     case 'mf-zin': if(FULL) FULL.zoomIn(); break;
     case 'mf-zout': if(FULL) FULL.zoomOut(); break;
     case 'mf-dev': { MF.pt=null; MF.sel=a.dataset.id||null; const d=MF.sel&&findDevice(MF.sel); if(d && d.fix && FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); try{ FULL.easeTo({center:[d.fix.lon,d.fix.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
