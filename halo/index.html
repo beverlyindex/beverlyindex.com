@@ -1447,6 +1447,8 @@ function liveSigns(t){            // what the sensors and the feed hold on this 
   const V=vis(), live=V.mode==='live'&&!V.test, near=live?V.devices.filter(d=>d.present&&!d.sim&&!d.mine&&!d.sigFit):[];
   if(t.id==='w_ble'){ const wy=near.filter(d=>d.withYou&&d.band!=='wifi'), rt=near.filter(d=>d.onRoute&&!d.withYou);
     if(wy.length) return [5, devName(wy[0])+' is travelling with you']; if(rt.length) return [4, devName(rt[0])+' has been near you at home and away']; }
+  if(t.id==='w_tower' && rayRecent('High').length) return [5,'your Rayhunter reports a tower behaving like a fake one'];
+  if(t.id==='w_tower' && rayRecent().length) return [4,'your Rayhunter raised a warning'];
   if(t.id==='w_tower' && cellLive() && CELL.serving){ if(CELL.serving.gen==='2G') return [5,'your phone is on 2G at this moment'];
     const sus=(typeof towerSuspects==='function')?towerSuspects():[]; if(sus.length) return [4,'a tower in use shows the signs of a fake one']; if(cellFlaps()>=3) return [4,'your tower keeps changing while you stand still']; }
   if(t.id==='a_pubwifi' && live){ const wy=near.filter(d=>d.band==='wifi'&&d.withYou); if(wy.length) return [5,'a hotspot is travelling with you'];
@@ -1840,6 +1842,7 @@ function renderCoverage(){
     ['Home', !hasSt?'Add a home listener':stationLive()?(T&&stationTest()?'Test data':'Listener reporting'):'Listener paused', stationLive()?(T&&stationTest()?'part':'live'):''],
     ['Your position', S.pos?'Live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'From your phone':gz()?'Home location':'Allow location', S.pos?'live':gz()?'part':''],
     ['Global feed', g?'Live, sources read '+feedAgo():'Connecting', g?'live':''],
+    ...(rayCan()&&P.ray&&P.ray.on ? [['Rayhunter', {off:'Starting',searching:'Looking for it',connected:'Connected',recording:'Recording, being read',unreachable:'Out of reach'}[RAY.state], RAY.state==='recording'?'live':RAY.state==='connected'?'part':'']] : []),
     ['Alerts', (as=>as==='granted'?'On, banners on this device':as==='screen'?'On, inside Halo':as==='denied'?'Allow in Settings':'<button class="btn sm primary" data-act="alert-ask" style="margin:0">Turn on</button>')(alertState()), alertState()==='granted'||alertState()==='screen'?'live':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':'Connecting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
@@ -3766,8 +3769,10 @@ async function cellAsk(sv){ const now=Date.now(); if(now-_cellAsk<20000 || SY.st
     P.cells[sv.reg].reg = x.found ? {found:true, lat:x.lat, lon:x.lon, range:x.range||0, samples:x.samples||0, t:now} : {found:false, t:now}; save(); S._poiKey=''; softRender(); }catch(e){} }
 const placeKnown = pos => { if(!pos) return false; const day=Date.now()-86400000; return Object.keys(P.cells||{}).filter(id=>{ const r=P.cells[id]; return r.n>=20 && r.t0<day && r.lat!=null && distLL(pos.lat,pos.lon,r.lat,r.lon)<600; }).length>=2; };
 // The signs of a fake tower that a phone can read for itself, each with its weight. Three or more points reads Suspect.
-function towerSigns(){ const sv=CELL.serving, out={score:0, signs:[], level:'ok'}; if(!cellLive() || !sv) return out;
-  const c=sv.c, add=(w,t)=>{ out.score+=w; out.signs.push({w,t}); }, rec=(P.cells||{})[sv.reg], reg=rec&&rec.reg, now=Date.now();
+function towerSigns(){ const sv=CELL.serving, out={score:0, signs:[], level:'ok'}, add=(w,t)=>{ out.score+=w; out.signs.push({w,t}); }, done=()=>{ out.level = out.score>=3 ? 'suspect' : out.score>=1 ? 'watch' : 'ok'; return out; };
+  rayRecent().slice(0,3).forEach(e=>add(e.sev==='High'?3:e.sev==='Medium'?2:1, 'Your Rayhunter reports: '+e.analyzer+'. '+e.message));
+  if(!cellLive() || !sv) return done();
+  const c=sv.c, rec=(P.cells||{})[sv.reg], reg=rec&&rec.reg, now=Date.now();
   if(sv.gen==='2G') add(3,'Your phone was moved to 2G, where a tower does not have to prove it is genuine.');
   if(reg && reg.found && sv.pos){ const km=distLL(sv.pos.lat,sv.pos.lon,reg.lat,reg.lon)/1000; if(km*1000>Math.max(8000, 3*(reg.range||0))) add(3,'The public register places this tower '+Math.round(km)+' km from where you are.'); }
   if(reg && reg.found===false) add(1,'This tower is absent from the public register. A new tower takes a few days to be listed.');
@@ -3775,8 +3780,47 @@ function towerSigns(){ const sv=CELL.serving, out={score:0, signs:[], level:'ok'
   const fl=cellFlaps(); if(fl>=3) add(2,'The tower in use changed '+fl+' times in ten minutes while you stood still.');
   const last=CELL.changes[CELL.changes.length-1]; if(last && last.tac && now-last.t<10*60000 && last.moved!==null && last.moved<50) add(1,'The tracking area changed while you stood still.');
   if(CELL.list.length===1 && CELL.nbT && CELL.t-CELL.nbT<5*60000 && CELL.t-sv.since<5*60000 && c.r!=null && c.r>=-80) add(1,'It is strong, and its neighbours fell silent when it took over.');
-  out.level = out.score>=3 ? 'suspect' : out.score>=1 ? 'watch' : 'ok'; return out; }
-const towerSuspects = () => towerSigns().level==='suspect' ? [CELL.serving] : [];
+  return done(); }
+const towerSuspects = () => (towerSigns().level==='suspect' && CELL.serving) ? [CELL.serving] : [];
+/* ----- Rayhunter as a sensor. Rayhunter is a small mobile hotspot that reads the control traffic between itself and the tower.
+   The Halo app reads the hotspot on its own Wi-Fi every 15 seconds and hands the console its state and its alerts. ----- */
+const RAY={state:'off', base:'', version:'', recording:null, analyzers:[], checked:0, battery:null, t:0};
+const RAY_SEV={High:'--r5', Medium:'--r4', Low:'--r3'};
+const rayCan = () => { const N=NATIVE(); return !!(N && typeof N.rayTake==='function' && typeof N.rayStart==='function'); };
+const rayClean = (v,n) => String(v==null?'':v).replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,n);
+const rayRecent = sev => (P.rayLog||[]).filter(e=>Date.now()-e.seen<30*60000 && (!sev || e.sev===sev));
+function rayTick(){ if(!rayCan()) return; const N=NATIVE(); let j=null;
+  try{ j=JSON.parse(N.rayTake()||'null'); }catch(e){} if(!j || typeof j!=='object') return;
+  const st=['off','searching','connected','recording','unreachable'].indexOf(j.state)>=0 ? j.state : 'off', was=RAY.state+'|'+RAY.checked;
+  Object.assign(RAY,{state:st, base:rayClean(j.base,40), version:rayClean(j.version,20), recording:(j.recording&&typeof j.recording==='object')?{name:rayClean(j.recording.name,60), start:rayClean(j.recording.start,40)}:null,
+    analyzers:Array.isArray(j.analyzers)?j.analyzers.slice(0,30).map(a=>rayClean(a,60)):[], checked:Number(j.checked)||0, battery:(j.battery&&typeof j.battery==='object'&&isFinite(Number(j.battery.level)))?{level:Math.round(Number(j.battery.level)), plugged:!!j.battery.plugged}:null, t:Date.now()});
+  if(P.ray && P.ray.on && st==='off'){ try{ N.rayStart(P.ray.base||''); }catch(e){} }           // the app was restarted: reading resumes
+  let fresh=0; (Array.isArray(j.events)?j.events:[]).forEach(e=>{ if(!e || typeof e!=='object') return;
+    const ev={t:Number(e.t)||Date.now(), seen:Date.now(), sev:RAY_SEV[e.sev]?e.sev:'Low', analyzer:rayClean(e.analyzer,60)||'Rayhunter', message:rayClean(e.message,240), rec:rayClean(e.rec,60), row:Number(e.row)||0};
+    P.rayLog=P.rayLog||[]; if(P.rayLog.some(x=>x.rec===ev.rec && x.row===ev.row && x.analyzer===ev.analyzer)) return;
+    P.rayLog.unshift(ev); fresh++; const high=ev.sev==='High', sv=cellLive()?CELL.serving:null, idx=RAY.analyzers.indexOf(ev.analyzer);
+    if(high){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); }
+    logEvidence('finding','Rayhunter, '+ev.sev+': '+ev.analyzer+'. '+ev.message+(sv?' Tower in use on this phone at the time: '+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+'.':''));
+    alertRaise('ray:'+ev.rec+':'+(idx>=0?idx:ev.analyzer), high?'Rayhunter: a tower is behaving like a fake one':'Rayhunter raised a warning', ev.analyzer+': '+ev.message+' Tower Watch has the steps.', {res:'w_tower'}, true); });      // quiet: the app has already put the banner on the phone
+  if(fresh){ P.rayLog.length=Math.min(P.rayLog.length,60); save(); }
+  if(fresh || was!==RAY.state+'|'+RAY.checked) softRender(); }
+function rayRow(){ const on=!!(P.ray&&P.ray.on), can=rayCan(), log=(P.rayLog||[]).slice(0,5), listening=!!(PH.nstat&&PH.nstat.listening);
+  const word=!can?'In the Android app':!on?'Off':{off:'Starting',searching:'Looking',connected:'Connected',recording:'Recording',unreachable:'Out of reach'}[RAY.state];
+  let h='<div class="dsec"><h4>Rayhunter <span class="chip '+(on&&can?'pot':'')+'" style="margin-left:6px">'+word+'</span></h4>';
+  const what='Rayhunter is the detector for fake towers from the Electronic Frontier Foundation: a small mobile hotspot that reads the control traffic between itself and the tower, the layer a phone keeps to itself.';
+  if(!can) h+='<p>'+what+' The Halo Android app reads its alerts and brings them here, into the signs, the rating, your banners and Evidence.</p>';
+  else if(!on) h+='<p>'+what+' Join this phone to the Wi-Fi of your Rayhunter, then connect. Halo reads its alerts every 15 seconds, with the screen on or off, and what it reads stays on this phone.</p><div class="formrow"><button class="btn sm primary" data-act="ray-on">Connect my Rayhunter</button></div>';
+  else { const line={off:'Starting the reading.', searching:'Looking for your Rayhunter. Join this phone to the Wi-Fi of the hotspot and Halo finds it.', connected:'Connected. Rayhunter records from the moment it is switched on, and Halo reads each alert as it is raised.',
+      recording:'Recording, and Halo is reading it. '+RAY.analyzers.length+(RAY.analyzers.length===1?' check is':' checks are')+' running on every message from the tower.', unreachable:'Out of reach. Halo looks for it again on every read: bring the hotspot near and join its Wi-Fi.'}[RAY.state];
+    const good=RAY.state==='recording'||RAY.state==='connected';
+    h+='<div class="hrow"><span class="hs '+(good?'ok':'att')+'">'+word+'</span><span>'+line+(listening?'':' Start listening and the reading begins.')+'</span></div>';
+    if(good) h+='<div class="kv" style="margin-top:10px"><span class="k">Address</span><span class="v">'+esc(RAY.base.replace(/^https?:\/\//,''))+'</span>'+(RAY.version?'<span class="k">Version</span><span class="v">'+esc(RAY.version)+'</span>':'')+
+      (RAY.battery?'<span class="k">Battery</span><span class="v">'+RAY.battery.level+'%'+(RAY.battery.plugged?', charging':'')+'</span>':'')+(RAY.checked?'<span class="k">Last read</span><span class="v">'+hhmm(RAY.checked)+'</span>':'')+
+      (RAY.analyzers.length?'<span class="k">Checks</span><span class="v">'+RAY.analyzers.map(esc).join(', ')+'</span>':'')+'</div>';
+    h+='<div class="formrow"><button class="btn sm" data-act="ray-off">Stop reading</button></div>'; }
+  if(log.length) h+='<h4 style="margin-top:12px">Alerts from your Rayhunter</h4>'+log.map(e=>'<div class="rowline"><span><b>'+esc(e.analyzer)+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(e.message)+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;text-align:right;color:var('+RAY_SEV[e.sev]+')">'+e.sev+'<br>'+esc(fmtD(new Date(e.seen).toISOString()))+' '+hhmm(e.seen)+'</span></div>').join('')+
+    '<div class="limit" style="margin-top:6px">Each alert is kept in Evidence with the tower this phone was using at that moment.</div>';
+  return h+'</div>'; }
 function towerSites(){ const g=gz(); if(!g || !ptsHas('site')) return ''; const pr=ptsR(MILE), near=ptsNear().filter(i=>i.k==='site' && i.d<=pr);
   return '<div class="dsec"><h4>Tower sites on the public record <span class="chip pot" style="margin-left:6px">'+near.length+' within '+miText(pr)+'</span></h4>'+
     (near.length ? '<p>These are the licensed sites around you. A tower your phone uses that stands where the record has a site is one more reason to trust it.</p>'+near.slice(0,6).map(i=>'<div class="rowline"><span><b>'+esc(i.n||'Tower site')+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc([i.t||'', i.p||''].filter(Boolean).join(' · ')||'on the map')+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.site+'">'+esc(miText(i.d))+' '+compass(i.brg)+'</span></div>').join('')+
@@ -3784,7 +3828,7 @@ function towerSites(){ const g=gz(); if(!g || !ptsHas('site')) return ''; const 
       : '<p>The record holds no site within '+miText(pr)+' of you.</p>')+
     '<div class="formrow"><button class="btn sm" data-act="map-full">Open the full map</button></div></div>'; }
 function toolTower(){
-  const can=!!(S.features&&S.features.cells), regRow = towerSites() + (can ? '<div class="dsec"><h4>Public register check <span class="chip '+(P.cellCheck?'pot':'')+'" style="margin-left:6px">'+(P.cellCheck?'On':'Off')+'</span></h4>'+
+  const can=!!(S.features&&S.features.cells), regRow = towerSites() + rayRow() + (can ? '<div class="dsec"><h4>Public register check <span class="chip '+(P.cellCheck?'pot':'')+'" style="margin-left:6px">'+(P.cellCheck?'On':'Off')+'</span></h4>'+
       '<p>Halo asks the public tower register where each tower you use is listed. A tower that is unlisted, or listed far from you, is a strong sign. The request carries the identity of the tower in use, which places you within that tower\'s range, and Halo\'s backend keeps the tower and nothing about who asked.</p>'+
       '<div class="formrow"><button class="btn sm '+(P.cellCheck?'':'primary')+'" data-act="cell-reg">'+(P.cellCheck?'Switch the register check off':'Switch the register check on')+'</button></div>'+
       '<div class="limit" style="margin-top:8px">Cell tower data from OpenCellID, licensed under CC BY-SA 4.0.</div></div>' : '');
@@ -3875,7 +3919,7 @@ async function nativeDrain(){
       if(!live && W.on && list.length) walkTick(b.t, list.map(x=>x.id), okLL(q)?q:null);
       if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
     if(batches.length){ liveTick(); walkSettle(); }
-    alertNativeTick();
+    rayTick(); alertNativeTick();
     const lost = !!PH.nstat && !PH.nstat.listening && Date.now()-PH.asked>6000;
     if(lost!==PH.lost){ PH.lost=lost; softRender(); renderVicinity(); }
   } finally { PH.busy=false; } }
@@ -4191,7 +4235,7 @@ function alertRaise(key, title, text, go, quiet){
 function renderAlerts(){ const box=el('alertBar'); if(!box) return; const bs=S.banners||[], b=bs[0];
   setHTML(box, b ? '<div class="alertb" role="alert"><span class="dot" style="background:var(--action);margin-top:5px"></span><span class="tx"><b>'+esc(b.title)+'</b>'+esc(b.text)+(bs.length>1?'<span class="more">'+(bs.length-1)+' more after this one</span>':'')+'</span>'+
     (b.go?'<button class="btn sm primary" data-act="alert-open">Open</button>':'')+'<button class="x" data-act="alert-x" title="Put away" aria-label="Put away">&times;</button></div>' : ''); }
-function alertGo(key){ const bs=S.banners||[], b=key?bs.find(x=>x.key===key):bs[0]; if(!b) return; S.banners=bs.filter(x=>x!==b); renderAlerts(); const g=b.go; if(!g) return;
+function alertGo(key){ const bs=S.banners||[], b=(key?bs.find(x=>x.key===key):bs[0]) || (/^ray:/.test(String(key||'')) ? {key, go:{res:'w_tower'}} : null); if(!b) return; S.banners=bs.filter(x=>x!==b); renderAlerts(); const g=b.go; if(!g) return;
   if(g.dev){ const d=findDevice(g.dev); if(d){ openDeviceInRoster(d); return; } setView('watchers'); return; }
   if(g.res){ const t=T(g.res); if(t){ S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; setView(t.side==='w'?'watchers':'attackers'); const c=el('tp-'+t.id); if(c) c.scrollIntoView({block:'start'}); return; } }
   if(g.view) setView(g.view); }
@@ -4201,7 +4245,7 @@ function alertScan(){
     if(d.withYou) alertRaise('with:'+d.sig, d.cls==='Tag'?'A tracker is travelling with you':d.band==='wifi'?'A hotspot is travelling with you':'A device is travelling with you', devName(d)+' '+followText(d)+'. Open it and decide whether it is yours.', {dev:d.id});
     else if(d.homeAway) alertRaise('route:'+d.sig, 'A device from your home is near you again', devName(d)+' '+followText(d)+'.', {dev:d.id});
     if(d.cls==='Camera') alertRaise('cam:'+d.sig, /Raven/.test(d.hint)?'A gunshot detector is in earshot':'A plate camera is in earshot', devName(d)+' is broadcasting '+distText(d)+' from you. Halo places it on the map as you move.', {dev:d.id}); });
-  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv && sv.gen!=='2G'){ if(alertRaise('tower:'+sv.reg, 'A tower in use shows the signs of a fake one', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows the signs of a fake one. '+ts.signs.map(x=>x.t).join(' ')); } } }
+  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv && sv.gen!=='2G' && !rayRecent('High').length){ if(alertRaise('tower:'+sv.reg, 'A tower in use shows the signs of a fake one', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows the signs of a fake one. '+ts.signs.map(x=>x.t).join(' ')); } } }
   const by={}; wifiNow().forEach(d=>{ if(d.adv && !d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
   Object.keys(by).forEach(n=>{ const x=by[n]; if(x.length>1 && x.some(d=>/^Open/.test(d.hint)) && x.some(d=>/^Secured/.test(d.hint)))
     alertRaise('twin:'+n, 'A copied Wi-Fi network is in range', n+' appears both locked and open. Join only the locked one, or use mobile data.', {res:'a_pubwifi'}); });
@@ -4416,6 +4460,8 @@ document.addEventListener('click', e=>{
     case 'mode': { const m=a.dataset.m; S.mode=m;
       if(m==='w') setView('watchers'); else if(m==='a') setView('attackers'); else if(S.view!=='overview') setView('overview'); else rerender(); break; }
     case 'layer': { P.layers=P.layers||{}; const k=a.dataset.k; P.layers[k]=!layerOn(k); save(); poiLayers(); S._cams=null; renderVicinity(); break; }
+    case 'ray-on': { const N=NATIVE(); P.ray={on:true, base:''}; save(); try{ if(N && typeof N.rayStart==='function') N.rayStart(''); }catch(e){} RAY.state='searching'; rayTick(); rerender(); break; }
+    case 'ray-off': { const N=NATIVE(); P.ray={on:false, base:''}; save(); try{ if(N && typeof N.rayStop==='function') N.rayStop(); }catch(e){} RAY.state='off'; rerender(); break; }
     case 'cell-reg': { P.cellCheck=!P.cellCheck; save(); if(P.cellCheck && CELL.serving && cellLive()){ _cellAsk=0; cellAsk(CELL.serving); } rerender(); break; }
     case 'path-go': { const nx=pathState().next; if(nx) pathGo(nx.go()); break; }
     case 'alert-open': alertGo(); break;
@@ -4533,7 +4579,7 @@ function boot(){
   setInterval(()=>{ if(S.global && document.visibilityState==='visible') applyGlobal(true); }, 60000);          // the age on screen counts up by the minute
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-(S.globalAt||0)>120000) loadGlobal(); });
   syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit(); startGeo();
-  nativeMine(); alertNativeTick();
+  nativeMine(); rayTick(); alertNativeTick();
   fetch(API+'/health',{cache:'no-store'}).then(r=>r.json()).then(j=>{ S.features=(j&&j.features)||{}; if(booted) softRender(); }).catch(()=>{});
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') alertNativeTick(); });
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.haloOpen) alertGo(e.data.haloOpen); });
