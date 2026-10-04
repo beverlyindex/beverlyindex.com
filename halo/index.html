@@ -81,6 +81,7 @@ a{color:var(--chrome2)}
 .btn.red{background:linear-gradient(180deg,#ff6b6b,#b81f2c);color:#fff;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -3px 8px rgba(0,0,0,.35),0 10px 24px -8px rgba(255,90,90,.6),inset 0 0 0 1px #ff8d8d}
 .btn.wide{width:100%}
+body.calm .you-dot::after,body.calm .ticker .track{animation:none}      /* a warm or saving phone draws nothing that moves on its own */
 /* A choice that is made stays visibly made: a button that holds a state turns green while that state holds. */
 .btn.on{background:linear-gradient(180deg,#1f7a4d,#0f4a2e);color:#eafff3;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px var(--clear),0 6px 16px -8px rgba(74,232,138,.6)}
 /* Every control answers a tap: it turns green at once, holds it for a moment, then settles into its new state. */
@@ -1884,12 +1885,16 @@ function renderCoverage(){
     ['Your position', S.pos?'Live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'From your phone':gz()?'Home location':'Allow location', S.pos?'live':gz()?'part':''],
     ['Global feed', g?'Live, sources read '+feedAgo():'Connecting', g?'live':''],
     ...(rayCan()&&P.ray&&P.ray.on ? [['Rayhunter', {off:'Starting',searching:'Looking for it',connected:'Connected',recording:'Recording, being read',unreachable:'Out of reach'}[RAY.state], RAY.state==='recording'?'live':RAY.state==='connected'?'part':'']] : []),
+    ...((st=>st&&st.power ? [['Power', ({full:'Full',balanced:'Balanced',saver:'Saver'}[st.power]||'Full')+(st.listening?(st.moving?', moving':', still'):'')+(st.battery&&st.battery.temp!=null?' · phone '+Number(st.battery.temp).toFixed(0)+'&deg;C':'')+(st.battery&&st.battery.level!=null?' · '+st.battery.level+'%':''), st.power==='full'?'live':'part']] : [])(PH.nstat||(NATIVE()?nativeStatus():null))),
     ['Alerts', (as=>as==='granted'?'On, banners on this device':as==='screen'?'On, inside Halo':S.alertAsking?'Asking, answer Allow':'<button class="btn sm '+(as==='denied'?'gold':'primary')+'" data-act="alert-ask" style="margin:0">'+(as==='denied'?'Allow in settings':'Turn on')+'</button>')(alertState()), alertState()==='granted'||alertState()==='screen'?'live':S.alertAsking?'part':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':'Connecting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
   el('covCard').innerHTML='<h3>Coverage <span class="n">what Halo is watching for you</span></h3>'+
     rows.map(r=>'<div class="cov"><span>'+r[0]+'</span><span class="st"><span class="dot '+r[2]+'"></span>'+r[1]+'</span></div>'+(r[0]==='Alerts'&&S.alertHelp&&alertState()!=='granted'?'<div class="limit" id="alertHelp" style="margin:2px 0 8px">'+esc(S.alertHelp)+'</div>':'')).join('')+
+    ((st=>st&&st.power ? '<div class="limit" style="margin:6px 0 2px">Power <span style="white-space:nowrap">'+['auto','full','saver'].map(m=>'<button class="chipbtn '+((st.powerMode||'auto')===m?'on':'')+'" data-act="power" data-m="'+m+'">'+({auto:'Auto',full:'Full',saver:'Saver'}[m])+'</button>').join(' ')+'</span><br>'+
+        ({auto:'Auto listens at full rate while you move, steps down when the phone is still, and steps down again when it is warm or low on battery.',full:'Full listens at the fastest rate at all times. The phone runs warmer.',saver:'Saver listens at the slowest rate. The phone runs coolest, and each reading takes longer to arrive.'}[st.powerMode||'auto'])+'</div>' : '')(PH.nstat||(NATIVE()?nativeStatus():null)))+
     '<div class="formrow"><button class="btn sm" data-act="go-sensors">Add or manage sensors</button></div>';
+  { const st=PH.nstat||(NATIVE()?nativeStatus():null); document.body.classList.toggle('calm', !!(st && (st.power==='saver' || (st.battery && st.battery.temp>=38)))); }
 }
 function renderHomeMini(){
   const n=P.home.people.length;
@@ -4576,6 +4581,8 @@ document.addEventListener('click', e=>{
     case 'layer': { P.layers=P.layers||{}; const k=a.dataset.k; P.layers[k]=!layerOn(k); save(); poiLayers(); S._cams=null; renderVicinity(); if(S.mapFull) mapFullTick(false); break; }
     case 'ray-on': { const N=NATIVE(); P.ray={on:true, base:''}; save(); try{ if(N && typeof N.rayStart==='function') N.rayStart(''); }catch(e){} RAY.state='searching'; rayTick(); rerender(); break; }
     case 'ray-off': { const N=NATIVE(); P.ray={on:false, base:''}; save(); try{ if(N && typeof N.rayStop==='function') N.rayStop(); }catch(e){} RAY.state='off'; rerender(); break; }
+    case 'power': { const N=NATIVE(), m=a.dataset.m; try{ if(N && typeof N.setPower==='function'){ N.setPower(m); PH.nstat=nativeStatus(); if(PH.nstat) PH.nstat.powerMode=m; } }catch(e){} renderCoverage(); setTimeout(()=>{ PH.nstat=nativeStatus(); renderCoverage(); },2500);
+      toast({auto:'Power: Auto. Halo sets the rate from how you move.',full:'Power: Full. Fastest listening at all times.',saver:'Power: Saver. Slowest listening, coolest phone.'}[m]||'Power set.'); break; }
     case 'cell-reg': { P.cellCheck=!P.cellCheck; save(); if(P.cellCheck && CELL.serving && cellLive()){ _cellAsk=0; cellAsk(CELL.serving); } rerender(); break; }
     case 'path-go': { const nx=pathState().next; if(nx) pathGo(nx.go()); break; }
     case 'alert-open': alertGo(); break;
