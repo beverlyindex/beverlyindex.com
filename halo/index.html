@@ -528,6 +528,15 @@ select.inp{flex:none}
 .evrow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:var(--r2);background:rgba(10,16,32,.5)}
 .evrow .ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(63,116,214,.12);border:1px solid var(--line2);font-size:13px;font-family:var(--mono);color:var(--mut)}
 .evrow .et{font-weight:600;font-size:13px;line-height:1.4}
+.logtext{width:100%;min-height:74px;resize:vertical;font:inherit;font-size:13.5px;line-height:1.5}
+.loglist{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.logrow{padding:11px 12px;border:1px solid var(--line);border-radius:var(--r2);background:rgba(10,16,32,.5)}
+.logrow .lt{font-size:13.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.logrow .lm{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:6px;line-height:1.6}
+.logrow .lm b{color:var(--warn);font-weight:600}
+.logrow .formrow{margin-top:8px}
+.logrow .lh{margin-top:8px;padding:8px 10px;border-left:2px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--mut);white-space:pre-wrap;overflow-wrap:anywhere}
+.logrow .lh span{display:block;font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-bottom:2px;white-space:normal}
 .evrow .eh{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:3px;word-break:break-all}
 .evrow .ed{font-family:var(--mono);font-size:10.5px;color:var(--mut);text-align:right;line-height:1.5}
 .empty{color:var(--dim);font-size:13px;text-align:center;padding:22px 10px;line-height:1.5}
@@ -737,6 +746,13 @@ a.tk:hover b{text-decoration:underline}
 
         <section data-pane="evidence" class="hidden">
           <div class="pagehead"><h2>Evidence</h2><p>Every action you record is hashed and chained on this device, then encrypted before it syncs to your other devices. Test data stays out of this log.</p></div>
+          <div class="card" id="logCard" style="margin-bottom:14px">
+            <h3>Your log <span class="n" id="logCount"></span></h3>
+            <p class="limit" style="margin:0 0 10px">Write what you saw, heard or did, in your own words. Each entry carries the time it was written. An edit carries its own time, and the earlier wording is kept beside it.</p>
+            <textarea class="inp logtext" id="logText" rows="3" maxlength="4000" placeholder="What happened, where, and who was present"></textarea>
+            <div class="formrow"><button class="btn sm primary" data-act="log-add">Add to my log</button></div>
+            <div class="loglist" id="logList"></div>
+          </div>
           <div class="card">
             <h3>Evidence chain <span class="n" id="evCount"></span></h3>
             <div class="toolbar"><button class="btn sm" data-act="ev-export">Export signed log</button><button class="btn sm gold" data-act="report-new">New report</button><button class="btn sm" data-act="report">Last report</button></div>
@@ -2046,11 +2062,34 @@ async function writeEvidence(kind, text, extra){
   P.evidence.unshift(rec); if(P.evidence.length>500) P.evidence.length=500;
   save(); if(S.view==='evidence') renderEvidence(); if(booted) fillTickers();
 }
-function renderEvidence(){
+/* ----- Your log: notes in your own words. Each entry carries the time it was written; an edit carries its own time and the
+   earlier wording is kept. Every entry and every edit is also written into the Evidence chain, so a later change can be detected. ----- */
+const stamp = t => { const d=new Date(t); return d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear()+', '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0'); };
+function logAdd(){ const x=val('logText').slice(0,4000); if(!x) return toast('Write the entry first.');
+  P.log=P.log||[]; const t=Date.now(), id='L'+t.toString(36)+Math.floor(Math.random()*1296).toString(36);
+  P.log.unshift({id, t, text:x, v:[]}); if(P.log.length>1000) P.log.length=1000; save();
+  logEvidence('log','Log entry: '+x,{log:id}); el('logText').value=''; toast('Added to your log, '+stamp(t)+'.'); renderLog(); }
+function logSave(id){ const r=(P.log||[]).find(x=>x.id===id), i=el('logEdit-'+id); if(!r || !i) return; const x=i.value.trim().slice(0,4000);
+  if(!x) return toast('An entry keeps its words. Write the new wording, or press Cancel.');
+  if(x===r.text){ S.logEdit=null; renderLog(); return toast('The wording is the same, so the entry stands as it was.'); }
+  const t=Date.now(); r.v=r.v||[]; r.v.push({t:r.e||r.t, text:r.text}); if(r.v.length>50) r.v.shift(); r.text=x; r.e=t; r.n=(r.n||0)+1; save();
+  logEvidence('log','Log entry edited. First written '+stamp(r.t)+'. It now reads: '+x,{log:id, edit:r.n}); S.logEdit=null; S.logHist=S.logHist||{}; S.logHist[id]=true; toast('Edit saved, '+stamp(t)+'. The earlier wording is kept.'); renderLog(); }
+function renderLog(){ const host=el('logList'); if(!host) return; const list=P.log||[];
+  el('logCount').textContent = list.length ? list.length+(list.length===1?' entry':' entries') : '';
+  const html = list.length ? list.map(r=>{ const ed=S.logEdit===r.id, n=r.n||0, open=!!(S.logHist&&S.logHist[r.id]);
+    return '<div class="logrow" data-log="'+r.id+'">'+
+      (ed ? '<textarea class="inp logtext" id="logEdit-'+r.id+'" maxlength="4000">'+esc(r.text)+'</textarea>' : '<div class="lt">'+esc(r.text)+'</div>')+
+      '<div class="lm">Written '+stamp(r.t)+(n?' · <b>Edited '+stamp(r.e)+'</b>'+(n>1?' · '+n+' edits':''):'')+'</div>'+
+      '<div class="formrow">'+(ed ? '<button class="btn sm primary" data-act="log-save" data-id="'+r.id+'">Save the edit</button><button class="btn sm" data-act="log-cancel">Cancel</button>'
+        : '<button class="btn sm" data-act="log-edit" data-id="'+r.id+'">Edit</button>'+(n?'<button class="btn sm'+(open?' on':'')+'" data-act="log-hist" data-id="'+r.id+'">'+(open?'Earlier wording shown':'Earlier wording ('+n+')')+'</button>':''))+'</div>'+
+      (open&&n ? [...(r.v||[])].reverse().map((v,i,a)=>'<div class="lh"><span>'+(i===a.length-1?'As first written, ':'As edited, ')+stamp(v.t)+'</span>'+esc(v.text)+'</div>').join('') : '')+'</div>'; }).join('')
+    : '<div class="empty" style="padding:12px 6px">Your first entry appears here with its time.</div>';
+  if(host._h!==html){ host.innerHTML=html; host._h=html; if(S.logEdit){ const i=el('logEdit-'+S.logEdit); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } } } }
+function renderEvidence(){ renderLog();
   const rem=remoteEv(), all=P.evidence.map(r=>Object.assign({mine:true},r)).concat(rem.map(r=>Object.assign({mine:false},r))).sort((a,b)=>b.t-a.t);
   el('evCount').textContent=P.evidence.length+' records'+(rem.length?' · '+rem.length+' from your other devices':'');
   if(!all.length){ el('evList').innerHTML='<div class="empty">No records yet. Completed steps, logged findings and captures are chained here with their time.</div>'; return; }
-  const ic={defence:'D',finding:'F',capture:'C',note:'N'};
+  const ic={defence:'D',finding:'F',capture:'C',note:'N',log:'L'};
   el('evList').innerHTML=all.map(r=>'<div class="evrow"><div class="ic">'+(ic[r.kind]||'N')+'</div><div><div class="et">'+esc(r.text)+'</div><div class="eh">sha256 '+esc(String(r.hash).slice(0,32))+
     (r.mine?'':' · <span class="chip pot">'+esc(devName2(r.dev))+'</span>'+(r.linked===false?' <span class="chip real">chain break recorded</span>':''))+'</div></div>'+
     '<div class="ed">'+new Date(r.t).toLocaleDateString()+'<br>'+new Date(r.t).toLocaleTimeString()+'</div></div>').join('');
@@ -3079,7 +3118,9 @@ function reportHTML(){
      '<p>The bottom line rises to Take Action when any device meets the test for moving with you. It rises to Warning while three or more threats real to you have open defence steps, and it falls to Watch at two or fewer. It reads Clear when every applicable defence is complete.</p><p>Next review: '+dstr(nextD)+'.</p>';
   // ---- 12 evidence
   h+='<h2>12. Evidence</h2><p>The Evidence chain on this device holds '+plural(P.evidence.length,'entry','entries')+'. Each entry carries a fingerprint and the fingerprint of the entry before it, so a later change to any entry can be detected.'+(P.evidence.length?' The newest fingerprint is '+e(String(P.prevHash).slice(0,16))+'.':'')+'</p>'+
-     (P.evidence.length?tbl(['When','Kind','Entry'],P.evidence.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), e(x.kind), e(x.text.length>170?x.text.slice(0,170)+' ...':x.text)])):'');
+     (P.evidence.length?tbl(['When','Kind','Entry'],P.evidence.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), e(x.kind), e(x.text.length>170?x.text.slice(0,170)+' ...':x.text)])):'')+
+     ((P.log||[]).length?'<h3>Your log</h3><p>'+plural(P.log.length,'entry','entries')+' in your own words, newest first. An edited entry shows its present wording and the time of the edit; the earlier wording is kept in Halo.</p>'+
+       tbl(['Written','Entry','Edited'],P.log.slice(0,25).map(x=>[e(stamp(x.t)), e(x.text.length>600?x.text.slice(0,600)+' ...':x.text), x.n?e(stamp(x.e))+(x.n>1?', '+x.n+' edits':''):'']))+(P.log.length>25?'<p>'+(P.log.length-25)+' earlier entries are in Halo, under Evidence.</p>':''):'');
   // ---- 13 limits
   h+='<h2>13. What Halo did for this report</h2><ul class="rp-list">'+
     ['Matched all '+THREATS.length+' threats in its register to your profile, and counted every defence and Special step you have completed.',
@@ -4577,7 +4618,12 @@ document.addEventListener('click', e=>{
         rerender(); });
       break; }
     case 'geo-ask': { geoAsk().then(()=>{ renderVicinity(); if(!S.pos) toast('Position not shared. The reason is beside the button.'); }); break; }
-    case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),device:Y.name||null,chain:P.evidence,otherDevices:remoteEv()},null,2)],{type:'application/json'});
+    case 'log-add': logAdd(); break;
+    case 'log-edit': S.logEdit=a.dataset.id; renderLog(); break;
+    case 'log-cancel': S.logEdit=null; renderLog(); break;
+    case 'log-save': logSave(a.dataset.id); break;
+    case 'log-hist': { S.logHist=S.logHist||{}; S.logHist[a.dataset.id]=!S.logHist[a.dataset.id]; renderLog(); break; }
+    case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),device:Y.name||null,log:P.log||[],chain:P.evidence,otherDevices:remoteEv()},null,2)],{type:'application/json'});
       saveOut('remiel-halo-evidence.json','application/json',blob); toast('Signed log exported.'); break; }
     case 'h-padd': { const n=val('hpName'); if(!n) return toast('Enter the name.'); H.people.push({name:n,rel:val('hpRel'),consent:el('hpConsent').checked,watch:el('hpWatch').checked}); save(); rerender(); break; }
     case 'h-pdel': H.people.splice(+a.dataset.i,1); save(); rerender(); break;
