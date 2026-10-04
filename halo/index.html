@@ -224,6 +224,25 @@ select.inp{flex:none}
 .rate{display:inline-flex;align-items:center;gap:6px;vertical-align:middle;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--rc);border:1px solid var(--rc);border-radius:999px;padding:1px 9px 1px 2px;white-space:nowrap;background:rgba(0,0,0,.25)}
 .rate b{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--rc);color:#0a0f1e;font-size:11px;font-weight:700}
 .ratekey{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pathc{margin:0 0 14px;padding:14px 14px 12px;border:1px solid var(--line2);border-radius:16px;background:linear-gradient(180deg,rgba(40,62,120,.34),rgba(14,22,46,.6));box-shadow:0 10px 26px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08)}
+.pathc .ph{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.pathc .pt{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:#dfe8ff;font-weight:600}
+.pathc .prank{color:var(--att2);font-weight:600;font-size:14px}
+.pathc .ppct{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--ink)}
+.pathc .pbar{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:10px 0 4px}
+.pathc .pseg{height:9px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.5)}
+.pathc .pseg i{display:block;height:100%;background:linear-gradient(90deg,#3f74d6,#7fb0ff);border-radius:6px}
+.pathc .pseg.full i{background:linear-gradient(90deg,#c5a55a,#f0d06a)}
+.pathc .pnames{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;font-family:var(--mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);text-align:center}
+.pathc .pnames .on{color:var(--att2)}
+.pathc .pnext{display:flex;align-items:center;gap:10px;margin-top:11px;font-size:13.5px;line-height:1.4}
+.pathc .pnext span{flex:1;min-width:0} .pathc .pnext i{display:block;font-style:normal;color:var(--mut);font-size:12px}
+.pathc .plist{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.pathc .pst{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:8px 0 4px}
+.pathc .pstep{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.4;padding:3px 0;color:var(--ink)}
+.pathc .pstep .bx{flex:none;width:17px;height:17px;border-radius:5px;border:1px solid var(--line2);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#0a0f1e}
+.pathc .pstep.ok{color:var(--mut)} .pathc .pstep.ok .bx{background:var(--clear);border-color:var(--clear)}
+.pathc .pmore{background:none;border:0;color:var(--chrome2);font-size:12px;padding:6px 0 0;text-decoration:underline}
 .instbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;border:1px solid rgba(79,141,240,.45);border-radius:12px;background:rgba(26,58,130,.22);font-size:13px;line-height:1.4}
 .instbar span{flex:1 1 180px}
 .backbar{position:sticky;top:0;z-index:30;display:flex;gap:8px;align-items:center;margin:-14px -16px 10px;padding:8px 16px;background:rgba(7,11,22,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
@@ -1700,6 +1719,61 @@ function scopeHTML(a){
 }
 function scopeTick(){ const box=el('scopePills'); if(!box || S.view!=='overview') return; const now=Date.now(); if(now-(S._scT||0)<900) return; S._scT=now;
   const h=scopeHTML(); if(box._h!==h){ box._h=h; box.innerHTML=h; } const ag=el('scopeAge'); if(ag) ag.textContent=scopeAge(); }
+/* ---------- Your path: five stages from the first visit to fully guarded. The next step is always one tap away. ----------
+   Each stage ends in a level. A finished step is ticked, counted in the percentage, and a finished stage is entered in Evidence. */
+const pathDef = id => { const t=T(id); return !t || scopeOf(t)===false || (scopeOf(t)===true && !isOpen(t)); };      // defended, or not real to you
+const pathReal = () => THREATS.filter(t=>t.shelf==='real' && scopeOf(t)===true && stepsOf(t).length>0);
+const pathTop = () => pathReal().filter(isOpen).sort((a,b)=>((rating(b)||{}).n||0)-((rating(a)||{}).n||0) || IMPACT_W(b.impact)-IMPACT_W(a.impact))[0] || null;
+const PATH=[
+ {k:'set', name:'Set up', rank:'Aware', steps:[
+   {k:'profile', t:()=>'Answer your profile', why:'Halo then rates every threat for you, from 1 to 5.', ok:()=>PROFILE_Q.every(q=>pv(q.k)!==null), go:()=>({pull:'profile'})},
+   {k:'alerts', t:()=>'Turn on alerts', why:'A banner reaches you the moment a new threat appears.', ok:()=>['granted','screen'].indexOf(alertState())>=0, go:()=>({act:'alert-ask'})},
+   {k:'listen', t:()=>'Start listening', why:'Halo shows the devices, towers and cameras around you.', ok:()=>!!(P.path&&P.path.heard), go:()=>({view:'watchers'})} ]},
+ {k:'own', name:'Know what is yours', rank:'Prepared', steps:[
+   {k:'sig', t:()=>'Add three of your own devices to Your Signature', why:'Halo then sets your own devices aside, and a stranger stands out.', ok:()=>sigSize()>=3, go:()=>({pull:'sig', view:'watchers'})},
+   {k:'health', t:()=>'Run the Device Health Check', why:'A few seconds, and you know this device is in order.', ok:()=>healthCount().at>0, go:()=>({pull:'health'})} ]},
+ {k:'ai', name:'Guard against rogue AI', rank:'Guarded', steps:[
+   {k:'trap', t:()=>'Run the Agent Trap Check once', why:'Paste a page, a file or a message, and Halo shows what it tells an AI to do.', ok:()=>(P.traps||[]).length>0, go:()=>({pull:'trap', view:'attackers'})},
+   {k:'agent', t:()=>'Finish the Agent Hijack defences', why:'An AI agent then acts for you and for nobody else.', ok:()=>pathDef('a_agent'), go:()=>({res:'a_agent'})},
+   {k:'access', t:()=>'Finish the Assistant Access Review', why:'Your assistant reaches only what you chose.', ok:()=>pathDef('a_access'), go:()=>({res:'a_access'})},
+   {k:'ext', t:()=>'Finish the Extension Audit', why:'Your browser carries only extensions you trust.', ok:()=>pathDef('a_ext'), go:()=>({res:'a_ext'})} ]},
+ {k:'doors', name:'Close the common doors', rank:'Hardened', steps:[
+   {k:'imm', t:()=>{ const t=pathReal().filter(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4)[0]; return t?'Defend what is imminent: '+t.name:'Defend what is imminent'; }, why:'Anything rated 4 or 5 comes first.', ok:()=>!pathReal().some(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4), go:()=>{ const t=pathReal().filter(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4)[0]; return t?{res:t.id}:{view:'attackers'}; }},
+   {k:'half', t:()=>{ const t=pathTop(); return 'Defend half of the threats real to you'+(t?': next, '+t.name:''); }, why:'Each finished card moves its rating down to 1.', ok:()=>{ const r=pathReal(); return r.length>0 && r.filter(t=>!isOpen(t)).length*2>=r.length; }, go:()=>{ const t=pathTop(); return t?{res:t.id}:{view:'attackers'}; }},
+   {k:'all', t:()=>{ const t=pathTop(); return 'Defend every threat real to you'+(t?': next, '+t.name:''); }, why:'The bottom line then reads Clear.', ok:()=>{ const r=pathReal(); return r.length>0 && !r.some(isOpen); }, go:()=>{ const t=pathTop(); return t?{res:t.id}:{view:'attackers'}; }} ]},
+ {k:'ahead', name:'Stay ahead', rank:'Ahead', steps:[
+   {k:'trip', t:()=>'Take one trip with Halo listening', why:'Halo records what was around you and what stayed with you.', ok:()=>(P.trips||[]).length>0, go:()=>({view:'watchers'})},
+   {k:'special', t:()=>'Complete one Special countermeasure', why:'A gold side marks every card that holds one.', ok:()=>THREATS.some(t=>spCount(t).dn>0), go:()=>{ const t=THREATS.find(t=>t.shelf==='real'&&scopeOf(t)===true&&spCount(t).n>spCount(t).dn); return t?{res:t.id}:{view:'watchers'}; }},
+   {k:'report', t:()=>'Make a new report', why:'Every threat, your rating for each, and what to do next, on paper.', ok:()=>(P.reportN||0)>0 || (P.reports||[]).length>0, go:()=>({act:'report-new'})} ]} ];
+function pathState(){
+  const stages=PATH.map(st=>{ const steps=st.steps.map(x=>{ let ok=false; try{ ok=!!x.ok(); }catch(e){} return {k:st.k+'.'+x.k, t:x.t(), why:x.why, ok, go:x.go}; }); const done=steps.filter(x=>x.ok).length;
+    return {k:st.k, name:st.name, rank:st.rank, steps, done, n:steps.length, full:done===steps.length}; });
+  let rank='Starting', lvl=0; for(const st of stages){ if(st.full){ rank=st.rank; lvl++; } else break; }
+  const all=stages.reduce((n,x)=>n+x.n,0), dn=stages.reduce((n,x)=>n+x.done,0), open=stages.find(x=>!x.full);
+  return {stages, rank, lvl, pct:Math.round(100*dn/all), dn, all, next:open?open.steps.find(x=>!x.ok):null, stage:open||null}; }
+function pathCard(){
+  const ps=pathState(), nx=ps.next, open=S.open.has('path');
+  let h='<div class="pathc" id="pathCard"><div class="ph"><span class="pt">Your path</span><span class="prank">'+esc(ps.rank)+' · level '+ps.lvl+' of 5</span><span class="ppct">'+ps.pct+'% protected</span></div>'+
+    '<div class="pbar">'+ps.stages.map(x=>'<div class="pseg'+(x.full?' full':'')+'"><i style="width:'+Math.round(100*x.done/x.n)+'%"></i></div>').join('')+'</div>'+
+    '<div class="pnames">'+ps.stages.map(x=>'<span class="'+(x.full?'on':'')+'">'+esc(x.rank)+'</span>').join('')+'</div>';
+  h+= nx ? '<div class="pnext"><span><b>Next: '+esc(nx.t)+'.</b><i>'+esc(nx.why)+'</i></span><button class="btn sm primary" data-act="path-go">Go</button></div>'
+         : '<div class="pnext"><span><b>Every step is complete.</b><i>Halo keeps watch, and a new step appears here when a new threat does.</i></span></div>';
+  h+='<button class="pmore" data-act="pull" data-id="path">'+(open?'Hide the steps':'See all '+ps.all+' steps, '+ps.dn+' done')+'</button>';
+  if(open) h+='<div class="plist">'+ps.stages.map((x,i)=>'<div class="pst">'+(i+1)+'. '+esc(x.name)+' · level: '+esc(x.rank)+' · '+x.done+' of '+x.n+'</div>'+
+      x.steps.map(y=>'<div class="pstep'+(y.ok?' ok':'')+'"><span class="bx">'+(y.ok?'&#10003;':'')+'</span><span>'+esc(y.t)+'</span></div>').join('')).join('')+'</div>';
+  return h+'</div>'; }
+function pathGo(g){ if(!g) return;
+  if(g.act==='alert-ask') return void alertAsk(); if(g.act==='report-new') return void reportOpen(true);
+  const show=sel=>setTimeout(()=>{ const c=document.querySelector(sel); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },120);
+  if(g.res){ const t=T(g.res); if(!t) return; S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; const v=t.side==='w'?'watchers':'attackers'; if(S.view!==v) setView(v); else { navPush(t.id); rerender(); } return show('#tp-'+t.id); }
+  if(g.pull){ S.open.add(g.pull); const v=g.view||'overview'; if(S.view!==v) setView(v); else { navPush(g.pull); rerender(); } return show('.tp-head[data-id="'+g.pull+'"]'); }
+  if(g.view) setView(g.view); }
+// A step that has just been finished is announced once. A finished stage is entered in Evidence.
+function pathCheck(){ if(!booted) return; const ps=pathState(); P.path=P.path||{}; const d=P.path.done=P.path.done||{}, first=!P.path.init; let changed=false;
+  ps.stages.forEach(st=>{ st.steps.forEach(x=>{ if(x.ok && !d[x.k]){ d[x.k]=Date.now(); changed=true; if(!first) toast('Step complete: '+x.t+'. '+ps.pct+'% protected.'); } });
+    if(st.full && !d['stage.'+st.k]){ d['stage.'+st.k]=Date.now(); changed=true;
+      if(!first){ logEvidence('note','Your path: stage '+st.name+' complete. Level reached: '+st.rank+'. '+ps.pct+'% protected.'); alertRaise('path:'+st.k, 'Level reached: '+st.rank, 'You finished the stage '+st.name+'. '+(ps.next?'Next: '+ps.next.t+'.':'Every step is complete.'), null, true); } } });
+  if(first){ P.path.init=true; changed=true; } if(changed) save(); }
 function renderOverview(){
   const a=assess(), tc=a.t<0?'--mut':TIER_VAR[a.t], g=S.global;
   const real=THREATS.filter(t=>t.shelf==='real').length, pot=THREATS.length-real;
@@ -1715,9 +1789,9 @@ function renderOverview(){
   h+='<div class="verdict"><div class="ring">'+a.n+'</div><div><div class="vt">'+esc(a.title)+'</div><div class="vs">'+a.s+'</div><div class="vm">'+esc(a.meta)+'</div>'+
      '<div class="chips"><span class="chip '+(a.side==='Watchers'?'w':a.side==='Attackers'?'a':'')+'">'+esc(a.side)+'</span><span class="chip real">'+real+' Real &amp; Imminent</span><span class="chip pot">'+pot+' Potential</span></div></div></div>';
   { const lr=reportLast(); h+='<div class="formrow" style="margin:0 0 12px"><button class="btn gold wide" data-act="report-new">New report: every current threat, explained</button>'+(lr?'<button class="btn wide" data-act="report">Last report, No. '+lr.n+', '+hhmm(lr.t)+'</button>':'')+'</div>'; }
-  const list=THREATS.filter(t=>t.shelf==='real' && scopeOf(t)===true && isOpen(t)).sort((x,y)=>IMPACT_W(y.impact)-IMPACT_W(x.impact) || doneCount(x)-doneCount(y)).slice(0,3);
   const cat=x=>'<div class="cat"><span>'+x+'</span></div>';
-  h+='<div class="stack">'+(list.length?cat('Start here')+list.map(threatPull).join(''):'')+cat('Your set-up')+profilePull()+sigPull()+healthPull()+devicesPull()+cat('The wider picture')+globalPull()+resourcesPull()+'</div>';
+  h+=pathCard();
+  h+='<div class="stack">'+cat('Your set-up')+profilePull()+sigPull()+healthPull()+devicesPull()+cat('The wider picture')+globalPull()+resourcesPull()+'</div>';
   h+='<div class="limit" style="margin-top:16px;text-align:center"><a href="#" data-act="terms">Terms of use</a></div></div>';
   el('ovMain').innerHTML=h;
   renderCoverage(); el('homeMini').style.display='none'; renderVicinity();
@@ -2788,6 +2862,7 @@ function reportHTML(){
   const stepsAll=applies.reduce((n,r)=>n+r.n,0), stepsDone=applies.reduce((n,r)=>n+Math.min(r.dn,r.n),0), spAll=applies.reduce((n,r)=>n+r.sp.n,0), spDone=applies.reduce((n,r)=>n+r.sp.dn,0), hitsAll=THREATS.reduce((n,t)=>n+((P.hits||{})[t.id]||0),0);
   h+='<h2>4. The bottom line in detail</h2><p>The bottom line is read from the components below. Any one of them can raise it.</p>'+
     tbl(['Component','Reading','What it means'],[
+      ['Your path',(ps=>ps.rank+', level '+ps.lvl+' of 5, '+ps.pct+'% protected')(pathState()),'Five stages, from set-up to staying ahead'],
       ['Threats real to you',answered?applies.length+' of '+R.length:'Profile to answer','Decided by your profile answers alone'],
       ['Defence steps complete',stepsAll?stepsDone+' of '+stepsAll:'None to count','Each step is one setting or habit that closes one path'],
       ['Special countermeasures complete',spAll?spDone+' of '+spAll:'None to count','Stronger steps, for a threat you believe is active'],
@@ -3493,6 +3568,7 @@ function liveTick(){
   sigApply();
   LIVE.devs.forEach(d=>{ if(!d.sim && (d.withYou || d.homeAway)) autoLog(d); });
   alertScan();
+  if(mobileLive() && !(P.path&&P.path.heard) && [...LIVE.devs.values()].some(d=>d.present&&!d.sim)){ P.path=P.path||{}; P.path.heard=true; save(); }
   tripAuto(); walkTick();
   if(!booted) return;
   if(S.view==='overview'||S.view==='watchers') renderVicinity();
@@ -4097,6 +4173,7 @@ function render(){
   else renderEvidence();
   document.querySelectorAll('.ticker [data-m]').forEach(b=>b.classList.toggle('on', (b.dataset.m==='w'&&S.view==='watchers')||(b.dataset.m==='a'&&S.view==='attackers')));
   backRows();
+  try{ pathCheck(); }catch(e){}
 }
 function rerender(){ const sc=el('scroll'), y=sc.scrollTop; render(); sc.scrollTop=y; }
 document.querySelectorAll('.nav button[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
@@ -4139,6 +4216,7 @@ document.addEventListener('click', e=>{
     case 'prof': { const k=a.dataset.k, v=a.dataset.v==='y'; if(P.profile[k]===v) delete P.profile[k]; else P.profile[k]=v; save(); rerender(); break; }
     case 'mode': { const m=a.dataset.m; S.mode=m;
       if(m==='w') setView('watchers'); else if(m==='a') setView('attackers'); else if(S.view!=='overview') setView('overview'); else rerender(); break; }
+    case 'path-go': { const nx=pathState().next; if(nx) pathGo(nx.go()); break; }
     case 'alert-open': alertGo(); break;
     case 'alert-x': S.banners=(S.banners||[]).slice(1); renderAlerts(); break;
     case 'alert-ask': alertAsk(); break;
