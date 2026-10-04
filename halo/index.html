@@ -442,6 +442,18 @@ select.inp{flex:none}
   background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.6), var(--mk,#4ae88a) 58%, rgba(5,10,25,.45));
   box-shadow:0 0 13px -1px var(--mk,#4ae88a),0 2px 6px rgba(0,0,0,.55);transition:transform .12s}
 .legend{display:flex;gap:14px;margin-top:12px;font-size:11px;color:var(--mut);flex-wrap:wrap}
+.layers{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.layers .lay{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink);background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:999px;padding:4px 11px 4px 5px}
+.layers .lay i{width:18px;height:18px;border-radius:50%;background:var(--lc);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:10px;font-weight:700;color:#0a0f1e}
+.layers .lay.off{opacity:.45} .layers .lay.off i{background:transparent;box-shadow:inset 0 0 0 2px var(--lc);color:var(--lc)}
+.layers .lay b{font-weight:600;color:var(--lc)}
+.dev-marker.k-cam{border-radius:5px;background:#ff8a3c !important;border-color:#2a1300;box-shadow:0 0 10px -1px #ff8a3c}
+.dev-marker.k-cam::after{content:"";position:absolute;inset:27%;border-radius:50%;background:#2a1300}
+.dev-marker.k-tag{border-radius:3px;transform:rotate(45deg)}
+.twr{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.twr .tk{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--tc);color:var(--tc);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.twr .td{color:var(--mut);font-family:var(--mono);font-size:11px;grid-column:2 / 4}
+.twr .ts{font-family:var(--mono);font-size:11px;color:var(--mut);white-space:nowrap}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
 
 /* tickers */
@@ -696,6 +708,7 @@ a.tk:hover b{text-decoration:underline}
                   <span><i class="rgh"></i>Direction rough</span>
                   <span><i class="hol"></i>Heard, direction pending (list only)</span>
                 </div>
+                <div class="layers" id="mapLayers"></div>
                 <div id="suspects"></div>
                 <div class="posline" id="posLine"></div>
                 <div class="posline" id="mapCredit" style="margin-top:4px">Maps: &copy; OpenStreetMap contributors</div>
@@ -861,7 +874,7 @@ const THREATS = [
    limit:'A web page cannot scan Bluetooth. Live detection needs the Halo Android app or the carried sensor.',
    src:[{n:'Google Android Help', u:'https://support.google.com/android/answer/13658562'},{n:'Apple Support', u:'https://support.apple.com/en-us/119874'}] },
  { id:'w_tower', side:'w', shelf:'real', name:'Tower Watch', how:'How to Defend against Fake Cell Towers', short:'Fake cell towers', impact:'Location and content',
-   needs:'A phone that launched with Android 16, or a Rayhunter hotspot', scope:()=>anyOf(pv('android'),pv('iphone')),
+   needs:'Runs in the Halo Android app. A Rayhunter hotspot adds modem-level alerts', scope:()=>anyOf(pv('android'),pv('iphone')),
    where:'On the phone: the SIM settings and, on supported Android 16 phones, Mobile network security. On the sensor: the Rayhunter screen.',
    what:'A fake tower captures your SIM identity, fixes your location, and can force the phone to 2G where calls and texts are exposed.',
    steps:[
@@ -873,6 +886,20 @@ const THREATS = [
    convert:'Each alert is a time and a place. Over weeks they map where interception operates along your routes. Rayhunter keeps the capture file for an analyst.',
    limit:'An alert is a warning, not proof. Legitimate networks also request identifiers.',
    src:[{n:'Android Open Source Project', u:'https://source.android.com/docs/security/features/cellular-security/mobile-network-security'},{n:'Apple Support', u:'https://support.apple.com/en-us/105120'},{n:'EFF Rayhunter', u:'https://github.com/EFForg/rayhunter'}] },
+ { id:'w_alpr', side:'w', shelf:'real', name:'Plate Camera Watch', how:'How to Defend against Licence Plate Cameras', short:'Cameras that log every vehicle', impact:'Location and routine',
+   needs:'Runs here: the map shows every mapped camera, and the Halo Android app hears Flock hardware', scope:()=>true, tool:'alpr',
+   where:'On poles at junctions, town limits, car parks and neighbourhood entrances. Flock Safety is the largest maker in the United States. The map on this screen marks each one in orange.',
+   what:'A plate camera photographs every passing vehicle and records its plate, the time and the place. The records are searchable, kept for weeks, and shared between police forces and private networks, so together they describe where you live, work, worship and sleep.',
+   steps:[
+     ['x','Open the full map and look along your usual routes: each orange mark is a mapped plate camera'],
+     ['x','Tap Plate cameras on the map key to switch the marks on, and read the count for the area around you'],
+     ['x','For a journey you want kept to yourself, choose a route that passes fewer cameras, and leave the tolled road and the car park with a camera at its gate'],
+     ['x','Ask your town or county, in writing, how long plate records are kept and who they are shared with','','Most forces must answer a public records request. Halo keeps your request and the reply in Evidence.'],
+     ['x','Keep your plate legal and readable','Covering or altering a plate is an offence, and it draws attention to the vehicle.'] ],
+   deflect:'Fewer cameras passed is less of your routine on record. Halo counts them for the area around you.',
+   convert:'Every camera you find and map shrinks the blind spot for everyone who uses the map.',
+   limit:'',
+   src:[{n:'DeFlock', u:'https://deflock.org/'},{n:'OpenStreetMap, the ALPR tag', u:'https://wiki.openstreetmap.org/wiki/Tag:surveillance:type%3DALPR'},{n:'Electronic Frontier Foundation, June 2026', u:'https://www.eff.org/deeplinks/2026/06/get-flock-out-here'},{n:'Ryan O\'Horo, spotting Flock cameras', u:'https://www.ryanohoro.com/post/spotting-flock-safety-s-falcon-cameras'},{n:'flock-you', u:'https://github.com/colonelpanichacks/flock-you'}] },
  { id:'w_stalk', side:'w', shelf:'real', name:'Stalkerware Check', how:'How to Defend against Stalkerware', short:'Hidden monitoring apps on your phone', impact:'Content and location',
    needs:'Guided check', scope:()=>anyOf(pv('android'),pv('iphone')),
    where:'Android: apps holding accessibility, device admin or notification access. iPhone: devices signed in to your Apple Account, sharing settings and configuration profiles.',
@@ -1243,6 +1270,14 @@ const SPECIAL = {
    ['x','Switch the monitor\'s Wi-Fi and Bluetooth off in its settings, then watch it leave the Display Watch list'],
    ['x','Log what you found and what you switched off. Evidence keeps the date and the fingerprint'],
    ['x','Ask the maker in writing what your model and its app collect and send. Keep the reply in Evidence'] ] },
+ w_alpr:{ d:[
+   ['x','Open the full map before you set off and trace the route: count the orange marks on it'],
+   ['x','Pick the route with the fewest, and note the count in Evidence'],
+   ['x','With Halo listening as you travel, a Flock camera that broadcasts raises a banner and takes its place on the map'] ],
+  c:[
+   ['x','Find a camera the map does not show. Note the junction, the direction it faces and the maker'],
+   ['x','Add it at deflock.org, which writes it to OpenStreetMap. Halo shows it within the hour'],
+   ['x','Log the camera in Evidence with the time and the place'] ] },
  w_wifi:{ d:[
    ['x','Choose the one room that matters most, usually the bedroom'],
    ['x','Cover its outside walls and windows with a radio-attenuating material: foil-backed insulation board, shielding paint, or metallised window film','Mobile signal and Wi-Fi in that room drop as well.'],
@@ -1533,6 +1568,7 @@ function threatBody(t){
   if(t.id==='w_tower') h+=toolTower();
   if(t.id==='a_pubwifi') h+=toolWifi();
   if(t.id==='w_monitor') h+=toolMonitor();
+  if(t.tool==='alpr') h+=toolAlpr();
   h+='<div class="dsec"><h4>Log a finding</h4><div class="formrow" style="margin-top:0"><input class="inp" id="note-'+t.id+'" placeholder="What you found, in your own words">'+
      '<button class="btn sm" data-act="note" data-id="'+t.id+'">Add to Evidence</button></div></div>';
   h+='<div class="limit"><b>'+(t.src.length>1?'Sources.':'Source.')+'</b> '+
@@ -1840,7 +1876,7 @@ function viewRadius(){
   const cur=S._view||BASE_R;                              // a tighter view is taken only once everything sits well inside it
   return (S._view = VIEW_STEPS.find(v=>far<=v*(v<cur?0.7:0.85)) || BASE_R);
 }
-const quietAp = d => d.band==='wifi' && !d.withYou && !d.onRoute && !d.mine;
+const quietAp = d => d.band==='wifi' && d.cls!=='Camera' && !d.withYou && !d.onRoute && !d.mine;
 const inRadius = () => { const rs=radiusState(); return vis().devices.filter(d=>d.present && d.dist<=rs.r && !quietAp(d)); };
 const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Math.round(d.dist)+' m';
 const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';          // placed, direction rough, or direction not known
@@ -1873,7 +1909,7 @@ function renderVicinity(){
         '<span class="sd">'+esc(distText(d))+'<br><span class="'+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></span></div>'; }).join('')
       : '<div class="empty" style="padding:14px 6px">'+(V.mode==='live'?'Your sensor is reporting. Nothing is in earshot inside the radius at this moment.':'No simulated devices inside the radius at this moment.')+'</div>'; }
   if(host._h!==html){ host.innerHTML=html; host._h=html; }          // leave the rows alone when nothing changed, so a tap is never lost
-  renderIdent(); macroUpdate(); renderWalk();
+  renderIdent(); macroUpdate(); renderWalk(); poiTick(); renderLayers();
   renderMap();
 }
 
@@ -1886,7 +1922,7 @@ function renderWatchers(){
   if(el('rost')) renderRoster();
 }
 // The pulls fall into a few plain groups, so a person can find the one they need at a glance.
-const CATS={ w:[['Following you',['w_ble','w_tower']],['Inside your devices',['w_stalk','w_work']],['Sensing your home',['w_wifi','w_monitor']]],
+const CATS={ w:[['Following you',['w_ble','w_tower','w_alpr']],['Inside your devices',['w_stalk','w_work']],['Sensing your home',['w_wifi','w_monitor']]],
   a:[['AI agents',['a_agent','a_access','a_ext']],['Fraud and impersonation',['a_phish','a_fraud']],['Your identity',['a_alias','a_phone','a_breach']],['Your phone and networks',['a_android','a_theft','a_malware','a_pubwifi']]] };
 function grouped(side, list, lead){ const used=new Set(); let h='';
   CATS[side].forEach((c,i)=>{ const xs=c[1].map(id=>list.find(t=>t.id===id)).filter(Boolean); if(!xs.length && !(i===0&&lead)) return; xs.forEach(t=>used.add(t.id));
@@ -2136,7 +2172,7 @@ async function initMap(){
     MAP.addLayer({id:'zone-fix-l',type:'line',source:'zones',filter:['==',['get','kind'],'fix'],paint:{'line-color':'#e8a84a','line-width':1,'line-opacity':.6}});
     MAP.addLayer({id:'zone-range',type:'line',source:'zones',filter:['==',['get','kind'],'range'],paint:{'line-color':'#9aa6c4','line-width':1,'line-opacity':.55,'line-dasharray':[1.5,2.5]}});
     MAP.addLayer({id:'zone-arc',type:'line',source:'zones',filter:['==',['get','kind'],'arc'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.8}});
-    YOU=mark(MAP,'you-dot');
+    poiAttach(MAP); YOU=mark(MAP,'you-dot');
     fitRadius(true); renderVicinity();
   });
   MACRO=new window.maplibregl.Map(opt(el('macroMap')));
@@ -2147,12 +2183,60 @@ async function initMap(){
     MACRO.addLayer({id:'m-track',type:'line',source:'macro',filter:['==',['get','kind'],'track'],paint:{'line-color':'#9fc4ff','line-width':2,'line-opacity':.85}});
     MACRO.addLayer({id:'m-range',type:'line',source:'macro',filter:['==',['get','kind'],'range'],paint:{'line-color':'#9aa6c4','line-width':1,'line-opacity':.55,'line-dasharray':[1.5,2.5]}});
     MACRO.addLayer({id:'m-heard',type:'circle',source:'macro',filter:['==',['get','kind'],'heard'],paint:{'circle-radius':3.5,'circle-color':['get','c'],'circle-opacity':.85,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
-    YOU2=mark(MACRO,'you-dot sm');
+    poiAttach(MACRO); YOU2=mark(MACRO,'you-dot sm');
     macroUpdate();
   });
   if(window.ResizeObserver){ const ro=new ResizeObserver(()=>{ try{ MAP.resize(); MACRO.resize(); }catch(e){} _fitR=0; _fitM=0; fitRadius(true); macroFit(); });
     ro.observe(el('haloMap')); ro.observe(el('macroMap')); }
 }
+
+/* ---------- Threat points on every map ----------
+   What a route map does for fuel and food, Halo does for threats: each kind has its own colour and mark, on Micro, Macro and the full map.
+     Plate cameras, orange: mapped licence plate cameras, from OpenStreetMap through the DeFlock project.
+     Towers, cyan: every tower your phone has used that the public register places. Red: a tower in use that shows the signs of a fake one.
+     The ring around you, cyan dashes: your tower is somewhere on it, from the phone's own timing.
+   Devices Halo hears keep their round markers; a tracker is a diamond and a camera heard by radio is an orange square. */
+const POI = window.HALO_POI || {alpr:['https://tiles.dontgetflocked.com/cameras-us-hourly.json','https://tiles.dontgetflocked.com/cameras-ca-hourly.json']};
+const POI_C={cam:'#ff8a3c', tower:'#2dd4ea', towerbad:'#ff4d4d'};
+const layerOn = k => !(P.layers && P.layers[k]===false);
+function poiImage(kind){ const n=44, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d'), c=POI_C[kind];
+  g.beginPath(); g.arc(22,22,19,0,Math.PI*2); g.fillStyle=c; g.fill(); g.lineWidth=3; g.strokeStyle='#070b16'; g.stroke();
+  g.fillStyle='#070b16'; g.strokeStyle='#070b16'; g.lineWidth=3; g.lineCap='round';
+  if(kind==='cam'){ g.fillRect(10,16,18,13); g.beginPath(); g.moveTo(28,20); g.lineTo(35,15); g.lineTo(35,30); g.lineTo(28,25); g.closePath(); g.fill(); g.fillStyle=c; g.beginPath(); g.arc(19,22.5,3.6,0,Math.PI*2); g.fill(); }
+  else { g.beginPath(); g.moveTo(22,13); g.lineTo(14,33); g.moveTo(22,13); g.lineTo(30,33); g.moveTo(17,26); g.lineTo(27,26); g.stroke(); g.beginPath(); g.arc(22,12,3,0,Math.PI*2); g.fill();
+    g.lineWidth=2.2; g.beginPath(); g.arc(22,12,8,-Math.PI*.82,-Math.PI*.18); g.stroke(); }
+  return g.getImageData(0,0,n,n); }
+function poiAttach(map){ if(!map || map._poi) return; map._poi=true;
+  try{ ['cam','tower','towerbad'].forEach(k=>{ if(!map.hasImage('poi-'+k)) map.addImage('poi-'+k, poiImage(k), {pixelRatio:2}); });
+    (POI.alpr||[]).forEach((u,i)=>{ map.addSource('alpr'+i,{type:'vector',url:u});
+      map.addLayer({id:'alpr'+i, type:'symbol', source:'alpr'+i, 'source-layer':'cameras', minzoom:8,
+        layout:{'icon-image':'poi-cam','icon-size':['interpolate',['linear'],['zoom'],8,.3,11,.5,14,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('cam')?'visible':'none'}}); });
+    map.addSource('poi',{type:'geojson',data:poiData()});
+    map.addLayer({id:'poi-ring',type:'line',source:'poi',filter:['==',['get','kind'],'taring'],layout:{visibility:layerOn('tower')?'visible':'none'},paint:{'line-color':POI_C.tower,'line-width':1.5,'line-opacity':.8,'line-dasharray':[2,2.5]}});
+    map.addLayer({id:'poi-tower',type:'symbol',source:'poi',filter:['in',['get','kind'],['literal',['tower','towerbad']]],
+      layout:{'icon-image':['case',['==',['get','kind'],'towerbad'],'poi-towerbad','poi-tower'],'icon-size':['interpolate',['linear'],['zoom'],8,.45,13,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('tower')?'visible':'none'}});
+  }catch(e){ map._poi=false; } }
+function poiData(){ const f=[], g=gz(), sv=cellLive()?CELL.serving:null, bad=sv&&towerSigns().level==='suspect';
+  Object.keys(P.cells||{}).forEach(id=>{ const r=P.cells[id].reg; if(r && r.found && okLL(r)) f.push({type:'Feature',properties:{kind:(bad&&sv.reg===id)?'towerbad':'tower',id},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}); });
+  if(g && sv && sv.c.ta!=null && (sv.c.k==='lte'||sv.c.k==='gsm')){ const m=Math.max(60, sv.c.ta*(sv.c.k==='lte'?78:554)); f.push({type:'Feature',properties:{kind:'taring'},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,m)}}); }
+  return {type:'FeatureCollection',features:f}; }
+function poiTick(){ const d=poiData(), key=JSON.stringify(d); if(key===S._poiKey) return; S._poiKey=key;
+  [MAP,MACRO,FULL].forEach(m=>{ try{ const src=m&&m.getSource&&m.getSource('poi'); if(src) src.setData(d); }catch(e){} }); }
+function poiLayers(){ [MAP,MACRO,FULL].forEach(m=>{ if(!m||!m._poi) return; try{ (POI.alpr||[]).forEach((u,i)=>m.setLayoutProperty('alpr'+i,'visibility',layerOn('cam')?'visible':'none'));
+    ['poi-ring','poi-tower'].forEach(l=>m.setLayoutProperty(l,'visibility',layerOn('tower')?'visible':'none')); }catch(e){} }); }
+// Plate cameras around you, nearest first, read from the map squares the Macro sphere holds.
+function camsNear(){ const g=gz(); if(!g || !MACRO || !MACRO._poi) return [];
+  if(S._cams && Date.now()-S._cams.t<4000 && S._cams.k===g.lat.toFixed(4)+','+g.lon.toFixed(4)) return S._cams.v;
+  const seen={}, out=[];
+  (POI.alpr||[]).forEach((u,i)=>{ let fs=[]; try{ fs=MACRO.querySourceFeatures('alpr'+i,{sourceLayer:'cameras'}); }catch(e){}
+    fs.forEach(f=>{ if(!f.geometry || f.geometry.type!=='Point') return; const q=f.properties||{}, co=f.geometry.coordinates, id=String(q.osmId||co.join(','));
+      if(seen[id]) return; seen[id]=1; const d=distLL(g.lat,g.lon,co[1],co[0]);
+      out.push({id, lat:co[1], lon:co[0], d, brg:(Math.atan2((co[0]-g.lon)*Math.cos(g.lat*Math.PI/180),co[1]-g.lat)*180/Math.PI+360)%360, brand:String(q.brand||''), op:String(q.operator||''), dir:String(q.directionCardinal||''), zone:String(q.surveillanceZone||'')}); }); });
+  out.sort((a,b)=>a.d-b.d); S._cams={t:Date.now(), k:g.lat.toFixed(4)+','+g.lon.toFixed(4), v:out}; return out; }
+const poiCount = k => k==='alpr' ? (layerOn('cam') ? camsNear().filter(c=>c.d<=MILE).length : 0) : 0;
+function renderLayers(){ const box=el('mapLayers'); if(!box) return; const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r).length, tw=Object.keys(P.cells||{}).filter(id=>(P.cells[id].reg||{}).found).length;
+  const lay=(k,ch,name,note)=>'<button class="lay'+(layerOn(k)?'':' off')+'" data-act="layer" data-k="'+k+'" style="--lc:'+POI_C[k]+'"><i>'+ch+'</i>'+name+(note?' <b>'+note+'</b>':'')+'</button>';
+  setHTML(box, lay('cam','&#9679;','Plate cameras', g&&MACRO&&MACRO._poi ? inR+' within '+miText(r) : '')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''))); }
 
 /* ----- Macro: the wider area. Your route, home, where flagged devices were heard, and known threats beyond the radius ----- */
 const MILE=1609.344, MACRO_STEPS=[2*MILE,5*MILE,15*MILE], MACRO_DEFAULT=5*MILE;      // ground zero is always your own position
@@ -2191,6 +2275,7 @@ function macroUpdate(){
     const inc=far.filter(d=>isKnownThreat(d));
     if(heard.length) line+=heard.length+' flagged '+(heard.length===1?'device':'devices')+' on your route. ';
     if(far.length) line+=far.length+' heard beyond your radius'+(inc.length?', '+inc.length+' a known threat':'')+'. ';
+    if(layerOn('cam') && MACRO && MACRO._poi){ const cs=camsNear().filter(c=>c.d<=r); if(cs.length) line+='<b style="color:'+POI_C.cam+'">'+cs.length+' plate '+(cs.length===1?'camera':'cameras')+'</b> within '+miText(r)+', the nearest '+miText(cs[0].d)+' '+compass(cs[0].brg)+'. '; }
   }
   line+=' <span style="white-space:nowrap">'+MACRO_STEPS.map(m=>'<button class="chipbtn '+((S.macroR||MACRO_DEFAULT)===m?'on':'')+'" data-act="macro-r" data-m="'+m+'">'+miText(m)+'</button>').join(' ')+'</span>';
   setHTML(el('macroLine'), line);
@@ -2208,7 +2293,7 @@ function selectDevice(id){ S.identId=id; S.identOpen=true; S.renaming=false; ren
 function placeMarkers(map, store, list, extra){
   const ids=new Set(list.map(d=>d.id));
   Object.keys(store).forEach(id=>{ if(!ids.has(id)){ store[id].remove(); delete store[id]; } });
-  list.forEach(d=>{ const ll=devLngLat(d), mc=mkClass(d), cls='dev-marker'+extra+mc+(S.identId===d.id?' sel':'');
+  list.forEach(d=>{ const ll=devLngLat(d), mc=mkClass(d), cls='dev-marker'+extra+mc+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':'');
     const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):' (simulated)');
     if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
       e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
@@ -2768,7 +2853,7 @@ async function mapFullOpen(){
       FULL.addLayer({id:'mf-heard',type:'circle',source:'mf',filter:['==',['get','kind'],'heard'],paint:{'circle-radius':4,'circle-color':['get','c'],'circle-opacity':.85,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
       if(VEC){ FULL.addSource('mfl',{type:'geojson',data:mfLabels()}); FULL.addLayer({id:'mf-ringlab',type:'symbol',source:'mfl',layout:{'text-field':['get','t'],'text-font':['Noto Sans Regular'],'text-size':10.5,'text-allow-overlap':true},paint:{'text-color':'#b9cdf5','text-halo-color':'#070b16','text-halo-width':1.4}}); }
       const e=document.createElement('div'); e.className='you-dot'; e.innerHTML='<span class="cone off"></span>'; FULL_YOU=new window.maplibregl.Marker({element:e}).setLngLat([g.lon,g.lat]).addTo(FULL);
-      mapFullTick(true); });
+      poiAttach(FULL); mapFullTick(true); });
   } else setTimeout(()=>{ try{ FULL.resize(); }catch(e){} mapFullTick(true); },60);
   clearInterval(MF.timer); MF.timer=setInterval(()=>mapFullTick(false), 1000);
 }
@@ -3406,14 +3491,14 @@ let LIVE_POLL=5000, LIVE_PRESENT=30000, LIVE_SILENT=60000;
 const FOLLOW_SPAN={ble:300, wifi:600}, FOLLOW_MIN=5, FIX_MIN_SAMPLES=5, FIX_MIN_BASELINE=25, FIX_MAX_UNC=60, FIX_MIN_UNC=12, FIX_MAX_RMS=9, FIT_S2_MIN=36, FIT_K=9, SECTOR_HALF=60;
 const SAMPLE_STEP=4, SAMPLE_AGE=30*60000, SAMPLE_MAX=80, POS_MAX_ACC=35, SOLVE_BUDGET_MS=40;
 const AWAY_M=300, LIVE_KEEP=2*3600000, DEVS_MAX=600, ROSTER_MAX=60, HOME_NEAR=150, AUTOLOG_PER_HOUR=6;
-const CLS=['Phone','Wearable','Tag','Laptop','Vehicle','Access point','Cell tower','Unknown'];
+const CLS=['Phone','Wearable','Tag','Laptop','Vehicle','Access point','Cell tower','Camera','Unknown'];
 const SENSOR_KIND={ phone:'Phone app', carried:'Carried sensor', station:'Home listener' };
 const hasSensors = () => Object.keys(P.sensors||{}).length>0 || PH.on;
 const hash32 = s => { let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
 const callsign = (h,h2) => W1[h%W1.length]+' '+W2[(h>>>8)%W2.length]+' '+(10+h2%90);      // simulated preview only
 // A real device is named by its maker and what kind of thing it is. The short code only tells two alike apart.
-const MAKERS=['Apple','Microsoft','Samsung','Google','Tile','Chipolo','Garmin','Bose','Sony','Harman','Amazon','Xiaomi','Huawei','LG','Huami','Espressif','Nokia','Intel','Meta','Fitbit','Tesla'];
-const KIND_WORD={Phone:'phone',Wearable:'wearable',Tag:'tracker',Laptop:'computer',Vehicle:'vehicle','Access point':'Wi-Fi access point','Cell tower':'cell tower',Unknown:'device'};
+const MAKERS=['Apple','Microsoft','Samsung','Google','Tile','Chipolo','Garmin','Bose','Sony','Harman','Amazon','Xiaomi','Huawei','LG','Huami','Espressif','Nokia','Intel','Meta','Fitbit','Tesla','Flock'];
+const KIND_WORD={Phone:'phone',Wearable:'wearable',Tag:'tracker',Laptop:'computer',Vehicle:'vehicle','Access point':'Wi-Fi access point','Cell tower':'cell tower',Camera:'surveillance device',Unknown:'device'};
 const makerOf = d => { const w=(d.hint||'').split(/[ ,]/)[0]; return MAKERS.indexOf(w)>=0 ? w : ''; };
 const autoName = d => { const m=makerOf(d), code=' #'+d.id.slice(-3).toUpperCase();
   return (m ? m+' '+KIND_WORD[d.cls] : d.cls!=='Unknown' ? 'Unidentified '+KIND_WORD[d.cls] : d.hint ? d.hint.split(',')[0] : 'Unidentified device')+code; };
@@ -3603,7 +3688,8 @@ const PH={on:false, scan:null, buf:new Map(), heard:0, err:'', msg:'', lost:fals
 // The Halo Android app gives the page a native ear: it keeps listening with the screen off and hands over what it heard.
 /* ----- cell towers: the one your phone is using, and its neighbours. Tower Watch reads them for two patterns:
    a drop to 2G, and a tower that keeps changing while you stand still. ----- */
-const CELL={t:0, list:[], serving:null, changes:[], seen:{}, low:0};
+const CELL={t:0, list:[], serving:null, changes:[], seen:{}, low:0, nbT:0};
+const cellReg = c => (c && c.ci!=null && c.ci!=='' && c.mcc!=null && c.tac!=null) ? [c.k, Number(c.mcc), Number(c.mnc)||0, Number(c.tac), String(c.ci)].join(':') : '';
 const CELL_GEN={gsm:'2G',cdma:'2G',wcdma:'3G',tdscdma:'3G',lte:'4G',nr:'5G'};
 const cellId = c => c.k+':'+(c.mcc||'')+'-'+(c.mnc||'')+':'+(c.tac==null?'':c.tac)+':'+(c.ci||('p'+(c.pci==null?'':c.pci)+'/'+(c.ch==null?'':c.ch)));
 function cellIngest(list, t, pos){
@@ -3611,27 +3697,79 @@ function cellIngest(list, t, pos){
   CELL.list.forEach(c=>{ CELL.seen[cellId(c)]=t; });
   if(!sv) return; const id=cellId(sv), gen=CELL_GEN[sv.k]||'';
   if(CELL.serving && CELL.serving.id!==id){ const moved=(pos && CELL.serving.pos) ? distLL(pos.lat,pos.lon,CELL.serving.pos.lat,CELL.serving.pos.lon) : null;
-    CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved}); if(CELL.changes.length>200) CELL.changes.shift();
+    CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved, tac:String(CELL.serving.c.tac)!==String(sv.tac)}); if(CELL.changes.length>200) CELL.changes.shift();
     if(W.on && gen==='2G' && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone dropped from '+CELL.serving.gen+' to 2G.','',t); }
   if(W.on){ W.cells=W.cells||{}; W.cells[id]=1; if(gen==='2G') W.g2=true; }
   if(gen==='2G' && (!CELL.serving || CELL.serving.gen!=='2G') && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save();
     alertRaise('2g', 'Your phone dropped to 2G', 'A 2G connection gives the phone no way to check that a tower is genuine. Tower Watch has the steps, and Evidence has the record.', {res:'w_tower'}); }
-  CELL.serving={id, gen, c:sv, pos:pos?{lat:pos.lat,lon:pos.lon}:(CELL.serving&&CELL.serving.pos)||null, since:(CELL.serving&&CELL.serving.id===id)?CELL.serving.since:t};
+  if(CELL.list.length>1) CELL.nbT=t;
+  CELL.serving={id, reg:cellReg(sv), gen, c:sv, pos:pos?{lat:pos.lat,lon:pos.lon}:(CELL.serving&&CELL.serving.pos)||null, since:(CELL.serving&&CELL.serving.id===id)?CELL.serving.since:t};
+  cellLearn(CELL.serving, t);
 }
 const cellLive = () => CELL.t>0 && Date.now()-CELL.t<60000;
 const cellFlaps = () => CELL.changes.filter(x=>Date.now()-x.t<10*60000 && x.moved!==null && x.moved<50).length;
 const cellWords = () => { const sv=CELL.serving; return !cellLive()||!sv ? '' : sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', '+(CELL.list.length-1)+' neighbours'; };
+/* Halo's own tower record. Every tower the phone uses is remembered with where and how often, so a tower met for the
+   first time in a place Halo knows stands out. With the register check on, the public register's place for it is kept too. */
+function cellLearn(sv, t){ if(!sv.reg) return; P.cells=P.cells||{}; let r=P.cells[sv.reg];
+  if(!r){ r=P.cells[sv.reg]={t0:t, t1:t, n:0, gen:sv.gen}; const ks=Object.keys(P.cells); if(ks.length>400) ks.sort((a,b)=>P.cells[a].t1-P.cells[b].t1).slice(0,ks.length-400).forEach(k=>delete P.cells[k]); }
+  r.n++; r.t1=t; if(sv.pos){ r.lat=sv.pos.lat; r.lon=sv.pos.lon; }
+  if(r.n===1 || r.n%30===0) save();
+  if(P.cellCheck && S.features && S.features.cells && !(r.reg && Date.now()-r.reg.t<(r.reg.found?30:1)*86400000)) cellAsk(sv); }
+let _cellAsk=0;
+async function cellAsk(sv){ const now=Date.now(); if(now-_cellAsk<20000 || SY.status!=='on') return; _cellAsk=now;
+  try{ const r=await api('POST','/cells/lookup',{cells:[{k:sv.c.k, mcc:Number(sv.c.mcc), mnc:Number(sv.c.mnc)||0, area:Number(sv.c.tac), cell:String(sv.c.ci)}]});
+    const x=r.s===200 && r.j && r.j.cells && r.j.cells[0]; if(!x || x.pending || !P.cells[sv.reg]) return;
+    P.cells[sv.reg].reg = x.found ? {found:true, lat:x.lat, lon:x.lon, range:x.range||0, samples:x.samples||0, t:now} : {found:false, t:now}; save(); S._poiKey=''; softRender(); }catch(e){} }
+const placeKnown = pos => { if(!pos) return false; const day=Date.now()-86400000; return Object.keys(P.cells||{}).filter(id=>{ const r=P.cells[id]; return r.n>=20 && r.t0<day && r.lat!=null && distLL(pos.lat,pos.lon,r.lat,r.lon)<600; }).length>=2; };
+// The signs of a fake tower that a phone can read for itself, each with its weight. Three or more points reads Suspect.
+function towerSigns(){ const sv=CELL.serving, out={score:0, signs:[], level:'ok'}; if(!cellLive() || !sv) return out;
+  const c=sv.c, add=(w,t)=>{ out.score+=w; out.signs.push({w,t}); }, rec=(P.cells||{})[sv.reg], reg=rec&&rec.reg, now=Date.now();
+  if(sv.gen==='2G') add(3,'Your phone was moved to 2G, where a tower does not have to prove it is genuine.');
+  if(reg && reg.found && sv.pos){ const km=distLL(sv.pos.lat,sv.pos.lon,reg.lat,reg.lon)/1000; if(km*1000>Math.max(8000, 3*(reg.range||0))) add(3,'The public register places this tower '+Math.round(km)+' km from where you are.'); }
+  if(reg && reg.found===false) add(1,'This tower is absent from the public register. A new tower takes a few days to be listed.');
+  if(rec && rec.n<=5 && now-rec.t0<15*60000 && placeKnown(sv.pos)) add(1,'Halo knows this place and is meeting this tower for the first time.');
+  const fl=cellFlaps(); if(fl>=3) add(2,'The tower in use changed '+fl+' times in ten minutes while you stood still.');
+  const last=CELL.changes[CELL.changes.length-1]; if(last && last.tac && now-last.t<10*60000 && last.moved!==null && last.moved<50) add(1,'The tracking area changed while you stood still.');
+  if(CELL.list.length===1 && CELL.nbT && CELL.t-CELL.nbT<5*60000 && CELL.t-sv.since<5*60000 && c.r!=null && c.r>=-80) add(1,'It is strong, and its neighbours fell silent when it took over.');
+  out.level = out.score>=3 ? 'suspect' : out.score>=1 ? 'watch' : 'ok'; return out; }
+const towerSuspects = () => towerSigns().level==='suspect' ? [CELL.serving] : [];
 function toolTower(){
-  if(!cellLive() || !CELL.serving) return '<div class="dsec"><h4>Your towers, live</h4><p>'+(NATIVE()?'Start listening and Halo shows the tower your phone is using, its neighbours, and every change.':'The Halo Android app shows the tower your phone is using, its neighbours, and every change, live.')+'</p></div>';
-  const sv=CELL.serving, c=sv.c, flaps=cellFlaps(), ch10=CELL.changes.filter(x=>Date.now()-x.t<10*60000).length, two=sv.gen==='2G';
-  return '<div class="dsec"><h4>Your towers, live <span class="chip pot" style="margin-left:6px">Live</span></h4>'+
-    (two?'<div class="hrow"><span class="hs att">Attention</span><span><b>Your phone is on 2G.</b> A 2G connection gives the phone no way to check that a tower is genuine. Switch 2G off in the steps above, and Halo records the moment in Evidence.</span></div>':'')+
-    (flaps>=3?'<div class="hrow"><span class="hs att">Attention</span><span><b>The tower changed '+flaps+' times while you stood still.</b> Halo has the times. Move a few streets and see whether it settles.</span></div>':'')+
-    (!two&&flaps<3?'<div class="hrow"><span class="hs ok">Steady</span><span>Your phone is on '+esc(sv.gen)+', and the tower is holding.</span></div>':'')+
-    '<div class="kv" style="margin-top:10px"><span class="k">In use</span><span class="v">'+esc(sv.gen)+' · network '+esc((c.mcc||'')+'-'+(c.mnc||''))+'</span><span class="k">Cell</span><span class="v mono" style="font-size:12px">'+esc(String(c.ci||'')||('PCI '+(c.pci==null?'':c.pci)))+(c.tac!=null?' · area '+c.tac:'')+'</span>'+
-    '<span class="k">Signal</span><span class="v">'+(c.r==null?'':c.r+' dBm')+(c.ta!=null&&(c.k==='lte'||c.k==='gsm')?' · about '+Math.round(c.ta*(c.k==='lte'?78:554))+' m by timing':'')+'</span><span class="k">Since</span><span class="v">'+hhmm(sv.since)+'</span>'+
-    '<span class="k">Neighbours</span><span class="v">'+(CELL.list.length-1)+' in earshot</span><span class="k">Changes, last 10 min</span><span class="v">'+ch10+'</span></div></div>';
+  const can=!!(S.features&&S.features.cells), regRow = can ? '<div class="dsec"><h4>Public register check <span class="chip '+(P.cellCheck?'pot':'')+'" style="margin-left:6px">'+(P.cellCheck?'On':'Off')+'</span></h4>'+
+      '<p>Halo asks the public tower register where each tower you use is listed. A tower that is unlisted, or listed far from you, is a strong sign. The request carries the identity of the tower in use, which places you within that tower\'s range, and Halo\'s backend keeps the tower and nothing about who asked.</p>'+
+      '<div class="formrow"><button class="btn sm '+(P.cellCheck?'':'primary')+'" data-act="cell-reg">'+(P.cellCheck?'Switch the register check off':'Switch the register check on')+'</button></div>'+
+      '<div class="limit" style="margin-top:8px">Cell tower data from OpenCellID, licensed under CC BY-SA 4.0.</div></div>' : '';
+  if(!cellLive() || !CELL.serving) return '<div class="dsec"><h4>Every tower in earshot, live</h4><p>'+(NATIVE()?'Start listening and Halo lists every tower your phone can hear, checks the one in use against the signs of a fake one, and records every change.':'The Halo Android app lists every tower your phone can hear, checks the one in use against the signs of a fake one, and records every change.')+'</p></div>'+regRow;
+  const sv=CELL.serving, ts=towerSigns(), ch10=CELL.changes.filter(x=>Date.now()-x.t<10*60000).length, rec=(P.cells||{})[sv.reg]||{}, reg=rec.reg;
+  const col={suspect:'--r5',watch:'--r3',ok:'--clear'}[ts.level], word={suspect:'Suspect',watch:'Watch',ok:'Steady'}[ts.level];
+  const tech=c=>(CELL_GEN[c.k]||'')+(c.k==='nr'?' (5G)':'');
+  const row=(c,i)=>{ const use=!!c.reg, tc=use?(ts.level==='suspect'?'var(--r5)':ts.level==='watch'?'var(--r3)':'var(--clear)'):'var(--mut)';
+    return '<div class="twr"><span class="tk" style="--tc:'+tc+'">'+(use?(ts.level==='suspect'?'In use · suspect':'In use'):'Neighbour')+'</span><span><b>'+esc(tech(c))+'</b>'+(c.mcc!=null?' · network '+esc(c.mcc+'-'+(c.mnc==null?'':c.mnc)):'')+'</span><span class="ts">'+(c.r==null?'':c.r+' dBm')+'</span>'+
+      '<span class="td">'+[c.ci?'cell '+esc(String(c.ci)):'', c.tac!=null?'area '+c.tac:'', c.pci!=null?'PCI '+c.pci:'', c.ch!=null?'channel '+c.ch:'', (use&&c.ta!=null&&(c.k==='lte'||c.k==='gsm'))?'about '+Math.round(c.ta*(c.k==='lte'?78:554))+' m by timing':''].filter(Boolean).join(' · ')+'</span></div>'; };
+  let h='<div class="dsec"><h4>Every tower in earshot, live <span class="chip pot" style="margin-left:6px">'+CELL.list.length+' in earshot</span></h4>'+
+    '<div class="hrow"><span class="hs '+(ts.level==='ok'?'ok':'att')+'" style="'+(ts.level==='ok'?'':'color:var('+col+');border-color:var('+col+')')+'">'+word+'</span><span>'+
+      (ts.level==='ok' ? 'Your phone is on '+esc(sv.gen)+'. Halo checked the tower in use against seven signs of a fake one, and it shows none.'
+        : '<b>The tower in use shows '+ts.signs.length+(ts.signs.length===1?' sign':' signs')+' of a fake one.</b> '+ts.signs.map(x=>esc(x.t)).join(' ')+(ts.level==='suspect'?' Switch to airplane mode, move a few streets, and call through an end-to-end encrypted app.':' Halo keeps watching it.'))+'</span></div>'+
+    [...CELL.list].sort((a,b)=>(b.reg?1:0)-(a.reg?1:0) || (b.r||-200)-(a.r||-200)).map(row).join('')+
+    '<div class="kv" style="margin-top:10px"><span class="k">In use since</span><span class="v">'+hhmm(sv.since)+'</span><span class="k">Changes, last 10 min</span><span class="v">'+ch10+'</span>'+
+    '<span class="k">Halo has met it</span><span class="v">'+(rec.n||1)+(rec.n===1?' time':' times')+(rec.t0?', first on '+fmtD(new Date(rec.t0).toISOString()):'')+'</span>'+
+    (P.cellCheck&&can?'<span class="k">Public register</span><span class="v">'+(!reg?'Asking':reg.found?(sv.pos?'Listed '+miText(distLL(sv.pos.lat,sv.pos.lon,reg.lat,reg.lon))+' from you':'Listed')+(reg.samples?', seen '+reg.samples+' times':''):'Unlisted')+'</span>':'')+'</div>'+
+    '<div class="limit" style="margin-top:8px">The seven signs: a move to 2G, a tower the register places far away, a tower absent from the register, a first meeting in a place Halo knows, repeated changes while you stand still, a new tracking area while you stand still, and neighbours that fall silent.</div></div>';
+  return h+regRow;
 }
+/* ----- Plate Camera Watch: the mapped cameras nearest you, and Flock hardware heard by radio ----- */
+function toolAlpr(){
+  const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r), heard=vis().mode==='live'?[...LIVE.devs.values()].filter(d=>d.cls==='Camera'&&d.present&&!d.sim):[];
+  let h='<div class="dsec"><h4>Plate cameras around you <span class="chip pot" style="margin-left:6px">'+(g&&MACRO&&MACRO._poi?inR.length+' within '+miText(r):'map loading')+'</span></h4>';
+  if(!g) h+='<p>Allow location and Halo counts the mapped cameras around you and names the nearest.</p>';
+  else if(!inR.length) h+='<div class="hrow"><span class="hs ok">Clear</span><span>The map holds no plate camera within '+miText(r)+' of you.</span></div>';
+  else h+=inR.slice(0,8).map(c=>'<div class="rowline"><span><b>'+esc(c.brand||'Plate camera')+'</b>'+(c.op?' <span class="mono" style="font-size:11px;color:var(--mut)">'+esc(c.op)+'</span>':'')+'<br><span class="mono" style="font-size:11px;color:var(--mut)">'+(c.dir?'faces '+esc(c.dir)+' · ':'')+(c.zone?esc(c.zone)+' · ':'')+'on the map in orange</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.cam+'">'+esc(miText(c.d))+' '+compass(c.brg)+'</span></div>').join('')+
+      (inR.length>8?'<div class="limit" style="margin-top:6px">'+(inR.length-8)+' more are on the map.</div>':'');
+  h+='<div class="formrow"><button class="btn sm primary" data-act="map-full">Open the full map</button></div></div>';
+  h+='<div class="dsec"><h4>Heard by radio, live</h4>'+(heard.length ? heard.map(d=>'<div class="rowline"><span><b>'+esc(devName(d))+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(kindText(d))+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.cam+'">'+esc(distText(d))+'</span></div>').join('')
+      : '<p>'+(vis().mode==='live'?'No Flock camera or gunshot detector is broadcasting near you now.':(NATIVE()||isAndroid()?'Start listening and Halo hears Flock cameras and gunshot detectors that broadcast, and places each one as you move.':'The Halo Android app hears Flock cameras and gunshot detectors that broadcast, and places each one as you move.'))+'</p>')+
+    '<div class="limit" style="margin-top:8px">Camera locations: &copy; OpenStreetMap contributors, under the Open Database Licence, mapped through the DeFlock project and refreshed every hour. United States and Canada.</div></div>';
+  return h; }
 /* ----- Display Watch: displays that announce themselves by radio. A smart monitor or television appears here while its Wi-Fi or Bluetooth is on. ----- */
 const DISPLAY_RE=/webos|\[lg\]|ultragear|myview|ultrafine|smart ?monitor|\bmonitor\b|\bmsi\b|bravia|odyssey|\[tv\]|\btv\b|google ?tv|android ?tv|fire ?tv|chromecast|roku|vizio|hisense/i;
 const displaysNow = () => [...LIVE.devs.values()].filter(d=>(d.present||d.atHome) && !d.sim && (DISPLAY_RE.test(d.adv||'') || (makerOf(d)==='LG' && d.band==='ble'))).sort((a,b)=>(b.rssi||-200)-(a.rssi||-200));
@@ -3677,7 +3815,8 @@ async function nativeDrain(){
           manufacturerData:new Map(Object.keys(x.m||{}).map(k=>[+k, dv(hexBytes(x.m[k]))])), serviceData:new Map(Object.keys(x.d||{}).map(k=>[k, dv(hexBytes(x.d[k]))]))};
         try{ const d=await phDescribe(ev); list.push({id:d.id, rssi:x.r, band:'ble', cls:d.cls, name:d.name, hint:d.hint, conf:d.conf, flags:d.flags}); PH.heard++; }catch(e){} }
       (b.w||[]).slice(0,120).forEach(x=>{ if(!x || !x.b || typeof x.r!=='number') return; const open=!/WPA|WEP|SAE|RSN|EAP|OWE|PSK/i.test(x.c||'');
-        list.push({id:'ap:'+String(x.b).toLowerCase(), rssi:x.r, band:'wifi', cls:'Access point', name:String(x.s||'').slice(0,40), hint:(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
+        const bs=String(x.b).toLowerCase(), flock=FLOCK_SSID.test(String(x.s||'')) || bs.indexOf(FLOCK_OUI)===0;
+        list.push({id:'ap:'+bs, rssi:x.r, band:'wifi', cls:flock?'Camera':'Access point', name:String(x.s||'').slice(0,40), hint:flock?'Flock Safety camera, Wi-Fi on':(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
       if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:okLL(q)?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew);
       if(!live && W.on && list.length) walkTick(b.t, list.map(x=>x.id), okLL(q)?q:null);
       if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
@@ -3687,6 +3826,7 @@ async function nativeDrain(){
     if(lost!==PH.lost){ PH.lost=lost; softRender(); renderVicinity(); }
   } finally { PH.busy=false; } }
 const COMPANY={0x004C:'Apple',0x0006:'Microsoft',0x0075:'Samsung',0x00E0:'Google',0x0087:'Garmin',0x009E:'Bose',0x012D:'Sony',0x0057:'Harman',0x0171:'Amazon',0x038F:'Xiaomi',0x027D:'Huawei',0x00C4:'LG',0x0157:'Huami',0x02E5:'Espressif',0x0001:'Nokia',0x0002:'Intel',0x01AB:'Meta'};
+const FLOCK_BLE=/^(fs ext battery|penguin[- ]?\d{4,}|pigvision|flock[- _]?[0-9a-z]{0,12})$/i, FLOCK_SSID=/^flock[-_ ]?[0-9a-f]{4,}/i, FLOCK_OUI='b4:1e:52', RAVEN_SVC=['3100','3200','3300','3400','3500'];
 const PH_TRACKERS={feed:'Tile',feec:'Tile',fd5a:'Samsung SmartTag',fe33:'Chipolo',feaa:'Find My Device network or beacon',fd84:'Tile',fcb2:'DULT tracker'};
 const PH_APPLE={0x02:'beacon',0x05:'AirDrop',0x07:'AirPods or Beats',0x09:'AirPlay',0x0C:'Handoff',0x0F:'Nearby Action',0x10:'Nearby Info',0x12:'Find My network'};
 const phShort = u => { u=String(u).toLowerCase(); return (u.length===36 && u.slice(8)==='-0000-1000-8000-00805f9b34fb') ? u.slice(4,8) : u; };
@@ -3702,6 +3842,9 @@ async function phDescribe(ev){
   const name=((ev.device&&ev.device.name)||ev.name||'').trim(), low=name.toLowerCase(), local='mx:p'+hash32(String(ev.device&&ev.device.id)).toString(36);
   const sdata={}; try{ ev.serviceData && ev.serviceData.forEach((v,k)=>{ sdata[phShort(k)]=phBytes(v); }); }catch(e){}
   const services=(ev.uuids||[]).map(phShort).sort(), mfr={}; try{ ev.manufacturerData && ev.manufacturerData.forEach((v,k)=>{ mfr[k]=phBytes(v); }); }catch(e){}
+  // Flock Safety hardware announces itself: the battery pack by name and by maker mark 0x09C8, the Raven gunshot detector by its services.
+  if(mfr[0x09C8] || FLOCK_BLE.test(name)) return {id:'fk:'+hash32('b'+String(ev.device&&ev.device.id)).toString(36), cls:'Camera', hint:'Flock Safety, plate camera', conf:mfr[0x09C8]?3:2, flags:[], name};
+  if(services.some(u=>RAVEN_SVC.indexOf(u)>=0)) return {id:'fk:'+hash32('r'+String(ev.device&&ev.device.id)).toString(36), cls:'Camera', hint:'Flock Raven, gunshot detector', conf:2, flags:[], name};
   for(const sv of Object.keys(sdata).concat(services)) if(PH_TRACKERS[sv])
     return {id:'sd:'+await phSha([sv, sdata[sv]||new Uint8Array(0)]), cls:'Tag', hint:PH_TRACKERS[sv], conf:2, flags:['fd5a','feaa','fcb2'].indexOf(sv)>=0?['randomized']:[], name};
   if(mfr[0x004C]){ const pb=mfr[0x004C], t=pb.length?pb[0]:-1;
@@ -4002,7 +4145,9 @@ function alertGo(key){ const bs=S.banners||[], b=key?bs.find(x=>x.key===key):bs[
 function alertScan(){
   LIVE.devs.forEach(d=>{ if(d.sim || d.mine || d.sigFit || !d.present) return;
     if(d.withYou) alertRaise('with:'+d.sig, d.cls==='Tag'?'A tracker is travelling with you':d.band==='wifi'?'A hotspot is travelling with you':'A device is travelling with you', devName(d)+' '+followText(d)+'. Open it and decide whether it is yours.', {dev:d.id});
-    else if(d.homeAway) alertRaise('route:'+d.sig, 'A device from your home is near you again', devName(d)+' '+followText(d)+'.', {dev:d.id}); });
+    else if(d.homeAway) alertRaise('route:'+d.sig, 'A device from your home is near you again', devName(d)+' '+followText(d)+'.', {dev:d.id});
+    if(d.cls==='Camera') alertRaise('cam:'+d.sig, /Raven/.test(d.hint)?'A gunshot detector is in earshot':'A plate camera is in earshot', devName(d)+' is broadcasting '+distText(d)+' from you. Halo places it on the map as you move.', {dev:d.id}); });
+  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv){ if(alertRaise('tower:'+sv.reg, 'A tower in use shows the signs of a fake one', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows the signs of a fake one. '+ts.signs.map(x=>x.t).join(' ')); } } }
   const by={}; wifiNow().forEach(d=>{ if(d.adv && !d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
   Object.keys(by).forEach(n=>{ const x=by[n]; if(x.length>1 && x.some(d=>/^Open/.test(d.hint)) && x.some(d=>/^Secured/.test(d.hint)))
     alertRaise('twin:'+n, 'A copied Wi-Fi network is in range', n+' appears both locked and open. Join only the locked one, or use mobile data.', {res:'a_pubwifi'}); });
@@ -4216,6 +4361,8 @@ document.addEventListener('click', e=>{
     case 'prof': { const k=a.dataset.k, v=a.dataset.v==='y'; if(P.profile[k]===v) delete P.profile[k]; else P.profile[k]=v; save(); rerender(); break; }
     case 'mode': { const m=a.dataset.m; S.mode=m;
       if(m==='w') setView('watchers'); else if(m==='a') setView('attackers'); else if(S.view!=='overview') setView('overview'); else rerender(); break; }
+    case 'layer': { P.layers=P.layers||{}; const k=a.dataset.k; P.layers[k]=!layerOn(k); save(); poiLayers(); S._cams=null; renderVicinity(); break; }
+    case 'cell-reg': { P.cellCheck=!P.cellCheck; save(); if(P.cellCheck && CELL.serving && cellLive()){ _cellAsk=0; cellAsk(CELL.serving); } rerender(); break; }
     case 'path-go': { const nx=pathState().next; if(nx) pathGo(nx.go()); break; }
     case 'alert-open': alertGo(); break;
     case 'alert-x': S.banners=(S.banners||[]).slice(1); renderAlerts(); break;
@@ -4334,6 +4481,7 @@ function boot(){
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-(S.globalAt||0)>120000) loadGlobal(); });
   syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit(); startGeo();
   nativeMine(); alertNativeTick();
+  fetch(API+'/health',{cache:'no-store'}).then(r=>r.json()).then(j=>{ S.features=(j&&j.features)||{}; if(booted) softRender(); }).catch(()=>{});
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') alertNativeTick(); });
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.haloOpen) alertGo(e.data.haloOpen); });
   if(NATIVE() && store.get('halo_listen')==='1'){ const st=nativeStatus(); if(st && st.permission==='granted') phStart(); }
