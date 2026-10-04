@@ -26,6 +26,7 @@
   --ink:#e9f0ff; --mut:#93a6cc; --dim:#6b7ea4;
   --chrome:#16407a; --chrome2:#3f74d6;
   --clear:#4ae88a; --watch:#3f74d6; --warn:#e8a84a; --action:#ff5a5a; --route:#2dd4ea;
+  --r1:#4ae88a; --r2:#c3dc52; --r3:#f2b441; --r4:#ff8a3c; --r5:#ff4d4d;   /* how real a threat is to you, 1 to 5 */
   --cyan:#39b7d6; --wat:#2550b8; --wat2:#9db8f7; --att:#d9a826; --att2:#f0d06a;
   --sans:'Inter',system-ui,sans-serif; --disp:'Saira',system-ui,sans-serif; --mono:'IBM Plex Mono',monospace;
   --r:16px; --r2:12px;
@@ -220,6 +221,9 @@ select.inp{flex:none}
 .alertb{display:flex;align-items:flex-start;gap:10px;margin:0 0 10px;padding:11px 12px;border:1px solid rgba(255,90,90,.6);border-left:5px solid var(--action);border-radius:12px;background:linear-gradient(180deg,rgba(120,22,30,.5),rgba(60,12,20,.5));box-shadow:0 8px 22px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);font-size:13.5px;line-height:1.4}
 .alertb .tx{flex:1;min-width:0} .alertb .tx b{display:block;color:#fff;font-size:14.5px;margin-bottom:2px} .alertb .more{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:4px;display:block}
 .alertb .x{background:none;border:0;color:var(--mut);font-size:20px;line-height:1;padding:2px 4px}
+.rate{display:inline-flex;align-items:center;gap:6px;vertical-align:middle;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--rc);border:1px solid var(--rc);border-radius:999px;padding:1px 9px 1px 2px;white-space:nowrap;background:rgba(0,0,0,.25)}
+.rate b{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--rc);color:#0a0f1e;font-size:11px;font-weight:700}
+.ratekey{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .instbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;border:1px solid rgba(79,141,240,.45);border-radius:12px;background:rgba(26,58,130,.22);font-size:13px;line-height:1.4}
 .instbar span{flex:1 1 180px}
 .backbar{position:sticky;top:0;z-index:30;display:flex;gap:8px;align-items:center;margin:-14px -16px 10px;padding:8px 16px;background:rgba(7,11,22,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
@@ -1378,12 +1382,44 @@ function spBlock(t,k,num,title,lead){ const d=doneMap(t), st=spSteps(t,k);
       (x.fx?'<span class="fx"><b>Effect.</b> '+esc(x.fx)+'</span>':'')+(x.note?'<span class="nt"><b>Note.</b> '+esc(x.note)+'</span>':'')+'</span></div>'; }).join(''); }
 
 /* ---------- Special: shown on any real threat the user is exposed to, or has logged a finding against ---------- */
+/* ---------- How real each threat is to you: a rating from 1 to 5, colour coded ----------
+   Real, 1 to 3: an open issue. What it does to you depends on the countermeasures you take now.
+     1 low: every defence is in place.   2 maybe: at least half are in place.   3 likely: most are still open.
+   Imminent, 4 and 5: Halo holds evidence.
+     4 likely to happen: a finding on record, or a precursor in earshot or in the feed.   5 happening to you now. */
+const RATE=[null, {n:1,k:'Real',w:'low',c:'--r1'}, {n:2,k:'Real',w:'maybe',c:'--r2'}, {n:3,k:'Real',w:'likely',c:'--r3'}, {n:4,k:'Imminent',w:'likely to happen',c:'--r4'}, {n:5,k:'Imminent',w:'happening to you now',c:'--r5'}];
+function liveSigns(t){            // what the sensors and the feed hold on this threat at this moment: [rating, why]
+  const V=vis(), live=V.mode==='live'&&!V.test, near=live?V.devices.filter(d=>d.present&&!d.sim&&!d.mine&&!d.sigFit):[];
+  if(t.id==='w_ble'){ const wy=near.filter(d=>d.withYou&&d.band!=='wifi'), rt=near.filter(d=>d.onRoute&&!d.withYou);
+    if(wy.length) return [5, devName(wy[0])+' is travelling with you']; if(rt.length) return [4, devName(rt[0])+' has been near you at home and away']; }
+  if(t.id==='w_tower' && cellLive() && CELL.serving){ if(CELL.serving.gen==='2G') return [5,'your phone is on 2G at this moment'];
+    const sus=(typeof towerSuspects==='function')?towerSuspects():[]; if(sus.length) return [4,'a tower in use shows the signs of a fake one']; if(cellFlaps()>=3) return [4,'your tower keeps changing while you stand still']; }
+  if(t.id==='a_pubwifi' && live){ const wy=near.filter(d=>d.band==='wifi'&&d.withYou); if(wy.length) return [5,'a hotspot is travelling with you'];
+    const by={}; wifiNow().forEach(d=>{ if(d.adv&&!d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
+    if(Object.keys(by).some(n=>by[n].length>1&&by[n].some(d=>/^Open/.test(d.hint))&&by[n].some(d=>/^Secured/.test(d.hint)))) return [4,'a copied Wi-Fi name is in range']; }
+  if(t.tool==='alias' && P.aliases.some(a=>aliasScore(a).n>=3)) return [5,'an alias is joined to you'];
+  if(t.tool==='patch'){ let k=[]; try{ k=kevMine(); }catch(e){} if(k.length) return [4,'a flaw in '+k[0].vendor+' '+k[0].product+' is under attack']; }
+  return null; }
+function rating(t){
+  if(t.shelf!=='real' || scopeOf(t)!==true) return null;
+  const sg=liveSigns(t); if(sg) return Object.assign({why:sg[1]}, RATE[sg[0]]);
+  const hits=(P.hits||{})[t.id]||0, at=(P.hitAt||{})[t.id]||0;
+  if(hits) return Object.assign({why: at&&Date.now()-at<7*86400000 ? 'you logged a finding this week' : hits+' finding'+(hits===1?'':'s')+' on record'}, RATE[at&&Date.now()-at<7*86400000?5:4]);
+  const n=stepsOf(t).length, dn=doneCount(t);
+  if(n && dn>=n) return Object.assign({why:'every defence is in place'}, RATE[1]);
+  if(n && dn*2>=n) return Object.assign({why:dn+' of '+n+' defences in place'}, RATE[2]);
+  return Object.assign({why:n?(dn?dn+' of '+n+' defences in place':'your defences start here'):'Halo is watching this one for you'}, RATE[3]); }
+const rateText = r => r.k+' '+r.n+', '+r.w;
+const rateChip = r => '<span class="rate" style="--rc:var('+r.c+')"><b>'+r.n+'</b>'+r.k+' · '+r.w+'</span>';
+const rateKey = () => '<div class="ratekey">'+RATE.slice(1).map(rateChip).join('')+'</div>';
+
+/* ---------- Special: shown on any real threat that is real to you, or that you have logged a finding against ---------- */
 function experiencing(t){
   if(t.shelf!=='real') return null;
   const hits=(P.hits||{})[t.id]||0;
   if(t.tool==='alias' && P.aliases.some(a=>aliasScore(a).n>=3)) return {lvl:'conf', txt:'An alias is joined to you'};
   if(hits) return {lvl:'conf', txt:hits+' finding'+(hits===1?'':'s')+' logged'};
-  if(scopeOf(t)===true) return {lvl:'exp', txt:'Applies to you'};
+  const r=rating(t); if(r) return {lvl:r.n>=4?'conf':'exp', txt:rateText(r)};
   return null;
 }
 const LIAB_LINE='Steps with an Effect line change your device, account or software. Read the effect before you act. You make each change at your own risk.';
@@ -1396,7 +1432,8 @@ function assess(){
   const answered = PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const pool = THREATS.filter(t=>t.shelf==='real' && (S.mode==='auto' || t.side===S.mode));
   const applies = pool.filter(t=>scopeOf(t)===true), unknown = pool.filter(t=>scopeOf(t)===null);
-  const open = applies.filter(isOpen).sort((a,b)=>IMPACT_W(b.impact)-IMPACT_W(a.impact) || doneCount(a)-doneCount(b));
+  const rn=t=>{ const r=rating(t); return r?r.n:0; }, imm=applies.filter(t=>rn(t)>=4).length;
+  const open = applies.filter(isOpen).sort((a,b)=>rn(b)-rn(a) || IMPACT_W(b.impact)-IMPACT_W(a.impact) || doneCount(a)-doneCount(b));
   const V=vis();
   const vic = V.mode==='live' ? (V.test?'Vicinity: test data from a simulated sensor':'Vicinity: live from your sensor') : V.mode==='sim' ? 'Vicinity: simulated preview'
     : stateWords(V.mode).vic;
@@ -1406,13 +1443,13 @@ function assess(){
       s:esc(w[0].name)+(w[0].tested?' is moving with you. It ':' ')+esc(followText(w[0]))+'. Open Watchers.', meta:reg+' · '+vic }; }
   const side = S.mode==='w'?'Watchers':S.mode==='a'?'Attackers':'Auto';
   if(answered===0) return { t:-1, n:'?', title:'Unknown', side,
-    s:'Answer your profile and Halo shows the threats that apply to you.',
+    s:'Answer your profile and Halo rates every threat for you, from 1 to 5.',
     meta:reg+' · '+vic };
   const meta=reg+' · '+vic+(unknown.length?' · '+unknown.length+' waiting on your profile':'');
   if(!open.length) return { t:0, n:0, title:'Clear, for what is assessed', side,
-    s:'Every defence is complete for the '+applies.length+' real threats that apply to you. '+(V.mode==='live'&&!V.test?'A sensor is reporting, and no device is moving with you.':'Start listening and Halo also watches the devices around you.'), meta, applies, open };
+    s:'Every defence is complete for the '+applies.length+' threats that are real to you. '+(V.mode==='live'&&!V.test?'A sensor is reporting, and no device is moving with you.':'Start listening and Halo also watches the devices around you.'), meta, applies, open };
   return { t: open.length<=2?1:2, n:open.length, title: open.length<=2?'Watch':'Warning', side,
-    s: applies.length+' real threats apply to you. '+open.length+' still '+(open.length===1?'has':'have')+' defences to complete. Start with '+open[0].name+'.',
+    s: applies.length+' threats are real to you'+(imm?', and '+imm+(imm===1?' is':' are')+' imminent':'')+'. '+open.length+' still '+(open.length===1?'has':'have')+' defences to complete. Start with '+open[0].name+'.',
     meta, applies, open };
 }
 
@@ -1428,8 +1465,8 @@ function threatPull(t){
   let bar, sum;
   if(t.shelf==='potential'){ bar='--cyan'; sum='Potential · '+t.imminence; }
   else if(sc===false){ bar='--dim'; sum='Does not apply, from your profile'; }
-  else if(n && dn>=n){ bar='--clear'; sum='Defended · '+dn+' of '+n+' done'; }
-  else { bar = sc===null?'--mut':'--warn'; sum=(sc===null?'Answer your profile':'Applies to you')+' · '+dn+' of '+n+' defences done'; }
+  else if(sc===null){ bar='--mut'; sum='Answer your profile · '+dn+' of '+n+' defences done'; }
+  else { const r=rating(t); bar=r.c; sum=rateChip(r)+' · '+(n&&dn>=n?'defended, ':'')+dn+' of '+n+' defences done'; }
   if(sc!==false){ const q=spCount(t); if(q.n) sum+=' · Special '+q.dn+' of '+q.n; }
   const gold = !!ex && spCount(t).n>0 && !(n && dn>=n && spCount(t).dn>=spCount(t).n);
   if(gold) bar='--att2';
@@ -1442,7 +1479,7 @@ function threatPull(t){
 }
 function threatBody(t){
   const sc=scopeOf(t), d=doneMap(t), steps=stepsOf(t), ex=experiencing(t);
-  const exp = sc===true?['Applies to you','warnc']:sc===false?['Does not apply, from your profile','okc']:['Answer your profile and Halo decides','unkc'];
+  const rt=rating(t), exp = rt?[rateChip(rt)+' <span style="color:var('+rt.c+')">'+esc(rt.why.charAt(0).toUpperCase()+rt.why.slice(1))+'.</span>','']:sc===false?['Does not apply, from your profile','okc']:['Answer your profile and Halo rates it','unkc'];
   const hits=(P.hits||{})[t.id]||0;
   let h='<div class="howto">'+esc(t.how)+'</div><div class="chips" style="margin-top:0">'+
     '<span class="chip '+t.side+'">'+(t.side==='w'?'Watchers':'Attackers')+'</span>'+
@@ -1452,11 +1489,11 @@ function threatBody(t){
   h+='<div class="dsec"><h4>Where it is</h4><p>'+esc(t.where)+'</p></div>';
   h+='<div class="dsec"><h4>What it does to you</h4><p>'+esc(t.what)+'</p></div>';
   h+='<div class="dsec"><h4>You</h4><div class="kv">'+
-     '<span class="k">Exposure</span><span class="v '+exp[1]+'">'+exp[0]+'</span>'+
+     '<span class="k">Rating</span><span class="v '+exp[1]+'">'+exp[0]+'</span>'+
      '<span class="k">Your findings</span><span class="v '+(hits?'warnc':'unkc')+'">'+(hits?hits+' logged in Evidence':'None logged')+'</span>'+
      '<span class="k">Sensor evidence</span><span class="v '+(vis().mode==='live'?'okc':'unkc')+'">'+(vis().mode==='live'?'Live from your sensor':'Starts when Halo is listening')+'</span>'+
      '<span class="k">Estimated impact</span><span class="v">'+esc(t.impact)+'</span>'+
-     '<span class="k">Runs on</span><span class="v">'+esc(t.needs)+'</span></div></div>';
+     '<span class="k">Runs on</span><span class="v">'+esc(t.needs)+'</span></div>'+(rt?rateKey()+'<div class="limit" style="margin-top:6px">Real, 1 to 3: an open issue, and what it does to you depends on the countermeasures you take now. Imminent, 4 and 5: Halo holds evidence that it is likely to happen, or that it is happening to you now.</div>':'')+'</div>';
   h+='<div class="dsec"><div class="dhead"><h4>Defend, step by step</h4>'+(hasPlat(t)?platPills():'')+'</div>';
   if(!t.steps.length) h+='<p>No action is available today. Halo tracks the date and moves this to Real &amp; Imminent the day a carrier in your area switches it on.</p>';
   steps.forEach((s,n)=>{ const on=!!d[s.i];
@@ -1637,28 +1674,28 @@ function profilePull(){
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, open=S.open.has('profile');
   let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(answered===PROFILE_Q.length?'--clear':'--cyan')+')">'+
     '<div class="tp-head" data-act="pull" data-id="profile"><div class="tp-top"><span class="tp-lab">Your profile</span><span class="tp-i">i</span></div>'+
-    '<div class="tp-sum">'+answered+' of '+PROFILE_Q.length+' answered · this decides what applies to you</div><span class="chev">&#9662;</span></div>';
+    '<div class="tp-sum">'+answered+' of '+PROFILE_Q.length+' answered · this decides which threats are real to you</div><span class="chev">&#9662;</span></div>';
   if(open){ h+='<div class="tp-body"><div class="dsec">';
     PROFILE_Q.forEach(q=>{ const v=pv(q.k);
       h+='<div class="q"><span>'+q.q+'</span><span class="yn"><button class="y '+(v===true?'on':'')+'" data-act="prof" data-k="'+q.k+'" data-v="y">Yes</button>'+
          '<button class="n '+(v===false?'on':'')+'" data-act="prof" data-k="'+q.k+'" data-v="n">No</button></span></div>'; });
-    h+='</div><div class="limit">Your answers stay on this device. They decide which threats apply to you.</div></div>'; }
+    h+='</div><div class="limit">Your answers stay on this device. They decide which threats are real to you.</div></div>'; }
   return h+'</div>';
 }
 /* ---------- Threat Scope: four live readings, from the whole world down to you ----------
    Worldwide now and Around you now move by themselves: the first each time the sources are read, the second each time a sensor reports.
-   Apply to you and Bottom line move the moment you answer, defend or mark something as yours. */
+   Real to you and Bottom line move the moment you answer, defend or mark something as yours. */
 const scopeAge = () => { const g=S.global, V=vis(); return (g?'world read '+feedAgo():'reading the world')+' · '+(V.mode==='live'?'around you, live now':'around you: '+stateWords(V.mode).count); };
 function scopeHTML(a){
   a=a||assess(); const g=S.global, kevN=(g&&g.kev)?g.kev.recent.length:0, day=Date.now()-86400000;
   const today=g?(g.news||[]).filter(x=>Date.parse(x.d)>day).length+(g.ai||[]).filter(x=>Date.parse(x.d)>day).length:0;
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length, applies=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true).length;
-  const openN=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true&&isOpen(t)).length;
+  const openN=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true&&isOpen(t)).length, imm=THREATS.filter(t=>{ const r=rating(t); return r&&r.n>=4; }).length;
   const V=vis(), live=V.mode==='live', near=live?V.devices.filter(d=>d.present&&!d.sim&&!quietAp(d)):[], flagged=near.filter(d=>!d.mine&&!d.sigFit&&(d.withYou||d.onRoute)).length;
   const extra=[cellLive()?CELL.list.length+(CELL.list.length===1?' tower':' towers'):'', (typeof poiCount==='function'&&poiCount('alpr'))?poiCount('alpr')+' cameras':''].filter(Boolean).join(' · ');
   return '<div class="nd" data-act="pipe" data-k="global" title="Open the Global scan"><span class="pl">Worldwide now</span><b>'+(THREATS.length+kevN)+'</b><i>'+THREATS.length+' threats'+(kevN?' · '+kevN+' live flaws':'')+(today?' · '+today+' reports today':'')+'</i></div>'+
     '<div class="nd" data-act="pipe" data-k="near" title="Open Watchers"><span class="pl">Around you now</span><b>'+(live?near.length:'&#9679;')+'</b><i>'+(live?(flagged?flagged+' flagged':'none flagged')+(extra?' · '+extra:''):esc(stateWords(V.mode).count))+'</i></div>'+
-    '<div class="nd" data-act="pipe" data-k="you" title="Open Your profile"><span class="pl">Apply to you</span><b>'+(answered?applies:'?')+'</b><i>'+(answered?(openN?openN+' to defend':'all defended'):'answer Your profile')+'</i></div>'+
+    '<div class="nd" data-act="pipe" data-k="you" title="Open Your profile"><span class="pl">Real to you</span><b>'+(answered?applies:'?')+'</b><i>'+(answered?((imm?'<span style="color:var(--r5)">'+imm+' imminent</span> · ':'')+(openN?openN+' to defend':'all defended')):'answer Your profile')+'</i></div>'+
     '<div class="nd end" style="--tierc:var('+(a.t<0?'--mut':TIER_VAR[a.t])+')"><span class="pl">Bottom line</span><b style="color:var(--tierc)">'+esc(a.t<0?'Unknown':TIER_NAME[a.t])+'</b><i>read below</i></div>';
 }
 function scopeTick(){ const box=el('scopePills'); if(!box || S.view!=='overview') return; const now=Date.now(); if(now-(S._scT||0)<900) return; S._scT=now;
@@ -2698,7 +2735,7 @@ function reportHTML(){
   const dstr=d=>d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear(), tstr=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   const tier=a.t<0?'Unknown':TIER_NAME[a.t];
   const row=t=>{ const n=stepsOf(t).length, dn=doneCount(t), sc=scopeOf(t), sp=spCount(t);
-    return {t, sc, n, dn, sp, hits:(P.hits||{})[t.id]||0, st: t.shelf!=='real'?'Potential':sc===false?'Does not apply':sc===null?'Profile to answer':(!n?'No action available':dn>=n?'Defended':dn>0?'Partly defended':'Open')}; };
+    return {t, sc, n, dn, sp, rate:rating(t), hits:(P.hits||{})[t.id]||0, st: t.shelf!=='real'?'Potential':sc===false?'Does not apply':sc===null?'Profile to answer':(!n?'No action available':dn>=n?'Defended':dn>0?'Partly defended':'Open')}; };
   const R=THREATS.filter(t=>t.shelf==='real').map(row), POT=THREATS.filter(t=>t.shelf!=='real').map(row);
   const applies=R.filter(r=>r.sc===true), unknown=R.filter(r=>r.sc===null), open=applies.filter(r=>r.n&&r.dn<r.n).sort((x,y)=>IMPACT_W(y.t.impact)-IMPACT_W(x.t.impact)||x.dn-y.dn), done=applies.filter(r=>r.n&&r.dn>=r.n);
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
@@ -2717,7 +2754,7 @@ function reportHTML(){
   h+='<h2>1. Summary</h2><p>Bottom line: <span class="rp-tier">'+e(tier)+'</span></p>'+
      '<div class="rp-bar4"><div><span>Watchers</span><b>'+e(sideWord('w'))+'</b></div><div><span>Attackers</span><b>'+e(sideWord('a'))+'</b></div><div><span>Around you</span><b>'+e(vicWord)+'</b></div><div><span>This device</span><b>'+e(!hc.at?'Not checked':hc.att?hc.att+' need attention':'In order')+'</b></div></div>';
   if(!answered) h+='<p>Answer your profile and Halo matches every threat in its register to you. It takes about two minutes, and it is the first action in the plan below.</p>';
-  else h+='<p>'+plural(applies.length,'threat','threats')+' of the '+R.length+' in use against people today '+(applies.length===1?'applies':'apply')+' to you, on the strength of your own profile answers. '+
+  else h+='<p>'+plural(applies.length,'threat','threats')+' of the '+R.length+' in use against people today '+(applies.length===1?'is':'are')+' real to you, on the strength of your own profile answers. '+
        (done.length?plural(done.length,'is','are')+' fully defended. ':'None is fully defended yet. ')+
        (open.length?plural(open.length,'still has','still have')+' steps to complete. The most serious open item is '+e(open[0].t.name)+', because what it reaches is '+e(lowerFirst(open[0].t.impact))+'.':'Every defence that applies to you is complete.')+
        (unknown.length?' '+plural(unknown.length,'more is','more are')+' decided as soon as you answer the remaining profile questions.':'')+'</p>';
@@ -2728,7 +2765,7 @@ function reportHTML(){
   if(first.length) h+='<p>What to do first: '+first.map((x,i)=>'('+(i+1)+') '+e(x.s.t.replace(/\.$/,''))+', which belongs to '+e(x.r.t.name)).join('; ')+'. The full plan is in section 7.</p>';
   // ---- 2 reason and scope
   const sens=Object.keys(P.sensors||{}).map(k=>P.sensors[k]);
-  h+='<h2>2. Reason for this report, and what was assessed</h2><p>This report was run on request. It sets out every threat in the Halo register, states whether each applies to you, and records what you have done about it. It draws on four things: your profile answers, the steps you have ticked, what your own sensors have reported, and public sources. Everything is processed on your own devices.</p>'+
+  h+='<h2>2. Reason for this report, and what was assessed</h2><p>This report was run on request. It sets out every threat in the Halo register, rates each one for you from 1 to 5, and records what you have done about it. It draws on four things: your profile answers, the steps you have ticked, what your own sensors have reported, and public sources. Everything is processed on your own devices.</p>'+
     tbl(['What was assessed','State at the time of the report'],[
       ['Your profile',answered+' of '+PROFILE_Q.length+' questions answered'],
       ['Phone platform used for the steps',e(PLAT_NAME[plat()])],
@@ -2751,7 +2788,7 @@ function reportHTML(){
   const stepsAll=applies.reduce((n,r)=>n+r.n,0), stepsDone=applies.reduce((n,r)=>n+Math.min(r.dn,r.n),0), spAll=applies.reduce((n,r)=>n+r.sp.n,0), spDone=applies.reduce((n,r)=>n+r.sp.dn,0), hitsAll=THREATS.reduce((n,t)=>n+((P.hits||{})[t.id]||0),0);
   h+='<h2>4. The bottom line in detail</h2><p>The bottom line is read from the components below. Any one of them can raise it.</p>'+
     tbl(['Component','Reading','What it means'],[
-      ['Threats that apply to you',answered?applies.length+' of '+R.length:'Profile to answer','Decided by your profile answers alone'],
+      ['Threats real to you',answered?applies.length+' of '+R.length:'Profile to answer','Decided by your profile answers alone'],
       ['Defence steps complete',stepsAll?stepsDone+' of '+stepsAll:'None to count','Each step is one setting or habit that closes one path'],
       ['Special countermeasures complete',spAll?spDone+' of '+spAll:'None to count','Stronger steps, for a threat you believe is active'],
       ['Findings you have logged',String(hitsAll),'Your own observations, kept in Evidence'],
@@ -2760,14 +2797,14 @@ function reportHTML(){
       ['Device health',e(!hc.at?'Ready to run':hc.ok+' pass, '+hc.att+' to attend to'),'What this device reports about itself'],
       ['Evidence chain',plural(P.evidence.length,'entry','entries'),'Each entry is fingerprinted and chained to the one before']]);
   // ---- 5 register
-  const reg=rs=>tbl(['Threat','What it is','Applies','Defence','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.sc===true?'Yes':r.sc===false?'No':'To answer', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
-  h+='<h2>5. The threat register, in full</h2><p>Every threat Halo tracks is listed, whether or not it applies to you. Watchers are those who observe where you are and what you do. Attackers are those who take over a device, an account or an identity.</p>'+
+  const reg=rs=>tbl(['Threat','What it is','Rating','Defence','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.rate?'<b>'+r.rate.n+'</b> '+e(r.rate.k+', '+r.rate.w):r.sc===false?'Does not apply':r.t.shelf!=='real'?'Potential':'To answer', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
+  h+='<h2>5. The threat register, in full</h2><p>Every threat Halo tracks is listed, with its rating for you. Real, 1 low, 2 maybe, 3 likely: an open issue, and what it does to you depends on the countermeasures you take now. Imminent, 4 likely to happen, 5 happening to you now: Halo holds evidence. Watchers are those who observe where you are and what you do. Attackers are those who take over a device, an account or an identity.</p>'+
      '<h3>Watchers, in use today</h3>'+reg(R.filter(r=>r.t.side==='w'))+'<h3>Attackers, in use today</h3>'+reg(R.filter(r=>r.t.side==='a'))+
      (POT.length?'<h3>Potential: not in use against people yet</h3>'+tbl(['Threat','What it is','When','Defence'],POT.map(r=>['<b>'+e(r.t.name)+'</b>',e(r.t.short),e(r.t.imminence||'Not known'),r.n?r.dn+' of '+r.n:'None available yet'])):'');
   const explain=R.filter(r=>r.sc!==false);
   if(explain.length){ h+='<h3>What each one means for you</h3>';
     explain.forEach(r=>{ const nx=nextStep(r);
-      h+='<p><b>'+e(r.t.name)+' ('+e(r.st.toLowerCase())+').</b> '+e(r.t.what)+' '+e(r.t.where)+(r.sc===null?' Answer your profile and Halo tells you whether it applies.':'')+
+      h+='<p><b>'+e(r.t.name)+' ('+e(r.st.toLowerCase())+').</b> '+e(r.t.what)+' '+e(r.t.where)+(r.sc===null?' Answer your profile and Halo rates it for you.':'')+
          (nx&&r.sc!==null?' Your next step: '+e(lowerFirst(nx.t.replace(/\.$/,'')))+'.':'')+(r.n&&r.dn>=r.n?' Every defence step is complete.':'')+'</p>'; }); }
   // ---- 6 risk assessment
   const prev=(P.reports||[])[0];
@@ -2790,7 +2827,7 @@ function reportHTML(){
     '<h3>What is protecting you</h3>'+(prot.length?'<ul class="rp-list">'+prot.map(x=>'<li>'+x+'</li>').join('')+'</ul>':'<p>Nothing is recorded yet. Each completed step will appear here.</p>')+
     '<h3>What is exposing you</h3>'+(risk.length?'<ul class="rp-list">'+risk.map(x=>'<li>'+x+'</li>').join('')+'</ul>':'<p>Nothing is recorded as open.</p>');
   // ---- 7 defence plan
-  const plan=[]; if(!answered||unknown.length) plan.push(['Answer the '+(PROFILE_Q.length-answered)+' open profile questions','Your profile','Tells Halo which threats apply to you']);
+  const plan=[]; if(!answered||unknown.length) plan.push(['Answer the '+(PROFILE_Q.length-answered)+' open profile questions','Your profile','Lets Halo rate every threat for you']);
   if(withYou.length) plan.push(['Open Watchers and work through the record for '+e(devName(withYou[0])),'Signal Roster','Read the advisory in section 8 first']);
   for(let pass=0; pass<2 && plan.length<10; pass++) open.forEach(r=>{ if(plan.length>=10) return; const d=doneMap(r.t), ss=stepsOf(r.t).filter(x=>!d[x.i]); const x=ss[pass]; if(x) plan.push([e(x.t), e(r.t.name), e(x.fx||'Closes one path this threat uses')]); });
   if(!hc.at) plan.push(['Run the Device Health Check on each device you own','Device Health Check','Shows what each device reports about itself']);
@@ -2821,8 +2858,8 @@ function reportHTML(){
     h+='<p>Checked on '+dstr(new Date(hc.at))+' on this '+e(HK_NAME[HK()])+'. You have confirmed '+hc.ticks+' of the '+hc.g+' settings that only you can read.</p>'+tbl(['Item','Result','Detail'],P.health.auto.items.map(x=>[e(x.name),LBL[x.st],e(x.txt)])); }
   // ---- 11 tracking over time
   const nextD=new Date(now.getTime()+7*86400000);
-  h+='<h2>11. Tracking over time</h2>'+((P.reports||[]).length?tbl(['Earlier report','Bottom line','Applied','Open'],P.reports.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), x.tier<0?'Unknown':TIER_NAME[x.tier], String(x.applies), String(x.open)])):'<p>This is the first report on this device. Later reports will be compared with it here.</p>')+
-     '<p>The bottom line rises to Take Action when any device meets the test for moving with you. It rises to Warning while three or more threats that apply to you have open defence steps, and it falls to Watch at two or fewer. It reads Clear when every applicable defence is complete.</p><p>Next review: '+dstr(nextD)+'.</p>';
+  h+='<h2>11. Tracking over time</h2>'+((P.reports||[]).length?tbl(['Earlier report','Bottom line','Real to you','Open'],P.reports.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), x.tier<0?'Unknown':TIER_NAME[x.tier], String(x.applies), String(x.open)])):'<p>This is the first report on this device. Later reports will be compared with it here.</p>')+
+     '<p>The bottom line rises to Take Action when any device meets the test for moving with you. It rises to Warning while three or more threats real to you have open defence steps, and it falls to Watch at two or fewer. It reads Clear when every applicable defence is complete.</p><p>Next review: '+dstr(nextD)+'.</p>';
   // ---- 12 evidence
   h+='<h2>12. Evidence</h2><p>The Evidence chain on this device holds '+plural(P.evidence.length,'entry','entries')+'. Each entry carries a fingerprint and the fingerprint of the entry before it, so a later change to any entry can be detected.'+(P.evidence.length?' The newest fingerprint is '+e(String(P.prevHash).slice(0,16))+'.':'')+'</p>'+
      (P.evidence.length?tbl(['When','Kind','Entry'],P.evidence.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), e(x.kind), e(x.text.length>170?x.text.slice(0,170)+' ...':x.text)])):'');
@@ -2855,7 +2892,7 @@ function reportOpen(fresh){
   try{ store.set('halo_report_last', JSON.stringify(j)); }catch(e){}
   paperShow('Remiel Halo Full Report', r.html, {kind:'full', line:reportLine(j)});
   P.reports=P.reports||[]; const quick=P.reports.length && r.snap.t-P.reports[0].t<=60000; P.reports.unshift(r.snap); P.reports.length=Math.min(P.reports.length,12); save();
-  if(!quick) logEvidence('note','Full report No. '+j.n+' made. Bottom line '+(r.snap.tier<0?'Unknown':TIER_NAME[r.snap.tier])+', '+r.snap.applies+' threats apply, '+r.snap.open+' open.');
+  if(!quick) logEvidence('note','Full report No. '+j.n+' made. Bottom line '+(r.snap.tier<0?'Unknown':TIER_NAME[r.snap.tier])+', '+r.snap.applies+' threats real to you, '+r.snap.open+' open.');
   if(fresh) toast('New report No. '+j.n+', made '+new Date(j.t).toLocaleTimeString()+'.');
   if(booted && S.view==='overview') softRender();
 }
@@ -3501,7 +3538,7 @@ function cellIngest(list, t, pos){
     CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved}); if(CELL.changes.length>200) CELL.changes.shift();
     if(W.on && gen==='2G' && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone dropped from '+CELL.serving.gen+' to 2G.','',t); }
   if(W.on){ W.cells=W.cells||{}; W.cells[id]=1; if(gen==='2G') W.g2=true; }
-  if(gen==='2G' && (!CELL.serving || CELL.serving.gen!=='2G') && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; save();
+  if(gen==='2G' && (!CELL.serving || CELL.serving.gen!=='2G') && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save();
     alertRaise('2g', 'Your phone dropped to 2G', 'A 2G connection gives the phone no way to check that a tower is genuine. Tower Watch has the steps, and Evidence has the record.', {res:'w_tower'}); }
   CELL.serving={id, gen, c:sv, pos:pos?{lat:pos.lat,lon:pos.lon}:(CELL.serving&&CELL.serving.pos)||null, since:(CELL.serving&&CELL.serving.id===id)?CELL.serving.since:t};
 }
@@ -4110,7 +4147,7 @@ document.addEventListener('click', e=>{
     case 'res': { const t=T(a.dataset.id), was=S.view; S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; setView(t.side==='w'?'watchers':'attackers'); if(was===S.view) navPush(t.id);
       const c=el('tp-'+t.id); if(c) c.scrollIntoView({block:'start'}); break; }
     case 'note': { const t=T(a.dataset.id), x=val('note-'+t.id); if(!x) return toast('Write what you found first.');
-      P.hits=P.hits||{}; P.hits[t.id]=(P.hits[t.id]||0)+1; logEvidence('finding',t.name+': '+x); toast('Added to Evidence.'); rerender(); if(el('rost')) renderRoster(); break; }
+      P.hits=P.hits||{}; P.hits[t.id]=(P.hits[t.id]||0)+1; P.hitAt=P.hitAt||{}; P.hitAt[t.id]=Date.now(); logEvidence('finding',t.name+': '+x); toast('Added to Evidence.'); rerender(); if(el('rost')) renderRoster(); break; }
     case 'alias-add': { const n=val('aliasName'); if(!n) return toast('Enter the alias name.'); P.aliases.push({name:n,links:{}}); save(); rerender(); break; }
     case 'alias-del': P.aliases.splice(+a.dataset.i,1); save(); rerender(); break;
     case 'alias-link': { const al=P.aliases[+a.dataset.i]; al.links=al.links||{}; al.links[a.dataset.k]=!al.links[a.dataset.k]; save(); rerender(); break; }
