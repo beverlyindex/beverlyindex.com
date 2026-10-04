@@ -712,6 +712,7 @@ a.tk:hover b{text-decoration:underline}
                 <div id="suspects"></div>
                 <div class="posline" id="posLine"></div>
                 <div class="posline" id="mapCredit" style="margin-top:4px">Maps: &copy; OpenStreetMap contributors</div>
+                <div class="posline" id="ptsCredit" style="margin-top:2px"></div>
               </div></div>
               <div class="card" id="covCard"></div>
               <div class="card" id="homeMini"></div>
@@ -2194,25 +2195,38 @@ async function initMap(){
      Towers, cyan: every tower your phone has used that the public register places. Red: a tower in use that shows the signs of a fake one.
      The ring around you, cyan dashes: your tower is somewhere on it, from the phone's own timing.
    Devices Halo hears keep their round markers; a tracker is a diamond and a camera heard by radio is an orange square. */
-const POI = window.HALO_POI || {alpr:['https://tiles.dontgetflocked.com/cameras-us-hourly.json','https://tiles.dontgetflocked.com/cameras-ca-hourly.json']};
-const POI_C={cam:'#ff8a3c', tower:'#2dd4ea', towerbad:'#ff4d4d'};
+const POI = window.HALO_POI || {alpr:['https://tiles.dontgetflocked.com/cameras-us-hourly.json','https://tiles.dontgetflocked.com/cameras-ca-hourly.json'], pts:true};
+const POI_C={cam:'#ff8a3c', cctv:'#ffd23f', speed:'#e8eefc', site:'#7aa2ff', tower:'#2dd4ea', towerbad:'#ff4d4d'};
+const PT_KIND={plate:'cam', cam:'cctv', gun:'cctv', speed:'speed', site:'site'};       // the kind of point, and the map key that shows or hides it
+const PT_WORD={plate:'Plate camera', cam:'Camera', gun:'Gunshot detector', speed:'Speed camera', site:'Tower site'};
 const layerOn = k => !(P.layers && P.layers[k]===false);
-function poiImage(kind){ const n=44, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d'), c=POI_C[kind];
+function poiImage(kind){ const n=44, cv=document.createElement('canvas'); cv.width=cv.height=n; const g=cv.getContext('2d'), c=POI_C[kind]||POI_C.cctv;
   g.beginPath(); g.arc(22,22,19,0,Math.PI*2); g.fillStyle=c; g.fill(); g.lineWidth=3; g.strokeStyle='#070b16'; g.stroke();
   g.fillStyle='#070b16'; g.strokeStyle='#070b16'; g.lineWidth=3; g.lineCap='round';
   if(kind==='cam'){ g.fillRect(10,16,18,13); g.beginPath(); g.moveTo(28,20); g.lineTo(35,15); g.lineTo(35,30); g.lineTo(28,25); g.closePath(); g.fill(); g.fillStyle=c; g.beginPath(); g.arc(19,22.5,3.6,0,Math.PI*2); g.fill(); }
+  else if(kind==='cctv'){ g.fillRect(13,11,18,4); g.beginPath(); g.arc(22,16,10,0,Math.PI); g.closePath(); g.fill(); g.fillStyle=c; g.beginPath(); g.arc(22,20.5,3.2,0,Math.PI*2); g.fill(); g.fillStyle='#070b16'; g.fillRect(20.5,28,3,5); }
+  else if(kind==='speed'){ g.beginPath(); g.arc(22,26,11,Math.PI,Math.PI*2); g.stroke(); g.beginPath(); g.moveTo(22,26); g.lineTo(29,17); g.stroke(); g.beginPath(); g.arc(22,26,2.6,0,Math.PI*2); g.fill(); g.fillRect(11,29,22,3); }
+  else if(kind==='gun'){ g.beginPath(); g.arc(14,22,3.6,0,Math.PI*2); g.fill(); g.lineWidth=2.6; [8,13,18].forEach(r=>{ g.beginPath(); g.arc(14,22,r,-.62,.62); g.stroke(); }); }
   else { g.beginPath(); g.moveTo(22,13); g.lineTo(14,33); g.moveTo(22,13); g.lineTo(30,33); g.moveTo(17,26); g.lineTo(27,26); g.stroke(); g.beginPath(); g.arc(22,12,3,0,Math.PI*2); g.fill();
     g.lineWidth=2.2; g.beginPath(); g.arc(22,12,8,-Math.PI*.82,-Math.PI*.18); g.stroke(); }
   return g.getImageData(0,0,n,n); }
 function poiAttach(map){ if(!map || map._poi) return; map._poi=true;
   if(!map._quiet){ map._quiet=true; map.on('error',()=>{}); }          // a map square that is slow to arrive is asked for again by the map itself
-  try{ ['cam','tower','towerbad'].forEach(k=>{ if(!map.hasImage('poi-'+k)) map.addImage('poi-'+k, poiImage(k), {pixelRatio:2}); });
+  try{ ['cam','cctv','speed','gun','site','tower','towerbad'].forEach(k=>{ if(!map.hasImage('poi-'+k)) map.addImage('poi-'+k, poiImage(k), {pixelRatio:2}); });
+    const on=k=>layerOn(k)?'visible':'none', size=['interpolate',['linear'],['zoom'],8,.3,11,.5,14,.8,17,1.05], sym=(id,flt,img,key,more)=>map.addLayer({id,type:'symbol',source:'pts',filter:flt,...(more||{}),layout:{'icon-image':img,'icon-size':size,'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:on(key)}});
+    map.addSource('pts',{type:'geojson',data:ptsData()}); map._ptsVer=PTS.ver;
+    map.addLayer({id:'pts-site-dot',type:'circle',source:'pts',maxzoom:15,filter:['==',['get','k'],'site'],layout:{visibility:on('site')},paint:{'circle-radius':['interpolate',['linear'],['zoom'],8,1.2,12,2.4,15,4.2],'circle-color':POI_C.site,'circle-opacity':.9,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
+    sym('pts-site',['==',['get','k'],'site'],'poi-site','site',{minzoom:15});
+    sym('pts-cctv',['in',['get','k'],['literal',['cam','gun']]],['case',['==',['get','k'],'gun'],'poi-gun','poi-cctv'],'cctv');
+    sym('pts-speed',['==',['get','k'],'speed'],'poi-speed','speed');
+    sym('pts-plate',['==',['get','k'],'plate'],'poi-cam','cam');
+    if(map===FULL) PT_LAYERS.forEach(l=>map.on('click',l,e=>{ const f=e.features&&e.features[0]; if(!f) return; const q=f.properties||{}; MF.sel=null; MF.pt={k:q.k, n:q.n||'', op:q.op||'', dir:q.dir||'', zone:q.zone||'', t:q.t||'', p:q.p||'', lon:f.geometry.coordinates[0], lat:f.geometry.coordinates[1]}; mapFullTick(false); }));
     map.addSource('poi',{type:'geojson',data:poiData()});
     map.addLayer({id:'poi-ring',type:'line',source:'poi',filter:['==',['get','kind'],'taring'],layout:{visibility:layerOn('tower')?'visible':'none'},paint:{'line-color':POI_C.tower,'line-width':1.5,'line-opacity':.8,'line-dasharray':[2,2.5]}});
     map.addLayer({id:'poi-tower',type:'symbol',source:'poi',filter:['in',['get','kind'],['literal',['tower','towerbad']]],
       layout:{'icon-image':['case',['==',['get','kind'],'towerbad'],'poi-towerbad','poi-tower'],'icon-size':['interpolate',['linear'],['zoom'],8,.45,13,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('tower')?'visible':'none'}});
   }catch(e){ map._poi=false; return; }
-  poiCams(map); poiSources(); }
+  poiCams(map); poiSources(); ptsLoad(); }
 // The camera squares come from a separate service. Its description is read first, with a time limit, so that a slow answer
 // never holds up the street map. Until it has arrived the maps simply carry no cameras, and Halo asks again.
 function poiSources(){ const now=Date.now(); if(S.alprTJ || now-(S._alprAt||0)<60000) return; S._alprAt=now;
@@ -2222,30 +2236,77 @@ function poiSources(){ const now=Date.now(); if(S.alprTJ || now-(S._alprAt||0)<6
 function poiCams(map){ if(!map || !map._poi || map._cams || !S.alprTJ) return; map._cams=true;
   try{ S.alprTJ.forEach((tj,i)=>{ if(!tj) return; map.addSource('alpr'+i,{type:'vector',tiles:tj.tiles,minzoom:tj.minzoom,maxzoom:tj.maxzoom,attribution:'Cameras: &copy; OpenStreetMap contributors, DeFlock'});
       map.addLayer({id:'alpr'+i, type:'symbol', source:'alpr'+i, 'source-layer':'cameras', minzoom:8,
-        layout:{'icon-image':'poi-cam','icon-size':['interpolate',['linear'],['zoom'],8,.3,11,.5,14,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('cam')?'visible':'none'}}, map.getLayer('poi-ring')?'poi-ring':undefined); });
+        layout:{'icon-image':'poi-cam','icon-size':['interpolate',['linear'],['zoom'],8,.3,11,.5,14,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('cam')?'visible':'none'}}, map.getLayer('poi-ring')?'poi-ring':undefined);
+      if(map===FULL) map.on('click','alpr'+i,e=>{ const f=e.features&&e.features[0]; if(!f) return; const q=f.properties||{}; MF.sel=null; MF.pt={k:'plate', n:String(q.brand||''), op:String(q.operator||''), dir:String(q.directionCardinal||''), zone:String(q.surveillanceZone||''), lon:f.geometry.coordinates[0], lat:f.geometry.coordinates[1]}; mapFullTick(false); }); });
   }catch(e){ map._cams=false; } }
 const camsReady = m => !!(m && m._cams);
+/* Threat points from Halo's own backend, one request per map square of about 7 km. The request names the square and never your
+   position. The nine squares around you are read first; the next ring follows when the Macro radius reaches past them. */
+const PT_Z=12, PT_LAYERS=['pts-plate','pts-cctv','pts-speed','pts-site','pts-site-dot'], PTS={sq:{}, busy:0, ver:0, data:null, dataVer:-1, near:null};
+const ptsOn = () => POI.pts===true && !!(S.features && S.features.poi);
+const ptTile = (lat,lon) => { const n=1<<PT_Z, r=lat*Math.PI/180; return {x:Math.min(n-1,Math.max(0,Math.floor((lon+180)/360*n))), y:Math.min(n-1,Math.max(0,Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n)))}; };
+const ptWidth = lat => 40075016*Math.cos(lat*Math.PI/180)/(1<<PT_Z);
+function ptsWant(){ const g=gz(); if(!g) return []; const c=ptTile(g.lat,g.lon), n=1<<PT_Z, rings=macroRadius()>ptWidth(g.lat)?2:1, out=[];
+  for(let dy=-rings;dy<=rings;dy++) for(let dx=-rings;dx<=rings;dx++){ const y=c.y+dy; if(y<0||y>=n) continue; out.push({k:(((c.x+dx)%n+n)%n)+'/'+y, ring:Math.max(Math.abs(dx),Math.abs(dy))}); }
+  return out.sort((a,b)=>a.ring-b.ring); }
+function ptsLoad(){ if(!ptsOn()) return; const now=Date.now(), want=ptsWant(), keep={}; want.forEach(q=>keep[q.k]=1);
+  Object.keys(PTS.sq).forEach(k=>{ if(!keep[k] && PTS.sq[k].state!=='busy' && now-PTS.sq[k].t>3600000){ delete PTS.sq[k]; PTS.ver++; } });
+  want.forEach(q=>{ const k=q.k, s=PTS.sq[k]; if(PTS.busy>=3) return;
+    if(s && (s.state==='busy' || (s.state==='ok' && now-s.t<(s.partial?15*60000:6*3600000)) || (s.state==='fail' && now-s.t<60000))) return;
+    PTS.sq[k]={state:'busy', t:now, items:(s&&s.items)||[], credit:(s&&s.credit)||[], partial:!!(s&&s.partial)}; PTS.busy++;
+    const ac=new AbortController(), to=setTimeout(()=>ac.abort(),30000), fail=()=>{ PTS.sq[k]={...PTS.sq[k], state:'fail', t:Date.now()}; };
+    fetch(API+'/poi/'+PT_Z+'/'+k,{signal:ac.signal}).then(r=>r.ok?r.json():null).then(j=>{
+      if(j && Array.isArray(j.items)) PTS.sq[k]={state:'ok', t:Date.now(), items:j.items.filter(i=>i && okLL(i) && PT_KIND[i.k] && i.id!=null), credit:Array.isArray(j.credit)?j.credit.map(c=>String(c).slice(0,200)):[], partial:!!j.partial};
+      else fail(); }).catch(fail)
+    .finally(()=>{ clearTimeout(to); PTS.busy--; PTS.ver++; S._cams=null; ptsShow(); ptsLoad(); if(booted) renderVicinity(); }); }); }
+// How far from you the loaded squares reach in every direction, in metres.
+function ptsReach(){ const g=gz(); if(!g) return 0; const c=ptTile(g.lat,g.lon), n=1<<PT_Z; let reach=0;
+  for(let ring=1; ring<=2; ring++){ let all=true;
+    for(let dy=-ring;dy<=ring&&all;dy++) for(let dx=-ring;dx<=ring;dx++){ const y=c.y+dy; if(y<0||y>=n) continue; const s=PTS.sq[(((c.x+dx)%n+n)%n)+'/'+y]; if(!s || !(s.state==='ok' || s.items.length)){ all=false; break; } }
+    if(!all) break; reach=ring*ptWidth(g.lat); }
+  return reach; }
+function ptsData(){ if(PTS.data && PTS.dataVer===PTS.ver) return PTS.data; const f=[], seen={};
+  Object.keys(PTS.sq).forEach(k=>PTS.sq[k].items.forEach(i=>{ if(seen[i.id]) return; seen[i.id]=1;
+    f.push({type:'Feature',properties:{k:i.k, n:i.n||'', op:i.op||'', dir:i.dir||'', zone:i.zone||'', t:i.t||'', p:i.p||''},geometry:{type:'Point',coordinates:[i.lon,i.lat]}}); }));
+  PTS.dataVer=PTS.ver; return PTS.data={type:'FeatureCollection',features:f}; }
+function ptsShow(){ [MAP,MACRO,FULL].forEach(m=>{ if(!m || !m._poi || m._ptsVer===PTS.ver) return; try{ const src=m.getSource('pts'); if(src){ src.setData(ptsData()); m._ptsVer=PTS.ver; } }catch(e){} }); }
+// Every loaded point with its distance and bearing from you, nearest first.
+function ptsNear(){ const g=gz(); if(!g) return []; const key=PTS.ver+'|'+g.lat.toFixed(4)+','+g.lon.toFixed(4); if(PTS.near && PTS.near.k===key) return PTS.near.v;
+  const out=[], seen={}, cl=Math.cos(g.lat*Math.PI/180);
+  Object.keys(PTS.sq).forEach(k=>PTS.sq[k].items.forEach(i=>{ if(seen[i.id]) return; seen[i.id]=1; out.push({...i, d:distLL(g.lat,g.lon,i.lat,i.lon), brg:(Math.atan2((i.lon-g.lon)*cl,i.lat-g.lat)*180/Math.PI+360)%360}); }));
+  out.sort((a,b)=>a.d-b.d); PTS.near={k:key, v:out}; return out; }
+const ptsReady = () => camsReady(MACRO) || ptsReach()>0;
+const ptsR = r => { const reach=ptsReach(); return reach ? Math.min(r, reach) : r; };          // counts are stated for the distance the loaded squares cover
+const ptsOf = (layer, r) => layerOn(layer) ? ptsNear().filter(i=>PT_KIND[i.k]===layer && i.d<=r) : [];
+const ptsHas = layer => Object.keys(PTS.sq).some(k=>PTS.sq[k].items.some(i=>PT_KIND[i.k]===layer));
+const ptsCredit = () => { const out=[]; Object.keys(PTS.sq).forEach(k=>PTS.sq[k].credit.forEach(c=>{ if(out.indexOf(c)<0) out.push(c); })); return out; };
+const faces = d => !d ? '' : 'faces '+(/^-?\d+(\.\d+)?$/.test(String(d)) ? compass(((Number(d)%360)+360)%360) : String(d));
+const ptLine = i => [i.op && i.op!==i.n ? i.op : '', i.t||'', i.p||'', faces(i.dir), i.zone||''].filter(Boolean).join(' · ');
 function poiData(){ const f=[], g=gz(), sv=cellLive()?CELL.serving:null, bad=sv&&towerSigns().level==='suspect';
   Object.keys(P.cells||{}).forEach(id=>{ const r=P.cells[id].reg; if(r && r.found && okLL(r)) f.push({type:'Feature',properties:{kind:(bad&&sv.reg===id)?'towerbad':'tower',id},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}); });
   if(g && sv && sv.c.ta!=null && (sv.c.k==='lte'||sv.c.k==='gsm')){ const m=Math.max(60, sv.c.ta*(sv.c.k==='lte'?78:554)); f.push({type:'Feature',properties:{kind:'taring'},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,m)}}); }
   return {type:'FeatureCollection',features:f}; }
-function poiTick(){ const d=poiData(), key=JSON.stringify(d); if(key===S._poiKey) return; S._poiKey=key;
+function poiTick(){ ptsLoad(); ptsShow(); const d=poiData(), key=JSON.stringify(d); if(key===S._poiKey) return; S._poiKey=key;
   [MAP,MACRO,FULL].forEach(m=>{ try{ const src=m&&m.getSource&&m.getSource('poi'); if(src) src.setData(d); }catch(e){} }); }
 function poiLayers(){ [MAP,MACRO,FULL].forEach(m=>{ if(!m||!m._poi) return; try{ (POI.alpr||[]).forEach((u,i)=>{ if(m.getLayer('alpr'+i)) m.setLayoutProperty('alpr'+i,'visibility',layerOn('cam')?'visible':'none'); });
-    ['poi-ring','poi-tower'].forEach(l=>m.setLayoutProperty(l,'visibility',layerOn('tower')?'visible':'none')); }catch(e){} }); }
+    ['poi-ring','poi-tower'].forEach(l=>m.setLayoutProperty(l,'visibility',layerOn('tower')?'visible':'none'));
+    [['pts-plate','cam'],['pts-cctv','cctv'],['pts-speed','speed'],['pts-site','site'],['pts-site-dot','site']].forEach(x=>{ if(m.getLayer(x[0])) m.setLayoutProperty(x[0],'visibility',layerOn(x[1])?'visible':'none'); }); }catch(e){} }); }
 // Plate cameras around you, nearest first, read from the map squares the Macro sphere holds.
-function camsNear(){ const g=gz(); if(!g || !camsReady(MACRO)) return [];
+function camsNear(){ const g=gz(); if(!g || !ptsReady()) return [];
   if(S._cams && Date.now()-S._cams.t<4000 && S._cams.k===g.lat.toFixed(4)+','+g.lon.toFixed(4)) return S._cams.v;
   const seen={}, out=[];
-  (POI.alpr||[]).forEach((u,i)=>{ let fs=[]; try{ if(MACRO.getSource('alpr'+i)) fs=MACRO.querySourceFeatures('alpr'+i,{sourceLayer:'cameras'}); }catch(e){}
+  (POI.alpr||[]).forEach((u,i)=>{ let fs=[]; try{ if(camsReady(MACRO) && MACRO.getSource('alpr'+i)) fs=MACRO.querySourceFeatures('alpr'+i,{sourceLayer:'cameras'}); }catch(e){}
     fs.forEach(f=>{ if(!f.geometry || f.geometry.type!=='Point') return; const q=f.properties||{}, co=f.geometry.coordinates, id=String(q.osmId||co.join(','));
       if(seen[id]) return; seen[id]=1; const d=distLL(g.lat,g.lon,co[1],co[0]);
       out.push({id, lat:co[1], lon:co[0], d, brg:(Math.atan2((co[0]-g.lon)*Math.cos(g.lat*Math.PI/180),co[1]-g.lat)*180/Math.PI+360)%360, brand:String(q.brand||''), op:String(q.operator||''), dir:String(q.directionCardinal||''), zone:String(q.surveillanceZone||'')}); }); });
+  ptsNear().forEach(i=>{ if(i.k!=='plate') return; const id=String(i.id).replace(/^n/,''); if(seen[id]) return; seen[id]=1; out.push({id, lat:i.lat, lon:i.lon, d:i.d, brg:i.brg, brand:String(i.n||''), op:String(i.op||''), dir:faces(i.dir).replace(/^faces /,''), zone:String(i.zone||'')}); });
   out.sort((a,b)=>a.d-b.d); S._cams={t:Date.now(), k:g.lat.toFixed(4)+','+g.lon.toFixed(4), v:out}; return out; }
 const poiCount = k => k==='alpr' ? (layerOn('cam') ? camsNear().filter(c=>c.d<=MILE).length : 0) : 0;
 function renderLayers(){ const box=el('mapLayers'); if(!box) return; poiSources(); const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r).length, tw=Object.keys(P.cells||{}).filter(id=>(P.cells[id].reg||{}).found).length;
   const lay=(k,ch,name,note)=>'<button class="lay'+(layerOn(k)?'':' off')+'" data-act="layer" data-k="'+k+'" style="--lc:'+POI_C[k]+'"><i>'+ch+'</i>'+name+(note?' <b>'+note+'</b>':'')+'</button>';
-  setHTML(box, lay('cam','&#9679;','Plate cameras', g&&camsReady(MACRO) ? inR+' within '+miText(r) : '')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''))); }
+  const pr=ptsR(r), more=(k,ch,name)=>ptsHas(k) ? lay(k,ch,name, g ? ptsOf(k,pr).length+' within '+miText(pr) : '') : '';
+  { const cr=ptsCredit(), ce=el('ptsCredit'); if(ce) setHTML(ce, cr.length ? 'Threat points: '+cr.map(esc).join(' ') : ''); }
+  setHTML(box, lay('cam','&#9679;','Plate cameras', g&&ptsReady() ? cams.filter(c=>c.d<=(camsReady(MACRO)?r:pr)).length+' within '+miText(camsReady(MACRO)?r:pr) : '')+more('cctv','&#9670;','Cameras')+more('speed','&#9673;','Speed cameras')+more('site','&#9652;','Tower sites')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''))); }
 
 /* ----- Macro: the wider area. Your route, home, where flagged devices were heard, and known threats beyond the radius ----- */
 const MILE=1609.344, MACRO_STEPS=[2*MILE,5*MILE,15*MILE], MACRO_DEFAULT=5*MILE;      // ground zero is always your own position
@@ -2284,7 +2345,9 @@ function macroUpdate(){
     const inc=far.filter(d=>isKnownThreat(d));
     if(heard.length) line+=heard.length+' flagged '+(heard.length===1?'device':'devices')+' on your route. ';
     if(far.length) line+=far.length+' heard beyond your radius'+(inc.length?', '+inc.length+' a known threat':'')+'. ';
-    if(layerOn('cam') && camsReady(MACRO)){ const cs=camsNear().filter(c=>c.d<=r); if(cs.length) line+='<b style="color:'+POI_C.cam+'">'+cs.length+' plate '+(cs.length===1?'camera':'cameras')+'</b> within '+miText(r)+', the nearest '+miText(cs[0].d)+' '+compass(cs[0].brg)+'. '; }
+    if(layerOn('cam') && ptsReady()){ const cr=camsReady(MACRO)?r:ptsR(r), cs=camsNear().filter(c=>c.d<=cr); if(cs.length) line+='<b style="color:'+POI_C.cam+'">'+cs.length+' plate '+(cs.length===1?'camera':'cameras')+'</b> within '+miText(cr)+', the nearest '+miText(cs[0].d)+' '+compass(cs[0].brg)+'. '; }
+    { const pr=ptsR(r), part=[['cctv','camera','cameras'],['speed','speed camera','speed cameras'],['site','tower site','tower sites']].map(x=>{ const n=ptsOf(x[0],pr).length; return n ? '<b style="color:'+POI_C[x[0]]+'">'+n+' '+(n===1?x[1]:x[2])+'</b>' : ''; }).filter(Boolean);
+      if(part.length) line+=part.join(', ')+' within '+miText(pr)+'. '; }
   }
   line+=' <span style="white-space:nowrap">'+MACRO_STEPS.map(m=>'<button class="chipbtn '+((S.macroR||MACRO_DEFAULT)===m?'on':'')+'" data-act="macro-r" data-m="'+m+'">'+miText(m)+'</button>').join(' ')+'</span>';
   setHTML(el('macroLine'), line);
@@ -2307,7 +2370,7 @@ function placeMarkers(map, store, list, extra){
     if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
       e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
     else{ const m=document.createElement('div'); m.className=cls; m.style.setProperty('--mk',markerColor(d)); m.title=tip;
-      m.addEventListener('click',ev=>{ ev.stopPropagation(); if(map===FULL){ MF.sel=d.id; mapFullTick(false); } else selectDevice(d.id); }); store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); } });
+      m.addEventListener('click',ev=>{ ev.stopPropagation(); if(map===FULL){ MF.pt=null; MF.sel=d.id; mapFullTick(false); } else selectDevice(d.id); }); store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); } });
 }
 // Your own position. It feeds the placement of devices, so it does not wait for, or depend on, the map.
 let _geoOn=false;
@@ -2791,7 +2854,7 @@ const whereWords = d => d.bearing==null ? '' : (relWords(d.bearing) || compass(d
 
 /* ---------- The full map. Both spheres stay small and still; this one fills the screen, can be moved and zoomed,
    follows you, and can turn so that the way you face is up. It draws only what Halo can place. ---------- */
-let FULL=null, FULL_YOU=null, FULL_HOME=null; const FULL_MARKERS={}; const MF={follow:true, headUp:false, sel:null, timer:0};
+let FULL=null, FULL_YOU=null, FULL_HOME=null; const FULL_MARKERS={}; const MF={follow:true, headUp:false, sel:null, pt:null, timer:0};
 const mfRingSteps=[25,50,100,200];
 function mfData(){ const f=[], g=gz(); if(!g) return {type:'FeatureCollection',features:f};
   if(S.pos) f.push({type:'Feature',properties:{kind:'acc'},geometry:{type:'Polygon',coordinates:[circlePoly(g.lat,g.lon,Math.max(3,Math.min(150,S.pos.acc)))]}});
@@ -2861,7 +2924,9 @@ function mapFullTick(force){
   const sd=MF.sel && devs.find(d=>d.id===MF.sel);
   setHTML(el('mfInfo'), sd ? '<div class="mf-info"><b>'+esc(devName(sd))+'</b> · '+esc(kindText(sd))+'<br>'+esc(distText(sd))+(sd.bearing!=null?', '+esc(whereWords(sd))+(heading()!=null?' ('+esc(compass(sd.bearing))+')':''):'. Move and make a turn, and Halo finds its direction')+
       (sd.fix?' · placed within '+Math.round(sd.fix.unc)+' m':sd.sector?' · direction only':'')+' · '+esc(flagOf(sd))+
-      '<div class="formrow"><button class="btn sm primary" data-act="mf-ident" data-id="'+sd.id+'">Identify</button><button class="btn sm" data-act="mf-dev" data-id="">Close</button></div></div>' : '');
+      '<div class="formrow"><button class="btn sm primary" data-act="mf-ident" data-id="'+sd.id+'">Identify</button><button class="btn sm" data-act="mf-dev" data-id="">Close</button></div></div>'
+    : (MF.pt && PT_WORD[MF.pt.k]) ? (i=>'<div class="mf-info" style="--hc:'+POI_C[PT_KIND[i.k]]+'"><b>'+esc(i.n||PT_WORD[i.k])+'</b>'+(i.n?' · '+PT_WORD[i.k]:'')+'<br>'+(g?esc(miText(distLL(g.lat,g.lon,i.lat,i.lon)))+' '+compass((Math.atan2((i.lon-g.lon)*Math.cos(g.lat*Math.PI/180),i.lat-g.lat)*180/Math.PI+360)%360):'')+(ptLine(i)?' · '+esc(ptLine(i)):'')+
+      '<div class="formrow"><button class="btn sm" data-act="mf-dev" data-id="">Close</button></div></div>')(MF.pt) : '');
 }
 
 /* ---------- Full Report: every current threat, explained, in one document. It follows the order of the NOUS Full Clinical Report:
@@ -3712,11 +3777,17 @@ function towerSigns(){ const sv=CELL.serving, out={score:0, signs:[], level:'ok'
   if(CELL.list.length===1 && CELL.nbT && CELL.t-CELL.nbT<5*60000 && CELL.t-sv.since<5*60000 && c.r!=null && c.r>=-80) add(1,'It is strong, and its neighbours fell silent when it took over.');
   out.level = out.score>=3 ? 'suspect' : out.score>=1 ? 'watch' : 'ok'; return out; }
 const towerSuspects = () => towerSigns().level==='suspect' ? [CELL.serving] : [];
+function towerSites(){ const g=gz(); if(!g || !ptsHas('site')) return ''; const pr=ptsR(MILE), near=ptsNear().filter(i=>i.k==='site' && i.d<=pr);
+  return '<div class="dsec"><h4>Tower sites on the public record <span class="chip pot" style="margin-left:6px">'+near.length+' within '+miText(pr)+'</span></h4>'+
+    (near.length ? '<p>These are the licensed sites around you. A tower your phone uses that stands where the record has a site is one more reason to trust it.</p>'+near.slice(0,6).map(i=>'<div class="rowline"><span><b>'+esc(i.n||'Tower site')+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc([i.t||'', i.p||''].filter(Boolean).join(' · ')||'on the map')+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.site+'">'+esc(miText(i.d))+' '+compass(i.brg)+'</span></div>').join('')+
+      (near.length>6?'<div class="limit" style="margin-top:6px">'+(near.length-6)+' more are on the map in blue.</div>':'')
+      : '<p>The record holds no site within '+miText(pr)+' of you.</p>')+
+    '<div class="formrow"><button class="btn sm" data-act="map-full">Open the full map</button></div></div>'; }
 function toolTower(){
-  const can=!!(S.features&&S.features.cells), regRow = can ? '<div class="dsec"><h4>Public register check <span class="chip '+(P.cellCheck?'pot':'')+'" style="margin-left:6px">'+(P.cellCheck?'On':'Off')+'</span></h4>'+
+  const can=!!(S.features&&S.features.cells), regRow = towerSites() + (can ? '<div class="dsec"><h4>Public register check <span class="chip '+(P.cellCheck?'pot':'')+'" style="margin-left:6px">'+(P.cellCheck?'On':'Off')+'</span></h4>'+
       '<p>Halo asks the public tower register where each tower you use is listed. A tower that is unlisted, or listed far from you, is a strong sign. The request carries the identity of the tower in use, which places you within that tower\'s range, and Halo\'s backend keeps the tower and nothing about who asked.</p>'+
       '<div class="formrow"><button class="btn sm '+(P.cellCheck?'':'primary')+'" data-act="cell-reg">'+(P.cellCheck?'Switch the register check off':'Switch the register check on')+'</button></div>'+
-      '<div class="limit" style="margin-top:8px">Cell tower data from OpenCellID, licensed under CC BY-SA 4.0.</div></div>' : '';
+      '<div class="limit" style="margin-top:8px">Cell tower data from OpenCellID, licensed under CC BY-SA 4.0.</div></div>' : '');
   if(!cellLive() || !CELL.serving) return '<div class="dsec"><h4>Every tower in earshot, live</h4><p>'+(NATIVE()?'Start listening and Halo lists every tower your phone can hear, checks the one in use against the signs of a fake one, and records every change.':'The Halo Android app lists every tower your phone can hear, checks the one in use against the signs of a fake one, and records every change.')+'</p></div>'+regRow;
   const sv=CELL.serving, ts=towerSigns(), ch10=CELL.changes.filter(x=>Date.now()-x.t<10*60000).length, rec=(P.cells||{})[sv.reg]||{}, reg=rec.reg;
   const col={suspect:'--r5',watch:'--r3',ok:'--clear'}[ts.level], word={suspect:'Suspect',watch:'Watch',ok:'Steady'}[ts.level];
@@ -3737,16 +3808,21 @@ function toolTower(){
 }
 /* ----- Plate Camera Watch: the mapped cameras nearest you, and Flock hardware heard by radio ----- */
 function toolAlpr(){
-  const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r), heard=vis().mode==='live'?[...LIVE.devs.values()].filter(d=>d.cls==='Camera'&&d.present&&!d.sim):[];
-  let h='<div class="dsec"><h4>Plate cameras around you <span class="chip pot" style="margin-left:6px">'+(g&&camsReady(MACRO)?inR.length+' within '+miText(r):'reading the map')+'</span></h4>';
+  const g=gz(), cams=g?camsNear():[], r=camsReady(MACRO)?macroRadius():ptsR(macroRadius()), inR=cams.filter(c=>c.d<=r), heard=vis().mode==='live'?[...LIVE.devs.values()].filter(d=>d.cls==='Camera'&&d.present&&!d.sim):[];
+  let h='<div class="dsec"><h4>Plate cameras around you <span class="chip pot" style="margin-left:6px">'+(g&&ptsReady()?inR.length+' within '+miText(r):'reading the map')+'</span></h4>';
   if(!g) h+='<p>Allow location and Halo counts the mapped cameras around you and names the nearest.</p>';
+  else if(!ptsReady()) h+='<p>Halo is reading the cameras for the squares around you. The list fills in as each square arrives.</p>';
   else if(!inR.length) h+='<div class="hrow"><span class="hs ok">Clear</span><span>The map holds no plate camera within '+miText(r)+' of you.</span></div>';
   else h+=inR.slice(0,8).map(c=>'<div class="rowline"><span><b>'+esc(c.brand||'Plate camera')+'</b>'+(c.op?' <span class="mono" style="font-size:11px;color:var(--mut)">'+esc(c.op)+'</span>':'')+'<br><span class="mono" style="font-size:11px;color:var(--mut)">'+(c.dir?'faces '+esc(c.dir)+' · ':'')+(c.zone?esc(c.zone)+' · ':'')+'on the map in orange</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.cam+'">'+esc(miText(c.d))+' '+compass(c.brg)+'</span></div>').join('')+
       (inR.length>8?'<div class="limit" style="margin-top:6px">'+(inR.length-8)+' more are on the map.</div>':'');
   h+='<div class="formrow"><button class="btn sm primary" data-act="map-full">Open the full map</button></div></div>';
+  { const pr=ptsR(macroRadius()), oth=ptsNear().filter(i=>(i.k==='cam'||i.k==='gun'||i.k==='speed') && i.d<=pr && layerOn(PT_KIND[i.k])), nc=oth.filter(i=>i.k!=='speed').length, ns=oth.length-nc;
+    if(oth.length) h+='<div class="dsec"><h4>Other cameras around you <span class="chip pot" style="margin-left:6px">'+[nc?nc+(nc===1?' camera':' cameras'):'', ns?ns+(ns===1?' speed camera':' speed cameras'):''].filter(Boolean).join(', ')+' within '+miText(pr)+'</span></h4>'+
+      oth.slice(0,6).map(i=>'<div class="rowline"><span><b>'+esc(i.n||PT_WORD[i.k])+'</b>'+(i.n?' <span class="mono" style="font-size:11px;color:var(--mut)">'+PT_WORD[i.k]+'</span>':'')+'<br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(ptLine(i)||'on the map')+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C[PT_KIND[i.k]]+'">'+esc(miText(i.d))+' '+compass(i.brg)+'</span></div>').join('')+
+      (oth.length>6?'<div class="limit" style="margin-top:6px">'+(oth.length-6)+' more are on the map, each with its own mark.</div>':'')+'</div>'; }
   h+='<div class="dsec"><h4>Heard by radio, live</h4>'+(heard.length ? heard.map(d=>'<div class="rowline"><span><b>'+esc(devName(d))+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(kindText(d))+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.cam+'">'+esc(distText(d))+'</span></div>').join('')
       : '<p>'+(vis().mode==='live'?'No Flock camera or gunshot detector is broadcasting near you now.':(NATIVE()||isAndroid()?'Start listening and Halo hears Flock cameras and gunshot detectors that broadcast, and places each one as you move.':'The Halo Android app hears Flock cameras and gunshot detectors that broadcast, and places each one as you move.'))+'</p>')+
-    '<div class="limit" style="margin-top:8px">Camera locations: &copy; OpenStreetMap contributors, under the Open Database Licence, mapped through the DeFlock project and refreshed every hour. United States and Canada.</div></div>';
+    '<div class="limit" style="margin-top:8px">'+(ptsCredit().length ? ptsCredit().map(esc).join(' ')+' ' : '')+(camsReady(MACRO)||!ptsCredit().length ? 'Camera locations: &copy; OpenStreetMap contributors, under the Open Database Licence, mapped through the DeFlock project and refreshed every hour.' : '')+'</div></div>';
   return h; }
 /* ----- Display Watch: displays that announce themselves by radio. A smart monitor or television appears here while its Wi-Fi or Bluetooth is on. ----- */
 const DISPLAY_RE=/webos|\[lg\]|ultragear|myview|ultrafine|smart ?monitor|\bmonitor\b|\bmsi\b|bravia|odyssey|\[tv\]|\btv\b|google ?tv|android ?tv|fire ?tv|chromecast|roku|vizio|hisense/i;
@@ -4393,7 +4469,7 @@ document.addEventListener('click', e=>{
     case 'mf-north': { MF.headUp=!MF.headUp; a.classList.toggle('on',MF.headUp); a.innerHTML='<small>'+(MF.headUp?'FACE UP':'N UP')+'</small>'; if(!MF.headUp && FULL){ try{ FULL.rotateTo(0,{duration:400}); }catch(e){} } headAsk(); mapFullTick(false); break; }
     case 'mf-zin': if(FULL) FULL.zoomIn(); break;
     case 'mf-zout': if(FULL) FULL.zoomOut(); break;
-    case 'mf-dev': { MF.sel=a.dataset.id||null; const d=MF.sel&&findDevice(MF.sel); if(d && d.fix && FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); try{ FULL.easeTo({center:[d.fix.lon,d.fix.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
+    case 'mf-dev': { MF.pt=null; MF.sel=a.dataset.id||null; const d=MF.sel&&findDevice(MF.sel); if(d && d.fix && FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); try{ FULL.easeTo({center:[d.fix.lon,d.fix.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
     case 'mf-ident': { const id=a.dataset.id; mapFullClose(false); setTimeout(()=>{ if(S.view!=='watchers') setView('watchers'); selectDevice(id); const c=el('identPanel'); if(c) c.scrollIntoView({block:'center'}); },120); break; }
     case 'report': reportOpen(false); break;
     case 'report-new': if(S.reportOpen && S.reportKind==='trip'){ tripDocShow(); toast('Trip report made again from the record, '+new Date().toLocaleTimeString()+'.'); } else reportOpen(true); break;
