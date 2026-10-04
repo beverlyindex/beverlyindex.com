@@ -548,6 +548,9 @@ select.inp{flex:none}
 .logrow .lm{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:6px;line-height:1.6}
 .logrow .lm b{color:var(--warn);font-weight:600}
 .logrow .formrow{margin-top:8px}
+.roomrow{padding:10px 0;border-top:1px solid var(--line)} .roomrow:first-of-type{border-top:0}
+.roomrow .rh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;font-size:14px}
+.roomplot{display:block;width:100%;max-width:300px;margin:10px auto 4px}
 .logrow .lh{margin-top:8px;padding:8px 10px;border-left:2px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--mut);white-space:pre-wrap;overflow-wrap:anywhere}
 .logrow .lh span{display:block;font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-bottom:2px;white-space:normal}
 .evrow .eh{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:3px;word-break:break-all}
@@ -2002,6 +2005,43 @@ function peopleBoard(edit){
     return '<div class="person '+(st.alert?'alert':'')+'" style="--sc:var('+st.c+')">'+((edit&&H.people.length)?'<button class="x" data-act="h-pdel" data-i="'+i+'">&times;</button>':'')+
       '<div class="orb">'+esc(initials(p.name))+'</div><div class="pname">'+esc(p.name)+'</div><div class="prel">'+esc(p.rel||'')+(p.watch?' · wears a fall-detecting watch':'')+'</div><div class="pstat">'+st.t+'</div></div>'; }).join('')+'</div>';
 }
+/* ----- Rooms read by radar. A small radar in a room of your own home reports to the home listener: whether someone is there,
+   how many people and where they stand, and, at a bedside, breathing and heart rate. No camera, no microphone, no picture. ----- */
+const ROOMS={};                                        // name -> the latest row from the listener
+const RADAR_WORD={ld2450:'People and where they are', mr60bha2:'Breathing and heart rate'};
+const roomClean = (v,n) => String(v==null?'':v).replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,n);
+function roomsIngest(rows, at){ let changed=false;
+  rows.slice(0,12).forEach(r=>{ if(!r || typeof r!=='object') return; const n=roomClean(r.n,30); if(!n || !RADAR_WORD[r.k]) return;
+    const num=v=>(typeof v==='number'&&Number.isFinite(v))?v:null, prev=ROOMS[n];
+    const row={n, k:r.k, ok:!!r.ok, p:!!r.p, c:num(r.c), br:num(r.br), hr:num(r.hr), d:num(r.d), at,
+      tg:Array.isArray(r.tg)?r.tg.slice(0,3).filter(t=>Array.isArray(t)&&num(t[0])!==null&&num(t[1])!==null).map(t=>[Math.max(-6000,Math.min(6000,t[0])),Math.max(0,Math.min(8000,t[1])),num(t[2])||0]):[],
+      since:(prev&&prev.p===!!r.p&&prev.ok===!!r.ok)?prev.since:at};
+    if(!prev || prev.p!==row.p || prev.ok!==row.ok || prev.c!==row.c) changed=true; ROOMS[n]=row;
+    if(row.ok && row.p && P.home.armed){ const people=row.c>1?row.c+' people are':'Someone is', hour=new Date(at).toISOString().slice(0,13);
+      if(alertRaise('room:'+n+':'+hour, people+' in '+n, 'Your radar in '+n+' reports a person there while Responder is set to Away.', {view:'responder'}))
+        logEvidence('finding','Responder, Away: the radar in '+n+' reported '+(row.c>1?row.c+' people':'a person')+' present.'+(row.tg.length?' Position from the radar: '+row.tg.map(t=>(t[1]/1000).toFixed(1)+' m out, '+Math.abs(t[0]/1000).toFixed(1)+' m to the '+(t[0]<0?'left':'right')).join('; ')+'.':'')); } });
+  if(changed && S.view==='responder') softRender(); }
+const roomsNow = () => Object.keys(ROOMS).map(k=>ROOMS[k]).filter(r=>Date.now()+LIVE.skew-r.at<10*60000).sort((a,b)=>a.n<b.n?-1:1);
+function roomPlot(r){            // the radar sits at the bottom centre and looks up the page; the field is 6 m deep and 6 m wide
+  const W=220, H=150, sx=x=>W/2+(x/3000)*(W/2-8), sy=y=>H-10-(Math.min(6000,y)/6000)*(H-22);
+  return '<svg class="roomplot" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Where the people stand, seen from the radar"><path d="M'+(W/2)+' '+(H-10)+' L8 '+(H-10-(H-22)*.58)+' A'+(W/2-8)+' '+(H-22)+' 0 0 1 '+(W-8)+' '+(H-10-(H-22)*.58)+' Z" fill="rgba(63,116,214,.10)" stroke="rgba(120,160,240,.45)"/>'+
+    [2000,4000,6000].map(y=>'<text x="'+(W/2+4)+'" y="'+(sy(y)+3)+'" font-size="8" fill="#7f8db0">'+(y/1000)+' m</text><path d="M'+(W/2-3)+' '+sy(y)+' h6" stroke="#7f8db0"/>').join('')+
+    '<rect x="'+(W/2-7)+'" y="'+(H-12)+'" width="14" height="6" rx="2" fill="#9fc4ff"/>'+
+    r.tg.map((t,i)=>'<circle cx="'+sx(t[0]).toFixed(1)+'" cy="'+sy(t[1]).toFixed(1)+'" r="7" fill="#ff8a3c" stroke="#070b16" stroke-width="2"/><text x="'+sx(t[0]).toFixed(1)+'" y="'+(sy(t[1])+3).toFixed(1)+'" font-size="8" font-weight="700" text-anchor="middle" fill="#070b16">'+(i+1)+'</text>').join('')+'</svg>'; }
+function roomsCard(){ const rs=roomsNow(); if(!rs.length) return '';
+  return '<div class="card" id="roomsCard"><h3>Rooms, read by radar <span class="n">'+rs.length+'</span></h3>'+rs.map(r=>{
+    const state=!r.ok?'Silent':r.p?'Someone here':'Empty', col=!r.ok?'--mut':r.p?(P.home.armed?'--action':'--warn'):'--clear';
+    return '<div class="roomrow"><div class="rh"><b>'+esc(r.n)+'</b><span class="chip" style="color:var('+col+');border-color:var('+col+')">'+state+'</span></div>'+
+      '<div class="kv"><span class="k">Reads</span><span class="v">'+RADAR_WORD[r.k]+'</span>'+
+      (r.ok&&r.c!==null?'<span class="k">People</span><span class="v">'+r.c+'</span>':'')+
+      (r.ok&&r.br!==null?'<span class="k">Breathing</span><span class="v">'+r.br.toFixed(0)+' a minute</span>':'')+
+      (r.ok&&r.hr!==null?'<span class="k">Heart</span><span class="v">'+r.hr.toFixed(0)+' a minute</span>':'')+
+      (r.ok&&r.d!==null?'<span class="k">Distance</span><span class="v">'+(r.d/100).toFixed(1)+' m from the radar</span>':'')+
+      '<span class="k">'+(r.ok?(r.p?'Here since':'Empty since'):'Silent since')+'</span><span class="v">'+hhmm(r.since-LIVE.skew)+'</span><span class="k">Last reading</span><span class="v">'+hhmm(r.at-LIVE.skew)+'</span></div>'+
+      (r.ok&&r.k==='ld2450'&&r.tg.length?roomPlot(r)+'<div class="limit">'+r.tg.map((t,i)=>'Person '+(i+1)+': '+(t[1]/1000).toFixed(1)+' m out, '+Math.abs(t[0]/1000).toFixed(1)+' m to the '+(t[0]<0?'left':'right')+(Math.abs(t[2])>5?', moving':', still')).join(' · ')+'</div>':'')+
+      (!r.ok?'<div class="limit">The radar in this room has stopped answering the home listener. Check its power and that it is on the home Wi-Fi.</div>':'')+
+      (r.k==='mr60bha2'&&r.ok?'<div class="limit">Breathing and heart rate are radar readings for your own awareness. They are not medical measurements.</div>':'')+'</div>'; }).join('')+
+    '<div class="limit" style="margin-top:8px">With Responder set to Away, a person in any of these rooms raises a banner and is written into Evidence.</div></div>'; }
 function renderResponder(){
   const H=P.home, R=H.rules, away=!!H.armed;
   let h='<div class="pagehead"><h2>Responder</h2><p>Know the moment someone at home needs help, and who responds. No cameras and no microphones: movement, stillness and falls only.</p></div>';
@@ -2011,6 +2051,7 @@ function renderResponder(){
       : '<b>Home.</b> You are in. Alerts to your phone are off. Set up the people, the rooms, the rules and the emergency numbers here.')+'</div>';
   const radar=H.rooms.filter(r=>r.sensor==='radar').length, watches=H.people.filter(p=>p.watch).length;
   h+='<div class="ov"><div class="stack" style="gap:14px">';
+  h+=roomsCard();
 
   if(away){
     h+='<div class="card"><h3>People at home <span class="n">'+H.people.length+'</span></h3>'+peopleBoard(false)+'</div>';
@@ -3712,6 +3753,7 @@ async function unsealSensor(id, blob){ const p=String(blob).split('.'); if(p[0]!
 function ingestReport(sid, rowT, p, off){
   if(!p || !Array.isArray(p.s)) return;
   const station=(P.sensors[sid]||{}).kind==='station', who=station?'station':'mobile';
+  if(station && Array.isArray(p.rooms) && !p.sim) roomsIngest(p.rooms, rowT);
   // The row time is the server's. The sensor's own clock is used only to order its reports, shifted onto the server's clock.
   const at=Number.isFinite(p.t) ? Math.min(rowT, Math.max(rowT-600000, p.t+(off||0))) : rowT;
   LIVE.seen[who]=Math.max(LIVE.seen[who], at);
