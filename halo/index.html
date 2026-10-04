@@ -470,6 +470,7 @@ select.inp{flex:none}
 .layers .laycap{flex-basis:100%;font-size:11px;color:var(--dim);font-family:var(--mono)}
 .sph-zoom{position:absolute;right:0;bottom:1%;z-index:6;display:flex;flex-direction:column;gap:8px}
 .sph-zoom button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line2);background:rgba(10,16,32,.92);color:var(--ink);font-size:20px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px -6px rgba(0,0,0,.8)}
+.unitsw{display:block;margin-top:6px;white-space:nowrap}
 .radline .steps{display:block;margin-top:6px;font-size:11.5px;color:var(--dim)}
 #mfLayers{margin:0 0 8px}
 .mf-fit{background:rgba(255,138,60,.14);border:1px solid #ff8a3c;color:#ffd9bf;border-radius:999px;font-size:12px;font-weight:600;padding:4px 11px;margin:3px 0}
@@ -2491,7 +2492,12 @@ const MILE=1609.344, MACRO_STEPS=[0.5*MILE,MILE,2*MILE,5*MILE,15*MILE], MACRO_DE
 function macroRadius(){
   return Math.max(S.macroR||MACRO_DEFAULT, radiusState().r*2);
 }
-const miText = m => m>=160 ? (m/MILE).toFixed(m>=10*MILE?0:1).replace(/\.0$/,'')+' mi' : Math.round(m*3.28084/10)*10+' ft';
+// Distances read in kilometres or miles. The first choice follows the language of the device: miles for the United States,
+// the United Kingdom, Liberia and Myanmar, kilometres elsewhere. One tap under the maps changes it, and the choice is kept.
+const unitsFor = lang => { const m=/^([a-z]{2,3})(?:[-_]([A-Za-z]{2}))?/.exec(String(lang||'')); if(!m) return 'mi'; const reg=(m[2]||'').toUpperCase(); return reg ? (['US','GB','LR','MM'].indexOf(reg)>=0?'mi':'km') : (m[1].toLowerCase()==='en'?'mi':'km'); };
+const unitNow = () => (P.units==='km'||P.units==='mi') ? P.units : unitsFor(navigator.language);
+const miText = m => unitNow()==='km' ? (m>=950 ? (m/1000).toFixed(m>=10000?0:1).replace(/\.0$/,'')+' km' : Math.max(10,Math.round(m/10)*10)+' m')
+  : (m>=160 ? (m/MILE).toFixed(m>=10*MILE?0:1).replace(/\.0$/,'')+' mi' : Math.round(m*3.28084/10)*10+' ft');
 const beyond = () => { const V=vis(), r=radiusState().r; return (V.mode==='live'||V.mode==='sim') ? V.devices.filter(d=>d.present!==false && d.dist>r && !d.mine) : []; };
 const heardDevs = () => { const V=vis(); return V.mode==='live' ? V.devices.filter(d=>(d.withYou||d.onRoute) && !d.mine).slice(0,12) : []; };
 function macroData(){ const f=[];
@@ -2527,7 +2533,8 @@ function macroUpdate(){
     { const pr=ptsR(r), part=[['cctv','camera','cameras'],['speed','speed camera','speed cameras'],['site','tower site','tower sites']].map(x=>{ const n=ptsOf(x[0],pr).length; return n ? '<b style="color:'+POI_C[x[0]]+'">'+n+' '+(n===1?x[1]:x[2])+'</b>' : ''; }).filter(Boolean);
       if(part.length) line+=part.join(', ')+' within '+miText(pr)+'. '; }
   }
-  line+=' <span style="white-space:nowrap">'+MACRO_STEPS.map(m=>'<button class="chipbtn '+((S.macroR||MACRO_DEFAULT)===m?'on':'')+'" data-act="macro-r" data-m="'+m+'">'+miText(m)+'</button>').join(' ')+'</span>';
+  line+=' <span style="white-space:nowrap">'+MACRO_STEPS.map(m=>'<button class="chipbtn '+((S.macroR||MACRO_DEFAULT)===m?'on':'')+'" data-act="macro-r" data-m="'+m+'">'+miText(m)+'</button>').join(' ')+'</span>'+
+    ' <span class="unitsw">'+['mi','km'].map(u=>'<button class="chipbtn '+(unitNow()===u?'on':'')+'" data-act="units" data-u="'+u+'">'+(u==='mi'?'Miles':'Kilometres')+'</button>').join(' ')+'</span>';
   setHTML(el('macroLine'), line);
   if(!MACRO||!MAP_CENTER) return;
   try{ const src=MACRO.getSource('macro'); if(src) src.setData(macroData()); if(YOU2) YOU2.setLngLat([MAP_CENTER.lon,MAP_CENTER.lat]); }catch(e){ return; }
@@ -3105,7 +3112,7 @@ function mapFullTick(force){
   const placed=devs.filter(d=>d.fix).length, rough=devs.filter(d=>!d.fix&&d.sector).length, nd=devs.filter(noDir).length, wy=devs.filter(d=>d.withYou).length, V=vis();
   setHTML(el('mfSum'), !g ? '<b>The map needs your position.</b> <button class="btn sm primary" data-act="geo-ask" style="margin-left:6px">Share my position</button>'
     : !(V.mode==='live'||V.mode==='sim') ? '<b>'+esc(stateWords(V.mode).count)+'.</b> Unknown, not Clear.'
-    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+((parts=>parts.length?' · <button class="mf-fit" data-act="mf-fit">Within 1 mi: '+parts.join(', ')+'. Show them</button>':'')((()=>{ const pr=ptsR(MILE), out=[], cs=poiCount('alpr'); if(cs) out.push(cs+' plate '+(cs===1?'camera':'cameras'));
+    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+((parts=>parts.length?' · <button class="mf-fit" data-act="mf-fit">Within '+miText(MILE)+': '+parts.join(', ')+'. Show them</button>':'')((()=>{ const pr=ptsR(MILE), out=[], cs=poiCount('alpr'); if(cs) out.push(cs+' plate '+(cs===1?'camera':'cameras'));
       [['cctv','camera','cameras'],['speed','speed camera','speed cameras'],['site','tower site','tower sites']].forEach(x=>{ const n=ptsOf(x[0],pr).length; if(n) out.push(n+' '+(n===1?x[1]:x[2])); }); return out; })()))+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
   renderLayers();
   const chips=devs.slice(0,24).map(d=>{ const th=deviceThreat(d); return '<button class="mf-chip'+(MF.sel===d.id?' sel':'')+'" data-act="mf-dev" data-id="'+d.id+'" style="--hc:var('+TIER_VAR[th.tierIdx]+')">'+esc(devName(d))+'<span>'+esc(distText(d))+(d.bearing!=null?' · '+esc(whereWords(d)):' · direction pending')+'</span></button>'; }).join('');
@@ -4710,6 +4717,7 @@ document.addEventListener('click', e=>{
     case 'ident-photo': { const f=el('identFile'); if(f){ f.value=''; f.click(); } break; }
     case 'ident-photo-del': { const d=identPick(); if(d && P.photos && P.photos[d.id]){ delete P.photos[d.id]; save(); logEvidence('note','Photo removed from '+d.name+' ('+d.id+').'); renderVicinity(); } break; }
     case 'macro-r': { S.macroR=+a.dataset.m; _fitM=0; macroUpdate(); renderLayers(); break; }
+    case 'units': { P.units=a.dataset.u==='km'?'km':'mi'; save(); S._cams=null; renderVicinity(); if(S.mapFull) mapFullTick(false); toast(P.units==='km'?'Distances now read in kilometres and metres.':'Distances now read in miles and feet.'); break; }
     case 'micro-v': { S.microV=+a.dataset.m||0; S._view=null; _fitR=0; renderVicinity(); break; }
     case 'sph-zoom': { const big=el('stage').dataset.big==='macro', inn=a.dataset.d==='in', list=big?MACRO_STEPS:MICRO_VIEWS, cur=big?(S.macroR||MACRO_DEFAULT):viewRadius();
       const nx = inn ? [...list].reverse().find(v=>v<cur-1) : list.find(v=>v>cur+1);
@@ -4734,7 +4742,7 @@ document.addEventListener('click', e=>{
     case 'mf-close': mapFullClose(false); break;
     case 'mf-follow': { MF.follow=!MF.follow; a.classList.toggle('on',MF.follow); mapFullTick(false); break; }
     case 'mf-north': { MF.headUp=!MF.headUp; a.classList.toggle('on',MF.headUp); a.innerHTML='<small>'+(MF.headUp?'FACE UP':'N UP')+'</small>'; if(!MF.headUp && FULL){ try{ FULL.rotateTo(0,{duration:400}); }catch(e){} } headAsk(); mapFullTick(false); break; }
-    case 'mf-fit': { const g=gz(); if(!FULL || !g) break; MF.follow=false; el('mfFollow').classList.remove('on'); fitTo(FULL, g, MILE, true); toast('The map now shows 1 mile around you. The round button brings it back to you.'); break; }
+    case 'mf-fit': { const g=gz(); if(!FULL || !g) break; MF.follow=false; el('mfFollow').classList.remove('on'); fitTo(FULL, g, MILE, true); toast('The map now shows '+miText(MILE)+' around you. The round button brings it back to you.'); break; }
     case 'mf-zin': if(FULL) FULL.zoomIn(); break;
     case 'mf-zout': if(FULL) FULL.zoomOut(); break;
     case 'mf-dev': { MF.pt=null; MF.sel=a.dataset.id||null; const d=MF.sel&&findDevice(MF.sel); if(d && d.fix && FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); try{ FULL.easeTo({center:[d.fix.lon,d.fix.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
