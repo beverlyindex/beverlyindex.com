@@ -740,7 +740,7 @@ a.tk:hover b{text-decoration:underline}
                   <span><i style="background:var(--route)"></i>Seen on route</span>
                   <span><i style="background:var(--action)"></i>With you</span>
                   <span><i class="rgh"></i>Direction rough</span>
-                  <span><i class="hol"></i>Heard, direction pending (list only)</span>
+                  <span><i class="hol"></i>Heard, direction pending: a dashed ring at its distance</span>
                 </div>
                 <div class="layers" id="mapLayers"></div>
                 <div id="suspects"></div>
@@ -1934,7 +1934,7 @@ function renderVicinity(){
   setHTML(el('microLab'), 'Micro<i> · '+(view!==BASE_R&&!rs.ext ? view+' m view' : blocks+' blocks'+(rs.ext?', extended':''))+'</i>');
   setHTML(el('microState'), '');            // the map is never covered by words: the state is read on the line above it
   { const nd=shown?sus.filter(noDir).length:0, pl=shown?sus.length-nd:0;
-    setHTML(el('microNote'), nd ? (pl?'+':'')+nd+' heard, direction pending' : ''); }
+    setHTML(el('microNote'), nd ? (pl?'+':'')+nd+' heard, direction pending · on rings' : ''); }
   setHTML(el('radLine'), (rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(view<BASE_R ? (shown||S.microV?' Micro is zoomed to '+view+' m.':'') : view>BASE_R ? ' Micro is widened to '+view+' m; the inner line is your radius.' : ''))+
@@ -2197,7 +2197,7 @@ function zonesData(){ const f=[];
   const V=vis(); if(V.mode==='live' && MAP_CENTER) inRadius().forEach(d=>{
     if(d.fix) f.push({type:'Feature',properties:{kind:'fix'},geometry:{type:'Polygon',coordinates:[circlePoly(d.fix.lat,d.fix.lon,d.fix.unc)]}});
     else if(d.sector) f.push({type:'Feature',properties:{kind:'arc'},geometry:{type:'LineString',coordinates:arcLine(MAP_CENTER.lat,MAP_CENTER.lon,d.dist,d.sector.brg-d.sector.half,d.sector.brg+d.sector.half)}});
-    else if(d.id===(S._identShown||S.identId)) f.push({type:'Feature',properties:{kind:'range'},geometry:{type:'LineString',coordinates:circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,d.dist)}}); });
+    else f.push({type:'Feature',properties:{kind:'range', c:markerColor(d), sel:d.id===(S._identShown||S.identId)?1:0},geometry:{type:'LineString',coordinates:circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,Math.max(2,d.dist))}}); });      // direction pending: it is somewhere on this ring
   return {type:'FeatureCollection',features:f}; }
 const distLL=(la1,lo1,la2,lo2)=>Math.hypot((la2-la1)*111320,(lo2-lo1)*111320*Math.cos(la1*Math.PI/180));
 function fitTo(map,c,r,animate){ const dLat=r/111320, dLon=r/(111320*Math.cos(c.lat*Math.PI/180));
@@ -2238,7 +2238,7 @@ async function initMap(){
     MAP.addLayer({id:'zone-me',type:'fill',source:'zones',filter:['==',['get','kind'],'me'],paint:{'fill-color':'#3f74d6','fill-opacity':.14}});
     MAP.addLayer({id:'zone-fix',type:'fill',source:'zones',filter:['==',['get','kind'],'fix'],paint:{'fill-color':'#e8a84a','fill-opacity':.12}});
     MAP.addLayer({id:'zone-fix-l',type:'line',source:'zones',filter:['==',['get','kind'],'fix'],paint:{'line-color':'#e8a84a','line-width':1,'line-opacity':.6}});
-    MAP.addLayer({id:'zone-range',type:'line',source:'zones',filter:['==',['get','kind'],'range'],paint:{'line-color':'#9aa6c4','line-width':1,'line-opacity':.55,'line-dasharray':[1.5,2.5]}});
+    MAP.addLayer({id:'zone-range',type:'line',source:'zones',filter:['==',['get','kind'],'range'],paint:{'line-color':['coalesce',['get','c'],'#9aa6c4'],'line-width':['case',['==',['get','sel'],1],2.4,1.1],'line-opacity':['case',['==',['get','sel'],1],.95,.5],'line-dasharray':[1.5,2.5]}});
     MAP.addLayer({id:'zone-arc',type:'line',source:'zones',filter:['==',['get','kind'],'arc'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.8}});
     poiAttach(MAP); YOU=mark(MAP,'you-dot');
     fitRadius(true); renderVicinity();
@@ -2249,7 +2249,7 @@ async function initMap(){
     MACRO.addLayer({id:'m-foot-f',type:'fill',source:'macro',filter:['==',['get','kind'],'foot'],paint:{'fill-color':'#4f8df0','fill-opacity':.16}});
     MACRO.addLayer({id:'m-foot',type:'line',source:'macro',filter:['==',['get','kind'],'foot'],paint:{'line-color':'#4f8df0','line-width':1.5,'line-opacity':.9}});
     MACRO.addLayer({id:'m-track',type:'line',source:'macro',filter:['==',['get','kind'],'track'],paint:{'line-color':'#9fc4ff','line-width':2,'line-opacity':.85}});
-    MACRO.addLayer({id:'m-range',type:'line',source:'macro',filter:['==',['get','kind'],'range'],paint:{'line-color':'#9aa6c4','line-width':1,'line-opacity':.55,'line-dasharray':[1.5,2.5]}});
+    MACRO.addLayer({id:'m-range',type:'line',source:'macro',filter:['==',['get','kind'],'range'],paint:{'line-color':['coalesce',['get','c'],'#9aa6c4'],'line-width':['case',['==',['get','sel'],1],2.4,1.1],'line-opacity':['case',['==',['get','sel'],1],.95,.5],'line-dasharray':[1.5,2.5]}});
     MACRO.addLayer({id:'m-heard',type:'circle',source:'macro',filter:['==',['get','kind'],'heard'],paint:{'circle-radius':3.5,'circle-color':['get','c'],'circle-opacity':.85,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
     poiAttach(MACRO); YOU2=mark(MACRO,'you-dot sm');
     macroUpdate();
@@ -2594,7 +2594,7 @@ function updateDeviceMarkers(){
   if(!MAP||!MAP_CENTER) return;
   try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); const z=MAP.getSource('zones'); if(z) z.setData(zonesData()); }catch(e){}
   fitRadius(false);
-  // A device whose direction is not known has no place on a map. It is counted on the sphere and listed by distance below.
+  // A device whose direction is not yet known is drawn as a dashed ring at its distance: it is somewhere on that ring. Once you move and turn, the ring becomes a mark.
   const V=vis(); placeMarkers(MAP, MAP_MARKERS, (V.mode==='live'||V.mode==='sim')?inRadius().filter(d=>!noDir(d)):[], '');
 }
 function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else { updateDeviceMarkers(); macroUpdate(); } }
@@ -2962,7 +2962,7 @@ function mfData(){ const f=[], g=gz(); if(!g) return {type:'FeatureCollection',f
   const V=vis(); if(V.mode==='live'||V.mode==='sim') V.devices.filter(d=>d.present!==false).forEach(d=>{
     if(d.fix) f.push({type:'Feature',properties:{kind:'zone'},geometry:{type:'Polygon',coordinates:[circlePoly(d.fix.lat,d.fix.lon,d.fix.unc)]}});
     else if(d.sector) f.push({type:'Feature',properties:{kind:'arc'},geometry:{type:'LineString',coordinates:arcLine(g.lat,g.lon,d.dist,d.sector.brg-d.sector.half,d.sector.brg+d.sector.half)}});
-    else if(d.id===MF.sel) f.push({type:'Feature',properties:{kind:'range'},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,d.dist)}}); });
+    else f.push({type:'Feature',properties:{kind:'range', c:markerColor(d), sel:d.id===MF.sel?1:0},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,Math.max(2,d.dist))}}); });
   heardDevs().forEach(d=>d.samples.forEach(sm=>{ const q=toLL(sm.x,sm.y); f.push({type:'Feature',properties:{kind:'heard',c:d.withYou?'#ff5a5a':'#2dd4ea'},geometry:{type:'Point',coordinates:[q.lon,q.lat]}}); }));
   return {type:'FeatureCollection',features:f}; }
 // The ring labels live in their own source. Lettering needs a download, and a failed download must not take the rings and your route down with it.
@@ -2987,7 +2987,7 @@ async function mapFullOpen(){
       L('mf-zone','fill','zone',{'fill-color':'#e8a84a','fill-opacity':.14});
       L('mf-zone-l','line','zone',{'line-color':'#e8a84a','line-width':1.2,'line-opacity':.7});
       L('mf-arc','line','arc',{'line-color':'#e8a84a','line-width':2.5,'line-opacity':.85});
-      L('mf-range','line','range',{'line-color':'#dfe8ff','line-width':1.2,'line-opacity':.7,'line-dasharray':[1.5,2.5]});
+      L('mf-range','line','range',{'line-color':['coalesce',['get','c'],'#dfe8ff'],'line-width':['case',['==',['get','sel'],1],2.6,1.2],'line-opacity':['case',['==',['get','sel'],1],.95,.5],'line-dasharray':[1.5,2.5]});
       FULL.addLayer({id:'mf-heard',type:'circle',source:'mf',filter:['==',['get','kind'],'heard'],paint:{'circle-radius':4,'circle-color':['get','c'],'circle-opacity':.85,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
       if(VEC){ FULL.addSource('mfl',{type:'geojson',data:mfLabels()}); FULL.addLayer({id:'mf-ringlab',type:'symbol',source:'mfl',layout:{'text-field':['get','t'],'text-font':['Noto Sans Regular'],'text-size':10.5,'text-allow-overlap':true},paint:{'text-color':'#b9cdf5','text-halo-color':'#070b16','text-halo-width':1.4}}); }
       const e=document.createElement('div'); e.className='you-dot'; e.innerHTML='<span class="cone off"></span>'; FULL_YOU=new window.maplibregl.Marker({element:e}).setLngLat([g.lon,g.lat]).addTo(FULL);
