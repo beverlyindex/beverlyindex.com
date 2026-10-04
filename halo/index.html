@@ -467,7 +467,7 @@ select.inp{flex:none}
 .ticker .track .date{color:var(--dim);font-family:var(--mono);font-size:11px}
 @keyframes marq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
-/* preview roster (simulated devices) */
+/* roster */
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .chipbtn{border:1px solid var(--line2);background:transparent;color:var(--mut);font-size:12px;font-weight:600;padding:7px 12px;border-radius:999px}
 .chipbtn.on{color:#fff;background:var(--chrome2);border-color:var(--chrome2)}
@@ -724,7 +724,7 @@ a.tk:hover b{text-decoration:underline}
         <section data-pane="responder" class="hidden"><div id="hMain"></div></section>
 
         <section data-pane="evidence" class="hidden">
-          <div class="pagehead"><h2>Evidence</h2><p>Every action you record is hashed and chained on this device, then encrypted before it syncs to your other devices. Simulated previews never enter this log.</p></div>
+          <div class="pagehead"><h2>Evidence</h2><p>Every action you record is hashed and chained on this device, then encrypted before it syncs to your other devices. Test data stays out of this log.</p></div>
           <div class="card">
             <h3>Evidence chain <span class="n" id="evCount"></span></h3>
             <div class="toolbar"><button class="btn sm" data-act="ev-export">Export signed log</button><button class="btn sm gold" data-act="report-new">New report</button><button class="btn sm" data-act="report">Last report</button></div>
@@ -827,8 +827,8 @@ const P = loadState();
 function save(){ store.set('halo_v2', JSON.stringify(P)); onLocalChange(); }
 
 /* ---------- session state ---------- */
-const S = { view:'overview', mode:'auto', shelf:'real', open:new Set(), preview:false, devices:[], sort:'near',
-  openDevices:new Set(), _rsig:'', homePreview:false, homeAlert:null, global:null, globalErr:false, pos:null,
+const S = { view:'overview', mode:'auto', shelf:'real', open:new Set(), devices:[], sort:'near',
+  openDevices:new Set(), _rsig:'', global:null, globalErr:false, pos:null,
   capTarget:null, capAim:0, capStream:null, capRAF:0 };
 
 const REGISTER_DATE = '3 October 2026';
@@ -1480,16 +1480,13 @@ const LIAB_LINE='Steps with an Effect line change your device, account or softwa
 
 /* ---------- Assess: the BLUF ---------- */
 function assess(){
-  if(S.homeAlert) return { t:3, n:'!', title:'Take Action', side:'Responder',
-    s:'Simulated preview. Possible fall: '+esc(S.homeAlert.who)+', '+esc(S.homeAlert.room)+'. No movement since. Call now.',
-    meta:'This is a preview. No home station is connected.' };
   const answered = PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const pool = THREATS.filter(t=>t.shelf==='real' && (S.mode==='auto' || t.side===S.mode));
   const applies = pool.filter(t=>scopeOf(t)===true), unknown = pool.filter(t=>scopeOf(t)===null);
   const rn=t=>{ const r=rating(t); return r?r.n:0; }, imm=applies.filter(t=>rn(t)>=4).length;
   const open = applies.filter(isOpen).sort((a,b)=>rn(b)-rn(a) || IMPACT_W(b.impact)-IMPACT_W(a.impact) || doneCount(a)-doneCount(b));
   const V=vis();
-  const vic = V.mode==='live' ? (V.test?'Vicinity: test data from a simulated sensor':'Vicinity: live from your sensor') : V.mode==='sim' ? 'Vicinity: simulated preview'
+  const vic = V.mode==='live' ? (V.test?'Vicinity: test data':'Vicinity: live from your sensor')
     : stateWords(V.mode).vic;
   const reg = S.global ? 'Global feed read '+feedAgo() : 'Register as of '+REGISTER_DATE;
   if(V.mode==='live'){ const w=V.devices.filter(d=>d.present&&d.withYou&&!d.sim);
@@ -1822,11 +1819,11 @@ function renderOverview(){
   const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const openN=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true&&isOpen(t)).length;
   h+='<div class="pipe-h">Threat Scope<span id="scopeAge">'+esc(scopeAge())+'</span></div><div class="pipe" id="scopePills">'+scopeHTML(a)+'</div>';
+  h+=pathCard();
   h+='<div class="verdict"><div class="ring">'+a.n+'</div><div><div class="vt">'+esc(a.title)+'</div><div class="vs">'+a.s+'</div><div class="vm">'+esc(a.meta)+'</div>'+
      '<div class="chips"><span class="chip '+(a.side==='Watchers'?'w':a.side==='Attackers'?'a':'')+'">'+esc(a.side)+'</span><span class="chip real">'+real+' Real &amp; Imminent</span><span class="chip pot">'+pot+' Potential</span></div></div></div>';
   { const lr=reportLast(); h+='<div class="formrow" style="margin:0 0 12px"><button class="btn gold wide" data-act="report-new">New report: every current threat, explained</button>'+(lr?'<button class="btn wide" data-act="report">Last report, No. '+lr.n+', '+hhmm(lr.t)+'</button>':'')+'</div>'; }
   const cat=x=>'<div class="cat"><span>'+x+'</span></div>';
-  h+=pathCard();
   h+='<div class="stack">'+cat('Your set-up')+profilePull()+sigPull()+healthPull()+devicesPull()+cat('The wider picture')+globalPull()+resourcesPull()+'</div>';
   h+='<div class="limit" style="margin-top:16px;text-align:center"><a href="#" data-act="terms">Terms of use</a></div></div>';
   el('ovMain').innerHTML=h;
@@ -1872,6 +1869,7 @@ function viewRadius(){
   const rs=radiusState(), V=vis(); if(rs.ext) return rs.r;
   if(V.mode!=='live' && V.mode!=='sim') return BASE_R;
   let far=0; V.devices.forEach(d=>{ if(d.present!==false && d.dist<=rs.r) far=Math.max(far, d.dist+(d.fix?d.fix.unc:0)); });
+  if(layerOn('cam')) camsNear().forEach(c=>{ if(c.d<=rs.r) far=Math.max(far, c.d); });      // a plate camera inside your two blocks stays in view
   if(!far) return (S._view=BASE_R);
   const cur=S._view||BASE_R;                              // a tighter view is taken only once everything sits well inside it
   return (S._view = VIEW_STEPS.find(v=>far<=v*(v<cur?0.7:0.85)) || BASE_R);
@@ -1883,7 +1881,7 @@ const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';     
 const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'direction rough, '+whereWords(d) : 'direction pending';
 function renderVicinity(){
   const V=vis(), shown=V.mode==='live'||V.mode==='sim', rs=radiusState(), blocks=rs.r/BLOCK_M, sus=shown?inRadius():[];
-  el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : V.mode==='sim' ? sus.length+' simulated' : stateWords(V.mode).count;
+  el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : stateWords(V.mode).count;
   el('radLine').className='radline'+(rs.ext?' ext':'');
   el('sphMicro').classList.toggle('ext',!!rs.ext);
   const view=viewRadius();
@@ -1894,8 +1892,8 @@ function renderVicinity(){
   el('radLine').innerHTML = rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(shown && viewRadius()<BASE_R ? ' Micro is zoomed to '+viewRadius()+' m.' : '');
-  const devLine = V.mode==='live' ? (V.test?'test data from a simulated sensor':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
-    : V.mode==='sim' ? 'simulated, updated every 1.6 seconds' : stateWords(V.mode).line;
+  const devLine = V.mode==='live' ? (V.test?'test data':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
+    : stateWords(V.mode).line;
   setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'from your phone, '+Math.max(1,Math.round((Date.now()-P.where.t)/60000))+' min ago':gz()?'your saved home location':'allow location and your map appears')+' · Devices: '+esc(devLine));
   groundSync(); syncBase();
   const note=el('mapNote');
@@ -1907,7 +1905,7 @@ function renderVicinity(){
       return '<div class="sus'+(S.identId===d.id?' sel':'')+'" data-act="sus" data-id="'+d.id+'" style="--hc:var('+tc+')"><span class="sdot'+mkClass(d)+'" style="--mk:'+markerColor(d)+'"></span>'+
         '<span class="sn"><b>'+esc(devName(d))+'</b> <span class="sm">'+esc(kindText(d))+' · '+flagOf(d)+(dirNote(d)?' · '+dirNote(d):'')+(d.sim?' · test data':'')+'</span></span>'+
         '<span class="sd">'+esc(distText(d))+'<br><span class="'+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></span></div>'; }).join('')
-      : '<div class="empty" style="padding:14px 6px">'+(V.mode==='live'?'Your sensor is reporting. Nothing is in earshot inside the radius at this moment.':'No simulated devices inside the radius at this moment.')+'</div>'; }
+      : '<div class="empty" style="padding:14px 6px">'+(V.mode==='live'?'Your sensor is reporting. Nothing is in earshot inside the radius at this moment.':'Nothing is in earshot inside the radius at this moment.')+'</div>'; }
   if(host._h!==html){ host.innerHTML=html; host._h=html; }          // leave the rows alone when nothing changed, so a tap is never lost
   renderIdent(); macroUpdate(); renderWalk(); poiTick(); renderLayers();
   renderMap();
@@ -2207,36 +2205,47 @@ function poiImage(kind){ const n=44, cv=document.createElement('canvas'); cv.wid
     g.lineWidth=2.2; g.beginPath(); g.arc(22,12,8,-Math.PI*.82,-Math.PI*.18); g.stroke(); }
   return g.getImageData(0,0,n,n); }
 function poiAttach(map){ if(!map || map._poi) return; map._poi=true;
+  if(!map._quiet){ map._quiet=true; map.on('error',()=>{}); }          // a map square that is slow to arrive is asked for again by the map itself
   try{ ['cam','tower','towerbad'].forEach(k=>{ if(!map.hasImage('poi-'+k)) map.addImage('poi-'+k, poiImage(k), {pixelRatio:2}); });
-    (POI.alpr||[]).forEach((u,i)=>{ map.addSource('alpr'+i,{type:'vector',url:u});
-      map.addLayer({id:'alpr'+i, type:'symbol', source:'alpr'+i, 'source-layer':'cameras', minzoom:8,
-        layout:{'icon-image':'poi-cam','icon-size':['interpolate',['linear'],['zoom'],8,.3,11,.5,14,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('cam')?'visible':'none'}}); });
     map.addSource('poi',{type:'geojson',data:poiData()});
     map.addLayer({id:'poi-ring',type:'line',source:'poi',filter:['==',['get','kind'],'taring'],layout:{visibility:layerOn('tower')?'visible':'none'},paint:{'line-color':POI_C.tower,'line-width':1.5,'line-opacity':.8,'line-dasharray':[2,2.5]}});
     map.addLayer({id:'poi-tower',type:'symbol',source:'poi',filter:['in',['get','kind'],['literal',['tower','towerbad']]],
       layout:{'icon-image':['case',['==',['get','kind'],'towerbad'],'poi-towerbad','poi-tower'],'icon-size':['interpolate',['linear'],['zoom'],8,.45,13,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('tower')?'visible':'none'}});
-  }catch(e){ map._poi=false; } }
+  }catch(e){ map._poi=false; return; }
+  poiCams(map); poiSources(); }
+// The camera squares come from a separate service. Its description is read first, with a time limit, so that a slow answer
+// never holds up the street map. Until it has arrived the maps simply carry no cameras, and Halo asks again.
+function poiSources(){ const now=Date.now(); if(S.alprTJ || now-(S._alprAt||0)<60000) return; S._alprAt=now;
+  Promise.all((POI.alpr||[]).map(u=>{ const ac=new AbortController(), to=setTimeout(()=>ac.abort(),7000);
+    return fetch(u,{signal:ac.signal}).then(r=>r.ok?r.json():null).then(j=>(j&&Array.isArray(j.tiles)&&j.tiles.length)?{tiles:j.tiles, minzoom:j.minzoom||0, maxzoom:j.maxzoom||14}:null).catch(()=>null).finally(()=>clearTimeout(to)); }))
+  .then(list=>{ if(!list.some(Boolean)) return; S.alprTJ=list; [MAP,MACRO,FULL].forEach(poiCams); S._cams=null; if(booted) renderVicinity(); }); }
+function poiCams(map){ if(!map || !map._poi || map._cams || !S.alprTJ) return; map._cams=true;
+  try{ S.alprTJ.forEach((tj,i)=>{ if(!tj) return; map.addSource('alpr'+i,{type:'vector',tiles:tj.tiles,minzoom:tj.minzoom,maxzoom:tj.maxzoom,attribution:'Cameras: &copy; OpenStreetMap contributors, DeFlock'});
+      map.addLayer({id:'alpr'+i, type:'symbol', source:'alpr'+i, 'source-layer':'cameras', minzoom:8,
+        layout:{'icon-image':'poi-cam','icon-size':['interpolate',['linear'],['zoom'],8,.3,11,.5,14,.8,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('cam')?'visible':'none'}}, map.getLayer('poi-ring')?'poi-ring':undefined); });
+  }catch(e){ map._cams=false; } }
+const camsReady = m => !!(m && m._cams);
 function poiData(){ const f=[], g=gz(), sv=cellLive()?CELL.serving:null, bad=sv&&towerSigns().level==='suspect';
   Object.keys(P.cells||{}).forEach(id=>{ const r=P.cells[id].reg; if(r && r.found && okLL(r)) f.push({type:'Feature',properties:{kind:(bad&&sv.reg===id)?'towerbad':'tower',id},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}); });
   if(g && sv && sv.c.ta!=null && (sv.c.k==='lte'||sv.c.k==='gsm')){ const m=Math.max(60, sv.c.ta*(sv.c.k==='lte'?78:554)); f.push({type:'Feature',properties:{kind:'taring'},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,m)}}); }
   return {type:'FeatureCollection',features:f}; }
 function poiTick(){ const d=poiData(), key=JSON.stringify(d); if(key===S._poiKey) return; S._poiKey=key;
   [MAP,MACRO,FULL].forEach(m=>{ try{ const src=m&&m.getSource&&m.getSource('poi'); if(src) src.setData(d); }catch(e){} }); }
-function poiLayers(){ [MAP,MACRO,FULL].forEach(m=>{ if(!m||!m._poi) return; try{ (POI.alpr||[]).forEach((u,i)=>m.setLayoutProperty('alpr'+i,'visibility',layerOn('cam')?'visible':'none'));
+function poiLayers(){ [MAP,MACRO,FULL].forEach(m=>{ if(!m||!m._poi) return; try{ (POI.alpr||[]).forEach((u,i)=>{ if(m.getLayer('alpr'+i)) m.setLayoutProperty('alpr'+i,'visibility',layerOn('cam')?'visible':'none'); });
     ['poi-ring','poi-tower'].forEach(l=>m.setLayoutProperty(l,'visibility',layerOn('tower')?'visible':'none')); }catch(e){} }); }
 // Plate cameras around you, nearest first, read from the map squares the Macro sphere holds.
-function camsNear(){ const g=gz(); if(!g || !MACRO || !MACRO._poi) return [];
+function camsNear(){ const g=gz(); if(!g || !camsReady(MACRO)) return [];
   if(S._cams && Date.now()-S._cams.t<4000 && S._cams.k===g.lat.toFixed(4)+','+g.lon.toFixed(4)) return S._cams.v;
   const seen={}, out=[];
-  (POI.alpr||[]).forEach((u,i)=>{ let fs=[]; try{ fs=MACRO.querySourceFeatures('alpr'+i,{sourceLayer:'cameras'}); }catch(e){}
+  (POI.alpr||[]).forEach((u,i)=>{ let fs=[]; try{ if(MACRO.getSource('alpr'+i)) fs=MACRO.querySourceFeatures('alpr'+i,{sourceLayer:'cameras'}); }catch(e){}
     fs.forEach(f=>{ if(!f.geometry || f.geometry.type!=='Point') return; const q=f.properties||{}, co=f.geometry.coordinates, id=String(q.osmId||co.join(','));
       if(seen[id]) return; seen[id]=1; const d=distLL(g.lat,g.lon,co[1],co[0]);
       out.push({id, lat:co[1], lon:co[0], d, brg:(Math.atan2((co[0]-g.lon)*Math.cos(g.lat*Math.PI/180),co[1]-g.lat)*180/Math.PI+360)%360, brand:String(q.brand||''), op:String(q.operator||''), dir:String(q.directionCardinal||''), zone:String(q.surveillanceZone||'')}); }); });
   out.sort((a,b)=>a.d-b.d); S._cams={t:Date.now(), k:g.lat.toFixed(4)+','+g.lon.toFixed(4), v:out}; return out; }
 const poiCount = k => k==='alpr' ? (layerOn('cam') ? camsNear().filter(c=>c.d<=MILE).length : 0) : 0;
-function renderLayers(){ const box=el('mapLayers'); if(!box) return; const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r).length, tw=Object.keys(P.cells||{}).filter(id=>(P.cells[id].reg||{}).found).length;
+function renderLayers(){ const box=el('mapLayers'); if(!box) return; poiSources(); const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r).length, tw=Object.keys(P.cells||{}).filter(id=>(P.cells[id].reg||{}).found).length;
   const lay=(k,ch,name,note)=>'<button class="lay'+(layerOn(k)?'':' off')+'" data-act="layer" data-k="'+k+'" style="--lc:'+POI_C[k]+'"><i>'+ch+'</i>'+name+(note?' <b>'+note+'</b>':'')+'</button>';
-  setHTML(box, lay('cam','&#9679;','Plate cameras', g&&MACRO&&MACRO._poi ? inR+' within '+miText(r) : '')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''))); }
+  setHTML(box, lay('cam','&#9679;','Plate cameras', g&&camsReady(MACRO) ? inR+' within '+miText(r) : '')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''))); }
 
 /* ----- Macro: the wider area. Your route, home, where flagged devices were heard, and known threats beyond the radius ----- */
 const MILE=1609.344, MACRO_STEPS=[2*MILE,5*MILE,15*MILE], MACRO_DEFAULT=5*MILE;      // ground zero is always your own position
@@ -2275,7 +2284,7 @@ function macroUpdate(){
     const inc=far.filter(d=>isKnownThreat(d));
     if(heard.length) line+=heard.length+' flagged '+(heard.length===1?'device':'devices')+' on your route. ';
     if(far.length) line+=far.length+' heard beyond your radius'+(inc.length?', '+inc.length+' a known threat':'')+'. ';
-    if(layerOn('cam') && MACRO && MACRO._poi){ const cs=camsNear().filter(c=>c.d<=r); if(cs.length) line+='<b style="color:'+POI_C.cam+'">'+cs.length+' plate '+(cs.length===1?'camera':'cameras')+'</b> within '+miText(r)+', the nearest '+miText(cs[0].d)+' '+compass(cs[0].brg)+'. '; }
+    if(layerOn('cam') && camsReady(MACRO)){ const cs=camsNear().filter(c=>c.d<=r); if(cs.length) line+='<b style="color:'+POI_C.cam+'">'+cs.length+' plate '+(cs.length===1?'camera':'cameras')+'</b> within '+miText(r)+', the nearest '+miText(cs[0].d)+' '+compass(cs[0].brg)+'. '; }
   }
   line+=' <span style="white-space:nowrap">'+MACRO_STEPS.map(m=>'<button class="chipbtn '+((S.macroR||MACRO_DEFAULT)===m?'on':'')+'" data-act="macro-r" data-m="'+m+'">'+miText(m)+'</button>').join(' ')+'</span>';
   setHTML(el('macroLine'), line);
@@ -2294,7 +2303,7 @@ function placeMarkers(map, store, list, extra){
   const ids=new Set(list.map(d=>d.id));
   Object.keys(store).forEach(id=>{ if(!ids.has(id)){ store[id].remove(); delete store[id]; } });
   list.forEach(d=>{ const ll=devLngLat(d), mc=mkClass(d), cls='dev-marker'+extra+mc+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':'');
-    const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):' (simulated)');
+    const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):'');
     if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
       e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
     else{ const m=document.createElement('div'); m.className=cls; m.style.setProperty('--mk',markerColor(d)); m.title=tip;
@@ -2343,7 +2352,7 @@ function identPick(){
   return [...inRadius()].sort(bySeverity)[0] || null;
 }
 const dirLine = d => !d.live ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : (d.fix && d.bearing!=null) ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.sector ? 'Roughly '+compass(d.sector.brg) : 'Pending';
-const originLine = d => d.live ? (d.sim ? 'Test data from a simulated sensor' : 'Heard by '+(d.sensor==='this-phone'?'this phone':(P.sensors[d.sensor]||{}).name||'your sensor')) : 'Simulated preview';
+const originLine = d => d.live ? (d.sim ? 'Test data' : 'Heard by '+(d.sensor==='this-phone'?'this phone':(P.sensors[d.sensor]||{}).name||'your sensor')) : '';
 function renderIdent(force){
   const V=vis(), d=identPick(), face=el('idFace'), sp=el('sphIdent'); S._identShown=d?d.id:null; if(!face) return;
   if(!d){ sp.style.removeProperty('--hc'); face.className='id-face none'; face.style.backgroundImage='';
@@ -2393,7 +2402,7 @@ async function identPhoto(file){
     toast('Photo attached.'); renderVicinity();
   }catch(e){ toast('That photo could not be read.'); }
 }
-// A picture of the identity card, to keep or to hand to someone. Test and simulated devices are stamped as such.
+// A picture of the identity card, to keep or to hand to someone. Test data is stamped as such.
 async function identSave(){
   const d=identPick(); if(!d) return;
   const th=deviceThreat(d), ph=photoOf(d), W=720, H=960, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
@@ -2414,7 +2423,7 @@ async function identSave(){
   rows.forEach((r,i)=>{ const y=572+i*40; g.textAlign='left'; g.fillStyle='#7f8bab'; g.font='17px system-ui, sans-serif'; g.fillText(r[0],90,y); g.textAlign='right'; g.fillStyle='#e8eefc'; g.font='18px system-ui, sans-serif'; g.fillText(String(r[1]).slice(0,44),W-90,y);
     g.strokeStyle='rgba(120,150,210,.18)'; g.lineWidth=1; g.beginPath(); g.moveTo(90,y+13); g.lineTo(W-90,y+13); g.stroke(); });
   g.textAlign='center';
-  if(!d.live || d.sim){ g.fillStyle='rgba(255,90,90,.16)'; g.fillRect(0,860,W,44); g.fillStyle='#ff8a8a'; g.font='600 18px system-ui, sans-serif'; g.fillText(d.live?'TEST DATA. NOT A REAL DEVICE.':'SIMULATED PREVIEW. NOT A REAL DEVICE.', cx, 888); }
+  if(!d.live || d.sim){ g.fillStyle='rgba(255,90,90,.16)'; g.fillRect(0,860,W,44); g.fillStyle='#ff8a8a'; g.font='600 18px system-ui, sans-serif'; g.fillText('TEST DATA. NOT A REAL DEVICE.', cx, 888); }
   g.fillStyle='#7f8bab'; g.font='14px system-ui, sans-serif';
   g.fillText('The name is a call sign given by Halo. It is not a person\'s name.', cx, 926);
   g.fillText('Saved '+new Date().toLocaleString()+'  ·  Beverly Index LLC', cx, 946);
@@ -2430,44 +2439,13 @@ function updateDeviceMarkers(){
 }
 function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else { updateDeviceMarkers(); macroUpdate(); } }
 
-/* ---------- simulated preview devices. Never logged to Evidence ---------- */
+/* ---------- names and small helpers ---------- */
 const W1=['Amber','Iron','Silent','North','Grey','Hollow','Pale','Copper','Dusk','Quiet','Stone','Red','Low','Blue','Still','Far','Lone','Dim'];
 const W2=['Harbor','Sparrow','Lantern','Current','Vector','Marten','Signal','Cipher','Meadow','Anchor','Falcon','Ember','Pivot','Cedar','Relay','Compass','Beacon','Warden'];
 const GLY=['◆','▲','●','✦','⬟','⬢','◈','❖'];
 let cs=0; const rnd=(a,b)=>a+Math.random()*(b-a), pick=a=>a[Math.floor(Math.random()*a.length)];
 const rssiOf = dist => Math.round(-40-22*Math.log10(Math.max(1,dist)));
 const trendOf = v => v<-0.3?'Approaching':v>0.3?'Leaving':'Steady';
-function makeDevice(o={}){
-  const d={ id:'d'+(cs++), name:pick(W1)+' '+pick(W2), glyph:pick(GLY), cls:o.cls||pick(['Phone','Wearable','Tag','Laptop','Vehicle','Unknown']),
-    dist:o.dist!=null?o.dist:rnd(15,260), vel:o.vel!=null?o.vel:rnd(-0.9,0.9), bearing:rnd(0,359), firstSeen:Date.now()-Math.floor(rnd(0,o.old?2.4e6:9e5)), lastSeen:Date.now(), present:true,
-    randomizes:Math.random()<0.4, identity:o.identity||Math.floor(rnd(1,4)), onRoute:!!o.onRoute, withYou:false, knownBefore:o.knownBefore||Math.random()<0.4 };
-  d.rssi=rssiOf(d.dist); d.trend=trendOf(d.vel); d.timesSeen=Math.floor(rnd(1,o.old?40:7));
-  d.wifi={link:pick(['Home router','Public access point','Unknown access point','Mobile hotspot','None observed']), stores:Math.random()<0.5, relay:pick(['No relay observed','Relays to a cloud host','Relays to an unknown endpoint'])};
-  d.bt=pick(['Advertising continuously','Paired-device traffic','Silent, answers scans','Beaconing on an interval']);
-  d.sig={capability:pick(['Dual-band, BLE 5.x','Single-band, BLE 4.x','Multi-radio, BLE and UWB']), networks:pick(['Seeks one saved network','Seeks several saved networks','Seeks no saved network']), phys:'Clock offset and power-ramp traits recorded'};
-  return d;
-}
-function seedPreview(){ S.devices=[
-  makeDevice({cls:'Phone',dist:18,vel:0.1,identity:3,knownBefore:true}), makeDevice({cls:'Wearable',dist:42,vel:-0.2,identity:3,knownBefore:true}),
-  makeDevice({cls:'Tag',dist:95,vel:-0.5,identity:2,onRoute:true,old:true}), makeDevice({cls:'Laptop',dist:150,vel:0.2,identity:2}),
-  makeDevice({cls:'Unknown',dist:70,vel:0.4,identity:1}),
-  makeDevice({cls:'Vehicle',dist:430,vel:-2.2,identity:3,onRoute:true,old:true}) ]; }
-function tick(){
-  if(!S.preview) return;
-  const now=Date.now();
-  S.devices.forEach(d=>{
-    d.vel=Math.max(-2.6,Math.min(2.6,d.vel+rnd(-0.12,0.12)));
-    d.dist+=d.vel*1.6+rnd(-0.6,0.6);
-    if(d.dist<6){ d.dist=6; d.vel=Math.abs(d.vel)*0.6+0.2; }
-    if(d.dist>MAX_R-20){ d.dist=MAX_R-20; d.vel=-Math.abs(d.vel)-0.3; }
-    d.bearing=(d.bearing+rnd(-2.5,2.5)+360)%360; d.rssi=rssiOf(d.dist); d.trend=trendOf(d.vel);
-    if(d.present) d.lastSeen=now; if(Math.random()<0.012) d.present=!d.present; });
-  if(Math.random()<0.04 && S.devices.length<10){ const nd=makeDevice({dist:rnd(180,320),vel:rnd(-1.4,-0.3)}); if(Math.random()<0.3) nd.onRoute=true; S.devices.push(nd); }
-  S.devices.filter(d=>d.present&&d.onRoute&&d.dist<25&&!d.withYou).forEach(d=>{ if(Math.random()<0.15) d.withYou=true; });
-  if(vis().mode!=='sim') return;
-  if(S.view==='overview'||S.view==='watchers') renderVicinity();
-  if(el('rost')) renderRoster();
-}
 const band = d => d.dist<30?'Very near':d.dist<=BLOCK_M?'Within one block':d.dist<=BASE_R?'Within two blocks':'Beyond two blocks';
 const labelOf = d => { const l=d && d.live && P.labels && P.labels[d.id]; return (typeof l==='string' && l) ? l : ''; };
 const devName = d => d.live ? (labelOf(d) || d.adv || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
@@ -2518,7 +2496,7 @@ function openDeviceInRoster(d){ S.openDevices.add(d.id); S.open.add('w_ble'); if
 /* ---------- Capture Now (preview targets only until a sensor is connected) ---------- */
 const capEl=el('capture');
 const capName = t => t ? ((t.cls==='Unknown'&&t.identity<2)?'Unknown':t.name) : '';
-const capTag = t => !t ? '' : !t.live ? ' (simulated)' : t.sim ? ' (test data)' : '';
+const capTag = t => !t ? '' : t.sim ? ' (test data)' : '';
 async function openCapture(target){
   S.capTarget=target||vis().devices.filter(d=>d.present).sort((a,b)=>b.rssi-a.rssi)[0]||null;
   capEl.classList.remove('hidden'); el('capTarget').textContent=S.capTarget?('Target: '+capName(S.capTarget)+capTag(S.capTarget)):'No device selected';
@@ -2556,7 +2534,7 @@ el('capShot').onclick=async ()=>{
   if(S.capStream && v.videoWidth) ctx.drawImage(v,0,0,c.width,c.height); else { ctx.fillStyle='#070b14'; ctx.fillRect(0,0,c.width,c.height); }
   ctx.drawImage(el('capOverlay'),0,0);
   if(t && t.live && !t.sim){ await logEvidence('capture','Capture of '+capName(t)+' ('+t.cls+'), '+distText(t)+'. Camera frame taken at '+new Date().toLocaleTimeString()+'.',{aim:S.capAim,sig:t.sig}); toast('Capture added to Evidence.'); }
-  else toast('Capture saved to this device. Simulated and test targets are not added to Evidence.');
+  else toast('Capture saved to this device. Test data stays out of Evidence.');
   c.toBlob(b=>{ if(b) saveOut('halo-capture-'+Date.now()+'.png','image/png',b); });
 };
 
@@ -2877,7 +2855,7 @@ function mapFullTick(force){
   const placed=devs.filter(d=>d.fix).length, rough=devs.filter(d=>!d.fix&&d.sector).length, nd=devs.filter(noDir).length, wy=devs.filter(d=>d.withYou).length, V=vis();
   setHTML(el('mfSum'), !g ? '<b>The map needs your position.</b> <button class="btn sm primary" data-act="geo-ask" style="margin-left:6px">Share my position</button>'
     : !(V.mode==='live'||V.mode==='sim') ? '<b>'+esc(stateWords(V.mode).count)+'.</b> Unknown, not Clear.'
-    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
+    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+((cs=>cs?' · <b style="color:#ff8a3c">'+cs+' plate '+(cs===1?'camera':'cameras')+' within 1 mi</b>':'')(poiCount('alpr')))+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
   const chips=devs.slice(0,24).map(d=>{ const th=deviceThreat(d); return '<button class="mf-chip'+(MF.sel===d.id?' sel':'')+'" data-act="mf-dev" data-id="'+d.id+'" style="--hc:var('+TIER_VAR[th.tierIdx]+')">'+esc(devName(d))+'<span>'+esc(distText(d))+(d.bearing!=null?' · '+esc(whereWords(d)):' · direction pending')+'</span></button>'; }).join('');
   const ch=el('mfChips'); if(ch._h!==chips){ ch.innerHTML=chips; ch._h=chips; }
   const sd=MF.sel && devs.find(d=>d.id===MF.sel);
@@ -2918,7 +2896,7 @@ function reportHTML(){
        (open.length?plural(open.length,'still has','still have')+' steps to complete. The most serious open item is '+e(open[0].t.name)+', because what it reaches is '+e(lowerFirst(open[0].t.impact))+'.':'Every defence that applies to you is complete.')+
        (unknown.length?' '+plural(unknown.length,'more is','more are')+' decided as soon as you answer the remaining profile questions.':'')+'</p>';
   h+='<p>'+(live ? 'A sensor is reporting, and '+plural(near.length,'device is','devices are')+' in earshot. '+(withYou.length?e(withYou.map(devName).join(', '))+' '+(withYou.length===1?'has':'have')+' met the test for moving with you. Treat this as the first priority, and read the advisory in section 8 before you act.':'None has met the test for moving with you.')+(route.length?' '+plural(route.length,'device has','devices have')+' been heard in more than one place on your route.':'')
-        : V.mode==='live' ? 'The sensor data on this account is test data from a simulated sensor, shown for practice.'
+        : V.mode==='live' ? 'The sensor data on this account is test data.'
         : e(stateWords(ls).long))+'</p>';
   const first=open.slice(0,3).map(r=>({r, s:nextStep(r)})).filter(x=>x.s);
   if(first.length) h+='<p>What to do first: '+first.map((x,i)=>'('+(i+1)+') '+e(x.s.t.replace(/\.$/,''))+', which belongs to '+e(x.r.t.name)).join('; ')+'. The full plan is in section 7.</p>';
@@ -3495,7 +3473,7 @@ const CLS=['Phone','Wearable','Tag','Laptop','Vehicle','Access point','Cell towe
 const SENSOR_KIND={ phone:'Phone app', carried:'Carried sensor', station:'Home listener' };
 const hasSensors = () => Object.keys(P.sensors||{}).length>0 || PH.on;
 const hash32 = s => { let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
-const callsign = (h,h2) => W1[h%W1.length]+' '+W2[(h>>>8)%W2.length]+' '+(10+h2%90);      // simulated preview only
+const callsign = (h,h2) => W1[h%W1.length]+' '+W2[(h>>>8)%W2.length]+' '+(10+h2%90);
 // A real device is named by its maker and what kind of thing it is. The short code only tells two alike apart.
 const MAKERS=['Apple','Microsoft','Samsung','Google','Tile','Chipolo','Garmin','Bose','Sony','Harman','Amazon','Xiaomi','Huawei','LG','Huami','Espressif','Nokia','Intel','Meta','Fitbit','Tesla','Flock'];
 const KIND_WORD={Phone:'phone',Wearable:'wearable',Tag:'tracker',Laptop:'computer',Vehicle:'vehicle','Access point':'Wi-Fi access point','Cell tower':'cell tower',Camera:'surveillance device',Unknown:'device'};
@@ -3748,19 +3726,19 @@ function toolTower(){
       '<span class="td">'+[c.ci?'cell '+esc(String(c.ci)):'', c.tac!=null?'area '+c.tac:'', c.pci!=null?'PCI '+c.pci:'', c.ch!=null?'channel '+c.ch:'', (use&&c.ta!=null&&(c.k==='lte'||c.k==='gsm'))?'about '+Math.round(c.ta*(c.k==='lte'?78:554))+' m by timing':''].filter(Boolean).join(' · ')+'</span></div>'; };
   let h='<div class="dsec"><h4>Every tower in earshot, live <span class="chip pot" style="margin-left:6px">'+CELL.list.length+' in earshot</span></h4>'+
     '<div class="hrow"><span class="hs '+(ts.level==='ok'?'ok':'att')+'" style="'+(ts.level==='ok'?'':'color:var('+col+');border-color:var('+col+')')+'">'+word+'</span><span>'+
-      (ts.level==='ok' ? 'Your phone is on '+esc(sv.gen)+'. Halo checked the tower in use against seven signs of a fake one, and it shows none.'
+      (ts.level==='ok' ? 'Your phone is on '+esc(sv.gen)+'. Halo checked the tower in use against '+((P.cellCheck&&can)?'seven':'five')+' signs of a fake one, and it shows none.'
         : '<b>The tower in use shows '+ts.signs.length+(ts.signs.length===1?' sign':' signs')+' of a fake one.</b> '+ts.signs.map(x=>esc(x.t)).join(' ')+(ts.level==='suspect'?' Switch to airplane mode, move a few streets, and call through an end-to-end encrypted app.':' Halo keeps watching it.'))+'</span></div>'+
     [...CELL.list].sort((a,b)=>(b.reg?1:0)-(a.reg?1:0) || (b.r||-200)-(a.r||-200)).map(row).join('')+
     '<div class="kv" style="margin-top:10px"><span class="k">In use since</span><span class="v">'+hhmm(sv.since)+'</span><span class="k">Changes, last 10 min</span><span class="v">'+ch10+'</span>'+
     '<span class="k">Halo has met it</span><span class="v">'+(rec.n||1)+(rec.n===1?' time':' times')+(rec.t0?', first on '+fmtD(new Date(rec.t0).toISOString()):'')+'</span>'+
     (P.cellCheck&&can?'<span class="k">Public register</span><span class="v">'+(!reg?'Asking':reg.found?(sv.pos?'Listed '+miText(distLL(sv.pos.lat,sv.pos.lon,reg.lat,reg.lon))+' from you':'Listed')+(reg.samples?', seen '+reg.samples+' times':''):'Unlisted')+'</span>':'')+'</div>'+
-    '<div class="limit" style="margin-top:8px">The seven signs: a move to 2G, a tower the register places far away, a tower absent from the register, a first meeting in a place Halo knows, repeated changes while you stand still, a new tracking area while you stand still, and neighbours that fall silent.</div></div>';
+    '<div class="limit" style="margin-top:8px">The signs: a move to 2G, a first meeting in a place Halo knows, repeated changes while you stand still, a new tracking area while you stand still, and neighbours that fall silent'+((P.cellCheck&&can)?', a tower the public register places far away, and a tower absent from the register.':'.'+(can?' Switch the register check on for two more.':''))+'</div></div>';
   return h+regRow;
 }
 /* ----- Plate Camera Watch: the mapped cameras nearest you, and Flock hardware heard by radio ----- */
 function toolAlpr(){
   const g=gz(), cams=g?camsNear():[], r=macroRadius(), inR=cams.filter(c=>c.d<=r), heard=vis().mode==='live'?[...LIVE.devs.values()].filter(d=>d.cls==='Camera'&&d.present&&!d.sim):[];
-  let h='<div class="dsec"><h4>Plate cameras around you <span class="chip pot" style="margin-left:6px">'+(g&&MACRO&&MACRO._poi?inR.length+' within '+miText(r):'map loading')+'</span></h4>';
+  let h='<div class="dsec"><h4>Plate cameras around you <span class="chip pot" style="margin-left:6px">'+(g&&camsReady(MACRO)?inR.length+' within '+miText(r):'reading the map')+'</span></h4>';
   if(!g) h+='<p>Allow location and Halo counts the mapped cameras around you and names the nearest.</p>';
   else if(!inR.length) h+='<div class="hrow"><span class="hs ok">Clear</span><span>The map holds no plate camera within '+miText(r)+' of you.</span></div>';
   else h+=inR.slice(0,8).map(c=>'<div class="rowline"><span><b>'+esc(c.brand||'Plate camera')+'</b>'+(c.op?' <span class="mono" style="font-size:11px;color:var(--mut)">'+esc(c.op)+'</span>':'')+'<br><span class="mono" style="font-size:11px;color:var(--mut)">'+(c.dir?'faces '+esc(c.dir)+' · ':'')+(c.zone?esc(c.zone)+' · ':'')+'on the map in orange</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.cam+'">'+esc(miText(c.d))+' '+compass(c.brg)+'</span></div>').join('')+
@@ -3843,8 +3821,8 @@ async function phDescribe(ev){
   const sdata={}; try{ ev.serviceData && ev.serviceData.forEach((v,k)=>{ sdata[phShort(k)]=phBytes(v); }); }catch(e){}
   const services=(ev.uuids||[]).map(phShort).sort(), mfr={}; try{ ev.manufacturerData && ev.manufacturerData.forEach((v,k)=>{ mfr[k]=phBytes(v); }); }catch(e){}
   // Flock Safety hardware announces itself: the battery pack by name and by maker mark 0x09C8, the Raven gunshot detector by its services.
-  if(mfr[0x09C8] || FLOCK_BLE.test(name)) return {id:'fk:'+hash32('b'+String(ev.device&&ev.device.id)).toString(36), cls:'Camera', hint:'Flock Safety, plate camera', conf:mfr[0x09C8]?3:2, flags:[], name};
   if(services.some(u=>RAVEN_SVC.indexOf(u)>=0)) return {id:'fk:'+hash32('r'+String(ev.device&&ev.device.id)).toString(36), cls:'Camera', hint:'Flock Raven, gunshot detector', conf:2, flags:[], name};
+  if(mfr[0x09C8] || FLOCK_BLE.test(name)) return {id:'fk:'+hash32('b'+String(ev.device&&ev.device.id)).toString(36), cls:'Camera', hint:'Flock Safety, plate camera', conf:mfr[0x09C8]?3:2, flags:[], name};
   for(const sv of Object.keys(sdata).concat(services)) if(PH_TRACKERS[sv])
     return {id:'sd:'+await phSha([sv, sdata[sv]||new Uint8Array(0)]), cls:'Tag', hint:PH_TRACKERS[sv], conf:2, flags:['fd5a','feaa','fcb2'].indexOf(sv)>=0?['randomized']:[], name};
   if(mfr[0x004C]){ const pb=mfr[0x004C], t=pb.length?pb[0]:-1;
@@ -4021,7 +3999,7 @@ function walkDocHTML(){
   const longEnough=st.minutes>=FOLLOW_MIN && st.distance_m>=FOLLOW_SPAN.ble, sensors=(PH.on?['This phone']:[]).concat(carriedIds().map(k=>P.sensors[k].name));
   const stayed=ds.filter(r=>!r.withYou).map(r=>Object.assign({share:durMs>0?(r.last-r.first)/durMs:0},r)).filter(r=>r.share>=.5 && (r.span||0)>=80).sort((a,b)=>b.share-a.share).slice(0,6);
   let h='<h1>Remiel Halo Trip Report</h1><p class="rp-sub">What was around you, and what stayed with you</p>'+
-    '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded on '+e(Y.name||'this device')+(W.test?' &nbsp;·&nbsp; <b>Test data from a simulated sensor</b>':'')+'</div>';
+    '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded on '+e(Y.name||'this device')+(W.test?' &nbsp;·&nbsp; <b>Test data</b>':'')+'</div>';
   // 1
   const bottom = !ds.length ? 'Route recorded' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : longEnough ? 'Nothing moved with you' : 'Follower test in progress';
   h+='<h2>1. Summary</h2><p>Bottom line: <span class="rp-tier">'+e(bottom)+'</span></p>'+
@@ -4147,7 +4125,7 @@ function alertScan(){
     if(d.withYou) alertRaise('with:'+d.sig, d.cls==='Tag'?'A tracker is travelling with you':d.band==='wifi'?'A hotspot is travelling with you':'A device is travelling with you', devName(d)+' '+followText(d)+'. Open it and decide whether it is yours.', {dev:d.id});
     else if(d.homeAway) alertRaise('route:'+d.sig, 'A device from your home is near you again', devName(d)+' '+followText(d)+'.', {dev:d.id});
     if(d.cls==='Camera') alertRaise('cam:'+d.sig, /Raven/.test(d.hint)?'A gunshot detector is in earshot':'A plate camera is in earshot', devName(d)+' is broadcasting '+distText(d)+' from you. Halo places it on the map as you move.', {dev:d.id}); });
-  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv){ if(alertRaise('tower:'+sv.reg, 'A tower in use shows the signs of a fake one', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows the signs of a fake one. '+ts.signs.map(x=>x.t).join(' ')); } } }
+  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv && sv.gen!=='2G'){ if(alertRaise('tower:'+sv.reg, 'A tower in use shows the signs of a fake one', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows the signs of a fake one. '+ts.signs.map(x=>x.t).join(' ')); } } }
   const by={}; wifiNow().forEach(d=>{ if(d.adv && !d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
   Object.keys(by).forEach(n=>{ const x=by[n]; if(x.length>1 && x.some(d=>/^Open/.test(d.hint)) && x.some(d=>/^Secured/.test(d.hint)))
     alertRaise('twin:'+n, 'A copied Wi-Fi network is in range', n+' appears both locked and open. Join only the locked one, or use mobile data.', {res:'a_pubwifi'}); });
@@ -4167,7 +4145,7 @@ function alertNativeTick(){ const N=NATIVE(); if(!N) return;
     if(typeof N.takeOpen==='function'){ const k=N.takeOpen(); if(k) alertGo(k); } }catch(e){} }
 function nativeMine(){ const N=NATIVE(); if(!N || typeof N.setMine!=='function') return; try{ N.setMine(JSON.stringify(Object.keys(sigGet().keys||{}).slice(0,300))); }catch(e){} }
 
-/* ----- which devices the screen shows: live from a sensor, the simulated preview, or nothing ----- */
+/* ----- which devices the screen shows: live from a sensor, or nothing ----- */
 // The words for each state in which nothing near you can be shown. None of them reads Clear.
 function stateWords(m){ const since=hhmm(liveLast()-LIVE.skew);
   return m==='silent' ? {count:'listening paused', line:'your sensor last reported at '+since, long:'Your sensor last reported at '+since+'. Wake it and Halo carries on.', note:'Listening paused.', vic:'Vicinity: listening paused', cov:'Paused since '+since}
@@ -4475,7 +4453,6 @@ function boot(){
   if(last && VIEW_NAME[last.v] && Date.now()-last.t<30*86400000){ S.shelf=last.sh==='potential'?'potential':'real'; (last.o||[]).forEach(x=>S.open.add(x)); setView(last.v); }
   else { if(PROFILE_Q.every(q=>pv(q.k)===null)) S.open.add('profile'); setView('overview'); }
   navKeep();
-  setInterval(tick, 1600);
   loadGlobal(); setInterval(loadGlobal, 2*60*1000); setInterval(fillTickers, 60000);
   setInterval(()=>{ if(S.global && document.visibilityState==='visible') applyGlobal(true); }, 60000);          // the age on screen counts up by the minute
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-(S.globalAt||0)>120000) loadGlobal(); });
