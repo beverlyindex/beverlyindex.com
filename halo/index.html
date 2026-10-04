@@ -164,6 +164,10 @@ select.inp{flex:none}
 .mf-chip span{display:block;font-family:var(--mono);font-size:10.5px;color:var(--mut)}
 .mf-info{border:1px solid var(--line2);border-radius:12px;background:rgba(10,16,32,.96);padding:10px 12px;margin-bottom:8px;font-size:13px;line-height:1.45}
 .mf-info .formrow{margin-top:8px}
+.ptcard p{margin:4px 0 8px;color:var(--mut);font-size:12.5px}
+.ptcard .kv{font-size:12.5px;gap:5px 12px}
+.ptcard a{color:#9fc4ff}
+#ptInfo .ptcard{margin-top:10px}
 #mapFull .maplibregl-ctrl-bottom-left{bottom:150px}
 .you-dot .cone{position:absolute;left:50%;top:50%;width:0;height:0;margin:-34px 0 0 -13px;border-left:13px solid transparent;border-right:13px solid transparent;border-bottom:30px solid rgba(79,141,240,.42);transform-origin:13px 34px;pointer-events:none}
 .you-dot .cone.off{display:none}
@@ -724,6 +728,7 @@ a.tk:hover b{text-decoration:underline}
                   <div class="sph-zoom"><button data-act="sph-zoom" data-d="in" title="Closer" aria-label="Closer">+</button><button data-act="sph-zoom" data-d="out" title="Wider" aria-label="Wider">&minus;</button></div>
                 </div>
                 <div class="formrow" style="justify-content:center;margin-top:8px"><button class="btn sm primary" data-act="map-full">Open the full map</button></div>
+                <div id="ptInfo"></div>
                 <div id="walkBox"></div>
                 <div class="map-note" id="mapNote">Loading the map.</div>
                 <div class="macroline" id="macroLine"></div>
@@ -2284,7 +2289,7 @@ function poiAttach(map){ if(!map || map._poi) return; map._poi=true;
     sym('pts-cctv',['in',['get','k'],['literal',['cam','gun']]],['case',['==',['get','k'],'gun'],'poi-gun','poi-cctv'],'cctv');
     sym('pts-speed',['==',['get','k'],'speed'],'poi-speed','speed');
     sym('pts-plate',['==',['get','k'],'plate'],'poi-cam','cam');
-    if(map===FULL) PT_LAYERS.forEach(l=>map.on('click',l,e=>{ const f=e.features&&e.features[0]; if(!f) return; const q=f.properties||{}; MF.sel=null; MF.pt={k:q.k, n:q.n||'', op:q.op||'', dir:q.dir||'', zone:q.zone||'', t:q.t||'', p:q.p||'', c:Number(q.c)||0, lon:f.geometry.coordinates[0], lat:f.geometry.coordinates[1]}; mapFullTick(false); }));
+    if(map===FULL) PT_LAYERS.forEach(l=>map.on('click',l,e=>{ const f=e.features&&e.features[0]; if(!f) return; MF.sel=null; MF.pt=ptFrom(f); mapFullTick(false); }));
     map.addSource('poi',{type:'geojson',data:poiData()});
     map.addLayer({id:'poi-ring',type:'line',source:'poi',filter:['==',['get','kind'],'taring'],layout:{visibility:layerOn('tower')?'visible':'none'},paint:{'line-color':POI_C.tower,'line-width':1.5,'line-opacity':.8,'line-dasharray':[2,2.5]}});
     map.addLayer({id:'poi-tower',type:'symbol',source:'poi',filter:['in',['get','kind'],['literal',['tower','towerbad']]],
@@ -2301,7 +2306,7 @@ function poiCams(map){ if(!map || !map._poi || map._cams || !S.alprTJ) return; m
   try{ S.alprTJ.forEach((tj,i)=>{ if(!tj) return; map.addSource('alpr'+i,{type:'vector',tiles:tj.tiles,minzoom:tj.minzoom,maxzoom:tj.maxzoom,attribution:'Cameras: &copy; OpenStreetMap contributors, DeFlock'});
       map.addLayer({id:'alpr'+i, type:'symbol', source:'alpr'+i, 'source-layer':'cameras', minzoom:8,
         layout:{'icon-image':'poi-cam','icon-size':['interpolate',['linear'],['zoom'],8,.22,11,.36,13,.6,15,.85,17,1.05],'icon-allow-overlap':true,'icon-ignore-placement':true,visibility:layerOn('cam')?'visible':'none'}}, map.getLayer('poi-ring')?'poi-ring':undefined);
-      if(map===FULL) map.on('click','alpr'+i,e=>{ const f=e.features&&e.features[0]; if(!f) return; const q=f.properties||{}; MF.sel=null; MF.pt={k:'plate', n:String(q.brand||''), op:String(q.operator||''), dir:String(q.directionCardinal||''), zone:String(q.surveillanceZone||''), lon:f.geometry.coordinates[0], lat:f.geometry.coordinates[1]}; mapFullTick(false); }); });
+      if(map===FULL) map.on('click','alpr'+i,e=>{ const f=e.features&&e.features[0]; if(!f) return; MF.sel=null; MF.pt=ptFrom(f); mapFullTick(false); }); });
   }catch(e){ map._cams=false; } }
 const camsReady = m => !!(m && m._cams);
 /* Threat points from Halo's own backend, one request per map square of about 7 km. The request names the square and never your
@@ -2331,7 +2336,7 @@ function ptsReach(){ const g=gz(); if(!g) return 0; const c=ptTile(g.lat,g.lon),
   return reach; }
 function ptsData(){ if(PTS.data && PTS.dataVer===PTS.ver) return PTS.data; const f=[], seen={};
   Object.keys(PTS.sq).forEach(k=>PTS.sq[k].items.forEach(i=>{ if(seen[i.id]) return; seen[i.id]=1;
-    f.push({type:'Feature',properties:{k:i.k, n:i.n||'', op:i.op||'', dir:i.dir||'', zone:i.zone||'', t:i.t||'', p:i.p||'', c:i.c||0},geometry:{type:'Point',coordinates:[i.lon,i.lat]}}); }));
+    const q={}; Object.keys(i).forEach(k=>{ if(k!=='lat' && k!=='lon' && (typeof i[k]==='string' || typeof i[k]==='number')) q[k]=i[k]; }); f.push({type:'Feature',properties:q,geometry:{type:'Point',coordinates:[i.lon,i.lat]}}); }));
   PTS.dataVer=PTS.ver; return PTS.data={type:'FeatureCollection',features:f}; }
 function ptsShow(){ [MAP,MACRO,FULL].forEach(m=>{ if(!m || !m._poi || m._ptsVer===PTS.ver) return; try{ const src=m.getSource('pts'); if(src){ src.setData(ptsData()); m._ptsVer=PTS.ver; } }catch(e){} }); }
 // Every loaded point with its distance and bearing from you, nearest first.
@@ -2345,6 +2350,33 @@ const ptsOf = (layer, r) => layerOn(layer) ? ptsNear().filter(i=>PT_KIND[i.k]===
 const ptsHas = layer => Object.keys(PTS.sq).some(k=>PTS.sq[k].items.some(i=>PT_KIND[i.k]===layer));
 const ptsCredit = () => { const out=[]; Object.keys(PTS.sq).forEach(k=>PTS.sq[k].credit.forEach(c=>{ if(out.indexOf(c)<0) out.push(c); })); return out; };
 const faces = d => !d ? '' : 'faces '+(/^-?\d+(\.\d+)?$/.test(String(d)) ? compass(((Number(d)%360)+360)%360) : String(d));
+// A mark that is tapped is read out in full: what it is, where it points, how it is built, who runs it, and where the record came from.
+const PT_SAY={plate:'Reads and records the plate of each vehicle that passes, with the time.', cam:'Records what passes in front of it.', gun:'Listens for gunfire and reports where the sound came from.', speed:'Measures speed and photographs the plate of a vehicle above the limit.', site:'A licensed mast or small cell on the public record.'};
+const PT_BUILD={dome:'Dome. It can look all round, and its facing at any moment is hidden', fixed:'Fixed. It watches one direction', panning:'Panning. It turns, so its view changes'};
+function ptFrom(f){ const q=f.properties||{}, co=f.geometry.coordinates, i={lon:co[0], lat:co[1]};
+  if(q.k && PT_WORD[q.k]) Object.keys(q).forEach(k=>{ i[k]=q[k]; });
+  else Object.assign(i,{k:'plate', n:String(q.brand||q.manufacturer||''), mf:String(q.brand||q.manufacturer||''), op:String(q.operator||''), dir:String(q.directionCardinal||q.direction||''), zone:String(q.surveillanceZone||''), ty:String(q.cameraType||''), mt:String(q.mount||q.cameraMount||''), id:q.osmId!=null?'n'+q.osmId:''});
+  return i; }
+function ptCard(i, close){ const g=gz(), rows=[], e=esc, words=v=>e(String(v==null?'':v).replace(/_/g,' ')), add=(k,v)=>{ if(v) rows.push('<span class="k">'+k+'</span><span class="v">'+v+'</span>'); };
+  if(g) add('From you', e(miText(distLL(g.lat,g.lon,i.lat,i.lon)))+' '+compass((Math.atan2((i.lon-g.lon)*Math.cos(g.lat*Math.PI/180),i.lat-g.lat)*180/Math.PI+360)%360));
+  add('Faces', i.dir ? e(faces(i.dir).replace(/^faces /,''))+(/^-?\d+(\.\d+)?$/.test(String(i.dir))?' ('+Math.round(Number(i.dir))+'&deg;)':'') : i.ty==='dome' ? 'All round' : '');
+  add('Tilt', i.ang ? e(i.ang)+(/^-?\d+(\.\d+)?$/.test(String(i.ang))?'&deg; down':'') : '');
+  add('Build', PT_BUILD[i.ty] || words(i.ty));
+  add('Mounted on', words(i.mt));
+  add('Height', i.ht ? e(i.ht)+(/^\d+(\.\d+)?$/.test(String(i.ht))?' m':'') : '');
+  add('Watches', words([i.zone, i.sv && i.sv!==i.zone ? i.sv : ''].filter(Boolean).join(', ')));
+  add('Speed limit', i.ms ? e(i.ms)+(/^\d+$/.test(String(i.ms))?' km/h':'') : '');
+  add('Run by', i.op ? e(i.op)+(i.opt?' ('+words(i.opt)+')':'') : words(i.opt));
+  add('Maker', e([i.mf, i.md].filter(Boolean).join(' ')));
+  add('Kind of site', e(i.t)); add('Installations', i.c>1 ? String(i.c) : ''); add('Power', e(i.p));
+  add('State', e(i.st)); add('In place since', e(i.sd)); add('Reference', e(i.ref)); add('Note on the map', e(i.ds));
+  add('Position', Number(i.lat).toFixed(5)+', '+Number(i.lon).toFixed(5));
+  add('Source', i.reg ? 'Public register' : /^n\d+$/.test(String(i.id||'')) ? 'OpenStreetMap, <a href="https://www.openstreetmap.org/node/'+String(i.id).slice(1)+'" target="_blank" rel="noopener">open the record</a>' : 'OpenStreetMap');
+  const thin = !(i.dir||i.ty||i.mt||i.ht||i.zone||i.op||i.mf||i.t||i.st||i.ds);
+  return '<div class="mf-info ptcard" style="border-color:'+POI_C[PT_KIND[i.k]]+'"><b style="color:'+POI_C[PT_KIND[i.k]]+'">'+e(i.n||PT_WORD[i.k])+'</b>'+(i.n?' · '+PT_WORD[i.k]:'')+'<p>'+PT_SAY[i.k]+'</p><div class="kv">'+rows.join('')+'</div>'+
+    (thin?'<div class="limit" style="margin-top:8px">The map holds its position so far. What you see of it, its facing and its mount, belongs in Your log under Evidence.</div>':'')+
+    '<div class="formrow"><button class="btn sm" '+close+'>Close</button></div></div>'; }
+function renderPt(){ const box=el('ptInfo'); if(box) setHTML(box, S.pt ? ptCard(S.pt,'data-act="pt-close"') : ''); }
 const ptLine = i => [i.op && i.op!==i.n ? i.op : '', i.t||'', i.c>1 ? i.c+' installations' : '', i.p||'', faces(i.dir), i.zone||''].filter(Boolean).join(' · ');
 function poiData(){ const f=[], g=gz(), sv=cellLive()?CELL.serving:null, bad=sv&&towerSigns().level==='suspect';
   Object.keys(P.cells||{}).forEach(id=>{ const r=P.cells[id].reg; if(r && r.found && okLL(r)) f.push({type:'Feature',properties:{kind:(bad&&sv.reg===id)?'towerbad':'tower',id},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}); });
@@ -2370,7 +2402,7 @@ function renderLayers(){ const box=el('mapLayers'); if(!box) return; poiSources(
   const lay=(k,ch,name,note)=>'<button class="lay'+(layerOn(k)?'':' off')+'" data-act="layer" data-k="'+k+'" style="--lc:'+POI_C[k]+'"><i>'+ch+'</i>'+name+(note?' <b>'+note+'</b>':'')+'</button>';
   const pr=ptsR(r), more=(k,ch,name)=>ptsHas(k) ? lay(k,ch,name, g ? ptsOf(k,pr).length+' within '+miText(pr) : '') : '';
   { const cr=ptsCredit(), ce=el('ptsCredit'); if(ce) setHTML(ce, cr.length ? 'Threat points: '+cr.map(esc).join(' ') : ''); }
-  const keyHTML=(cap)=>(cap?'<span class="laycap">Tap a kind to show or hide it on every map.</span>':'')+'<button class="layall'+(anyOn?'':' off')+'" data-act="layer-all">'+(anyOn?'Hide all':'Show all')+'</button>'+lay('cam','&#9679;','Plate cameras', g&&ptsReady() ? cams.filter(c=>c.d<=(camsReady(MACRO)?r:pr)).length+' within '+miText(camsReady(MACRO)?r:pr) : '')+more('cctv','&#9670;','Cameras')+more('speed','&#9673;','Speed cameras')+more('site','&#9652;','Tower sites')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''));
+  const keyHTML=(cap)=>(cap?'<span class="laycap">Tap a mark on the front map to read it. Tap a kind here to show or hide it on every map.</span>':'')+'<button class="layall'+(anyOn?'':' off')+'" data-act="layer-all">'+(anyOn?'Hide all':'Show all')+'</button>'+lay('cam','&#9679;','Plate cameras', g&&ptsReady() ? cams.filter(c=>c.d<=(camsReady(MACRO)?r:pr)).length+' within '+miText(camsReady(MACRO)?r:pr) : '')+more('cctv','&#9670;','Cameras')+more('speed','&#9673;','Speed cameras')+more('site','&#9652;','Tower sites')+lay('tower','&#9650;','Towers', cellLive()?CELL.list.length+' in earshot'+(tw?', '+tw+' placed':''):(tw?tw+' placed':''));
   setHTML(box, keyHTML(true)); setHTML(el('mfLayers'), keyHTML(false)); }
 
 /* ----- Macro: the wider area. Your route, home, where flagged devices were heard, and known threats beyond the radius ----- */
@@ -2992,8 +3024,7 @@ function mapFullTick(force){
   setHTML(el('mfInfo'), sd ? '<div class="mf-info"><b>'+esc(devName(sd))+'</b> · '+esc(kindText(sd))+'<br>'+esc(distText(sd))+(sd.bearing!=null?', '+esc(whereWords(sd))+(heading()!=null?' ('+esc(compass(sd.bearing))+')':''):'. Move and make a turn, and Halo finds its direction')+
       (sd.fix?' · placed within '+Math.round(sd.fix.unc)+' m':sd.sector?' · direction only':'')+' · '+esc(flagOf(sd))+
       '<div class="formrow"><button class="btn sm primary" data-act="mf-ident" data-id="'+sd.id+'">Identify</button><button class="btn sm" data-act="mf-dev" data-id="">Close</button></div></div>'
-    : (MF.pt && PT_WORD[MF.pt.k]) ? (i=>'<div class="mf-info" style="--hc:'+POI_C[PT_KIND[i.k]]+'"><b>'+esc(i.n||PT_WORD[i.k])+'</b>'+(i.n?' · '+PT_WORD[i.k]:'')+'<br>'+(g?esc(miText(distLL(g.lat,g.lon,i.lat,i.lon)))+' '+compass((Math.atan2((i.lon-g.lon)*Math.cos(g.lat*Math.PI/180),i.lat-g.lat)*180/Math.PI+360)%360):'')+(ptLine(i)?' · '+esc(ptLine(i)):'')+
-      '<div class="formrow"><button class="btn sm" data-act="mf-dev" data-id="">Close</button></div></div>')(MF.pt) : '');
+    : (MF.pt && PT_WORD[MF.pt.k]) ? ptCard(MF.pt, 'data-act="mf-dev" data-id=""') : '');
 }
 
 /* ---------- Full Report: every current threat, explained, in one document. It follows the order of the NOUS Full Clinical Report:
@@ -4564,7 +4595,13 @@ document.addEventListener('click', e=>{
     case 'sort': S.sort=a.dataset.s; S._rsig=''; rerender(); renderRoster(); break;
     case 'dev': { const id=a.dataset.id; S.openDevices.has(id)?S.openDevices.delete(id):S.openDevices.add(id); renderRoster(); break; }
     case 'sus': { const d=findDevice(a.dataset.id); if(d) selectDevice(d.id); break; }
-    case 'sph': { const st=el('stage'), w=a.dataset.s; if(st.dataset.big!==w){ st.dataset.big=w; S.big=w; _fitR=0; _fitM=0; } break; }
+    case 'sph': { const st=el('stage'), w=a.dataset.s; if(st.dataset.big!==w){ st.dataset.big=w; S.big=w; _fitR=0; _fitM=0; break; }
+      const map=w==='macro'?MACRO:MAP; if(!map || !map._poi) break;
+      try{ const r=map.getContainer().getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, ls=PT_LAYERS.concat((POI.alpr||[]).map((u,i)=>'alpr'+i)).filter(l=>map.getLayer(l));
+        const fs=map.queryRenderedFeatures([[x-16,y-16],[x+16,y+16]],{layers:ls}); if(!fs.length) break;
+        const d=f=>{ const q=map.project(f.geometry.coordinates); return Math.hypot(q.x-x,q.y-y); }; fs.sort((p,q)=>d(p)-d(q));
+        S.pt=ptFrom(fs[0]); renderPt(); const c=el('ptInfo'); if(c) c.scrollIntoView({block:'nearest',behavior:'smooth'}); }catch(err){} break; }
+    case 'pt-close': S.pt=null; renderPt(); break;
     case 'ident-open': { S.identOpen=!S.identOpen; renderIdent(); break; }
     case 'ident-close': { S.identOpen=false; S.renaming=false; renderIdent(); break; }
     case 'ident-auto': { S.identId=null; S.renaming=false; renderVicinity(); break; }
