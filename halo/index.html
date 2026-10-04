@@ -757,7 +757,7 @@ a.tk:hover b{text-decoration:underline}
                   <span><i style="background:var(--route)"></i>Seen on route</span>
                   <span><i style="background:var(--action)"></i>With you</span>
                   <span><i class="rgh"></i>Direction rough</span>
-                  <span><i class="hol"></i>Heard, direction pending: a dashed ring at its distance</span>
+                  <span><i class="hol"></i>Heard, direction pending: hollow, at its measured distance</span>
                 </div>
                 <div class="layers" id="mapLayers"></div>
                 <div id="suspects"></div>
@@ -1950,12 +1950,13 @@ function radiusState(){
   if(!inc) return {r:BASE_R, ext:null};
   return {r:Math.min(MAX_R, Math.ceil((inc.dist+15)/BLOCK_M)*BLOCK_M), ext:inc};
 }
-const VIEW_STEPS=[25,50,BLOCK_M,BASE_R], MICRO_VIEWS=[50,BLOCK_M,BASE_R,2*BASE_R,4*BASE_R];      // the views you can set by hand; the radius itself stays two blocks
+const VIEW_STEPS=[10,25,50,BLOCK_M,BASE_R], MICRO_VIEWS=[10,25,50,BLOCK_M,BASE_R,2*BASE_R,4*BASE_R];      // the views you can set by hand; the radius itself stays two blocks
 function viewRadius(){
   const rs=radiusState(), V=vis(); if(S.microV) return rs.ext ? Math.max(rs.r, S.microV) : S.microV;      // a view set by hand holds until Auto is chosen
   if(rs.ext) return rs.r;
   if(V.mode!=='live' && V.mode!=='sim') return BASE_R;
-  let far=0; V.devices.forEach(d=>{ if(d.present!==false && d.dist<=rs.r) far=Math.max(far, d.dist+(d.fix?d.fix.unc:0)); });
+  const ds=[]; let must=0; V.devices.forEach(d=>{ if(d.present!==false && d.dist<=rs.r && !quietAp(d)){ const x=d.dist+(d.fix?d.fix.unc:0); ds.push(x); if(isKnownThreat(d)) must=Math.max(must,x); } });
+  ds.sort((a,b)=>a-b); let far = ds.length ? Math.max(must, ds.length>=6 ? ds[Math.ceil(ds.length*0.75)-1] : ds[ds.length-1]) : 0;      // with many devices the view takes in three quarters of them; the rest are one tap wider
   if(layerOn('cam')) camsNear().forEach(c=>{ if(c.d<=rs.r) far=Math.max(far, c.d); });      // a plate camera inside your two blocks stays in view
   if(!far) return (S._view=BASE_R);
   const cur=S._view||BASE_R;                              // a tighter view is taken only once everything sits well inside it
@@ -1975,7 +1976,8 @@ function renderVicinity(){
   setHTML(el('microLab'), 'Micro<i> · '+(view!==BASE_R&&!rs.ext ? view+' m view' : blocks+' blocks'+(rs.ext?', extended':''))+'</i>');
   setHTML(el('microState'), '');            // the map is never covered by words: the state is read on the line above it
   { const nd=shown?sus.filter(noDir).length:0, pl=shown?sus.length-nd:0;
-    setHTML(el('microNote'), nd ? (pl?'+':'')+nd+' heard, direction pending · on rings' : ''); }
+    const out=shown?sus.filter(d=>d.dist>view).length:0;
+    setHTML(el('microNote'), (nd ? (pl?'+':'')+nd+' heard, direction pending' : '')+(out?(nd?' · ':'')+out+' beyond view':'')); }
   setHTML(el('radLine'), (rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(view<BASE_R ? (shown||S.microV?' Micro is zoomed to '+view+' m.':'') : view>BASE_R ? ' Micro is widened to '+view+' m; the inner line is your radius.' : ''))+
@@ -2267,8 +2269,8 @@ function ringsData(){
   return {type:'FeatureCollection',features:feats};
 }
 const noDir = d => d.live && !d.fix && !d.sector && d.bearing==null;
-function devLngLat(d){ if(d.fix) return [d.fix.lon,d.fix.lat];
-  const m=d.dist, a=(d.bearing!=null?d.bearing:d.handleBrg||0)*Math.PI/180, lat=MAP_CENTER.lat;
+function devLngLat(d, micro){ if(d.fix) return [d.fix.lon,d.fix.lat];
+  const pend=d.bearing==null, m=(micro && pend && d._showDist!=null)?d._showDist:d.dist, a=(!pend?d.bearing:(d._brg!=null?d._brg:d.handleBrg||0))*Math.PI/180, lat=MAP_CENTER.lat;
   return [MAP_CENTER.lon+Math.sin(a)*m/(111320*Math.cos(lat*Math.PI/180)), MAP_CENTER.lat+Math.cos(a)*m/111320]; }
 const markerColor = d => d.withYou?'var(--action)':d.onRoute?'var(--route)':d.knownBefore?'var(--clear)':'var(--warn)';
 function zonesData(){ const f=[];
@@ -2538,10 +2540,19 @@ function macroUpdate(){
 const setHTML = (node,html) => { if(node && node._h!==html){ node.innerHTML=html; node._h=html; } };
 function selectDevice(id){ S.identId=id; S.identOpen=true; S.renaming=false; renderVicinity(); }
 // Device markers on a sphere. A marker carries the tier colour and the placement state, at full contrast.
+/* A device whose direction is not yet known is drawn hollow, at its measured distance. Its place round the ring is a seat, kept
+   steady from one moment to the next and chosen so that marks do not sit on top of each other; the mark moves to the true
+   bearing and turns solid once you have moved and turned. A device nearer than your own dot is drawn just clear of it. */
+function pendLayout(list, view){ const box=el('haloMap'), R=Math.max(60,(box&&box.clientWidth||300)/2), gap=R<120?10:17, taken=[];
+  list.filter(d=>!noDir(d)).forEach(d=>{ const q=devXY(d,view,R); if(q) taken.push(q); });
+  list.filter(noDir).sort((a,b)=>a.id<b.id?-1:1).forEach(d=>{ const show=Math.min(Math.max(d.dist, view*0.13), d.dist>view?d.dist:view*0.95), r=show/view*R; let a=Math.round((d.handleBrg||0)/15)*15, best=a;
+    for(let k=0;k<24;k++){ const t=(a+k*15)%360, x=Math.sin(t*Math.PI/180)*r, y=-Math.cos(t*Math.PI/180)*r; if(!taken.some(q=>Math.hypot(q.x-x,q.y-y)<gap)){ best=t; break; } }
+    d._brg=best; d._showDist=show; taken.push({x:Math.sin(best*Math.PI/180)*r, y:-Math.cos(best*Math.PI/180)*r}); }); }
+function devXY(d, view, R){ if(d.bearing==null && !d.fix) return null; const b=(d.bearing!=null?d.bearing:0)*Math.PI/180, r=d.dist/view*R; return {x:Math.sin(b)*r, y:-Math.cos(b)*r}; }
 function placeMarkers(map, store, list, extra){
   const ids=new Set(list.map(d=>d.id));
   Object.keys(store).forEach(id=>{ if(!ids.has(id)){ store[id].remove(); delete store[id]; } });
-  list.forEach(d=>{ const ll=devLngLat(d), mc=mkClass(d), cls='dev-marker'+extra+mc+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':'');
+  list.forEach(d=>{ const ll=devLngLat(d, map===MAP), mc=mkClass(d), cls='dev-marker'+extra+mc+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':'');
     const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):'');
     if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
       e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
@@ -2673,8 +2684,8 @@ function updateDeviceMarkers(){
   if(!MAP||!MAP_CENTER) return;
   try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); const z=MAP.getSource('zones'); if(z) z.setData(zonesData()); }catch(e){}
   fitRadius(false);
-  // A device whose direction is not yet known is drawn as a dashed ring at its distance: it is somewhere on that ring. Once you move and turn, the ring becomes a mark.
-  const V=vis(); placeMarkers(MAP, MAP_MARKERS, (V.mode==='live'||V.mode==='sim')?inRadius().filter(d=>!noDir(d)):[], '');
+  // Every device heard is a mark. Direction known: solid, where it is. Direction pending: hollow, at its measured distance, on its dashed ring.
+  const V=vis(), list=(V.mode==='live'||V.mode==='sim')?inRadius():[]; pendLayout(list, viewRadius()); placeMarkers(MAP, MAP_MARKERS, list, '');
 }
 function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else { updateDeviceMarkers(); macroUpdate(); } }
 
@@ -3084,7 +3095,7 @@ function mapFullTick(force){
   const hm=P.home&&P.home.loc; if(okLL(hm)){ if(!FULL_HOME){ const e=document.createElement('div'); e.className='home-dot'; e.title='Home'; FULL_HOME=new window.maplibregl.Marker({element:e}).setLngLat([hm.lon,hm.lat]).addTo(FULL); } else FULL_HOME.setLngLat([hm.lon,hm.lat]); }
   else if(FULL_HOME){ FULL_HOME.remove(); FULL_HOME=null; }
   const save=MAP_CENTER; if(g) MAP_CENTER={lat:g.lat,lon:g.lon};                 // direction-only devices are drawn from where you are now
-  placeMarkers(FULL, FULL_MARKERS, g?devs.filter(d=>!noDir(d)):[], '');
+  placeMarkers(FULL, FULL_MARKERS, g?devs:[], '');
   Object.keys(FULL_MARKERS).forEach(id=>FULL_MARKERS[id].getElement().classList.toggle('sel', id===MF.sel));
   MAP_CENTER=save;
   if(g && MF.follow){ const o={center:[g.lon,g.lat], duration:force?0:600}; if(MF.headUp && h!=null) o.bearing=h; try{ FULL.easeTo(o); }catch(e){} }
