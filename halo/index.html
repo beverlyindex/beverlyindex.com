@@ -81,6 +81,13 @@ a{color:var(--chrome2)}
 .btn.red{background:linear-gradient(180deg,#ff6b6b,#b81f2c);color:#fff;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -3px 8px rgba(0,0,0,.35),0 10px 24px -8px rgba(255,90,90,.6),inset 0 0 0 1px #ff8d8d}
 .btn.wide{width:100%}
+/* A choice that is made stays visibly made: a button that holds a state turns green while that state holds. */
+.btn.on{background:linear-gradient(180deg,#1f7a4d,#0f4a2e);color:#eafff3;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px var(--clear),0 6px 16px -8px rgba(74,232,138,.6)}
+/* Every control answers a tap: it turns green at once, holds it for a moment, then settles into its new state. */
+.tapped{outline:2px solid var(--clear) !important;outline-offset:1px;transition:none !important}
+button.tapped,.btn.tapped,.chipbtn.tapped,.lay.tapped,.mf-chip.tapped{background:linear-gradient(180deg,#34b874,#17683f) !important;color:#fff !important;border-color:var(--clear) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 0 0 1px var(--clear),0 0 16px -2px rgba(74,232,138,.7) !important}
+button.tapped *,.btn.tapped *{color:#fff !important}
 .btn.sm{font-size:12px;padding:8px 12px;border-radius:10px}
 
 .seg{display:flex;gap:9px;flex-wrap:wrap}
@@ -243,6 +250,7 @@ select.inp{flex:none}
 .pathc .pstep .bx{flex:none;width:17px;height:17px;border-radius:5px;border:1px solid var(--line2);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#0a0f1e}
 .pathc .pstep.ok{color:var(--mut)} .pathc .pstep.ok .bx{background:var(--clear);border-color:var(--clear)}
 .pathc .pmore{background:none;border:0;color:var(--chrome2);font-size:12px;padding:6px 0 0;text-decoration:underline}
+.pathc .pmore.on{color:var(--clear)}
 .instbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;border:1px solid rgba(79,141,240,.45);border-radius:12px;background:rgba(26,58,130,.22);font-size:13px;line-height:1.4}
 .instbar span{flex:1 1 180px}
 .backbar{position:sticky;top:0;z-index:30;display:flex;gap:8px;align-items:center;margin:-14px -16px 10px;padding:8px 16px;background:rgba(7,11,22,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
@@ -332,7 +340,9 @@ select.inp{flex:none}
 .box{width:21px;height:21px;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;color:#04140a;font-size:13px;font-weight:700;
   background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1.5px var(--line2),inset 0 -2px 4px rgba(0,0,0,.4)}
 .chk.on .box{background:linear-gradient(180deg,#8bf3b6,#2fbf6d);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 14px -3px var(--clear)}
-.chk.on .tx{color:var(--mut)}
+.chk.on{background:linear-gradient(90deg,rgba(74,232,138,.14),rgba(74,232,138,.02));box-shadow:inset 3px 0 0 var(--clear);border-radius:8px;padding-left:9px;padding-right:6px}
+.chk.on .tx{color:#c9efd9}
+.chk.risk.on{background:linear-gradient(90deg,rgba(255,90,90,.16),rgba(255,90,90,.02));box-shadow:inset 3px 0 0 var(--action);color:#ffd9d9}
 .special{border:1px solid rgba(217,168,38,.5);border-radius:var(--r2);padding:13px 14px;
   background:linear-gradient(180deg,rgba(217,168,38,.10),rgba(217,168,38,.02));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 0 22px -14px var(--att)}
 .special h4{margin:0 0 6px;font-family:var(--mono);font-weight:600;letter-spacing:.16em;text-transform:uppercase;font-size:11px;color:var(--att2)}
@@ -1587,7 +1597,7 @@ function toolAlias(){
   P.aliases.forEach((a,i)=>{ const s=aliasScore(a); const col=s.n===0?'--clear':s.n<=2?'--warn':'--action';
     h+='<div style="border-top:1px solid var(--line);padding:10px 0"><div class="rowline" style="border:0;padding:0 0 6px"><b>'+esc(a.name)+'</b>'+
        '<span><span class="score" style="color:var('+col+')">'+s.score+'</span> <span class="mono" style="font-size:11px;color:var(--mut)">'+(s.n===0?'holding':s.n<=2?'weak':'joined to you')+'</span> <button class="x" data-act="alias-del" data-i="'+i+'">&times;</button></span></div>';
-    ANCHORS.forEach(x=>{ const on=a.links&&a.links[x[0]]; h+='<div class="chk '+(on?'on':'')+'" style="border:0;padding:5px 0" data-act="alias-link" data-i="'+i+'" data-k="'+x[0]+'"><span class="box" '+(on?'style="background:linear-gradient(180deg,#ff8d8d,#c9303c);box-shadow:0 0 12px -3px var(--action)"':'')+'>'+(on?'&#10003;':'')+'</span><span>'+x[1]+'</span></div>'; });
+    ANCHORS.forEach(x=>{ const on=a.links&&a.links[x[0]]; h+='<div class="chk risk '+(on?'on':'')+'" style="border:0;padding:5px 6px 5px 9px" data-act="alias-link" data-i="'+i+'" data-k="'+x[0]+'"><span class="box" '+(on?'style="background:linear-gradient(180deg,#ff8d8d,#c9303c);box-shadow:0 0 12px -3px var(--action)"':'')+'>'+(on?'&#10003;':'')+'</span><span>'+x[1]+'</span></div>'; });
     h+='</div>'; });
   h+='<div class="formrow"><input class="inp" id="aliasName" placeholder="Alias or account name"><button class="btn sm primary" data-act="alias-add">Add alias</button></div></div>';
   return h;
@@ -1795,7 +1805,7 @@ function pathCard(){
     '<div class="pnames">'+ps.stages.map(x=>'<span class="'+(x.full?'on':'')+'">'+esc(x.rank)+'</span>').join('')+'</div>';
   h+= nx ? '<div class="pnext"><span><b>Next: '+esc(nx.t)+'.</b><i>'+esc(nx.why)+'</i></span><button class="btn sm primary" data-act="path-go">Go</button></div>'
          : '<div class="pnext"><span><b>Every step is complete.</b><i>Halo keeps watch, and a new step appears here when a new threat does.</i></span></div>';
-  h+='<button class="pmore" data-act="pull" data-id="path">'+(open?'Hide the steps':'See all '+ps.all+' steps, '+ps.dn+' done')+'</button>';
+  h+='<button class="pmore'+(open?' on':'')+'" data-act="pull" data-id="path">'+(open?'Hide the steps':'See all '+ps.all+' steps, '+ps.dn+' done')+'</button>';
   if(open) h+='<div class="plist">'+ps.stages.map((x,i)=>'<div class="pst">'+(i+1)+'. '+esc(x.name)+' · level: '+esc(x.rank)+' · '+x.done+' of '+x.n+'</div>'+
       x.steps.map(y=>'<div class="pstep'+(y.ok?' ok':'')+'"><span class="bx">'+(y.ok?'&#10003;':'')+'</span><span>'+esc(y.t)+'</span></div>').join('')).join('')+'</div>';
   return h+'</div>'; }
@@ -1844,11 +1854,11 @@ function renderCoverage(){
     ['Your position', S.pos?'Live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'From your phone':gz()?'Home location':'Allow location', S.pos?'live':gz()?'part':''],
     ['Global feed', g?'Live, sources read '+feedAgo():'Connecting', g?'live':''],
     ...(rayCan()&&P.ray&&P.ray.on ? [['Rayhunter', {off:'Starting',searching:'Looking for it',connected:'Connected',recording:'Recording, being read',unreachable:'Out of reach'}[RAY.state], RAY.state==='recording'?'live':RAY.state==='connected'?'part':'']] : []),
-    ['Alerts', (as=>as==='granted'?'On, banners on this device':as==='screen'?'On, inside Halo':as==='denied'?'Allow in Settings':'<button class="btn sm primary" data-act="alert-ask" style="margin:0">Turn on</button>')(alertState()), alertState()==='granted'||alertState()==='screen'?'live':''],
+    ['Alerts', (as=>as==='granted'?'On, banners on this device':as==='screen'?'On, inside Halo':S.alertAsking?'Asking, answer Allow':'<button class="btn sm '+(as==='denied'?'gold':'primary')+'" data-act="alert-ask" style="margin:0">'+(as==='denied'?'Allow in settings':'Turn on')+'</button>')(alertState()), alertState()==='granted'||alertState()==='screen'?'live':S.alertAsking?'part':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':'Connecting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
   el('covCard').innerHTML='<h3>Coverage <span class="n">what Halo is watching for you</span></h3>'+
-    rows.map(r=>'<div class="cov"><span>'+r[0]+'</span><span class="st"><span class="dot '+r[2]+'"></span>'+r[1]+'</span></div>').join('')+
+    rows.map(r=>'<div class="cov"><span>'+r[0]+'</span><span class="st"><span class="dot '+r[2]+'"></span>'+r[1]+'</span></div>'+(r[0]==='Alerts'&&S.alertHelp&&alertState()!=='granted'?'<div class="limit" id="alertHelp" style="margin:2px 0 8px">'+esc(S.alertHelp)+'</div>':'')).join('')+
     '<div class="formrow"><button class="btn sm" data-act="go-sensors">Add or manage sensors</button></div>';
 }
 function renderHomeMini(){
@@ -2446,7 +2456,7 @@ function identCard(d){
     (d.live?'<span class="k">Call sign</span><span class="v">'+esc(d.name)+'</span><span class="k">Broadcast name</span><span class="v '+(d.adv?'':'unkc')+'">'+esc(d.adv||'None')+'</span><span class="k">Maker hint</span><span class="v '+(d.hint?'':'unkc')+'">'+esc(d.hint||'None')+'</span>':'')+'</div>'+
     (real?'<div class="limit" style="margin-top:10px"><b>To find which device this is.</b> Switch Bluetooth off on the device you suspect. If this entry reads out of earshot within a minute, that is the one. Then rename it'+(d.randomizes?'. This kind of device changes its address every few minutes and will come back as a new entry':'')+'.</div>':'')+
     '<div class="dev-acts"><button class="btn primary" data-act="ident-save">Save identity card</button>'+
-    (real?'<button class="btn" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Not mine':'This is mine')+'</button>':'')+
+    (real?'<button class="btn'+(d.mine?' on':'')+'" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003; Undo':'This is mine')+'</button>':'')+
     (real?'<button class="btn" data-act="ident-photo">'+(ph?'Replace your photo':'Attach your photo')+'</button>'+(ph?'<button class="btn" data-act="ident-photo-del">Remove photo</button>':''):'')+
     '<button class="btn" data-act="ident-roster">Open in Signal Roster</button>'+
     (S.identId?'<button class="btn" data-act="ident-auto">Follow the top threat</button>':'')+'</div>'+
@@ -3211,7 +3221,7 @@ function trapPull(){
         : r.level===1 ? ['Read each item above. A link or a command can be harmless in a message you expected, and a trap in one you did not.','If you give it to an agent, give the cleaned text, and tell the agent to treat it as material to read, never as instructions.','Do not let the agent open the links in it.']
         : ['Keep an agent\'s access as small as the task needs.','Tell the agent to treat anything it reads as material to work on.'])
         .map((x,i)=>'<div class="chk" style="cursor:default"><span class="box">'+(i+1)+'</span><span class="tx">'+x+'</span></div>').join('')+
-       '<div class="formrow"><button class="btn sm" data-act="trap-copy">Copy the cleaned text</button><button class="btn sm '+(r.logged?'':'primary')+'" data-act="trap-log"'+(r.logged?' disabled':'')+'>'+(r.logged?'Added to Evidence':'Add to Evidence')+'</button><button class="btn sm" data-act="res" data-id="a_agent">Open Agent Hijack</button></div></div>'; }
+       '<div class="formrow"><button class="btn sm" data-act="trap-copy">Copy the cleaned text</button><button class="btn sm '+(r.logged?'on':'primary')+'" data-act="trap-log"'+(r.logged?' disabled':'')+'>'+(r.logged?'Added to Evidence &#10003;':'Add to Evidence')+'</button><button class="btn sm" data-act="res" data-id="a_agent">Open Agent Hijack</button></div></div>'; }
   if(n) h+='<div class="dsec"><h4>Checked on this device</h4>'+P.traps.slice(0,6).map(x=>'<div class="rowline"><span>'+esc(x.kind)+(x.name?' · '+esc(x.name):'')+' <span class="mono" style="font-size:11px;color:var(--mut)">'+esc(x.hash.slice(0,12))+'</span></span><span class="mono" style="font-size:11px;color:var('+TRAP_LVL[x.level][1]+');white-space:nowrap">'+TRAP_LVL[x.level][0]+' · '+new Date(x.t).toLocaleDateString()+'</span></div>').join('')+'</div>';
   return h+'<div class="limit"><b>What it reads for.</b> Hidden text, instructions aimed at an AI, commands that run code, connectors, links that carry data out, and encoded text. <b>Sources.</b> <a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/" target="_blank" rel="noopener">OWASP, prompt injection</a>, <a href="https://www.ncsc.gov.uk/blog-post/thinking-about-security-ai-systems" target="_blank" rel="noopener">NCSC</a></div></div></div>';
 }
@@ -3310,7 +3320,7 @@ function sigPull(){
     h+='<p style="margin-bottom:8px">Hold this phone against a device you own. It rises to the top of the list. Press Mine. Three or four presses and your signature is done.</p>'+
       (ds.length?ds.map((d,i)=>'<div class="rowline"><span><b>'+esc(devName(d))+'</b>'+(i===0&&top.rssi>=-58?' <span class="chip pot">closest to this phone now</span>':'')+
           '<br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(kindText(d))+' · '+esc(distText(d))+(d.sigFit?' · fits your signature':'')+'</span></span>'+
-          '<button class="btn sm '+(d.mine?'':'primary')+'" data-act="sig-mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003;':'Mine')+'</button></div>').join('')
+          '<button class="btn sm '+(d.mine?'on':'primary')+'" data-act="sig-mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003;':'Mine')+'</button></div>').join('')
         :'<p>Nothing is in earshot at this moment.</p>'); }
   h+='</div><div class="dsec"><h4>A device with a name</h4><p>A computer, a headset or a phone often broadcasts its own name, such as DESKTOP-KS7PU98. Compare it with the name the device shows for itself, and you know at once whether it is yours.</p>'+
     '<div class="kv" style="margin-top:8px"><span class="k">Windows</span><span class="v">Settings, System, About, Device name</span><span class="k">Mac</span><span class="v">System Settings, General, About, Name</span>'+
@@ -4215,10 +4225,19 @@ function alertState(){ const m=alertMode();
   if(m==='app'){ const st=PH.nstat||nativeStatus()||{}; return st.notifications||'needed'; }
   if(m==='web') return Notification.permission==='granted'?'granted':Notification.permission==='denied'?'denied':'needed';
   return 'screen'; }
-async function alertAsk(){ const m=alertMode();
-  try{ if(m==='app'){ NATIVE().askNotifications(); setTimeout(()=>{ PH.nstat=nativeStatus(); softRender(); },1500); }
-    else if(m==='web'){ await Notification.requestPermission(); if(Notification.permission==='granted') alertSystem('halo:on','Halo alerts are on','A banner like this one appears the moment a new threat does.'); } }catch(e){}
-  softRender(); }
+// Turn on: the row says Asking while the question is open, then says what happened and, where the browser or Android holds
+// the switch, exactly where that switch is. An older browser answers through a callback, and some keep the question back.
+async function alertAsk(){ const m=alertMode(); if(S.alertAsking) return; S.alertAsking=true; S.alertHelp=''; renderCoverage();
+  try{ if(m==='app'){ NATIVE().askNotifications(); for(let i=0;i<10;i++){ await new Promise(r=>setTimeout(r,1000)); PH.nstat=nativeStatus(); if(alertState()!=='needed') break; } }
+    else if(m==='web'){ await new Promise(res=>{ let done=false; const f=()=>{ if(!done){ done=true; res(); } };
+        try{ const r=Notification.requestPermission(f); if(r && typeof r.then==='function') r.then(f,f); }catch(e){ f(); } setTimeout(f,20000); });
+      if(Notification.permission==='granted') alertSystem('halo:on','Halo alerts are on','A banner like this one appears the moment a new threat does.'); } }catch(e){}
+  S.alertAsking=false; const st=alertState();
+  S.alertHelp = st==='granted' ? '' : m==='app' ? 'Android holds this switch. Open Settings, Apps, Remiel Halo, Notifications, and switch them on. Halo turns its banners on the moment you do.'
+    : m==='web' ? (st==='denied' ? 'This browser has notifications set to Block for Halo. Tap the padlock or the settings mark beside the address, open Permissions or Site settings, set Notifications to Allow, then tap Turn on again.'
+      : 'This browser kept the question back. Tap the padlock or the settings mark beside the address, open Permissions or Site settings, set Notifications to Allow, then tap Turn on again.') : '';
+  toast(st==='granted' ? 'Alerts are on. A banner appears on this device the moment a new threat does.' : st==='screen' ? 'Alerts are on inside Halo.' : 'One more step: the note under Alerts says where the switch is.');
+  renderCoverage(); softRender(); }
 function alertSystem(key, title, text){
   try{ const f=alertNative(); if(f){ NATIVE()[f](String(title), String(text), String(key)); return; }
     if(alertMode()!=='web' || Notification.permission!=='granted') return;
@@ -4329,8 +4348,8 @@ function liveBody(d){
     '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Advertised name</span><span class="v '+(d.adv?'':'unkc')+'">'+esc(d.adv||'None')+'</span>'+(d.hint?'<span class="k">Maker hint</span><span class="v">'+esc(d.hint)+'</span>':'')+
     '<span class="k">Address</span><span class="v '+(d.randomizes?'warnc':'')+'">'+(d.randomizes?'Randomizes, held by signature':'Not reported as randomized')+'</span></div></div>'+
     '<div class="dev-acts"><button class="btn primary" data-act="capture" data-id="'+d.id+'">Capture Now</button>'+
-    '<button class="btn" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Not mine':'This is mine')+'</button>'+
-    (d.sim?'':'<button class="btn" data-act="dev-log" data-id="'+d.id+'">Log to Evidence</button>')+'</div>';
+    '<button class="btn'+(d.mine?' on':'')+'" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003; Undo':'This is mine')+'</button>'+
+    (d.sim?'':'<button class="btn'+((S.devLogged||{})[d.id]?' on':'')+'" data-act="dev-log" data-id="'+d.id+'">'+((S.devLogged||{})[d.id]?'Logged &#10003; Log again':'Log to Evidence')+'</button>')+'</div>';
 }
 
 /* ---------- tickers. Live items come from the Global feed. The rest are dated, sourced entries from the register ---------- */
@@ -4428,6 +4447,14 @@ const val = id => { const e=el(id); return e ? e.value.trim() : ''; };
 document.addEventListener('change', e=>{ const f=e.target; if(!f || f.id!=='trapFile' || !f.files || !f.files[0]) return;
   const file=f.files[0]; if(file.size>8*1024*1024){ f.value=''; return toast('That file is too large to check here. Paste the part you want checked.'); }
   file.text().then(t=>{ f.value=''; if(/\u0000/.test(t.slice(0,4000))) return toast('That is not a text file. Copy its text and paste it.'); trapRun(t, file.name); }).catch(()=>toast('The file could not be read.')); });
+/* A tap is always answered. The control is marked at once, and marked again if the screen is drawn again under it. */
+function tapSel(a){ if(a.id) return '#'+CSS.escape(a.id); const ks=Object.keys(a.dataset); if(!ks.length) return null;
+  return a.tagName.toLowerCase()+ks.map(k=>'[data-'+k.replace(/[A-Z]/g,m=>'-'+m.toLowerCase())+'="'+String(a.dataset[k]).replace(/["\\]/g,'\\$&')+'"]').join(''); }
+function tapMark(a){ const sel=tapSel(a), idx=sel?[...document.querySelectorAll(sel)].indexOf(a):-1, until=Date.now()+900, mine=new Set();
+  const put=()=>{ if(Date.now()>=until) return; let n=a; if(!document.contains(a)){ n=null; if(sel){ try{ const now=document.querySelectorAll(sel); n=now[idx>=0&&idx<now.length?idx:0]||null; }catch(e){} } }
+    if(n){ n.classList.add('tapped'); mine.add(n); } };
+  put(); [40,160,400,700].forEach(ms=>setTimeout(put,ms)); setTimeout(()=>mine.forEach(n=>n.classList.remove('tapped')),920); }
+document.addEventListener('click', e=>{ const a=e.target.closest && e.target.closest('[data-act],[data-view],button,.btn'); if(a && !a.disabled) tapMark(a); }, true);
 document.addEventListener('click', e=>{
   const a=e.target.closest('[data-act]'); if(!a) return;
   const act=a.dataset.act, H=P.home;
@@ -4504,7 +4531,7 @@ document.addEventListener('click', e=>{
     case 'sig-name-del': { const g=sigGet(), nm=a.dataset.n; g.names=g.names.filter(x=>x!==nm); Object.keys(g.by).forEach(k=>{ if(g.by[k]==='n:'+nm){ delete g.by[k]; sigKeysDrop(k); if(P.mine) delete P.mine[k]; } }); g.t=Date.now(); save(); nativeMine(); liveTick(); rerender(); break; }
     case 'sig-count-del': { const g=sigGet(), k=a.dataset.k; g.counts[k]=Math.max(0,(g.counts[k]||0)-1); if(!g.counts[k]) delete g.counts[k]; const id=Object.keys(g.by).find(x=>g.by[x]==='c:'+k); if(id){ delete g.by[id]; sigKeysDrop(id); if(P.mine) delete P.mine[id]; } g.t=Date.now(); save(); nativeMine(); liveTick(); rerender(); break; }
     case 'dev-log': { const d=findDevice(a.dataset.id); if(!d||!d.live||d.sim) break;
-      logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+'), '+distText(d)+', '+flagOf(d).toLowerCase()+'. Heard '+d.timesSeen+' times since '+new Date(d.firstSeen).toLocaleTimeString()+'.',{sig:d.sig}); toast('Added to Evidence.'); break; }
+      logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+'), '+distText(d)+', '+flagOf(d).toLowerCase()+'. Heard '+d.timesSeen+' times since '+new Date(d.firstSeen).toLocaleTimeString()+'.',{sig:d.sig}); S.devLogged=S.devLogged||{}; S.devLogged[d.id]=true; toast('Added to Evidence.'); S._rsig=''; if(el('rost')) renderRoster(); break; }
     case 'sn-add': sensorAdd(); break;
     case 'go-sensors': { S.open.delete('profile'); S.open.add('devices'); if(S.view!=='overview') setView('overview'); else { navPush('devices'); rerender(); } setTimeout(()=>{ const c=el('sensorsSec'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
     case 'sn-remove': sensorRemove(a.dataset.id); break;
