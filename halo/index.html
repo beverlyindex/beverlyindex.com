@@ -610,6 +610,7 @@ select.inp{flex:none}
 .toast{position:fixed;left:50%;bottom:160px;transform:translateX(-50%);z-index:70;background:var(--panel2);border:1px solid var(--line2);
   border-radius:999px;padding:10px 18px;font-size:13px;color:var(--ink);box-shadow:0 14px 40px rgba(0,0,0,.5);opacity:0;transition:.25s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
+ol.steps{margin:8px 0 2px;padding-left:20px;font-size:13px;line-height:1.5;color:var(--ink)} ol.steps li{margin:5px 0;padding-left:2px} ol.steps li::marker{color:var(--watch);font-weight:700}
 .updbar{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:80;display:flex;align-items:center;gap:10px;white-space:nowrap;background:var(--panel2);border:1px solid var(--chrome2);border-radius:999px;padding:7px 8px 7px 16px;font-size:13px;color:var(--ink);box-shadow:0 8px 26px rgba(0,0,0,.55)}
 .updbar.hidden{display:none}
 .updbar .btn{margin:0}
@@ -878,7 +879,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.06', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1957,9 +1958,9 @@ function renderOverview(){
   const real=THREATS.filter(t=>t.shelf==='real').length, pot=THREATS.length-real;
   const applies=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true).length;
   let h='<div style="--tierc:var('+tc+')">';
-  if(!installed() && !S.justInstalled && (INSTALL||isAndroid()||isIOS()) && !store.get('halo_inst_hide'))
-    h+='<div class="instbar"><span>'+(isAndroid() ? '<b>Halo on the web.</b> Add this page to your home screen for quick access. Device listening on this phone runs in the Remiel Halo app.' : '<b>Install Halo on this phone.</b> It opens full screen from your home screen.')+'</span>'+
-       '<button class="btn sm primary" data-act="'+(INSTALL?'install':'go-install')+'">'+(INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
+  if(!NATIVE() && !S.justInstalled && (isAndroid() || (!installed() && (INSTALL||isIOS()))) && !store.get('halo_inst_hide'))
+    h+='<div class="instbar"><span>'+(isAndroid() ? '<b>Get the Remiel Halo app.</b> It hears the devices around you, with the screen on or off.' : isIOS() ? '<b>Put Halo on your home screen.</b> It opens full screen, like an app.' : '<b>Install Halo on this computer.</b> It opens in a window of its own.')+'</span>'+
+       '<button class="btn sm primary" data-act="'+(INSTALL && !isAndroid()?'install':'go-install')+'">'+(isAndroid()?'Get the app':INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
   if(!g) h+='<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'Halo keeps trying the live feed':'Reaching the live feed')+'</div>';
   const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const openN=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true&&isOpen(t)).length;
@@ -3762,17 +3763,61 @@ window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); INSTALL=
 window.addEventListener('appinstalled', ()=>{ INSTALL=null; S.justInstalled=true; if(booted){ toast('Halo is installed. Open it from your home screen.'); rerender(); } });
 if('serviceWorker' in navigator && (location.protocol==='https:' || /[?&]sw=1/.test(location.search)))
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+const APP={info:null, state:'', asked:0};                 // the Android app file on offer, and where a download stands
+const fmtKB = n => n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.round(n/1024)+' KB';
+const verNum = v => String(v||'').split('.').reduce((n,x)=>n*1000+(parseInt(x,10)||0),0);
+async function appInfo(){                                   // what the site has on offer; asked once per visit, by a signed-in account
+  if(APP.info || APP.asking || SY.status!=='on' || Date.now()-APP.asked<20000) return; APP.asking=true; APP.asked=Date.now();
+  try{ const r=await api('GET','/app/android'); if(r.s===200 && r.j && r.j.file){ APP.info=r.j; if(booted && el('installSec')) rerender(); } }catch(e){} finally{ APP.asking=false; } }
+async function appGet(){
+  if(APP.state==='asking') return; APP.state='asking'; rerender();
+  let r=null; try{ r=await api('GET','/app/android'); }catch(e){}
+  if(!r || r.s!==200 || !r.j || !r.j.path){ APP.state='fail'; rerender(); toast('The app file was not reached. Try again in a moment.'); return; }
+  APP.info=r.j; APP.state='sent'; rerender();
+  const a=document.createElement('a'); a.href=API+r.j.path; a.rel='noopener'; a.download=r.j.file; a.style.display='none'; document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(), 1500);
+  toast('The download has started: '+r.j.file+'.');
+}
 function installSection(){
-  let h='<div class="dsec" id="installSec"><h4>Install Halo on this device</h4>';
-  if(NATIVE()){ let v=''; try{ v=NATIVE().version(); }catch(e){} return h+'<div class="kv"><span class="k">Halo Android app</span><span class="v okc">Version '+esc(v)+'. The phone itself is the sensor</span></div></div>'; }
-  if(installed()) return h+'<div class="kv"><span class="k">Installed</span><span class="v okc">Yes. This is the installed Halo</span></div></div>';
-  if(S.justInstalled) return h+'<p>Installed. Close this tab and open Remiel Halo from your home screen. Your account and settings carry over.</p></div>';
-  if(INSTALL) return h+'<p style="margin-bottom:10px">Puts Remiel Halo on your home screen and opens it full screen. Your account and settings carry over.</p>'+
-    '<div class="formrow" style="margin-top:0"><button class="btn primary" data-act="install">Install Remiel Halo</button></div>'+
-    '</div>';
-  h+= isIOS() ? '<p>In Safari: tap the Share button, then Add to Home Screen, then Add.</p>'
-     : isAndroid() ? '<p>In Chrome: tap the three dots at the top right, then Add to Home screen, then Install.</p>'
-     : '<p>On a computer Halo runs in the browser and needs no install. On an Android phone, open this page in Chrome and the Install button appears here.</p>';
+  const auto=isIOS()?'apple':isAndroid()?'android':'computer', pick=S.instOS||auto, words={android:'an Android phone', apple:'an iPhone or iPad', computer:'a computer'};
+  let h='<div class="dsec" id="installSec"><h4>Get Halo on this device</h4>';
+  h+='<p style="margin-bottom:8px">Halo reads this device as <b>'+words[auto]+'</b>. Confirm it, or choose another.</p>'+
+     '<div class="formrow" style="margin-top:0;gap:8px">'+[['android','Android'],['apple','iPhone or iPad'],['computer','Computer']].map(x=>'<button class="chipbtn '+(pick===x[0]?'on':'')+'" data-act="inst-os" data-k="'+x[0]+'">'+x[1]+'</button>').join('')+'</div>';
+  if(pick==='android'){
+    const N=NATIVE(), i=APP.info; let v=''; try{ if(N) v=String(N.version()); }catch(e){}
+    if(!i) appInfo();
+    if(N){ const newer=i && verNum(i.version)>verNum(v);
+      h+='<div class="kv" style="margin-top:10px"><span class="k">Halo Android app</span><span class="v okc">Version '+esc(v)+(i && !newer?', current':'')+'. This phone is the sensor</span></div>'+
+         (newer?'<p style="margin-top:8px">Version '+esc(i.version)+' is ready. Open <b>beverly-index.com/halo</b> in Chrome on this phone, come to this section, and tap Download. It installs over this app and keeps your account and records.</p>':'');
+      return h+'</div>'; }
+    const ready=SY.status==='on' && (!S.features || S.features.app!==false), st=APP.state;
+    h+='<p style="margin:10px 0 8px">The Remiel Halo app is Halo with an ear: it hears the Bluetooth, Wi-Fi and cell signals around you, with the screen on or off.</p>'+
+       '<div class="formrow" style="margin-top:0"><button class="btn '+(st==='sent'?'on':'primary')+'" data-act="app-get"'+(ready && st!=='asking'?'':' disabled')+'>'+(st==='asking'?'Preparing the file':st==='sent'?'Downloaded. Download again':'Download the Remiel Halo app')+'</button></div>'+
+       '<p class="limit" style="margin:6px 0 0">'+(i?'Version '+esc(i.version)+' · '+fmtKB(i.size)+' · Android '+i.minAndroid+' or later · '+esc(i.file):'Android 10 or later.')+(ready?'':S.features && S.features.app===false?' The file is being published. Until it is here, Beverly Index sends it to you directly.':' The file is handed to a signed-in device: Halo is signing in.')+(isAndroid()?'':' On this device the file can be saved and sent to the phone; the direct way is to open beverly-index.com/halo on the phone itself.')+'</p>'+
+       '<ol class="steps">'+
+       '<li>Tap <b>Download</b>. If the browser asks whether to keep the file, choose <b>Download anyway</b>.</li>'+
+       '<li><b>Samsung phones:</b> open Settings, then Security and privacy, then Auto Blocker, and switch it off. You switch it on again at step 6.</li>'+
+       '<li>Open the file: tap the download notice, or open Files (My Files on Samsung), then Downloads, then '+esc(i?i.file:'the Remiel Halo file')+'.</li>'+
+       '<li>If the phone asks whether this app may install apps, choose <b>Settings</b>, allow it, and go back.</li>'+
+       '<li>Tap <b>Install</b>. If Play Protect offers to scan the app, let it scan, then continue.</li>'+
+       '<li><b>Samsung phones:</b> switch Auto Blocker on again.</li>'+
+       '<li>Open <b>Remiel Halo</b> from the app list and enter the same access key. In Watchers, tap <b>Start listening</b>.</li>'+
+       '<li>Keep one Halo icon on the home screen: the app. Remove a web shortcut named Halo if you have one.</li></ol>'+
+       (i?'<details class="limit" style="margin-top:6px"><summary style="cursor:pointer">File fingerprint, for anyone who verifies downloads</summary><span class="mono" style="word-break:break-all;font-size:11px">SHA-256 '+esc(i.sha256)+'</span></details>':'');
+    return h+'</div>'; }
+  if(pick==='apple'){
+    if(isIOS() && installed()) return h+'<div class="kv" style="margin-top:10px"><span class="k">Installed</span><span class="v okc">Yes. This is Halo from your home screen</span></div></div>';
+    h+='<p style="margin:10px 0 4px">On iPhone and iPad, Halo runs from the home screen and opens full screen. It shows the maps, cameras and tower sites, the threat library, Device Health Check, Responder, Evidence and reports, and the devices your home listener hears.</p>'+
+       '<ol class="steps">'+
+       '<li>Open <b>beverly-index.com/halo</b> in <b>Safari</b>.</li>'+
+       '<li>Tap the <b>Share</b> button, the square with the arrow.</li>'+
+       '<li>Scroll down and tap <b>Add to Home Screen</b>.</li>'+
+       '<li>Tap <b>Add</b>.</li>'+
+       '<li>Open <b>Halo</b> from the home screen and enter your access key.</li></ol>';
+    return h+'</div>'; }
+  if(!isAndroid() && !isIOS() && installed()) return h+'<div class="kv" style="margin-top:10px"><span class="k">Installed</span><span class="v okc">Yes. This is the installed Halo</span></div></div>';
+  if(S.justInstalled) return h+'<p style="margin-top:10px">Installed. Close this tab and open Remiel Halo from your applications. Your account and settings carry over.</p></div>';
+  h+='<p style="margin:10px 0 4px">On a computer Halo runs in the browser at <b>beverly-index.com/halo</b>, with nothing to install. A computer at home can also be your home listener: open Devices and sync, then Add sensor, then Home station.</p>'+
+     (INSTALL && !isAndroid()?'<div class="formrow" style="margin-top:6px"><button class="btn primary" data-act="install">Install Remiel Halo as a window of its own</button></div>':'');
   return h+'</div>';
 }
 function devicesPull(){
@@ -4281,7 +4326,7 @@ function phPanel(){
   if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening.', html:'This phone is listening while Halo is on screen. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
   if(PH.on && PH.lost) return {ok:false, text:'Listening paused while Halo was off the screen.', html:'Listening paused while Halo was off the screen. '+btn('Resume listening')};
   if(!phCan()) return {ok:false, text:'', html: isAndroid()
-    ? '<b>This window is Halo on the web.</b> On this phone the Remiel Halo app listens, with the screen on or off: open it from your home screen, under the name Remiel Halo. In Chrome, one setting gives the same ear for Bluetooth while Halo is on screen. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the Chrome steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app.</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Start listening.</li></ol></details>'
+    ? '<b>This window is Halo on the web.</b> On this phone the Remiel Halo app listens, with the screen on or off: open it from your home screen, under the name Remiel Halo. <button class="btn sm primary" data-act="go-install" style="margin:4px 0">Get the app</button><br>In Chrome, one setting gives the same ear for Bluetooth while Halo is on screen. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the Chrome steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app.</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Start listening.</li></ol></details>'
     : 'Listening runs in the Halo Android app, and on a computer at home.'};
   const why = PH.err==='NotAllowedError' ? 'Allow the scan when Chrome asks, and this phone listens for you.' : PH.err ? 'Switch Bluetooth and Location on, then press the button.' : 'This phone hears the Bluetooth devices around you.';
   return {ok:false, text:why, html:why+' '+btn('Start listening')};
@@ -4740,6 +4785,8 @@ document.addEventListener('click', e=>{
   switch(act){
     case 'terms': e.preventDefault(); openTerms(); break;
     case 'upd-now': updApply(true); break;
+    case 'inst-os': S.instOS=a.dataset.k; rerender(); break;
+    case 'app-get': appGet(); break;
     case 'upd-check': updCheck(true); break;
     case 'link-start': linkStart(); break;
     case 'link-join': linkJoin(''); break;
@@ -4753,7 +4800,7 @@ document.addEventListener('click', e=>{
     case 'pull': { const id=a.dataset.id; if(S.open.has(id)){ closeRecord(id); break; }
       S.open.add(id); navPush(id); rerender(); if(el('rost')) renderRoster(); break; }
     case 'install': { if(!INSTALL) break; const ev=INSTALL; INSTALL=null; ev.prompt(); (ev.userChoice||Promise.resolve({})).then(c=>{ if(!c||c.outcome!=='accepted') toast('Not installed. The steps to install from the browser menu are shown here.'); rerender(); }).catch(()=>rerender()); break; }
-    case 'go-install': { S.open.delete('profile'); S.open.add('devices'); navPush('devices'); rerender(); setTimeout(()=>{ const c=el('installSec'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
+    case 'go-install': { if(S.view!=='overview') setView('overview'); S.open.delete('profile'); S.open.add('devices'); navPush('devices'); rerender(); setTimeout(()=>{ const c=el('installSec'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
     case 'inst-hide': store.set('halo_inst_hide','1'); rerender(); break;
     case 'pull-close': closeRecord(a.dataset.rid); break;
     case 'back': if(NAVN>0) history.back(); else setView('overview'); break;
