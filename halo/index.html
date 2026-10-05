@@ -158,7 +158,7 @@ select.inp{flex:none}
 .mf-top{position:absolute;left:0;right:0;top:0;z-index:3;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;background:linear-gradient(180deg,rgba(7,11,22,.94),rgba(7,11,22,0));pointer-events:none}
 .mf-top > *{pointer-events:auto}
 .mf-top b{font-family:var(--disp);letter-spacing:.06em;font-size:15px}
-.mf-top .mf-pos{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--mut);text-align:right;line-height:1.35;pointer-events:none}
+.mf-top .mf-pos{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:#cfd9f3;text-align:right;line-height:1.35;pointer-events:none;background:rgba(7,11,22,.78);border-radius:8px;padding:3px 8px}
 .mf-ctl{position:absolute;right:12px;top:calc(64px + env(safe-area-inset-top));z-index:3;display:flex;flex-direction:column;gap:8px}
 .mf-ctl button{width:46px;height:46px;border-radius:12px;border:1px solid var(--line2);background:rgba(10,16,32,.92);color:var(--ink);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .mf-ctl button.on{border-color:var(--watch);color:#9fc4ff;box-shadow:0 0 14px -4px var(--watch)}
@@ -176,7 +176,8 @@ select.inp{flex:none}
 .ptcard .kv{font-size:12.5px;gap:5px 12px}
 .ptcard a{color:#9fc4ff}
 #ptInfo .ptcard{margin-top:10px}
-#mapFull .maplibregl-ctrl-bottom-left{bottom:150px}
+#mapFull .maplibregl-ctrl-top-left{top:calc(58px + env(safe-area-inset-top))}
+#mapFull .maplibregl-ctrl-scale{background:rgba(7,11,22,.78);color:#cfd9f3;border-color:#7f9bd6;font-family:var(--mono);font-size:10px;margin-left:12px}
 .you-dot .cone{position:absolute;left:50%;top:50%;width:0;height:0;margin:-34px 0 0 -13px;border-left:13px solid transparent;border-right:13px solid transparent;border-bottom:30px solid rgba(79,141,240,.42);transform-origin:13px 34px;pointer-events:none}
 .you-dot .cone.off{display:none}
 #report{position:fixed;inset:0;z-index:90;background:#e9e6df;overflow:auto;color:#1A1A2E;-webkit-overflow-scrolling:touch}
@@ -880,7 +881,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.07', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.08', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3162,7 +3163,7 @@ async function mapFullOpen(){
   if(!FULL){ const ok=await loadMapLibre(); if(!ok){ setHTML(el('mfSum'),'The map needs a connection.'); return; }
     await probeVector(); const g=gz()||{lat:34.0522,lon:-118.2437};
     FULL=new window.maplibregl.Map({container:el('mfMap'), style:mapStyle(!!gz()), center:[g.lon,g.lat], zoom:17.2, attributionControl:false, fadeDuration:0, dragRotate:false, pitchWithRotate:false, touchPitch:false, maxZoom:20.5, minZoom:3});
-    FULL.addControl(new window.maplibregl.ScaleControl({maxWidth:110, unit:'metric'}), 'bottom-left');
+    FULL.addControl(new window.maplibregl.ScaleControl({maxWidth:110, unit:'metric'}), 'top-left');
     FULL.on('dragstart',()=>{ MF.follow=false; el('mfFollow').classList.remove('on'); });
     FULL.on('error', e=>{ S.mfErr=String((e&&e.error&&(e.error.message||e.error))||'map error').slice(0,200); });
     FULL.once('style.load',()=>{
@@ -3202,7 +3203,7 @@ function mapFullTick(force){
   setHTML(el('mfPos'), g ? (S.pos?'Position within '+Math.round(S.pos.acc)+' m':'Saved home location')+(h!=null?'<br>Facing '+compass(h):'') : 'No position');
   const placed=devs.filter(d=>d.fix).length, rough=devs.filter(d=>!d.fix&&d.sector).length, nd=devs.filter(noDir).length, wy=devs.filter(d=>d.withYou).length, V=vis();
   setHTML(el('mfSum'), !g ? '<b>The map needs your position.</b> <button class="btn sm primary" data-act="geo-ask" style="margin-left:6px">Share my position</button>'
-    : !(V.mode==='live'||V.mode==='sim') ? '<b>'+esc(stateWords(V.mode).count)+'.</b> Unknown, not Clear.'
+    : !(V.mode==='live'||V.mode==='sim') ? '<b>'+esc(stateWords(V.mode).note)+'</b> The map shows the cameras and tower sites around you.'
     : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+((parts=>parts.length?' · <button class="mf-fit" data-act="mf-fit">Within '+miText(MILE)+': '+parts.join(', ')+'. Show them</button>':'')((()=>{ const pr=ptsR(MILE), out=[], cs=poiCount('alpr'); if(cs) out.push(cs+' plate '+(cs===1?'camera':'cameras'));
       [['cctv','camera','cameras'],['speed','speed camera','speed cameras'],['site','tower site','tower sites']].forEach(x=>{ const n=ptsOf(x[0],pr).length; if(n) out.push(n+' '+(n===1?x[1]:x[2])); }); return out; })()))+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
   renderLayers();
