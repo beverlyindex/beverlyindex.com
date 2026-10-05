@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.06', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.07', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1979,6 +1979,8 @@ function renderOverview(){
   const real=THREATS.filter(t=>t.shelf==='real').length, pot=THREATS.length-real;
   const applies=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true).length;
   let h='<div style="--tierc:var('+tc+')">';
+  if(NATIVE() && isAndroid()){ if(!APP.info) appInfo(); let v=''; try{ v=String(NATIVE().version()); }catch(e){}
+    if(APP.info && verNum(APP.info.version)>verNum(v)) h+='<div class="instbar"><span><b>Halo app '+esc(APP.info.version)+' is ready.</b> You have '+esc(v)+'. The new one keeps listening through a long walk.</span><button class="btn sm primary" data-act="go-install">Get it</button></div>'; }
   if(!NATIVE() && !S.justInstalled && (isAndroid() || (!installed() && (INSTALL||isIOS()))) && !store.get('halo_inst_hide'))
     h+='<div class="instbar"><span>'+(isAndroid() ? '<b>Get the Remiel Halo app.</b> It hears the devices around you, with the screen on or off.' : isIOS() ? '<b>Put Halo on your home screen.</b> It opens full screen, like an app.' : '<b>Install Halo on this computer.</b> It opens in a window of its own.')+'</span>'+
        '<button class="btn sm primary" data-act="'+(INSTALL && !isAndroid()?'install':'go-install')+'">'+(isAndroid()?'Get the app':INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
