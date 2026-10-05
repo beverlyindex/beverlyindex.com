@@ -881,7 +881,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.08', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.09', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -4609,10 +4609,14 @@ function nativeMine(){ const N=NATIVE(); if(!N || typeof N.setMine!=='function')
 // The words for each state in which nothing near you can be shown. None of them reads Clear.
 const webOnAndroid = () => isAndroid() && !NATIVE();                  // Halo opened in a browser, or from the web shortcut, on an Android phone
 const earless = () => webOnAndroid() && !phCan() && !PH.on;
+const canHear = () => !!NATIVE() || phCan();                      // this device has an ear of its own
 function stateWords(m){ const since=hhmm(liveLast()-LIVE.skew);
   if(earless() && m!=='offline') return m==='homeonly'
     ? {count:'home is watched', line:'your home listener is reporting', long:'Your home listener is watching your home. Open the Remiel Halo app on this phone and Halo shows what is around you here.', note:'Home is watched.', vic:'Vicinity: home is watched', cov:'Home listener reporting'}
     : {count:'open the Halo app', line:'the Remiel Halo app listens on this phone', long:'This window is Halo on the web. On this phone the Remiel Halo app is the one that listens: open it from your home screen and the devices around you appear on Micro.', note:'Open the Halo app.', vic:'Vicinity: open the Halo app', cov:'Listens in the Halo app'};
+  if(!canHear() && !PH.on && (m==='none' || m==='waiting')) return m==='waiting'
+    ? {count:'waiting for a sensor', line:'no sensor has reported yet', long:'No sensor has reported yet. Start your home listener, or switch on the sensor you carry, and the devices it hears appear here.', note:'Waiting for a sensor.', vic:'Vicinity: waiting for a sensor', cov:'Waiting'}
+    : {count:'add a sensor', line:'devices are heard by a Halo sensor', long:'On this device Halo shows the maps, cameras, tower sites and threats. The devices around you are heard by a Halo sensor: the Remiel Halo app on an Android phone, a home listener on a computer, or a sensor you carry. Add one under Devices and sync.', note:'Add a sensor.', vic:'Vicinity: add a sensor', cov:'Add a sensor'};
   if(m==='waiting' && !PH.on) return {count:'waiting for a sensor', line:'no sensor has reported yet', long:'No sensor has reported yet. Press Start listening on this phone, or start your home listener.', note:'Waiting for a sensor.', vic:'Vicinity: waiting for a sensor', cov:'Waiting'};
   return m==='silent' ? {count:'listening paused', line:'your sensor last reported at '+since, long:'Your sensor last reported at '+since+'. Wake it and Halo carries on.', note:'Listening paused.', vic:'Vicinity: listening paused', cov:'Paused since '+since}
     : m==='waiting' ? {count:'first report on its way', line:'this phone is listening, first report on its way', long:'This phone is listening. Its first report is on its way.', note:'First report on its way.', vic:'Vicinity: first report on its way', cov:'Connected'}
