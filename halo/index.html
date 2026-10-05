@@ -605,6 +605,9 @@ select.inp{flex:none}
 .toast{position:fixed;left:50%;bottom:160px;transform:translateX(-50%);z-index:70;background:var(--panel2);border:1px solid var(--line2);
   border-radius:999px;padding:10px 18px;font-size:13px;color:var(--ink);box-shadow:0 14px 40px rgba(0,0,0,.5);opacity:0;transition:.25s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
+.updbar{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:80;display:flex;align-items:center;gap:10px;white-space:nowrap;background:var(--panel2);border:1px solid var(--chrome2);border-radius:999px;padding:7px 8px 7px 16px;font-size:13px;color:var(--ink);box-shadow:0 8px 26px rgba(0,0,0,.55)}
+.updbar.hidden{display:none}
+.updbar .btn{margin:0}
 
 /* ---------- how-to steps, effects, Special banner, liability, vicinity radius, live feed ---------- */
 .howto{font-family:var(--disp);font-weight:600;font-size:16.5px;letter-spacing:.01em;color:var(--ink)}
@@ -685,6 +688,7 @@ a.tk:hover b{text-decoration:underline}
     <button id="gateGo" class="btn primary wide" style="margin-top:4px;padding:13px">Unlock</button>
     <div class="gate-terms">By unlocking you accept the <a href="#" data-act="terms">Terms of use</a>. You assume all liability for changes you make to your devices, accounts and software.</div>
     <div class="gate-foot">Beverly Index LLC. Access is logged. United States.</div>
+    <div class="gate-foot" id="gateBuild" style="margin-top:6px;font-family:var(--mono)"></div>
   </div>
 </div>
 
@@ -765,6 +769,7 @@ a.tk:hover b{text-decoration:underline}
                 <div class="posline" id="posLine"></div>
                 <div class="posline" id="mapCredit" style="margin-top:4px">Maps: &copy; OpenStreetMap contributors</div>
                 <div class="posline" id="ptsCredit" style="margin-top:2px"></div>
+                <div class="posline" id="buildLine" style="margin-top:2px;font-family:var(--mono)"></div>
               </div></div>
               <div class="card" id="covCard"></div>
               <div class="card" id="homeMini"></div>
@@ -845,6 +850,7 @@ a.tk:hover b{text-decoration:underline}
   </div>
 </div>
 
+<div class="updbar hidden" id="updBar" role="status"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -859,6 +865,53 @@ const store = {
   get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
   set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 };
+
+/* ---------- the build of this console, and how it stays current ----------
+   A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
+   The console asks the site which build is current, and loads it at a moment that costs you nothing. */
+const BUILD='2026-10-05.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const UPD={remote:'', at:0, held:false, busy:false};
+const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
+function updSafe(){                                       // a reload now would interrupt nothing
+  const a=document.activeElement, typing=a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type!=='file' && (a.tagName==='SELECT' || String(a.value||'').length>0);
+  if(typing) return false;
+  if(typeof booted==='undefined' || !booted) return true;                 // still at the gate
+  if(W.on || S.mapFull || S.splash) return false;
+  if([...document.querySelectorAll('textarea')].some(x=>x.value && x.offsetParent)) return false;         // a note being written is never lost
+  return ![...LIVE.devs.values()].some(d=>d.present && !d.sim && !d.mine && (d.withYou || d.onRoute));      // a device being followed keeps its history
+}
+function updBar(){ const b=el('updBar'); if(!b) return; const on=UPD.held && UPD.remote>BUILD; b.classList.toggle('hidden', !on);
+  if(on) b.innerHTML='<span>A newer Halo is ready.</span> <button class="btn sm primary" data-act="upd-now">Update now</button>'; }
+function updApply(force){
+  if(!(UPD.remote>BUILD)) { UPD.held=false; updBar(); return false; }
+  const tr=updTries(), same=tr.b===UPD.remote;
+  if(!force && same && (tr.n>=4 || Date.now()-tr.t<4*60*1000)){ return false; }      // the site has not handed over the new page yet: wait, then ask again
+  if(!force && !updSafe()){ UPD.held=true; updBar(); return false; }
+  store.set('halo_upd', JSON.stringify({b:UPD.remote, n:(same?tr.n:0)+1, t:Date.now()}));
+  try{ if(typeof save==='function') save(); if(typeof wSave==='function' && W.on) wSave(true); }catch(e){}
+  location.reload(); return true;
+}
+async function updCheck(manual){
+  if(UPD.busy) return; if(!manual && Date.now()-UPD.at<45000) return; UPD.busy=true; UPD.at=Date.now();
+  try{ const r=await fetch('build.json', {cache:'no-store'}), j=r.ok?await r.json():null, b=j && typeof j.build==='string' && BUILD_RE.test(j.build) ? j.build : '';
+    if(b){ UPD.remote=b; UPD.ok=Date.now(); }
+    if(manual && !b) toast('The site was not reached. Halo asks again by itself.');
+    else if(manual && !(b>BUILD)) toast('This is the current build.');
+    if(b>BUILD) updApply(!!manual);
+  }catch(e){ if(manual) toast('The site was not reached. Halo asks again by itself.'); }
+  finally{ UPD.busy=false; if(typeof booted!=='undefined' && booted && el('covCard')) try{ renderCoverage(); }catch(e){} buildShow(); }
+}
+function buildShow(){ const app=(()=>{ try{ const n=window.HaloNative; return n && typeof n.version==='function' ? String(n.version()) : ''; }catch(e){ return ''; } })();
+  const t='Halo build '+BUILD+(app?' · Android app '+esc(app):'');
+  ['gateBuild','buildLine'].forEach(id=>{ const e=el(id); if(e) e.textContent=t; }); }
+function updStart(){
+  { const tr=updTries(); if(tr.b && !(tr.b>BUILD)) store.set('halo_upd',''); }       // the new build arrived
+  buildShow(); updCheck();
+  setInterval(()=>{ if(UPD.held) updApply(false); }, 30000);
+  setInterval(()=>updCheck(), 5*60*1000);
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') updCheck(); });
+  window.addEventListener('online', ()=>updCheck());
+}
 
 /* ---------- access gate ---------- */
 const OWNER="RH-BEVR-2026", BETA="RH-HALO-2026";
@@ -1924,6 +1977,7 @@ function renderCoverage(){
     ...(rayCan()&&P.ray&&P.ray.on ? [['Rayhunter', {off:'Starting',searching:'Looking for it',connected:'Connected',recording:'Recording, being read',unreachable:'Out of reach'}[RAY.state], RAY.state==='recording'?'live':RAY.state==='connected'?'part':'']] : []),
     ...((st=>st&&st.power ? [['Power', ({full:'Full',balanced:'Balanced',saver:'Saver'}[st.power]||'Full')+(st.listening?(st.moving?', moving':', still'):'')+(st.battery&&st.battery.temp!=null?' · phone '+Number(st.battery.temp).toFixed(0)+'&deg;C':'')+(st.battery&&st.battery.level!=null?' · '+st.battery.level+'%':''), st.power==='full'?'live':'part']] : [])(PH.nstat||(NATIVE()?nativeStatus():null))),
     ['Alerts', (as=>as==='granted'?'On, banners on this device':as==='screen'?'On, inside Halo':S.alertAsking?'Asking, answer Allow':'<button class="btn sm '+(as==='denied'?'gold':'primary')+'" data-act="alert-ask" style="margin:0">'+(as==='denied'?'Allow in settings':'Turn on')+'</button>')(alertState()), alertState()==='granted'||alertState()==='screen'?'live':S.alertAsking?'part':''],
+    ['Halo build', BUILD+(UPD.remote>BUILD ? ' <button class="btn sm primary" data-act="upd-now" style="margin:0 0 0 6px">Update now</button>' : (UPD.ok?', current':'')+' <button class="chipbtn" data-act="upd-check" style="margin-left:6px">Check</button>'), UPD.remote>BUILD?'part':UPD.ok?'live':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':'Connecting', SY.status==='on'?'live':''],
     ['Your profile',answered+' of '+PROFILE_Q.length+' answered',answered===PROFILE_Q.length?'live':(answered?'part':'')]];
   el('covCard').innerHTML='<h3>Coverage <span class="n">what Halo is watching for you</span></h3>'+
@@ -4644,6 +4698,8 @@ document.addEventListener('click', e=>{
   const act=a.dataset.act, H=P.home;
   switch(act){
     case 'terms': e.preventDefault(); openTerms(); break;
+    case 'upd-now': updApply(true); break;
+    case 'upd-check': updCheck(true); break;
     case 'link-start': linkStart(); break;
     case 'link-join': linkJoin(''); break;
     case 'go-account': { S.open.delete('profile'); S.open.add('devices'); if(S.view!=='overview') setView('overview'); else { navPush('devices'); rerender(); } setTimeout(()=>{ const c=document.querySelector('.tp-head[data-id="devices"]'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },150); break; }
@@ -4820,6 +4876,7 @@ function boot(){
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.haloOpen) alertGo(e.data.haloOpen); });
   if(NATIVE() && store.get('halo_listen')==='1'){ const st=nativeStatus(); if(st && st.permission==='granted') phStart(); }
 }
+updStart();
 /* returning visit: unlock only after everything above is defined */
 if(codeOk(store.get('halo_key'))) openApp();
 </script>
