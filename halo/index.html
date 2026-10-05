@@ -411,6 +411,11 @@ select.inp{flex:none}
 .sph-state{position:absolute;inset:0;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14%;pointer-events:none;
   font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;color:#fff;background:rgba(6,10,20,.62)}
 .sph-state:empty{display:none}
+.sph-plain{position:absolute;inset:0;border-radius:50%;overflow:hidden;pointer-events:none;z-index:2}
+.sph-plain:empty{display:none}
+.sph-plain i{position:absolute;width:0;height:0;display:flex;align-items:center;justify-content:center}
+.sph-plain i>*{flex:none;pointer-events:auto}
+.sph-plain .ring{position:absolute;left:50%;top:50%;border:1px solid rgba(79,141,240,.4);border-radius:50%;transform:translate(-50%,-50%)}
 .sph-note{position:absolute;left:54%;top:9%;transform:translateX(-50%);z-index:3;pointer-events:none;white-space:nowrap;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:#dfe8ff;background:rgba(7,11,22,.78);border:1px solid var(--line2);border-radius:999px;padding:4px 10px}
 .sph-note:empty{display:none}
 .stage[data-big="macro"] .sph.micro .sph-note{display:none}
@@ -734,6 +739,7 @@ a.tk:hover b{text-decoration:underline}
                 <div class="stage" id="stage" data-big="micro">
                   <div class="sph micro" id="sphMicro" data-act="sph" data-s="micro">
                     <div class="sph-map" id="haloMap"></div>
+                    <div class="sph-plain" id="microPlain"></div>
                     <div class="sph-state" id="microState"></div>
                     <span class="sph-note" id="microNote"></span>
                     <span class="sph-lab" id="microLab">Micro</span>
@@ -869,7 +875,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2354,7 +2360,8 @@ async function initMap(){
   if(_mapInit) return; _mapInit=true; startGeo();
   const note=el('mapNote');
   const ok=await loadMapLibre();
-  if(!ok){ S.mapFail=true; note.textContent='The maps need a connection. The list below still works.'; _mapInit=false; return; }
+  if(!ok){ S.mapFail=true; note.textContent='The street map is waiting for a connection. Every device heard is drawn on Micro without it.'; _mapInit=false;
+    if(!S._mlRetry){ S._mlRetry=setTimeout(()=>{ S._mlRetry=0; _mlP=null; }, 15000); } return; }      // asked again after a quarter of a minute
   S.mapFail=false;
   await probeVector();
   const g0=gz();
@@ -2365,7 +2372,8 @@ async function initMap(){
   // Both spheres stay centred on you and do not pan, so a finger on the page always scrolls the page.
   const opt=box=>({container:box, style:mapStyle(!!g0), center:[MAP_CENTER.lon,MAP_CENTER.lat], zoom:15.5, attributionControl:false, interactive:false, fadeDuration:0});
   const mark=(map,cls)=>{ const e=document.createElement('div'); e.className=cls; return new window.maplibregl.Marker({element:e}).setLngLat([MAP_CENTER.lon,MAP_CENTER.lat]).addTo(map); };
-  MAP=new window.maplibregl.Map(opt(el('haloMap')));
+  try{ MAP=new window.maplibregl.Map(opt(el('haloMap'))); }
+  catch(e){ MAP=null; S.mapFail=true; note.textContent='The street map is resting on this device. Every device heard is drawn on Micro without it.'; microPlain(); return; }
   MAP.once('style.load',()=>{                          // the rings do not wait for the basemap tiles
     MAP.addSource('rings',{type:'geojson',data:ringsData()});
     MAP.addLayer({id:'rings-inner',type:'line',source:'rings',filter:['==',['get','kind'],'inner'],paint:{'line-color':'#4f8df0','line-width':1,'line-opacity':.4}});
@@ -2748,7 +2756,23 @@ function updateDeviceMarkers(){
   // Every device heard is a mark. Direction known: solid, where it is. Direction pending: hollow, at its measured distance, on its dashed ring.
   const V=vis(), list=(V.mode==='live'||V.mode==='sim')?inRadius():[]; pendLayout(list, viewRadius()); placeMarkers(MAP, MAP_MARKERS, list, '');
 }
-function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else { updateDeviceMarkers(); macroUpdate(); } }
+// Micro without the map library. The marks are the same marks at the same distances; only the streets are absent.
+function microPlain(){
+  const host=el('microPlain'); if(!host) return;
+  if(MAP){ if(host.firstChild){ host.textContent=''; host._ids=''; } return; }
+  const V=vis(), list=(V.mode==='live'||V.mode==='sim')?inRadius():[], view=viewRadius(), box=el('haloMap'), R=Math.max(40,(box.clientWidth||300)/2-8);
+  pendLayout(list, view);
+  const sig=view+'|'+Math.round(R)+'|'+(S.identId||'')+'|'+list.map(d=>d.id+':'+Math.round(d.dist)+':'+(d.bearing==null?'p'+d._brg:Math.round(d.bearing))+mkClass(d)+markerColor(d)).join(',');
+  if(host._ids===sig) return; host._ids=sig; host.textContent='';
+  const at=(x,y,node)=>{ const i=document.createElement('i'); i.style.left='calc(50% + '+x.toFixed(1)+'px)'; i.style.top='calc(50% + '+y.toFixed(1)+'px)'; i.appendChild(node); host.appendChild(i); };
+  const ring=document.createElement('span'); ring.className='ring'; ring.style.width=ring.style.height=R+'px'; host.appendChild(ring);
+  const me=document.createElement('div'); me.className='you-dot'; at(0,0,me);
+  list.forEach(d=>{ const pend=d.bearing==null, m=(pend && d._showDist!=null)?d._showDist:d.dist, a=(pend?(d._brg||0):d.bearing)*Math.PI/180, r=m/view*R;
+    const e=document.createElement('div'); e.className='dev-marker'+mkClass(d)+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':''); e.style.setProperty('--mk',markerColor(d));
+    e.title=devName(d)+(dirNote(d)?', '+dirNote(d):''); e.dataset.dev=d.id; e.addEventListener('click',ev=>{ ev.stopPropagation(); selectDevice(d.id); });
+    at(Math.sin(a)*r, -Math.cos(a)*r, e); });
+}
+function renderMap(){ if(S.view!=='overview' && S.view!=='watchers') return; if(!MAP) initMap(); else { updateDeviceMarkers(); macroUpdate(); } microPlain(); }
 
 /* ---------- names and small helpers ---------- */
 const W1=['Amber','Iron','Silent','North','Grey','Hollow','Pale','Copper','Dusk','Quiet','Stone','Red','Low','Blue','Still','Far','Lone','Dim'];
