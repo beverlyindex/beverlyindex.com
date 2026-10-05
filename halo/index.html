@@ -878,7 +878,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -901,6 +901,7 @@ function updApply(force){
   location.reload(); return true;
 }
 async function updCheck(manual){
+  if(!/^https?:$/.test(location.protocol)) return;        // a copy opened from a file has no site to ask
   if(UPD.busy) return; if(!manual && Date.now()-UPD.at<45000) return; UPD.busy=true; UPD.at=Date.now();
   try{ const r=await fetch('build.json', {cache:'no-store'}), j=r.ok?await r.json():null, b=j && typeof j.build==='string' && BUILD_RE.test(j.build) ? j.build : '';
     if(b){ UPD.remote=b; UPD.ok=Date.now(); }
