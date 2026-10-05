@@ -881,7 +881,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.09', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.10', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1989,6 +1989,7 @@ function renderCoverage(){
     ['Global feed', g?'Live, sources read '+feedAgo():'Connecting', g?'live':''],
     ...(rayCan()&&P.ray&&P.ray.on ? [['Rayhunter', {off:'Starting',searching:'Looking for it',connected:'Connected',recording:'Recording, being read',unreachable:'Out of reach'}[RAY.state], RAY.state==='recording'?'live':RAY.state==='connected'?'part':'']] : []),
     ...((st=>st&&st.power ? [['Power', ({full:'Full',balanced:'Balanced',saver:'Saver'}[st.power]||'Full')+(st.listening?(st.moving?', moving':', still'):'')+(st.battery&&st.battery.temp!=null?' · phone '+Number(st.battery.temp).toFixed(0)+'&deg;C':'')+(st.battery&&st.battery.level!=null?' · '+st.battery.level+'%':''), st.power==='full'?'live':'part']] : [])(PH.nstat||(NATIVE()?nativeStatus():null))),
+    ...((st=>st && NATIVE() && typeof NATIVE().setBoot==='function' ? [['Listening', (PH.on&&!PH.lost?'On. Starts when Halo opens':'Starts when Halo opens')+(st.boot!==false && st.always==='granted' ? ' and when the phone starts' : ' <button class="btn sm gold" data-act="ph-always" style="margin:0 0 0 6px">Start with the phone</button>'), PH.on&&!PH.lost?'live':'part']] : [])(PH.nstat||(NATIVE()?nativeStatus():null))),
     ['Alerts', (as=>as==='granted'?'On, banners on this device':as==='screen'?'On, inside Halo':S.alertAsking?'Asking, answer Allow':'<button class="btn sm '+(as==='denied'?'gold':'primary')+'" data-act="alert-ask" style="margin:0">'+(as==='denied'?'Allow in settings':'Turn on')+'</button>')(alertState()), alertState()==='granted'||alertState()==='screen'?'live':S.alertAsking?'part':''],
     ['Halo build', BUILD+(UPD.remote>BUILD ? ' <button class="btn sm primary" data-act="upd-now" style="margin:0 0 0 6px">Update now</button>' : (UPD.ok?', current':'')+' <button class="chipbtn" data-act="upd-check" style="margin-left:6px">Check</button>'), UPD.remote>BUILD?'part':UPD.ok?'live':''],
     ['Halo account', SY.status==='on'?'Signed in, synced '+hhmm(SY.at):SY.status==='out'?'Signed out':SY.status==='off'?'Sync off':'Connecting', SY.status==='on'?'live':''],
@@ -4301,6 +4302,13 @@ function phFlush(){
   ingestReport('this-phone', now+LIVE.skew, {t:now, pos:S.pos?{lat:S.pos.lat,lon:S.pos.lon,acc:S.pos.acc}:undefined, s:list}, LIVE.skew);
   liveTick();
 }
+// In the Halo app the phone listens from the moment Halo opens. It stops only when Stop listening is pressed, and stays stopped until Start is pressed.
+function autoListen(){
+  if(!NATIVE() || PH.on || store.get('halo_listen')==='0') return;
+  if(S.splash) return void setTimeout(autoListen, 1200);              // the phone's own questions wait for the film to end
+  const st=nativeStatus(); if(!st || st.permission==='denied' || st.userStopped) return;
+  phStart();
+}
 async function phStart(){
   PH.err=''; PH.msg=''; store.set('halo_listen','1');
   if(NATIVE()){ try{ NATIVE().start(); }catch(e){} PH.native=true; PH.on=true; PH.lost=false; PH.asked=Date.now(); if(!PH.timer) PH.timer=setInterval(phFlush, 2000);
@@ -4319,7 +4327,9 @@ document.addEventListener('visibilitychange', ()=>{ if(PH.on && document.visibil
 function phPanel(){
   const btn=(label,cls)=>'<button class="btn sm '+(cls||'primary')+'" data-act="ph-start">'+label+'</button>';
   if(NATIVE()){ const st=PH.nstat||nativeStatus()||{};
-    if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening to Bluetooth, Wi-Fi and cell, with the screen on or off.', html:'This phone is listening to Bluetooth, Wi-Fi and cell, with the screen on or off. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
+    if(PH.on && !PH.lost){ const N=NATIVE(), bootable=typeof N.setBoot==='function' && typeof N.askAlways==='function', atBoot=bootable && st.boot!==false && st.always==='granted';
+      return {ok:true, text:'This phone is listening to Bluetooth, Wi-Fi and cell, with the screen on or off.', html:'This phone is listening to Bluetooth, Wi-Fi and cell, with the screen on or off. Listening starts by itself each time Halo opens'+(atBoot?', and each time the phone starts.':'.')+
+        (bootable && !atBoot?' <button class="btn sm gold" data-act="ph-always" style="margin:4px 6px 0 0">Start with the phone</button>':'')+' <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'}; }
     const why = st.permission==='denied' ? 'Allow Location and Nearby devices for Halo, and this phone listens for you.'
       : st.permission==='needed' ? 'Allow Location and Nearby devices, and this phone listens for you.'
       : st.bluetooth===false ? 'Switch Bluetooth on, and this phone listens for you.'
@@ -4328,7 +4338,7 @@ function phPanel(){
   if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening.', html:'This phone is listening while Halo is on screen. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
   if(PH.on && PH.lost) return {ok:false, text:'Listening paused while Halo was off the screen.', html:'Listening paused while Halo was off the screen. '+btn('Resume listening')};
   if(!phCan()) return {ok:false, text:'', html: isAndroid()
-    ? '<b>This window is Halo on the web.</b> On this phone the Remiel Halo app listens, with the screen on or off: open it from your home screen, under the name Remiel Halo. <button class="btn sm primary" data-act="go-install" style="margin:4px 0">Get the app</button><br>In Chrome, one setting gives the same ear for Bluetooth while Halo is on screen. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the Chrome steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app.</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Start listening.</li></ol></details>'
+    ? '<b>This window is Halo on the web.</b> On this phone the Remiel Halo app listens, with the screen on or off: open it from your home screen, under the name Remiel Halo. <a class="btn sm primary" href="'+APP_LINK+'" style="margin:4px 6px 4px 0;text-decoration:none;display:inline-flex">Open the Halo app</a><button class="btn sm" data-act="go-install" style="margin:4px 0">Get the app</button><br>In Chrome, one setting gives the same ear for Bluetooth while Halo is on screen. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the Chrome steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app.</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Start listening.</li></ol></details>'
     : 'Listening runs in the Halo Android app, and on a computer at home.'};
   const why = PH.err==='NotAllowedError' ? 'Allow the scan when Chrome asks, and this phone listens for you.' : PH.err ? 'Switch Bluetooth and Location on, then press the button.' : 'This phone hears the Bluetooth devices around you.';
   return {ok:false, text:why, html:why+' '+btn('Start listening')};
@@ -4607,6 +4617,7 @@ function nativeMine(){ const N=NATIVE(); if(!N || typeof N.setMine!=='function')
 
 /* ----- which devices the screen shows: live from a sensor, or nothing ----- */
 // The words for each state in which nothing near you can be shown. None of them reads Clear.
+const APP_LINK='intent://open#Intent;scheme=remielhalo;package=com.beverlyindex.halo;S.browser_fallback_url='+encodeURIComponent('https://beverly-index.com/halo/?get=app')+';end';      // opens the app; a phone that has no app yet comes back to the download
 const webOnAndroid = () => isAndroid() && !NATIVE();                  // Halo opened in a browser, or from the web shortcut, on an Android phone
 const earless = () => webOnAndroid() && !phCan() && !PH.on;
 const canHear = () => !!NATIVE() || phCan();                      // this device has an ear of its own
@@ -4913,6 +4924,7 @@ document.addEventListener('click', e=>{
     case 'health-tick': { const t=healthTicks(), i=+a.dataset.i; t[i]=!t[i]; save(); if(t[i]) logEvidence('defence','Device health, confirmed on this '+HK_NAME[HK()]+': '+HEALTH_GUIDED[HK()][i][0]+'.'); rerender(); break; }
     case 'health-keep': { (navigator.storage&&navigator.storage.persist?navigator.storage.persist():Promise.resolve(false)).then(ok=>{ toast(ok?'The browser will keep Halo\'s data.':'The browser did not agree. Install Halo to the home screen, then try again.'); healthGo(); }).catch(()=>healthGo()); break; }
     case 'ph-start': phStart(); break;
+    case 'ph-always': { const N=NATIVE(); try{ if(N){ N.setBoot(true); N.askAlways(); } }catch(e){} toast('Choose Allow all the time. Halo then listens from the moment the phone starts.'); setTimeout(()=>{ PH.nstat=nativeStatus(); renderVicinity(); if(el('covCard')) renderCoverage(); }, 4000); break; }
     case 'ph-stop': phStop(); break;
     case 'walk-doc': tripDocShow(); break;
     case 'walk-save': walkSave(false); break;
@@ -4968,7 +4980,8 @@ function boot(){
   fetch(API+'/health',{cache:'no-store'}).then(r=>r.json()).then(j=>{ S.features=(j&&j.features)||{}; if(booted) softRender(); }).catch(()=>{});
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') alertNativeTick(); });
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.haloOpen) alertGo(e.data.haloOpen); });
-  if(NATIVE() && store.get('halo_listen')==='1'){ const st=nativeStatus(); if(st && st.permission==='granted') phStart(); }
+  autoListen();
+  if(/[?&]get=app\b/.test(location.search)){ try{ history.replaceState(history.state,'',location.pathname); }catch(e){} setTimeout(()=>{ const b=document.createElement('button'); b.dataset.act='go-install'; b.style.display='none'; document.body.appendChild(b); b.click(); b.remove(); }, 400); }
 }
 updStart();
 /* returning visit: unlock only after everything above is defined */
