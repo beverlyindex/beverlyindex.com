@@ -653,6 +653,7 @@ ol.steps{margin:8px 0 2px;padding-left:20px;font-size:13px;line-height:1.5;color
 .legend i.hol{background:transparent;box-shadow:inset 0 0 0 2px var(--mut)}
 .legend i.rgh{background:radial-gradient(circle,var(--mut) 0 28%,transparent 32%);box-shadow:inset 0 0 0 2px var(--mut)}
 .sdot.rough{background:radial-gradient(circle,var(--mk) 0 28%,transparent 32%);box-shadow:inset 0 0 0 2px var(--mk)}
+.dev-marker.ghost{opacity:.4}
 .dev-marker.far{width:14px;height:14px}
 .dev-marker.hollow.far{width:12px;height:12px}
 .dev-marker.rough{background:radial-gradient(circle,var(--mk) 0 26%,rgba(7,11,22,.55) 30%) !important;box-shadow:inset 0 0 0 3px var(--mk),0 0 10px -2px var(--mk) !important;border-color:transparent}
@@ -881,7 +882,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2039,6 +2040,7 @@ function viewRadius(){
 }
 const quietAp = d => d.band==='wifi' && d.cls!=='Camera' && !d.withYou && !d.onRoute && !d.mine;
 const inRadius = () => { const rs=radiusState(); return vis().devices.filter(d=>d.present && d.dist<=rs.r && !quietAp(d)); };
+const onMicro = () => { const rs=radiusState(); return vis().devices.filter(d=>(d.present || d.linger) && d.dist<=rs.r && !quietAp(d)); };      // those in earshot, and those just lost
 const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Math.round(d.dist)+' m';
 const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';          // placed, direction rough, or direction not known
 const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'direction rough, '+whereWords(d) : 'direction pending';
@@ -2347,7 +2349,7 @@ const noDir = d => d.live && !d.fix && !d.sector && d.bearing==null;
 function devLngLat(d, micro){ const rim=micro && d._rim && d.bearing!=null; if(d.fix && !rim) return [d.fix.lon,d.fix.lat];
   const pend=d.bearing==null, m=(micro && (pend || rim) && d._showDist!=null)?d._showDist:d.dist, a=(!pend?d.bearing:(d._brg!=null?d._brg:d.handleBrg||0))*Math.PI/180, lat=MAP_CENTER.lat;
   return [MAP_CENTER.lon+Math.sin(a)*m/(111320*Math.cos(lat*Math.PI/180)), MAP_CENTER.lat+Math.cos(a)*m/111320]; }
-const markerColor = d => d.withYou?'var(--action)':d.onRoute?'var(--route)':d.knownBefore?'var(--clear)':'var(--warn)';
+const markerColor = d => d.withYou?'var(--action)':d.maybe?'#ff8a3c':d.onRoute?'var(--route)':d.knownBefore?'var(--clear)':'var(--warn)';
 function zonesData(){ const f=[];
   if(S.pos && MAP_CENTER) f.push({type:'Feature',properties:{kind:'me'},geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,Math.max(3,Math.min(150,S.pos.acc)))]}});
   const V=vis(); if(V.mode==='live' && MAP_CENTER) inRadius().forEach(d=>{
@@ -2639,10 +2641,10 @@ function devXY(d, view, R){ if(d.bearing==null && !d.fix) return null; const b=(
 function placeMarkers(map, store, list, extra){
   const ids=new Set(list.map(d=>d.id));
   Object.keys(store).forEach(id=>{ if(!ids.has(id)){ store[id].remove(); delete store[id]; } });
-  list.forEach(d=>{ const far=map===MAP && !!d._rim, ll=devLngLat(d, map===MAP), mc=mkClass(d), cls='dev-marker'+extra+mc+(far?' far':'')+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':'');
-    const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):'');
+  list.forEach(d=>{ const far=map===MAP && !!d._rim, gone=!d.present && !!d.linger, ll=devLngLat(d, map===MAP), mc=mkClass(d), cls='dev-marker'+extra+mc+(far?' far':'')+(gone?' ghost':'')+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':'');
+    const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):'')+(gone?', last heard '+Math.max(1,Math.round((Date.now()+LIVE.skew-d.seenMobile)/1000))+' s ago':'');
     if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
-      e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('far',far); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
+      e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('far',far); e.classList.toggle('ghost',gone); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
     else{ const m=document.createElement('div'); m.className=cls; m.style.setProperty('--mk',markerColor(d)); m.title=tip;
       m.addEventListener('click',ev=>{ ev.stopPropagation(); if(map===FULL){ MF.pt=null; MF.sel=d.id; mapFullTick(false); } else selectDevice(d.id); }); store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); } });
 }
@@ -2687,7 +2689,7 @@ const bySeverity = (a,b) => deviceThreat(b).tierIdx-deviceThreat(a).tierIdx || a
 function identPick(){
   const V=vis(); if(V.mode!=='live' && V.mode!=='sim') return null;
   const chosen=S.identId ? V.devices.find(x=>x.id===S.identId) : null;
-  if(chosen) return chosen;
+  if(chosen && (chosen.present || chosen.linger)) return chosen;          // the one you chose, for as long as it is here
   S.identId=null;                                          // nothing chosen, or the chosen device is gone: follow the top threat inside the radius
   return [...inRadius()].sort(bySeverity)[0] || null;
 }
@@ -2775,21 +2777,21 @@ function updateDeviceMarkers(){
   try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); const z=MAP.getSource('zones'); if(z) z.setData(zonesData()); }catch(e){}
   fitRadius(false);
   // Every device heard is a mark. Direction known: solid, where it is. Direction pending: hollow, at its measured distance, on its dashed ring.
-  const V=vis(), list=(V.mode==='live'||V.mode==='sim')?inRadius():[]; pendLayout(list, viewRadius()); placeMarkers(MAP, MAP_MARKERS, list, '');
+  const V=vis(), list=(V.mode==='live'||V.mode==='sim')?onMicro():[]; pendLayout(list, viewRadius()); placeMarkers(MAP, MAP_MARKERS, list, '');
 }
 // Micro without the map library. The marks are the same marks at the same distances; only the streets are absent.
 function microPlain(){
   const host=el('microPlain'); if(!host) return;
   if(MAP){ if(host.firstChild){ host.textContent=''; host._ids=''; } return; }
-  const V=vis(), list=(V.mode==='live'||V.mode==='sim')?inRadius():[], view=viewRadius(), box=el('haloMap'), R=Math.max(40,(box.clientWidth||300)/2-8);
+  const V=vis(), list=(V.mode==='live'||V.mode==='sim')?onMicro():[], view=viewRadius(), box=el('haloMap'), R=Math.max(40,(box.clientWidth||300)/2-8);
   pendLayout(list, view);
-  const sig=view+'|'+Math.round(R)+'|'+(S.identId||'')+'|'+list.map(d=>d.id+':'+Math.round(d.dist)+':'+(d._rim?'r':'')+(d.bearing==null?'p'+d._brg:Math.round(d.bearing))+mkClass(d)+markerColor(d)).join(',');
+  const sig=view+'|'+Math.round(R)+'|'+(S.identId||'')+'|'+list.map(d=>d.id+':'+Math.round(d.dist)+':'+(d._rim?'r':'')+(d.present?'':'g')+(d.bearing==null?'p'+d._brg:Math.round(d.bearing))+mkClass(d)+markerColor(d)).join(',');
   if(host._ids===sig) return; host._ids=sig; host.textContent='';
   const at=(x,y,node)=>{ const i=document.createElement('i'); i.style.left='calc(50% + '+x.toFixed(1)+'px)'; i.style.top='calc(50% + '+y.toFixed(1)+'px)'; i.appendChild(node); host.appendChild(i); };
   const ring=document.createElement('span'); ring.className='ring'; ring.style.width=ring.style.height=R+'px'; host.appendChild(ring);
   const me=document.createElement('div'); me.className='you-dot'; at(0,0,me);
   list.forEach(d=>{ const pend=d.bearing==null, m=d._showDist!=null?d._showDist:d.dist, a=(pend?(d._brg||0):d.bearing)*Math.PI/180, r=m/view*R;
-    const e=document.createElement('div'); e.className='dev-marker'+mkClass(d)+(d._rim?' far':'')+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':''); e.style.setProperty('--mk',markerColor(d));
+    const e=document.createElement('div'); e.className='dev-marker'+mkClass(d)+(d._rim?' far':'')+(!d.present&&d.linger?' ghost':'')+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':''); e.style.setProperty('--mk',markerColor(d));
     e.title=devName(d)+(dirNote(d)?', '+dirNote(d):''); e.dataset.dev=d.id; e.addEventListener('click',ev=>{ ev.stopPropagation(); selectDevice(d.id); });
     at(Math.sin(a)*r, -Math.cos(a)*r, e); });
 }
@@ -2806,7 +2808,7 @@ const band = d => d.dist<30?'Very near':d.dist<=BLOCK_M?'Within one block':d.dis
 const labelOf = d => { const l=d && d.live && P.labels && P.labels[d.id]; return (typeof l==='string' && l) ? l : ''; };
 const devName = d => d.live ? (labelOf(d) || d.adv || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
 const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : d.cls+(d.hint?', '+d.hint:''))+(d.live && devName(d)!==d.name ? ' · '+d.name : '');
-const flagOf = d => d.mine?'Yours':d.sigFit?'Fits your signature':d.withYou?'With you':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':(!d.knownBefore?'New':'Known');
+const flagOf = d => d.mine?'Yours':d.sigFit?'Fits your signature':d.withYou?'Moving with you':d.maybe?'Staying with you so far':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':d.verdict==='fixed'?'Stays in place':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 function deviceThreat(d){ const c=d.identity; let s=1; if(d.withYou) s=4; else if(d.onRoute) s=3; else if(!d.knownBefore) s=2;
   return {c, s, tierIdx:Math.max(0,Math.min(3,Math.round(((c-1)+(s-1))/2)))}; }
@@ -3870,7 +3872,10 @@ function devicesPull(){
 const LIVE={ after:0, started:false, seen:{mobile:0,station:0}, devs:new Map(), err:false, skew:0, bands:{}, polledAt:0, autoLog:[], home:false };
 const liveLast = () => Math.max(LIVE.seen.mobile, LIVE.seen.station);
 let LIVE_POLL=5000, LIVE_PRESENT=30000, LIVE_SILENT=60000;
-const FOLLOW_SPAN={ble:300, wifi:600}, FOLLOW_MIN=5, FIX_MIN_SAMPLES=5, FIX_MIN_BASELINE=25, FIX_MAX_UNC=60, FIX_MIN_UNC=12, FIX_MAX_RMS=9, FIT_S2_MIN=36, FIT_K=9, SECTOR_HALF=60;
+// The follower test. Your route is cut into legs of 30 m. A device that moves with you is heard on nearly every leg at about the same strength.
+// A device that stays in place is strong near it, weak further off, and missing from the legs beyond its range. These figures are Halo's working rules.
+const FOLLOW={leg:30, legs:5, reach:200, mins:4, share:.8, spread:10, level:-91, tagLegs:4, tagReach:150, tagMins:3, drift:6, rate:.3, maybeLegs:3, maybeReach:80, maybeMins:1.5, maybeSpread:8, maybeDrift:4, fixedSpread:18, fixedShare:.6, linger:90000, quiet:12000};
+const FOLLOW_SPAN={ble:FOLLOW.reach, wifi:600}, FOLLOW_MIN=FOLLOW.mins, FIX_MIN_SAMPLES=5, FIX_MIN_BASELINE=25, FIX_MAX_UNC=60, FIX_MIN_UNC=12, FIX_MAX_RMS=9, FIT_S2_MIN=36, FIT_K=9, SECTOR_HALF=60;
 const SAMPLE_STEP=4, SAMPLE_AGE=30*60000, SAMPLE_MAX=80, POS_MAX_ACC=35, SOLVE_BUDGET_MS=40;
 const AWAY_M=300, LIVE_KEEP=2*3600000, DEVS_MAX=600, ROSTER_MAX=60, HOME_NEAR=150, AUTOLOG_PER_HOUR=6;
 const CLS=['Phone','Wearable','Tag','Laptop','Vehicle','Access point','Cell tower','Camera','Unknown'];
@@ -3976,6 +3981,7 @@ function ingestReport(sid, rowT, p, off){
   if(okLL(p.pos)){ pos=toXY(p.pos.lat,p.pos.lon); pos.acc=(typeof p.pos.acc==='number'&&p.pos.acc>=0)?p.pos.acc:0; if(Math.hypot(pos.x,pos.y)>200000) pos=null; }   // the sensor knows where it is
   else if(station){ if(okLL(P.home.loc)){ pos=toXY(P.home.loc.lat,P.home.loc.lon); pos.acc=0; } }                 // a home station does not move
   else { const q=posAt(at-LIVE.skew); if(q) pos={x:q.x,y:q.y,acc:q.acc}; }                                         // carried with this device
+  if(!station) LIVE.repN=(LIVE.repN||0)+1;                 // one more report from a sensor that is with you
   let away=false;                                        // was this heard by a sensor that is with you, well away from home?
   if(!station && pos && okLL(P.home.loc)){ const hq=toXY(P.home.loc.lat,P.home.loc.lon); away=Math.hypot(pos.x-hq.x,pos.y-hq.y)>AWAY_M; }
   for(const s of p.s.slice(0,150)){ if(!s || typeof s.id!=='string' || !s.id || s.id.length>80) continue;
@@ -3994,9 +4000,25 @@ function ingestReport(sid, rowT, p, off){
     d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
     const fl=Array.isArray(s.flags)?s.flags:[]; d.fFollow=!station&&fl.indexOf('with_you')>=0; d.fRoute=fl.indexOf('route')>=0; d.fKnown=fl.indexOf('known')>=0; d.randomizes=fl.indexOf('randomized')>=0;
     if(pos && rssi!==null && !(pos.acc>POS_MAX_ACC)) addSample(d,pos,rssi,at);            // a poor position fix would mislead the placement
+    if(!station && rssi!==null) legAdd(d, (pos && !(pos.acc>POS_MAX_ACC))?pos:null, rssi, at);
     d.hist.push(reading); if(d.hist.length>12) d.hist.shift();
   }
 }
+// Your legs: a new leg begins each time you are 30 m from where the last one began. Each device keeps its readings by leg.
+function legNow(pos){ const g=LIVE.leg||(LIVE.leg={i:0,x:null,y:null});
+  if(pos){ if(g.x===null){ g.x=pos.x; g.y=pos.y; } else if(Math.hypot(pos.x-g.x,pos.y-g.y)>=FOLLOW.leg){ g.i++; g.x=pos.x; g.y=pos.y; } }
+  return g.i; }
+function legAdd(d,pos,rssi,at){ const i=legNow(pos), k=d.trk||(d.trk={i0:i, r0:LIVE.repN||0, legs:{}, x0:null, x1:null, y0:null, y1:null});
+  k.n=(k.n||0)+1; const L=k.legs[i]||(k.legs[i]=[]); if(L.length<40) L.push(rssi); else L[(at>>>0)%40]=rssi;
+  if(pos){ if(k.x0===null){ k.x0=k.x1=pos.x; k.y0=k.y1=pos.y; } else { k.x0=Math.min(k.x0,pos.x); k.x1=Math.max(k.x1,pos.x); k.y0=Math.min(k.y0,pos.y); k.y1=Math.max(k.y1,pos.y); } }
+  const ks=Object.keys(k.legs); if(ks.length>60){ delete k.legs[ks[0]]; k.i0=+Object.keys(k.legs)[0]; } }
+// What the legs say about one device.
+function legRead(d){ const k=d.trk; if(!k) return {legs:0, share:0, spread:0, level:-120, drift:0, rate:0, reach:0, span:0};
+  const om=Object.keys(k.legs).map(Number).sort((a,b)=>a-b).map(i=>k.legs[i]).filter(L=>L.length>=1).map(L=>median(L)), ms=[...om].sort((a,b)=>a-b);
+  let drift=0; if(om.length>=3){ const n=om.length, mx=(n-1)/2, my=om.reduce((a,b)=>a+b,0)/n; let sxy=0, sxx=0; om.forEach((y,i)=>{ sxy+=(i-mx)*(y-my); sxx+=(i-mx)*(i-mx); }); drift=sxy/sxx*(n-1); }      // a steady rise or fall along the route: you are nearing it or leaving it
+  const span=(LIVE.leg?LIVE.leg.i:0)-k.i0+1, cut=ms.length>=6?1:0, core=ms.slice(cut, ms.length-cut);
+  return {legs:ms.length, share:span>0?Object.keys(k.legs).length/span:0, spread:core.length?core[core.length-1]-core[0]:0, level:ms.length?median(ms):-120, drift, rate:(k.n||0)/Math.max(1,(LIVE.repN||0)-k.r0+1),
+    reach:k.x0===null?0:Math.hypot(k.x1-k.x0,k.y1-k.y0), span}; }
 // One sample per place you stood: readings taken within a few metres are averaged, old ones are dropped.
 function addSample(d,pos,rssi,t){ const sm=d.samples, l=sm[sm.length-1];
   if(l && Math.hypot(pos.x-l.x,pos.y-l.y)<SAMPLE_STEP){ l.rssi=(l.rssi*l.k+rssi)/(l.k+1); l.k=Math.min(l.k+1,8); l.t=t; return; }
@@ -4011,7 +4033,8 @@ function solveFix(d){ d.fresh=0; d.base=baselineOf(d.samples);
   else if(e.brg!==null && e.dev<=SECTOR_HALF) d.sector={brg:e.brg, half:SECTOR_HALF, n:d.samples.length}; }
 const followSpan = d => d.cls==='Cell tower'||d.band==='cell' ? Infinity : (d.band==='wifi'||d.cls==='Access point') ? FOLLOW_SPAN.wifi : FOLLOW_SPAN.ble;
 function liveDerive(d, nowS){
-  const keep=d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT, mob=nowS-d.seenMobile<keep, sta=nowS-d.seenStation<keep;      // Wi-Fi is scanned every 30 seconds
+  const keep=d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT, held=scanQuiet(), mob=nowS-held-d.seenMobile<keep, sta=nowS-d.seenStation<keep;      // Wi-Fi is scanned every 30 seconds. Time the scanner was quiet does not count against a device
+  d.linger = !mob && d.seenMobile>0 && nowS-held-d.seenMobile<FOLLOW.linger;              // just lost: it fades on the map instead of vanishing
   d.present = mob || (sta && LIVE.home);                 // near you. What only the home station hears is near you only when you are home
   d.atHome = sta && !d.present;
   d.mine = !!(P.mine && P.mine[d.id]);
@@ -4020,19 +4043,27 @@ function liveDerive(d, nowS){
   else { d.dist=Math.max(1,median(d.hist.slice(-3))); d.bearing=d.sector?d.sector.brg:null; }
   const h=d.hist, a=h.length>=4?median(h.slice(0,Math.floor(h.length/2))):null, b=h.length>=4?median(h.slice(Math.floor(h.length/2))):null;
   d.vel = (a===null)?0:((b-a)/a < -0.35 ? -1 : (b-a)/a > 0.5 ? 1 : 0); d.trend=trendOf(d.vel);       // a clear change only: single readings jump about
-  // follower test: still in earshot, at steady strength, after you have moved a long way
-  const sm=d.samples; d.span=0; d.steady=false;
-  if(sm.length>1){ for(const s of sm) d.span=Math.max(d.span, Math.hypot(s.x-sm[0].x,s.y-sm[0].y));
-    const mean=sm.reduce((x,s)=>x+s.rssi,0)/sm.length, sd=Math.sqrt(sm.reduce((x,s)=>x+(s.rssi-mean)*(s.rssi-mean),0)/sm.length); d.rssiSd=sd; d.steady = sd<=9 && mean>=-88; }
+  // follower test: heard on nearly every leg of your route, at about the same strength, after you have moved a long way
+  const lr=legRead(d), tag=d.cls==='Tag', radio=isFinite(followSpan(d)) && d.band!=='wifi';
+  d.span=lr.reach; d.steady=lr.legs>=2 && lr.spread<=FOLLOW.spread; d.leg=lr;
   d.mins=(d.lastSeen-d.firstSeen)/60000;
-  d.need=followSpan(d);
-  d.tested = d.span>=d.need && d.mins>=FOLLOW_MIN && d.steady && !d.fix;       // this console's own test
+  d.need=tag?FOLLOW.tagReach:followSpan(d);
+  const even=lr.share>=FOLLOW.share && lr.spread<=FOLLOW.spread && Math.abs(lr.drift)<=FOLLOW.drift && lr.level>=FOLLOW.level && lr.rate>=FOLLOW.rate;      // heard on nearly every leg, evenly, clearly, and in at least three reports in ten
+  d.verdict = !radio ? 'near'
+    : even && lr.legs>=(tag?FOLLOW.tagLegs:FOLLOW.legs) && lr.reach>=d.need && d.mins>=(tag?FOLLOW.tagMins:FOLLOW.mins) ? 'with'
+    : even && lr.spread<=FOLLOW.maybeSpread && Math.abs(lr.drift)<=FOLLOW.maybeDrift && lr.legs>=FOLLOW.maybeLegs && lr.reach>=FOLLOW.maybeReach && d.mins>=FOLLOW.maybeMins ? 'maybe'      // the early call asks for a flatter signal
+    : lr.span>=3 && (lr.spread>=FOLLOW.fixedSpread || lr.share<FOLLOW.fixedShare) ? 'fixed'
+    : d.mins<2 ? 'passing' : 'near';
+  d.tested = d.verdict==='with';                         // this console's own test
+  d.maybe = !d.mine && d.present && d.verdict==='maybe';
   d.withYou = !d.mine && d.present && (d.tested || d.fFollow);
   d.homeAway = !d.mine && d.seenStation>0 && (d.seenAway||0)>0;         // heard by your home listener, and by a sensor with you away from home
   d.onRoute = !d.mine && (!!d.fRoute || d.homeAway); d.knownBefore = d.mine || !!d.fKnown;
 }
 const sensorName = id => id==='this-phone' ? 'this phone' : ((P.sensors[id]||{}).name||'a sensor');
-const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : d.tested ? 'stayed in earshot for '+Math.round(d.mins)+' minutes across '+Math.round(d.span)+' m of your movement' : 'was reported as moving with you by '+sensorName(d.sensor);
+const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : (d.tested||d.maybe) ? 'has stayed in earshot for '+(d.mins<1.5?'a minute':Math.round(d.mins)+' minutes')+' across '+Math.round(d.span)+' m of your movement, at an even strength on '+d.leg.legs+' legs of your route' : 'was reported as moving with you by '+sensorName(d.sensor);
+// The phone's scanner has gone quiet (the app says how long). The last picture is held for that long, up to three minutes.
+function scanQuiet(){ const st=PH.native && PH.on ? PH.nstat : null, a=st && typeof st.scanAge==='number' ? st.scanAge : 0; return a>FOLLOW.quiet ? Math.min(a, 180000) : 0; }
 // One Evidence entry per device per day, and only a few per hour, so a faulty sensor cannot bury the record.
 function autoLog(d){ const day=new Date().toISOString().slice(0,10); P.flagged=P.flagged||{};
   if(P.flagged[d.id]===day) return;
@@ -4275,6 +4306,8 @@ async function nativeDrain(){
       (b.w||[]).slice(0,120).forEach(x=>{ if(!x || !x.b || typeof x.r!=='number') return; const open=!/WPA|WEP|SAE|RSN|EAP|OWE|PSK/i.test(x.c||'');
         const bs=String(x.b).toLowerCase(), flock=FLOCK_SSID.test(String(x.s||'')) || bs.indexOf(FLOCK_OUI)===0;
         list.push({id:'ap:'+bs, rssi:x.r, band:'wifi', cls:flock?'Camera':'Access point', name:String(x.s||'').slice(0,40), hint:flock?'Flock Safety camera, Wi-Fi on':(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
+      LIVE.seen.mobile=Math.max(LIVE.seen.mobile, b.t+LIVE.skew);      // the phone reported, whether or not anything was in earshot
+      if(typeof b.sa==='number') LIVE.sa=b.sa;
       if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:okLL(q)?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew);
       if(!live && W.on && list.length) walkTick(b.t, list.map(x=>x.id), okLL(q)?q:null);
       if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
@@ -4621,6 +4654,7 @@ function alertGo(key){ const bs=S.banners||[], b=(key?bs.find(x=>x.key===key):bs
 function alertScan(){
   LIVE.devs.forEach(d=>{ if(d.sim || d.mine || d.sigFit || !d.present) return;
     if(d.withYou) alertRaise('with:'+d.sig, d.cls==='Tag'?'A tracker is travelling with you':d.band==='wifi'?'A hotspot is travelling with you':'A device is travelling with you', devName(d)+' '+followText(d)+'. Open it and decide whether it is yours.', {dev:d.id});
+    else if(d.maybe && d.cls==='Tag') alertRaise('maybe:'+d.sig, 'A tracker tag is staying with you', devName(d)+' '+followText(d)+'. If it is yours, open it and press This is mine. Halo keeps testing.', {dev:d.id});
     else if(d.homeAway) alertRaise('route:'+d.sig, 'A device from your home is near you again', devName(d)+' '+followText(d)+'.', {dev:d.id});
     if(d.cls==='Camera') alertRaise('cam:'+d.sig, /Raven/.test(d.hint)?'A gunshot detector is in earshot':'A plate camera is in earshot', devName(d)+' is broadcasting '+distText(d)+' from you. Halo places it on the map as you move.', {dev:d.id}); });
   { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv && sv.gen!=='2G' && !rayRecent('High').length){ if(alertRaise('tower:'+sv.reg, 'A tower in use shows the signs of a fake one', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows the signs of a fake one. '+ts.signs.map(x=>x.t).join(' ')); } } }
@@ -4707,7 +4741,7 @@ function liveBody(d){
   const rel = d.fix && d.bearing!=null, atStation=(P.sensors[d.sensor]||{}).kind==='station';
   const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+Math.round(d.fix.unc)+' m' : 'about '+Math.round(d.dist)+' m'+(atStation?' from your home listener':'')+', from signal strength. It sharpens each time the device is heard again';
   const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side' : (d.base>=FIX_MIN_BASELINE ? 'Keep moving and make a turn, and Halo fixes its place' : 'Move about '+FIX_MIN_BASELINE+' m and make a turn, and Halo finds its direction');
-  const ft = d.mine ? 'Yours' : d.withYou ? 'With you' : (!isFinite(d.need) ? 'Tracked in Tower Watch' : d.span>=d.need && !d.steady ? 'Left behind: its strength rose and fell as a fixed transmitter does' : d.fix ? 'Stays in one place' : 'Testing: completes at '+d.need+' m of your movement and '+FOLLOW_MIN+' minutes');
+  const ft = d.mine ? 'Yours' : d.withYou ? 'Moving with you' : (!isFinite(d.need) ? 'Tracked in Tower Watch' : d.maybe ? 'Staying with you so far: even strength on '+d.leg.legs+' legs. The test completes at '+d.need+' m and '+(d.cls==='Tag'?FOLLOW.tagMins:FOLLOW.mins)+' minutes' : d.fix ? 'Stays in one place' : d.verdict==='fixed' ? 'Stays in place: its strength rises and falls as you pass, as a fixed transmitter does' : 'Testing: completes at '+d.need+' m of your movement and '+(d.cls==='Tag'?FOLLOW.tagMins:FOLLOW.mins)+' minutes');
   return '<div class="dsec"><h4>Proximity</h4><div class="kv"><span class="k">Distance</span><span class="v">'+esc(where)+'</span><span class="k">Direction</span><span class="v '+(rel?'':'unkc')+'">'+esc(dir)+'</span>'+
     '<span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm · '+esc(d.band==='wifi'?'Wi-Fi':d.band==='cell'?'Cellular':'Bluetooth')+'</span>'+
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></div></div>'+
