@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2066,12 +2066,16 @@ function renderVicinity(){
   setHTML(el('microState'), '');            // the map is never covered by words: the state is read on the line above it
   { const nd=shown?sus.filter(noDir).length:0, pl=shown?sus.length-nd:0;
     const out=shown?sus.filter(d=>d.dist>view*0.92).length:0;
-    setHTML(el('microNote'), (nd ? (pl?'+':'')+nd+' heard, direction pending' : '')+(out?(nd?'<br>':'')+out+' on the rim, beyond this view':'')); }
+    const near=shown&&sus.length?Math.round(Math.min(...sus.map(d=>d.dist))):0, wy=shown?sus.filter(d=>d.withYou).length:0, my=shown?sus.filter(d=>d.maybe).length:0;
+    setHTML(el('microNote'), !shown||!sus.length ? '' : sus.length+' near you · nearest about '+near+' m'+(wy?'<br><b style="color:#ff8d8d">'+wy+' moving with you</b>':my?'<br><b style="color:#ffb27a">'+my+' staying with you so far</b>':'')+(out?'<br>'+out+' on the rim, beyond this view':'')); }
   setHTML(el('radLine'), (rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
-    : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(view<BASE_R ? (shown||S.microV?' Micro is zoomed to '+view+' m.':'') : view>BASE_R ? ' Micro is widened to '+view+' m; the inner line is your radius.' : ''))+
+    : '<b>'+(shown ? sus.length+(sus.length===1?' device':' devices')+' within 2 blocks'+(sus.length?', the nearest about '+Math.round(Math.min(...sus.map(d=>d.dist)))+' m':'')+'.' : 'Radius: 2 blocks, about '+BASE_R+' m.')+'</b>'+((n=>n?' <b style="color:#ff8d8d">'+n+' moving with you.</b>':'')(shown?sus.filter(d=>d.withYou).length:0))+(view<BASE_R ? (shown||S.microV?' Micro is zoomed to '+view+' m.':'') : view>BASE_R ? ' Micro is widened to '+view+' m; the inner line is your radius.' : ''))+
     ' <span class="steps">Micro view '+[0].concat(MICRO_VIEWS).map(m=>'<button class="chipbtn '+((S.microV||0)===m?'on':'')+'" data-act="micro-v" data-m="'+m+'">'+(m?m+' m':'Auto')+'</button>').join(' ')+'</span>');
-  const devLine = V.mode==='live' ? (V.test?'test data':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
+  const sq=scanQuiet(), sa=PH.native && PH.on && PH.nstat && typeof PH.nstat.scanAge==='number' ? PH.nstat.scanAge : null;
+  const devLine = V.mode==='live' && sq ? 'Bluetooth has been quiet for '+Math.round(sq/1000)+' s. Halo is restarting the scan and holds the last picture'
+    : V.mode==='live' && sa!==null && sa>=0 && !V.test ? 'this phone is listening, Bluetooth last heard '+(sa<3000?'just now':Math.round(sa/1000)+' s ago')+((PH.nstat.scanRestarts|0)?', scan restarted '+PH.nstat.scanRestarts+(PH.nstat.scanRestarts===1?' time':' times'):'')
+    : V.mode==='live' ? (V.test?'test data':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
     : stateWords(V.mode).line;
   setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'from your phone, '+Math.max(1,Math.round((Date.now()-P.where.t)/60000))+' min ago':gz()?'your saved home location':'allow location and your map appears')+' · Devices: '+esc(devLine));
   groundSync(); syncBase();
@@ -2357,6 +2361,9 @@ function ringsData(){
   const wide=!!rs.ext || viewRadius()>BASE_R, feats=[f((wide?BASE_R:viewRadius())/2,'inner')]; if(wide) feats.push(f(BASE_R,'base'));      // in a wider view the two-block radius is drawn inside it
   return {type:'FeatureCollection',features:feats};
 }
+// The distance of each ring on Micro, written at its southern edge, clear of the note at the top.
+function ringLabData(){ if(!MAP_CENTER) return {type:'FeatureCollection',features:[]}; const rs=radiusState(), v=viewRadius(), wide=!!rs.ext || v>BASE_R, rr=[(wide?BASE_R:v)/2].concat(wide?[BASE_R]:[]);
+  return {type:'FeatureCollection',features:rr.map(r=>({type:'Feature',properties:{t:(r>=10?Math.round(r):r.toFixed(1))+' m'},geometry:{type:'Point',coordinates:[MAP_CENTER.lon, MAP_CENTER.lat-r/111320]}}))}; }
 const noDir = d => d.live && !d.fix && !d.sector && d.bearing==null;
 function devLngLat(d, micro){ const rim=micro && d._rim && d.bearing!=null; if(d.fix && !rim) return [d.fix.lon,d.fix.lat];
   const pend=d.bearing==null, m=(micro && (pend || rim) && d._showDist!=null)?d._showDist:d.dist, a=(!pend?d.bearing:(d._brg!=null?d._brg:d.handleBrg||0))*Math.PI/180, lat=MAP_CENTER.lat;
@@ -2412,6 +2419,7 @@ async function initMap(){
     MAP.addLayer({id:'zone-fix-l',type:'line',source:'zones',filter:['==',['get','kind'],'fix'],paint:{'line-color':'#e8a84a','line-width':1,'line-opacity':.6}});
     MAP.addLayer({id:'zone-range',type:'line',source:'zones',filter:['==',['get','kind'],'range'],paint:{'line-color':['coalesce',['get','c'],'#9aa6c4'],'line-width':['case',['==',['get','sel'],1],2.4,1.1],'line-opacity':['case',['==',['get','sel'],1],.95,.5],'line-dasharray':[1.5,2.5]}});
     MAP.addLayer({id:'zone-arc',type:'line',source:'zones',filter:['==',['get','kind'],'arc'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.8}});
+    if(VEC){ MAP.addSource('ringlab',{type:'geojson',data:ringLabData()}); MAP.addLayer({id:'rings-lab',type:'symbol',source:'ringlab',layout:{'text-field':['get','t'],'text-font':['Noto Sans Regular'],'text-size':10,'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'#b9cdf5','text-halo-color':'#070b16','text-halo-width':1.4}}); }
     poiAttach(MAP); YOU=mark(MAP,'you-dot');
     fitRadius(true); renderVicinity();
   });
@@ -2786,7 +2794,7 @@ async function identSave(){
 }
 function updateDeviceMarkers(){
   if(!MAP||!MAP_CENTER) return;
-  try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); const z=MAP.getSource('zones'); if(z) z.setData(zonesData()); }catch(e){}
+  try{ const s=MAP.getSource('rings'); if(s) s.setData(ringsData()); const z=MAP.getSource('zones'); if(z) z.setData(zonesData()); const rl=MAP.getSource('ringlab'); if(rl) rl.setData(ringLabData()); }catch(e){}
   fitRadius(false);
   // Every device heard is a mark. Direction known: solid, where it is. Direction pending: hollow, at its measured distance, on its dashed ring.
   const V=vis(), list=(V.mode==='live'||V.mode==='sim')?onMicro():[]; pendLayout(list, viewRadius()); placeMarkers(MAP, MAP_MARKERS, list, '');
@@ -3224,7 +3232,7 @@ function mapFullTick(force){
   const placed=devs.filter(d=>d.fix).length, rough=devs.filter(d=>!d.fix&&d.sector).length, nd=devs.filter(noDir).length, wy=devs.filter(d=>d.withYou).length, V=vis();
   setHTML(el('mfSum'), !g ? '<b>The map needs your position.</b> <button class="btn sm primary" data-act="geo-ask" style="margin-left:6px">Share my position</button>'
     : !(V.mode==='live'||V.mode==='sim') ? '<b>'+esc(stateWords(V.mode).note)+'</b> The map shows the cameras and tower sites around you.'
-    : '<b>'+devs.length+' heard</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+((parts=>parts.length?' · <button class="mf-fit" data-act="mf-fit">Within '+miText(MILE)+': '+parts.join(', ')+'. Show them</button>':'')((()=>{ const pr=ptsR(MILE), out=[], cs=poiCount('alpr'); if(cs) out.push(cs+' plate '+(cs===1?'camera':'cameras'));
+    : '<b>'+devs.length+' in earshot now</b> · '+placed+' placed'+(rough?' · '+rough+' direction only':'')+(nd?' · '+nd+' direction pending':'')+((parts=>parts.length?' · <button class="mf-fit" data-act="mf-fit">Within '+miText(MILE)+': '+parts.join(', ')+'. Show them</button>':'')((()=>{ const pr=ptsR(MILE), out=[], cs=poiCount('alpr'); if(cs) out.push(cs+' plate '+(cs===1?'camera':'cameras'));
       [['cctv','camera','cameras'],['speed','speed camera','speed cameras'],['site','tower site','tower sites']].forEach(x=>{ const n=ptsOf(x[0],pr).length; if(n) out.push(n+' '+(n===1?x[1]:x[2])); }); return out; })()))+(wy?' · <b style="color:var(--action)">'+wy+' with you</b>':'')+(V.mode==='sim'?' · simulated':V.test?' · test data':''));
   renderLayers();
   const chips=devs.slice(0,24).map(d=>{ const th=deviceThreat(d); return '<button class="mf-chip'+(MF.sel===d.id?' sel':'')+'" data-act="mf-dev" data-id="'+d.id+'" style="--hc:var('+TIER_VAR[th.tierIdx]+')">'+esc(devName(d))+'<span>'+esc(distText(d))+(d.bearing!=null?' · '+esc(whereWords(d)):' · direction pending')+'</span></button>'; }).join('');
@@ -4641,7 +4649,7 @@ function renderWalk(){
   const phone=!!NATIVE() || isAndroid() || isIOS(), ml=mobileLive();
   if(phone && !ml && vis().mode!=='sim'){ const ph=phPanel(); h+='<div class="listen"><span>'+ph.html+'</span></div>'; }
   const st=W.t0?walkStats():null, last=W.events&&W.events.length?wEvents().filter(e=>e.k!=='start'&&e.k!=='stop').slice(-1)[0]:null;
-  const line=()=>'<b>'+(W.on?'Trip':'Last trip')+'</b> '+(W.on?'':hhmm(W.t0)+' to '+hhmm(W.t1)+' · ')+esc(walkDur((W.t1||Date.now())-W.t0))+' · '+esc(miText(st.distance_m))+' · '+st.heard+' heard · '+st.placed+' placed · <b class="'+(st.withYou?'hot':'')+'">'+st.withYou+' with you</b>'+(W.test?' · test data':'');
+  const line=()=>'<b>'+(W.on?'Trip':'Last trip')+'</b> '+(W.on?'':hhmm(W.t0)+' to '+hhmm(W.t1)+' · ')+esc(walkDur((W.t1||Date.now())-W.t0))+' · '+esc(miText(st.distance_m))+' · <b class="'+(st.withYou?'hot':'')+'">'+st.withYou+' moving with you</b>'+(st.staying?' · '+st.staying+' staying with you so far':'')+' · '+st.heard+' heard · '+st.placed+' placed'+(W.test?' · test data':'');
   if(W.on) h+='<div class="trip on"><span class="dot live"></span><span class="t">'+line()+(last?'<span class="last">'+esc(last.text)+'</span>':'')+'</span><button class="btn sm gold" data-act="walk-doc">Trip report</button></div>';
   else if(W.t0 && W.t1 && !W.closed) h+='<div class="trip"><span class="t">'+line()+'</span><button class="btn sm gold" data-act="walk-doc">Trip report</button><button class="x" data-act="walk-close" title="Put away">&times;</button></div>';
   setHTML(box,h);
