@@ -881,7 +881,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.10', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.11', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2573,10 +2573,7 @@ const heardDevs = () => { const V=vis(); return V.mode==='live' ? V.devices.filt
 function macroData(){ const f=[];
   if(MAP_CENTER){
     f.push({type:'Feature',properties:{kind:'foot'},geometry:{type:'Polygon',coordinates:[circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,radiusState().r)]}});
-    if(TRACK.length>1){ const step=Math.max(1,Math.floor(TRACK.length/300)), pts=[];
-      for(let i=0;i<TRACK.length;i+=step){ const q=toLL(TRACK[i].x,TRACK[i].y); pts.push([q.lon,q.lat]); }
-      const q=toLL(TRACK[TRACK.length-1].x,TRACK[TRACK.length-1].y); pts.push([q.lon,q.lat]);
-      f.push({type:'Feature',properties:{kind:'track'},geometry:{type:'LineString',coordinates:pts}}); }
+    if(TRACK.length>1){ const ls=trackLines(300); if(ls.length) f.push({type:'Feature',properties:{kind:'track'},geometry:{type:'MultiLineString',coordinates:ls}}); }
     heardDevs().forEach(d=>d.samples.forEach(sm=>{ const q=toLL(sm.x,sm.y); f.push({type:'Feature',properties:{kind:'heard',c:d.withYou?'#ff5a5a':'#2dd4ea'},geometry:{type:'Point',coordinates:[q.lon,q.lat]}}); }));
     beyond().forEach(d=>{ if(d.live && !d.fix && !d.sector) f.push({type:'Feature',properties:{kind:'range'},geometry:{type:'LineString',coordinates:circlePoly(MAP_CENTER.lat,MAP_CENTER.lon,d.dist)}}); });
   }
@@ -2646,8 +2643,9 @@ function placeMarkers(map, store, list, extra){
 // Your own position. It feeds the placement of devices, so it does not wait for, or depend on, the map.
 let _geoOn=false;
 function geoFix(p){
-  const la=p.coords.latitude, lo=p.coords.longitude;
-  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; trackPush(la, lo, p.coords.accuracy); walkPos(); whereTick();
+  const la=p.coords.latitude, lo=p.coords.longitude, gate=posGate(la, lo, p.coords.accuracy, Date.now());
+  if(!gate){ clearTimeout(GATE.tm); GATE.tm=setTimeout(()=>{ if(GATE.pend){ const q=GATE.pend; geoFix({coords:{latitude:q.la, longitude:q.lo, accuracy:q.acc}}); } }, GATE_MS+200); S.geoErr=0; return; }
+  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; if(!(p.coords.accuracy>150)) trackPush(la, lo, p.coords.accuracy, undefined, gate===2); walkPos(); whereTick();
   if(typeof p.coords.heading==='number' && !isNaN(p.coords.heading) && p.coords.speed>0.8){ HEAD.gps=p.coords.heading; HEAD.gt=Date.now(); }
   if(MAP && MAP_CENTER){ const moved=Math.hypot((la-MAP_CENTER.lat)*111320, (lo-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
     if(!_centred || moved>6){ _centred=true; recentre(la, lo); } }      // ignore position jitter under 6 metres
@@ -3146,8 +3144,7 @@ const mfRingSteps=[25,50,100,200];
 function mfData(){ const f=[], g=gz(); if(!g) return {type:'FeatureCollection',features:f};
   if(S.pos) f.push({type:'Feature',properties:{kind:'acc'},geometry:{type:'Polygon',coordinates:[circlePoly(g.lat,g.lon,Math.max(3,Math.min(150,S.pos.acc)))]}});
   mfRingSteps.forEach(r=>f.push({type:'Feature',properties:{kind:'ring'},geometry:{type:'LineString',coordinates:circlePoly(g.lat,g.lon,r)}}));
-  if(TRACK.length>1){ const step=Math.max(1,Math.floor(TRACK.length/600)), pts=[]; for(let i=0;i<TRACK.length;i+=step){ const q=toLL(TRACK[i].x,TRACK[i].y); pts.push([q.lon,q.lat]); }
-    const q=toLL(TRACK[TRACK.length-1].x,TRACK[TRACK.length-1].y); pts.push([q.lon,q.lat]); f.push({type:'Feature',properties:{kind:'track'},geometry:{type:'LineString',coordinates:pts}}); }
+  if(TRACK.length>1){ const ls=trackLines(600); if(ls.length) f.push({type:'Feature',properties:{kind:'track'},geometry:{type:'MultiLineString',coordinates:ls}}); }
   if(W.route && W.route.length>1 && (W.on || !W.closed)) f.push({type:'Feature',properties:{kind:'walk'},geometry:{type:'LineString',coordinates:W.route.map(q=>[q.lon,q.lat])}});
   const V=vis(); if(V.mode==='live'||V.mode==='sim') V.devices.filter(d=>d.present!==false).forEach(d=>{
     if(d.fix) f.push({type:'Feature',properties:{kind:'zone'},geometry:{type:'Polygon',coordinates:[circlePoly(d.fix.lat,d.fix.lon,d.fix.unc)]}});
@@ -3888,18 +3885,37 @@ const TRACK=[], GEO={o:null, seen:0};
 function toXY(lat,lon){ if(!GEO.o) GEO.o={lat,lon}; return {x:(lon-GEO.o.lon)*111320*Math.cos(GEO.o.lat*Math.PI/180), y:(lat-GEO.o.lat)*111320}; }
 function toLL(x,y){ return {lat:GEO.o.lat+y/111320, lon:GEO.o.lon+x/(111320*Math.cos(GEO.o.lat*Math.PI/180))}; }
 function reanchor(lat,lon){ GEO.o={lat,lon}; TRACK.length=0; LIVE.devs.forEach(d=>{ d.samples.length=0; d.fix=null; d.sector=null; d.fresh=0; }); }
-function trackPush(lat,lon,acc,at){
+// A phone's position sometimes leaps to a rough fix far away and back. A fix that would need impossible speed is held; if the next fix returns, it is dropped.
+// If the phone really is in the new place (three fixes agree, or twelve seconds pass), it is taken, and the route starts a new line there.
+const GATE={last:null, pend:null, n:0, tm:0};
+function posGate(la,lo,acc,t){ acc=(typeof acc==='number'&&acc>0)?acc:50; const L=GATE.last, keep=()=>{ GATE.last={la,lo,acc,t}; GATE.pend=null; GATE.n=0; clearTimeout(GATE.tm); };
+  if(!L){ keep(); return 1; }
+  const d=distLL(L.la,L.lo,la,lo), dt=Math.max(0.5,(t-L.t)/1000);
+  if(L.acc>150 && acc<=60){ keep(); return d>150?2:1; }                 // the first sharp fix replaces a rough one
+  if(acc>150 && L.acc<=60 && dt<120) return 0;                          // a rough fix soon after a sharp one says nothing new
+  if(d>Math.max(80,1.5*(acc+L.acc)) && d/dt>75){                        // faster than any road or rail journey
+    const Q=GATE.pend, same=Q && distLL(Q.la,Q.lo,la,lo)<Math.max(60,2*acc); GATE.n=same?GATE.n+1:1; if(!same) GATE.since=t; GATE.pend={la,lo,acc,t};
+    if(GATE.n>=3 || t-GATE.since>=GATE_MS){ keep(); return 2; }
+    return 0; }
+  keep(); return 1; }
+const GATE_MS=(typeof window.HALO_GATE_MS==='number') ? window.HALO_GATE_MS : 12000;
+function trackPush(lat,lon,acc,at,brk){
   if(GEO.o && Math.hypot((lat-GEO.o.lat)*111320,(lon-GEO.o.lon)*111320*Math.cos(GEO.o.lat*Math.PI/180))>200000) reanchor(lat,lon);   // you are far from where the frame was set
   const p=toXY(lat,lon), last=TRACK[TRACK.length-1], now=at||Date.now(); GEO.seen=Date.now();
   if(last && now<last.t2) return;
-  if(last && Math.hypot(p.x-last.x,p.y-last.y)<2){ last.acc=acc; last.t2=now; return; }
-  TRACK.push({t:now,t2:now,x:p.x,y:p.y,acc}); if(TRACK.length>4000) TRACK.splice(0,800); }
+  if(last && !brk && Math.hypot(p.x-last.x,p.y-last.y)<2){ last.acc=acc; last.t2=now; return; }
+  TRACK.push({t:now,t2:now,x:p.x,y:p.y,acc,brk:brk?1:0}); if(TRACK.length>4000) TRACK.splice(0,800); }
+// The route as lines for a map: a new line begins wherever the position was taken up afresh.
+function trackLines(max){ const step=Math.max(1,Math.floor(TRACK.length/max)), lines=[]; let cur=[];
+  for(let i=0;i<TRACK.length;i++){ const p=TRACK[i]; if(p.brk && cur.length){ if(cur.length>1) lines.push(cur); cur=[]; }
+    if(i%step===0 || i===TRACK.length-1 || p.brk){ const q=toLL(p.x,p.y); cur.push([q.lon,q.lat]); } }
+  if(cur.length>1) lines.push(cur); return lines; }
 // Where you were at a given moment: between the two track points either side of it. Nothing, if your position was not being reported then.
 function posAt(t){ if(!TRACK.length) return null;
   let i=TRACK.length-1; while(i>=0 && TRACK[i].t>t) i--;
   if(i<0) return TRACK[0].t-t<30000 ? TRACK[0] : null;
   const a=TRACK[i], b=TRACK[i+1];
-  if(b && b.t-a.t2<=20000){ if(t<=a.t2) return a; const f=(t-a.t2)/Math.max(1,b.t-a.t2); return {x:a.x+(b.x-a.x)*f, y:a.y+(b.y-a.y)*f, acc:Math.max(a.acc||0,b.acc||0), t}; }
+  if(b && !b.brk && b.t-a.t2<=20000){ if(t<=a.t2) return a; const f=(t-a.t2)/Math.max(1,b.t-a.t2); return {x:a.x+(b.x-a.x)*f, y:a.y+(b.y-a.y)*f, acc:Math.max(a.acc||0,b.acc||0), t}; }
   return t-a.t2<=30000 ? a : null; }                               // a gap: the phone was locked, or position was off
 const posNow = () => TRACK.length?TRACK[TRACK.length-1]:null;
 const okLL = q => !!q && typeof q.lat==='number' && typeof q.lon==='number' && Math.abs(q.lat)<=85 && Math.abs(q.lon)<=180 && !(q.lat===0 && q.lon===0);
@@ -4238,7 +4254,7 @@ async function nativeDrain(){
     for(const b of batches){ if(!b || !Number.isFinite(b.t)) continue; const q=b.pos, live=Date.now()-b.t<8000;
       if(okLL(q)){ const acc=typeof q.acc==='number'?q.acc:25;
         if(live) geoFix({coords:{latitude:q.lat, longitude:q.lon, accuracy:acc, heading:q.heading, speed:q.speed}});
-        else { trackPush(q.lat,q.lon,acc,q.t||b.t); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc}, b.t); } }
+        else { const gate=posGate(q.lat,q.lon,acc,q.t||b.t); if(gate && !(acc>150)){ trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc}, b.t); } } }
       const list=[];
       for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
         const ev={device:{id:x.a,name:x.n||''}, rssi:x.r, uuids:x.u||[],
