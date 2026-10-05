@@ -882,7 +882,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3874,7 +3874,7 @@ const liveLast = () => Math.max(LIVE.seen.mobile, LIVE.seen.station);
 let LIVE_POLL=5000, LIVE_PRESENT=30000, LIVE_SILENT=60000;
 // The follower test. Your route is cut into legs of 30 m. A device that moves with you is heard on nearly every leg at about the same strength.
 // A device that stays in place is strong near it, weak further off, and missing from the legs beyond its range. These figures are Halo's working rules.
-const FOLLOW={leg:30, legs:5, reach:200, mins:4, share:.8, spread:10, level:-91, tagLegs:4, tagReach:150, tagMins:3, drift:6, rate:.3, maybeLegs:3, maybeReach:80, maybeMins:1.5, maybeSpread:8, maybeDrift:4, fixedSpread:18, fixedShare:.6, linger:90000, quiet:12000};
+const FOLLOW={leg:30, legs:5, reach:200, mins:4, share:.8, spread:10, level:-91, tagLegs:4, tagReach:150, tagMins:3, drift:6, rate:.3, maybeLegs:4, maybeReach:120, maybeMins:2, maybeSpread:8, maybeDrift:6, fixedSpread:18, fixedShare:.6, linger:90000, quiet:12000};
 const FOLLOW_SPAN={ble:FOLLOW.reach, wifi:600}, FOLLOW_MIN=FOLLOW.mins, FIX_MIN_SAMPLES=5, FIX_MIN_BASELINE=25, FIX_MAX_UNC=60, FIX_MIN_UNC=12, FIX_MAX_RMS=9, FIT_S2_MIN=36, FIT_K=9, SECTOR_HALF=60;
 const SAMPLE_STEP=4, SAMPLE_AGE=30*60000, SAMPLE_MAX=80, POS_MAX_ACC=35, SOLVE_BUDGET_MS=40;
 const AWAY_M=300, LIVE_KEEP=2*3600000, DEVS_MAX=600, ROSTER_MAX=60, HOME_NEAR=150, AUTOLOG_PER_HOUR=6;
@@ -4009,15 +4009,15 @@ function legNow(pos){ const g=LIVE.leg||(LIVE.leg={i:0,x:null,y:null});
   if(pos){ if(g.x===null){ g.x=pos.x; g.y=pos.y; } else if(Math.hypot(pos.x-g.x,pos.y-g.y)>=FOLLOW.leg){ g.i++; g.x=pos.x; g.y=pos.y; } }
   return g.i; }
 function legAdd(d,pos,rssi,at){ const i=legNow(pos), k=d.trk||(d.trk={i0:i, r0:LIVE.repN||0, legs:{}, x0:null, x1:null, y0:null, y1:null});
-  k.n=(k.n||0)+1; const L=k.legs[i]||(k.legs[i]=[]); if(L.length<40) L.push(rssi); else L[(at>>>0)%40]=rssi;
+  k.n=(k.n||0)+1; k.iL=i; k.rL=LIVE.repN||0; const L=k.legs[i]||(k.legs[i]=[]); if(L.length<40) L.push(rssi); else L[(at>>>0)%40]=rssi;
   if(pos){ if(k.x0===null){ k.x0=k.x1=pos.x; k.y0=k.y1=pos.y; } else { k.x0=Math.min(k.x0,pos.x); k.x1=Math.max(k.x1,pos.x); k.y0=Math.min(k.y0,pos.y); k.y1=Math.max(k.y1,pos.y); } }
   const ks=Object.keys(k.legs); if(ks.length>60){ delete k.legs[ks[0]]; k.i0=+Object.keys(k.legs)[0]; } }
 // What the legs say about one device.
 function legRead(d){ const k=d.trk; if(!k) return {legs:0, share:0, spread:0, level:-120, drift:0, rate:0, reach:0, span:0};
   const om=Object.keys(k.legs).map(Number).sort((a,b)=>a-b).map(i=>k.legs[i]).filter(L=>L.length>=1).map(L=>median(L)), ms=[...om].sort((a,b)=>a-b);
   let drift=0; if(om.length>=3){ const n=om.length, mx=(n-1)/2, my=om.reduce((a,b)=>a+b,0)/n; let sxy=0, sxx=0; om.forEach((y,i)=>{ sxy+=(i-mx)*(y-my); sxx+=(i-mx)*(i-mx); }); drift=sxy/sxx*(n-1); }      // a steady rise or fall along the route: you are nearing it or leaving it
-  const span=(LIVE.leg?LIVE.leg.i:0)-k.i0+1, cut=ms.length>=6?1:0, core=ms.slice(cut, ms.length-cut);
-  return {legs:ms.length, share:span>0?Object.keys(k.legs).length/span:0, spread:core.length?core[core.length-1]-core[0]:0, level:ms.length?median(ms):-120, drift, rate:(k.n||0)/Math.max(1,(LIVE.repN||0)-k.r0+1),
+  const span=(k.iL!=null?k.iL:k.i0)-k.i0+1, cut=ms.length>=6?1:0, core=ms.slice(cut, ms.length-cut);
+  return {legs:ms.length, share:span>0?Object.keys(k.legs).length/span:0, spread:core.length?core[core.length-1]-core[0]:0, level:ms.length?median(ms):-120, drift, rate:(k.n||0)/Math.max(1,(k.rL||0)-k.r0+1),
     reach:k.x0===null?0:Math.hypot(k.x1-k.x0,k.y1-k.y0), span}; }
 // One sample per place you stood: readings taken within a few metres are averaged, old ones are dropped.
 function addSample(d,pos,rssi,t){ const sm=d.samples, l=sm[sm.length-1];
@@ -4475,12 +4475,15 @@ function walkTick(at, only, q){
     if(!heard){ if(r.here){ r.here=false; if(r.n>=3) wEvent('gone','Gone: '+(r.label||r.call)+', heard for '+walkDur(r.last-r.first)+(r.span?' across '+r.span+' m of your movement':''), d.id, Math.min(now, r.last+LIVE_PRESENT)); } return; }
     r.last=Math.min(now, Math.round(d.seenMobile-LIVE.skew)); r.n++; r.label=labelOf(d)||''; r.call=d.name; r.cls=d.cls; r.hint=d.hint||''; r.adv=d.adv||''; r.mine=!!d.mine; r.sim=r.sim&&!!d.sim;
     if(!r.here){ r.here=true; wEvent('back','Back in earshot: '+walkName(d)+', '+distText(d), d.id); }
-    if(d.dist<=r.min || !r.at){ r.min=Math.round(Math.min(r.min,d.dist)); if(here) r.at={lat:+here.lat.toFixed(6),lon:+here.lon.toFixed(6)}; }
+    if(d.dist<=r.min || !r.at){ r.min=Math.round(Math.min(r.min,d.dist)); r.minT=now; if(here) r.at={lat:+here.lat.toFixed(6),lon:+here.lon.toFixed(6)}; }
+    if(r.n>=8){ const L=r.dl||(r.dl=[]), l=L[L.length-1]; if(!l || now-l[0]>=10000){ L.push([now, Math.round(d.dist)]); if(L.length>120) r.dl=L.filter((x,i)=>i%2===0); } }      // its distance through the trip, every ten seconds
     if(d.fix){ const first=!r.placed; r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n};
       if(first) wEvent('placed','Placed: '+walkName(d)+', '+Math.round(d.dist)+' m'+(d.bearing!=null?' '+compass(d.bearing):'')+', likely within '+Math.round(d.fix.unc)+' m', d.id); }
     else if(d.sector && !r.rough && !r.placed){ r.rough={brg:Math.round(d.sector.brg)}; wEvent('rough','Direction found: '+walkName(d)+', roughly '+compass(d.sector.brg), d.id); }
-    if(d.withYou && !r.withYou){ r.withYou=now; wEvent('with','With you: '+walkName(d)+' '+followText(d), d.id); }
-    r.mins=+(d.mins||0).toFixed(1); r.span=Math.round(d.span||0); r.steady=!!d.steady; r.rssi=Math.round(d.rssi); r.tested=!!d.tested; };
+    if(d.withYou && !r.withYou){ r.withYou=now; wEvent('with','Moving with you: '+walkName(d)+' '+followText(d), d.id); }
+    else if(d.maybe && !r.maybe){ r.maybe=now; wEvent('maybe','Staying with you so far: '+walkName(d)+' '+followText(d), d.id); }
+    r.mins=+(d.mins||0).toFixed(1); r.span=Math.round(d.span||0); r.steady=!!d.steady; r.rssi=Math.round(d.rssi); r.tested=!!d.tested;
+    if(d.leg){ r.v=d.verdict||''; r.legs=d.leg.legs; r.share=+d.leg.share.toFixed(2); r.spread=Math.round(d.leg.spread); r.level=Math.round(d.leg.level); r.drift=Math.round(d.leg.drift); r.rate=+d.leg.rate.toFixed(2); } };
   if(back) (only||[]).forEach(sig=>{ const d=LIVE.devs.get(sig); if(d){ liveDerive(d,nowS); each(d); } });      // the app's own record: each device is entered at the time the app heard it
   else { LIVE.devs.forEach(each);
     Object.keys(W.devs).forEach(id=>{ const r=W.devs[id];           // a device the engine no longer holds
@@ -4494,16 +4497,21 @@ function walkSettle(){ if(W.on || !W.t1 || W.settled || !W.devs) return; W.settl
     else if(d.sector && !r.rough){ r.rough={brg:Math.round(d.sector.brg)}; wEvent('rough','Direction found: '+walkName(d)+', roughly '+compass(d.sector.brg), d.id, W.t1-1); } });
   W.kept=false; if(P.trips && P.trips[0] && P.trips[0].t0===W.t0) P.trips.shift(); tripKeep(); wSave(true); renderVicinity(); }
 const wEvents = () => [...(W.events||[])].sort((a,b)=>a.t-b.t);
-function walkStats(){ const ds=Object.values(W.devs||{}); return {heard:ds.length, here:ds.filter(r=>r.here).length, placed:ds.filter(r=>r.placed).length, withYou:ds.filter(r=>r.withYou&&!r.mine).length, minutes:+(((W.t1||Date.now())-W.t0)/60000).toFixed(1), distance_m:Math.round(W.dist||0)}; }
+// What a device did on the trip, in the words the report and the screens use.
+const tripReading = r => r.mine?'Yours':r.withYou?'Moved with you':r.v==='maybe'?'Stayed with you for part of the trip':r.v==='fixed'?'Stays in place':(r.last-r.first<120000)?'Passed by':'Near your route';
+function tripReach(){ const rt=W.route||[]; if(rt.length<2) return 0; const k=Math.cos(rt[0].lat*Math.PI/180); let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  rt.forEach(q=>{ const x=(q.lon-rt[0].lon)*111320*k, y=(q.lat-rt[0].lat)*111320; x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }); return Math.round(Math.hypot(x1-x0,y1-y0)); }
+function walkStats(){ const ds=Object.values(W.devs||{}); return {heard:ds.length, here:ds.filter(r=>r.here).length, placed:ds.filter(r=>r.placed).length, withYou:ds.filter(r=>r.withYou&&!r.mine).length, staying:ds.filter(r=>r.v==='maybe'&&!r.withYou&&!r.mine).length, inPlace:ds.filter(r=>r.v==='fixed'&&!r.withYou).length, reach_m:tripReach(), minutes:+(((W.t1||Date.now())-W.t0)/60000).toFixed(1), distance_m:Math.round(W.dist||0)}; }
 function walkReport(){
   const iso=t=>new Date(t).toISOString();
   return {product:'Remiel Halo', kind:'trip report', version:1, testData:!!W.test, started:iso(W.t0), stopped:iso(W.t1||Date.now()), summary:walkStats(), screenOffSeconds:W.gaps||0,
-    method:'Halo hears Bluetooth. A device is placed once it is heard from several of your positions, including a turn. With you means still in earshot at steady strength after '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement.',
-    engine:{FOLLOW_SPAN, FOLLOW_MIN, FIX_MIN_SAMPLES, FIX_MIN_BASELINE, FIX_MAX_UNC, POS_MAX_ACC, LIVE_PRESENT},
+    method:'Halo hears Bluetooth and cuts your route into legs of '+FOLLOW.leg+' m. Moving with you: heard on at least '+Math.round(FOLLOW.share*100)+' percent of your legs, at leg strengths within '+FOLLOW.spread+' dB of one another, in at least three reports in ten, across '+FOLLOW.reach+' m end to end and '+FOLLOW.mins+' minutes ('+FOLLOW.tagReach+' m and '+FOLLOW.tagMins+' minutes for a tracker tag). Stays in place: strong near it, fading or missing on the legs beyond. Distance is read from signal strength.',
+    engine:{FOLLOW, FIX_MIN_SAMPLES, FIX_MIN_BASELINE, FIX_MAX_UNC, POS_MAX_ACC, LIVE_PRESENT},
     sensors:(PH.on?[{name:'This phone', kind:'phone browser'}]:[]).concat(carriedIds().map(k=>({name:P.sensors[k].name, kind:P.sensors[k].kind}))),
     devices:Object.values(W.devs).sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0) || (b.placed?1:0)-(a.placed?1:0) || b.n-a.n)
       .map(r=>({id:r.id, callSign:r.call, yourName:r.label||'', markedMine:!!r.mine, class:r.cls, maker:r.hint, broadcastName:r.adv, band:r.band, testData:!!r.sim, firstHeard:iso(r.first), lastHeard:iso(r.last), reports:r.n,
-        closest_m:r.min, youWereAt:r.at, placed:r.placed, directionRough:r.rough, withYou:r.withYou?iso(r.withYou):null, minutesHeard:r.mins||0, yourMovement_m:r.span||0, steadySignal:!!r.steady, lastSignal_dBm:r.rssi})),
+        closest_m:r.min, closestAt:r.minT?iso(r.minT):null, youWereAt:r.at, placed:r.placed, directionRough:r.rough, reading:tripReading(r), withYou:r.withYou?iso(r.withYou):null, stayingSince:r.maybe?iso(r.maybe):null, minutesHeard:r.mins||0, yourMovement_m:r.span||0,
+        legsHeard:r.legs||0, legShare:r.share||0, legSpread_dB:r.spread||0, legLevel_dBm:r.level||0, legDrift_dB:r.drift||0, reportShare:r.rate||0, steadySignal:!!r.steady, lastSignal_dBm:r.rssi, distance:(r.dl||[]).map(x=>({t:iso(x[0]), m:x[1]}))})),
     events:wEvents().map(e=>({t:iso(e.t), kind:e.k, text:e.text, id:e.id})), route:W.route.map(q=>({t:iso(q.t), lat:q.lat, lon:q.lon, acc_m:q.acc}))};
 }
 /* The trip, written out so it can be read: the bottom line first, then what Halo recorded,
@@ -4516,21 +4524,28 @@ function walkDocHTML(){
   const chunks=(head,rows,n)=>{ let o=''; for(let i=0;i<rows.length;i+=n) o+=tbl(head,rows.slice(i,i+n)); return o; };
   const nm=r=>e(r.label||r.adv||r.call), kind=r=>e([r.cls==='Unknown'?'':r.cls, r.hint].filter(Boolean).join(', ')||'Maker not broadcast');
   const place=r=>r.placed?'Placed, within '+r.placed.unc+' m':r.rough?'Direction only: '+compass(r.rough.brg):'Distance only';
-  const stand=r=>r.mine?'Yours':r.withYou?'With you':longEnough?'Left behind':'Heard';
-  const withYou=ds.filter(r=>r.withYou&&!r.mine), mine=ds.filter(r=>r.mine), placed=ds.filter(r=>r.placed);
-  const longEnough=st.minutes>=FOLLOW_MIN && st.distance_m>=FOLLOW_SPAN.ble, sensors=(PH.on?['This phone']:[]).concat(carriedIds().map(k=>P.sensors[k].name));
-  const stayed=ds.filter(r=>!r.withYou).map(r=>Object.assign({share:durMs>0?(r.last-r.first)/durMs:0},r)).filter(r=>r.share>=.5 && (r.span||0)>=80).sort((a,b)=>b.share-a.share).slice(0,6);
+  const stand=tripReading;
+  const withYou=ds.filter(r=>r.withYou&&!r.mine), maybe=ds.filter(r=>r.v==='maybe'&&!r.withYou&&!r.mine), fixed=ds.filter(r=>r.v==='fixed'&&!r.withYou&&!r.mine), passed=ds.filter(r=>!r.mine&&tripReading(r)==='Passed by'), mine=ds.filter(r=>r.mine), placed=ds.filter(r=>r.placed);
+  const reach=tripReach(), longEnough=st.minutes>=FOLLOW.mins && reach>=FOLLOW.reach, sensors=(PH.on?['This phone']:[]).concat(carriedIds().map(k=>P.sensors[k].name));
+  const stayed=fixed.map(r=>Object.assign({tshare:durMs>0?(r.last-r.first)/durMs:0},r)).filter(r=>r.tshare>=.3).sort((a,b)=>b.tshare-a.tshare).slice(0,8);
+  let sec=0; const H=t=>'<h2>'+(++sec)+'. '+t+'</h2>';
+  const spark=r=>{ const L=r.dl||[]; if(L.length<3) return ''; const ta=L[0][0], tb=L[L.length-1][0], mx=Math.max(40,...L.map(x=>x[1]));
+    return '<svg viewBox="0 0 150 34" style="width:150px;height:34px;display:block" role="img" aria-label="Distance through the trip"><line x1="0" y1="33" x2="150" y2="33" stroke="#b9b3a0" stroke-width="1"/><polyline fill="none" stroke="#1A1A2E" stroke-width="1.6" points="'+
+      L.map(x=>(tb>ta?(x[0]-ta)/(tb-ta)*148+1:1).toFixed(1)+','+(32-Math.min(1,x[1]/mx)*29).toFixed(1)).join(' ')+'"/></svg><span style="font-size:10px;color:#55556b">0 to '+mx+' m, higher is further</span>'; };
+  const dline=r=>{ const L=r.dl||[]; if(!L.length) return 'about '+r.min+' m'; const n=Math.min(6,L.length), pick=[]; for(let i=0;i<n;i++) pick.push(L[Math.round(i*(L.length-1)/Math.max(1,n-1))]); return pick.map(x=>hhmm(x[0])+' '+x[1]+' m').join(' · '); };
   let h='<h1>Remiel Halo Trip Report</h1><p class="rp-sub">What was around you, and what stayed with you</p>'+
     '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded on '+e(Y.name||'this device')+(W.test?' &nbsp;·&nbsp; <b>Test data</b>':'')+'</div>';
   // 1
-  const bottom = !ds.length ? 'Route recorded' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : longEnough ? 'Nothing moved with you' : 'Follower test in progress';
-  h+='<h2>1. Summary</h2><p>Bottom line: <span class="rp-tier">'+e(bottom)+'</span></p>'+
+  const bottom = !ds.length ? 'Route recorded' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : maybe.length ? plural(maybe.length,'device','devices')+' stayed with you for part of the trip' : longEnough ? 'No device moved with you' : 'A short route: '+reach+' m end to end';
+  h+=H('Summary')+'<p>Bottom line: <span class="rp-tier">'+e(bottom)+'</span></p>'+
     '<div class="rp-bar4"><div><span>Travelled</span><b>'+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'</b></div><div><span>Heard</span><b>'+plural(st.heard,'device','devices')+'</b></div><div><span>On the map</span><b>'+st.placed+' placed</b></div><div><span>With you</span><b>'+withYou.length+'</b></div></div>';
   if(!ds.length) h+='<p>Halo recorded your route for this trip. Start listening before the next one, and Halo also records every device along it.</p>';
   else h+='<p>You travelled '+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'. '+e(sensors.join(' and ')||'Your sensor')+' heard '+plural(st.heard,'device','devices')+' on Bluetooth. '+
-      (withYou.length ? e(withYou.map(r=>r.label||r.adv||r.call).join(', '))+' stayed in earshot at a steady strength while you moved, which is the pattern of something travelling with you. Read section 3, then decide whether each one is yours.'
-       : longEnough ? 'Halo tested every one of them for '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement, and each was left behind.' : 'The follower test completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of movement, and it carries on into your next stretch.')+
-      ' '+(st.placed?plural(st.placed,'device was','devices were')+' placed on the map from readings at several of your positions.':'Halo places a device once your route has a turn in it.')+'</p>';
+      'Of these, '+withYou.length+' moved with you, '+maybe.length+' stayed with you for part of the trip, '+fixed.length+' stay in place along your route, and '+passed.length+' passed by. '+
+      (withYou.length ? e(withYou.map(r=>r.label||r.adv||r.call).join(', '))+' '+(withYou.length===1?'was':'were')+' heard on nearly every leg of your route at an even strength, which is the pattern of something travelling with you. Read section 3, then decide whether each one is yours.'
+       : maybe.length ? e(maybe.map(r=>r.label||r.adv||r.call).join(', '))+' kept an even strength over part of your route. Read section 3, and mark the ones that are yours.'
+       : longEnough ? 'Your route reached '+reach+' m end to end, which completes the follower test.' : 'Your route reached '+reach+' m end to end. The follower test completes at '+FOLLOW.reach+' m end to end and '+FOLLOW.mins+' minutes ('+FOLLOW.tagReach+' m and '+FOLLOW.tagMins+' minutes for a tracker tag), and it carries on into your next stretch.')+
+      ' '+(st.placed?plural(st.placed,'device was','devices were')+' placed on the map from readings at several of your positions.':'')+'</p>';
   // route sketch
   const rt=W.route||[];
   if(rt.length>=3){ const la0=rt[0].lat, k=Math.cos(la0*Math.PI/180), X=q=>(q.lon-rt[0].lon)*111320*k, Yy=q=>(q.lat-la0)*111320, pts=rt.map(q=>[X(q),Yy(q)]).concat(placed.map(r=>[X(r.placed),Yy(r.placed)]));
@@ -4542,43 +4557,56 @@ function walkDocHTML(){
       '<circle cx="'+rp[0][0].toFixed(1)+'" cy="'+rp[0][1].toFixed(1)+'" r="6" fill="#fff" stroke="#1A1A2E" stroke-width="2"/><circle cx="'+rp[rp.length-1][0].toFixed(1)+'" cy="'+rp[rp.length-1][1].toFixed(1)+'" r="6" fill="#1A1A2E"/>'+
       placed.map((r,i)=>{ const q=px([X(r.placed),Yy(r.placed)]); return '<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+Math.max(5,r.placed.unc*sc).toFixed(1)+'" fill="rgba(197,165,90,.22)" stroke="#C5A55A"/><text x="'+q[0].toFixed(1)+'" y="'+(q[1]+4).toFixed(1)+'" font-family="Georgia,serif" font-size="12" text-anchor="middle" fill="#1A1A2E">'+(i+1)+'</text>'; }).join('')+
       '<line x1="40" y1="290" x2="'+(40+bar*sc).toFixed(1)+'" y2="290" stroke="#55556b" stroke-width="2"/><text x="'+(46+bar*sc).toFixed(1)+'" y="294" font-family="Georgia,serif" font-size="11" fill="#55556b">'+bar+' m</text>'+
-      '<text x="590" y="16" font-family="Georgia,serif" font-size="11" text-anchor="end" fill="#55556b">North is up. Open circle: start. Filled circle: end. Gold: placed devices, numbered as in section 4.</text></svg>'+
+      '<text x="590" y="16" font-family="Georgia,serif" font-size="11" text-anchor="end" fill="#55556b">North is up. Open circle: start. Filled circle: end. Gold: placed devices, numbered as in section 5.</text></svg>'+
       '<p class="rp-sub" style="font-size:12px;margin-top:4px">The shape of your route, with each placed device and its zone.</p>'; }
   // 2
-  h+='<h2>2. What Halo recorded</h2>'+tbl(['Item','This trip'],[
+  h+=H('What Halo recorded')+tbl(['Item','This trip'],[
     ['Listening',e(sensors.join(', ')||'Route only')],['Signals','Bluetooth: trackers, phones, watches, earbuds, laptops and beacons'+(W.aps&&Object.keys(W.aps).length?'. Wi-Fi: '+Object.keys(W.aps).length+' access points':'')+(W.cells&&Object.keys(W.cells).length?'. Cell: '+plural(Object.keys(W.cells).length,'tower','towers')+' used'+(W.g2?', with a drop to 2G':''):'')],
     ['Length',e(walkDur(durMs))+', '+e(miText(st.distance_m))],
-    ['Follower test',longEnough?'Complete: '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m reached':'In progress: completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m'],
+    ['Follower test',longEnough?'Complete: your route reached '+reach+' m end to end over '+e(walkDur(durMs)):'Your route reached '+reach+' m end to end. The test completes at '+FOLLOW.reach+' m and '+FOLLOW.mins+' minutes'],
     ['Your position',rt.length?plural(rt.length,'point','points')+' recorded, typically within '+Math.round(median(rt.map(q=>q.acc)))+' m':'Starts with the first fix'],
     ['Record',W.gaps?'Continuous except for '+e(walkDur(W.gaps*1000)):'Continuous']]);
   // 3
-  h+='<h2>3. Devices that moved with you</h2>';
-  if(withYou.length) h+='<p>Each device below stayed in earshot at a steady strength while you moved at least '+FOLLOW_SPAN.ble+' m over at least '+FOLLOW_MIN+' minutes. A device that is fixed in place fades as you move away from it. One that travels with you does not.</p>'+
-    tbl(['Device','Maker and kind','Heard for','Across','Closest'],withYou.map(r=>['<b>'+nm(r)+'</b>',kind(r),e(walkDur(r.last-r.first)),(r.span||0)+' m of your movement','about '+r.min+' m']))+
-    '<p>First mark your own things: a watch, earbuds, a second phone, a tag on your keys. In Watchers, open the device and press This is mine. Whatever is left deserves your attention, and Evidence already holds the record.</p>';
-  else h+='<p>'+(longEnough?'Halo tested every device heard, and each was left behind.':'The test is running. It completes at '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of movement.')+'</p>';
+  h+=H('Devices that moved with you');
+  if(withYou.length) h+='<p>Each device below was heard on nearly every leg of your route, at an even strength, while you moved at least '+FOLLOW.tagReach+' m end to end. A device that is fixed in place is strong as you pass it and fades as you move on. One that travels with you does not.</p>'+
+    tbl(['Device','Maker and kind','Heard for','Legs of your route','Across','Closest'],withYou.map(r=>['<b>'+nm(r)+'</b>',kind(r),e(walkDur(r.last-r.first)),(r.legs||0)+' legs, within '+(r.spread||0)+' dB',(r.span||0)+' m end to end','about '+r.min+' m']))+
+    '<p>First mark your own things: a watch, earbuds, a second phone, a tag on your keys. In Watchers, open the device and press This is mine. Whatever is left deserves your attention.</p>';
+  else h+='<p>'+(longEnough?'No device met the test on this trip.':'No device has met the test. Your route reached '+reach+' m end to end; the test completes at '+FOLLOW.reach+' m and '+FOLLOW.mins+' minutes.')+'</p>';
+  if(maybe.length) h+='<h3>Stayed with you for part of the trip</h3><p>These kept an even strength over part of your route, short of the full test. Your own devices appear here first.</p>'+
+    tbl(['Device','Maker and kind','Heard for','Legs of your route','Across','Closest'],maybe.map(r=>['<b>'+nm(r)+'</b>',kind(r),e(walkDur(r.last-r.first)),(r.legs||0)+' legs, within '+(r.spread||0)+' dB',(r.span||0)+' m end to end','about '+r.min+' m']));
   if(mine.length) h+='<p>Marked as yours, and left out of the test: '+e(mine.map(r=>r.label||r.adv||r.call).join(', '))+'.</p>';
-  if(stayed.length) h+='<h3>Stayed in earshot longest, without meeting the test</h3>'+tbl(['Device','Maker and kind','Heard for','Share of the trip','Across'],stayed.map(r=>[nm(r),kind(r),e(walkDur(r.last-r.first)),Math.round(r.share*100)+'%',(r.span||0)+' m']))+'<p>These stayed longest. Your own devices usually appear here first: mark them as yours and Halo sets them aside.</p>';
-  // 4
-  h+='<h2>4. Devices placed on the map</h2>'+(placed.length?'<p>A placed device was heard from several of your positions, and those readings agree on one location. The zone is where it most likely is.</p>'+
-    tbl(['','Device','Maker and kind','Zone','Closest you came','Location'],placed.map((r,i)=>[String(i+1),'<b>'+nm(r)+'</b>',kind(r),'Within '+r.placed.unc+' m','about '+r.min+' m',r.placed.lat.toFixed(5)+', '+r.placed.lon.toFixed(5)]))
-    :'<p>Halo places a device once it is heard from several of your positions, with a turn between them.</p>');
+  if(stayed.length) h+='<h3>In earshot longest, and staying in place</h3>'+tbl(['Device','Maker and kind','Heard for','Share of the trip','Halo\'s reading'],stayed.map(r=>[nm(r),kind(r),e(walkDur(r.last-r.first)),Math.round(r.tshare*100)+'%','Stays in place: its strength changed by '+(r.spread||0)+' dB along your route'+(r.share<FOLLOW.fixedShare?', and it was out of earshot on '+Math.round((1-r.share)*100)+'% of your legs':'')]))+
+    '<p>A route that stays within about 150 m of one place keeps the fixed devices of that place in earshot throughout. Their strength rises and falls as you pass, which is how Halo tells them from a device that moves with you.</p>';
+  // 4 distance through the trip
+  { const key=[...withYou, ...maybe, ...ds.filter(r=>!r.mine && !r.withYou && r.v!=='maybe' && (r.dl||[]).length>=3).sort((a,b)=>a.min-b.min).slice(0,8)];
+    h+=H('How close each one came');
+    h+=key.length ? '<p>For the devices that moved with you, and the eight that came closest: the closest distance, when, where you were, and the distance through the trip. Distance is read from signal strength, so it is given as about so many metres.</p>'+
+        chunks(['Device','Reading','Closest','Where you were','Distance through the trip'], key.map(r=>['<b>'+nm(r)+'</b><br><span style="font-size:11px">'+kind(r)+'</span>', e(stand(r)), 'about '+r.min+' m'+(r.minT?' at '+hms(r.minT):''), r.at?r.at.lat.toFixed(5)+', '+r.at.lon.toFixed(5):'Position pending', spark(r)+'<div style="font-size:11px">'+e(dline(r))+'</div>']), 6)
+      : '<p>Halo logs a distance every ten seconds for each device heard at least eight times. None reached that on this trip.</p>'; }
   // 5
-  const all=[...ds].sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0)||(b.placed?1:0)-(a.placed?1:0)||a.first-b.first);
-  h+='<h2>5. Every device heard</h2>'+(all.length?chunks(['Device','Maker and kind','First heard','Heard for','Closest','Placement','Standing'],all.map(r=>[nm(r),kind(r),hms(r.first),e(walkDur(r.last-r.first)),'about '+r.min+' m',place(r),stand(r)]),12):'<p>None.</p>');
+  h+=H('Devices placed on the map')+(placed.length?'<p>A placed device was heard from several of your positions, and those readings agree on one location. The zone is where it most likely is.</p>'+
+    tbl(['','Device','Maker and kind','Zone','Closest you came','Location'],placed.map((r,i)=>[String(i+1),'<b>'+nm(r)+'</b>',kind(r),'Within '+r.placed.unc+' m','about '+r.min+' m',r.placed.lat.toFixed(5)+', '+r.placed.lon.toFixed(5)]))
+    :'<p>Halo places a device once it is heard from several of your positions, with a turn between them, at a steady position. No device met that on this trip, so each is given by distance.</p>');
+  // 6
+  const all=[...ds].sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0)||(b.v==='maybe'?1:0)-(a.v==='maybe'?1:0)||a.min-b.min);
+  h+=H('Every device heard')+(all.length?chunks(['Device','Maker and kind','First heard','Heard for','Closest','Placement','Reading'],all.map(r=>[nm(r),kind(r),hms(r.first),e(walkDur(r.last-r.first)),'about '+r.min+' m',place(r),stand(r)]),12):'<p>None.</p>');
   // 6 by maker
   const mk={}; ds.forEach(r=>{ const m=makerOf(r)||'Maker not broadcast'; mk[m]=mk[m]||{n:0,tr:0}; mk[m].n++; if(r.cls==='Tag') mk[m].tr++; });
-  if(ds.length) h+='<h2>6. By maker</h2>'+tbl(['Maker','Devices','Of which trackers'],Object.keys(mk).sort((a,b)=>mk[b].n-mk[a].n).map(m=>[e(m),String(mk[m].n),String(mk[m].tr)]))+'<p>Halo reads the maker from what each device broadcasts.</p>';
+  if(ds.length) h+=H('By maker')+tbl(['Maker','Devices','Of which trackers'],Object.keys(mk).sort((a,b)=>mk[b].n-mk[a].n).map(m=>[e(m),String(mk[m].n),String(mk[m].tr)]))+'<p>Halo reads the maker from what each device broadcasts.</p>';
   // 7 timeline
   const evs=wEvents();
-  h+='<h2>'+(ds.length?'7':'6')+'. What changed, in order</h2>'+chunks(['Time','Change'],evs.slice(0,150).map(x=>[hms(x.t),e(x.text)]),16)+(evs.length>150?'<p>'+(evs.length-150)+' later changes are in the saved data file.</p>':'');
+  h+=H('What changed, in order')+chunks(['Time','Change'],evs.slice(0,150).map(x=>[hms(x.t),e(x.text)]),16)+(evs.length>150?'<p>'+(evs.length-150)+' later changes are in the saved data file.</p>':'');
   // limits
-  h+='<h2>'+(ds.length?'8':'7')+'. How to read this report</h2><ul class="rp-list">'+
-    ['With you: the device stayed in earshot at a steady strength across '+FOLLOW_MIN+' minutes and '+FOLLOW_SPAN.ble+' m of your movement.',
+  h+=H('How to read this report')+'<ul class="rp-list">'+
+    ['Legs: Halo cuts your route into legs of '+FOLLOW.leg+' m and keeps each device\'s strength leg by leg.',
+     'Moved with you: heard on at least '+Math.round(FOLLOW.share*100)+' percent of your legs, with leg strengths within '+FOLLOW.spread+' dB of one another, in at least three reports in ten, across '+FOLLOW.reach+' m end to end and '+FOLLOW.mins+' minutes. For a tracker tag: '+FOLLOW.tagReach+' m and '+FOLLOW.tagMins+' minutes.',
+     'Stayed with you for part of the trip: the same pattern over a shorter stretch, from '+FOLLOW.maybeReach+' m end to end.',
+     'Stays in place: its strength changed by '+FOLLOW.fixedSpread+' dB or more along your route, or it was missing from the legs beyond its range.',
+     'Passed by: heard for under two minutes.',
      'Placed: the device was heard from several of your positions, and the readings agree on one zone.',
-     'Left behind: the device faded as you moved on, as a fixed or passing device does.',
-     'Distance: read from signal strength, and refined each time the device is heard again.',
-     'Every entry here is in your Evidence chain, fingerprinted and dated.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
+     'Distance: read from signal strength every ten seconds. A device in a pocket or behind a wall reads further away than it is.',
+     'These are Halo\'s working rules. The data file holds the figures for every device, so each reading can be checked.',
+     'Saving the trip data writes one entry in your Evidence chain, with the fingerprint of the file.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
     '<div class="rp-foot">Generated by Remiel Halo. Beverly Index LLC. Recorded on your own device. The data file that goes with this report holds the route and every reading.</div>';
   return h;
 }
