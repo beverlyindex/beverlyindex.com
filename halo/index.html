@@ -416,7 +416,7 @@ select.inp{flex:none}
 .sph-plain i{position:absolute;width:0;height:0;display:flex;align-items:center;justify-content:center}
 .sph-plain i>*{flex:none;pointer-events:auto}
 .sph-plain .ring{position:absolute;left:50%;top:50%;border:1px solid rgba(79,141,240,.4);border-radius:50%;transform:translate(-50%,-50%)}
-.sph-note{position:absolute;left:54%;top:9%;transform:translateX(-50%);z-index:3;pointer-events:none;white-space:nowrap;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:#dfe8ff;background:rgba(7,11,22,.78);border:1px solid var(--line2);border-radius:999px;padding:4px 10px}
+.sph-note{position:absolute;left:54%;top:7%;transform:translateX(-50%);z-index:3;pointer-events:none;white-space:nowrap;text-align:center;line-height:1.5;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:#dfe8ff;background:rgba(7,11,22,.78);border:1px solid var(--line2);border-radius:13px;padding:4px 10px}
 .sph-note:empty{display:none}
 .stage[data-big="macro"] .sph.micro .sph-note{display:none}
 .sph-state b{font-size:13px;font-weight:600}
@@ -650,6 +650,8 @@ select.inp{flex:none}
 .legend i.hol{background:transparent;box-shadow:inset 0 0 0 2px var(--mut)}
 .legend i.rgh{background:radial-gradient(circle,var(--mut) 0 28%,transparent 32%);box-shadow:inset 0 0 0 2px var(--mut)}
 .sdot.rough{background:radial-gradient(circle,var(--mk) 0 28%,transparent 32%);box-shadow:inset 0 0 0 2px var(--mk)}
+.dev-marker.far{width:14px;height:14px}
+.dev-marker.hollow.far{width:12px;height:12px}
 .dev-marker.rough{background:radial-gradient(circle,var(--mk) 0 26%,rgba(7,11,22,.55) 30%) !important;box-shadow:inset 0 0 0 3px var(--mk),0 0 10px -2px var(--mk) !important;border-color:transparent}
 .sm{color:var(--mut);font-size:11.5px}
 .sd{text-align:right;font-family:var(--mono);font-size:11px;color:var(--mut);line-height:1.4}
@@ -769,6 +771,7 @@ a.tk:hover b{text-decoration:underline}
                   <span><i style="background:var(--action)"></i>With you</span>
                   <span><i class="rgh"></i>Direction rough</span>
                   <span><i class="hol"></i>Heard, direction pending: hollow, at its measured distance</span>
+                  <span><i class="hol" style="width:8px;height:8px"></i>Small mark on the rim: inside your radius, beyond this view</span>
                 </div>
                 <div class="layers" id="mapLayers"></div>
                 <div id="suspects"></div>
@@ -875,7 +878,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2037,8 +2040,8 @@ function renderVicinity(){
   setHTML(el('microLab'), 'Micro<i> · '+(view!==BASE_R&&!rs.ext ? view+' m view' : blocks+' blocks'+(rs.ext?', extended':''))+'</i>');
   setHTML(el('microState'), '');            // the map is never covered by words: the state is read on the line above it
   { const nd=shown?sus.filter(noDir).length:0, pl=shown?sus.length-nd:0;
-    const out=shown?sus.filter(d=>d.dist>view).length:0;
-    setHTML(el('microNote'), (nd ? (pl?'+':'')+nd+' heard, direction pending' : '')+(out?(nd?' · ':'')+out+' beyond view':'')); }
+    const out=shown?sus.filter(d=>d.dist>view*0.92).length:0;
+    setHTML(el('microNote'), (nd ? (pl?'+':'')+nd+' heard, direction pending' : '')+(out?(nd?'<br>':'')+out+' on the rim, beyond this view':'')); }
   setHTML(el('radLine'), (rs.ext
     ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>Radius: 2 blocks, about '+BASE_R+' m.</b>'+(view<BASE_R ? (shown||S.microV?' Micro is zoomed to '+view+' m.':'') : view>BASE_R ? ' Micro is widened to '+view+' m; the inner line is your radius.' : ''))+
@@ -2330,8 +2333,8 @@ function ringsData(){
   return {type:'FeatureCollection',features:feats};
 }
 const noDir = d => d.live && !d.fix && !d.sector && d.bearing==null;
-function devLngLat(d, micro){ if(d.fix) return [d.fix.lon,d.fix.lat];
-  const pend=d.bearing==null, m=(micro && pend && d._showDist!=null)?d._showDist:d.dist, a=(!pend?d.bearing:(d._brg!=null?d._brg:d.handleBrg||0))*Math.PI/180, lat=MAP_CENTER.lat;
+function devLngLat(d, micro){ const rim=micro && d._rim && d.bearing!=null; if(d.fix && !rim) return [d.fix.lon,d.fix.lat];
+  const pend=d.bearing==null, m=(micro && (pend || rim) && d._showDist!=null)?d._showDist:d.dist, a=(!pend?d.bearing:(d._brg!=null?d._brg:d.handleBrg||0))*Math.PI/180, lat=MAP_CENTER.lat;
   return [MAP_CENTER.lon+Math.sin(a)*m/(111320*Math.cos(lat*Math.PI/180)), MAP_CENTER.lat+Math.cos(a)*m/111320]; }
 const markerColor = d => d.withYou?'var(--action)':d.onRoute?'var(--route)':d.knownBefore?'var(--clear)':'var(--warn)';
 function zonesData(){ const f=[];
@@ -2613,18 +2616,25 @@ function selectDevice(id){ S.identId=id; S.identOpen=true; S.renaming=false; ren
    steady from one moment to the next and chosen so that marks do not sit on top of each other; the mark moves to the true
    bearing and turns solid once you have moved and turned. A device nearer than your own dot is drawn just clear of it. */
 function pendLayout(list, view){ const box=el('haloMap'), R=Math.max(60,(box&&box.clientWidth||300)/2), gap=R<120?10:17, taken=[];
-  list.filter(d=>!noDir(d)).forEach(d=>{ const q=devXY(d,view,R); if(q) taken.push(q); });
-  list.filter(noDir).sort((a,b)=>a.id<b.id?-1:1).forEach(d=>{ const show=Math.min(Math.max(d.dist, view*0.13), d.dist>view?d.dist:view*0.95), r=show/view*R; let a=Math.round((d.handleBrg||0)/15)*15, best=a;
-    for(let k=0;k<24;k++){ const t=(a+k*15)%360, x=Math.sin(t*Math.PI/180)*r, y=-Math.cos(t*Math.PI/180)*r; if(!taken.some(q=>Math.hypot(q.x-x,q.y-y)<gap)){ best=t; break; } }
-    d._brg=best; d._showDist=show; taken.push({x:Math.sin(best*Math.PI/180)*r, y:-Math.cos(best*Math.PI/180)*r}); }); }
+  const RIM=0.92;                                          // a device beyond the view is held on the rim, so no device inside the radius is ever off the sphere
+  const cover=[]; { const mb=box&&box.getBoundingClientRect(); if(mb && mb.width) ['sphIdent','sphMacro','microNote'].forEach(id=>{ const e=el(id), b=e&&e.getBoundingClientRect(); if(!b || !b.width) return;      // the smaller spheres and the note lie over part of Micro: no mark is put beneath them
+      cover.push(id==='microNote' ? {x0:b.left-mb.left-mb.width/2-9, x1:b.right-mb.left-mb.width/2+9, y0:b.top-mb.top-mb.height/2-9, y1:b.bottom-mb.top-mb.height/2+9} : {x:b.left+b.width/2-mb.left-mb.width/2, y:b.top+b.height/2-mb.top-mb.height/2, r:b.width/2+10}); }); }
+  const hid=(x,y)=>cover.some(c=>c.r ? Math.hypot(c.x-x,c.y-y)<c.r : (x>c.x0 && x<c.x1 && y>c.y0 && y<c.y1));
+  list.forEach(d=>{ d._rim = d.dist>view*RIM; });
+  list.filter(d=>!noDir(d)).forEach(d=>{ d._showDist=d._rim?view*RIM:null; const q=devXY(d._rim?{bearing:d.bearing,fix:d.fix,dist:view*RIM}:d,view,R); if(q) taken.push(q); });
+  list.filter(noDir).sort((a,b)=>a.id<b.id?-1:1).forEach(d=>{ const show=Math.min(Math.max(d.dist, view*0.13), view*RIM), r0=show/view*R, lo=0.13*R, hi=RIM*R, a=Math.round((d.handleBrg||0)/15)*15; let best=a, r=r0, found=false;
+    // its own ring first; when that ring is full, the nearest ring with room, so no two marks ever share a place
+    for(let j=0;j<40 && !found;j++){ const rr=r0+(j%2?1:-1)*Math.ceil(j/2)*gap; if(rr<lo-0.5 || rr>hi+0.5) continue;
+      for(let k=0;k<48;k++){ const t=(a+(k<24?k*15:(k-24)*15+7.5))%360, x=Math.sin(t*Math.PI/180)*rr, y=-Math.cos(t*Math.PI/180)*rr; if(!hid(x,y) && !taken.some(q=>Math.hypot(q.x-x,q.y-y)<gap)){ best=t; r=rr; found=true; break; } } }
+    d._brg=best; d._showDist=r/R*view; taken.push({x:Math.sin(best*Math.PI/180)*r, y:-Math.cos(best*Math.PI/180)*r}); }); }
 function devXY(d, view, R){ if(d.bearing==null && !d.fix) return null; const b=(d.bearing!=null?d.bearing:0)*Math.PI/180, r=d.dist/view*R; return {x:Math.sin(b)*r, y:-Math.cos(b)*r}; }
 function placeMarkers(map, store, list, extra){
   const ids=new Set(list.map(d=>d.id));
   Object.keys(store).forEach(id=>{ if(!ids.has(id)){ store[id].remove(); delete store[id]; } });
-  list.forEach(d=>{ const ll=devLngLat(d, map===MAP), mc=mkClass(d), cls='dev-marker'+extra+mc+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':'');
+  list.forEach(d=>{ const far=map===MAP && !!d._rim, ll=devLngLat(d, map===MAP), mc=mkClass(d), cls='dev-marker'+extra+mc+(far?' far':'')+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':'');
     const tip=devName(d)+(d.live?(d.sim?' (test data)':'')+(dirNote(d)?', '+dirNote(d):''):'');
     if(store[d.id]){ const m=store[d.id]; m.setLngLat(ll); const e=m.getElement(); e.style.setProperty('--mk',markerColor(d));
-      e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
+      e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('far',far); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
     else{ const m=document.createElement('div'); m.className=cls; m.style.setProperty('--mk',markerColor(d)); m.title=tip;
       m.addEventListener('click',ev=>{ ev.stopPropagation(); if(map===FULL){ MF.pt=null; MF.sel=d.id; mapFullTick(false); } else selectDevice(d.id); }); store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); } });
 }
@@ -2762,13 +2772,13 @@ function microPlain(){
   if(MAP){ if(host.firstChild){ host.textContent=''; host._ids=''; } return; }
   const V=vis(), list=(V.mode==='live'||V.mode==='sim')?inRadius():[], view=viewRadius(), box=el('haloMap'), R=Math.max(40,(box.clientWidth||300)/2-8);
   pendLayout(list, view);
-  const sig=view+'|'+Math.round(R)+'|'+(S.identId||'')+'|'+list.map(d=>d.id+':'+Math.round(d.dist)+':'+(d.bearing==null?'p'+d._brg:Math.round(d.bearing))+mkClass(d)+markerColor(d)).join(',');
+  const sig=view+'|'+Math.round(R)+'|'+(S.identId||'')+'|'+list.map(d=>d.id+':'+Math.round(d.dist)+':'+(d._rim?'r':'')+(d.bearing==null?'p'+d._brg:Math.round(d.bearing))+mkClass(d)+markerColor(d)).join(',');
   if(host._ids===sig) return; host._ids=sig; host.textContent='';
   const at=(x,y,node)=>{ const i=document.createElement('i'); i.style.left='calc(50% + '+x.toFixed(1)+'px)'; i.style.top='calc(50% + '+y.toFixed(1)+'px)'; i.appendChild(node); host.appendChild(i); };
   const ring=document.createElement('span'); ring.className='ring'; ring.style.width=ring.style.height=R+'px'; host.appendChild(ring);
   const me=document.createElement('div'); me.className='you-dot'; at(0,0,me);
-  list.forEach(d=>{ const pend=d.bearing==null, m=(pend && d._showDist!=null)?d._showDist:d.dist, a=(pend?(d._brg||0):d.bearing)*Math.PI/180, r=m/view*R;
-    const e=document.createElement('div'); e.className='dev-marker'+mkClass(d)+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':''); e.style.setProperty('--mk',markerColor(d));
+  list.forEach(d=>{ const pend=d.bearing==null, m=d._showDist!=null?d._showDist:d.dist, a=(pend?(d._brg||0):d.bearing)*Math.PI/180, r=m/view*R;
+    const e=document.createElement('div'); e.className='dev-marker'+mkClass(d)+(d._rim?' far':'')+(d.cls==='Camera'?' k-cam':d.cls==='Tag'?' k-tag':'')+(S.identId===d.id?' sel':''); e.style.setProperty('--mk',markerColor(d));
     e.title=devName(d)+(dirNote(d)?', '+dirNote(d):''); e.dataset.dev=d.id; e.addEventListener('click',ev=>{ ev.stopPropagation(); selectDevice(d.id); });
     at(Math.sin(a)*r, -Math.cos(a)*r, e); });
 }
