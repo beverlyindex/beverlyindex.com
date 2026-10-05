@@ -487,7 +487,7 @@ select.inp{flex:none}
 .layers .lay b{font-weight:600;color:var(--lc)}
 .dev-marker.k-cam{border-radius:5px;background:#ff8a3c !important;border-color:#2a1300;box-shadow:0 0 10px -1px #ff8a3c}
 .dev-marker.k-cam::after{content:"";position:absolute;inset:27%;border-radius:50%;background:#2a1300}
-.dev-marker.k-tag{border-radius:3px;transform:rotate(45deg)}
+.dev-marker.k-tag{border-radius:4px}
 .twr{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
 .twr .tk{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--tc);color:var(--tc);border-radius:999px;padding:1px 8px;white-space:nowrap}
 .twr .td{color:var(--mut);font-family:var(--mono);font-size:11px;grid-column:2 / 4}
@@ -648,6 +648,9 @@ ol.steps{margin:8px 0 2px;padding-left:20px;font-size:13px;line-height:1.5;color
 .sus::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:2px;background:var(--hc);box-shadow:0 0 10px var(--hc)}
 .sdot{width:10px;height:10px;border-radius:50%;background:var(--mk);box-shadow:0 0 8px var(--mk)}
 .sdot.hollow{background:transparent;box-shadow:inset 0 0 0 2px var(--mk)}
+.sdot.k-tag{border-radius:2px}
+.legend i.sq{border-radius:2px;background:var(--mut)}
+.legend .cap{flex-basis:100%;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:2px}
 .dev-marker.hollow{width:15px;height:15px;background:rgba(7,11,22,.55) !important;box-shadow:inset 0 0 0 2.5px var(--mk),0 0 8px -2px var(--mk) !important;border-color:transparent}
 .dev-marker.hollow.sel{width:19px;height:19px}
 .legend i.hol{background:transparent;box-shadow:inset 0 0 0 2px var(--mut)}
@@ -769,13 +772,22 @@ a.tk:hover b{text-decoration:underline}
                 <div id="identPanel"></div>
                 <input type="file" id="identFile" accept="image/*" hidden>
                 <div class="legend">
+                  <span class="cap">Shape: what it is</span>
+                  <span><i style="background:var(--mut)"></i>Circle: a phone, watch, earbuds, laptop or other device</span>
+                  <span><i class="sq"></i>Square: a tracker tag</span>
+                  <span><i class="sq" style="background:#ff8a3c"></i>Orange square: a camera heard by radio</span>
+                  <span class="cap">Colour: what Halo knows about it</span>
+                  <span><i style="background:var(--action)"></i>Moving with you</span>
+                  <span><i style="background:#ff8a3c"></i>Staying with you so far</span>
                   <span><i style="background:var(--clear)"></i>Known</span>
                   <span><i style="background:var(--warn)"></i>New</span>
                   <span><i style="background:var(--route)"></i>Seen on route</span>
-                  <span><i style="background:var(--action)"></i>With you</span>
+                  <span class="cap">Fill: how well it is placed</span>
+                  <span><i style="background:var(--mut)"></i>Solid: placed</span>
                   <span><i class="rgh"></i>Direction rough</span>
                   <span><i class="hol"></i>Heard, direction pending: hollow, at its measured distance</span>
                   <span><i class="hol" style="width:8px;height:8px"></i>Small mark on the rim: inside your radius, beyond this view</span>
+                  <span><i style="background:var(--mut);opacity:.4"></i>Faded: heard until a moment ago</span>
                 </div>
                 <div class="layers" id="mapLayers"></div>
                 <div id="suspects"></div>
@@ -882,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2069,7 +2081,7 @@ function renderVicinity(){
   if(!shown) html='<div class="empty" style="padding:14px 6px">'+esc(stateWords(V.mode).long)+'</div>';
   else { const list=[...sus].sort((a,b)=>deviceThreat(b).tierIdx-deviceThreat(a).tierIdx || a.dist-b.dist).slice(0,8);
     html = list.length ? list.map(d=>{ const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
-      return '<div class="sus'+(S.identId===d.id?' sel':'')+'" data-act="sus" data-id="'+d.id+'" style="--hc:var('+tc+')"><span class="sdot'+mkClass(d)+'" style="--mk:'+markerColor(d)+'"></span>'+
+      return '<div class="sus'+(S.identId===d.id?' sel':'')+'" data-act="sus" data-id="'+d.id+'" style="--hc:var('+tc+')"><span class="sdot'+mkClass(d)+(d.cls==='Tag'?' k-tag':'')+'" style="--mk:'+markerColor(d)+'"></span>'+
         '<span class="sn"><b>'+esc(devName(d))+'</b> <span class="sm">'+esc(kindText(d))+' · '+flagOf(d)+(dirNote(d)?' · '+dirNote(d):'')+(d.sim?' · test data':'')+'</span></span>'+
         '<span class="sd">'+esc(distText(d))+'<br><span class="'+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></span></div>'; }).join('')
       : '<div class="empty" style="padding:14px 6px">'+(V.mode==='live'?'Your sensor is reporting. Nothing is in earshot inside the radius at this moment.':'Nothing is in earshot inside the radius at this moment.')+'</div>'; }
