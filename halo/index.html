@@ -881,7 +881,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-05.11', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-05.12', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1600,7 +1600,7 @@ function liveSigns(t){            // what the sensors and the feed hold on this 
     const by={}; wifiNow().forEach(d=>{ if(d.adv&&!d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
     if(Object.keys(by).some(n=>by[n].length>1&&by[n].some(d=>/^Open/.test(d.hint))&&by[n].some(d=>/^Secured/.test(d.hint)))) return [4,'a copied Wi-Fi name is in range']; }
   if(t.tool==='alias' && P.aliases.some(a=>aliasScore(a).n>=3)) return [5,'an alias is joined to you'];
-  if(t.tool==='patch'){ let k=[]; try{ k=kevMine(); }catch(e){} if(k.length) return [4,'a flaw in '+k[0].vendor+' '+k[0].product+' is under attack']; }
+  if(t.tool==='patch'){ let k=[]; try{ k=kevMine(); }catch(e){} if(k.length) return [4,'a flaw in '+kevWords(k[0]).name+' is under attack']; }
   return null; }
 function rating(t){
   if(t.shelf!=='real' || scopeOf(t)!==true) return null;
@@ -1809,6 +1809,12 @@ function feedAgo(){ const g=S.global; if(!g) return ''; const m=Math.max(0,Math.
 const fmtLT = iso => { const d=new Date(iso); return isNaN(d)?'':String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
 function fmtDT(iso){ const d=new Date(iso); if(isNaN(d)) return ''; return d.getUTCDate()+' '+MON[d.getUTCMonth()]+', '+String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')+' UTC'; }
 const KEV_FOR={android:['android','browser'], iphone:['apple']};
+// "Apple Multiple Products" and "1900 Series Switches is" come straight from the register. Halo says them as a person would.
+function kevWords(v){ const ven=String(v.vendor||'').trim(), pr=String(v.product||'').trim();
+  if(/^multiple (products|devices|versions)$/i.test(pr) || !pr) return {name:'Several '+ven+' products', are:'are', it:'them'};
+  const name=(pr.toLowerCase().indexOf(ven.toLowerCase())===0 ? pr : ven+' '+pr).replace(/\s+/g,' ').trim();
+  const many=/(products|switches|routers|devices|firewalls|appliances|cameras|phones|gateways|servers|controllers|printers|drivers|chipsets|processors|modems|extenders|adapters|browsers|recorders|systems)$/i.test(pr);
+  return {name, are:many?'are':'is', it:many?'them':'it'}; }
 function kevMine(){
   const g=S.global; if(!g||!g.kev) return [];
   const want=new Set(KEV_FOR[plat()]); if(pv('wifihome')!==false) want.add('router');
@@ -1838,7 +1844,7 @@ function applyGlobal(quiet){
 function liveFeedW(){ const g=S.global; if(!g) return [];
   return (g.privacy||[]).slice(0,8).map(x=>({t:x.t, src:'EFF · '+fmtD(x.d), u:x.u})); }
 function liveFeedA(){ const g=S.global; if(!g) return [];
-  const k=(g.kev&&g.kev.recent||[]).slice(0,8).map(v=>({t:'Exploited now: '+v.vendor+' '+v.product+' ('+v.cve+').', src:'CISA · '+fmtD(v.added), u:v.u}));
+  const k=(g.kev&&g.kev.recent||[]).slice(0,8).map(v=>({t:'Exploited now: '+kevWords(v).name+' ('+v.cve+').', src:'CISA · '+fmtD(v.added), u:v.u}));
   const c=(g.consumer||[]).slice(0,5).map(x=>({t:x.t, src:'FTC · '+fmtD(x.d), u:x.u}));
   const ai=(g.ai||[]).slice(0,8).map(x=>({t:x.t, src:x.src+' · '+fmtD(x.d)+' · unreviewed', u:x.u}));
   const nw=(g.news||[]).slice(0,14).map(x=>({t:x.t, src:x.src+' · '+fmtD(x.d), u:x.u}));          // the latest hacking news, newest first
@@ -3711,7 +3717,7 @@ async function healthRun(){
   const g=S.global;
   if(g && g.kev){ const want = k==='android'?['android','browser'] : k==='ios'||k==='mac'?['apple','browser'] : k==='windows'?['windows','microsoft','browser'] : ['browser'];
     const hit=g.kev.recent.filter(v=>v.platforms.some(x=>want.indexOf(x)>=0));
-    if(hit.length) add('kev','Flaws under attack','att',hit.length+' in the last '+g.kev.windowDays+' days touch this kind of device. The newest: '+hit[0].vendor+' '+hit[0].product+'.','Install every waiting update today. The full list is in the Patch Clock.');
+    if(hit.length) add('kev','Flaws under attack','att',hit.length+' in the last '+g.kev.windowDays+' days touch this kind of device. The newest: '+kevWords(hit[0]).name+'.','Install every waiting update today. The full list is in the Patch Clock.');
     else add('kev','Flaws under attack','ok','None listed for this kind of device in the last '+g.kev.windowDays+' days.',''); }
   else add('kev','Flaws under attack','unk','Checked as soon as the live feed connects.','');
   const pd=(P.patch||[]).map(x=>daysSince(x.date)).filter(n=>n!==null).sort((a,b)=>a-b)[0];
@@ -4620,7 +4626,7 @@ function alertScan(){
 // What the feed brought: a flaw under active attack in a product you told Halo you use. The first reading sets the baseline.
 function alertFeed(){ let list=[]; try{ list=kevMine(); }catch(e){ return; }
   const first=!P.kevSeen; P.kevSeen=P.kevSeen||{}; let n=0;
-  list.forEach(v=>{ if(P.kevSeen[v.cve]) return; P.kevSeen[v.cve]=1; n++; if(!first) alertRaise('kev:'+v.cve, v.vendor+' '+v.product+' is under attack', 'A flaw in it is being used against people now ('+v.cve+'). Update it today. Patch Clock has the steps.', {res:'p_patch'}); });
+  list.forEach(v=>{ if(P.kevSeen[v.cve]) return; P.kevSeen[v.cve]=1; n++; if(!first) { const w=kevWords(v); alertRaise('kev:'+v.cve, w.name+' '+w.are+' under attack', 'A flaw in '+w.it+' is being used against people now ('+v.cve+'). Update '+w.it+' today. Patch Clock has the steps.', {res:'p_patch'}); } });
   if(n) save(); }
 // What the app itself raised while the screen was off, and which banner you tapped.
 function alertNativeTick(){ const N=NATIVE(); if(!N) return;
@@ -4735,7 +4741,7 @@ function myFindings(side){
     if(V.mode==='live'){ const pres=V.devices.filter(d=>d.present&&!d.sim), fl=pres.filter(d=>d.withYou||d.homeAway);
       if(pres.length || !V.test) out.push({t:'Now: '+pres.length+' device'+(pres.length===1?'':'s')+' in earshot'+(fl.length?', '+fl.length+' flagged. Open Watchers':', none flagged')+'.', src:(mobileLive()?'your sensor':'your home listener')+' · '+hhmm(liveLast()-LIVE.skew), mine:true}); }
     else if(V.mode!=='sim') out.push({t:'Your vicinity: '+stateWords(V.mode).count+'.', src:'your sensors', mine:true}); }
-  else kevMine().slice(0,3).forEach(v=>out.push({t:'In your own devices: '+v.vendor+' '+v.product+' is under attack ('+v.cve+'). Update it.', src:'CISA · '+fmtD(v.added), u:v.u, mine:true}));
+  else kevMine().slice(0,3).forEach(v=>out.push({t:'In your own devices: '+kevWords(v).name+' '+kevWords(v).are+' under attack ('+v.cve+'). Update '+kevWords(v).it+'.', src:'CISA · '+fmtD(v.added), u:v.u, mine:true}));
   P.evidence.filter(r=>r.kind==='finding' && r.t>week && names.some(n=>r.text.indexOf(n)===0)).slice(0,4)
     .forEach(r=>out.push({t:'Your finding: '+r.text.slice(0,140), src:'Evidence · '+new Date(r.t).toLocaleDateString()+' '+hhmm(r.t), mine:true}));
   return out;
