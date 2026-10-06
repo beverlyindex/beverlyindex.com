@@ -87,9 +87,14 @@ a{color:var(--chrome2)}
 .btn.wide{width:100%}
 #splash{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity .85s ease}
 #splash.out{opacity:0}
-#splash video{width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .7s ease;background:#000}
+#splash video{position:relative;z-index:1;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .7s ease;background:#000}
+#splash .sposter{position:absolute;inset:0;z-index:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;pointer-events:none;background:radial-gradient(circle at 50% 42%,#0e1830 0,#05080f 70%)}
+#splash .sposter img{width:min(58vw,250px);height:auto;display:block}
+#splash .sposter .sring{width:30px;height:30px;border-radius:50%;border:2px solid rgba(122,162,255,.22);border-top-color:#7aa2ff;animation:sspin 1s linear infinite}
+#splash .sposter .stxt{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.74)}
+@keyframes sspin{to{transform:rotate(360deg)}}
 #splash video.on{opacity:1}
-#splash .sbtn{position:absolute;bottom:calc(22px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.28);background:rgba(8,12,24,.6);color:rgba(255,255,255,.86);font-size:12.5px;font-weight:600;letter-spacing:.06em;padding:9px 16px;border-radius:999px}
+#splash .sbtn{z-index:2;position:absolute;bottom:calc(22px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.28);background:rgba(8,12,24,.6);color:rgba(255,255,255,.86);font-size:12.5px;font-weight:600;letter-spacing:.06em;padding:9px 16px;border-radius:999px}
 #splash #splashSkip{right:22px} #splash #splashSound{left:22px} #splash #splashSound.on{border-color:var(--clear);color:#c9efd9}
 body.calm .you-dot::after,body.calm .ticker .track{animation:none}      /* a warm or saving phone draws nothing that moves on its own */
 /* A choice that is made stays visibly made: a button that holds a state turns green while that state holds. */
@@ -690,6 +695,7 @@ a.tk:hover b{text-decoration:underline}
 
 <!-- ============ SPLASH: shown once, after a successful unlock ============ -->
 <div id="splash" class="hidden" aria-label="Beverly Index, then Remiel">
+  <div class="sposter"><img src="halo-logo.png" alt="Remiel Halo"><div class="sring"></div><div class="stxt">Opening Halo</div></div>
   <video id="splashVideo" playsinline muted preload="auto"></video>
   <button class="sbtn" id="splashSound" type="button">Sound on</button>
   <button class="sbtn" id="splashSkip" type="button">Skip</button>
@@ -904,7 +910,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.21', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.22', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -974,20 +980,27 @@ function endArm(){ const now=Date.now(), all=()=>document.querySelectorAll('[dat
   toast('Tap again to end the session. Listening stops on this device and Halo locks. Your records are kept.');
   setTimeout(()=>{ if(S.endArm!==now) return; S.endArm=0; all().forEach(b=>{ b.classList.remove('arm'); if(b.classList.contains('btn')) b.textContent='End session'; }); }, 6000); }
 function openApp(){ el('gate').classList.add('hidden'); el('app').classList.remove('hidden'); boot(); }
-/* The splash: the Beverly Index film, a fade to black, the Remiel film, then a fade to Halo's first screen. It plays after a
-   successful unlock and at no other time. Halo starts behind it, so the first screen is ready when the film ends. A film that
-   will not start is passed over, and Skip ends it at once. */
+/* The splash: the Beverly Index film, then the Remiel film, then a fade to Halo's first screen. It plays after a
+   successful unlock and at no other time. Halo starts behind it, so the first screen is ready when the film ends.
+   The screen is never empty: Halo's mark and the words Opening Halo stand under the films from the first instant.
+   The films are fetched whole while the gate is on screen, so they start at once. A film that has not started within
+   FILM_START_MS, or that stops moving, is passed over, and Skip ends it at once. */
 const SPLASH=['../videos/BI-FINAL-Mystic-Space-Walker-Intro_720p.mp4','../videos/REMIEL-FINAL-Energy-Vortex-Intro_720p.mp4'];
 const splashWanted = () => (window.HALO_SPLASH===true || (window.HALO_SPLASH!==false && !window.HALO_API)) && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const FILM={urls:[], warm:false}, FILM_START_MS=(typeof window.HALO_FILM_MS==='number')?window.HALO_FILM_MS:3000;
+function filmWarm(){ if(FILM.warm || !splashWanted() || !window.fetch || !window.URL || !/^https?:$/.test(location.protocol)) return; FILM.warm=true;
+  const c=navigator.connection||{}; if(c.saveData || /(^|-)2g$/.test(c.effectiveType||'')) return;            // a slow or metered line keeps its data: the films then play only if they start in time
+  (async()=>{ for(let i=0;i<SPLASH.length;i++){ try{ const r=await fetch(SPLASH[i]); if(!r.ok) break; FILM.urls[i]=URL.createObjectURL(await r.blob()); }catch(e){ break; } } })(); }
 function splashRun(){ return new Promise(done=>{
-  const box=el('splash'), v=el('splashVideo'), snd=el('splashSound'); let i=-1, over=false, guard=0, wait=0;
-  const finish=()=>{ if(over) return; over=true; clearTimeout(guard); clearTimeout(wait); box.classList.add('out');
+  const box=el('splash'), v=el('splashVideo'), snd=el('splashSound'); let i=-1, over=false, guard=0, wait=0, stall=0, lastT=-1, still=0;
+  const finish=()=>{ if(over) return; over=true; clearTimeout(guard); clearTimeout(wait); clearInterval(stall); box.classList.add('out');
     setTimeout(()=>{ try{ v.pause(); }catch(e){} box.classList.add('hidden'); box.classList.remove('out'); v.classList.remove('on'); v.removeAttribute('src'); try{ v.load(); }catch(e){} S.splash=null; done(); }, 880); };
-  const start=()=>{ if(over) return; i++; S.splash={i, src:SPLASH[i]}; v.src=SPLASH[i]; guard=setTimeout(next, 7000);            // a film that does not start within 7 seconds is passed over
+  const start=()=>{ if(over) return; i++; S.splash={i, src:SPLASH[i], ready:!!FILM.urls[i]}; v.src=FILM.urls[i]||SPLASH[i]; guard=setTimeout(finish, FILM_START_MS);            // a film that has not started in time ends the opening: Halo is ready behind it
     const pr=v.play(); if(pr && pr.catch) pr.catch(()=>{ if(over) return; if(!v.muted){ v.muted=true; snd.textContent='Sound on'; snd.classList.remove('on'); const p2=v.play(); if(p2 && p2.catch) p2.catch(next); } else next(); }); };
-  const next=()=>{ if(over) return; clearTimeout(guard); if(i+1>=SPLASH.length) return finish();          // the last film fades straight into Halo
+  const next=()=>{ if(over) return; clearTimeout(guard); clearInterval(stall); if(i+1>=SPLASH.length) return finish();          // the last film fades straight into Halo
     v.classList.remove('on'); wait=setTimeout(start, i<0?0:760); };                                           // fade to black, then the next film
-  v.onplaying=()=>{ if(over) return; clearTimeout(guard); v.classList.add('on'); guard=setTimeout(next, ((isFinite(v.duration)&&v.duration>0?v.duration:12)+3)*1000); };
+  v.onplaying=()=>{ if(over) return; clearTimeout(guard); clearInterval(stall); v.classList.add('on'); guard=setTimeout(next, ((isFinite(v.duration)&&v.duration>0?v.duration:12)+3)*1000);
+    lastT=-1; still=0; stall=setInterval(()=>{ if(over) return; const t=v.currentTime; if(t===lastT && !v.ended){ if(++still>=5) next(); } else { still=0; lastT=t; } }, 500); };          // a film that stops moving for 2.5 seconds is passed over
   v.onended=next; v.onerror=next;
   el('splashSkip').onclick=finish;
   snd.onclick=()=>{ v.muted=!v.muted; snd.textContent=v.muted?'Sound on':'Sound off'; snd.classList.toggle('on',!v.muted); };
@@ -5153,7 +5166,8 @@ function boot(){
 updStart();
 /* returning visit: unlock only after everything above is defined */
 if(codeOk(store.get('halo_key'))) openApp();
-else if(store.get('halo_ended')){ const gn=el('gateNote'); if(gn) gn.textContent='Session ended. Listening is off on this device and your records are kept. Enter your key to start again.'; }
+else filmWarm();
+if(!codeOk(store.get('halo_key')) && store.get('halo_ended')){ const gn=el('gateNote'); if(gn) gn.textContent='Session ended. Listening is off on this device and your records are kept. Enter your key to start again.'; }
 </script>
 </body>
 </html>
