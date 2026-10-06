@@ -927,7 +927,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.26', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.27', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -989,7 +989,7 @@ function tryUnlock(){
    Nothing is erased. Entering the key again starts a new session with listening on. */
 function endSession(){ try{ if(W.on) walkStop(); }catch(e){} try{ phStop(); }catch(e){} try{ const N=NATIVE(); if(N && typeof N.stop==='function') N.stop(); }catch(e){}
   store.set('halo_ended', String(Date.now())); store.set('halo_key','');
-  let done=false; const once=()=>{ if(done) return; done=true; try{ location.reload(); }catch(e){} };
+  let done=false; const once=()=>{ if(done) return; done=true; try{ const N=NATIVE(); if(N && typeof N.quit==='function'){ N.quit(); setTimeout(()=>{ try{ location.reload(); }catch(e){} }, 900); return; } }catch(e){} try{ location.reload(); }catch(e){} };
   try{ logEvidence('note','Session ended on this device. Listening stopped and Halo locked.').then(once, once); }catch(e){} setTimeout(once, 1500); }
 function endArm(){ const now=Date.now(), all=()=>document.querySelectorAll('[data-act="end-session"]');
   if(S.endArm && now-S.endArm<6000) return void endSession();
