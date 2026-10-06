@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.13', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.14', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2735,7 +2735,7 @@ function renderIdent(force){
     setHTML(el('identPanel'), ''); return; }
   const th=deviceThreat(d), ph=photoOf(d);
   sp.style.setProperty('--hc','var('+TIER_VAR[th.tierIdx]+')'); face.className='id-face'+(ph?' photo':''); face.style.backgroundImage=ph?'url("'+ph+'")':'';
-  setHTML(face, '<div class="g">'+d.glyph+'</div><div class="nm">'+esc(devName(d))+'</div><div class="mt">'+esc(d.cls==='Unknown'?'Unidentified':d.cls)+' · '+TIER_NAME[th.tierIdx]+'</div>');
+  setHTML(face, '<div class="g">'+d.glyph+'</div><div class="nm">'+esc(devName(d))+'</div><div class="mt">'+esc(d.cls==='Unknown'?'Unidentified':d.cls)+' · '+DEV_TIER[th.tierIdx]+'</div>');
   if(!S.renaming || force) setHTML(el('identPanel'), S.identOpen ? identCard(d) : '');
 }
 function identCard(d){
@@ -2744,7 +2744,7 @@ function identCard(d){
     '<div style="min-width:0;flex:1">'+(S.renaming
       ? '<div class="formrow" style="margin-top:0"><input class="inp" id="identLabel" maxlength="40" value="'+esc(labelOf(d))+'" placeholder="Your name for this device"><button class="btn sm primary" data-act="ident-rename-save">Save</button><button class="btn sm" data-act="ident-rename-cancel">Cancel</button></div>'
       : '<div class="idname">'+esc(devName(d))+(d.live?' <button class="btn sm" data-act="ident-rename" style="margin-left:8px;vertical-align:middle">Rename</button>':'')+'</div>')+
-    '<div class="idsub">'+esc(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+TIER_NAME[th.tierIdx]+' · '+flagOf(d)+'</div><div class="idsub">'+esc(originLine(d))+'</div></div>'+
+    '<div class="idsub">'+esc(d.cls==='Unknown'?'Unidentified device':d.cls)+' · '+DEV_TIER[th.tierIdx]+' · '+flagOf(d)+'</div><div class="idsub">'+esc(originLine(d))+'</div></div>'+
     '<button class="x" data-act="ident-close" aria-label="Close the identity card">&times;</button></div>'+
     '<div class="kv" style="margin-top:10px"><span class="k">Distance</span><span class="v">'+esc(distText(d))+(d.live&&d.present===false?', '+rosterState(d):'')+'</span>'+
     '<span class="k">Direction</span><span class="v '+(dirLine(d)==='Pending'?'unkc':'')+'">'+esc(dirLine(d))+'</span>'+
@@ -2792,7 +2792,7 @@ async function identSave(){
     g.fillStyle=col; g.font='110px system-ui, sans-serif'; g.textBaseline='middle'; g.fillText(d.glyph,cx,cy+6); g.textBaseline='alphabetic'; }
   g.restore(); g.lineWidth=5; g.strokeStyle=col; g.shadowColor=col; g.shadowBlur=28; g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.stroke(); g.shadowBlur=0;
   g.fillStyle='#fff'; g.font='600 38px system-ui, sans-serif'; g.fillText(devName(d), cx, 478);
-  g.fillStyle=col; g.font='600 19px system-ui, sans-serif'; g.fillText(((d.cls==='Unknown'?'Unidentified device':d.cls)+'  ·  '+TIER_NAME[th.tierIdx]+'  ·  '+flagOf(d)).toUpperCase(), cx, 514);
+  g.fillStyle=col; g.font='600 19px system-ui, sans-serif'; g.fillText(((d.cls==='Unknown'?'Unidentified device':d.cls)+'  ·  '+DEV_TIER[th.tierIdx]+'  ·  '+flagOf(d)).toUpperCase(), cx, 514);
   const rows=[['Source',originLine(d)],['Distance',distText(d)],['Direction',dirLine(d)],['Trend',d.trend],['First heard',new Date(d.firstSeen).toLocaleString()],['Times heard',String(d.timesSeen)]];
   if(d.live) rows.push(['Halo reference',d.id]);
   rows.forEach((r,i)=>{ const y=572+i*40; g.textAlign='left'; g.fillStyle='#7f8bab'; g.font='17px system-ui, sans-serif'; g.fillText(r[0],90,y); g.textAlign='right'; g.fillStyle='#e8eefc'; g.font='18px system-ui, sans-serif'; g.fillText(String(r[1]).slice(0,44),W-90,y);
@@ -2843,8 +2843,10 @@ const devName = d => d.live ? (labelOf(d) || d.adv || d.name) : ((d.cls==='Unkno
 const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : d.cls+(d.hint?', '+d.hint:''))+(d.live && devName(d)!==d.name ? ' · '+d.name : '');
 const flagOf = d => d.mine?'Yours':d.sigFit?'Fits your signature':d.withYou?'Moving with you':d.maybe?'Staying with you so far':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':d.verdict==='fixed'?'Stays in place':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
-function deviceThreat(d){ const c=d.identity; let s=1; if(d.withYou) s=4; else if(d.onRoute) s=3; else if(!d.knownBefore) s=2;
-  return {c, s, tierIdx:Math.max(0,Math.min(3,Math.round(((c-1)+(s-1))/2)))}; }
+// One tier per device, read straight from what it did: moving with you is Take Action, as in the bottom line.
+const DEV_TIER=['No flag','Watch','Warning','Take Action'];
+function deviceThreat(d){ const s = (d.mine||d.sigFit) ? 0 : d.withYou ? 3 : (d.maybe||d.homeAway) ? 2 : d.onRoute ? 1 : 0;
+  return {c:d.identity, s, tierIdx:s}; }
 const rosterState = d => !d.live||d.present ? d.trend : d.atHome ? 'heard at home' : 'out of earshot';
 function renderRoster(){
   const host=el('rost'); if(!host) return;
@@ -2857,14 +2859,14 @@ function renderRoster(){
       const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
       row.style.setProperty('--hc','var('+tc+')'); row.style.setProperty('--ht',TIER_TINT[th.tierIdx]);
       const ps=row.querySelector('.psum'); if(ps) ps.textContent=kindText(d)+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'');
-      const pl=row.querySelector('.pill'); if(pl){ pl.textContent='C'+th.c+'·S'+th.s+' '+TIER_NAME[th.tierIdx]; pl.style.color='var('+tc+')'; pl.style.borderColor='var('+tc+')'; }
+      const pl=row.querySelector('.pill'); if(pl){ pl.textContent=DEV_TIER[th.tierIdx]; pl.style.color='var('+tc+')'; pl.style.borderColor='var('+tc+')'; }
       if(d.live){ const pb=row.querySelector('.pull-body'); if(pb && S.openDevices.has(d.id)){ const hb=liveBody(d); if(pb._h!==hb){ pb.innerHTML=hb; pb._h=hb; } } }
       else { const lv=row.querySelector('[data-live]'); if(lv) lv.innerHTML=liveKV(d); } });
     return; }
   host.innerHTML=list.map(d=>{ const th=deviceThreat(d), tc=TIER_VAR[th.tierIdx];
     return '<div class="pull '+(S.openDevices.has(d.id)?'open':'')+'" data-dev="'+d.id+'" style="--hc:var('+tc+');--ht:'+TIER_TINT[th.tierIdx]+'">'+
       '<div class="pull-head" data-act="dev" data-id="'+d.id+'"><div class="glyph">'+d.glyph+'</div><div class="phd"><div class="plab">'+esc(devName(d))+'</div><div class="psum">'+esc(kindText(d))+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'')+'</div></div>'+
-      '<div class="pmeta"><span class="pill" style="color:var('+tc+');border-color:var('+tc+')">C'+th.c+'·S'+th.s+' '+TIER_NAME[th.tierIdx]+'</span><span class="chev">&#9662;</span></div></div>'+
+      '<div class="pmeta"><span class="pill" style="color:var('+tc+');border-color:var('+tc+')">'+DEV_TIER[th.tierIdx]+'</span><span class="chev">&#9662;</span></div></div>'+
       '<div class="pull-body">'+(S.openDevices.has(d.id)?(d.live?liveBody(d):deviceBody(d)):'')+'</div></div>'; }).join('')+
     (extra?'<div class="empty" style="padding:10px 6px">'+extra+' more devices were heard and are not listed. Sort by Nearest to see those closest to you.</div>':'');
   S._rsig=sig;
@@ -3609,12 +3611,14 @@ function sigDrop(d){ const g=sigGet(), b=g.by[d.id]; if(P.mine) delete P.mine[d.
   else { const k=b.slice(2); g.counts[k]=Math.max(0,(g.counts[k]||0)-1); if(!g.counts[k]) delete g.counts[k]; }
   g.t=Date.now(); }
 const sigSize = () => { const g=sigGet(); return g.names.length+Object.keys(g.counts).reduce((n,k)=>n+g.counts[k],0); };
-// After every reading: a device with one of your names is yours. Unnamed devices fill the places your signature holds for their kind, longest heard first.
+// After every reading: a device with one of your names is yours. Unnamed devices fill the places your signature holds for their kind, nearest first,
+// and only while they are beside this phone (FOLLOW.sigNear metres). A device of the same maker and kind that keeps its distance is tested like any other.
+const sigNear = d => { if(d.atHome || (typeof d.dist==='number' && d.dist<=FOLLOW.sigNear)){ d.sigAt=Date.now(); return true; } return !!d.sigAt && Date.now()-d.sigAt<60000 && typeof d.dist==='number' && d.dist<=FOLLOW.sigNear*2; };
 function sigApply(){ const g=sigGet(); if(!g.names.length && !Object.keys(g.counts).length) return;
   const left=Object.assign({},g.counts), devs=[...LIVE.devs.values()].filter(d=>d.present||d.atHome);
   devs.forEach(d=>{ d.sigFit=false; if(d.adv && g.names.indexOf(d.adv)>=0){ d.mine=true; d.withYou=false; d.onRoute=false; d.knownBefore=true; }
     else if(d.mine && g.by[d.id] && g.by[d.id][0]==='c'){ const k=g.by[d.id].slice(2); if(left[k]>0) left[k]--; } });
-  devs.filter(d=>!d.mine && left[sigKey(d)]>0).sort((a,b)=>((b.tested||b.fFollow)?1:0)-((a.tested||a.fFollow)?1:0) || (b.mins||0)-(a.mins||0) || b.rssi-a.rssi)
+  devs.filter(d=>!d.mine && left[sigKey(d)]>0 && sigNear(d)).sort((a,b)=>(a.dist||0)-(b.dist||0) || (b.mins||0)-(a.mins||0))
     .forEach(d=>{ const k=sigKey(d); if(left[k]>0){ left[k]--; d.sigFit=true; d.withYou=false; d.knownBefore=true; } });
 }
 // The open list follows what the phone hears: hold it against a device and that device rises to the top.
@@ -3629,7 +3633,7 @@ function sigPull(){
   h+='<div class="dsec"><h4>Your signature <span class="spsub">'+(n?n+' recorded':'empty')+'</span></h4>'+
     (n ? g.names.map(x=>'<div class="rowline"><span><b>'+esc(x)+'</b> <span class="chip pot">by name</span></span><button class="x" data-act="sig-name-del" data-n="'+esc(x)+'" title="Take it out">&times;</button></div>').join('')+
          Object.keys(g.counts).map(k=>'<div class="rowline"><span><b>'+g.counts[k]+' &times; '+esc(sigKeyWords(k))+'</b> <span class="chip">by kind</span></span><button class="x" data-act="sig-count-del" data-k="'+esc(k)+'" title="Take one out">&times;</button></div>').join('')
-       : '<p>Your signature is the set of devices you own. Once Halo has it, your own devices read Yours wherever you go, and anything else that travels with you stands out at once.</p>')+'</div>';
+       : '<p>Your signature is the set of devices you own. Once Halo has it, a device with one of your names reads Yours wherever you go. Unnamed devices are counted by maker and kind while they are within about 6 m of this phone: one more than you own stands out.</p>')+'</div>';
   h+='<div class="dsec"><h4>Add what is yours</h4>';
   if(!live) h+='<p>'+esc(stateWords(V.mode).long)+'</p>'+(NATIVE()||isAndroid()?'<div class="formrow">'+(phPanel().html)+'</div>':'');
   else { const ds=V.devices.filter(d=>d.present||d.atHome).sort((a,b)=>(b.rssi||-200)-(a.rssi||-200)).slice(0,14), top=ds[0];
@@ -3908,7 +3912,7 @@ const liveLast = () => Math.max(LIVE.seen.mobile, LIVE.seen.station);
 let LIVE_POLL=5000, LIVE_PRESENT=30000, LIVE_SILENT=60000;
 // The follower test. Your route is cut into legs of 30 m. A device that moves with you is heard on nearly every leg at about the same strength.
 // A device that stays in place is strong near it, weak further off, and missing from the legs beyond its range. These figures are Halo's working rules.
-const FOLLOW={leg:30, legs:5, reach:200, mins:4, share:.8, spread:10, level:-91, tagLegs:4, tagReach:150, tagMins:3, drift:6, rate:.3, maybeLegs:4, maybeReach:120, maybeMins:2, maybeSpread:8, maybeDrift:6, fixedSpread:18, fixedShare:.6, linger:90000, quiet:12000};
+const FOLLOW={leg:30, legs:5, reach:200, mins:4, share:.8, spread:10, level:-91, tagLegs:4, tagReach:150, tagMins:3, drift:6, rate:.3, maybeLegs:4, maybeReach:120, maybeMins:2, maybeSpread:8, maybeDrift:6, fixedSpread:18, fixedShare:.6, linger:90000, quiet:12000, sigNear:6};
 const FOLLOW_SPAN={ble:FOLLOW.reach, wifi:600}, FOLLOW_MIN=FOLLOW.mins, FIX_MIN_SAMPLES=5, FIX_MIN_BASELINE=25, FIX_MAX_UNC=60, FIX_MIN_UNC=12, FIX_MAX_RMS=9, FIT_S2_MIN=36, FIT_K=9, SECTOR_HALF=60;
 const SAMPLE_STEP=4, SAMPLE_AGE=30*60000, SAMPLE_MAX=80, POS_MAX_ACC=35, SOLVE_BUDGET_MS=40;
 const AWAY_M=300, LIVE_KEEP=2*3600000, DEVS_MAX=600, ROSTER_MAX=60, HOME_NEAR=150, AUTOLOG_PER_HOUR=6;
