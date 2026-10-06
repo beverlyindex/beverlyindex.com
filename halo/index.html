@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.11', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.12', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1766,7 +1766,7 @@ function toolPatch(){
   const g=S.global, mine=kevMine();
   h+='<div class="dsec"><h4>Exploited now <span class="chip '+(g?'pot':'')+'" style="margin-left:6px">'+(g?'Live · read '+feedAgo():'Connecting')+'</span></h4>';
   if(!g||!g.kev) h+='<p>Halo is connecting to the live exploited list.</p>';
-  else h+='<p style="margin-bottom:8px">Flaws under active attack, from the CISA catalogue, that touch '+PLAT_NAME[plat()]+(pv('wifihome')!==false?' or home network equipment':'')+'. A device older than the date shown is exposed until it is updated.</p>'+
+  else h+='<p style="margin-bottom:8px">Flaws under active attack, from the CISA catalogue, in '+kevFam()+'. The date is the day the flaw joined the catalogue. Open an entry to see which products and versions it names, then install the update it gives.</p>'+
     (mine.length?mine.slice(0,10).map(kevRow).join(''):'<div class="empty" style="padding:8px">None for your platform in the last '+g.kev.windowDays+' days.</div>');
   h+='</div>';
   return h;
@@ -1833,6 +1833,8 @@ function kevWords(v){ const ven=String(v.vendor||'').trim(), pr=String(v.product
   const name=(pr.toLowerCase().indexOf(ven.toLowerCase())===0 ? pr : ven+' '+pr).replace(/\s+/g,' ').trim();
   const many=/(products|switches|routers|devices|firewalls|appliances|cameras|phones|gateways|servers|controllers|printers|drivers|chipsets|processors|modems|extenders|adapters|browsers|recorders|systems)$/i.test(pr);
   return {name, are:many?'are':'is', it:many?'them':'it'}; }
+// The exploited list is matched on a family of products: the kind of phone in the profile, and home network equipment. The words say so.
+const kevFam = () => (plat()==='iphone'?'Apple products':'Android phones and browsers')+(pv('wifihome')!==false?' and home network equipment':'');
 function kevMine(){
   const g=S.global; if(!g||!g.kev) return [];
   const want=new Set(KEV_FOR[plat()]); if(pv('wifihome')!==false) want.add('router');
@@ -1880,9 +1882,9 @@ function globalPull(){
          '<span class="st"><span class="dot '+(s.ok?'live':'')+'"></span>'+(s.ok?s.count+' items':'Not reached')+'</span></div>').join('')+
          '<div class="limit" style="margin-top:8px">'+(S.globalVia==='backend'?'Read from the sources by the Halo backend every 5 minutes, last at '+fmtLT(g.generated)+' your time'+(g.stale?'. A source that is slow to answer shows its last items':'')+'.':'This is the hourly copy of the feed. Halo switches back to the 5 minute feed as soon as it connects.')+' Titles, dates and links only.</div></div>';
       const mine=kevMine();
-      h+='<div class="dsec"><h4>Exploited now, on what you use</h4>'+
-         (g.kev ? '<p style="margin-bottom:8px">'+g.kev.recentAll+' flaws joined the exploited list in the last '+g.kev.windowDays+' days. '+mine.length+' touch '+PLAT_NAME[plat()]+(pv('wifihome')!==false?' or home network equipment':'')+'.</p>'+
-           (mine.length?mine.slice(0,8).map(kevRow).join(''):'<div class="empty" style="padding:8px">None for your platform in this window.</div>')+
+      h+='<div class="dsec"><h4>Exploited now, in '+kevFam()+'</h4>'+
+         (g.kev ? '<p style="margin-bottom:8px">'+g.kev.recentAll+' flaws joined the exploited list in the last '+g.kev.windowDays+' days. '+mine.length+(mine.length===1?' is':' are')+' in '+kevFam()+'. If you own one, update it.</p>'+
+           (mine.length?mine.slice(0,8).map(kevRow).join(''):'<div class="empty" style="padding:8px">None in '+kevFam()+' in this window.</div>')+
            '<div class="formrow"><button class="btn sm" data-act="res" data-id="p_patch">Open Patch Clock</button></div>' : '<p>Connecting to the exploited list.</p>')+'</div>';
       const lst=(k,title,n)=>{ const a=g[k]||[]; return a.length ? '<div class="dsec"><h4>'+title+'</h4>'+a.slice(0,n||6).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a>'+(k==='news'&&x.src?' <span class="mono" style="font-size:11px;color:var(--mut)">'+esc(x.src)+'</span>':'')+'</span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap">'+esc(fmtD(x.d))+'</span></div>').join('')+'</div>' : ''; };
       h+=lst('news','Latest hacking news',10)+lst('ai','AI agents and AI misuse: unreviewed headlines')+lst('consumer','Consumer alerts, Federal Trade Commission')+lst('privacy','Surveillance and privacy, Electronic Frontier Foundation')+lst('advisories','Advisories, CISA');
@@ -3371,7 +3373,7 @@ function reportHTML(){
   h+='<h2>9. The wider picture</h2>';
   if(!g) h+='<p>This section fills in as soon as the live feed is reached. The register in section 5 stands as of '+e(REGISTER_DATE)+'.</p>';
   else { h+='<p>The feed was generated on '+e(fmtDT(g.generated))+' from '+g.sources.filter(x=>x.ok).length+' of '+g.sources.length+' public sources.'+(g.kev?' The United States catalogue of flaws under active attack listed '+g.kev.recentAll+' in the last '+g.kev.windowDays+' days.':'')+'</p>';
-    if(km.length) h+='<h3>Flaws under active attack that touch your devices</h3>'+tbl(['Product','Flaw','Listed'],km.slice(0,8).map(v=>[e(v.vendor+' '+v.product),e(v.cve)+(v.ransomware?' (used in ransomware)':''),e(v.added)]))+'<p>A device whose last security update is older than the date listed is exposed until it is updated.</p>';
+    if(km.length) h+='<h3>Flaws under active attack in '+e(kevFam())+'</h3>'+tbl(['Product','Flaw','Listed'],km.slice(0,8).map(v=>[e(v.vendor+' '+v.product),e(v.cve)+(v.ransomware?' (used in ransomware)':''),e(v.added)]))+'<p>The date is the day each flaw joined the catalogue. Open the entry to see which products and versions it names, then install the update it gives.</p>';
     else if(g.kev) h+='<p>No flaw listed in that period touches your kind of phone or home network equipment.</p>';
     const items=(k,n)=>(g[k]||[]).slice(0,n).map(x=>[e(x.t),e(x.src),e(x.d)]);
     const news=items('advisories',4).concat(items('consumer',3),items('privacy',3));
@@ -4731,7 +4733,7 @@ function alertScan(){
 // What the feed brought: a flaw under active attack in a product you told Halo you use. The first reading sets the baseline.
 function alertFeed(){ let list=[]; try{ list=kevMine(); }catch(e){ return; }
   const first=!P.kevSeen; P.kevSeen=P.kevSeen||{}; let n=0;
-  list.forEach(v=>{ if(P.kevSeen[v.cve]) return; P.kevSeen[v.cve]=1; n++; if(!first) { const w=kevWords(v); alertRaise('kev:'+v.cve, w.name+' '+w.are+' under attack', 'A flaw in '+w.it+' is being used against people now ('+v.cve+'). Update '+w.it+' today. Patch Clock has the steps.', {res:'p_patch'}); } });
+  list.forEach(v=>{ if(P.kevSeen[v.cve]) return; P.kevSeen[v.cve]=1; n++; if(!first) { const w=kevWords(v); alertRaise('kev:'+v.cve, w.name+' '+w.are+' under attack', 'A flaw in '+w.it+' is being used against people now ('+v.cve+'). If you own one, update it today. Patch Clock has the steps.', {res:'p_patch'}); } });
   if(n) save(); }
 // What the app itself raised while the screen was off, and which banner you tapped.
 function alertNativeTick(){ const N=NATIVE(); if(!N) return;
@@ -4846,7 +4848,7 @@ function myFindings(side){
     if(V.mode==='live'){ const pres=V.devices.filter(d=>d.present&&!d.sim), fl=pres.filter(d=>d.withYou||d.homeAway);
       if(pres.length || !V.test) out.push({t:'Now: '+pres.length+' device'+(pres.length===1?'':'s')+' in earshot'+(fl.length?', '+fl.length+' flagged. Open Watchers':', none flagged')+'.', src:(mobileLive()?'your sensor':'your home listener')+' · '+hhmm(liveLast()-LIVE.skew), mine:true}); }
     else if(V.mode!=='sim') out.push({t:'Your vicinity: '+stateWords(V.mode).count+'.', src:'your sensors', mine:true}); }
-  else kevMine().slice(0,3).forEach(v=>out.push({t:'In your own devices: '+kevWords(v).name+' '+kevWords(v).are+' under attack ('+v.cve+'). Update '+kevWords(v).it+'.', src:'CISA · '+fmtD(v.added), u:v.u, mine:true}));
+  else kevMine().slice(0,3).forEach(v=>out.push({t:'Under attack: '+kevWords(v).name+' ('+v.cve+'). If you own one, update it.', src:'CISA · '+fmtD(v.added), u:v.u, mine:true}));
   P.evidence.filter(r=>r.kind==='finding' && r.t>week && names.some(n=>r.text.indexOf(n)===0)).slice(0,4)
     .forEach(r=>out.push({t:'Your finding: '+r.text.slice(0,140), src:'Evidence · '+new Date(r.t).toLocaleDateString()+' '+hhmm(r.t), mine:true}));
   return out;
