@@ -971,7 +971,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.28', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.29', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2047,7 +2047,7 @@ const PATH=[
    {k:'alerts', t:()=>'Turn on alerts', why:'A banner reaches you the moment a new threat appears.', ok:()=>['granted','screen'].indexOf(alertState())>=0, go:()=>({act:'alert-ask'})},
    {k:'listen', t:()=>canHear()?'Start listening':'Open the full map', get why(){ return canHear()?'Halo shows the devices and towers around you.':'Halo shows the cameras and tower sites around you.'; }, ok:()=>!!(P.path&&(P.path.heard||(!canHear()&&P.path.mapped))), go:()=>canHear()?({view:'watchers'}):({act:'map-full'})} ]},
  {k:'own', name:'Know what is yours', rank:'Prepared', steps:[
-   {k:'sig', t:()=>'Add three of your own devices to Your Signature', why:'Halo then sets your own devices aside, and a stranger stands out.', ok:()=>sigSize()>=3, go:()=>({pull:'sig', view:'watchers'})},
+   {k:'sig', t:()=>'Add three of your own devices to Your Signature', why:'Halo then sets your own devices aside, and a stranger stands out.', ok:()=>sigSize()+PAIRED.list.length>=3, go:()=>({pull:'sig', view:'watchers'})},
    {k:'health', t:()=>'Run the Device Health Check', why:'A few seconds, and you know this device is in order.', ok:()=>healthCount().at>0, go:()=>({pull:'health'})} ]},
  {k:'ai', name:'Guard against rogue AI', rank:'Guarded', steps:[
    {k:'trap', t:()=>'Run the Agent Trap Check once', why:'Paste a page, a file or a message, and Halo shows what it tells an AI to do.', ok:()=>(P.traps||[]).length>0, go:()=>({pull:'trap', view:'attackers'})},
@@ -2962,7 +2962,7 @@ const randName = n => { n=String(n||''); return n.length>=20 && /^[A-Za-z0-9]+$/
 const nameShow = n => randName(n) ? n.slice(0,6)+'…'+n.slice(-4) : n;
 const KIND_SHOW={'Access point':'Wi-Fi network'};
 const devName = d => d.live ? (labelOf(d) || nameShow(d.adv) || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
-const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : (KIND_SHOW[d.cls]||d.cls)+(d.hint?', '+(d.band==='wifi'?d.hint.replace(/^Secured network/,'secured').replace(/^Open network/,'open'):d.hint):''))+(d.live && randName(d.adv) && !labelOf(d) ? ' · machine-made name, typical of a link between Wi-Fi units' : '')+(d.live && devName(d)!==d.name && d.band!=='wifi' ? ' · '+d.name : '');
+const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : (KIND_SHOW[d.cls]||d.cls)+(d.hint?', '+(d.band==='wifi'?d.hint.replace(/^Secured network/,'secured').replace(/^Open network/,'open'):d.hint):''))+(d.live && d.paired ? ' · paired with this phone' : '')+(d.live && randName(d.adv) && !labelOf(d) ? ' · machine-made name, typical of a link between Wi-Fi units' : '')+(d.live && devName(d)!==d.name && d.band!=='wifi' ? ' · '+d.name : '');
 const flagOf = d => d.mine?'Yours':d.sigFit?'Fits your signature':d.withYou?'Moving with you':d.maybe?'Staying with you so far':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':d.verdict==='fixed'?'Stays in place':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 // One tier per device, read straight from what it did: moving with you is Take Action, as in the bottom line.
@@ -3795,7 +3795,9 @@ const sigSize = () => { const g=sigGet(); return g.names.length+Object.keys(g.co
 // After every reading: a device with one of your names is yours. Unnamed devices fill the places your signature holds for their kind, nearest first,
 // and only while they are beside this phone (FOLLOW.sigNear metres). A device of the same maker and kind that keeps its distance is tested like any other.
 const sigNear = d => { if(d.atHome || (typeof d.dist==='number' && d.dist<=FOLLOW.sigNear)){ d.sigAt=Date.now(); return true; } return !!d.sigAt && Date.now()-d.sigAt<60000 && typeof d.dist==='number' && d.dist<=FOLLOW.sigNear*2; };
-function sigApply(){ const g=sigGet(); if(!g.names.length && !Object.keys(g.counts).length) return;
+function sigApply(){ const g=sigGet();
+  LIVE.devs.forEach(d=>{ if(d.paired){ d.mine=true; d.withYou=false; d.maybe=false; d.onRoute=false; d.knownBefore=true; } });          // paired with this phone: yours, without a tap
+  if(!g.names.length && !Object.keys(g.counts).length) return;
   const left=Object.assign({},g.counts), devs=[...LIVE.devs.values()].filter(d=>d.present||d.atHome);
   devs.forEach(d=>{ d.sigFit=false; if(d.adv && g.names.indexOf(d.adv)>=0){ d.mine=true; d.withYou=false; d.onRoute=false; d.knownBefore=true; }
     else if(d.mine && g.by[d.id] && g.by[d.id][0]==='c'){ const k=g.by[d.id].slice(2); if(left[k]>0) left[k]--; } });
@@ -3808,13 +3810,15 @@ function sigRefresh(force){ const box=el('tp-sig'); if(!box || !S.open.has('sig'
 function sigPull(){
   const open=S.open.has('sig'), g=sigGet(), n=sigSize(), V=vis(), live=V.mode==='live'||V.mode==='sim';
   let h='<div class="tp '+(open?'open':'')+'" style="--hc:var('+(n?'--clear':'--cyan')+')" id="tp-sig"><div class="tp-head" data-act="pull" data-id="sig"><div class="tp-top"><span class="tp-lab">Your Signature</span><span class="tp-i">i</span></div>'+
-    '<div class="tp-sum">'+(n?n+' of your own devices recorded · Halo sets them aside':'Mark what is yours once, and Halo knows your devices from everyone else\'s')+'</div><span class="chev">&#9662;</span></div>';
+    '<div class="tp-sum">'+((n+PAIRED.list.length)?(n+PAIRED.list.length)+' of your own devices recorded · Halo sets them aside':'Mark what is yours once, and Halo knows your devices from everyone else\'s')+'</div><span class="chev">&#9662;</span></div>';
   if(!open) return h+'</div>';
   h+='<div class="tp-body"><div class="howto">How to Tell Your Own Devices from Everyone Else\'s</div>';
   h+='<div class="dsec"><h4>Your signature <span class="spsub">'+(n?n+' recorded':'empty')+'</span></h4>'+
     (n ? g.names.map(x=>'<div class="rowline"><span><b>'+esc(x)+'</b> <span class="chip pot">by name</span></span><button class="x" data-act="sig-name-del" data-n="'+esc(x)+'" title="Take it out">&times;</button></div>').join('')+
          Object.keys(g.counts).map(k=>'<div class="rowline"><span><b>'+g.counts[k]+' &times; '+esc(sigKeyWords(k))+'</b> <span class="chip">by kind</span></span><button class="x" data-act="sig-count-del" data-k="'+esc(k)+'" title="Take one out">&times;</button></div>').join('')
        : '<p>Your signature is the set of devices you own. Once Halo has it, a device with one of your names reads Yours wherever you go. Unnamed devices are counted by maker and kind while they are within about 6 m of this phone: one more than you own stands out.</p>')+'</div>';
+  if(PAIRED.list.length) h+='<div class="dsec"><h4>Paired with this phone <span class="spsub">'+PAIRED.list.length+' recognised by themselves</span></h4>'+PAIRED.list.slice(0,30).map(x=>'<div class="rowline"><span><b>'+esc(x.name||'Unnamed device')+'</b> <span class="chip pot">'+esc(x.kind||'device')+'</span></span><span class="mono" style="font-size:11px;color:var(--clear)">Yours</span></div>').join('')+
+    '<div class="limit" style="margin-top:6px">Halo reads this list from the phone. A device you pair with this phone is yours from then on.</div></div>';
   h+='<div class="dsec"><h4>Add what is yours</h4>';
   if(!live) h+='<p>'+esc(stateWords(V.mode).long)+'</p>'+(NATIVE()||isAndroid()?'<div class="formrow">'+(phPanel().html)+'</div>':'');
   else { const ds=V.devices.filter(d=>d.present||d.atHome).sort((a,b)=>(b.rssi||-200)-(a.rssi||-200)).slice(0,14), top=ds[0];
@@ -4215,7 +4219,7 @@ function ingestReport(sid, rowT, p, off){
     d.lastSeen=Math.max(d.lastSeen||0, at); d.firstSeen=Math.min(d.firstSeen, at); d.timesSeen++; d.sensor=sid; d.identity=Math.max(1,Math.min(3,(s.conf|0)||2));
     if(station) d.seenStation=Math.max(d.seenStation, at); else { d.seenMobile=Math.max(d.seenMobile, at); if(away) d.seenAway=Math.max(d.seenAway||0, at); }
     d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
-    const fl=Array.isArray(s.flags)?s.flags:[]; d.fFollow=!station&&fl.indexOf('with_you')>=0; d.fRoute=fl.indexOf('route')>=0; d.fKnown=fl.indexOf('known')>=0; d.randomizes=fl.indexOf('randomized')>=0;
+    const fl=Array.isArray(s.flags)?s.flags:[]; d.fFollow=!station&&fl.indexOf('with_you')>=0; d.fRoute=fl.indexOf('route')>=0; d.fKnown=fl.indexOf('known')>=0; d.randomizes=fl.indexOf('randomized')>=0; d.paired=fl.indexOf('paired')>=0 || (!!d.adv && PAIRED.names.has(d.adv));
     if(pos && rssi!==null && !(pos.acc>POS_MAX_ACC)) addSample(d,pos,rssi,at);            // a poor position fix would mislead the placement
     if(!station && rssi!==null) legAdd(d, (pos && !(pos.acc>POS_MAX_ACC))?pos:null, rssi, at);
     d.hist.push(reading); if(d.hist.length>12) d.hist.shift();
@@ -4516,6 +4520,17 @@ function codKind(cod){ cod=Number(cod)||0; const major=(cod>>8)&31, minor=(cod>>
   if(major===6) return {cls:'Unknown', hint:'Printer or imaging device'};
   if(major===9) return {cls:'Wearable', hint:'Health device'};
   return {cls:'Unknown', hint:'Bluetooth device'}; }
+/* Devices paired with this phone. The Halo app reads the phone's own list of paired devices: each name, kind and a fingerprint of its address.
+   A device heard with one of those fingerprints, or broadcasting one of those names, is yours: Halo sets it aside without a tap. */
+const PAIRED={ids:new Set(), names:new Set(), list:[], t:0};
+function pairedLoad(force){ const N=NATIVE(); if(!N || typeof N.paired!=='function') return; if(!force && Date.now()-PAIRED.t<300000) return; PAIRED.t=Date.now();
+  let a=[]; try{ a=JSON.parse(N.paired()||'[]')||[]; }catch(e){ a=[]; } if(!Array.isArray(a)) a=[];
+  PAIRED.list=a.filter(x=>x&&typeof x==='object').slice(0,60).map(x=>({name:String(x.name||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40), kind:String(x.kind||'').slice(0,20), id:String(x.id||'').slice(0,24)}));
+  PAIRED.ids=new Set(PAIRED.list.map(x=>x.id).filter(Boolean)); PAIRED.names=new Set(PAIRED.list.map(x=>x.name).filter(n=>n.length>=3)); }
+const _pairH=new Map();
+async function pairId(addr){ addr=String(addr||'').toUpperCase(); let h=_pairH.get(addr);          // the fingerprint the app makes: the first twelve hex digits of the SHA-256 of the address
+  if(!h){ const b=new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(addr))); h=[...b.slice(0,6)].map(x=>x.toString(16).padStart(2,'0')).join(''); if(_pairH.size>4000) _pairH.clear(); _pairH.set(addr,h); } return h; }
+const isPaired = async a => PAIRED.ids.size>0 && !!a && PAIRED.ids.has(await pairId(a));
 const NATIVE = () => { const n=window.HaloNative; return (n && typeof n.drain==='function' && typeof n.start==='function') ? n : null; };
 const nativeStatus = () => { try{ return JSON.parse(NATIVE().status()); }catch(e){ return null; } };
 const phCan = () => !!NATIVE() || !!(navigator.bluetooth && navigator.bluetooth.requestLEScan);
@@ -4525,6 +4540,7 @@ async function nativeDrain(){
   const N=NATIVE(); if(!N || PH.busy) return; PH.busy=true;
   try{ PH.nstat=nativeStatus();
     let batches=[]; try{ batches=JSON.parse(N.drain())||[]; }catch(e){ batches=[]; }
+    pairedLoad();
     for(const b of batches){ if(!b || !Number.isFinite(b.t)) continue; const q=b.pos, live=Date.now()-b.t<8000;
       if(okLL(q)){ const acc=typeof q.acc==='number'?q.acc:25;
         GATE.nat=Date.now();
@@ -4532,10 +4548,10 @@ async function nativeDrain(){
         else { const gate=posGate(q.lat,q.lon,acc,q.t||b.t,q.src); if(gate && !(acc>POS_MAX_ACC)){ trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc}, b.t); } } }
       const list=[];
       for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
-        if(x.cl){ const k=codKind(x.cod), nm=String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); list.push({id:'bc:'+hash32(String(x.a)).toString(36), rssi:x.r, band:'ble', cls:k.cls, name:nm, hint:k.hint, conf:nm?3:2, flags:[]}); PH.heard++; continue; }
+        if(x.cl){ const k=codKind(x.cod), nm=String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); let pr=false; try{ pr=await isPaired(x.a); }catch(e){} list.push({id:'bc:'+hash32(String(x.a)).toString(36), rssi:x.r, band:'ble', cls:k.cls, name:nm, hint:k.hint, conf:nm?3:2, flags:pr?['paired']:[]}); PH.heard++; continue; }
         const ev={device:{id:x.a,name:x.n||''}, rssi:x.r, uuids:x.u||[],
           manufacturerData:new Map(Object.keys(x.m||{}).map(k=>[+k, dv(hexBytes(x.m[k]))])), serviceData:new Map(Object.keys(x.d||{}).map(k=>[k, dv(hexBytes(x.d[k]))]))};
-        try{ const d=await phDescribe(ev); list.push({id:d.id, rssi:x.r, band:'ble', cls:d.cls, name:d.name, hint:d.hint, conf:d.conf, flags:d.flags}); PH.heard++; }catch(e){} }
+        try{ const d=await phDescribe(ev), pr=await isPaired(x.a); list.push({id:d.id, rssi:x.r, band:'ble', cls:d.cls, name:d.name, hint:d.hint, conf:d.conf, flags:pr?d.flags.concat('paired'):d.flags}); PH.heard++; }catch(e){} }
       (b.w||[]).slice(0,120).forEach(x=>{ if(!x || !x.b || typeof x.r!=='number') return; const open=!/WPA|WEP|SAE|RSN|EAP|OWE|PSK/i.test(x.c||'');
         const bs=String(x.b).toLowerCase(), flock=FLOCK_SSID.test(String(x.s||'')) || bs.indexOf(FLOCK_OUI)===0;
         list.push({id:'ap:'+bs, rssi:x.r, band:'wifi', cls:flock?'Camera':'Access point', name:String(x.s||'').slice(0,40), hint:flock?'Flock Safety camera, Wi-Fi on':(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
