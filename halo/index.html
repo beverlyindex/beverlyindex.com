@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.12', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.13', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2130,7 +2130,7 @@ function renderAttackers(){
 }
 
 /* ---------- Responder: who needs help at home, and who responds. Two modes: Home and Away ---------- */
-const SENSORS={ none:'No sensor', wifi:'Wi-Fi motion node', radar:'Ceiling radar, presence and fall', door:'Door contact' };
+const SENSORS={ none:'No sensor', wifi:'Wi-Fi motion node', radar:'Ceiling radar', door:'Door contact' };
 const initials = n => String(n||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase() || '?';
 function homeStatus(p,i){
   if(!p.consent) return {c:'--warn', t:'Record their agreement<br>and monitoring can begin'};
@@ -2183,11 +2183,11 @@ function roomsCard(){ const rs=roomsNow(); if(!rs.length) return '';
     '<div class="limit" style="margin-top:8px">With Responder set to Away, a person in any of these rooms raises a banner and is written into Evidence.</div></div>'; }
 function renderResponder(){
   const H=P.home, R=H.rules, away=!!H.armed;
-  let h='<div class="pagehead"><h2>Responder</h2><p>Know the moment someone at home needs help, and who responds. No cameras and no microphones: movement, stillness and falls only.</p></div>';
+  let h='<div class="pagehead"><h2>Responder</h2><p>See who is listed at home, call your emergency numbers, and receive a banner when a radar in your home reports a person there while you are away. No cameras and no microphones.</p></div>';
   h+='<div class="seg" style="margin-bottom:8px"><button data-act="h-arm" data-v="n" class="m-auto '+(!away?'on':'')+'">Home</button><button data-act="h-arm" data-v="y" class="m-w '+(away?'on':'')+'">Away</button></div>';
   h+='<div class="limit" style="margin-bottom:14px">'+(away
-      ? '<b>Away.</b> You are out. Your home listener watches the home, and Halo raises a banner on your phone.'
-      : '<b>Home.</b> You are in. Alerts to your phone are off. Set up the people, the rooms, the rules and the emergency numbers here.')+'</div>';
+      ? '<b>Away.</b> You are out. Halo raises a banner on your phone when a radar in your home reports a person there.'
+      : '<b>Home.</b> You are in. Banners from your home radar are off. Set up the people, the rooms and the emergency numbers here.')+'</div>';
   const radar=H.rooms.filter(r=>r.sensor==='radar').length, watches=H.people.filter(p=>p.watch).length;
   h+='<div class="ov"><div class="stack" style="gap:14px">';
   h+=roomsCard();
@@ -2200,9 +2200,9 @@ function renderResponder(){
     h+='</div>';
     h+='</div><div class="stack" style="gap:14px">';
     h+='<div class="card"><h3>Watch status</h3><div class="kv"><span class="k">Home listener</span><span class="v '+(stationLive()?'okc':'unkc')+'">'+(stationLive()?'Reporting':'Add one in Devices and sync')+'</span><span class="k">Heard at home</span><span class="v '+(stationLive()?'okc':'unkc')+'">'+(stationLive()?homeHeard()+' devices in earshot':'Starts with your home listener')+'</span>'+
-       '<span class="k">Fall coverage, rooms</span><span class="v '+(radar?'okc':'warnc')+'">'+radar+' of '+H.rooms.length+' with a radar sensor</span>'+
-       '<span class="k">Fall coverage, people</span><span class="v '+(watches?'okc':'warnc')+'">'+watches+' of '+H.people.length+' with a watch</span>'+
-       '<span class="k">Rules armed</span><span class="v">'+((R.fall?1:0)+(R.night?1:0)+4)+' of 6</span></div>'+
+       '<span class="k">Radar rooms</span><span class="v '+(radar?'okc':'warnc')+'">'+radar+' of '+H.rooms.length+' marked by you</span>'+
+       '<span class="k">Fall watches</span><span class="v '+(watches?'okc':'warnc')+'">'+watches+' of '+H.people.length+' people marked by you</span>'+
+       '<span class="k">Rule in force</span><span class="v">A person in a radar room while you are away</span></div>'+
        '</div>';
   } else {
     h+='<div class="card"><h3>Home location</h3><div class="kv"><span class="k">Position</span><span class="v '+(H.loc?'okc':'unkc')+'" id="homeLocV">'+(H.loc?'Set '+new Date(H.loc.t).toLocaleDateString()+', within '+Math.round(H.loc.acc)+' m':'Not set')+'</span></div>'+
@@ -2213,23 +2213,25 @@ function renderResponder(){
        '<div class="formrow"><input class="inp" id="hpName" placeholder="Name"><input class="inp" id="hpRel" placeholder="Relation, for example Father"></div>'+
        '<div class="formrow"><label class="lbl"><input type="checkbox" id="hpConsent"> They know and agree</label><label class="lbl"><input type="checkbox" id="hpWatch"> Wears a fall-detecting watch</label>'+
        '<button class="btn sm primary" data-act="h-padd" style="margin-left:auto">Add person</button></div>'+
-       '<div class="limit" style="margin-top:10px">Halo monitors only people whose agreement is recorded.</div></div>';
+       '<div class="limit" style="margin-top:10px">Record each person\'s agreement here before you place a radar in a room they use.</div></div>';
 
     h+='<div class="card"><h3>Rooms and sensors <span class="n">'+H.rooms.length+'</span></h3>';
     if(!H.rooms.length) h+='<div class="empty">No rooms listed yet. Start with the bathroom and the bedroom.</div>';
     H.rooms.forEach((r,i)=>{ h+='<div class="rowline"><span><b>'+esc(r.name)+'</b></span><span><span class="mono" style="font-size:11.5px;color:var(--mut)">'+SENSORS[r.sensor]+'</span> <button class="x" data-act="h-rdel" data-i="'+i+'">&times;</button></span></div>'; });
     h+='<div class="formrow"><input class="inp" id="hrName" placeholder="Room"><select class="inp" id="hrSensor">'+Object.keys(SENSORS).map(k=>'<option value="'+k+'">'+SENSORS[k]+'</option>').join('')+'</select>'+
        '<button class="btn sm primary" data-act="h-radd">Add room</button></div>'+
-       '<div class="kv" style="margin-top:12px"><span class="k">Fall coverage, rooms</span><span class="v '+(radar?'okc':'warnc')+'">'+radar+' of '+H.rooms.length+' with a radar sensor</span>'+
-       '<span class="k">Fall coverage, people</span><span class="v '+(watches?'okc':'warnc')+'">'+watches+' of '+H.people.length+' with a watch</span></div></div>';
+       '<div class="kv" style="margin-top:12px"><span class="k">Radar rooms</span><span class="v '+(radar?'okc':'warnc')+'">'+radar+' of '+H.rooms.length+' marked by you</span>'+
+       '<span class="k">Fall watches</span><span class="v '+(watches?'okc':'warnc')+'">'+watches+' of '+H.people.length+' people marked by you</span></div></div>';
 
     h+='<div class="card"><h3>Rules</h3>'+
-       '<div class="q"><span><b>Fall detected.</b> Raise Take Action at once</span><span class="yn"><button class="y '+(R.fall?'on':'')+'" data-act="h-rule" data-k="fall" data-v="y">On</button><button class="n '+(!R.fall?'on':'')+'" data-act="h-rule" data-k="fall" data-v="n">Off</button></span></div>'+
+       '<div class="q"><span><b>A person in a radar room while you are away.</b> Halo raises a banner and writes it to Evidence</span><span class="chip pot">In force</span></div>'+
+       '<div class="limit" style="margin:8px 0">Your settings for the rules below are saved with your account.</div>'+
+       '<div class="q"><span><b>Fall detected.</b> Your setting</span><span class="yn"><button class="y '+(R.fall?'on':'')+'" data-act="h-rule" data-k="fall" data-v="y">On</button><button class="n '+(!R.fall?'on':'')+'" data-act="h-rule" data-k="fall" data-v="n">Off</button></span></div>'+
        '<div class="q"><span><b>No movement anywhere</b> during waking hours, minutes</span><input class="inp num" type="number" min="10" max="240" data-rule="still" value="'+esc(R.still)+'"></div>'+
        '<div class="q"><span><b>Not up by</b></span><input class="inp num" type="time" style="width:110px" data-rule="upBy" value="'+esc(R.upBy)+'"></div>'+
        '<div class="q"><span><b>In the bathroom longer than</b>, minutes</span><input class="inp num" type="number" min="10" max="120" data-rule="bath" value="'+esc(R.bath)+'"></div>'+
        '<div class="q"><span><b>Exterior door opens overnight</b></span><span class="yn"><button class="y '+(R.night?'on':'')+'" data-act="h-rule" data-k="night" data-v="y">On</button><button class="n '+(!R.night?'on':'')+'" data-act="h-rule" data-k="night" data-v="n">Off</button></span></div>'+
-       '<div class="q"><span><b>Station goes silent.</b> Home reads Unknown, never Clear</span><span class="chip">Always on</span></div></div>';
+       '</div>';
     h+='</div><div class="stack" style="gap:14px">';
 
     h+='<div class="card"><h3>Emergency numbers</h3>';
@@ -2241,8 +2243,8 @@ function renderResponder(){
   h+='<div class="card"><h3>What makes this real</h3><ol class="steps">'+
      '<li><b>A fall-detecting watch on the person at risk.</b> It works today, at home and outside. An Apple Watch calls emergency services after about a minute without a response. <a href="https://support.apple.com/en-us/108896" target="_blank" rel="noopener">Apple Support</a></li>'+
      '<li><b>A ceiling radar sensor in the bathroom and the bedroom.</b> It detects a fall with no camera. The Aqara FP2 is one. Its maker states it is not a medical device. <a href="https://www.aqara.com/en/product/presence-sensor-fp2/" target="_blank" rel="noopener">Aqara</a></li>'+
-     '<li><b>Wi-Fi motion nodes in the other rooms.</b> About 10 euros each. They see movement and stillness. They do not see a fall. <a href="https://github.com/francescopace/espectre" target="_blank" rel="noopener">ESPectre</a></li>'+
-     '<li><b>The Halo home station</b> carries those events to the backend and on to your phone. No station is connected yet.</li></ol>'+
+     '<li><b>Wi-Fi motion nodes in the other rooms.</b> About 10 euros each. They see movement and stillness. <a href="https://github.com/francescopace/espectre" target="_blank" rel="noopener">ESPectre</a></li>'+
+     '<li><b>The Halo home listener</b> carries radar readings to your phone. Home listener: '+(stationLive()?'reporting now':'add one in Devices and sync')+'.</li></ol>'+
      '<div class="limit" style="margin-top:8px">Responder is not a medical device and does not replace a medical alert service. For a person at high risk, step 1 comes first. <a href="#" data-act="terms">Terms of use</a></div></div>';
   h+='</div></div>';
   el('hMain').innerHTML=h;
