@@ -1026,7 +1026,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.39', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.40', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2447,14 +2447,24 @@ function elogErase(){ const E=S.elog; if(!E || !ELOG.ok) return; if(!E.arm){ E.a
    lists what is along that route now: the cameras and tower sites of the public record, and the devices your own encounter log holds there.
    Once you confirm, Location follows the route and counts what is new since you set off, and Responder shows your emergency numbers if you
    are past your arrival time. A device is heard when it comes into earshot of the phone; the plan shows what is on record, not what is on air. ---------- */
-const RT={cam:60, site:150, log:100, arrive:60, grace:10*60000, off:150, speed:{foot:1.3, bike:4.2, car:9}, word:{foot:'on foot', bike:'by bicycle', car:'by car'}, label:{foot:'On foot', bike:'Bicycle', car:'Car'}};
+const RT={cam:60, site:150, log:100, arrive:60, grace:10*60000, off:150, back:40, same:30, at:35, speed:{foot:1.3, bike:4.2, car:9}, word:{foot:'on foot', bike:'by bicycle', car:'by car'}, label:{foot:'On foot', bike:'Bicycle', car:'Car'}};
 const llOf = t => { const m=/^\s*(-?\d{1,2}(?:\.\d+)?)\s*[,; ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/.exec(String(t||'')); if(!m) return null; const p={lat:+m[1], lon:+m[2]}; return okLL(p)?p:null; };
 const lineLen = L => { let m=0; for(let i=1;i<L.length;i++) m+=distLL(L[i-1][1],L[i-1][0],L[i][1],L[i][0]); return m; };
 // Where a point falls on a line: how far from the line it is, and how far along the line that nearest place lies.
-function onLine(lat, lon, L){ let best={d:Infinity, at:0}, run=0; const k=Math.cos(lat*Math.PI/180)*111320, px=lon*k, py=lat*111320;
-  for(let i=1;i<L.length;i++){ const ax=L[i-1][0]*k, ay=L[i-1][1]*111320, dx=L[i][0]*k-ax, dy=L[i][1]*111320-ay, seg=Math.hypot(dx,dy), t=seg?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(seg*seg))):0, d=Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+function onLine(lat, lon, L, a0, a1){ let best={d:Infinity, at:a0||0}, run=0; const k=Math.cos(lat*Math.PI/180)*111320, px=lon*k, py=lat*111320, lo=a0==null?-Infinity:a0, hi=a1==null?Infinity:a1;          // a0 to a1: only that stretch of the line, measured along it
+  for(let i=1;i<L.length;i++){ const ax=L[i-1][0]*k, ay=L[i-1][1]*111320, dx=L[i][0]*k-ax, dy=L[i][1]*111320-ay, seg=Math.hypot(dx,dy);
+    if(run+seg<lo || run>hi){ run+=seg; continue; }
+    const t0=seg?Math.max(0,(lo-run)/seg):0, t1=seg?Math.min(1,(hi-run)/seg):1, t=seg?Math.max(t0,Math.min(t1,((px-ax)*dx+(py-ay)*dy)/(seg*seg))):0, d=Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
     if(d<best.d) best={d, at:run+t*seg}; run+=seg; }
   return best; }
+// How far along the route you are. Progress only moves forwards, within the distance you could have covered since the last look,
+// so a loop, or a street walked out and back, is never mistaken for its other half.
+function routeProg(R, me, now){ const p0=R.prog||0, dt=Math.max(1,(now-(R.pt||R.t0))/1000), reach=60+3*RT.speed[R.mode]*dt;
+  const win=onLine(me.lat,me.lon,R.line,Math.max(0,p0-RT.back),Math.min(R.len,p0+Math.min(reach,5000)));
+  if(win.d<=RT.off) return {d:win.d, at:win.at, off:false};
+  const all=onLine(me.lat,me.lon,R.line);                    // away from the stretch you were on, yet on the line somewhere else: you cut across, or you are going round the other way
+  if(all.d<=RT.cam) return {d:all.d, at:p0, off:false, other:all.at};
+  return {d:Math.min(win.d, all.d), at:p0, off:true}; }
 const routeLive = () => (P.route && !P.route.done) ? P.route : null;
 const routeLineNow = () => (S.plan && (S.plan.line || (S.plan.pts && S.plan.pts.length>1 ? S.plan.pts.map(p=>[p.lon,p.lat]) : null))) || (routeLive() && routeLive().line) || null;
 // The squares of the public record that a route crosses, so its cameras are loaded before you leave.
@@ -2470,7 +2480,7 @@ const camWords = pts => { const c={}; pts.forEach(p=>{ if(p.k!=='site') c[p.k]=(
 // What your own encounter log holds along a line: devices met within 100 m of it.
 async function routeLog(L){ if(!ELOG.ok) return null; const ds=await elogAll('dev'), near=ds.filter(r=>!(P.mine||{})[r.id] && (r.places||[]).some(p=>onLine(p.la,p.lo,L).d<=RT.log));
   return {n:near.length, trk:near.filter(r=>r.cls==='Tag'||r.cls==='Camera').map(recName).slice(0,6), multi:near.filter(r=>r.places.length>=2).length}; }
-function planOpen(){ S.plan={fromText:'', toText:'', mode:P.routeMode||'foot', pts:[], line:null, from:null, to:null, err:'', pick:null, past:false, by:''}; S.mark=null; markRender(); planRender(); const b=el('routeBox'); if(b) b.scrollIntoView({block:'start'}); renderVicinity(); }
+function planOpen(){ S.plan={fromText:'', toText:'', mode:P.routeMode||'foot', pts:[], line:null, from:null, to:null, err:'', pick:null, past:false, by:'', back:false, name:''}; S.mark=null; markRender(); planRender(); const b=el('routeBox'); if(b) b.scrollIntoView({block:'start'}); renderVicinity(); }
 function planClose(){ S.plan=null; planRender(); routeShow(); renderVicinity(); }
 function planGrab(){ const p=S.plan; if(!p) return; const f=el('planFrom'), t=el('planTo'), a=el('planEta'); if(f) p.fromText=f.value.trim(); if(t) p.toText=t.value.trim(); if(a && a.value) p.etaText=a.value; }
 const planHere = () => { const me=ePos(); return me ? {lat:+me.lat.toFixed(5), lon:+me.lon.toFixed(5), name:'Where you are now', here:true} : null; };
@@ -2486,7 +2496,8 @@ async function planResolve(field){ const p=S.plan, text=p[field+'Text'], held=p[
   p.credit2=String(r.j.credit||''); p.pick={field, places:r.j.places.slice(0,5)}; return null; }
 async function planGo(){ const p=S.plan; if(!p || p.busy) return; planGrab(); p.err=''; p.pick=null; p.past=false; p.busy=true; planRender();
   try{ const from=await planResolve('from'); if(!from || !S.plan){ return; } const to=await planResolve('to'); if(!to || !S.plan){ return; }
-    await planLine([from,to]); }
+    if(distLL(from.lat,from.lon,to.lat,to.lon)<RT.same){ p.line=null; p.err='Your start and your destination are the same place. To go round and come back, tap Draw on the map, tap each corner, then Back to start.'; return; }
+    p.name=p.back ? to.name+' and back' : to.name; await planLine(p.back ? [from,to,from] : [from,to]); }
   catch(e){ if(S.plan) S.plan.err='The route could not be worked out. Draw it on the map.'; }
   finally{ if(S.plan){ S.plan.busy=false; planRender(); routeShow(); } } }
 // The line through the points: the streets when the backend offers them, the points themselves otherwise.
@@ -2518,7 +2529,7 @@ function planRender(){ const box=el('routeBox'); if(!box) return; const p=S.plan
   let h='<div class="mark plan"><div class="mark-h"><b>Plan a route</b><button class="btn sm" data-act="plan-x">Close</button></div>'+
     '<div class="plan-f"><label for="planFrom">From</label><input class="inp" id="planFrom" maxlength="120" value="'+esc(p.fromText)+'" placeholder="Where you are now" autocomplete="off"></div>'+
     '<div class="plan-f"><label for="planTo">To</label><input class="inp" id="planTo" maxlength="120" value="'+esc(p.toText)+'" placeholder="'+(can.find?'Address, place or coordinates':'Coordinates: 34.0522, -118.2437')+'" autocomplete="off" enterkeyhint="go"></div>'+
-    '<div class="elog-chips" style="margin:10px 0 0">'+['foot','bike','car'].map(m=>'<button class="chipbtn '+(p.mode===m?'on':'')+'" data-act="plan-mode" data-m="'+m+'">'+RT.label[m]+'</button>').join('')+'</div>'+
+    '<div class="elog-chips" style="margin:10px 0 0">'+['foot','bike','car'].map(m=>'<button class="chipbtn '+(p.mode===m?'on':'')+'" data-act="plan-mode" data-m="'+m+'">'+RT.label[m]+'</button>').join('')+'<button class="chipbtn '+(p.back?'on':'')+'" data-act="plan-back" aria-pressed="'+(p.back?'true':'false')+'">Return to the start</button></div>'+
     '<div class="loc-bar"><button class="btn primary mk'+(p.busy?' on':'')+'" data-act="plan-go">'+(p.busy?'Working it out':'Show the route')+'</button><button class="btn" data-act="plan-draw">Draw on the map</button></div>'+
     ((P.routes||[]).length || (W.route||[]).length>2 ? '<div class="limit" style="text-align:center;margin-top:8px"><button class="linkbtn'+(p.past?' on':'')+'" data-act="plan-past">A route you took</button></div>' : '')+
     (p.err?'<div class="fixbar" style="margin-top:8px"><span>'+esc(p.err)+'</span></div>':'');
@@ -2526,45 +2537,51 @@ function planRender(){ const box=el('routeBox'); if(!box) return; const p=S.plan
   if(p.past){ const past=[]; if((W.route||[]).length>2 && W.t0) past.push({i:'w', name:(W.on?'Your trip in progress':'Your last trip')+', '+eT(W.t0), len:Math.round(W.dist||0)}); (P.routes||[]).forEach((r,i)=>past.push({i:String(i), name:r.name+', '+eT(r.t), len:r.len}));
     h+='<div class="elog-h4">A route you took</div>'+past.map(x=>'<button class="plan-pick" data-act="plan-use" data-i="'+x.i+'">'+esc(x.name)+'<small>'+esc(miText(x.len))+'</small></button>').join(''); }
   if(p.line){ const pts=routePoints(p.line);
-    h+=planSketch(p.line, pts)+'<div class="plan-sum"><b>'+esc(miText(p.len))+'</b>, about '+esc(walkDur(p.dur*1000))+' '+RT.word[p.mode]+'. '+(p.by==='streets'?'It follows the streets.':p.by==='drawn'?'As you drew it.':'A straight line between the two points.')+'</div>'+
+    h+=planSketch(p.line, pts)+'<div class="plan-sum"><b>'+esc(miText(p.len))+'</b>, about '+esc(walkDur(p.dur*1000))+' '+RT.word[p.mode]+'. '+(p.by==='streets'?'It follows the streets.':p.by==='drawn'?'As you drew it.':'A straight line between the two points.')+(planLoop(p.line)?' It returns to where it starts.':'')+'</div>'+
       '<div id="planScan"></div>'+
       '<div class="plan-f" style="margin-top:12px"><label for="planEta" style="width:auto">Arrive by</label><input class="inp" id="planEta" type="time" value="'+esc(p.etaText||'')+'" style="flex:none;width:130px"></div>'+
       '<p class="limit" style="margin:6px 2px 0">Ten minutes past this time, Halo raises a banner and Responder shows your emergency numbers, until you tap I arrived.</p>'+
       '<div class="loc-bar"><button class="btn" data-act="plan-see">See it on the map</button><button class="btn primary mk" data-act="plan-confirm">Confirm and start</button></div>'; }
   h+='<p class="limit" style="margin:10px 2px 0">'+((can.route||can.find)?'Halo asks its own server for '+(can.find?'the place and ':'')+'the streets between your points. The server keeps nothing. ':'')+esc([p.credit,p.credit2].filter(Boolean).join(' '))+'</p></div>';
   box.innerHTML=h; if(p.line){ const b=el('planScan'); if(b){ b._h=''; planScan(); } } }
+const planLoop = L => !!L && L.length>2 && distLL(L[0][1],L[0][0],L[L.length-1][1],L[L.length-1][0])<=RT.arrive;
 function planPick(i){ const p=S.plan, x=p && p.pick && p.pick.places[i]; if(!x) return; planGrab(); const f=p.pick.field, short=x.name.split(',').slice(0,2).join(',').trim(); p[f+'Text']=short; p[f]={lat:x.lat, lon:x.lon, name:short, text:short}; p.pick=null; planRender(); planGo(); }
 function planUse(i){ const p=S.plan; if(!p) return; planGrab(); let line=null, name='';
   if(i==='w'){ line=W.route.map(q=>[q.lon,q.lat]); name='Your last trip'; } else { const r=(P.routes||[])[+i]; if(r){ line=r.line; name=r.name; p.mode=r.mode||p.mode; } }
-  if(!line || line.length<2) return; p.past=false; p.err=''; p.line=line; p.len=Math.round(lineLen(line)); p.dur=Math.round(p.len/RT.speed[p.mode]); p.by='drawn'; p.log=null;
+  if(!line || line.length<2) return; p.name=planLoop(line)?'your starting point':name; p.past=false; p.err=''; p.line=line; p.len=Math.round(lineLen(line)); p.dur=Math.round(p.len/RT.speed[p.mode]); p.by='drawn'; p.log=null;
   p.from={lat:line[0][1], lon:line[0][0], name:'Start'}; p.to={lat:line[line.length-1][1], lon:line[line.length-1][0], name}; p.toText=name; p.to.text=name; p.fromText=''; 
   const due=new Date(Date.now()+p.dur*1000+5*60000); p.etaText=String(due.getHours()).padStart(2,'0')+':'+String(due.getMinutes()).padStart(2,'0');
   ptsLoad(); routeLog(line).then(x=>{ if(S.plan===p){ p.log=x; planScan(); } }); planRender(); routeShow(); }
 // Drawing: the full map opens, each tap adds a point, and the points in order are the route.
 async function planDraw(){ const p=S.plan; if(!p) return; planGrab(); p.draw=true; p.pts=[]; p.line=null; p.err=''; p.pick=null; p.past=false; await mapFullOpen(); MF.follow=false; el('mfFollow').classList.remove('on'); planDrawBar(); routeShow(); }
 function planDrawBar(){ const b=el('mfDraw'), p=S.plan; if(!b) return; el('mapFull').classList.toggle('drawing', !!(p && p.draw)); if(!p || !p.draw){ b.classList.add('hidden'); b.innerHTML=''; return; } const n=p.pts.length;          // while you draw, the sheet is put away and a tap on your own mark counts as a tap on the map
-  b.classList.remove('hidden'); b.innerHTML='<b>Draw your route.</b> '+(n===0?'Tap where you start, then each turn, then where you finish.':n===1?'Now tap the next point.':n+' points, '+esc(miText(lineLen(p.pts.map(q=>[q.lon,q.lat]))))+'.')+
-    '<div class="formrow"><button class="btn sm" data-act="plan-undo"'+(n?'':' disabled')+'>Undo</button><button class="btn sm" data-act="plan-clear"'+(n?'':' disabled')+'>Clear</button><button class="btn sm primary" data-act="plan-done">'+(n>1?'Done':'Cancel')+'</button></div>'; }
+  b.classList.remove('hidden'); b.innerHTML='<b>Draw your route.</b> '+(n===0?'Tap where you start, then each turn, then where you finish. For a loop, tap Back to start after the last turn.':n===1?'Now tap the next point.':n+' points, '+esc(miText(lineLen(p.pts.map(q=>[q.lon,q.lat]))))+'.')+
+    '<div class="formrow" style="flex-wrap:wrap"><button class="btn sm" data-act="plan-undo"'+(n?'':' disabled')+'>Undo</button><button class="btn sm" data-act="plan-clear"'+(n?'':' disabled')+'>Clear</button>'+(n>1?'<button class="btn sm gold" data-act="plan-loop">Back to start</button>':'')+'<button class="btn sm primary" data-act="plan-done">'+(n>1?'Done':'Cancel')+'</button></div>'; }
 function planTap(lat, lon){ const p=S.plan; if(!p || !p.draw || p.pts.length>=40) return; p.pts.push({lat:+lat.toFixed(5), lon:+lon.toFixed(5)}); planDrawBar(); routeShow(); }
 async function planDrawDone(viaBack){ const p=S.plan; if(!p || !p.draw) return; p.draw=false; planDrawBar(); if(!viaBack && S.mapFull) mapFullClose(false);
-  if(p.pts.length>1){ p.from=null; p.to=null; p.fromText=p.pts[0].lat.toFixed(5)+', '+p.pts[0].lon.toFixed(5); const z=p.pts[p.pts.length-1]; p.toText=z.lat.toFixed(5)+', '+z.lon.toFixed(5); p.busy=true; planRender();
-    try{ await planLine(p.pts.slice(), true); if(S.plan===p){ p.from.text=p.fromText; p.to.text=p.toText; } }catch(e){ if(S.plan===p){ p.line=p.pts.map(q=>[q.lon,q.lat]); p.len=Math.round(lineLen(p.line)); p.dur=Math.round(p.len/RT.speed[p.mode]); p.by='drawn'; } }
+  if(p.pts.length>1){ p.name=''; p.back=false; p.from=null; p.to=null; p.fromText=p.pts[0].lat.toFixed(5)+', '+p.pts[0].lon.toFixed(5); const z=p.pts[p.pts.length-1]; p.toText=z.lat.toFixed(5)+', '+z.lon.toFixed(5); p.busy=true; planRender();
+    try{ await planLine(p.pts.slice(), true); if(S.plan===p){ p.from.text=p.fromText; p.to.text=p.toText; if(planLoop(p.line)) p.name='your starting point'; } }catch(e){ if(S.plan===p){ p.line=p.pts.map(q=>[q.lon,q.lat]); p.len=Math.round(lineLen(p.line)); p.dur=Math.round(p.len/RT.speed[p.mode]); p.by='drawn'; } }
     finally{ if(S.plan===p) p.busy=false; } }
   planRender(); routeShow(); const b=el('routeBox'); if(b && S.plan) b.scrollIntoView({block:'start'}); }
 function planConfirm(){ const p=S.plan; if(!p || !p.line) return; planGrab(); const now=Date.now(); let eta=now+p.dur*1000+5*60000;
   { const m=/^(\d\d):(\d\d)$/.exec(p.etaText||''); if(m){ const d=new Date(); d.setHours(+m[1],+m[2],0,0); if(d.getTime()<now-60000) d.setDate(d.getDate()+1); eta=d.getTime(); } }
-  const step=Math.max(1,Math.ceil(p.line.length/400)), line=p.line.filter((c,i)=>i%step===0||i===p.line.length-1), name=(p.to&&p.to.name)||'your destination';
-  P.routeMode=p.mode; P.route={id:'R'+now.toString(36), t0:now, name, mode:p.mode, line, len:p.len, dur:p.dur, eta, by:p.by, from:{lat:line[0][1], lon:line[0][0]}, to:{lat:line[line.length-1][1], lon:line[line.length-1][0]}, pts:routePoints(line), ptsVer:PTS.ver, done:0};
+  const step=Math.max(1,Math.ceil(p.line.length/400)), line=p.line.filter((c,i)=>i%step===0||i===p.line.length-1), loop=planLoop(line), name=p.name||(loop?'your starting point':(p.to&&p.to.name)||'your destination');
+  P.routeMode=p.mode; P.route={id:'R'+now.toString(36), t0:now, name, mode:p.mode, line, len:p.len, dur:p.dur, eta, by:p.by, from:{lat:line[0][1], lon:line[0][0]}, to:{lat:line[line.length-1][1], lon:line[line.length-1][0]}, loop, prog:0, pt:now, pts:routePoints(line), ptsVer:PTS.ver, done:0};
   P.routes=P.routes||[]; if(!P.routes.some(r=>r.name===name && Math.abs(r.len-p.len)<30)) P.routes.unshift({t:now, name, mode:p.mode, len:p.len, line:line.filter((c,i)=>i%Math.max(1,Math.ceil(line.length/150))===0||i===line.length-1)}); P.routes.length=Math.min(P.routes.length,8); save();
   S.plan=null; planRender(); if(!W.on && mobileLive()) walkStart(); if(W.on){ W.plan=routeInfo(P.route); wEvent('note','Route set to '+name+': '+miText(p.len)+' '+RT.word[p.mode]+', due '+hhmm(eta)+'.'); wSave(true); }
   routeShow(); renderVicinity(); toast('Route set. Halo follows it from here, and counts what is new since you set off.'); const b=el('locBox'); if(b) b.scrollIntoView({block:'start'}); }
 const routeInfo = R => ({id:R.id, name:R.name, len:R.len, mode:R.mode, eta:R.eta, cams:(R.pts||[]).filter(x=>x.k!=='site').length});
-function routeDone(how){ const R=routeLive(); if(!R) return; R.done=Date.now(); R.how=how; save(); if(W.on){ if(W.plan && W.plan.id===R.id){ W.plan.done=R.done; W.plan.how=how; } wEvent('note', how==='arrived'?'Arrived at '+R.name+'.':'Route to '+R.name+' ended by you.'); wSave(true); }
-  S.banners=(S.banners||[]).filter(b=>b.key!=='late:'+R.id); renderAlerts(); routeShow(); renderVicinity(); if(S.view==='responder') rerender(); toast(how==='arrived'?'Arrived. The route is closed.':'The route is ended.'); }
+function routeDone(how){ const R=routeLive(); if(!R) return; R.done=Date.now(); R.how=how; save(); if(W.on){ if(W.plan && W.plan.id===R.id){ W.plan.done=R.done; W.plan.how=how; } wEvent('note', how==='arrived'?(R.loop?'Back at your starting point.':'Arrived at '+R.name+'.'):'Route to '+R.name+' ended by you.'); wSave(true); }
+  S.banners=(S.banners||[]).filter(b=>b.key!=='late:'+R.id); renderAlerts(); routeShow(); renderVicinity(); if(S.view==='responder') rerender(); toast(how==='arrived'?(R.loop?'Back at your start. The route is closed.':'Arrived. The route is closed.'):'The route is ended.'); }
 // On the way: you have arrived when you are at the destination after having been away from it; ten minutes past the time you set, Halo says so once.
 function routeTick(){ const R=routeLive(); if(!R) return; const me=ePos(), now=Date.now();
   if(R.ptsVer!==PTS.ver){ R.pts=routePoints(R.line); R.ptsVer=PTS.ver; }
-  if(me && now-me.t<30000){ const d=distLL(me.lat,me.lon,R.to.lat,R.to.lon); R.far=Math.max(R.far||0,d); if(d<=Math.max(RT.arrive, Math.min(100, me.acc||0)) && R.far>=Math.min(150, R.len/3)){ routeDone('arrived'); return; } }
+  if(me && now-me.t<30000){ const pr=routeProg(R, me, now); R.offD=pr.off?Math.round(pr.d):0;
+    if(pr.other!=null){ R.lost=R.lost||now; if(now-R.lost>60000 && pr.other>(R.prog||0)){ R.prog=Math.round(pr.other); R.pt=now; R.lost=0; } }          // a minute further along the line than expected: you cut across, and progress catches up
+    else if(!pr.off){ R.lost=0; if(pr.at>(R.prog||0)) R.prog=Math.round(pr.at); R.pt=now; }
+    const d=distLL(me.lat,me.lon,R.to.lat,R.to.lon); R.far=Math.max(R.far||0,d);          // at the destination, having covered most of the route or having been well away from it
+    if(d<=Math.max(RT.at, Math.min(100, 2*(me.acc||0))) && ((R.prog||0)>=0.8*R.len || R.far>=Math.min(150, R.len/3))){ routeDone('arrived'); return; }
+    if(now-(R.sv||0)>20000){ R.sv=now; save(); } }
   if(now>R.eta+RT.grace && !R.late){ R.late=now; save(); if(W.on) wEvent('warn','Past the arrival time set for '+R.name+' ('+hhmm(R.eta)+').');
     if(alertRaise('late:'+R.id, 'You are past your arrival time', 'You set '+hhmm(R.eta)+' for '+R.name+'. If you have arrived, tap I arrived on Location. Your emergency numbers are in Responder.', {view:'responder'})) buzz([300,150,300,150,300]);
     if(S.view==='responder') rerender(); else if(S.view==='overview'||S.view==='watchers') renderVicinity(); } }
@@ -2573,9 +2590,9 @@ function routeSince(R){ if(!W.on || !W.plan || W.plan.id!==R.id || !ELOG.ready) 
   Object.values(W.devs||{}).forEach(r=>{ if(r.mine || !r.sig) return; const h=ELOG.hist.get(r.sig), old=h?h.pl.filter(q=>q[2]<R.t0):[];
     if(!h || h.first>=R.t0-1000) o.fresh++; else if(r.at && old.length && !old.some(q=>distLL(r.at.lat,r.at.lon,q[0],q[1])<=ELOG.PLACE_M)) o.away++; else o.here++; });
   return o; }
-function routeStrip(){ const R=routeLive(); if(!R) return ''; const me=ePos(), pr=me?onLine(me.lat,me.lon,R.line):null, off=pr && pr.d>RT.off, left=pr?Math.max(0,R.len-pr.at):R.len, late=Date.now()>R.eta+RT.grace;
+function routeStrip(){ const R=routeLive(); if(!R) return ''; const me=ePos(), pr=me?{at:R.prog||0, d:R.offD||0}:null, off=!!(pr && R.offD), left=pr?Math.max(0,R.len-pr.at):R.len, late=Date.now()>R.eta+RT.grace;
   const ahead=(R.pts||[]).filter(c=>c.k!=='site' && (!pr || c.at>pr.at+10)), nx=ahead[0], sn=routeSince(R);
-  return '<div class="rt-strip" id="rtStrip"'+(late?' style="border-color:var(--action);background:rgba(255,90,90,.10)"':'')+'><div class="rt-top"><b>Route to '+esc(R.name)+'</b><span class="mono">'+esc(miText(left))+(pr?' to go':'')+' · due '+hhmm(R.eta)+'</span></div>'+
+  return '<div class="rt-strip" id="rtStrip"'+(late?' style="border-color:var(--action);background:rgba(255,90,90,.10)"':'')+'><div class="rt-top"><b>'+(R.loop && R.name==='your starting point'?'Loop back to your start':'Route to '+esc(R.name))+'</b><span class="mono">'+esc(miText(left))+(pr?' to go':'')+' · due '+hhmm(R.eta)+'</span></div>'+
     '<div class="rt-sub">'+(late?'<b>You are past your arrival time.</b> ':'')+(off?'You are '+esc(miText(pr.d))+' off the route you planned. ':'')+
       (ahead.length ? '<b>'+ahead.length+(ahead.length===1?' camera':' cameras')+' ahead.</b>'+(nx&&pr?' Next: '+esc(PT_WORD[nx.k].toLowerCase())+' in '+esc(miText(Math.max(0,nx.at-pr.at)))+'.':'') : ((R.pts||[]).some(c=>c.k!=='site')?'No camera ahead on the public record.':''))+'</div>'+
     (sn?'<div class="rt-sub">Since you set off: <b>'+sn.fresh+'</b> first time · <b>'+sn.here+'</b> seen here before · <b style="'+(sn.away?'color:var(--route)':'')+'">'+sn.away+'</b> seen at another place</div>':'')+
@@ -5789,6 +5806,8 @@ document.addEventListener('click', e=>{
     case 'plan-x': planClose(); break;
     case 'plan-mode': if(S.plan){ planGrab(); S.plan.mode=a.dataset.m; if(S.plan.line && S.plan.by!=='drawn' && S.plan.from && S.plan.to){ S.plan.from.text=S.plan.fromText; S.plan.to.text=S.plan.toText; planGo(); } else if(S.plan.line){ S.plan.dur=Math.round(S.plan.len/RT.speed[S.plan.mode]); planRender(); } else planRender(); } break;
     case 'plan-go': planGo(); break;
+    case 'plan-back': if(S.plan){ planGrab(); S.plan.back=!S.plan.back; if(S.plan.line && S.plan.by!=='drawn' && S.plan.from && S.plan.to && S.plan.to.text===S.plan.toText){ S.plan.from.text=S.plan.fromText; planGo(); } else planRender(); } break;
+    case 'plan-loop': if(S.plan && S.plan.draw && S.plan.pts.length>1){ const a=S.plan.pts[0]; S.plan.pts.push({lat:a.lat, lon:a.lon}); planDrawDone(false); } break;
     case 'plan-pick': planPick(+a.dataset.i); break;
     case 'plan-past': if(S.plan){ planGrab(); S.plan.past=!S.plan.past; S.plan.pick=null; planRender(); } break;
     case 'plan-use': planUse(a.dataset.i); break;
