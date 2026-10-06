@@ -817,7 +817,7 @@ a.tk:hover b{text-decoration:underline}
           </div>
           <div class="card">
             <h3>Evidence chain <span class="n" id="evCount"></span></h3>
-            <div class="toolbar"><button class="btn sm" data-act="ev-export">Export signed log</button><button class="btn sm gold" data-act="report-new">New report</button><button class="btn sm" data-act="report">Last report</button></div>
+            <div class="toolbar"><button class="btn sm" data-act="ev-export">Export the log</button><button class="btn sm gold" data-act="report-new">New report</button><button class="btn sm" data-act="report">Last report</button></div>
             <div class="ev" id="evList"></div>
           </div>
         </section>
@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.16', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.17', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1553,7 +1553,7 @@ const SPECIAL = {
   c:[
    ['x','Note anything unusual: the battery draining fast, the phone hot when idle, a setting that changed, an app you did not install'],
    ['x',LOGIT+', with the time. Halo hashes each entry, so a later change to it would show'],
-   ['x','If findings repeat, open Evidence, press Export signed log, and take the file to a security specialist'] ] },
+   ['x','If findings repeat, open Evidence, press Export the log, and take the file to a security specialist'] ] },
  a_breach:{ d:[
    ['x','Freeze your file at each of the three United States bureaus. It is free: equifax.com/personal/credit-report-services, experian.com/freeze, transunion.com/credit-freeze','Nobody can open new credit in your name while the freeze is on, including you. Lift it before you apply for credit.','',1],
    ['x','Each bureau gives you a PIN or an account. Keep them: you need them to lift the freeze'],
@@ -1712,7 +1712,7 @@ function threatBody(t){
      '<span class="k">Estimated impact</span><span class="v">'+esc(t.impact)+'</span>'+
      '<span class="k">Runs on</span><span class="v">'+esc(t.needs)+'</span></div>'+(rt?rateKey()+'<div class="limit" style="margin-top:6px">1 to 3: the share of your defence steps that are ticked. 4 and 5: a finding you logged, or a sign a sensor shows. Mark a finding resolved and it leaves the rating; the entry stays in Evidence.</div>':'')+'</div>';
   h+='<div class="dsec"><div class="dhead"><h4>Defend, step by step</h4>'+(hasPlat(t)?platPills():'')+'</div>';
-  if(!t.steps.length) h+='<p>No action is available today. Halo tracks the date and moves this to Real &amp; Imminent the day a carrier in your area switches it on.</p>';
+  if(!t.steps.length) h+='<p>This card is for your awareness. Its steps are added to the register when 6G sensing is announced for deployment.</p>';
   steps.forEach((s,n)=>{ const on=!!d[s.i];
     h+='<div class="chk '+(on?'on':'')+'" data-act="def" data-id="'+t.id+'" data-i="'+s.i+'"><span class="box">'+(on?'&#10003;':(n+1))+'</span><span class="tx">'+esc(s.t)+
        (s.fx?'<span class="fx"><b>Effect.</b> '+esc(s.fx)+'</span>':'')+(s.note?'<span class="nt"><b>Note.</b> '+esc(s.note)+'</span>':'')+'</span></div>'; });
@@ -1723,7 +1723,7 @@ function threatBody(t){
   h+='<div class="special'+(ex&&ex.lvl==='conf'?' conf':'')+'"><div class="dhead"><h4>Special <span class="spsub">countermeasures, step by step · '+spc.dn+' of '+spc.n+' done'+(ex?' · '+esc(ex.txt):'')+'</span></h4>'+(spHasPlat(t)&&!hasPlat(t)?platPills():'')+'</div>'+
      (t.spfx?'<div class="fx" style="margin:2px 0 8px"><b>Before you start.</b> '+esc(t.spfx)+'</div>':'')+
      spBlock(t,'d',1,'Deflect',t.deflect)+spBlock(t,'c',2,'Convert',t.convert)+
-     '<div class="limit" style="margin-top:10px">Tick each step as you finish it. Halo keeps the tick, records it in Evidence, and counts it toward your protection.</div>'+
+     '<div class="limit" style="margin-top:10px">Tick each step as you finish it. Halo keeps the tick and records it in Evidence.</div>'+
      '<div class="liab" style="margin-top:8px">A countermeasure that changes a device, account or software is yours to decide and yours to carry. <a href="#" data-act="terms">Terms of use</a></div></div>';
   if(t.tool==='alias') h+=toolAlias();
   if(t.tool==='patch') h+=toolPatch();
@@ -1905,7 +1905,7 @@ function profilePull(){
     PROFILE_Q.forEach(q=>{ const v=pv(q.k);
       h+='<div class="q"><span>'+q.q+'</span><span class="yn"><button class="y '+(v===true?'on':'')+'" data-act="prof" data-k="'+q.k+'" data-v="y">Yes</button>'+
          '<button class="n '+(v===false?'on':'')+'" data-act="prof" data-k="'+q.k+'" data-v="n">No</button></span></div>'; });
-    h+='</div><div class="limit">Your answers stay on this device. They decide which threats are real to you.</div></div>'; }
+    h+='</div><div class="limit">Your answers are sealed on this device before they sync to your other devices. They decide which threats are real to you.</div></div>'; }
   return h+'</div>';
 }
 /* ---------- Threat Scope: four live readings, from the whole world down to you ----------
@@ -2758,7 +2758,7 @@ function identCard(d){
     (real?'<button class="btn" data-act="ident-photo">'+(ph?'Replace your photo':'Attach your photo')+'</button>'+(ph?'<button class="btn" data-act="ident-photo-del">Remove photo</button>':''):'')+
     '<button class="btn" data-act="ident-roster">Open in Signal Roster</button>'+
     (S.identId?'<button class="btn" data-act="ident-auto">Follow the top threat</button>':'')+'</div>'+
-    '<div class="limit" style="margin-top:10px">'+(real?'Halo cannot photograph anyone. A photo here is one you took or chose. It stays on this device, and its fingerprint is written to Evidence. ':'')+
+    '<div class="limit" style="margin-top:10px">'+(real?'A photo here is one you took or chose. It stays on this device, and its fingerprint is written to Evidence. ':'')+
     'The name is a call sign Halo gives the device. It is not a person\'s name.</div></div>';
 }
 // The user's own photo: cut square, reduced, and re-encoded, which also strips the camera's location data.
@@ -3405,7 +3405,7 @@ function reportHTML(){
      live?'Read your sensor live, and tested each device around you for movement with you.':'Held your sensor set-up ready: listening starts with one press.',
      g?'Read the live feed from '+g.sources.filter(x=>x.ok).length+' public sources, generated '+e(fmtDT(g.generated))+'.':'Used its register of '+e(REGISTER_DATE)+'.',
      hc.at?'Checked what this device reports about itself, '+hc.n+' items.':'Prepared the Device Health Check for this device.',
-     'Fingerprinted and chained every Evidence entry, so each can be shown to be unaltered.',
+     'Fingerprinted and chained every Evidence entry.',
      'Kept all of it on your own devices, encrypted before it syncs.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
     '<div class="rp-foot">Generated by Remiel Halo, a stand-alone counter-surveillance instrument. Beverly Index LLC. Produced on your own device from your own entries, your own sensors and public sources. Changes you make to a device, an account or software are yours to decide and yours to carry.</div>';
   return {html:h, snap:{t:now.getTime(), tier:a.t, applies:applies.length, open:open.length, att:hc.att}};
@@ -3591,7 +3591,7 @@ function aiPull(){
   h+='<div class="dsec"><h4>Unreviewed headlines <span class="spsub">'+(g?'live, read '+feedAgo():'connecting')+'</span></h4>'+
     (live.length?'<p style="margin-bottom:6px">As published by the sources in the last days. These are leads. Each becomes a finding once it is reviewed.</p>'+live.slice(0,12).map(x=>'<div class="rowline"><span><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></span><span class="mono" style="font-size:11px;color:var(--mut);white-space:nowrap;text-align:right">'+esc(x.src)+'<br>'+esc(fmtD(x.d))+'</span></div>').join('')
       :'<p>'+(g?'The feed in use carries no AI headlines.':'Headlines appear here as soon as the live feed connects.')+'</p>')+'</div>';
-  h+='<div class="limit"><b>The standard.</b> Every reviewed entry is confirmed at its primary source and by a second, independent source, and carries its date. A report waiting for its second source joins the list as soon as it has one. <b>Coverage.</b> The list covers actors linked to China and Russia, criminal groups, and the AI developers themselves. For Belarus, and for xAI, the sources have published nothing that meets the standard so far. New incidents appear first among the unreviewed headlines.</div></div>';
+  h+='<div class="limit"><b>The standard.</b> Every reviewed entry is confirmed at its primary source and by a second, independent source, and carries its date. A report waiting for its second source joins the list as soon as it has one. <b>Coverage.</b> The list covers actors linked to China and Russia, criminal groups, and the AI developers themselves. New incidents appear first among the unreviewed headlines.</div></div>';
   return h+'</div>';
 }
 
@@ -5087,7 +5087,7 @@ document.addEventListener('click', e=>{
     case 'log-save': logSave(a.dataset.id); break;
     case 'log-hist': { S.logHist=S.logHist||{}; S.logHist[a.dataset.id]=!S.logHist[a.dataset.id]; renderLog(); break; }
     case 'ev-export': { const blob=new Blob([JSON.stringify({product:'Remiel Halo',exported:new Date().toISOString(),device:Y.name||null,log:P.log||[],chain:P.evidence,otherDevices:remoteEv()},null,2)],{type:'application/json'});
-      saveOut('remiel-halo-evidence.json','application/json',blob); toast('Signed log exported.'); break; }
+      saveOut('remiel-halo-evidence.json','application/json',blob); toast('Log exported, with its chain of fingerprints.'); break; }
     case 'h-padd': { const n=val('hpName'); if(!n) return toast('Enter the name.'); H.people.push({name:n,rel:val('hpRel'),consent:el('hpConsent').checked,watch:el('hpWatch').checked}); save(); rerender(); break; }
     case 'h-pdel': H.people.splice(+a.dataset.i,1); save(); rerender(); break;
     case 'h-radd': { const n=val('hrName'); if(!n) return toast('Enter the room.'); H.rooms.push({name:n,sensor:el('hrSensor').value}); save(); rerender(); break; }
