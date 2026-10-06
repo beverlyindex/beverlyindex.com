@@ -918,7 +918,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.23', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.24', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2033,9 +2033,9 @@ function renderOverview(){
   let h='<div style="--tierc:var('+tc+')">';
   if(NATIVE() && isAndroid()){ if(!APP.info) appInfo(); let v=''; try{ v=String(NATIVE().version()); }catch(e){}
     if(APP.info && verNum(APP.info.version)>verNum(v)) h+='<div class="instbar"><span><b>Halo app '+esc(APP.info.version)+' is ready.</b> You have '+esc(v)+'. The new one keeps listening through a long walk.</span><button class="btn sm primary" data-act="go-install">Get it</button></div>'; }
-  if(!NATIVE() && !S.justInstalled && (isAndroid() || (!installed() && (INSTALL||isIOS()))) && !store.get('halo_inst_hide'))
+  if(!NATIVE() && !S.justInstalled && (isAndroid() || (!installed() && INSTALL && !isIOS())) && !store.get('halo_inst_hide'))
     h+='<div class="instbar"><span>'+(isAndroid() ? '<b>You are in the web version of Halo.</b> The Remiel Halo app hears the devices around you, and keeps hearing tracker tags with the screen off.' : isIOS() ? '<b>Put Halo on your home screen.</b> It opens full screen, like an app.' : '<b>Install Halo on this computer.</b> It opens in a window of its own.')+'</span>'+
-       '<button class="btn sm primary" data-act="'+(INSTALL && !isAndroid()?'install':'go-install')+'">'+(isAndroid()?'Get the app':INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
+       (isAndroid()?'<a class="btn sm primary" data-act="app-open" href="'+APP_LINK+'" style="text-decoration:none;display:inline-flex">Switch to the app</a>':'')+'<button class="btn sm'+(isAndroid()?'':' primary')+'" data-act="'+(INSTALL && !isAndroid()?'install':'go-install')+'">'+(isAndroid()?'Get the app':INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
   if(!g) h+='<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'Halo keeps trying the live feed':'Reaching the live feed')+'</div>';
   const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const openN=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true&&isOpen(t)).length;
@@ -2044,7 +2044,7 @@ function renderOverview(){
   h+='<div class="verdict"><div class="ring">'+a.n+'</div><div><div class="vt">'+esc(a.title)+'</div><div class="vs">'+a.s+'</div><div class="vm">'+esc(a.meta)+'</div>'+
      '<div class="chips"><span class="chip '+(a.side==='Watchers'?'w':a.side==='Attackers'?'a':'')+'">'+esc(a.side)+'</span><span class="chip real">'+real+' Real &amp; Imminent</span><span class="chip pot">'+pot+' Potential</span></div></div></div>';
   { const lr=reportLast(); h+='<div class="formrow" style="margin:0 0 12px"><button class="btn gold wide" data-act="report-new">New report: every threat in the register, explained</button>'+(lr?'<button class="btn wide" data-act="report">Last report, No. '+lr.n+', '+hhmm(lr.t)+'</button>':'')+'</div>'; }
-  if(!NATIVE()) h+='<div class="formrow" style="margin:0 0 12px"><button class="btn wide" id="getAppBtn" data-act="go-install">'+(isIOS()?'Put Halo on this iPhone':'Get the Remiel Halo app')+'</button></div>';
+  if(!NATIVE() && (!isIOS() || (S.features && S.features.ios))) h+='<div class="formrow" style="margin:0 0 12px"><button class="btn wide" id="getAppBtn" data-act="'+(isIOS()?'ios-get':'go-install')+'">'+(isIOS()?'Get the Remiel Halo app for iPhone':'Get the Remiel Halo app')+'</button></div>';
   const cat=x=>'<div class="cat"><span>'+x+'</span></div>';
   h+='<div class="stack">'+cat('Your activity')+profilePull()+sigPull()+healthPull()+devicesPull()+cat('The wider picture')+globalPull()+resourcesPull()+'</div>';
   h+='<div class="formrow" style="margin:18px 0 0;justify-content:center"><button class="btn sm endbtn" data-act="end-session">End session</button></div>'+
@@ -3905,14 +3905,11 @@ function installSection(){
        (i?'<details class="limit" style="margin-top:6px"><summary style="cursor:pointer">File fingerprint, for anyone who verifies downloads</summary><span class="mono" style="word-break:break-all;font-size:11px">SHA-256 '+esc(i.sha256)+'</span></details>':'');
     return h+'</div>'; }
   if(pick==='apple'){
-    if(isIOS() && installed()) return h+'<div class="kv" style="margin-top:10px"><span class="k">Installed</span><span class="v okc">Yes. This is Halo from your home screen</span></div></div>';
-    h+='<p style="margin:10px 0 4px">On iPhone and iPad, Halo runs from the home screen and opens full screen. It shows the maps, cameras and tower sites, the threat library, Device Health Check, Responder, Evidence and reports, and the devices your home listener hears.</p>'+
-       '<ol class="steps">'+
-       '<li>Open <b>beverly-index.com/halo</b> in <b>Safari</b>.</li>'+
-       '<li>Tap the <b>Share</b> button, the square with the arrow.</li>'+
-       '<li>Scroll down and tap <b>Add to Home Screen</b>.</li>'+
-       '<li>Tap <b>Add</b>.</li>'+
-       '<li>Open <b>Halo</b> from the home screen and enter your access key.</li></ol>';
+    const ios=!!(S.features && S.features.ios);
+    h+= isIOS() ? '<div class="kv" style="margin-top:10px"><span class="k">This '+(/iPad/.test(navigator.userAgent)?'iPad':'iPhone')+'</span><span class="v okc">You are in Halo now. Nothing to download</span></div>'
+      : '<p style="margin:10px 0 4px">On an iPhone or iPad, open <b>beverly-index.com/halo</b> and enter the access key. Halo runs there at once, with nothing to download.</p>';
+    h+='<p style="margin:8px 0 4px">Halo on an iPhone shows the maps, cameras and tower sites, every threat with its steps, Device Health Check, Responder, Evidence and reports.</p>';
+    if(ios) h+='<div class="formrow" style="margin-top:8px"><button class="btn primary" data-act="ios-get">Get the Remiel Halo app for iPhone</button></div><p class="limit" style="margin:6px 0 0">The button opens TestFlight, the app Apple provides for new apps. Tap Install there. The Halo app hears the Bluetooth devices around you.</p>';
     return h+'</div>'; }
   if(!isAndroid() && !isIOS() && installed()) return h+'<div class="kv" style="margin-top:10px"><span class="k">Installed</span><span class="v okc">Yes. This is the installed Halo</span></div></div>';
   if(S.justInstalled) return h+'<p style="margin-top:10px">Installed. Close this tab and open Remiel Halo from your applications. Your account and settings carry over.</p></div>';
@@ -5004,6 +5001,7 @@ document.addEventListener('click', e=>{
     case 'upd-now': updApply(true); break;
     case 'inst-os': S.instOS=a.dataset.k; rerender(); break;
     case 'app-get': appGet(); break;
+    case 'ios-get': { api('GET','/app/ios').then(r=>{ const u=r && r.s===200 && r.j && String(r.j.link||''); if(u && /^https:\/\/(testflight\.apple\.com|apps\.apple\.com)\//.test(u)) location.href=u; else toast('The iPhone app link was not reached. Try again in a moment.'); }).catch(()=>toast('The iPhone app link was not reached. Try again in a moment.')); break; }
     case 'upd-check': updCheck(true); break;
     case 'link-start': linkStart(); break;
     case 'link-join': linkJoin(''); break;
