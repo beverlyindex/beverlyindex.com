@@ -201,6 +201,10 @@ select.inp{flex:none}
 .mark{margin-top:12px;padding:12px;border:1px solid var(--chrome2);border-radius:14px;background:rgba(22,40,90,.35)}
 .mark-h{display:flex;align-items:baseline;gap:10px} .mark-h b{font-family:var(--disp);font-size:18px;font-weight:600;flex:1} .mark-h span{font-size:12px;color:var(--mut)}
 .mark .inp{width:100%;min-height:48px;font-size:15px}
+.elog-chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 8px} .elog .kv{margin-top:8px}
+.elog-h4{margin:14px 2px 6px;font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--wat2)}
+.elog-line{display:flex;gap:10px;padding:8px 2px;border-top:1px solid var(--line);font-size:13px} .elog-line span:first-child{flex:1;min-width:0} .elog-line .mono{font-size:12px;color:var(--mut);white-space:nowrap}
+.loc-log{width:100%;margin-top:10px;min-height:46px}
 .mk-row .mk-box{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
 .mk-row.on{border-color:var(--chrome2);background:rgba(63,116,214,.20)} .mk-row.on .mk-box{background:var(--chrome2);border-color:var(--chrome2)}
 #vicCard.one .onemap{display:block}
@@ -854,7 +858,7 @@ a.tk:hover b{text-decoration:underline}
                 <h3>Location <span class="n" id="vicCount" data-act="state-fix"></span></h3>
                 <div id="fixBar"></div>
                 <div class="radline" id="radLine"></div>
-                <div class="loc" id="locBox"></div><div id="markBox"></div>
+                <div class="loc" id="locBox"></div><div id="markBox"></div><div id="elogBox"></div>
                 <div class="formrow map-only" style="align-items:center;margin:2px 0 8px"><button class="btn sm primary" data-act="wview" data-v="list">&#8249; List</button><span class="limit" style="margin:0">Map: Micro, Macro and Identification. Tap a sphere to bring it forward.</span></div>
                 <div class="onemap" id="oneMap"><div class="om-pre" id="omPre"></div><div class="om-legend layers" id="omLegend"></div><div class="om-body"><div class="om-host" id="omHost"></div><div class="om-list" id="omList"></div></div></div>
                 <div class="stage" id="stage" data-big="micro">
@@ -1007,7 +1011,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.36', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.37', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2267,9 +2271,11 @@ function locLanes(){ const V=vis(), live=V.mode==='live'||V.mode==='sim', all=li
   const wy=pool.filter(d=>d.withYou||d.maybe).sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0)||a.dist-b.dist), rest=pool.filter(d=>!d.withYou&&!d.maybe);
   return {V, live, all, pool, mine:all.length-pool.length, wy, beside:rest.filter(d=>d.dist<=LOC.near).sort(by), closer:rest.filter(d=>d.dist>LOC.near&&d.vel<0).sort(by), behind:rest.filter(d=>d.dist>LOC.near&&d.vel>0).sort(by), steady:rest.filter(d=>d.dist>LOC.near&&!d.vel).sort(by)}; }
 const locSub = d => d.withYou ? (d.tested ? 'With you for '+(d.mins<1.5?'a minute':Math.round(d.mins)+' minutes')+', across '+Math.round(d.span)+' m' : 'Reported as moving with you')
-  : d.maybe ? 'With you so far: '+(d.mins<1.5?'a minute':Math.round(d.mins)+' minutes')+', '+Math.round(d.span)+' m' : kindText(d).replace(/^Tag, (?=[A-Z])/,'')+' · '+flagOf(d);
+  : d.maybe ? 'With you so far: '+(d.mins<1.5?'a minute':Math.round(d.mins)+' minutes')+', '+Math.round(d.span)+' m' : kindText(d).replace(/^Tag, (?=[A-Z])/,'')+' · '+locFlag(d);
+const locFlag = d => { const f=flagOf(d), h=histWords(d); return (h && (f==='New' || f==='Known' || f==='Stays in place')) ? h : f; };
+const locColor = d => d.withYou?'var(--action)':d.maybe?'#ff8a3c':(d.onRoute||histElse(d))?'var(--route)':(d.knownBefore||histHere(d))?'var(--clear)':'var(--warn)';
 function locRow(d, dim){ const c=d.withYou?' hot':d.maybe?' warm':(d.cls==='Tag'||d.cls==='Camera')?' trk':dim?' dim':'';
-  return '<button class="loc-row'+c+(S.identId===d.id&&S.identOpen?' sel':'')+'" data-act="sus" data-id="'+d.id+'"><span class="sdot'+(d.cls==='Tag'?' k-tag':'')+'" style="--mk:'+markerColor(d)+'"></span>'+
+  return '<button class="loc-row'+c+(S.identId===d.id&&S.identOpen?' sel':'')+'" data-act="sus" data-id="'+d.id+'"><span class="sdot'+(d.cls==='Tag'?' k-tag':'')+'" style="--mk:'+locColor(d)+'"></span>'+
     '<span class="loc-t"><b>'+esc(devName(d))+'</b><small>'+esc(locSub(d))+(d.sim?' · test data':'')+'</small></span><span class="loc-d"><b>'+esc(distText(d))+'</b><small'+(d.vel<0?' class="near"':'')+'>'+trendWord(d)+'</small></span></button>'; }
 function locLane(key, title, hint, list, o){ o=o||{}; const open=!!(S.locOpen||{})[key], n=o.n!=null?o.n:LOC.show, show=open?list.slice(0,60):list.slice(0,n);
   return '<div class="loc-lane'+(o.cls?' '+o.cls:'')+'" data-lane="'+key+'"><div class="loc-h"><span>'+title+(list.length?' · '+list.length:'')+'</span><i>'+hint+'</i></div>'+
@@ -2297,8 +2303,9 @@ function locRender(){ const box=el('locBox'); if(!box || !locMode()) return; con
        locLane('closer','Coming closer','signal rising',L.closer,{none:'None'})+
        locLane('behind','Falling behind','signal fading',L.behind,{dim:true, none:'None'});
     if(L.steady.length) h+=locLane('steady','Holding steady','further than '+LOC.near+' m',L.steady,{dim:true, n:0});
-    h+='<div class="loc-key"><span><i class="sdot" style="--mk:var(--warn)"></i>New</span><span><i class="sdot" style="--mk:var(--clear)"></i>Known</span><span><i class="sdot" style="--mk:var(--route)"></i>Seen on your route</span><span><i class="sdot k-tag" style="--mk:var(--warn)"></i>Square: tracker tag</span></div>'; }
-  h+=locPoints()+'<div class="loc-bar"><button class="btn" data-act="wview" data-v="spheres">Map</button><button class="btn primary mk'+(S.mark?' on':'')+'" data-act="mark-open">'+(S.mark?'Marking this moment':'Mark this moment')+'</button></div>';
+    h+='<div class="loc-key"><span><i class="sdot" style="--mk:var(--warn)"></i>First time</span><span><i class="sdot" style="--mk:var(--clear)"></i>Seen here before</span><span><i class="sdot" style="--mk:var(--route)"></i>Seen at another place</span><span><i class="sdot k-tag" style="--mk:var(--warn)"></i>Square: tracker tag</span></div>'; }
+  h+=locPoints()+'<div class="loc-bar"><button class="btn" data-act="wview" data-v="spheres">Map</button><button class="btn primary mk'+(S.mark?' on':'')+'" data-act="mark-open">'+(S.mark?'Marking this moment':'Mark this moment')+'</button></div>'+
+    '<button class="btn loc-log'+(S.elog?' on':'')+'" data-act="elog-open">Encounter log'+(ELOG.ready?': '+ELOG.n.dev+(ELOG.n.dev===1?' device':' devices')+', '+ELOG.n.enc+(ELOG.n.enc===1?' encounter':' encounters'):'')+'</button>';
   if(box._h!==h){ box.innerHTML=h; box._h=h; } }
 /* Mark this moment: your own words on what you saw, tied to the devices nearest you at that second. The list is taken once, when you tap,
    so it holds still while you type. Your words name the devices you tick, and the mark is kept in your log and in Evidence. */
@@ -2326,6 +2333,99 @@ function markSave(){ const m=S.mark; if(!m) return; const x=val('markText').slic
   S.markHere=S.markHere||{}; on.forEach(d=>{ S.markHere[d.id]=1; });
   S.mark=null; markRender(); renderVicinity(); if(el('logList')) renderLog();
   toast(on.length ? 'Marked. Your words are on '+on.length+(on.length===1?' device':' devices')+' and in your Evidence log.' : 'Marked, and saved in your Evidence log.'); }
+/* ---------- The encounter log. One encounter is one stretch of time a device stayed in earshot of the phone you carry: when it began and ended,
+   how near it came, and where you were at that moment. Encounters are written to a database on this phone and kept across trips, so each device
+   carries its own history: how many times, on how many days, at how many places. The log records; it raises no alert. ---------- */
+const ELOG={db:null, ok:false, ready:false, open:new Map(), hist:new Map(), names:new Map(), n:{dev:0,enc:0,cam:0}, camT:{}, camAt:null, GAP:120000, PLACE_M:250, CAM_M:60, KEEP_MS:180*86400000};
+function elogInit(){ try{ if(!window.indexedDB) return; const rq=indexedDB.open('halo_log',1);
+    rq.onupgradeneeded=()=>{ const db=rq.result; db.createObjectStore('dev',{keyPath:'k'}); const en=db.createObjectStore('enc',{keyPath:'id',autoIncrement:true}); en.createIndex('k','k'); en.createIndex('t0','t0'); const cm=db.createObjectStore('cam',{keyPath:'id',autoIncrement:true}); cm.createIndex('t','t'); };
+    rq.onsuccess=()=>{ ELOG.db=rq.result; ELOG.ok=true; try{ JSON.parse(store.get('halo_elog_open')||'[]').forEach(o=>{ if(o && o.k && Date.now()-o.t1<6*3600000) ELOG.open.set(o.k,o); }); }catch(e){} elogLoad(); };
+    rq.onerror=()=>{}; }catch(e){} }
+const elogTx = (stores, mode) => ELOG.db.transaction(stores, mode);
+const elogAll = (name, index, key) => new Promise(res=>{ try{ const s=elogTx([name],'readonly').objectStore(name), rq=index?s.index(index).getAll(key):s.getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); }catch(e){ res([]); } });
+const elogCount = name => new Promise(res=>{ try{ const rq=elogTx([name],'readonly').objectStore(name).count(); rq.onsuccess=()=>res(rq.result||0); rq.onerror=()=>res(0); }catch(e){ res(0); } });
+function elogCache(r){ ELOG.hist.set(r.k,{enc:r.enc, days:(r.days||[]).length, pl:(r.places||[]).map(p=>[p.la,p.lo,p.first]), first:r.first, last:r.last});
+  if(r.name){ let s=ELOG.names.get(r.name); if(!s) ELOG.names.set(r.name, s=new Set()); s.add(r.k); } }
+async function elogLoad(){ const devs=await elogAll('dev'); devs.forEach(elogCache); ELOG.n.dev=devs.length; ELOG.n.enc=await elogCount('enc'); ELOG.n.cam=await elogCount('cam'); ELOG.ready=true;
+  try{ const old=IDBKeyRange.upperBound(Date.now()-ELOG.KEEP_MS), tx=elogTx(['enc','cam'],'readwrite'); tx.objectStore('enc').index('t0').openCursor(old).onsuccess=ev=>{ const c=ev.target.result; if(c){ c.delete(); c.continue(); } }; tx.objectStore('cam').index('t').openCursor(old).onsuccess=ev=>{ const c=ev.target.result; if(c){ c.delete(); c.continue(); } }; }catch(e){}
+  if(booted) renderVicinity(); }
+// One sighting of a device by the phone you carry. Ordinary Wi-Fi networks and cell towers are counted by the trip and by Tower Watch; they are not logged one by one.
+function elogHear(d, t, dist, pos){ if(!ELOG.ok || d.sim || d.band==='cell' || (d.band==='wifi' && d.cls!=='Camera')) return;
+  let o=ELOG.open.get(d.sig); if(o && t-o.t1>ELOG.GAP){ elogClose(o); o=null; } if(o && t<o.t0-ELOG.GAP) return;
+  if(!o){ o={k:d.sig, t0:t, t1:t, min:null, minT:t, la:null, lo:null, n:0, trip:0}; ELOG.open.set(d.sig,o); }
+  o.t0=Math.min(o.t0,t); o.t1=Math.max(o.t1,t); o.n++; o.id=d.id; o.name=d.adv||''; o.cls=d.cls; o.hint=d.hint||''; o.band=d.band; if(W.on) o.trip=W.t0;
+  const ll=pos?toLL(pos.x,pos.y):null;
+  if(o.min===null || dist<o.min){ o.min=dist; o.minT=t; if(ll){ o.la=+ll.lat.toFixed(5); o.lo=+ll.lon.toFixed(5); } } else if(o.la===null && ll){ o.la=+ll.lat.toFixed(5); o.lo=+ll.lon.toFixed(5); } }
+function elogClose(o){ ELOG.open.delete(o.k); if(!ELOG.ok || !(o.n>=1)) return; const day=dayKey(o.t0), min=o.min===null?null:Math.max(1,Math.round(o.min));
+  try{ const tx=elogTx(['dev','enc'],'readwrite'), ds=tx.objectStore('dev');
+    tx.objectStore('enc').add({k:o.k, t0:o.t0, t1:o.t1, min, minT:o.minT, la:o.la, lo:o.lo, n:o.n, trip:o.trip||0}); ELOG.n.enc++;
+    const g=ds.get(o.k); g.onsuccess=()=>{ const r=g.result||{k:o.k, first:o.t0, enc:0, secs:0, days:[], places:[]}; if(!g.result) ELOG.n.dev++;
+      r.id=o.id; r.name=o.name||r.name||''; r.cls=o.cls; r.hint=o.hint; r.band=o.band; r.first=Math.min(r.first,o.t0); r.last=Math.max(r.last||0,o.t1); r.enc++; r.secs=(r.secs||0)+Math.round((o.t1-o.t0)/1000); if(min!==null) r.min=r.min==null?min:Math.min(r.min,min);
+      if(r.days.indexOf(day)<0){ r.days.push(day); if(r.days.length>400) r.days.shift(); }
+      if(o.la!==null){ const p=r.places.find(p=>distLL(p.la,p.lo,o.la,o.lo)<=ELOG.PLACE_M); if(p){ p.n++; p.last=o.t1; } else { r.places.push({la:o.la, lo:o.lo, n:1, first:o.t0, last:o.t1}); if(r.places.length>30){ r.places.sort((a,b)=>b.last-a.last); r.places.length=30; } } }
+      ds.put(r); elogCache(r); }; }catch(e){} }
+function elogSweep(){ if(!ELOG.ok) return; const now=Date.now(); ELOG.open.forEach(o=>{ if(now-o.t1>ELOG.GAP) elogClose(o); }); if(now-(ELOG.parked||0)>30000) elogPark(); }
+function elogPark(){ ELOG.parked=Date.now(); try{ store.set('halo_elog_open', JSON.stringify([...ELOG.open.values()].slice(0,400))); }catch(e){} }          // encounters still open are kept through a reload
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && ELOG.ok) elogPark(); }); window.addEventListener('pagehide', ()=>{ if(ELOG.ok) elogPark(); });
+// The cameras of the public record that you pass: each one once per pass, with the time, the distance and where you were.
+function elogCamsAt(lat, lon, t){ if(!ELOG.ok || vis().test) return; const a=ELOG.camAt; if(a && distLL(a.lat,a.lon,lat,lon)<15 && t-a.t<60000) return; ELOG.camAt={lat,lon,t};
+  const near=[]; Object.keys(PTS.sq||{}).forEach(k=>((PTS.sq[k]||{}).items||[]).forEach(i=>{ if(!PT_WORD[i.k] || i.k==='site') return; const d=distLL(lat,lon,i.lat,i.lon); if(d<=ELOG.CAM_M) near.push({pid:i.k+':'+String(i.id).replace(/^n/,''), kind:PT_WORD[i.k], name:String(i.n||''), op:String(i.op||''), lat:i.lat, lon:i.lon, d}); }));
+  if(Math.abs(t-Date.now())<20000){ try{ camsNear().forEach(c=>{ if(c.d<=ELOG.CAM_M && !near.some(x=>x.pid==='plate:'+c.id)) near.push({pid:'plate:'+c.id, kind:'Plate camera', name:c.brand||'', op:c.op||'', lat:c.lat, lon:c.lon, d:c.d}); }); }catch(e){} }
+  near.forEach(c=>{ if(t-(ELOG.camT[c.pid]||0)<10*60000) return; ELOG.camT[c.pid]=t;
+    try{ elogTx(['cam'],'readwrite').objectStore('cam').add({pid:c.pid, kind:c.kind, name:c.name, op:c.op, t, d:Math.round(c.d), la:+c.lat.toFixed(5), lo:+c.lon.toFixed(5), meLa:+lat.toFixed(5), meLo:+lon.toFixed(5), trip:W.on?W.t0:0}); ELOG.n.cam++; }catch(e){} }); }
+function elogCams(){ const p=S.pos; if(!p || p.src==='net' || Date.now()-p.t>20000 || !(p.acc<=POS_MAX_ACC)) return; elogCamsAt(p.lat, p.lon, Date.now()); }
+// What the log holds on a device, for the screens. By its own identity first; failing that, by the name it broadcasts, and the words say so.
+const ePos = () => (S.pos && S.pos.src!=='net') ? S.pos : null;
+function histOf(d){ if(!ELOG.ready) return undefined; const h=ELOG.hist.get(d.sig); if(h) return h;
+  if(d.adv){ const ks=ELOG.names.get(d.adv); if(ks && ks.size){ let enc=0, days=0; const pl=[]; ks.forEach(k=>{ const x=ELOG.hist.get(k); if(!x) return; enc+=x.enc; days=Math.max(days,x.days); x.pl.forEach(p=>{ if(!pl.some(q=>distLL(q[0],q[1],p[0],p[1])<=ELOG.PLACE_M)) pl.push(p); }); }); if(enc) return {enc, days, pl, name:true}; } }
+  return null; }
+const histAt = h => { const me=ePos(); return (me && h.pl.length) ? h.pl.some(q=>distLL(me.lat,me.lon,q[0],q[1])<=ELOG.PLACE_M) : null; };
+function histWords(d){ const h=histOf(d); if(h===undefined) return ''; if(!h) return 'First time seen'; const P=h.pl.length, here=histAt(h);
+  return (h.name?'This name seen ':'Seen ')+h.enc+(h.enc===1?' time':' times')+(here===null ? (P>1?', at '+P+' places':'') : here ? (P>1?', here and at '+(P-1)+' other '+(P-1===1?'place':'places'):', always here') : ', at '+(P===1?'another place':P+' other places')); }
+const histHere = d => { const h=histOf(d); return !!(h && histAt(h)===true); }, histElse = d => { const h=histOf(d); return !!(h && histAt(h)===false); };
+const histLong = d => { const h=histOf(d); return h===undefined?'Reading the log':!h?'First time seen':(h.name?'By its name: ':'')+h.enc+(h.enc===1?' encounter':' encounters')+' on '+h.days+(h.days===1?' day':' days')+', at '+h.pl.length+(h.pl.length===1?' place':' places'); };
+const histRec = sig => { const h=ELOG.ready?ELOG.hist.get(sig):null; return h ? h.enc+(h.enc===1?' time':' times')+', '+h.days+(h.days===1?' day':' days')+', '+h.pl.length+(h.pl.length===1?' place':' places') : ELOG.ready?'First time':''; };
+/* The log on screen: the devices met most, those met at more than one place, those met on most days, the trackers, and the cameras passed. */
+const eT = t => { const d=new Date(t); return d.getDate()+' '+MON[d.getMonth()]+', '+hhmm(t); };
+const recName = r => (P.labels||{})[r.id] || r.name || autoName({hint:r.hint||'', cls:CLS.indexOf(r.cls)>=0?r.cls:'Unknown', id:String(r.id||r.k)});
+const recKind = r => kindText({cls:CLS.indexOf(r.cls)>=0?r.cls:'Unknown', hint:r.hint||'', band:r.band}).replace(/^Tag, (?=[A-Z])/,'');
+const ELOG_F=[['all','Seen most'],['places','More than one place'],['days','Most days'],['trk','Trackers'],['cams','Cameras passed']];
+async function elogRender(){ const box=el('elogBox'); if(!box) return; const E=S.elog; if(!E){ box.innerHTML=''; return; }
+  const head=t=>'<div class="mark elog"><div class="mark-h"><b>'+t+'</b><button class="btn sm" data-act="elog-x">Close</button></div>';
+  if(!ELOG.ok){ box.innerHTML=head('Encounter log')+'<p class="limit" style="margin:8px 2px 0">The log is kept in a database on the phone. This browser offers none, so open Halo in the app or in Chrome and the log begins.</p></div>'; return; }
+  if(E.k){ const r=(await elogAll('dev')).find(x=>x.k===E.k), enc=(await elogAll('enc','k',E.k)).sort((a,b)=>b.t0-a.t0); if(S.elog!==E) return;
+    if(!r){ box.innerHTML=head('Encounter log')+'<p class="limit">This device has no closed encounter yet. Its first one is written two minutes after it leaves earshot.</p><div class="loc-bar"><button class="btn" data-act="elog-back">Back to the log</button></div></div>'; return; }
+    box.innerHTML=head(esc(recName(r)))+'<div class="idsub">'+esc(recKind(r))+'</div>'+
+      '<div class="kv"><span class="k">Encounters</span><span class="v">'+r.enc+'</span><span class="k">Days</span><span class="v">'+r.days.length+'</span><span class="k">Places</span><span class="v">'+r.places.length+'</span>'+
+      '<span class="k">First seen</span><span class="v">'+eT(r.first)+'</span><span class="k">Last seen</span><span class="v">'+eT(r.last)+'</span><span class="k">Nearest ever</span><span class="v">'+(r.min==null?'Not measured':'about '+r.min+' m')+'</span><span class="k">Time in earshot</span><span class="v">'+esc(walkDur((r.secs||0)*1000))+'</span></div>'+
+      (r.places.length?'<div class="elog-h4">Where you were</div>'+r.places.slice().sort((a,b)=>b.n-a.n).map(p=>'<div class="elog-line"><span>'+p.la.toFixed(5)+', '+p.lo.toFixed(5)+'</span><span class="mono">'+p.n+(p.n===1?' time':' times')+' · last '+eT(p.last)+'</span></div>').join(''):'')+
+      '<div class="elog-h4">Encounters, latest first</div>'+enc.slice(0,40).map(x=>'<div class="elog-line"><span>'+eT(x.t0)+' · '+esc(walkDur(x.t1-x.t0))+(x.min==null?'':' · nearest about '+x.min+' m')+(x.trip?' · on a trip':'')+'</span><span class="mono">'+(x.la==null?'place not recorded':x.la.toFixed(5)+', '+x.lo.toFixed(5))+'</span></div>').join('')+
+      (enc.length>40?'<p class="limit" style="margin:8px 2px 0">'+(enc.length-40)+' earlier encounters are in the saved file.</p>':'')+
+      '<div class="loc-bar"><button class="btn" data-act="elog-back">Back to the log</button></div></div>'; return; }
+  const f=E.f||'all', chips='<div class="elog-chips">'+ELOG_F.map(x=>'<button class="chipbtn '+(f===x[0]?'on':'')+'" data-act="elog-f" data-f="'+x[0]+'">'+x[1]+'</button>').join('')+'</div>';
+  const foot='<div class="loc-bar"><button class="btn primary mk" data-act="elog-save">Save the log</button><button class="btn" data-act="elog-share">Share</button></div>'+
+    '<div class="limit" style="text-align:center;margin-top:8px"><button class="linkbtn" data-act="elog-erase" style="color:'+(E.arm?'#ff9a9a':'')+'">'+(E.arm?'Tap again to erase the whole log':'Erase the log')+'</button></div></div>';
+  let body='';
+  if(f==='cams'){ const cs=await elogAll('cam'); if(S.elog!==E) return; const by={}; cs.forEach(c=>{ const g=by[c.pid]||(by[c.pid]={c, n:0, last:0, min:Infinity}); g.n++; g.last=Math.max(g.last,c.t); g.min=Math.min(g.min,c.d); });
+    const rows=Object.values(by).sort((a,b)=>b.n-a.n||b.last-a.last);
+    body=rows.length ? rows.slice(0,80).map(g=>'<div class="loc-row dim" style="cursor:default"><span class="sdot k-tag" style="--mk:#ff8a3c"></span><span class="loc-t"><b>'+esc(g.c.kind+(g.c.name?', '+g.c.name:''))+'</b><small>'+g.c.la.toFixed(5)+', '+g.c.lo.toFixed(5)+' · last '+eT(g.last)+'</small></span><span class="loc-d"><b>'+g.n+(g.n===1?' pass':' passes')+'</b><small>nearest '+g.min+' m</small></span></div>').join('')
+      : '<div class="loc-none">No camera pass is on record yet. Halo writes one each time you come within '+ELOG.CAM_M+' m of a camera on the public record.</div>'; }
+  else { let ds=await elogAll('dev'); if(S.elog!==E) return;
+    ds = f==='places' ? ds.filter(r=>r.places.length>=2).sort((a,b)=>b.places.length-a.places.length||b.enc-a.enc) : f==='days' ? ds.filter(r=>r.days.length>=2).sort((a,b)=>b.days.length-a.days.length||b.enc-a.enc) : f==='trk' ? ds.filter(r=>r.cls==='Tag'||r.cls==='Camera').sort((a,b)=>b.enc-a.enc||b.last-a.last) : ds.sort((a,b)=>b.enc-a.enc||b.last-a.last);
+    body=ds.length ? ds.slice(0,80).map(r=>'<button class="loc-row'+((P.mine||{})[r.id]?' dim':r.places.length>=2?' trk':'')+'" data-act="elog-dev" data-k="'+esc(r.k)+'"><span class="sdot'+(r.cls==='Tag'?' k-tag':'')+'" style="--mk:'+((P.mine||{})[r.id]?'var(--clear)':r.places.length>=2?'var(--route)':'var(--mut)')+'"></span><span class="loc-t"><b>'+esc(recName(r))+'</b><small>'+esc(recKind(r))+((P.mine||{})[r.id]?' · yours':'')+' · last '+eT(r.last)+'</small></span><span class="loc-d"><b>'+r.enc+(r.enc===1?' time':' times')+'</b><small>'+r.days.length+(r.days.length===1?' day':' days')+' · '+r.places.length+(r.places.length===1?' place':' places')+'</small></span></button>').join('')+(ds.length>80?'<p class="limit" style="margin:8px 2px 0">The 80 at the top of '+ds.length+'. The saved file holds them all.</p>':'')
+      : '<div class="loc-none">'+(f==='all'?'The log is empty. The first encounter is written two minutes after a device leaves earshot.':f==='places'?'No device has been seen at more than one place.':f==='days'?'No device has been seen on more than one day.':'No tracker is on record.')+'</div>'; }
+  box.innerHTML=head('Encounter log')+'<div class="idsub">'+ELOG.n.dev+(ELOG.n.dev===1?' device':' devices')+' · '+ELOG.n.enc+(ELOG.n.enc===1?' encounter':' encounters')+' · '+ELOG.n.cam+(ELOG.n.cam===1?' camera pass':' camera passes')+' · kept on this phone</div>'+chips+body+foot; }
+async function elogFile(){ const devices=await elogAll('dev'), encounters=await elogAll('enc'), cameras=await elogAll('cam'), d=new Date();
+  const text=JSON.stringify({product:'Remiel Halo', kind:'encounter log', version:1, build:BUILD, saved:d.toISOString(), note:'One encounter is one stretch of time a device stayed in earshot of the phone you carried. Places are where you were at the nearest moment, to five decimal places. A place groups encounters within '+ELOG.PLACE_M+' m.', labels:P.labels||{}, yours:Object.keys(P.mine||{}), devices, encounters, cameras},null,1);
+  const name='halo-encounters-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
+  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  return {text, name, hash, n:[devices.length, encounters.length, cameras.length]}; }
+async function elogSave(share){ if(!ELOG.ok) return; ELOG.open.forEach(o=>{ if(Date.now()-o.t1>ELOG.GAP) elogClose(o); }); const f=await elogFile();
+  if(ELOG.saved!==f.hash){ ELOG.saved=f.hash; logEvidence('note','Encounter log saved. '+f.n[0]+' devices, '+f.n[1]+' encounters, '+f.n[2]+' camera passes. File '+f.name+', SHA-256 '+f.hash+'.'); }
+  if(share && !NATIVE()){ try{ const file=new File([f.text], f.name, {type:'application/json'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Remiel Halo encounter log'}); return; } }catch(e){ if(e && e.name==='AbortError') return; } }
+  await saveOut(f.name,'application/json',f.text,!!(share && NATIVE())); toast(share?'Encounter log handed to the share sheet, and recorded in Evidence.':'Encounter log saved, and recorded in Evidence.'); }
+function elogErase(){ const E=S.elog; if(!E || !ELOG.ok) return; if(!E.arm){ E.arm=true; elogRender(); return; }
+  try{ const tx=elogTx(['dev','enc','cam'],'readwrite'); ['dev','enc','cam'].forEach(s=>tx.objectStore(s).clear()); tx.oncomplete=()=>{ ELOG.hist.clear(); ELOG.names.clear(); ELOG.open.clear(); ELOG.n={dev:0,enc:0,cam:0}; ELOG.camT={}; elogPark(); E.arm=false; logEvidence('note','Encounter log erased at your instruction.'); toast('The encounter log is erased.'); elogRender(); renderVicinity(); }; }catch(e){} }
 const buzz = p => { try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} };
 
 /* ---------- Watchers and Attackers screens ---------- */
@@ -2982,12 +3082,14 @@ function identCard(d){
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span>'+
     '<span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span>'+
     '<span class="k">Times heard</span><span class="v">'+d.timesSeen+'</span>'+
+    (d.live?'<span class="k">On record</span><span class="v">'+esc(histLong(d))+'</span>':'')+
     (d.live?'<span class="k">Call sign</span><span class="v">'+esc(d.name)+'</span><span class="k">Broadcast name</span><span class="v '+(d.adv?'':'unkc')+'">'+esc(d.adv||'None')+'</span><span class="k">Maker hint</span><span class="v '+(d.hint?'':'unkc')+'">'+esc(d.hint||'None')+'</span>':'')+'</div>'+
     (real?'<div class="limit" style="margin-top:10px"><b>To find which device this is.</b> Switch Bluetooth off on the device you suspect. If this entry reads out of earshot within a minute, that is the one. Then rename it'+(d.randomizes?'. This kind of device changes its address every few minutes and will come back as a new entry':'')+'.</div>':'')+
     '<div class="dev-acts"><button class="btn primary" data-act="ident-save">Save identity card</button>'+
     (real?'<button class="btn'+(d.mine?' on':'')+'" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003; Undo':'This is mine')+'</button>':'')+
     (real?'<button class="btn" data-act="ident-photo">'+(ph?'Replace your photo':'Attach your photo')+'</button>'+(ph?'<button class="btn" data-act="ident-photo-del">Remove photo</button>':''):'')+
     '<button class="btn" data-act="ident-roster">Open in Signal Roster</button>'+
+    ((real && ELOG.ready && ELOG.hist.get(d.sig))?'<button class="btn" data-act="elog-dev" data-k="'+esc(d.sig)+'">Its encounter record</button>':'')+
     (S.identId?'<button class="btn" data-act="ident-auto">Follow the top threat</button>':'')+'</div>'+
     '<div class="limit" style="margin-top:10px">'+(real?'A photo here is one you took or chose. It stays on this device, and its fingerprint is written to Evidence. ':'')+
     'The name is a call sign Halo gives the device. It is not a person\'s name.</div></div>';
@@ -4339,6 +4441,7 @@ function ingestReport(sid, rowT, p, off){
     if(pos && rssi!==null && !(pos.acc>POS_MAX_ACC)) addSample(d,pos,rssi,at);            // a poor position fix would mislead the placement
     if(!station && rssi!==null) legAdd(d, (pos && !(pos.acc>POS_MAX_ACC))?pos:null, rssi, at);
     d.hist.push(reading); if(d.hist.length>12) d.hist.shift();
+    if(!station && !p.sim) elogHear(d, at-LIVE.skew, reading, (pos && !(pos.acc>POS_MAX_ACC))?pos:null);
   }
 }
 // Your legs: a new leg begins each time you are 30 m from where the last one began. Each device keeps its readings by leg.
@@ -4427,6 +4530,7 @@ function liveTick(){
   LIVE.devs.forEach(d=>{ if(!d.sim && (d.withYou || d.homeAway)) autoLog(d); });
   alertScan();
   try{ recogTick(); }catch(e){}
+  try{ elogSweep(); elogCams(); }catch(e){}
   if(mobileLive() && !(P.path&&P.path.heard) && [...LIVE.devs.values()].some(d=>d.present&&!d.sim)){ P.path=P.path||{}; P.path.heard=true; save(); }
   tripAuto(); walkTick();
   if(!booted) return;
@@ -4716,7 +4820,7 @@ async function nativeDrain(){
       if(okLL(q)){ const acc=typeof q.acc==='number'?q.acc:25;
         GATE.nat=Date.now(); used=false;
         if(live) used = geoFix({coords:{latitude:q.lat, longitude:q.lon, accuracy:acc, heading:q.heading, speed:q.speed}, src:q.src})>0 && !(acc>POS_MAX_ACC);
-        else if(q.src!=='net'){ const gate=posGate(q.lat,q.lon,acc,q.t||b.t,q.src); if(gate && !(acc>POS_MAX_ACC)){ used=true; const spd=(typeof q.speed==='number' && !isNaN(q.speed))?q.speed:null; trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc,spd}, b.t); } } }
+        else if(q.src!=='net'){ const gate=posGate(q.lat,q.lon,acc,q.t||b.t,q.src); if(gate && !(acc>POS_MAX_ACC)){ used=true; try{ elogCamsAt(q.lat, q.lon, b.t); }catch(e){} const spd=(typeof q.speed==='number' && !isNaN(q.speed))?q.speed:null; trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc,spd}, b.t); } } }
       const list=[];
       for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
         if(x.cl){ let k=codKind(x.cod); const nm=String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); let pr=false; try{ pr=await isPaired(x.a); }catch(e){}
@@ -4923,7 +5027,7 @@ function walkTick(at, only, q){
     else if(sen && W.silent){ W.silent=false; wEvent('note','Listening again.'); } }
   const each=d=>{ const heard=nowS-d.seenMobile<(d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT); let r=W.devs[d.id];
     if(!r){ if(!heard) return; if(quietAp(d)){ W.aps=W.aps||{}; W.aps[d.id]=1; return; }
-      r=W.devs[d.id]={id:d.id, call:d.name, cls:d.cls, hint:d.hint||'', adv:d.adv||'', band:d.band, first:now, last:now, n:0, min:Math.round(d.dist), at:null, here:true, placed:null, rough:null, withYou:0, sim:!!d.sim};
+      r=W.devs[d.id]={id:d.id, sig:d.sig, call:d.name, cls:d.cls, hint:d.hint||'', adv:d.adv||'', band:d.band, first:now, last:now, n:0, min:Math.round(d.dist), at:null, here:true, placed:null, rough:null, withYou:0, sim:!!d.sim};
       if(d.sim) W.test=true;
       wEvent('new','New: '+walkName(d)+', '+distText(d), d.id); }
     if(!heard){ if(r.here){ r.here=false; const gt=Math.min(now, r.last+LIVE_PRESENT); if(r.n>=3 && r.last>(r.goneL||0)){ r.goneL=r.last; wEvent('gone','Gone: '+(r.label||r.call)+', heard for '+walkDur(r.last-r.first)+(r.span?' across '+r.span+' m of your movement':''), d.id, gt); } } return; }
@@ -5044,7 +5148,13 @@ function walkDocHTML(){
     :'<p>Halo places a device once it is heard from several of your positions, with a turn between them, at a steady position. No device met that on this trip, so each is given by distance.</p>');
   // 6
   const all=[...ds].sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0)||(tripMaybe(b)?1:0)-(tripMaybe(a)?1:0)||a.min-b.min);
-  h+=H('Every device heard')+(all.length?chunks(['Device','Maker and kind','First heard','Heard for','Closest','Placement','Reading'],all.map(r=>[nm(r),kind(r),hms(r.first),e(walkDur(r.last-r.first)),'about '+r.min+' m',place(r),stand(r)]),12):'<p>None.</p>');
+  const onRec=ELOG.ready && all.some(r=>r.sig);
+  h+=H('Every device heard')+(all.length?chunks(['Device','Maker and kind','First heard','Heard for','Closest','Placement','Reading'].concat(onRec?['On record']:[]),all.map(r=>[nm(r),kind(r),hms(r.first),e(walkDur(r.last-r.first)),'about '+r.min+' m',place(r),stand(r)].concat(onRec?[r.sig?e(histRec(r.sig)):'']:[])),12):'<p>None.</p>');
+  if(onRec){ const met=all.map(r=>({r, h:ELOG.hist.get(r.sig)})).filter(x=>x.h && !x.r.mine && (x.h.days>=2 || x.h.pl.length>=2)).sort((a,b)=>b.h.pl.length-a.h.pl.length||b.h.days-a.h.days||b.h.enc-a.h.enc);
+    const fresh=x=>{ const at=x.r.at; if(!at || x.h.pl.length<2) return 'No'; const p=x.h.pl.find(q=>distLL(at.lat,at.lon,q[0],q[1])<=ELOG.PLACE_M); return (p && p[2]>=W.t0-60000) ? 'Yes' : 'No'; };
+    h+=H('Devices seen before')+(met.length ? '<p>Of the devices on this trip, these are on record from more than one day or more than one place. A device seen at a new place on this trip was at a place where your log had not recorded it before.</p>'+
+        chunks(['Device','Maker and kind','Encounters','Days','Places','At a new place on this trip'], met.map(x=>['<b>'+nm(x.r)+'</b>',kind(x.r),String(x.h.enc),String(x.h.days),String(x.h.pl.length),fresh(x)]),14)
+      : '<p>No device on this trip is on record from more than one day or more than one place. The log grows with each trip.</p>'); }
   // 6 by maker
   const mk={}; ds.forEach(r=>{ const m=makerOf(r)||'Maker not broadcast'; mk[m]=mk[m]||{n:0,tr:0}; mk[m].n++; if(r.cls==='Tag') mk[m].tr++; });
   if(ds.length) h+=H('By maker')+tbl(['Maker','Devices','Of which trackers'],Object.keys(mk).sort((a,b)=>mk[b].n-mk[a].n).map(m=>[e(m),String(mk[m].n),String(mk[m].tr)]))+'<p>Halo reads the maker from what each device broadcasts.</p>';
@@ -5069,6 +5179,7 @@ function walkDocHTML(){
      'Passed by: heard for under two minutes.',
      'Near your route: heard for two minutes or more, with too few legs to tell whether it stays in place.',
      'Placed: the device was heard from several of your positions, and the readings agree on one zone.',
+     'On record: the encounters your log holds for the device, this trip included, with the days and places they fall on. A place groups encounters within '+ELOG.PLACE_M+' m of one another.',
      'Cell towers: each tower your phone used, and each change. A change counts as a sign only when your own path shows you stayed in one place for the three minutes before it.',
      'Distance: read from signal strength every ten seconds. A device in a pocket or behind a wall reads further away than it is.',
      'These are Halo\'s working rules. The data file holds the figures for every device, so each reading can be checked.',
@@ -5495,6 +5606,14 @@ document.addEventListener('click', e=>{
     case 'mark-x': S.mark=null; markRender(); renderVicinity(); break;
     case 'mark-tick': { const m=S.mark, d=m&&m.devs[+a.dataset.i]; if(d){ const x=val('markText'); d.on=!d.on; markRender(); const i=el('markText'); if(i) i.value=x; } break; }
     case 'mark-save': markSave(); break;
+    case 'elog-open': if(S.elog) S.elog=null; else S.elog={f:'all'}; elogRender().then(()=>{ if(S.elog){ const b=el('elogBox'); if(b) b.scrollIntoView({block:'start'}); } }); renderVicinity(); break;
+    case 'elog-x': S.elog=null; elogRender(); renderVicinity(); break;
+    case 'elog-f': if(S.elog){ S.elog={f:a.dataset.f}; elogRender(); } break;
+    case 'elog-dev': S.elog={f:(S.elog&&S.elog.f)||'all', k:a.dataset.k}; if(!locMode()){ S.wview='list'; renderVicinity(); } elogRender().then(()=>{ const b=el('elogBox'); if(b) b.scrollIntoView({block:'start'}); }); renderVicinity(); break;
+    case 'elog-back': if(S.elog){ S.elog={f:S.elog.f||'all'}; elogRender(); } break;
+    case 'elog-save': elogSave(false); break;
+    case 'elog-share': elogSave(true); break;
+    case 'elog-erase': elogErase(); break;
     case 'mf-follow': { MF.follow=!MF.follow; a.classList.toggle('on',MF.follow); mapFullTick(false); break; }
     case 'mf-north': { MF.headUp=!MF.headUp; a.classList.toggle('on',MF.headUp); a.innerHTML='<small>'+(MF.headUp?'FACE UP':'N UP')+'</small>'; if(!MF.headUp && FULL){ try{ FULL.rotateTo(0,{duration:400}); }catch(e){} } headAsk(); mapFullTick(false); break; }
     case 'mf-fit': { const g=gz(); if(!FULL || !g) break; MF.follow=false; el('mfFollow').classList.remove('on'); fitTo(FULL, g, MILE, true); toast('The map now shows '+miText(MILE)+' around you. The round button brings it back to you.'); break; }
@@ -5572,7 +5691,7 @@ function boot(){
   setInterval(()=>{ if(S.global && document.visibilityState==='visible') applyGlobal(true); }, 60000);          // the age on screen counts up by the minute
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-(S.globalAt||0)>120000) loadGlobal(); });
   syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit(); startGeo();
-  nativeMine(); rayTick(); alertNativeTick(); towerCorrect();
+  nativeMine(); rayTick(); alertNativeTick(); towerCorrect(); elogInit();
   fetch(API+'/health',{cache:'no-store'}).then(r=>r.json()).then(j=>{ S.features=(j&&j.features)||{}; if(booted) softRender(); }).catch(()=>{});
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') alertNativeTick(); });
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.haloOpen) alertGo(e.data.haloOpen); });
