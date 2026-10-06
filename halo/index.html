@@ -51,7 +51,7 @@ a{color:var(--chrome2)}
 .gate-card{width:100%;max-width:400px;text-align:center;background:var(--panel);border:1px solid var(--line);
   border-radius:var(--r);padding:38px 26px 30px;backdrop-filter:blur(14px);box-shadow:0 30px 80px rgba(0,0,0,.5)}
 .gate-logo{display:block;width:min(340px,80vw);max-width:100%;height:auto;margin:6px auto 20px;filter:drop-shadow(0 0 40px rgba(60,140,240,.3))}
-.brand-logo{width:clamp(84px,24vw,112px);height:auto;display:block;flex:none}
+.brand-logo{width:clamp(84px,27.5vw,112px);height:auto;display:block;flex:none}
 .rail-logo{width:112px;max-width:100%;height:auto;display:block;margin:0 auto}
 .gate-sub{color:var(--mut);font-size:13px;margin:0 0 26px}
 .gate-sub b{color:var(--chrome2);font-weight:600}
@@ -150,6 +150,7 @@ select.inp{flex:none}
 .topbar .src-pill{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .topbar .acctbtn{width:34px;height:34px;border-radius:10px}
 @media(max-width:430px){ .topbar{gap:7px} .topbar .src-pill{letter-spacing:.05em;padding:5px 8px} }
+@media(max-width:400px){ .topbar .src-pill{font-size:9.5px;letter-spacing:.02em;padding:5px 7px} }
 @media(max-width:380px){ .topbar{gap:6px;padding:12px 12px} .topbar .acctbtn{width:32px;height:32px} .topbar .src-pill{font-size:9.5px;letter-spacing:.02em;padding:5px 7px} }
 .tagline{color:var(--dim);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
 .src-pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;padding:5px 9px;border-radius:999px;
@@ -456,6 +457,12 @@ select.inp{flex:none}
 .id-face.photo .g{display:none}
 .id-face.photo .nm,.id-face.photo .mt{background:rgba(6,10,20,.72);padding:1px 7px;border-radius:6px}
 .id-face.none .nm{color:var(--mut);font-weight:500}
+.id-face.none.fix{cursor:pointer}
+.id-face.none.fix .nm{color:#fff;font-weight:700;background:linear-gradient(180deg,#4f8df0,#2f5fc4);padding:5px 9px;border-radius:999px;box-shadow:0 0 14px -3px #4f8df0}
+.fixbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 10px;padding:10px 12px;border:1px solid rgba(79,141,240,.55);border-radius:13px;background:linear-gradient(180deg,rgba(60,100,200,.22),rgba(20,34,72,.4));font-size:13px;line-height:1.4;color:var(--ink)}
+.fixbar span{flex:1 1 180px}
+.fixbar .btn{flex:none}
+#vicCount.fix{cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .map-note{text-align:center;padding:8px 10px;border-radius:9px;margin-top:10px;
   color:var(--mut);font-size:11px;font-family:var(--mono);background:rgba(8,13,26,.6);border:1px solid var(--line2);line-height:1.45}
 .macroline{font-size:12px;line-height:1.5;color:var(--mut);margin-top:8px}
@@ -759,7 +766,8 @@ a.tk:hover b{text-decoration:underline}
             <div id="ovMain"></div>
             <div class="stack" style="gap:14px">
               <div id="ovVic"><div class="card" id="vicCard">
-                <h3>Vicinity <span class="n" id="vicCount"></span></h3>
+                <h3>Vicinity <span class="n" id="vicCount" data-act="state-fix"></span></h3>
+                <div id="fixBar"></div>
                 <div class="radline" id="radLine"></div>
                 <div class="stage" id="stage" data-big="micro">
                   <div class="sph micro" id="sphMicro" data-act="sph" data-s="micro">
@@ -910,7 +918,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.22', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.23', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2026,7 +2034,7 @@ function renderOverview(){
   if(NATIVE() && isAndroid()){ if(!APP.info) appInfo(); let v=''; try{ v=String(NATIVE().version()); }catch(e){}
     if(APP.info && verNum(APP.info.version)>verNum(v)) h+='<div class="instbar"><span><b>Halo app '+esc(APP.info.version)+' is ready.</b> You have '+esc(v)+'. The new one keeps listening through a long walk.</span><button class="btn sm primary" data-act="go-install">Get it</button></div>'; }
   if(!NATIVE() && !S.justInstalled && (isAndroid() || (!installed() && (INSTALL||isIOS()))) && !store.get('halo_inst_hide'))
-    h+='<div class="instbar"><span>'+(isAndroid() ? '<b>Get the Remiel Halo app.</b> It hears the devices around you, and keeps hearing tracker tags with the screen off.' : isIOS() ? '<b>Put Halo on your home screen.</b> It opens full screen, like an app.' : '<b>Install Halo on this computer.</b> It opens in a window of its own.')+'</span>'+
+    h+='<div class="instbar"><span>'+(isAndroid() ? '<b>You are in the web version of Halo.</b> The Remiel Halo app hears the devices around you, and keeps hearing tracker tags with the screen off.' : isIOS() ? '<b>Put Halo on your home screen.</b> It opens full screen, like an app.' : '<b>Install Halo on this computer.</b> It opens in a window of its own.')+'</span>'+
        '<button class="btn sm primary" data-act="'+(INSTALL && !isAndroid()?'install':'go-install')+'">'+(isAndroid()?'Get the app':INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
   if(!g) h+='<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'Halo keeps trying the live feed':'Reaching the live feed')+'</div>';
   const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
@@ -2108,6 +2116,9 @@ const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'directio
 function renderVicinity(){
   const V=vis(), shown=V.mode==='live'||V.mode==='sim', rs=radiusState(), blocks=rs.r/BLOCK_M, sus=shown?inRadius():[];
   el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : stateWords(V.mode).count;
+  { const f=stateFix(V.mode), fb=el('fixBar'), noPos=!S.pos && !gz() && !whereFresh(); el('vicCount').classList.toggle('fix', !!f);
+    const hb=(f?'<div class="fixbar"><span>'+esc(f.why)+'</span>'+fixBtn(f)+'</div>':'')+(noPos?'<div class="fixbar"><span>'+(S.geoErr?esc(geoHelp()):'Allow location and your map appears.')+'</span><button class="btn sm primary" data-act="geo-ask">Allow location</button></div>':'');
+    if(fb && fb._h!==hb){ fb.innerHTML=hb; fb._h=hb; } }
   el('radLine').className='radline'+(rs.ext?' ext':'');
   el('sphMicro').classList.toggle('ext',!!rs.ext);
   const view=viewRadius();
@@ -2768,8 +2779,9 @@ const dirLine = d => !d.live ? compass(d.bearing)+', '+Math.round(d.bearing)+'°
 const originLine = d => d.live ? (d.sim ? 'Test data' : 'Heard by '+(d.sensor==='this-phone'?'this phone':(P.sensors[d.sensor]||{}).name||'your sensor')) : '';
 function renderIdent(force){
   const V=vis(), d=identPick(), face=el('idFace'), sp=el('sphIdent'); S._identShown=d?d.id:null; if(!face) return;
-  if(!d){ sp.style.removeProperty('--hc'); face.className='id-face none'; face.style.backgroundImage='';
-    setHTML(face, '<div class="g">&#9676;</div><div class="nm">'+((V.mode==='live'||V.mode==='sim')?'Nothing inside the radius':earless()?'Open the Halo app':'No device heard yet')+'</div><div class="mt">'+((V.mode==='live'||V.mode==='sim')?'no threat to show':earless()?'it listens for devices':esc(stateWords(V.mode).note.replace(/\.$/,'').toLowerCase()))+'</div>');
+  if(!d){ const fx=stateFix(V.mode); sp.style.removeProperty('--hc'); face.className='id-face none'+(fx?' fix':''); face.style.backgroundImage='';
+    setHTML(face, fx ? '<div class="g">&#9676;</div><div class="nm">'+esc(fx.label)+'</div><div class="mt">tap here</div>'
+      : '<div class="g">&#9676;</div><div class="nm">'+((V.mode==='live'||V.mode==='sim')?'Nothing inside the radius':'No device heard yet')+'</div><div class="mt">'+((V.mode==='live'||V.mode==='sim')?'no threat to show':esc(stateWords(V.mode).note.replace(/\.$/,'').toLowerCase()))+'</div>');
     setHTML(el('identPanel'), ''); return; }
   const th=deviceThreat(d), ph=photoOf(d);
   sp.style.setProperty('--hc','var('+TIER_VAR[th.tierIdx]+')'); face.className='id-face'+(ph?' photo':''); face.style.backgroundImage=ph?'url("'+ph+'")':'';
@@ -4485,7 +4497,7 @@ function phPanel(){
   if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening.', html:'This phone is listening while Halo is on screen. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
   if(PH.on && PH.lost) return {ok:false, text:'Listening paused while Halo was off the screen.', html:'Listening paused while Halo was off the screen. '+btn('Resume listening')};
   if(!phCan()) return {ok:false, text:'', html: isAndroid()
-    ? '<b>This window is Halo on the web.</b> On this phone the Remiel Halo app listens, and keeps hearing tracker tags with the screen off: open it from your home screen, under the name Remiel Halo. <a class="btn sm primary" href="'+APP_LINK+'" style="margin:4px 6px 4px 0;text-decoration:none;display:inline-flex">Open the Halo app</a><button class="btn sm" data-act="go-install" style="margin:4px 0">Get the app</button><br>In Chrome, one setting gives the same ear for Bluetooth while Halo is on screen. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the Chrome steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app.</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Start listening.</li></ol></details>'
+    ? '<b>You are in the web version of Halo.</b> On this phone the Remiel Halo app hears the devices around you, and keeps hearing tracker tags with the screen off. <a class="btn sm primary" data-act="app-open" href="'+APP_LINK+'" style="margin:4px 6px 4px 0;text-decoration:none;display:inline-flex">Switch to the Halo app</a><button class="btn sm" data-act="go-install" style="margin:4px 0">Get the app</button>'
     : 'Listening runs in the Halo Android app, and on a computer at home.'};
   const why = PH.err==='NotAllowedError' ? 'Allow the scan when Chrome asks, and this phone listens for you.' : PH.err ? 'Switch Bluetooth and Location on, then press the button.' : 'This phone hears the Bluetooth devices around you.';
   return {ok:false, text:why, html:why+' '+btn('Start listening')};
@@ -4799,8 +4811,8 @@ const earless = () => webOnAndroid() && !phCan() && !PH.on;
 const canHear = () => !!NATIVE() || phCan();                      // this device has an ear of its own
 function stateWords(m){ const since=hhmm(liveLast()-LIVE.skew);
   if(earless() && m!=='offline') return m==='homeonly'
-    ? {count:'home is watched', line:'your home listener is reporting', long:'Your home listener is watching your home. Open the Remiel Halo app on this phone and Halo shows what is around you here.', note:'Home is watched.', vic:'Vicinity: home is watched', cov:'Home listener reporting'}
-    : {count:'open the Halo app', line:'the Remiel Halo app listens on this phone', long:'This window is Halo on the web. On this phone the Remiel Halo app is the one that listens: open it from your home screen and the devices around you appear on Micro.', note:'Open the Halo app.', vic:'Vicinity: open the Halo app', cov:'Listens in the Halo app'};
+    ? {count:'home is watched', line:'your home listener is reporting', long:'Your home listener is watching your home. You are in the web version of Halo: tap Switch to the Halo app and Halo shows what is around you here.', note:'Home is watched.', vic:'Vicinity: home is watched', cov:'Home listener reporting'}
+    : {count:'web version', line:'the Remiel Halo app hears devices on this phone', long:'You are in the web version of Halo. On this phone the Remiel Halo app is the one that hears devices. Tap Switch to the Halo app, and the devices around you appear on Micro.', note:'Switch to the Halo app.', vic:'Vicinity: web version', cov:'Listens in the Halo app'};
   if(!canHear() && !PH.on && (m==='none' || m==='waiting')) return m==='waiting'
     ? {count:'waiting for a sensor', line:'no sensor has reported yet', long:'No sensor has reported yet. Start your home listener, or switch on the sensor you carry, and the devices it hears appear here.', note:'Waiting for a sensor.', vic:'Vicinity: waiting for a sensor', cov:'Waiting'}
     : {count:'add a sensor', line:'devices are heard by a Halo sensor', long:'On this device Halo shows the maps, cameras, tower sites and threats. The devices around you are heard by a Halo sensor: the Remiel Halo app on an Android phone, a home listener on a computer, or a sensor you carry. Add one under Devices and sync.', note:'Add a sensor.', vic:'Vicinity: add a sensor', cov:'Add a sensor'};
@@ -4810,6 +4822,18 @@ function stateWords(m){ const since=hhmm(liveLast()-LIVE.skew);
     : m==='offline' ? {count:'reconnecting', line:'reconnecting to your Halo account', long:'Halo is reconnecting to your account.', note:'Reconnecting.', vic:'Vicinity: reconnecting', cov:'Reconnecting'}
     : m==='homeonly' ? {count:'home is watched', line:'your home listener is reporting', long:'Your home listener is watching your home. Start listening on this phone and Halo shows what is around you here.', note:'Home is watched.', vic:'Vicinity: home is watched', cov:'Home listener reporting'}
     : {count:'ready to listen', line:'press Start listening', long:'Press Start listening and Halo shows the devices around you.', note:'Ready to listen.', vic:'Vicinity: ready to listen', cov:'Ready'}; }
+/* The fix for the state the screen is in. Each empty state has one cause and one control: start listening, switch to the app,
+   add a sensor, or allow location. The same answer is used by the bar on the Vicinity card, the Identification sphere and Overview. */
+function stateFix(m){ m=m||liveState();
+  if(m==='live' || m==='sim' || m==='offline') return null;
+  if(earless()) return {label:'Switch to the Halo app', href:APP_LINK, why:'You are in the web version of Halo. On this phone the Halo app is the one that hears devices.'};
+  if(canHear()){ if(PH.on && !PH.lost) return null; const pp=phPanel();
+    return {label:PH.lost?'Resume listening':PH.on?'Try again':'Start listening', act:'ph-start', why:pp.text||'This phone hears the devices around you.'}; }
+  if(m==='waiting' || m==='silent' || m==='homeonly') return null;
+  return {label:'Add a sensor', act:'go-sensors', why:'The devices around you are heard by a Halo sensor: the Remiel Halo app on an Android phone, or a listener at home.'}; }
+const fixBtn = f => !f ? '' : f.href ? '<a class="btn sm primary" data-act="app-open" href="'+f.href+'" style="text-decoration:none;display:inline-flex">'+f.label+'</a>' : '<button class="btn sm primary" data-act="'+f.act+'">'+f.label+'</button>';
+function fire(act){ const b=document.createElement('button'); b.dataset.act=act; b.style.display='none'; document.body.appendChild(b); b.click(); b.remove(); }
+function runFix(f){ if(!f) return false; if(f.href){ try{ location.href=f.href; }catch(e){} } else fire(f.act); return true; }
 function vis(){
   const st=liveState();
   if(st==='live'){ const devs=[...LIVE.devs.values()], pres=devs.filter(d=>d.present); return {mode:'live', test:pres.length>0&&pres.every(d=>d.sim), devices:devs}; }
@@ -5041,7 +5065,10 @@ document.addEventListener('click', e=>{
         const d=f=>{ const q=map.project(f.geometry.coordinates); return Math.hypot(q.x-x,q.y-y); }; fs.sort((p,q)=>d(p)-d(q));
         S.pt=ptFrom(fs[0]); renderPt(); const c=el('ptInfo'); if(c) c.scrollIntoView({block:'nearest',behavior:'smooth'}); }catch(err){} break; }
     case 'pt-close': S.pt=null; renderPt(); break;
-    case 'ident-open': { S.identOpen=!S.identOpen; renderIdent(); break; }
+    case 'ident-open': { if(!S._identShown && runFix(stateFix())) break; S.identOpen=!S.identOpen; renderIdent(); break; }
+    case 'state-fix': runFix(stateFix()); break;
+    case 'app-open': break;                    // the link itself opens the Halo app
+    case 'go-sensors': { S.open.delete('profile'); S.open.add('devices'); if(S.view!=='overview') setView('overview'); else { navPush('devices'); rerender(); } setTimeout(()=>{ const c=el('sensorsSec')||el('installSec'); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },180); break; }
     case 'ident-close': { S.identOpen=false; S.renaming=false; renderIdent(); break; }
     case 'ident-auto': { S.identId=null; S.renaming=false; renderVicinity(); break; }
     case 'ident-rename': { S.renaming=true; renderIdent(true); const i=el('identLabel'); if(i){ i.focus(); i.select(); } break; }
