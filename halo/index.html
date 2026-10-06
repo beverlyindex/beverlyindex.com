@@ -335,7 +335,7 @@ select.inp{flex:none}
 .alertb .tx{flex:1;min-width:0} .alertb .tx b{display:block;color:#fff;font-size:14.5px;margin-bottom:2px} .alertb .more{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:4px;display:block}
 .alertb .x{background:none;border:0;color:var(--mut);font-size:20px;line-height:1;padding:2px 4px}
 .rate{display:inline-flex;align-items:center;gap:6px;vertical-align:middle;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--rc);border:1px solid var(--rc);border-radius:999px;padding:1px 9px 1px 2px;white-space:nowrap;background:rgba(0,0,0,.25)}
-.rate b{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--rc);color:#0a0f1e;font-size:11px;font-weight:700}
+.rate b{flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--rc);color:#0a0f1e;font-size:11px;font-weight:700}
 .ratekey{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .pathc{margin:0 0 14px;padding:14px 14px 12px;border:1px solid var(--line2);border-radius:16px;background:linear-gradient(180deg,rgba(40,62,120,.34),rgba(14,22,46,.6));box-shadow:0 10px 26px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08)}
 .pathc .ph{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -449,6 +449,7 @@ select.inp{flex:none}
 .kv .k{color:var(--dim);font-family:var(--mono);font-size:11.5px;white-space:nowrap}
 .kv .v{color:var(--ink);text-align:right;min-width:0;overflow-wrap:anywhere}
 .kv .v .rate{white-space:normal;border-radius:12px;text-align:left}
+@media(max-width:360px){ .rate{white-space:normal;border-radius:12px;text-align:left;max-width:100%} .chip{white-space:normal;max-width:100%} }
 .kv .v.warnc{color:var(--warn)} .kv .v.okc{color:var(--clear)} .kv .v.purplec{color:var(--route)} .kv .v.unkc{color:var(--mut)}
 .chk{display:flex;gap:11px;align-items:flex-start;padding:9px 0;cursor:pointer;font-size:13.5px;line-height:1.45;border-top:1px solid var(--line)}
 .chk:first-of-type{border-top:0;padding-top:2px}
@@ -488,7 +489,9 @@ select.inp{flex:none}
 /* coverage */
 .cov{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
 .cov:first-of-type{border-top:0}
-.cov .st{font-family:var(--mono);font-size:11px;color:var(--mut);display:flex;align-items:center;gap:7px;white-space:nowrap}
+.cov .st{font-family:var(--mono);font-size:11px;color:var(--mut);display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px 7px;min-width:0;text-align:right}
+.cov > span:first-child{flex:none}
+.cov .st .dot{flex:none} .cov .st .btn{flex:none;white-space:nowrap;margin:0 !important}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none}
 .dot.live{background:var(--clear);box-shadow:0 0 10px var(--clear)}
 .dot.part{background:var(--warn);box-shadow:0 0 10px var(--warn)}
@@ -917,6 +920,7 @@ a.tk:hover b{text-decoration:underline}
               <div class="card" id="homeMini"></div>
             </div>
           </div>
+          <div id="ovEnd"></div>
         </section>
 
         <section data-pane="watchers" class="hidden"><div id="wHead"></div><div id="wVic" style="margin-bottom:14px"></div><div id="wMain"></div></section>
@@ -1011,7 +1015,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.37', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.38', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2154,10 +2158,11 @@ function renderOverview(){
   h+=pathCard();
   h+='<div class="pipe-h">Threat Scope<span id="scopeAge">'+esc(scopeAge())+'</span></div><div class="pipe" id="scopePills">'+scopeHTML(a)+'</div>';
   h+='<div class="stack">'+cat('Your activity')+profilePull()+sigPull()+healthPull()+devicesPull()+cat('The wider picture')+globalPull()+resourcesPull()+'</div>';
-  h+='<div class="formrow" style="margin:18px 0 0;justify-content:center"><button class="btn sm endbtn" data-act="end-session">End session</button></div>'+
-     '<div class="limit" style="margin-top:6px;text-align:center">End session stops listening on this device and locks Halo. Your records are kept.</div>';
-  h+='<div class="limit" style="margin-top:16px;text-align:center"><a href="#" data-act="terms">Terms of use</a></div></div>';
+  h+='</div>';
   el('ovMain').innerHTML=h;
+  setHTML(el('ovEnd'), '<div class="formrow" style="margin:22px 0 0;justify-content:center"><button class="btn sm endbtn" data-act="end-session">End session</button></div>'+          // the last thing on Overview, below every card
+     '<div class="limit" style="margin-top:6px;text-align:center">End session stops listening on this device and locks Halo. Your records are kept.</div>'+
+     '<div class="limit" style="margin-top:16px;text-align:center"><a href="#" data-act="terms">Terms of use</a></div>');
   renderCoverage(); el('homeMini').style.display='none'; renderVicinity();
 }
 function renderCoverage(){
@@ -5401,7 +5406,7 @@ function myFindings(side){
       if(pres.length || !V.test) out.push({t:'Now: '+pres.length+' device'+(pres.length===1?'':'s')+' in earshot'+(fl.length?', '+fl.length+' flagged. Open Watchers':', none flagged')+'.', src:(mobileLive()?'your sensor':'your home listener')+' · '+hhmm(liveLast()-LIVE.skew), mine:true}); }
     else if(V.mode!=='sim') out.push({t:'Your vicinity: '+stateWords(V.mode).count+'.', src:'your sensors', mine:true}); }
   else kevMine().slice(0,3).forEach(v=>out.push({t:'Under attack: '+kevWords(v).name+' ('+v.cve+'). If you own one, update it.', src:'CISA · '+fmtD(v.added), u:v.u, mine:true}));
-  P.evidence.filter(r=>r.kind==='finding' && r.t>week && names.some(n=>r.text.indexOf(n)===0)).slice(0,4)
+  P.evidence.filter(r=>r.kind==='finding' && r.t>week && names.some(n=>r.text.indexOf(n)===0) && !(P.fixTower && /^Tower Watch: the tower in use/.test(r.text) && /while you stood still/.test(r.text))).slice(0,4)          // a finding withdrawn by a correction is not repeated here
     .forEach(r=>out.push({t:'Your finding: '+r.text.slice(0,140), src:'Evidence · '+new Date(r.t).toLocaleDateString()+' '+hhmm(r.t), mine:true}));
   return out;
 }
