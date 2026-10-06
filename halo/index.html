@@ -972,7 +972,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.32', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.33', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2206,7 +2206,7 @@ function renderVicinity(){
     : V.mode==='live' && sa!==null && sa>=0 && !V.test ? 'this phone is listening, Bluetooth last heard '+(sa<3000?'just now':Math.round(sa/1000)+' s ago')+((PH.nstat.scanRestarts|0)?', scan restarted '+PH.nstat.scanRestarts+(PH.nstat.scanRestarts===1?' time':' times'):'')
     : V.mode==='live' ? (V.test?'test data':(mobileLive()?'live from your sensor':'live from your home listener'+(homeByPos()?'':', shown as near you because Responder is set to Home'))+', last report '+hhmm(liveLast()-LIVE.skew))
     : stateWords(V.mode).line;
-  setHTML(el('posLine'), 'Your position: '+(S.pos?'live, within '+Math.round(S.pos.acc)+' m':whereFresh()?'from your phone, '+Math.max(1,Math.round((Date.now()-P.where.t)/60000))+' min ago':gz()?'your saved home location':'allow location and your map appears')+' · Devices: '+esc(devLine));
+  setHTML(el('posLine'), 'Your position: '+(S.pos?(S.pos.src==='net'?'from the network, within '+Math.round(S.pos.acc)+' m. Your route is drawn from GPS':'live, within '+Math.round(S.pos.acc)+' m'):whereFresh()?'from your phone, '+Math.max(1,Math.round((Date.now()-P.where.t)/60000))+' min ago':gz()?'your saved home location':'allow location and your map appears')+' · Devices: '+esc(devLine));
   groundSync(); syncBase();
   const note=el('mapNote');
   if(MAP || !S.mapFail) note.textContent = (V.mode==='live' && V.test) ? 'Test data.' : '';
@@ -2804,13 +2804,20 @@ let _geoOn=false;
 // The browser's own position. Inside the Halo app the app supplies the position, so the two are never mixed.
 function geoWeb(p){ if(PH.native && PH.on && GATE.nat && Date.now()-GATE.nat<30000) return; geoFix(p); }
 function geoFix(p){
-  const la=p.coords.latitude, lo=p.coords.longitude, gate=posGate(la, lo, p.coords.accuracy, Date.now(), p.src);
-  if(!gate){ clearTimeout(GATE.tm); GATE.tm=setTimeout(()=>{ if(GATE.pend){ const q=GATE.pend; geoFix({coords:{latitude:q.la, longitude:q.lo, accuracy:q.acc}}); } }, GATE_MS+200); S.geoErr=0; return; }
-  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo}; if(!(p.coords.accuracy>POS_MAX_ACC)) trackPush(la, lo, p.coords.accuracy, undefined, gate===2); walkPos(); whereTick();
+  const la=p.coords.latitude, lo=p.coords.longitude;
+  if(p.src==='net'){                                      // the network's estimate can sit a street away. It shows roughly where you are until GPS answers, and it never draws your route, starts a trip or feeds the follower test
+    if(!(S.pos && S.pos.src!=='net' && Date.now()-S.pos.t<NET_AFTER_GPS_MS)){ const first=!S.pos; S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo, src:'net'}; whereTick();
+      if(first && MAP && MAP_CENTER && !_centred){ _centred=true; recentre(la, lo); }
+      if(S.view==='overview'||S.view==='watchers') renderVicinity(); }
+    return -1; }
+  const gate=posGate(la, lo, p.coords.accuracy, Date.now(), p.src);
+  if(!gate){ clearTimeout(GATE.tm); GATE.tm=setTimeout(()=>{ if(GATE.pend){ const q=GATE.pend; geoFix({coords:{latitude:q.la, longitude:q.lo, accuracy:q.acc}}); } }, GATE_MS+200); S.geoErr=0; return 0; }
+  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo, spd:(typeof p.coords.speed==='number' && !isNaN(p.coords.speed))?p.coords.speed:null}; if(!(p.coords.accuracy>POS_MAX_ACC)) trackPush(la, lo, p.coords.accuracy, undefined, gate===2); walkPos(); whereTick();
   if(typeof p.coords.heading==='number' && !isNaN(p.coords.heading) && p.coords.speed>0.8){ HEAD.gps=p.coords.heading; HEAD.gt=Date.now(); }
   if(MAP && MAP_CENTER){ const moved=Math.hypot((la-MAP_CENTER.lat)*111320, (lo-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
     if(!_centred || moved>6){ _centred=true; recentre(la, lo); } }      // ignore position jitter under 6 metres
   if(S.view==='overview'||S.view==='watchers') renderVicinity();
+  return gate;
 }
 function geoFail(e){ S.geoErr=(e&&e.code)||2; if(S.view==='overview'||S.view==='watchers') renderVicinity(); }
 function startGeo(){
@@ -4138,7 +4145,7 @@ function posGate(la,lo,acc,t,src){ acc=(typeof acc==='number'&&acc>0)?acc:50; co
     if(GATE.n>=3 || t-GATE.since>=GATE_MS){ const pv=GATE.pv; keep(null); GATE.v=pv; return d>150?2:1; }
     return 0; }
   keep(v); return 1; }
-const GATE_MS=(typeof window.HALO_GATE_MS==='number') ? window.HALO_GATE_MS : 12000;
+const GATE_MS=(typeof window.HALO_GATE_MS==='number') ? window.HALO_GATE_MS : 12000, NET_AFTER_GPS_MS=60000;
 function trackPush(lat,lon,acc,at,brk){
   if(GEO.o && Math.hypot((lat-GEO.o.lat)*111320,(lon-GEO.o.lon)*111320*Math.cos(GEO.o.lat*Math.PI/180))>200000) reanchor(lat,lon);   // you are far from where the frame was set
   const p=toXY(lat,lon), last=TRACK[TRACK.length-1], now=at||Date.now(); GEO.seen=Date.now();
@@ -4572,11 +4579,11 @@ async function nativeDrain(){
   try{ PH.nstat=nativeStatus();
     let batches=[]; try{ batches=JSON.parse(N.drain())||[]; }catch(e){ batches=[]; }
     pairedLoad();
-    for(const b of batches){ if(!b || !Number.isFinite(b.t)) continue; const q=b.pos, live=Date.now()-b.t<8000;
+    for(const b of batches){ if(!b || !Number.isFinite(b.t)) continue; const q=b.pos, live=Date.now()-b.t<8000; let used=false;          // used: this batch's own fix passed Halo's checks
       if(okLL(q)){ const acc=typeof q.acc==='number'?q.acc:25;
-        GATE.nat=Date.now();
-        if(live) geoFix({coords:{latitude:q.lat, longitude:q.lon, accuracy:acc, heading:q.heading, speed:q.speed}, src:q.src});
-        else { const gate=posGate(q.lat,q.lon,acc,q.t||b.t,q.src); if(gate && !(acc>POS_MAX_ACC)){ trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc}, b.t); } } }
+        GATE.nat=Date.now(); used=false;
+        if(live) used = geoFix({coords:{latitude:q.lat, longitude:q.lon, accuracy:acc, heading:q.heading, speed:q.speed}, src:q.src})>0 && !(acc>POS_MAX_ACC);
+        else if(q.src!=='net'){ const gate=posGate(q.lat,q.lon,acc,q.t||b.t,q.src); if(gate && !(acc>POS_MAX_ACC)){ used=true; const spd=(typeof q.speed==='number' && !isNaN(q.speed))?q.speed:null; trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc,spd}, b.t); } } }
       const list=[];
       for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
         if(x.cl){ const k=codKind(x.cod), nm=String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); let pr=false; try{ pr=await isPaired(x.a); }catch(e){} list.push({id:'bc:'+hash32(String(x.a)).toString(36), rssi:x.r, band:'ble', cls:k.cls, name:nm, hint:k.hint, conf:nm?3:2, flags:pr?['paired']:[]}); PH.heard++; continue; }
@@ -4590,8 +4597,8 @@ async function nativeDrain(){
         list.push({id:'ap:'+bs, rssi:x.r, band:'wifi', cls:flock?'Camera':'Access point', name:String(x.s||'').slice(0,40), hint:flock?'Flock Safety camera, Wi-Fi on':(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
       LIVE.seen.mobile=Math.max(LIVE.seen.mobile, b.t+LIVE.skew);      // the phone reported, whether or not anything was in earshot
       if(typeof b.sa==='number') LIVE.sa=b.sa;
-      if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:okLL(q)?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew);
-      if(!live && W.on && list.length) walkTick(b.t, list.map(x=>x.id), okLL(q)?q:null);
+      if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:used?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew);          // a sighting is placed at this fix only when the fix passed Halo's checks; otherwise at the last position that did
+      if(!live && W.on && list.length) walkTick(b.t, list.map(x=>x.id), used?q:null);
       if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
     if(batches.length){ liveTick(); walkSettle(); }
     rayTick(); alertNativeTick();
@@ -4709,14 +4716,14 @@ const W = (()=>{ try{ const j=JSON.parse(store.get('halo_walk')||'null'); if(j &
 let _wLock=null, _wSaved=0, _wHidden=0;
 const wSave = force => { const n=Date.now(); if(!force && n-_wSaved<8000) return; _wSaved=n; try{ store.set('halo_walk', JSON.stringify(W)); }catch(e){} };
 async function wLock(){ W.awake=false; if(NATIVE()){ W.awake=true; return; } try{ if('wakeLock' in navigator && document.visibilityState==='visible'){ _wLock=await navigator.wakeLock.request('screen'); W.awake=true; } }catch(e){} }
-let _wAt=0;
+let _wAt=0; const SLOW_MPS=0.5, SLOW_STEP_M=25;
 function wEvent(k, text, id, t){ W.events.push({t:t||_wAt||Date.now(), k, text, id:id||''}); if(W.events.length>1500) W.events.splice(0, W.events.length-1500); }
 const walkDur = ms => { const s=Math.max(0,Math.round(ms/1000)); return s<90 ? s+' seconds' : Math.round(s/60)+' minutes'; };
 const walkName = d => devName(d)+' ('+[d.cls==='Unknown'?'unidentified':d.cls, d.hint].filter(Boolean).join(', ')+')';
 const carriedIds = () => Object.keys(P.sensors||{}).filter(k=>P.sensors[k].kind!=='station');
 // A trip starts by itself when you move while Halo is listening, and ends by itself once you have stopped.
 // It makes no difference whether you walk, cycle or drive.
-let TRIP_START_M=60, TRIP_IDLE_MS=5*60000; const TRIP={a:null}, TRIP_STILL_M=25, TRIP_MOVE_M=40;
+let TRIP_START_M=60, TRIP_IDLE_MS=5*60000; const TRIP={a:null}, TRIP_STILL_M=25, TRIP_MOVE_M=40, TRIP_START_N=3, TRIP_START_MS=(typeof window.HALO_TRIP_MS==='number') ? window.HALO_TRIP_MS : 10000;
 const tripKeep = () => { if(!(W.t0 && W.t1) || W.kept) return; const st=walkStats(); if(!st.heard && !st.distance_m) return; W.kept=true;
   P.trips=P.trips||[]; P.trips.unshift({t0:W.t0,t1:W.t1,m:st.distance_m,heard:st.heard,placed:st.placed,withYou:st.withYou}); P.trips.length=Math.min(P.trips.length,20); save(); };
 function walkStart(t0, a, at){
@@ -4730,19 +4737,23 @@ function walkStart(t0, a, at){
 function walkStop(t1){ if(!W.on) return; if(!t1) walkTick(); W.on=false; W.t1=Math.max(W.t0+1000, t1||Date.now()); wEvent('stop','Trip ended.','',W.t1); try{ if(_wLock) _wLock.release(); }catch(e){} _wLock=null; TRIP.a=null; tripKeep(); wSave(true); renderVicinity(); }
 // Positions in time order, live or from the app's own record. A trip taken with the screen off is recognised and recorded in full.
 function tripStep(q, t, hearing, back){
-  if(!q || !(q.acc<=POS_MAX_ACC)) return;
+  if(!q || !(q.acc<=POS_MAX_ACC) || q.src==='net') return;
   if(!W.on){ const a=TRIP.a;
     if(!hearing) return;
     if(!a || t<a.t-1000){ TRIP.a={lat:q.lat, lon:q.lon, t, left:t}; return; }
     const dm=distLL(a.lat,a.lon,q.lat,q.lon);
-    if(dm<TRIP_STILL_M){ a.left=t; return; }
-    if(dm>=TRIP_START_M){ TRIP.a=null; walkStart(a.left, a, back?t:0); return; }
+    if(dm<TRIP_STILL_M){ a.left=t; a.n=0; return; }
+    { const key=q.t||t; if(key!==a.k){ a.k=key; a.n=(a.n||0)+1; if(a.n===1) a.out=t; } }          // one fix away from where you stood says little. Three in a row, over ten seconds, is movement
+    if(dm>=TRIP_START_M && a.n>=TRIP_START_N && t-a.out>=TRIP_START_MS){ TRIP.a=null; walkStart(a.left, a, back?t:0); return; }
     if(t-a.left>10*60000) TRIP.a={lat:q.lat, lon:q.lon, t, left:t};
     return; }
   const i=W.idle;
   if(!i || distLL(i.lat,i.lon,q.lat,q.lon)>=TRIP_MOVE_M){ W.idle={lat:q.lat, lon:q.lon, t}; return; }
-  if(t-i.t>TRIP_IDLE_MS){ walkStop(back?i.t+TRIP_IDLE_MS:0); TRIP.a={lat:q.lat, lon:q.lon, t, left:t}; }
+  if(t-i.t>TRIP_IDLE_MS){ tripTrim(i); walkStop(back?i.t+TRIP_IDLE_MS:0); TRIP.a={lat:q.lat, lon:q.lon, t, left:t}; }
 }
+// Once you have stopped, a phone's position still wanders a little. Those points are no part of your route: it ends where you stopped.
+function tripTrim(i){ const R=W.route||[], k=R.findIndex(p=>p.t>i.t); if(k<1) return; R.length=k;
+  let m=0; for(let j=1;j<R.length;j++){ const d=distLL(R[j-1].lat,R[j-1].lon,R[j].lat,R[j].lon); if(d<500) m+=d; } W.dist=m; }
 function tripAuto(){ if(!W.on && TRIP.a && S.pos && S.pos.t<TRIP.a.t) return;      // the app's record is ahead of the last live fix: wait for the next one
   tripStep(S.pos, Date.now(), mobileLive(), false); }
 document.addEventListener('visibilitychange', ()=>{ if(!W.on) return;
@@ -4753,15 +4764,15 @@ document.addEventListener('visibilitychange', ()=>{ if(!W.on) return;
     if(PH.native && PH.on) nativeDrain();
     wLock(); } });
 function walkPos(q, at){
-  const sp=q||S.pos; if(!W.on || !sp) return; const now=at||Date.now();
+  const sp=q||S.pos; if(!W.on || !sp || sp.src==='net') return; const now=at||Date.now(), step=(typeof sp.spd==='number' && sp.spd<SLOW_MPS) ? Math.max(SLOW_STEP_M, 2*(sp.acc||0)) : 8;          // the phone says it is hardly moving: a new route point needs real distance
   { const S={pos:sp}, l=W.route[W.route.length-1], dm=l?distLL(l.lat,l.lon,S.pos.lat,S.pos.lon):Infinity, good=S.pos.acc<=POS_MAX_ACC;
     if(l && now<l.t) return;
-    if(!l || (good && dm>=8)){ if(l && dm<500) W.dist+=dm; W.route.push({t:now,lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6),acc:Math.round(S.pos.acc)}); if(W.route.length>4000) W.route.shift(); }
+    if(!l || (good && dm>=step)){ if(l && dm<500) W.dist+=dm; W.route.push({t:now,lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6),acc:Math.round(S.pos.acc)}); if(W.route.length>4000) W.route.shift(); }
     if(!good && !W.rough){ W.rough=true; wEvent('warn','Your position is good to '+Math.round(S.pos.acc)+' m just now. Placement resumes as it sharpens.'); }
     else if(good && W.rough){ W.rough=false; wEvent('note','Your position is good again, within '+Math.round(S.pos.acc)+' m.'); } }
 }
 function walkTick(at, only, q){
-  if(!W.on) return; const back=!!at, now=at||Date.now(), nowS=now+LIVE.skew, here=q||S.pos; _wAt=back?now:0;
+  if(!W.on) return; const back=!!at, now=at||Date.now(), nowS=now+LIVE.skew, here=q||((S.pos && S.pos.src!=='net')?S.pos:null); _wAt=back?now:0;
   if(!back){ walkPos();
     const sen=mobileLive();
     if(!sen && !W.silent && now-W.t0>20000){ W.silent=true; wEvent('warn','Listening paused. Halo resumes as soon as the sensor reports again.'); }
