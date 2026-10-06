@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.09', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.10', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1595,44 +1595,44 @@ function spBlock(t,k,num,title,lead){ const d=doneMap(t), st=spSteps(t,k);
       (x.fx?'<span class="fx"><b>Effect.</b> '+esc(x.fx)+'</span>':'')+(x.note?'<span class="nt"><b>Note.</b> '+esc(x.note)+'</span>':'')+'</span></div>'; }).join(''); }
 
 /* ---------- Special: shown on any real threat the user is exposed to, or has logged a finding against ---------- */
-/* ---------- How real each threat is to you: a rating from 1 to 5, colour coded ----------
-   Real, 1 to 3: an open issue. What it does to you depends on the countermeasures you take now.
-     1 low: every defence is in place.   2 maybe: at least half are in place.   3 likely: most are still open.
-   Imminent, 4 and 5: Halo holds evidence.
-     4 likely to happen: a finding on record, or a precursor in earshot or in the feed.   5 happening to you now. */
-const RATE=[null, {n:1,k:'Real',w:'low',c:'--r1'}, {n:2,k:'Real',w:'maybe',c:'--r2'}, {n:3,k:'Real',w:'likely',c:'--r3'}, {n:4,k:'Imminent',w:'likely to happen',c:'--r4'}, {n:5,k:'Imminent',w:'happening to you now',c:'--r5'}];
-function liveSigns(t){            // what the sensors and the feed hold on this threat at this moment: [rating, why]
+/* ---------- Where you stand on each threat: a rating from 1 to 5, colour coded. Each number names what set it. ----------
+   1 to 3 count your defence steps:  1 every step ticked.   2 half or more ticked.   3 steps still open.
+   4 and 5 come from a finding or a sign:  4 a finding or a sign on record.   5 a sign a sensor shows now, or a finding logged this week.
+   A finding you have marked resolved stays in Evidence and leaves the rating. */
+const RATE=[null, {n:1,k:'Real',w:'every step ticked',c:'--r1'}, {n:2,k:'Real',w:'half or more ticked',c:'--r2'}, {n:3,k:'Real',w:'steps still open',c:'--r3'}, {n:4,k:'Imminent',w:'a finding or a sign on record',c:'--r4'}, {n:5,k:'Imminent',w:'a sign now, or a finding this week',c:'--r5'}];
+const hitsOpen = id => Math.max(0, ((P.hits||{})[id]||0)-((P.hitClosed||{})[id]||0));      // findings logged and not yet marked resolved
+function liveSigns(t){            // what the sensors hold on this threat at this moment: [rating, why, from a sensor]
   const V=vis(), live=V.mode==='live'&&!V.test, near=live?V.devices.filter(d=>d.present&&!d.sim&&!d.mine&&!d.sigFit):[];
   if(t.id==='w_ble'){ const wy=near.filter(d=>d.withYou&&d.band!=='wifi'), rt=near.filter(d=>d.onRoute&&!d.withYou);
     if(wy.length) return [5, devName(wy[0])+' is travelling with you']; if(rt.length) return [4, devName(rt[0])+' has been near you at home and away']; }
   if(t.id==='w_tower' && rayRecent('High').length) return [5,'your Rayhunter reports a tower behaving like a fake one'];
   if(t.id==='w_tower' && rayRecent().length) return [4,'your Rayhunter raised a warning'];
-  if(t.id==='w_tower' && cellLive() && CELL.serving){ if(CELL.serving.gen==='2G') return [5,'your phone is on 2G at this moment'];
-    const sus=(typeof towerSuspects==='function')?towerSuspects():[]; if(sus.length) return [4,'a tower in use shows the signs of a fake one']; if(cellFlaps()>=3) return [4,'your tower keeps changing while you stand still']; }
+  if(t.id==='w_tower' && cellLive() && CELL.serving){ const dr=cellDrop(); if(dr) return [4,'your phone moved from '+dr.from+' to 2G at '+hhmm(dr.t)];
+    const sus=(typeof towerSuspects==='function')?towerSuspects():[]; if(sus.length) return [4,'the tower in use shows several of the signs Halo tests for']; if(cellFlaps()>=3) return [4,'your tower keeps changing while you stand still']; }
   if(t.id==='a_pubwifi' && live){ const wy=near.filter(d=>d.band==='wifi'&&d.withYou); if(wy.length) return [5,'a hotspot is travelling with you'];
     const by={}; wifiNow().forEach(d=>{ if(d.adv&&!d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
     if(Object.keys(by).some(n=>by[n].length>1&&by[n].some(d=>/^Open/.test(d.hint))&&by[n].some(d=>/^Secured/.test(d.hint)))) return [4,'a copied Wi-Fi name is in range']; }
-  if(t.tool==='alias' && P.aliases.some(a=>aliasScore(a).n>=3)) return [5,'an alias is joined to you'];
-  if(t.tool==='patch'){ let k=[]; try{ k=kevMine(); }catch(e){} if(k.length) return [4,'a flaw in '+kevWords(k[0]).name+' is under attack']; }
+  if(t.tool==='alias'){ const j=P.aliases.filter(a=>aliasScore(a).n>=3); if(j.length) return [4, 'the alias '+j[0].name+' shares '+aliasScore(j[0]).n+' anchors with your real identity, by your own marks', false]; }
   return null; }
 function rating(t){
   if(t.shelf!=='real' || scopeOf(t)!==true) return null;
-  const sg=liveSigns(t); if(sg) return Object.assign({why:sg[1]}, RATE[sg[0]]);
-  const hits=(P.hits||{})[t.id]||0, at=(P.hitAt||{})[t.id]||0;
-  if(hits) return Object.assign({why: at&&Date.now()-at<7*86400000 ? 'you logged a finding this week' : hits+' finding'+(hits===1?'':'s')+' on record'}, RATE[at&&Date.now()-at<7*86400000?5:4]);
+  const sg=liveSigns(t), hits=hitsOpen(t.id), at=(P.hitAt||{})[t.id]||0, wk=!!at&&Date.now()-at<7*86400000;
+  const fr = hits ? Object.assign({why: wk ? 'a finding was logged this week' : hits+' finding'+(hits===1?'':'s')+' on record', finding:true}, RATE[wk?5:4]) : null;
+  if(sg){ const lr=Object.assign({why:sg[1], live:sg[2]!==false}, RATE[sg[0]]); return (fr && fr.n>lr.n) ? fr : lr; }          // the higher of the two stands; a sign a sensor shows now wins a tie
+  if(fr) return fr;
   const n=stepsOf(t).length, dn=doneCount(t);
-  if(n && dn>=n) return Object.assign({why:'every defence is in place'}, RATE[1]);
-  if(n && dn*2>=n) return Object.assign({why:dn+' of '+n+' defences in place'}, RATE[2]);
-  return Object.assign({why:n?(dn?dn+' of '+n+' defences in place':'your defences start here'):'Halo is watching this one for you'}, RATE[3]); }
-const rateText = r => r.k+' '+r.n+', '+r.w;
-const rateChip = r => '<span class="rate" style="--rc:var('+r.c+')"><b>'+r.n+'</b>'+r.k+' · '+r.w+'</span>';
+  if(n && dn>=n) return Object.assign({why:'every defence step is ticked'}, RATE[1]);
+  if(n && dn*2>=n) return Object.assign({why:dn+' of '+n+' defence steps ticked'}, RATE[2]);
+  return Object.assign({why:n?(dn?dn+' of '+n+' defence steps ticked':'your defence steps start here'):'this card is for your awareness'}, RATE[3]); }
+const rateText = r => 'Rating '+r.n+', '+r.w;
+const rateChip = r => '<span class="rate" style="--rc:var('+r.c+')"><b>'+r.n+'</b>'+r.w+'</span>';
 const rateKey = () => '<div class="ratekey">'+RATE.slice(1).map(rateChip).join('')+'</div>';
 
 /* ---------- Special: shown on any real threat that is real to you, or that you have logged a finding against ---------- */
 function experiencing(t){
   if(t.shelf!=='real') return null;
-  const hits=(P.hits||{})[t.id]||0;
-  if(t.tool==='alias' && P.aliases.some(a=>aliasScore(a).n>=3)) return {lvl:'conf', txt:'An alias is joined to you'};
+  const hits=hitsOpen(t.id);
+  if(t.tool==='alias' && P.aliases.some(a=>aliasScore(a).n>=3)) return {lvl:'conf', txt:'An alias shares three or more anchors with you'};
   if(hits) return {lvl:'conf', txt:hits+' finding'+(hits===1?'':'s')+' logged'};
   const r=rating(t); if(r) return {lvl:r.n>=4?'conf':'exp', txt:rateText(r)};
   return null;
@@ -1644,7 +1644,7 @@ function assess(){
   const answered = PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const pool = THREATS.filter(t=>t.shelf==='real' && (S.mode==='auto' || t.side===S.mode));
   const applies = pool.filter(t=>scopeOf(t)===true), unknown = pool.filter(t=>scopeOf(t)===null);
-  const rn=t=>{ const r=rating(t); return r?r.n:0; }, imm=applies.filter(t=>rn(t)>=4).length;
+  const rn=t=>{ const r=rating(t); return r?r.n:0; };
   const open = applies.filter(isOpen).sort((a,b)=>rn(b)-rn(a) || IMPACT_W(b.impact)-IMPACT_W(a.impact) || doneCount(a)-doneCount(b));
   const V=vis();
   const vic = V.mode==='live' ? (V.test?'Vicinity: test data':'Vicinity: live from your sensor')
@@ -1658,10 +1658,15 @@ function assess(){
     s:'Answer your profile and Halo rates every threat for you, from 1 to 5.',
     meta:reg+' · '+vic };
   const meta=reg+' · '+vic+(unknown.length?' · '+unknown.length+' waiting on your profile':'');
+  // A threat rated 4 or 5 sets the bottom line before any count of steps. A sign a sensor shows now reads Take Action; a finding on record reads Warning.
+  const hot=applies.map(t=>({t, r:rating(t)})).filter(x=>x.r&&x.r.n>=4).sort((x,y)=>y.r.n-x.r.n || (y.r.live?1:0)-(x.r.live?1:0) || IMPACT_W(y.t.impact)-IMPACT_W(x.t.impact));
+  if(hot.length){ const x=hot[0], act=x.r.n===5&&!!x.r.live, more=hot.length-1;
+    return { t:act?3:2, n:hot.length, title:act?'Take Action':'Warning', side:x.t.side==='w'?'Watchers':'Attackers', top:x.t.id,
+      s:esc(x.t.name)+' is rated '+x.r.n+': '+esc(x.r.why)+'.'+(more?' '+more+' more '+(more===1?'is':'are')+' rated 4 or 5.':'')+' Open '+esc(x.t.name)+'.', meta, applies, open }; }
   if(!open.length) return { t:0, n:0, title:'Clear, for what is assessed', side,
-    s:'Every defence is complete for the '+applies.length+' threats that are real to you. '+(V.mode==='live'&&!V.test?'A sensor is reporting, and no device is moving with you.':'Start listening and Halo also watches the devices around you.'), meta, applies, open };
+    s:'Every defence step is ticked for the '+applies.length+' threats that are real to you, and none is rated 4 or 5. '+(V.mode==='live'&&!V.test?'A sensor is reporting, and no device is moving with you.':canHear()?'Start listening and Halo also watches the devices around you.':'The full map shows the cameras and tower sites around you.'), meta, applies, open };
   return { t: open.length<=2?1:2, n:open.length, title: open.length<=2?'Watch':'Warning', side,
-    s: applies.length+' threats are real to you'+(imm?', and '+imm+(imm===1?' is':' are')+' imminent':'')+'. '+open.length+' still '+(open.length===1?'has':'have')+' defences to complete. Start with '+open[0].name+'.',
+    s: applies.length+' threats are real to you. '+open.length+' still '+(open.length===1?'has':'have')+' defence steps to tick. Start with '+open[0].name+'.',
     meta, applies, open };
 }
 
@@ -1678,7 +1683,7 @@ function threatPull(t){
   if(t.shelf==='potential'){ bar='--cyan'; sum='Potential · '+t.imminence; }
   else if(sc===false){ bar='--dim'; sum='Does not apply, from your profile'; }
   else if(sc===null){ bar='--mut'; sum='Answer your profile · '+dn+' of '+n+' defences done'; }
-  else { const r=rating(t); bar=r.c; sum=rateChip(r)+' · '+(n&&dn>=n?'defended, ':'')+dn+' of '+n+' defences done'; }
+  else { const r=rating(t); bar=r.c; sum=rateChip(r)+' · '+dn+' of '+n+' defence steps ticked'; }
   if(sc!==false){ const q=spCount(t); if(q.n) sum+=' · Special '+q.dn+' of '+q.n; }
   const gold = !!ex && spCount(t).n>0 && !(n && dn>=n && spCount(t).dn>=spCount(t).n);
   if(gold) bar='--att2';
@@ -1702,10 +1707,10 @@ function threatBody(t){
   h+='<div class="dsec"><h4>What it does to you</h4><p>'+esc(t.what)+'</p></div>';
   h+='<div class="dsec"><h4>You</h4><div class="kv">'+
      '<span class="k">Rating</span><span class="v '+exp[1]+'">'+exp[0]+'</span>'+
-     '<span class="k">Your findings</span><span class="v '+(hits?'warnc':'unkc')+'">'+(hits?hits+' logged in Evidence':'None logged')+'</span>'+
+     '<span class="k">Your findings</span><span class="v '+(hitsOpen(t.id)?'warnc':'unkc')+'">'+(hits?hits+' logged in Evidence'+(hitsOpen(t.id)?' <button class="btn sm" data-act="hit-close" data-id="'+t.id+'" style="margin-left:6px">Mark resolved</button>':' · resolved &#10003;'):'None logged')+'</span>'+
      '<span class="k">Sensor evidence</span><span class="v '+(vis().mode==='live'?'okc':'unkc')+'">'+(vis().mode==='live'?'Live from your sensor':'Starts when Halo is listening')+'</span>'+
      '<span class="k">Estimated impact</span><span class="v">'+esc(t.impact)+'</span>'+
-     '<span class="k">Runs on</span><span class="v">'+esc(t.needs)+'</span></div>'+(rt?rateKey()+'<div class="limit" style="margin-top:6px">Real, 1 to 3: an open issue, and what it does to you depends on the countermeasures you take now. Imminent, 4 and 5: Halo holds evidence that it is likely to happen, or that it is happening to you now.</div>':'')+'</div>';
+     '<span class="k">Runs on</span><span class="v">'+esc(t.needs)+'</span></div>'+(rt?rateKey()+'<div class="limit" style="margin-top:6px">1 to 3: the share of your defence steps that are ticked. 4 and 5: a finding you logged, or a sign a sensor shows. Mark a finding resolved and it leaves the rating; the entry stays in Evidence.</div>':'')+'</div>';
   h+='<div class="dsec"><div class="dhead"><h4>Defend, step by step</h4>'+(hasPlat(t)?platPills():'')+'</div>';
   if(!t.steps.length) h+='<p>No action is available today. Halo tracks the date and moves this to Real &amp; Imminent the day a carrier in your area switches it on.</p>';
   steps.forEach((s,n)=>{ const on=!!d[s.i];
@@ -1914,7 +1919,7 @@ function scopeHTML(a){
   const extra=[cellLive()?CELL.list.length+(CELL.list.length===1?' tower':' towers'):'', (typeof poiCount==='function'&&poiCount('alpr'))?poiCount('alpr')+' cameras':''].filter(Boolean).join(' · ');
   return '<div class="nd" data-act="pipe" data-k="global" title="Open the Global scan"><span class="pl">Worldwide now</span><b>'+(THREATS.length+kevN)+'</b><i>'+THREATS.length+' threats'+(kevN?' · '+kevN+' live flaws':'')+(today?' · '+today+' reports today':'')+'</i></div>'+
     '<div class="nd" data-act="pipe" data-k="near" title="Open Watchers"><span class="pl">Around you now</span><b>'+(live?near.length:'&#9679;')+'</b><i>'+(live?(flagged?flagged+' flagged':'none flagged')+(extra?' · '+extra:''):esc(stateWords(V.mode).count))+'</i></div>'+
-    '<div class="nd" data-act="pipe" data-k="you" title="Open Your profile"><span class="pl">Real to you</span><b>'+(answered?applies:'?')+'</b><i>'+(answered?((imm?'<span style="color:var(--r5)">'+imm+' imminent</span> · ':'')+(openN?openN+' to defend':'all defended')):'answer Your profile')+'</i></div>'+
+    '<div class="nd" data-act="pipe" data-k="you" title="Open Your profile"><span class="pl">Real to you</span><b>'+(answered?applies:'?')+'</b><i>'+(answered?((imm?'<span style="color:var(--r5)">'+imm+' rated 4 or 5</span> · ':'')+(openN?openN+' to defend':'all defended')):'answer Your profile')+'</i></div>'+
     '<div class="nd end" style="--tierc:var('+(a.t<0?'--mut':TIER_VAR[a.t])+')"><span class="pl">Bottom line</span><b style="color:var(--tierc)">'+esc(a.t<0?'Unknown':TIER_NAME[a.t])+'</b><i>read below</i></div>';
 }
 function scopeTick(){ const box=el('scopePills'); if(!box || S.view!=='overview') return; const now=Date.now(); if(now-(S._scT||0)<900) return; S._scT=now;
@@ -3256,7 +3261,7 @@ function reportHTML(){
   const row=t=>{ const n=stepsOf(t).length, dn=doneCount(t), sc=scopeOf(t), sp=spCount(t);
     return {t, sc, n, dn, sp, rate:rating(t), hits:(P.hits||{})[t.id]||0, st: t.shelf!=='real'?'Potential':sc===false?'Does not apply':sc===null?'Profile to answer':(!n?'No action available':dn>=n?'Defended':dn>0?'Partly defended':'Open')}; };
   const R=THREATS.filter(t=>t.shelf==='real').map(row), POT=THREATS.filter(t=>t.shelf!=='real').map(row);
-  const applies=R.filter(r=>r.sc===true), unknown=R.filter(r=>r.sc===null), open=applies.filter(r=>r.n&&r.dn<r.n).sort((x,y)=>IMPACT_W(y.t.impact)-IMPACT_W(x.t.impact)||x.dn-y.dn), done=applies.filter(r=>r.n&&r.dn>=r.n);
+  const applies=R.filter(r=>r.sc===true), unknown=R.filter(r=>r.sc===null), open=applies.filter(r=>r.n&&r.dn<r.n).sort((x,y)=>((y.rate||{}).n||0)-((x.rate||{}).n||0)||IMPACT_W(y.t.impact)-IMPACT_W(x.t.impact)||x.dn-y.dn), done=applies.filter(r=>r.n&&r.dn>=r.n);
   const answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const live=V.mode==='live'&&!V.test, near=live?V.devices.filter(d=>d.present&&!d.sim):[], withYou=near.filter(d=>d.withYou), route=near.filter(d=>d.onRoute&&!d.withYou);
   const hc=healthCount(), nextStep=r=>{ const d=doneMap(r.t); return stepsOf(r.t).find(x=>!d[x.i]); };
@@ -3274,8 +3279,8 @@ function reportHTML(){
      '<div class="rp-bar4"><div><span>Watchers</span><b>'+e(sideWord('w'))+'</b></div><div><span>Attackers</span><b>'+e(sideWord('a'))+'</b></div><div><span>Around you</span><b>'+e(vicWord)+'</b></div><div><span>This device</span><b>'+e(!hc.at?'Not checked':hc.att?hc.att+' need attention':'In order')+'</b></div></div>';
   if(!answered) h+='<p>Answer your profile and Halo matches every threat in its register to you. It takes about two minutes, and it is the first action in the plan below.</p>';
   else h+='<p>'+plural(applies.length,'threat','threats')+' of the '+R.length+' in use against people today '+(applies.length===1?'is':'are')+' real to you, on the strength of your own profile answers. '+
-       (done.length?plural(done.length,'is','are')+' fully defended. ':'None is fully defended yet. ')+
-       (open.length?plural(open.length,'still has','still have')+' steps to complete. The most serious open item is '+e(open[0].t.name)+', because what it reaches is '+e(lowerFirst(open[0].t.impact))+'.':'Every defence that applies to you is complete.')+
+       (done.length?plural(done.length,'has','have')+' every defence step ticked. ':'')+
+       (open.length?plural(open.length,'still has','still have')+' steps to tick. Start with '+e(open[0].t.name)+': what it reaches is '+e(lowerFirst(open[0].t.impact))+'.':'Every defence step that applies to you is ticked.')+
        (unknown.length?' '+plural(unknown.length,'more is','more are')+' decided as soon as you answer the remaining profile questions.':'')+'</p>';
   h+='<p>'+(live ? 'A sensor is reporting, and '+plural(near.length,'device is','devices are')+' in earshot. '+(withYou.length?e(withYou.map(devName).join(', '))+' '+(withYou.length===1?'has':'have')+' met the test for moving with you. Treat this as the first priority, and read the advisory in section 8 before you act.':'None has met the test for moving with you.')+(route.length?' '+plural(route.length,'device has','devices have')+' been heard in more than one place on your route.':'')
         : V.mode==='live' ? 'The sensor data on this account is test data.'
@@ -3305,20 +3310,20 @@ function reportHTML(){
     h+='<h3>Last recorded trip</h3><p>On '+dstr(new Date(W.t0))+', from '+hhmm(W.t0)+' to '+hhmm(W.t1)+', you covered '+e(miText(st.distance_m))+'. Your sensor heard '+plural(st.heard,'device','devices')+', placed '+st.placed+', and flagged '+st.withYou+' as moving with you'+(wy.length?': '+e(wy.map(r=>r.label||r.call).join(', ')):'')+'.'+'</p>'; }
   // ---- 4 bottom line detail
   const stepsAll=applies.reduce((n,r)=>n+r.n,0), stepsDone=applies.reduce((n,r)=>n+Math.min(r.dn,r.n),0), spAll=applies.reduce((n,r)=>n+r.sp.n,0), spDone=applies.reduce((n,r)=>n+r.sp.dn,0), hitsAll=THREATS.reduce((n,t)=>n+((P.hits||{})[t.id]||0),0);
-  h+='<h2>4. The bottom line in detail</h2><p>The bottom line is read from the components below. Any one of them can raise it.</p>'+
+  h+='<h2>4. The bottom line in detail</h2><p>The bottom line is set by three of the components below: a device that meets the test for moving with you, the highest rating among the threats real to you, and the number of threats with defence steps still to tick. The others are shown for your record.</p>'+
     tbl(['Component','Reading','What it means'],[
       ['Your path',(ps=>ps.rank+', level '+ps.lvl+' of 5, '+ps.pct+'% protected')(pathState()),'Five stages, from set-up to staying ahead'],
       ['Threats real to you',answered?applies.length+' of '+R.length:'Profile to answer','Decided by your profile answers alone'],
       ['Defence steps complete',stepsAll?stepsDone+' of '+stepsAll:'None to count','Each step is one setting or habit that closes one path'],
       ['Special countermeasures complete',spAll?spDone+' of '+spAll:'None to count','Stronger steps, for a threat you believe is active'],
-      ['Findings you have logged',String(hitsAll),'Your own observations, kept in Evidence'],
+      ['Findings you have logged',String(hitsAll),'Your own observations, kept in Evidence. An open finding rates its threat 4 or 5'],
       ['Devices moving with you',live?String(withYou.length):'Starts with listening','One or more raises the bottom line to Take Action'],
       ['Global feed',e(g?'Live, '+fmtDT(g.generated):'Register of '+REGISTER_DATE),'Flaws under active attack and public advisories'],
       ['Device health',e(!hc.at?'Ready to run':hc.ok+' pass, '+hc.att+' to attend to'),'What this device reports about itself'],
       ['Evidence chain',plural(P.evidence.length,'entry','entries'),'Each entry is fingerprinted and chained to the one before']]);
   // ---- 5 register
-  const reg=rs=>tbl(['Threat','What it is','Rating','Defence','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.rate?'<b>'+r.rate.n+'</b> '+e(r.rate.k+', '+r.rate.w):r.sc===false?'Does not apply':r.t.shelf!=='real'?'Potential':'To answer', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
-  h+='<h2>5. The threat register, in full</h2><p>Every threat Halo tracks is listed, with its rating for you. Real, 1 low, 2 maybe, 3 likely: an open issue, and what it does to you depends on the countermeasures you take now. Imminent, 4 likely to happen, 5 happening to you now: Halo holds evidence. Watchers are those who observe where you are and what you do. Attackers are those who take over a device, an account or an identity.</p>'+
+  const reg=rs=>tbl(['Threat','What it is','Rating','Defence','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.rate?'<b>'+r.rate.n+'</b> '+e(r.rate.w):r.sc===false?'Does not apply':r.t.shelf!=='real'?'Potential':'To answer', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
+  h+='<h2>5. The threat register, in full</h2><p>Every threat Halo tracks is listed, with its rating for you. The rating names what set it. 1, every defence step ticked. 2, half or more ticked. 3, steps still open. 4, a finding or a sign on record. 5, a sign a sensor shows now, or a finding logged this week. Watchers are those who observe where you are and what you do. Attackers are those who take over a device, an account or an identity.</p>'+
      '<h3>Watchers, in use today</h3>'+reg(R.filter(r=>r.t.side==='w'))+'<h3>Attackers, in use today</h3>'+reg(R.filter(r=>r.t.side==='a'))+
      (POT.length?'<h3>Potential: not in use against people yet</h3>'+tbl(['Threat','What it is','When','Defence'],POT.map(r=>['<b>'+e(r.t.name)+'</b>',e(r.t.short),e(r.t.imminence||'Not known'),r.n?r.dn+' of '+r.n:'None available yet'])):'');
   const explain=R.filter(r=>r.sc!==false);
@@ -4968,6 +4973,8 @@ document.addEventListener('click', e=>{
       const c=el('tp-'+t.id); if(c) c.scrollIntoView({block:'start'}); break; }
     case 'note': { const t=T(a.dataset.id), x=val('note-'+t.id); if(!x) return toast('Write what you found first.');
       P.hits=P.hits||{}; P.hits[t.id]=(P.hits[t.id]||0)+1; P.hitAt=P.hitAt||{}; P.hitAt[t.id]=Date.now(); logEvidence('finding',t.name+': '+x); toast('Added to Evidence.'); rerender(); if(el('rost')) renderRoster(); break; }
+    case 'hit-close': { const t=T(a.dataset.id); if(!t) break; const n=hitsOpen(t.id); if(!n) break; P.hitClosed=P.hitClosed||{}; P.hitClosed[t.id]=(P.hits||{})[t.id]||0; save();
+      logEvidence('note',t.name+': '+n+' finding'+(n===1?'':'s')+' marked resolved.'); toast('Marked resolved. The entries stay in Evidence.'); rerender(); break; }
     case 'alias-add': { const n=val('aliasName'); if(!n) return toast('Enter the alias name.'); P.aliases.push({name:n,links:{}}); save(); rerender(); break; }
     case 'alias-del': P.aliases.splice(+a.dataset.i,1); save(); rerender(); break;
     case 'alias-link': { const al=P.aliases[+a.dataset.i]; al.links=al.links||{}; al.links[a.dataset.k]=!al.links[a.dataset.k]; save(); rerender(); break; }
@@ -5037,8 +5044,9 @@ document.addEventListener('click', e=>{
     case 'trap-file': el('trapFile').click(); break;
     case 'trap-clear': S.trap=null; rerender(); break;
     case 'trap-copy': { const r=S.trap; if(!r) break; (navigator.clipboard?navigator.clipboard.writeText(r.clean):Promise.reject()).then(()=>toast('Cleaned text copied. Read it before you use it.')).catch(()=>toast('Copy was not allowed by this browser.')); break; }
-    case 'trap-log': { const r=S.trap; if(!r||r.logged) break; r.logged=true; P.hits=P.hits||{}; P.hits.a_agent=(P.hits.a_agent||0)+1;
-      logEvidence('finding','Agent Trap Check: '+TRAP_LVL[r.level][0]+'. '+r.kind+(r.name?' ('+r.name+')':'')+', '+r.bytes+' characters, SHA-256 '+r.hash+'. '+
+    case 'trap-log': { const r=S.trap; if(!r||r.logged) break; r.logged=true;
+      if(r.level===2){ P.hits=P.hits||{}; P.hits.a_agent=(P.hits.a_agent||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.a_agent=Date.now(); }      // a trap found is a finding against Agent Hijack; a clean check is a record only
+      logEvidence(r.level===2?'finding':'note','Agent Trap Check: '+TRAP_LVL[r.level][0]+'. '+r.kind+(r.name?' ('+r.name+')':'')+', '+r.bytes+' characters, SHA-256 '+r.hash+'. '+
         (r.F.length?r.F.slice(0,6).map(x=>x.t).join('; ')+'.':'No finding.')+(r.hidden.length?' '+r.hidden.length+' hidden parts.':'')+' The content itself is not kept.'); toast('Added to Evidence.'); rerender(); break; }
     case 'health-run': if(!S.healthBusy) healthGo(); break;
     case 'health-tick': { const t=healthTicks(), i=+a.dataset.i; t[i]=!t[i]; save(); if(t[i]) logEvidence('defence','Device health, confirmed on this '+HK_NAME[HK()]+': '+HEALTH_GUIDED[HK()][i][0]+'.'); rerender(); break; }
