@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.08', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.09', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -4157,15 +4157,18 @@ function cellIngest(list, t, pos){
   if(!sv) return; const id=cellId(sv), gen=CELL_GEN[sv.k]||'';
   if(CELL.serving && CELL.serving.id!==id){ const moved=(pos && CELL.serving.pos) ? distLL(pos.lat,pos.lon,CELL.serving.pos.lat,CELL.serving.pos.lon) : null;
     CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved, tac:String(CELL.serving.c.tac)!==String(sv.tac)}); if(CELL.changes.length>200) CELL.changes.shift();
-    if(W.on && gen==='2G' && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone dropped from '+CELL.serving.gen+' to 2G.','',t); }
+    if(W.on && gen==='2G' && CELL.serving.gen && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone moved from '+CELL.serving.gen+' to 2G.','',t); }
   if(W.on){ W.cells=W.cells||{}; W.cells[id]=1; if(gen==='2G') W.g2=true; }
-  if(gen==='2G' && (!CELL.serving || CELL.serving.gen!=='2G') && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save();
-    alertRaise('2g', 'Your phone dropped to 2G', 'A 2G connection gives the phone no way to check that a tower is genuine. Tower Watch has the steps, and Evidence has the record.', {res:'w_tower'}); }
+  // A phone that is simply on 2G is reported on the card. A move from a newer network to 2G is the sign: it is recorded and raised once in six hours.
+  if(gen==='2G' && CELL.serving && CELL.serving.gen && CELL.serving.gen!=='2G' && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved from '+CELL.serving.gen+' to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); save();
+    alertRaise('2g', 'Your phone moved to 2G', 'A 2G connection gives the phone no way to check that a tower is genuine. Tower Watch has the steps, and Evidence has the record.', {res:'w_tower'}); }
   if(CELL.list.length>1) CELL.nbT=t;
   CELL.serving={id, reg:cellReg(sv), gen, c:sv, pos:pos?{lat:pos.lat,lon:pos.lon}:(CELL.serving&&CELL.serving.pos)||null, since:(CELL.serving&&CELL.serving.id===id)?CELL.serving.since:t};
   cellLearn(CELL.serving, t);
 }
 const cellLive = () => CELL.t>0 && Date.now()-CELL.t<60000;
+const cellDrop = () => { if(!cellLive() || !CELL.serving || CELL.serving.gen!=='2G') return null; const now=Date.now();      // a move from a newer network to 2G within the last 30 minutes, while still on 2G
+  for(let i=CELL.changes.length-1;i>=0;i--){ const c=CELL.changes[i]; if(now-c.t>30*60000) break; if(c.to==='2G' && c.from && c.from!=='2G') return c; } return null; };
 const cellFlaps = () => CELL.changes.filter(x=>Date.now()-x.t<10*60000 && x.moved!==null && x.moved<50).length;
 const cellWords = () => { const sv=CELL.serving; return !cellLive()||!sv ? '' : sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', '+(CELL.list.length-1)+' neighbours'; };
 /* Halo's own tower record. Every tower the phone uses is remembered with where and how often, so a tower met for the
@@ -4181,12 +4184,12 @@ async function cellAsk(sv){ const now=Date.now(); if(now-_cellAsk<20000 || SY.st
     const x=r.s===200 && r.j && r.j.cells && r.j.cells[0]; if(!x || x.pending || !P.cells[sv.reg]) return;
     P.cells[sv.reg].reg = x.found ? {found:true, lat:x.lat, lon:x.lon, range:x.range||0, samples:x.samples||0, t:now} : {found:false, t:now}; save(); S._poiKey=''; softRender(); }catch(e){} }
 const placeKnown = pos => { if(!pos) return false; const day=Date.now()-86400000; return Object.keys(P.cells||{}).filter(id=>{ const r=P.cells[id]; return r.n>=20 && r.t0<day && r.lat!=null && distLL(pos.lat,pos.lon,r.lat,r.lon)<600; }).length>=2; };
-// The signs of a fake tower that a phone can read for itself, each with its weight. Three or more points reads Suspect.
+// The signs a phone can read for itself, each with its weight. They are working rules: the card names each sign it finds, and three or more points adds the advice to move.
 function towerSigns(){ const sv=CELL.serving, out={score:0, signs:[], level:'ok'}, add=(w,t)=>{ out.score+=w; out.signs.push({w,t}); }, done=()=>{ out.level = out.score>=3 ? 'suspect' : out.score>=1 ? 'watch' : 'ok'; return out; };
   rayRecent().slice(0,3).forEach(e=>add(e.sev==='High'?3:e.sev==='Medium'?2:1, 'Your Rayhunter reports: '+e.analyzer+'. '+e.message));
   if(!cellLive() || !sv) return done();
   const c=sv.c, rec=(P.cells||{})[sv.reg], reg=rec&&rec.reg, now=Date.now();
-  if(sv.gen==='2G') add(3,'Your phone was moved to 2G, where a tower does not have to prove it is genuine.');
+  if(sv.gen==='2G'){ const dr=cellDrop(); if(dr) add(2,'Your phone moved from '+dr.from+' to 2G at '+hhmm(dr.t)+'. On 2G a tower does not have to prove it is genuine.'); else out.g2=true; }
   if(reg && reg.found && sv.pos){ const km=distLL(sv.pos.lat,sv.pos.lon,reg.lat,reg.lon)/1000; if(km*1000>Math.max(8000, 3*(reg.range||0))) add(3,'The public register places this tower '+Math.round(km)+' km from where you are.'); }
   if(reg && reg.found===false) add(1,'This tower is absent from the public register. A new tower takes a few days to be listed.');
   if(rec && rec.n<=5 && now-rec.t0<15*60000 && placeKnown(sv.pos)) add(1,'Halo knows this place and is meeting this tower for the first time.');
@@ -4236,7 +4239,7 @@ function rayRow(){ const on=!!(P.ray&&P.ray.on), can=rayCan(), log=(P.rayLog||[]
   return h+'</div>'; }
 function towerSites(){ const g=gz(); if(!g || !ptsHas('site')) return ''; const pr=ptsR(MILE), near=ptsNear().filter(i=>i.k==='site' && i.d<=pr);
   return '<div class="dsec"><h4>Tower sites on the public record <span class="chip pot" style="margin-left:6px">'+near.length+' within '+miText(pr)+'</span></h4>'+
-    (near.length ? '<p>These are the licensed sites on the public record, each a real mast or small cell, shown on the maps in blue. A fake tower is portable and stands on no record: Halo finds one by testing the tower your phone is using against the signs listed here, and a Rayhunter reads the tower itself.</p>'+near.slice(0,6).map(i=>'<div class="rowline"><span><b>'+esc(i.n||'Tower site')+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc([i.t||'', i.c>1?i.c+' installations':'', i.p||''].filter(Boolean).join(' · ')||'on the map')+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.site+'">'+esc(miText(i.d))+' '+compass(i.brg)+'</span></div>').join('')+
+    (near.length ? '<p>These are the licensed sites on the public record, each a real mast or small cell, shown on the maps in blue. A fake tower is portable and stands on no record. Halo tests the tower your phone is using for the signs listed here, and a Rayhunter reads the tower\'s own messages.</p>'+near.slice(0,6).map(i=>'<div class="rowline"><span><b>'+esc(i.n||'Tower site')+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc([i.t||'', i.c>1?i.c+' installations':'', i.p||''].filter(Boolean).join(' · ')||'on the map')+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:'+POI_C.site+'">'+esc(miText(i.d))+' '+compass(i.brg)+'</span></div>').join('')+
       (near.length>6?'<div class="limit" style="margin-top:6px">'+(near.length-6)+' more are on the map in blue.</div>':'')
       : '<p>The record holds no site within '+miText(pr)+' of you.</p>')+
     '<div class="formrow"><button class="btn sm" data-act="map-full">Open the full map</button></div></div>'; }
@@ -4245,17 +4248,19 @@ function toolTower(){
       '<p>Halo asks the public tower register where each tower you use is listed. A tower that is unlisted, or listed far from you, is a strong sign. The request carries the identity of the tower in use, which places you within that tower\'s range, and Halo\'s backend keeps the tower and nothing about who asked.</p>'+
       '<div class="formrow"><button class="btn sm '+(P.cellCheck?'':'primary')+'" data-act="cell-reg">'+(P.cellCheck?'Switch the register check off':'Switch the register check on')+'</button></div>'+
       '<div class="limit" style="margin-top:8px">Cell tower data from OpenCellID, licensed under CC BY-SA 4.0.</div></div>' : '');
-  if(!cellLive() || !CELL.serving) return '<div class="dsec"><h4>Every tower in earshot, live</h4><p>'+(NATIVE()?'Start listening and Halo lists every tower your phone can hear, checks the one in use against the signs of a fake one, and records every change.':'The Halo Android app lists every tower your phone can hear, checks the one in use against the signs of a fake one, and records every change.')+'</p></div>'+regRow;
+  if(!cellLive() || !CELL.serving) return '<div class="dsec"><h4>The cells your phone reports, live</h4><p>'+(NATIVE()?'Start listening and Halo lists':'The Halo Android app lists')+' the tower your phone is using and the neighbour cells it measures, tests the one in use for the signs below, and counts each change of tower.</p></div>'+regRow;
   const sv=CELL.serving, ts=towerSigns(), ch10=CELL.changes.filter(x=>Date.now()-x.t<10*60000).length, rec=(P.cells||{})[sv.reg]||{}, reg=rec.reg;
-  const col={suspect:'--r5',watch:'--r3',ok:'--clear'}[ts.level], word={suspect:'Suspect',watch:'Watch',ok:'Steady'}[ts.level];
+  const n2=(P.cellCheck&&can)?'seven':'five', only2g=ts.level==='ok'&&!!ts.g2, move=' Switch to airplane mode, move a few streets, and call through an end-to-end encrypted app.';
+  const col=only2g?'--r3':{suspect:'--r5',watch:'--r3',ok:'--clear'}[ts.level], word=only2g?'On 2G':{suspect:'Signs present',watch:ts.signs.length===1?'Sign present':'Signs present',ok:'No signs'}[ts.level];
   const tech=c=>(CELL_GEN[c.k]||'')+(c.k==='nr'?' (5G)':'');
   const row=(c,i)=>{ const use=!!c.reg, tc=use?(ts.level==='suspect'?'var(--r5)':ts.level==='watch'?'var(--r3)':'var(--clear)'):'var(--mut)';
-    return '<div class="twr"><span class="tk" style="--tc:'+tc+'">'+(use?(ts.level==='suspect'?'In use · suspect':'In use'):'Neighbour')+'</span><span><b>'+esc(tech(c))+'</b>'+(c.mcc!=null?' · network '+esc(c.mcc+'-'+(c.mnc==null?'':c.mnc)):'')+'</span><span class="ts">'+(c.r==null?'':c.r+' dBm')+'</span>'+
+    return '<div class="twr"><span class="tk" style="--tc:'+tc+'">'+(use?(ts.level==='suspect'?'In use · signs present':'In use'):'Neighbour')+'</span><span><b>'+esc(tech(c))+'</b>'+(c.mcc!=null?' · network '+esc(c.mcc+'-'+(c.mnc==null?'':c.mnc)):'')+'</span><span class="ts">'+(c.r==null?'':c.r+' dBm')+'</span>'+
       '<span class="td">'+[c.ci?'cell '+esc(String(c.ci)):'', c.tac!=null?'area '+c.tac:'', c.pci!=null?'PCI '+c.pci:'', c.ch!=null?'channel '+c.ch:'', (use&&c.ta!=null&&(c.k==='lte'||c.k==='gsm'))?'about '+Math.round(c.ta*(c.k==='lte'?78:554))+' m by timing':''].filter(Boolean).join(' · ')+'</span></div>'; };
-  let h='<div class="dsec"><h4>Every tower in earshot, live <span class="chip pot" style="margin-left:6px">'+CELL.list.length+' in earshot</span></h4>'+
-    '<div class="hrow"><span class="hs '+(ts.level==='ok'?'ok':'att')+'" style="'+(ts.level==='ok'?'':'color:var('+col+');border-color:var('+col+')')+'">'+word+'</span><span>'+
-      (ts.level==='ok' ? 'Your phone is on '+esc(sv.gen)+'. Halo checked the tower in use against '+((P.cellCheck&&can)?'seven':'five')+' signs of a fake one, and it shows none.'
-        : '<b>The tower in use shows '+ts.signs.length+(ts.signs.length===1?' sign':' signs')+' of a fake one.</b> '+ts.signs.map(x=>esc(x.t)).join(' ')+(ts.level==='suspect'?' Switch to airplane mode, move a few streets, and call through an end-to-end encrypted app.':' Halo keeps watching it.'))+'</span></div>'+
+  let h='<div class="dsec"><h4>The cells your phone reports, live <span class="chip pot" style="margin-left:6px">'+CELL.list.length+' reported</span></h4>'+
+    '<div class="hrow"><span class="hs '+(ts.level==='ok'&&!only2g?'ok':'att')+'" style="'+(ts.level==='ok'&&!only2g?'':'color:var('+col+');border-color:var('+col+')')+'">'+word+'</span><span>'+
+      (only2g ? 'Your phone is on 2G. On 2G a phone has no way to check that a tower is genuine. If 2G is unusual where you are, switch to airplane mode, move a few streets, and call through an end-to-end encrypted app.'
+        : ts.level==='ok' ? 'Your phone is on '+esc(sv.gen)+'. Halo tested the tower in use for '+n2+' signs and found none.'
+        : '<b>The tower in use shows '+ts.signs.length+' of the '+n2+' signs Halo tests for.</b> '+ts.signs.map(x=>esc(x.t)).join(' ')+(ts.g2?' Your phone is on 2G.':'')+(ts.level==='suspect'?move:' Halo keeps testing it.'))+'</span></div>'+
     [...CELL.list].sort((a,b)=>(b.reg?1:0)-(a.reg?1:0) || (b.r||-200)-(a.r||-200)).map(row).join('')+
     '<div class="kv" style="margin-top:10px"><span class="k">In use since</span><span class="v">'+hhmm(sv.since)+'</span><span class="k">Changes, last 10 min</span><span class="v">'+ch10+'</span>'+
     '<span class="k">Halo has met it</span><span class="v">'+(rec.n||1)+(rec.n===1?' time':' times')+(rec.t0?', first on '+fmtD(new Date(rec.t0).toISOString()):'')+'</span>'+
@@ -4710,7 +4715,7 @@ function alertScan(){
     else if(d.maybe && d.cls==='Tag') alertRaise('maybe:'+d.sig, 'A tracker tag is staying with you', devName(d)+' '+followText(d)+'. If it is yours, open it and press This is mine. Halo keeps testing.', {dev:d.id});
     else if(d.homeAway) alertRaise('route:'+d.sig, 'A device from your home is near you again', devName(d)+' '+followText(d)+'.', {dev:d.id});
     if(d.cls==='Camera') alertRaise('cam:'+d.sig, /Raven/.test(d.hint)?'A gunshot detector is in earshot':'A plate camera is in earshot', devName(d)+' is broadcasting '+distText(d)+' from you. Halo places it on the map as you move.', {dev:d.id}); });
-  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv && sv.gen!=='2G' && !rayRecent('High').length){ if(alertRaise('tower:'+sv.reg, 'A tower in use shows the signs of a fake one', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows the signs of a fake one. '+ts.signs.map(x=>x.t).join(' ')); } } }
+  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv && sv.gen!=='2G' && !rayRecent('High').length){ if(alertRaise('tower:'+sv.reg, 'The tower in use shows several of the signs Halo tests for', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows several of the signs Halo tests for. '+ts.signs.map(x=>x.t).join(' ')); } } }
   const by={}; wifiNow().forEach(d=>{ if(d.adv && !d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
   Object.keys(by).forEach(n=>{ const x=by[n]; if(x.length>1 && x.some(d=>/^Open/.test(d.hint)) && x.some(d=>/^Secured/.test(d.hint)))
     alertRaise('twin:'+n, 'A copied Wi-Fi network is in range', n+' appears both locked and open. Join only the locked one, or use mobile data.', {res:'a_pubwifi'}); });
