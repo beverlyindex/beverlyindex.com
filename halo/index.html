@@ -971,7 +971,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.30', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.31', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2968,6 +2968,8 @@ const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+
 // One tier per device, read straight from what it did: moving with you is Take Action, as in the bottom line.
 const DEV_TIER=['No flag','Watch','Warning','Take Action'];
 const NAME_NOTE='Names. Halo shows the name a device broadcasts, such as a computer, a headset, a car or a Wi-Fi network. Phones keep their owner\'s name private by design, so Halo names each by its maker and a short tag. Open a device to give it your own label.';
+const identBy = d => !d.live ? '' : d.paired ? 'Paired with this phone' : d.mine ? 'Marked as yours' : labelOf(d) ? 'Your own label' : d.adv ? (String(d.sig||'').slice(0,3)==='bc:' ? 'The name it gives in a Bluetooth search' : d.band==='wifi' ? 'Its network name' : 'The name it broadcasts')
+  : d.cls!=='Unknown' ? 'Its kind and maker, from what it broadcasts' : d.hint ? 'Its maker, from what it broadcasts' : 'Nothing it broadcasts names it';
 function deviceThreat(d){ const s = (d.mine||d.sigFit) ? 0 : d.withYou ? 3 : (d.maybe||d.homeAway) ? 2 : d.onRoute ? 1 : 0;
   return {c:d.identity, s, tierIdx:s}; }
 const rosterState = d => !d.live||d.present ? d.trend : d.atHome ? 'heard at home' : 'out of earshot';
@@ -3434,7 +3436,7 @@ function mapFullTick(force){
   const ch=el('mfChips'); if(ch._h!==chips){ ch.innerHTML=chips; ch._h=chips; }
   const sd=MF.sel && devs.find(d=>d.id===MF.sel);
   setHTML(el('mfInfo'), sd ? '<div class="mf-info"><b>'+esc(devName(sd))+'</b> · '+esc(kindText(sd))+'<br>'+esc(distText(sd))+(sd.bearing!=null?', '+esc(whereWords(sd))+(heading()!=null?' ('+esc(compass(sd.bearing))+')':''):'. Move and make a turn, and Halo finds its direction')+
-      (sd.fix?' · placed within '+Math.round(sd.fix.unc)+' m':sd.sector?' · direction only':'')+' · '+esc(flagOf(sd))+
+      (sd.fix?' · placed within '+Math.round(sd.fix.unc)+' m':sd.sector?' · direction only':'')+' · '+esc(flagOf(sd))+'<br><span style="color:var(--mut)">Identified by: '+esc(identBy(sd).charAt(0).toLowerCase()+identBy(sd).slice(1))+'</span>'+
       '<div class="formrow"><button class="btn sm primary" data-act="mf-ident" data-id="'+sd.id+'">Identify</button><button class="btn sm" data-act="mf-dev" data-id="">Close</button></div></div>'
     : (MF.pt && PT_WORD[MF.pt.k]) ? ptCard(MF.pt, 'data-act="mf-dev" data-id=""') : '');
   if(S.oneMap) oneRender();
@@ -4219,7 +4221,7 @@ function ingestReport(sid, rowT, p, off){
     d.lastSeen=Math.max(d.lastSeen||0, at); d.firstSeen=Math.min(d.firstSeen, at); d.timesSeen++; d.sensor=sid; d.identity=Math.max(1,Math.min(3,(s.conf|0)||2));
     if(station) d.seenStation=Math.max(d.seenStation, at); else { d.seenMobile=Math.max(d.seenMobile, at); if(away) d.seenAway=Math.max(d.seenAway||0, at); }
     d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
-    const fl=Array.isArray(s.flags)?s.flags:[]; d.fFollow=!station&&fl.indexOf('with_you')>=0; d.fRoute=fl.indexOf('route')>=0; d.fKnown=fl.indexOf('known')>=0; d.randomizes=fl.indexOf('randomized')>=0; d.paired=fl.indexOf('paired')>=0 || (!!d.adv && PAIRED.names.has(d.adv));
+    const fl=Array.isArray(s.flags)?s.flags:[]; d.fFollow=!station&&fl.indexOf('with_you')>=0; d.fRoute=fl.indexOf('route')>=0; d.fKnown=fl.indexOf('known')>=0; d.randomizes=fl.indexOf('randomized')>=0; d.paired=fl.indexOf('paired')>=0 || (!!d.adv && PAIRED.names.has(d.adv)); if(typeof s.tx==='number' && Number.isFinite(s.tx)) d.tx=Math.round(s.tx);
     if(pos && rssi!==null && !(pos.acc>POS_MAX_ACC)) addSample(d,pos,rssi,at);            // a poor position fix would mislead the placement
     if(!station && rssi!==null) legAdd(d, (pos && !(pos.acc>POS_MAX_ACC))?pos:null, rssi, at);
     d.hist.push(reading); if(d.hist.length>12) d.hist.shift();
@@ -4513,9 +4515,9 @@ function toolWifi(){
 }
 // The kind a device states for itself in a Bluetooth search: the standard class of device.
 function codKind(cod){ cod=Number(cod)||0; const major=(cod>>8)&31, minor=(cod>>2)&63;
-  if(major===2) return {cls:'Phone', hint:'Phone, by its own Bluetooth class'};
-  if(major===1) return {cls:'Laptop', hint:'Computer, by its own Bluetooth class'};
-  if(major===7) return {cls:'Wearable', hint:'Wearable, by its own Bluetooth class'};
+  if(major===2) return {cls:'Phone', hint:'states it is a phone'};
+  if(major===1) return {cls:'Laptop', hint:'states it is a computer'};
+  if(major===7) return {cls:'Wearable', hint:'states it is a wearable'};
   if(major===4) return minor===8 ? {cls:'Vehicle', hint:'Car audio'} : (minor===1||minor===2||minor===6) ? {cls:'Wearable', hint:'Headset or headphones'} : minor===5 ? {cls:'Unknown', hint:'Speaker'} : (minor>=9&&minor<=15) ? {cls:'Unknown', hint:'Television or display'} : {cls:'Unknown', hint:'Audio or video device'};
   if(major===5) return {cls:'Unknown', hint:'Keyboard, mouse or controller'};
   if(major===6) return {cls:'Unknown', hint:'Printer or imaging device'};
@@ -4579,7 +4581,9 @@ async function nativeDrain(){
         if(x.cl){ const k=codKind(x.cod), nm=String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); let pr=false; try{ pr=await isPaired(x.a); }catch(e){} list.push({id:'bc:'+hash32(String(x.a)).toString(36), rssi:x.r, band:'ble', cls:k.cls, name:nm, hint:k.hint, conf:nm?3:2, flags:pr?['paired']:[]}); PH.heard++; continue; }
         const ev={device:{id:x.a,name:x.n||''}, rssi:x.r, uuids:x.u||[],
           manufacturerData:new Map(Object.keys(x.m||{}).map(k=>[+k, dv(hexBytes(x.m[k]))])), serviceData:new Map(Object.keys(x.d||{}).map(k=>[k, dv(hexBytes(x.d[k]))]))};
-        try{ const d=await phDescribe(ev), pr=await isPaired(x.a); list.push({id:d.id, rssi:x.r, band:'ble', cls:d.cls, name:d.name, hint:d.hint, conf:d.conf, flags:pr?d.flags.concat('paired'):d.flags}); PH.heard++; }catch(e){} }
+        try{ const d=await phDescribe(ev), pr=await isPaired(x.a), ak=apKind(x.ap);
+          if(ak && d.cls==='Unknown'){ d.cls=ak[0]; d.hint=(d.hint?d.hint.split(',')[0]+', ':'')+ak[1]; d.conf=Math.max(d.conf,2); }          // the device says what it is
+          list.push({id:d.id, rssi:x.r, band:'ble', cls:d.cls, name:d.name, hint:d.hint, conf:d.conf, flags:pr?d.flags.concat('paired'):d.flags, tx:(typeof x.tx==='number'?x.tx:undefined)}); PH.heard++; }catch(e){} }
       (b.w||[]).slice(0,120).forEach(x=>{ if(!x || !x.b || typeof x.r!=='number') return; const open=!/WPA|WEP|SAE|RSN|EAP|OWE|PSK/i.test(x.c||'');
         const bs=String(x.b).toLowerCase(), flock=FLOCK_SSID.test(String(x.s||'')) || bs.indexOf(FLOCK_OUI)===0;
         list.push({id:'ap:'+bs, rssi:x.r, band:'wifi', cls:flock?'Camera':'Access point', name:String(x.s||'').slice(0,40), hint:flock?'Flock Safety camera, Wi-Fi on':(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
@@ -4596,7 +4600,16 @@ async function nativeDrain(){
 const COMPANY={0x004C:'Apple',0x0006:'Microsoft',0x0075:'Samsung',0x00E0:'Google',0x0087:'Garmin',0x009E:'Bose',0x012D:'Sony',0x0057:'Harman',0x0171:'Amazon',0x038F:'Xiaomi',0x027D:'Huawei',0x00C4:'LG',0x0157:'Huami',0x02E5:'Espressif',0x0001:'Nokia',0x0002:'Intel',0x01AB:'Meta'};
 const FLOCK_BLE=/^(fs ext battery|penguin[- ]?\d{4,}|pigvision|flock[- _]?[0-9a-z]{0,12})$/i, FLOCK_SSID=/^flock[-_ ]?[0-9a-f]{4,}/i, FLOCK_OUI='b4:1e:52', RAVEN_SVC=['3100','3200','3300','3400','3500'];
 const PH_TRACKERS={feed:'Tile',feec:'Tile',fd5a:'Samsung SmartTag',fe33:'Chipolo',feaa:'Find My Device network or beacon',fd84:'Tile',fcb2:'DULT tracker'};
-const PH_APPLE={0x02:'beacon',0x05:'AirDrop',0x07:'AirPods or Beats',0x09:'AirPlay',0x0C:'Handoff',0x0F:'Nearby Action',0x10:'Nearby Info',0x12:'Find My network'};
+const PH_APPLE={0x02:'beacon',0x05:'AirDrop on',0x07:'AirPods or Beats',0x09:'AirPlay device',0x0C:'Handoff on',0x0F:'device asking to connect',0x10:'iPhone, iPad, Mac or Watch',0x12:'Find My network'};
+// The model an Apple or Beats earphone states in its own pairing message.
+const APPLE_AUDIO={0x0220:'AirPods',0x0F20:'AirPods, 2nd generation',0x1320:'AirPods, 3rd generation',0x1920:'AirPods 4',0x1B20:'AirPods 4 with noise cancelling',0x0E20:'AirPods Pro',0x1420:'AirPods Pro, 2nd generation',0x2420:'AirPods Pro, 2nd generation',0x0A20:'AirPods Max',0x1F20:'AirPods Max',
+  0x0320:'Powerbeats3',0x0520:'BeatsX',0x0620:'Beats Solo3',0x0920:'Beats Studio3',0x0B20:'Powerbeats Pro',0x0C20:'Beats Solo Pro',0x0D20:'Powerbeats4',0x1020:'Beats Flex',0x1120:'Beats Studio Buds',0x1220:'Beats Fit Pro',0x1620:'Beats Studio Buds+',0x1720:'Beats Studio Pro'};
+// The kind a Windows device, or a device linked to Windows, states in its own beacon.
+const MS_KIND={1:['Unknown','Xbox'],6:['Phone','iPhone linked to Windows'],7:['Unknown','iPad linked to Windows'],8:['Phone','Android device linked to Windows'],9:['Laptop','Windows desktop computer'],11:['Phone','Windows phone'],12:['Laptop','Linux computer'],14:['Unknown','Surface Hub'],15:['Laptop','Windows laptop'],16:['Laptop','Windows tablet']};
+// The appearance a Bluetooth device states for itself, by its standard category.
+function apKind(ap){ ap=Number(ap); if(!(ap>0)) return null; const c=ap>>6;
+  return c===1?['Phone','states it is a phone']:c===2?['Laptop','states it is a computer']:c===3?['Wearable','states it is a watch']:c===5?['Unknown','Display']:c===8||c===9?['Tag','states it is a tag']:c===15?['Unknown','Keyboard, mouse or controller']
+    :c===33||c===34?['Unknown','Speaker or audio device']:c===35?['Vehicle','states it is a vehicle']:c===37?['Wearable','Earbuds, headset or headphones']:c===41?['Wearable','Hearing aid']:c===13||c===17||c===18?['Wearable','Fitness sensor']:null; }
 const phShort = u => { u=String(u).toLowerCase(); return (u.length===36 && u.slice(8)==='-0000-1000-8000-00805f9b34fb') ? u.slice(4,8) : u; };
 const phBytes = v => v ? new Uint8Array(v.buffer, v.byteOffset, v.byteLength) : new Uint8Array(0);
 const _phHash=new Map();
@@ -4618,8 +4631,13 @@ async function phDescribe(ev){
   if(mfr[0x004C]){ const pb=mfr[0x004C], t=pb.length?pb[0]:-1;
     if(t===0x12) return {id:'fm:'+await phSha([pb]), cls:'Tag', hint:'Apple, Find My network', conf:2, flags:['randomized'], name};
     if(t===0x02 && pb.length>=22) return {id:'ib:'+await phSha([pb.slice(0,22)]), cls:'Unknown', hint:'Beacon', conf:3, flags:[], name};
-    return {id:local, cls:t===0x07?'Wearable':/iphone/.test(low)?'Phone':/mac/.test(low)?'Laptop':'Unknown', hint:'Apple, '+(PH_APPLE[t]||'device'), conf:1, flags:['randomized'], name}; }
-  if(mfr[0x0006]) return {id:local, cls:'Laptop', hint:'Microsoft, Windows device', conf:1, flags:['randomized'], name};
+    const model=(t===0x07 && pb.length>=5 && pb[2]===0x01) ? APPLE_AUDIO[(pb[3]<<8)|pb[4]] : '';
+    return {id:local, cls:t===0x07?'Wearable':/iphone/.test(low)?'Phone':/mac/.test(low)?'Laptop':'Unknown', hint:'Apple, '+(model||PH_APPLE[t]||'device'), conf:model?2:1, flags:['randomized'], name}; }
+  if(mfr[0x0006]){ const pb=mfr[0x0006]; let cls='Laptop', what='Windows device', nm=name;
+    if(pb[0]===0x01 && pb.length>=2){ const k=MS_KIND[pb[1]&31]; if(k){ cls=k[0]; what=k[1]; } }
+    else if(pb[0]===0x03 && pb.length>3){ const off=pb[1]===0x00?3:pb[1]===0x01?9:pb[1]===0x02?12:-1; cls='Unknown'; what='accessory offering to pair';
+      if(off>0 && pb.length>off && !nm){ try{ nm=new TextDecoder().decode(pb.slice(off)).replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); }catch(e){} } }
+    return {id:local, cls, hint:'Microsoft, '+what, conf:nm?3:1, flags:['randomized'], name:nm}; }
   let cls='Unknown';
   for(const [words,c] of [[['watch','garmin','whoop','fitbit','buds','airpods','headphone','bose','jbl','sony wh','sony wf','beats'],'Wearable'],[['iphone','galaxy','pixel'],'Phone'],[['macbook','laptop','thinkpad','surface'],'Laptop'],[['tesla','toyota','honda','uconnect','obd'],'Vehicle'],[['tracker','chipolo','smarttag','airtag'],'Tag']])
     if(words.some(w=>low.indexOf(w)>=0)){ cls=c; break; }
@@ -5068,7 +5086,7 @@ function liveBody(d){
     '<div class="dsec"><h4>Follower test</h4><div class="kv"><span class="k">Result</span><span class="v '+(d.withYou?'warnc':'')+'">'+esc(ft)+'</span>'+
     '<span class="k">In earshot for</span><span class="v">'+(d.mins<1?'under a minute':Math.round(d.mins)+' min')+'</span><span class="k">While you moved</span><span class="v">'+Math.round(d.span||0)+' m</span></div></div>'+
     '<div class="dsec"><h4>History</h4><div class="kv"><span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span><span class="k">Reports</span><span class="v">'+d.timesSeen+'</span>'+
-    '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Name it broadcasts</span><span class="v '+(d.adv?'':'unkc')+'" style="word-break:break-all">'+esc(d.adv||'Kept private by the device')+'</span>'+(d.hint?'<span class="k">Maker hint</span><span class="v">'+esc(d.hint)+'</span>':'')+
+    '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Identified by</span><span class="v">'+esc(identBy(d))+'</span><span class="k">Name it broadcasts</span><span class="v '+(d.adv?'':'unkc')+'" style="word-break:break-all">'+esc(d.adv||'Kept private by the device')+'</span>'+(d.hint?'<span class="k">Maker hint</span><span class="v">'+esc(d.hint)+'</span>':'')+
     '<span class="k">Address</span><span class="v '+(d.randomizes?'warnc':'')+'">'+(d.randomizes?'Randomizes, held by signature':'Not reported as randomized')+'</span></div></div>'+
     '<div class="dev-acts"><button class="btn primary" data-act="capture" data-id="'+d.id+'">Capture Now</button>'+
     '<button class="btn'+(d.mine?' on':'')+'" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003; Undo':'This is mine')+'</button>'+
