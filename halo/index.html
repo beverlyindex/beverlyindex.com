@@ -972,7 +972,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.34', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.35', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1705,7 +1705,7 @@ function liveSigns(t){            // what the sensors hold on this threat at thi
   if(t.id==='w_tower' && rayRecent('High').length) return [5,'your Rayhunter reports a tower behaving like a fake one'];
   if(t.id==='w_tower' && rayRecent().length) return [4,'your Rayhunter raised a warning'];
   if(t.id==='w_tower' && cellLive() && CELL.serving){ const dr=cellDrop(); if(dr) return [4,'your phone moved from '+dr.from+' to 2G at '+hhmm(dr.t)];
-    const sus=(typeof towerSuspects==='function')?towerSuspects():[]; if(sus.length) return [4,'the tower in use shows several of the signs Halo tests for']; if(cellFlaps()>=3) return [4,'your tower keeps changing while you stand still']; }
+    const sus=(typeof towerSuspects==='function')?towerSuspects():[]; if(sus.length) return [4,'the tower in use shows several of the signs Halo tests for']; if(cellFlaps()>=3) return [3,'your tower changed several times while you stayed in one place']; }
   if(t.id==='a_pubwifi' && live){ const wy=near.filter(d=>d.band==='wifi'&&d.withYou); if(wy.length) return [5,'a hotspot is travelling with you'];
     const by={}; wifiNow().forEach(d=>{ if(d.adv&&!d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
     if(Object.keys(by).some(n=>by[n].length>1&&by[n].some(d=>/^Open/.test(d.hint))&&by[n].some(d=>/^Secured/.test(d.hint)))) return [4,'a copied Wi-Fi name is in range']; }
@@ -4355,7 +4355,7 @@ function liveStart(){ const loop=()=>{ if(document.visibilityState==='visible') 
 const PH={on:false, scan:null, buf:new Map(), heard:0, err:'', msg:'', lost:false, bound:false, timer:0, native:false, nstat:null, busy:false, asked:0};
 // The Halo Android app gives the page a native ear: it keeps listening with the screen off and hands over what it heard.
 /* ----- cell towers: the one your phone is using, and its neighbours. Tower Watch reads them for two patterns:
-   a drop to 2G, and a tower that keeps changing while you stand still. ----- */
+   a drop to 2G, and a tower that keeps changing while you stay in one place. ----- */
 const CELL={t:0, list:[], serving:null, changes:[], seen:{}, low:0, nbT:0};
 const cellReg = c => (c && c.ci!=null && c.ci!=='' && c.mcc!=null && c.tac!=null) ? [c.k, Number(c.mcc), Number(c.mnc)||0, Number(c.tac), String(c.ci)].join(':') : '';
 const CELL_GEN={gsm:'2G',cdma:'2G',wcdma:'3G',tdscdma:'3G',lte:'4G',nr:'5G'};
@@ -4365,9 +4365,11 @@ function cellIngest(list, t, pos){
   CELL.list.forEach(c=>{ CELL.seen[cellId(c)]=t; });
   if(!sv) return; const id=cellId(sv), gen=CELL_GEN[sv.k]||'';
   if(CELL.serving && CELL.serving.id!==id){ const moved=(pos && CELL.serving.pos) ? distLL(pos.lat,pos.lon,CELL.serving.pos.lat,CELL.serving.pos.lon) : null;
-    CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved, tac:String(CELL.serving.c.tac)!==String(sv.tac)}); if(CELL.changes.length>200) CELL.changes.shift();
+    CELL.changes.push({t, from:CELL.serving.gen, to:gen, moved, still:stillAt(t), tac:String(CELL.serving.c.tac)!==String(sv.tac)}); if(CELL.changes.length>200) CELL.changes.shift();
     if(W.on && gen==='2G' && CELL.serving.gen && CELL.serving.gen!=='2G') wEvent('warn','Tower Watch: your phone moved from '+CELL.serving.gen+' to 2G.','',t); }
-  if(W.on){ W.cells=W.cells||{}; W.cells[id]=1; if(gen==='2G') W.g2=true; }
+  if(W.on){ W.cells=W.cells||{}; if(gen==='2G') W.g2=true;
+    if(!W.cells[id] || (CELL.serving && CELL.serving.id!==id)){ W.tw=W.tw||[]; if(W.tw.length<200) W.tw.push({t, reg:cellReg(sv), gen, net:(sv.mcc==null?'':sv.mcc+'-'+(sv.mnc==null?'':sv.mnc)), ci:String(sv.ci==null?'':sv.ci), chg:!!(CELL.serving && CELL.serving.id!==id), still:(CELL.serving && CELL.serving.id!==id)?stillAt(t):null}); }          // each tower the trip used, in order
+    W.cells[id]=1; }
   // A phone that is simply on 2G is reported on the card. A move from a newer network to 2G is the sign: it is recorded and raised once in six hours.
   if(gen==='2G' && CELL.serving && CELL.serving.gen && CELL.serving.gen!=='2G' && t-CELL.low>6*3600000){ CELL.low=t; logEvidence('finding','Tower Watch: this phone moved from '+CELL.serving.gen+' to a 2G cell ('+(sv.mcc||'')+'-'+(sv.mnc||'')+', cell '+(sv.ci||'')+'). 2G gives a phone no way to check that a tower is genuine.'); save();
     alertRaise('2g', 'Your phone moved to 2G', 'A 2G connection gives the phone no way to check that a tower is genuine. Tower Watch has the steps, and Evidence has the record.', {res:'w_tower'}); }
@@ -4378,7 +4380,13 @@ function cellIngest(list, t, pos){
 const cellLive = () => CELL.t>0 && Date.now()-CELL.t<60000;
 const cellDrop = () => { if(!cellLive() || !CELL.serving || CELL.serving.gen!=='2G') return null; const now=Date.now();      // a move from a newer network to 2G within the last 30 minutes, while still on 2G
   for(let i=CELL.changes.length-1;i>=0;i--){ const c=CELL.changes[i]; if(now-c.t>30*60000) break; if(c.to==='2G' && c.from && c.from!=='2G') return c; } return null; };
-const cellFlaps = () => CELL.changes.filter(x=>Date.now()-x.t<10*60000 && x.moved!==null && x.moved<50).length;
+// Were you in one place for the three minutes before a moment? Your own path answers: true or false when it covers that time, and nothing when it does not.
+const STILL_WIN=180000, STILL_MIN=(typeof window.HALO_STILL_MS==='number') ? window.HALO_STILL_MS : 60000, STILL_M=20;
+function stillAt(t){ const pts=TRACK.filter(p=>p.t2>=t-STILL_WIN && p.t<=t+2000); if(!pts.length) return null;
+  const last=pts[pts.length-1], covered=Math.min(t,last.t2)-Math.max(pts[0].t, t-STILL_WIN); if(covered<STILL_MIN || t-last.t2>45000) return null;
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; pts.forEach(p=>{ x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); });
+  return Math.hypot(x1-x0,y1-y0)<=STILL_M; }
+const cellFlaps = () => CELL.changes.filter(x=>Date.now()-x.t<10*60000 && x.still===true).length;          // a change of tower while you move is ordinary. Only changes made while your path shows you in one place count
 const cellWords = () => { const sv=CELL.serving; return !cellLive()||!sv ? '' : sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', '+(CELL.list.length-1)+' neighbours'; };
 /* Halo's own tower record. Every tower the phone uses is remembered with where and how often, so a tower met for the
    first time in a place Halo knows stands out. With the register check on, the public register's place for it is kept too. */
@@ -4400,12 +4408,19 @@ function towerSigns(){ const sv=CELL.serving, out={score:0, signs:[], level:'ok'
   const c=sv.c, rec=(P.cells||{})[sv.reg], reg=rec&&rec.reg, now=Date.now();
   if(sv.gen==='2G'){ const dr=cellDrop(); if(dr) add(2,'Your phone moved from '+dr.from+' to 2G at '+hhmm(dr.t)+'. On 2G a tower does not have to prove it is genuine.'); else out.g2=true; }
   if(reg && reg.found && sv.pos){ const km=distLL(sv.pos.lat,sv.pos.lon,reg.lat,reg.lon)/1000; if(km*1000>Math.max(8000, 3*(reg.range||0))) add(3,'The public register places this tower '+Math.round(km)+' km from where you are.'); }
-  if(reg && reg.found===false) add(1,'This tower is absent from the public register. A new tower takes a few days to be listed.');
+  if(reg && reg.found===false) add(1,'This tower is absent from the public register. The register is incomplete, so on its own this is a weak sign.');
   if(rec && rec.n<=5 && now-rec.t0<15*60000 && placeKnown(sv.pos)) add(1,'Halo knows this place and is meeting this tower for the first time.');
-  const fl=cellFlaps(); if(fl>=3) add(2,'The tower in use changed '+fl+' times in ten minutes while you stood still.');
-  const last=CELL.changes[CELL.changes.length-1]; if(last && last.tac && now-last.t<10*60000 && last.moved!==null && last.moved<50) add(1,'The tracking area changed while you stood still.');
+  const fl=cellFlaps(); if(fl>=3) add(1,'The tower in use changed '+fl+' times in ten minutes while you stayed in one place.');
+  const last=CELL.changes[CELL.changes.length-1]; if(last && last.tac && now-last.t<10*60000 && last.still===true) add(2,'The tracking area changed while you stayed in one place.');
   if(CELL.list.length===1 && CELL.nbT && CELL.t-CELL.nbT<5*60000 && CELL.t-sv.since<5*60000 && c.r!=null && c.r>=-80) add(1,'It is strong, and its neighbours fell silent when it took over.');
   return done(); }
+// Builds before 2026-10-06.35 counted a change of tower as made "while you stood still" without reading your path. Findings that rest on that count are withdrawn by one entry; the chain itself is never edited.
+function towerCorrect(){ if(P.fixTower) return; P.fixTower=1;
+  const old=(P.evidence||[]).filter(r=>r.kind==='finding' && /^Tower Watch: the tower in use/.test(r.text) && /while you stood still/.test(r.text));
+  if(old.length){ const one=old.length===1, when=[...new Set(old.map(r=>fmtD(new Date(r.t).toISOString())))].join(', ');
+    logEvidence('note','Correction: '+old.length+' Tower Watch '+(one?'finding':'findings')+' recorded on '+when+' counted changes of tower as made while you stood still without reading your movement. '+(one?'That finding is':'Those findings are')+' withdrawn. '+(one?'The entry stays':'The entries stay')+' in this chain, unedited.');
+    P.hitClosed=P.hitClosed||{}; P.hitClosed.w_tower=Math.min((P.hits||{}).w_tower||0, (P.hitClosed.w_tower||0)+old.length); }
+  save(); }
 const towerSuspects = () => (towerSigns().level==='suspect' && CELL.serving) ? [CELL.serving] : [];
 /* ----- Rayhunter as a sensor. Rayhunter is a small mobile hotspot that reads the control traffic between itself and the tower.
    The Halo app reads the hotspot on its own Wi-Fi every 15 seconds and hands the console its state and its alerts. ----- */
@@ -4474,7 +4489,7 @@ function toolTower(){
     '<div class="kv" style="margin-top:10px"><span class="k">In use since</span><span class="v">'+hhmm(sv.since)+'</span><span class="k">Changes, last 10 min</span><span class="v">'+ch10+'</span>'+
     '<span class="k">Halo has met it</span><span class="v">'+(rec.n||1)+(rec.n===1?' time':' times')+(rec.t0?', first on '+fmtD(new Date(rec.t0).toISOString()):'')+'</span>'+
     (P.cellCheck&&can?'<span class="k">Public register</span><span class="v">'+(!reg?'Asking':reg.found?(sv.pos?'Listed '+miText(distLL(sv.pos.lat,sv.pos.lon,reg.lat,reg.lon))+' from you':'Listed')+(reg.samples?', seen '+reg.samples+' times':''):'Unlisted')+'</span>':'')+'</div>'+
-    '<div class="limit" style="margin-top:8px">The signs: a move to 2G, a first meeting in a place Halo knows, repeated changes while you stand still, a new tracking area while you stand still, and neighbours that fall silent'+((P.cellCheck&&can)?', a tower the public register places far away, and a tower absent from the register.':'.'+(can?' Switch the register check on for two more.':''))+'</div></div>';
+    '<div class="limit" style="margin-top:8px">The signs: a move to 2G, a first meeting in a place Halo knows, repeated changes while you stay in one place, a new tracking area while you stay in one place, and neighbours that fall silent'+((P.cellCheck&&can)?', a tower the public register places far away, and a tower absent from the register.':'.'+(can?' Switch the register check on for two more.':''))+'</div></div>';
   return h+regRow;
 }
 /* ----- Plate Camera Watch: the mapped cameras nearest you, and Flock hardware heard by radio ----- */
@@ -4927,8 +4942,17 @@ function walkDocHTML(){
   // 6 by maker
   const mk={}; ds.forEach(r=>{ const m=makerOf(r)||'Maker not broadcast'; mk[m]=mk[m]||{n:0,tr:0}; mk[m].n++; if(r.cls==='Tag') mk[m].tr++; });
   if(ds.length) h+=H('By maker')+tbl(['Maker','Devices','Of which trackers'],Object.keys(mk).sort((a,b)=>mk[b].n-mk[a].n).map(m=>[e(m),String(mk[m].n),String(mk[m].tr)]))+'<p>Halo reads the maker from what each device broadcasts.</p>';
-  // 7 timeline
+  // towers
   const evs=wEvents();
+  if(W.tw && W.tw.length){ const tw=W.tw, ch=tw.filter(x=>x.chg), stl=ch.filter(x=>x.still===true).length, ids=Object.keys(W.cells||{}).length, gens=[...new Set(tw.map(x=>x.gen).filter(Boolean))];
+    const regOf=x=>{ const r=((P.cells||{})[x.reg]||{}).reg; return !r?'Not checked':r.found?'Listed':'Unlisted'; }, unl=[...new Set(tw.filter(x=>regOf(x)==='Unlisted').map(x=>x.reg))].length;
+    const al=evs.filter(x=>x.k==='warn' && /^Tower Watch/.test(x.text));
+    h+=H('Cell towers')+'<p>Your phone used '+plural(ids,'tower','towers')+' on this trip and changed tower '+plural(ch.length,'time','times')+(ch.length?', '+stl+' of them while you stayed in one place':'')+'. A change of tower while you move is ordinary. '+
+      (gens.length?'The network was '+e(gens.join(', '))+(W.g2?'':' throughout')+'. ':'')+(W.g2?'Your phone was on 2G for part of the trip. On 2G a phone has no way to check that a tower is genuine. ':'')+
+      (unl?plural(unl,'tower is','towers are')+' absent from the public register. The register is incomplete, so on its own this is a weak sign. ':'')+
+      (al.length?'<b>Tower Watch raised '+plural(al.length,'alert','alerts')+':</b> '+al.map(x=>hms(x.t)+', '+e(x.text.replace(/^Tower Watch: /,''))).join(' '):'Tower Watch raised no alert on this trip.')+'</p>'+
+      chunks(['Time','Network','Cell','Public register','You were'], tw.map(x=>[hms(x.t), e([x.gen,x.net].filter(Boolean).join(', ')), e(x.ci||''), regOf(x), !x.chg?'Start of the record':x.still===true?'In one place':x.still===false?'Moving':'Position not recorded']), 16); }
+  // timeline
   h+=H('What changed, in order')+chunks(['Time','Change'],evs.slice(0,150).map(x=>[hms(x.t),e(x.text)]),16)+(evs.length>150?'<p>'+(evs.length-150)+' later changes are in the saved data file.</p>':'');
   // limits
   h+=H('How to read this report')+'<ul class="rp-list">'+
@@ -4939,6 +4963,7 @@ function walkDocHTML(){
      'Passed by: heard for under two minutes.',
      'Near your route: heard for two minutes or more, with too few legs to tell whether it stays in place.',
      'Placed: the device was heard from several of your positions, and the readings agree on one zone.',
+     'Cell towers: each tower your phone used, and each change. A change counts as a sign only when your own path shows you stayed in one place for the three minutes before it.',
      'Distance: read from signal strength every ten seconds. A device in a pocket or behind a wall reads further away than it is.',
      'These are Halo\'s working rules. The data file holds the figures for every device, so each reading can be checked.',
      'Saving the trip data writes one entry in your Evidence chain, with the fingerprint of the file.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
@@ -5020,11 +5045,10 @@ function alertScan(){
     else if(d.maybe && d.cls==='Tag') alertRaise('maybe:'+d.sig, 'A tracker tag is staying with you', devName(d)+' '+followText(d)+'. If it is yours, open it and press This is mine. Halo keeps testing.', {dev:d.id});
     else if(d.homeAway) alertRaise('route:'+d.sig, 'A device from your home is near you again', devName(d)+' '+followText(d)+'.', {dev:d.id});
     if(d.cls==='Camera') alertRaise('cam:'+d.sig, /Raven/.test(d.hint)?'A gunshot detector is in earshot':'A plate camera is in earshot', devName(d)+' is broadcasting '+distText(d)+' from you. Halo places it on the map as you move.', {dev:d.id}); });
-  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv && sv.gen!=='2G' && !rayRecent('High').length){ if(alertRaise('tower:'+sv.reg, 'The tower in use shows several of the signs Halo tests for', ts.signs[0].t+' Tower Watch has the steps.', {res:'w_tower'})){ P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows several of the signs Halo tests for. '+ts.signs.map(x=>x.t).join(' ')); } } }
+  { const ts=towerSigns(), sv=CELL.serving; if(ts.level==='suspect' && sv && sv.gen!=='2G' && !rayRecent('High').length){ if(alertRaise('tower:'+Math.floor(Date.now()/3600000), 'The tower in use shows several of the signs Halo tests for', ts.signs.slice(0,2).map(x=>x.t).join(' ')+' To be safe: switch to airplane mode, move a few streets, and call through an end-to-end encrypted app. Open this for the full steps.', {res:'w_tower'})){ if(W.on) wEvent('warn','Tower Watch: the tower in use ('+sv.gen+', cell '+(sv.c.ci||'')+') shows several of the signs Halo tests for. '+ts.signs.map(x=>x.t).join(' ')); P.hits=P.hits||{}; P.hits.w_tower=(P.hits.w_tower||0)+1; P.hitAt=P.hitAt||{}; P.hitAt.w_tower=Date.now(); save(); logEvidence('finding','Tower Watch: the tower in use ('+sv.gen+', '+(sv.c.mcc||'')+'-'+(sv.c.mnc||'')+', cell '+(sv.c.ci||'')+') shows several of the signs Halo tests for. '+ts.signs.map(x=>x.t).join(' ')); } } }
   const by={}; wifiNow().forEach(d=>{ if(d.adv && !d.sim) (by[d.adv]=by[d.adv]||[]).push(d); });
   Object.keys(by).forEach(n=>{ const x=by[n]; if(x.length>1 && x.some(d=>/^Open/.test(d.hint)) && x.some(d=>/^Secured/.test(d.hint)))
     alertRaise('twin:'+n, 'A copied Wi-Fi network is in range', n+' appears both locked and open. Join only the locked one, or use mobile data.', {res:'a_pubwifi'}); });
-  const fl=cellLive()?cellFlaps():0; if(fl>=3) alertRaise('flap', 'Your cell tower is changing while you stand still', 'It changed '+fl+' times in ten minutes. Tower Watch has the times and the steps.', {res:'w_tower'});
 }
 // What the feed brought: a flaw under active attack in a product you told Halo you use. The first reading sets the baseline.
 function alertFeed(){ let list=[]; try{ list=kevMine(); }catch(e){ return; }
@@ -5432,7 +5456,7 @@ function boot(){
   setInterval(()=>{ if(S.global && document.visibilityState==='visible') applyGlobal(true); }, 60000);          // the age on screen counts up by the minute
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-(S.globalAt||0)>120000) loadGlobal(); });
   syncStart(); liveStart(); if(W.on) wLock(); if(!isIOS()) headInit(); startGeo();
-  nativeMine(); rayTick(); alertNativeTick();
+  nativeMine(); rayTick(); alertNativeTick(); towerCorrect();
   fetch(API+'/health',{cache:'no-store'}).then(r=>r.json()).then(j=>{ S.features=(j&&j.features)||{}; if(booted) softRender(); }).catch(()=>{});
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') alertNativeTick(); });
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.haloOpen) alertGo(e.data.haloOpen); });
