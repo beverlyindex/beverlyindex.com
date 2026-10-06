@@ -193,7 +193,8 @@ select.inp{flex:none}
 #mapFull.inline .mf-ctl{top:44px;right:8px;gap:6px}
 #mapFull.inline .mf-ctl button{width:40px;height:40px}
 #mapFull.inline .mf-sheet{padding:8px 10px 10px}
-#mapFull.inline #mfLayers,#mapFull.inline #mfChips{display:none}
+#mapFull.inline #mfLayers,#mapFull.inline #mfChips,#mapFull.inline #mfInfo{display:none}
+#omInfo .mf-info{margin:0 0 4px}
 #mapFull.inline .mf-sum{margin:8px 0 0}
 .om-h{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:4px 2px 0}
 .om-h span{text-transform:none;letter-spacing:0;color:var(--dim);margin-left:6px}
@@ -971,7 +972,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.31', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.32', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2962,7 +2963,7 @@ const randName = n => { n=String(n||''); return n.length>=20 && /^[A-Za-z0-9]+$/
 const nameShow = n => randName(n) ? n.slice(0,6)+'…'+n.slice(-4) : n;
 const KIND_SHOW={'Access point':'Wi-Fi network'};
 const devName = d => d.live ? (labelOf(d) || nameShow(d.adv) || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
-const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : (KIND_SHOW[d.cls]||d.cls)+(d.hint?', '+(d.band==='wifi'?d.hint.replace(/^Secured network/,'secured').replace(/^Open network/,'open'):d.hint):''))+(d.live && d.paired ? ' · paired with this phone' : '')+(d.live && randName(d.adv) && !labelOf(d) ? ' · machine-made name, typical of a link between Wi-Fi units' : '')+(d.live && devName(d)!==d.name && d.band!=='wifi' ? ' · '+d.name : '');
+const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : (KIND_SHOW[d.cls]||d.cls)+(d.hint?', '+(d.band==='wifi'?d.hint.replace(/^Secured network/,'secured').replace(/^Open network/,'open'):d.hint):''))+(d.live && d.paired ? ' · paired with this phone' : '')+(d.live && randName(d.adv) && !labelOf(d) ? ' · machine-made name, typical of a link between Wi-Fi units' : '')+(d.live && labelOf(d) && (d.adv||d.name)!==labelOf(d) ? ' · '+(nameShow(d.adv)||d.name) : '');
 const flagOf = d => d.mine?'Yours':d.sigFit?'Fits your signature':d.withYou?'Moving with you':d.maybe?'Staying with you so far':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':d.verdict==='fixed'?'Stays in place':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 // One tier per device, read straight from what it did: moving with you is Take Action, as in the bottom line.
@@ -3361,7 +3362,7 @@ function oneRender(){ if(!oneMode() || !el('omLegend')) return; const V=vis(), l
   const leg=chip('','&#9679;','Devices','#9fb3d9')+chip('flag','&#9679;','Moving with you','var(--action)')+chip('tag','&#9632;','Tracker tags','#9fb3d9')+chip('unk','&#9675;','Unnamed','var(--warn)')+chip('mine','&#9679;','Yours','var(--clear)')+
     lay('cam','&#9679;','Plate cameras',cams)+more('cctv','&#9670;','Cameras')+more('speed','&#9673;','Speed cameras')+more('site','&#9652;','Tower sites')+(cellLive()?lay('tower','&#9650;','Towers',CELL.list.length):'');
   const devs=live?omDevs():[];
-  let rows='<div class="om-h">Around you<span>'+(live?devs.length+' shown, the most concerning first':esc(stateWords(V.mode).count))+'</span></div>';
+  let rows=(el('mfInfo') && el('mfInfo').innerHTML ? '<div id="omInfo">'+el('mfInfo').innerHTML+'</div>' : '')+'<div class="om-h">Around you<span>'+(live?devs.length+' shown, the most concerning first':esc(stateWords(V.mode).count))+'</span></div>';
   rows+= !live ? '<div class="empty" style="padding:12px 6px">'+esc(stateWords(V.mode).long)+'</div>'
     : !devs.length ? '<div class="empty" style="padding:12px 6px">'+((S.omF||'')?'None of this kind is in earshot at this moment.':'Your sensor is reporting. Nothing is in earshot at this moment.')+'</div>'
     : devs.slice(0,40).map(d=>{ const th=deviceThreat(d); return '<button class="om-row'+(MF.sel===d.id?' sel':'')+'" data-act="mf-dev" data-id="'+d.id+'" style="--mk:'+markerColor(d)+(th.tierIdx?';--hc:var('+TIER_VAR[th.tierIdx]+')':'')+'"><i class="om-dot'+(d.cls==='Tag'?' sq':'')+mkClass(d)+'"></i><span class="om-t"><b>'+esc(devName(d))+'</b><small>'+esc(kindText(d))+'</small></span><span class="om-r"><b>'+esc(distText(d))+'</b><small>'+esc(flagOf(d))+'</small></span></button>'; }).join('');
@@ -4293,7 +4294,7 @@ function autoLog(d){ const day=new Date().toISOString().slice(0,10); P.flagged=P
   const now=Date.now(); LIVE.autoLog=LIVE.autoLog.filter(t=>now-t<3600000); if(LIVE.autoLog.length>=AUTOLOG_PER_HOUR) return;
   Object.keys(P.flagged).forEach(k=>{ if(P.flagged[k]!==day) delete P.flagged[k]; });
   P.flagged[d.id]=day; LIVE.autoLog.push(now);
-  logEvidence('finding','Signal Roster: '+d.name+' ('+d.cls+', '+d.id+') '+followText(d)+'.'); }
+  logEvidence('finding','Signal Roster: '+devName(d)+' ('+(KIND_SHOW[d.cls]||d.cls)+') '+followText(d)+'. Halo record '+d.id+'.'); }
 function liveState(){
   if(!hasSensors()) return 'none';
   const nowS=Date.now()+LIVE.skew, mob=LIVE.seen.mobile>0 && nowS-LIVE.seen.mobile<LIVE_SILENT, sta=LIVE.seen.station>0 && nowS-LIVE.seen.station<LIVE_SILENT;
