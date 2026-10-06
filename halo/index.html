@@ -205,6 +205,16 @@ select.inp{flex:none}
 .elog-h4{margin:14px 2px 6px;font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--wat2)}
 .elog-line{display:flex;gap:10px;padding:8px 2px;border-top:1px solid var(--line);font-size:13px} .elog-line span:first-child{flex:1;min-width:0} .elog-line .mono{font-size:12px;color:var(--mut);white-space:nowrap}
 .loc-log{width:100%;margin-top:10px;min-height:46px}
+.plan-f{display:flex;align-items:center;gap:10px;margin-top:8px} .plan-f label{width:44px;flex:none;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--wat2)} .plan-f .inp{flex:1;min-width:0;min-height:46px;font-size:15px}
+.plan-pick{display:block;width:100%;text-align:left;padding:10px 12px;margin:6px 0 0;border-radius:12px;border:1px solid var(--line2);background:rgba(16,24,48,.72);color:var(--ink);font-family:var(--sans);font-size:13.5px;cursor:pointer} .plan-pick small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+.plan-sk{display:block;width:100%;height:150px;margin-top:10px;border-radius:12px;border:1px solid var(--line2);background:rgba(11,18,36,.7)}
+.plan-sum{margin:8px 2px 0;font-size:14px} .plan-sum b{font-family:var(--disp);font-size:17px;font-weight:600}
+.rt-strip{margin:8px 0 2px;padding:11px 12px;border-radius:14px;border:1px solid var(--route);background:rgba(45,212,234,.07)}
+.rt-top{display:flex;align-items:baseline;gap:10px} .rt-top b{flex:1;min-width:0;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .rt-top span{font-size:12px;color:var(--mut);white-space:nowrap}
+.rt-sub{margin-top:5px;font-size:13px;color:var(--mut)} .rt-sub b{color:var(--ink);font-weight:600}
+.rt-strip .formrow{margin-top:9px}
+.mf-draw{position:absolute;left:10px;right:66px;top:calc(58px + env(safe-area-inset-top));z-index:4;padding:10px 12px;border-radius:14px;border:1px solid var(--route);background:rgba(7,11,22,.92);font-size:13px;color:var(--ink)} .mf-draw .formrow{margin-top:8px;gap:8px} .mf-draw.hidden{display:none}
+#mapFull.drawing .mf-sheet{display:none} #mapFull.drawing .maplibregl-marker{pointer-events:none}
 .mk-row .mk-box{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
 .mk-row.on{border-color:var(--chrome2);background:rgba(63,116,214,.20)} .mk-row.on .mk-box{background:var(--chrome2);border-color:var(--chrome2)}
 #vicCard.one .onemap{display:block}
@@ -861,7 +871,7 @@ a.tk:hover b{text-decoration:underline}
                 <h3>Location <span class="n" id="vicCount" data-act="state-fix"></span></h3>
                 <div id="fixBar"></div>
                 <div class="radline" id="radLine"></div>
-                <div class="loc" id="locBox"></div><div id="markBox"></div><div id="elogBox"></div>
+                <div class="loc" id="locBox"></div><div id="routeBox"></div><div id="markBox"></div><div id="elogBox"></div>
                 <div class="formrow map-only" style="align-items:center;margin:2px 0 8px"><button class="btn sm primary" data-act="wview" data-v="list">&#8249; List</button><span class="limit" style="margin:0">Map: Micro, Macro and Identification. Tap a sphere to bring it forward.</span></div>
                 <div class="onemap" id="oneMap"><div class="om-pre" id="omPre"></div><div class="om-legend layers" id="omLegend"></div><div class="om-body"><div class="om-host" id="omHost"></div><div class="om-list" id="omList"></div></div></div>
                 <div class="stage" id="stage" data-big="micro">
@@ -986,6 +996,7 @@ a.tk:hover b{text-decoration:underline}
 <div id="mapFull" class="hidden"><div class="mf-map" id="mfMap"></div>
   <div class="mf-top"><button class="btn sm" data-act="mf-close">&#8249; Back</button><b>Map</b><span class="mf-pos" id="mfPos"></span></div>
   <div class="mf-ctl"><button data-act="mf-follow" id="mfFollow" class="on" title="Keep me in the centre">&#9678;</button><button data-act="mf-north" id="mfNorth" title="North up, or the way I face up"><small>N UP</small></button><button data-act="mf-zin" title="Closer">+</button><button data-act="mf-zout" title="Wider">&minus;</button><button data-act="mf-expand" id="mfExpand" title="Full screen, and back">&#10530;</button></div>
+  <div class="mf-draw hidden" id="mfDraw"></div>
   <div class="mf-sheet"><div id="mfInfo"></div><div class="mf-sum" id="mfSum"></div><div class="layers" id="mfLayers"></div><div class="mf-chips" id="mfChips"></div></div></div>
 <div id="report" class="hidden"><div class="rp-bar"><span><span id="rpTitle">Remiel Halo Full Report</span><i id="rpMeta"></i></span><button class="btn sm gold" data-act="report-new">New report</button><button class="btn sm" data-act="report-print">Print or save as PDF</button><button class="btn sm" data-act="report-close">Close</button></div><div class="rp-paper" id="rpPaper"></div></div>
 <div id="terms" class="hidden">
@@ -1015,7 +1026,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.38', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.39', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2226,7 +2237,7 @@ const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Ma
 const mkClass = d => !d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow';          // placed, direction rough, or direction not known
 const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'direction rough, '+whereWords(d) : 'direction pending';
 function renderVicinity(){
-  oneSync(); locRender();
+  oneSync(); locRender(); if(S.plan && S.plan.line) planScan();
   const V=vis(), shown=V.mode==='live'||V.mode==='sim', rs=radiusState(), blocks=rs.r/BLOCK_M, sus=shown?inRadius():[];
   el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : stateWords(V.mode).count;
   { const f=stateFix(V.mode), fb=el('fixBar'), noPos=!S.pos && !gz() && !whereFresh(); el('vicCount').classList.toggle('fix', !!f);
@@ -2301,7 +2312,7 @@ function ptsParts(){ const pr=ptsR(MILE), out=[], cs=poiCount('alpr'); if(cs) ou
 function locPoints(){ if(!gz() || !ptsReady()) return ''; const parts=ptsParts(); if(!parts.length) return ''; const cn=layerOn('cam')?camsNear()[0]:null;
   return '<div class="loc-cams"><span><b>Within '+esc(miText(ptsR(MILE)))+':</b> '+esc(parts.join(', '))+'.'+(cn?' The nearest plate camera is '+esc(miText(cn.d))+' '+compass(cn.brg)+'.':'')+'</span><button class="btn sm" data-act="wview" data-v="spheres" data-big="macro">Show on the map</button></div>'; }
 function locRender(){ const box=el('locBox'); if(!box || !locMode()) return; const L=locLanes();
-  let h=locVerdict(L);
+  let h=locVerdict(L)+routeStrip();
   if(L.live){
     h+=locLane('wy','With you','keeps pace as you move',L.wy,{cls:'with', n:4, none:'None'})+
        locLane('beside','Beside you','within '+LOC.near+' m',L.beside,{n:4, none:'No device within '+LOC.near+' m'})+
@@ -2309,7 +2320,8 @@ function locRender(){ const box=el('locBox'); if(!box || !locMode()) return; con
        locLane('behind','Falling behind','signal fading',L.behind,{dim:true, none:'None'});
     if(L.steady.length) h+=locLane('steady','Holding steady','further than '+LOC.near+' m',L.steady,{dim:true, n:0});
     h+='<div class="loc-key"><span><i class="sdot" style="--mk:var(--warn)"></i>First time</span><span><i class="sdot" style="--mk:var(--clear)"></i>Seen here before</span><span><i class="sdot" style="--mk:var(--route)"></i>Seen at another place</span><span><i class="sdot k-tag" style="--mk:var(--warn)"></i>Square: tracker tag</span></div>'; }
-  h+=locPoints()+'<div class="loc-bar"><button class="btn" data-act="wview" data-v="spheres">Map</button><button class="btn primary mk'+(S.mark?' on':'')+'" data-act="mark-open">'+(S.mark?'Marking this moment':'Mark this moment')+'</button></div>'+
+  h+=locPoints()+'<div class="loc-bar"><button class="btn" data-act="wview" data-v="spheres" style="flex:1">Map</button><button class="btn'+(S.plan?' on':'')+'" data-act="plan-open" style="flex:1.4">'+(S.plan?'Planning a route':'Plan a route')+'</button></div>'+
+    '<div class="loc-bar" style="margin-top:10px"><button class="btn primary mk'+(S.mark?' on':'')+'" data-act="mark-open">'+(S.mark?'Marking this moment':'Mark this moment')+'</button></div>'+
     '<button class="btn loc-log'+(S.elog?' on':'')+'" data-act="elog-open">Encounter log'+(ELOG.ready?': '+ELOG.n.dev+(ELOG.n.dev===1?' device':' devices')+', '+ELOG.n.enc+(ELOG.n.enc===1?' encounter':' encounters'):'')+'</button>';
   if(box._h!==h){ box.innerHTML=h; box._h=h; } }
 /* Mark this moment: your own words on what you saw, tied to the devices nearest you at that second. The list is taken once, when you tap,
@@ -2431,6 +2443,158 @@ async function elogSave(share){ if(!ELOG.ok) return; ELOG.open.forEach(o=>{ if(D
   await saveOut(f.name,'application/json',f.text,!!(share && NATIVE())); toast(share?'Encounter log handed to the share sheet, and recorded in Evidence.':'Encounter log saved, and recorded in Evidence.'); }
 function elogErase(){ const E=S.elog; if(!E || !ELOG.ok) return; if(!E.arm){ E.arm=true; elogRender(); return; }
   try{ const tx=elogTx(['dev','enc','cam'],'readwrite'); ['dev','enc','cam'].forEach(s=>tx.objectStore(s).clear()); tx.oncomplete=()=>{ ELOG.hist.clear(); ELOG.names.clear(); ELOG.open.clear(); ELOG.n={dev:0,enc:0,cam:0}; ELOG.camT={}; elogPark(); E.arm=false; logEvidence('note','Encounter log erased at your instruction.'); toast('The encounter log is erased.'); elogRender(); renderVicinity(); }; }catch(e){} }
+/* ---------- Plan a route. You say where you are going, by name, by coordinates or by drawing the route on the map. Before you leave, Halo
+   lists what is along that route now: the cameras and tower sites of the public record, and the devices your own encounter log holds there.
+   Once you confirm, Location follows the route and counts what is new since you set off, and Responder shows your emergency numbers if you
+   are past your arrival time. A device is heard when it comes into earshot of the phone; the plan shows what is on record, not what is on air. ---------- */
+const RT={cam:60, site:150, log:100, arrive:60, grace:10*60000, off:150, speed:{foot:1.3, bike:4.2, car:9}, word:{foot:'on foot', bike:'by bicycle', car:'by car'}, label:{foot:'On foot', bike:'Bicycle', car:'Car'}};
+const llOf = t => { const m=/^\s*(-?\d{1,2}(?:\.\d+)?)\s*[,; ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/.exec(String(t||'')); if(!m) return null; const p={lat:+m[1], lon:+m[2]}; return okLL(p)?p:null; };
+const lineLen = L => { let m=0; for(let i=1;i<L.length;i++) m+=distLL(L[i-1][1],L[i-1][0],L[i][1],L[i][0]); return m; };
+// Where a point falls on a line: how far from the line it is, and how far along the line that nearest place lies.
+function onLine(lat, lon, L){ let best={d:Infinity, at:0}, run=0; const k=Math.cos(lat*Math.PI/180)*111320, px=lon*k, py=lat*111320;
+  for(let i=1;i<L.length;i++){ const ax=L[i-1][0]*k, ay=L[i-1][1]*111320, dx=L[i][0]*k-ax, dy=L[i][1]*111320-ay, seg=Math.hypot(dx,dy), t=seg?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(seg*seg))):0, d=Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+    if(d<best.d) best={d, at:run+t*seg}; run+=seg; }
+  return best; }
+const routeLive = () => (P.route && !P.route.done) ? P.route : null;
+const routeLineNow = () => (S.plan && (S.plan.line || (S.plan.pts && S.plan.pts.length>1 ? S.plan.pts.map(p=>[p.lon,p.lat]) : null))) || (routeLive() && routeLive().line) || null;
+// The squares of the public record that a route crosses, so its cameras are loaded before you leave.
+function routeTiles(){ const L=routeLineNow(); if(!L) return []; const out={}; let run=0, last=null;
+  L.forEach((c,i)=>{ if(last) run+=distLL(last[1],last[0],c[1],c[0]); if(!last || run>=400 || i===L.length-1){ run=0; const t=ptTile(c[1],c[0]); out[t.x+'/'+t.y]=1; } last=c; });
+  return Object.keys(out).slice(0,30).map(k=>({k, ring:3})); }
+// The fixed points of the public record along a line, in the order you reach them.
+function routePoints(L){ const out=[], seen={}; Object.keys(PTS.sq||{}).forEach(k=>((PTS.sq[k]||{}).items||[]).forEach(i=>{ if(!PT_WORD[i.k] || seen[i.id]) return; seen[i.id]=1; const q=onLine(i.lat,i.lon,L);
+    if(q.d<=(i.k==='site'?RT.site:RT.cam)) out.push({id:String(i.id), k:i.k, n:String(i.n||'').slice(0,40), lat:+i.lat.toFixed(5), lon:+i.lon.toFixed(5), at:Math.round(q.at), d:Math.round(q.d)}); }));
+  return out.sort((a,b)=>a.at-b.at).slice(0,200); }
+const routeLoaded = () => { const t=routeTiles(); return !ptsOn() ? null : t.every(q=>{ const s=PTS.sq[q.k]; return s && s.state==='ok'; }); };
+const camWords = pts => { const c={}; pts.forEach(p=>{ if(p.k!=='site') c[p.k]=(c[p.k]||0)+1; }); return Object.keys(c).map(k=>c[k]+' '+PT_WORD[k].toLowerCase()+(c[k]===1?'':'s')); };
+// What your own encounter log holds along a line: devices met within 100 m of it.
+async function routeLog(L){ if(!ELOG.ok) return null; const ds=await elogAll('dev'), near=ds.filter(r=>!(P.mine||{})[r.id] && (r.places||[]).some(p=>onLine(p.la,p.lo,L).d<=RT.log));
+  return {n:near.length, trk:near.filter(r=>r.cls==='Tag'||r.cls==='Camera').map(recName).slice(0,6), multi:near.filter(r=>r.places.length>=2).length}; }
+function planOpen(){ S.plan={fromText:'', toText:'', mode:P.routeMode||'foot', pts:[], line:null, from:null, to:null, err:'', pick:null, past:false, by:''}; S.mark=null; markRender(); planRender(); const b=el('routeBox'); if(b) b.scrollIntoView({block:'start'}); renderVicinity(); }
+function planClose(){ S.plan=null; planRender(); routeShow(); renderVicinity(); }
+function planGrab(){ const p=S.plan; if(!p) return; const f=el('planFrom'), t=el('planTo'), a=el('planEta'); if(f) p.fromText=f.value.trim(); if(t) p.toText=t.value.trim(); if(a && a.value) p.etaText=a.value; }
+const planHere = () => { const me=ePos(); return me ? {lat:+me.lat.toFixed(5), lon:+me.lon.toFixed(5), name:'Where you are now', here:true} : null; };
+async function planResolve(field){ const p=S.plan, text=p[field+'Text'], held=p[field];
+  if(held && held.text===text && !held.here) return held;
+  if(field==='from' && (!text || /^where you are now$/i.test(text))){ const h=planHere(); if(!h){ p.err='Halo has no position for you yet. Allow location, or enter where you start.'; return null; } h.text=text; return p.from=h; }
+  if(!text){ p.err='Enter where you are going: '+((S.features||{}).find?'an address, a place or coordinates.':'coordinates, such as 34.0522, -118.2437.'); return null; }
+  const ll=llOf(text); if(ll){ return p[field]={lat:+ll.lat.toFixed(5), lon:+ll.lon.toFixed(5), name:ll.lat.toFixed(5)+', '+ll.lon.toFixed(5), text}; }
+  if(!(S.features||{}).find){ p.err='Enter coordinates, such as 34.0522, -118.2437, or draw the route on the map.'; return null; }
+  const me=ePos(), r=await api('POST','/route/find',{q:text, near:me?{lat:me.lat,lon:me.lon}:undefined});
+  if(r.s!==200 || !r.j || !Array.isArray(r.j.places)){ p.err=r.s===429?'The search is busy. Try again in a moment.':'The search did not answer. Enter coordinates, or draw the route on the map.'; return null; }
+  if(!r.j.places.length){ p.err='No place was found for "'+text+'". Try the town with it, or enter coordinates.'; return null; }
+  p.credit2=String(r.j.credit||''); p.pick={field, places:r.j.places.slice(0,5)}; return null; }
+async function planGo(){ const p=S.plan; if(!p || p.busy) return; planGrab(); p.err=''; p.pick=null; p.past=false; p.busy=true; planRender();
+  try{ const from=await planResolve('from'); if(!from || !S.plan){ return; } const to=await planResolve('to'); if(!to || !S.plan){ return; }
+    await planLine([from,to]); }
+  catch(e){ if(S.plan) S.plan.err='The route could not be worked out. Draw it on the map.'; }
+  finally{ if(S.plan){ S.plan.busy=false; planRender(); routeShow(); } } }
+// The line through the points: the streets when the backend offers them, the points themselves otherwise.
+async function planLine(points, drawn){ const p=S.plan; p.from=p.from||Object.assign({name:points[0].lat.toFixed(5)+', '+points[0].lon.toFixed(5)},points[0]); p.to=p.to||Object.assign({name:points[points.length-1].lat.toFixed(5)+', '+points[points.length-1].lon.toFixed(5)},points[points.length-1]);
+  let line=null, dur=0, by=drawn?'drawn':'straight';
+  if((S.features||{}).route && points.length<=12 && !(drawn && p.follow===false)){ const r=await api('POST','/route/plan',{points:points.map(q=>({lat:q.lat,lon:q.lon})), mode:p.mode});
+    if(r.s===200 && r.j && Array.isArray(r.j.line) && r.j.line.length>1){ line=r.j.line; dur=r.j.duration||0; by='streets'; p.credit=String(r.j.credit||''); }
+    else if(r.s===404) p.err='No way through was found '+RT.word[p.mode]+'. The route is shown as '+(drawn?'you drew it':'a straight line')+'.';
+    else if(r.s===429) p.err='The route service is busy. The route is shown as '+(drawn?'you drew it':'a straight line')+'; press Show the route again in a moment.'; }
+  if(!S.plan) return; if(!line) line=points.map(q=>[q.lon,q.lat]);
+  p.line=line; p.len=Math.round(lineLen(line)); p.dur=by==='streets'&&dur?dur:Math.round(p.len/RT.speed[p.mode]); p.by=by; p.log=null;
+  const due=new Date(Date.now()+p.dur*1000+5*60000); p.etaText=String(due.getHours()).padStart(2,'0')+':'+String(due.getMinutes()).padStart(2,'0');
+  ptsLoad(); routeLog(line).then(x=>{ if(S.plan===p){ p.log=x; planScan(); } }); }
+function planScanHTML(){ const p=S.plan; if(!p || !p.line) return ''; const pts=routePoints(p.line), cw=camWords(pts), sites=pts.filter(x=>x.k==='site').length, loaded=routeLoaded(), cams=pts.filter(x=>x.k!=='site');
+  const row=(a,b)=>'<div class="elog-line" style="display:block"><b>'+a+'</b><div class="limit" style="margin:2px 0 0">'+b+'</div></div>';
+  let h='<div class="elog-h4">Along this route now</div>';
+  if(loaded===null) h+=row('Cameras', 'The public record of cameras is switched off in this build.');
+  else h+=row(cw.length?esc(cw.join(', ')):(loaded?'No camera on the public record':'Reading the public record'), (loaded?'Within '+RT.cam+' m of the route, from the public record.':'The record for part of this route is still arriving.')+(cams.length?' First: '+esc(PT_WORD[cams[0].k].toLowerCase())+' '+esc(miText(cams[0].at))+' from the start.':''))+
+    (sites?row(sites+(sites===1?' tower site':' tower sites'), 'Within '+RT.site+' m of the route, from the public record.'):'');
+  h+= !ELOG.ok ? '' : !p.log ? row('Reading your encounter log','') : row(p.log.n+(p.log.n===1?' device':' devices')+' on record along it', p.log.n ? 'From your own encounter log.'+(p.log.trk.length?' Trackers: '+esc(p.log.trk.join(', '))+'.':'')+(p.log.multi?' '+p.log.multi+' of them seen at more than one place.':'') : 'Your encounter log holds nothing along this route yet. This trip is its first record.');
+  return h; }
+function planScan(){ const b=el('planScan'); if(b && S.plan) { const h=planScanHTML(); if(b._h!==h){ b.innerHTML=h; b._h=h; } } }
+function planSketch(L, pts){ const la0=L[0][1], k=Math.cos(la0*Math.PI/180), X=c=>(c[0]-L[0][0])*111320*k, Y=c=>(c[1]-la0)*111320, xs=L.map(X), ys=L.map(Y), x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys), w=Math.max(40,x1-x0), h=Math.max(40,y1-y0), s=Math.min(300/w,118/h), ox=(340-w*s)/2, oy=(150-h*s)/2;
+  const px=c=>(ox+(X(c)-x0)*s).toFixed(1)+','+(150-oy-(Y(c)-y0)*s).toFixed(1), step=Math.max(1,Math.floor(L.length/160)), q=L.filter((c,i)=>i%step===0||i===L.length-1);
+  return '<svg class="plan-sk" viewBox="0 0 340 150" role="img" aria-label="The shape of the route"><polyline fill="none" stroke="#2dd4ea" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="'+q.map(px).join(' ')+'"/>'+
+    (pts||[]).filter(x=>x.k!=='site').slice(0,40).map(x=>{ const c=px([x.lon,x.lat]).split(','); return '<rect x="'+(+c[0]-3.5)+'" y="'+(+c[1]-3.5)+'" width="7" height="7" fill="#ff8a3c"/>'; }).join('')+
+    (()=>{ const a=px(L[0]).split(','), z=px(L[L.length-1]).split(','); return '<circle cx="'+a[0]+'" cy="'+a[1]+'" r="6" fill="#0b1224" stroke="#e9f0ff" stroke-width="2.5"/><circle cx="'+z[0]+'" cy="'+z[1]+'" r="6" fill="#e9f0ff"/>'; })()+'</svg>'; }
+function planRender(){ const box=el('routeBox'); if(!box) return; const p=S.plan; if(!p){ box.innerHTML=''; return; } const can=S.features||{};
+  let h='<div class="mark plan"><div class="mark-h"><b>Plan a route</b><button class="btn sm" data-act="plan-x">Close</button></div>'+
+    '<div class="plan-f"><label for="planFrom">From</label><input class="inp" id="planFrom" maxlength="120" value="'+esc(p.fromText)+'" placeholder="Where you are now" autocomplete="off"></div>'+
+    '<div class="plan-f"><label for="planTo">To</label><input class="inp" id="planTo" maxlength="120" value="'+esc(p.toText)+'" placeholder="'+(can.find?'Address, place or coordinates':'Coordinates: 34.0522, -118.2437')+'" autocomplete="off" enterkeyhint="go"></div>'+
+    '<div class="elog-chips" style="margin:10px 0 0">'+['foot','bike','car'].map(m=>'<button class="chipbtn '+(p.mode===m?'on':'')+'" data-act="plan-mode" data-m="'+m+'">'+RT.label[m]+'</button>').join('')+'</div>'+
+    '<div class="loc-bar"><button class="btn primary mk'+(p.busy?' on':'')+'" data-act="plan-go">'+(p.busy?'Working it out':'Show the route')+'</button><button class="btn" data-act="plan-draw">Draw on the map</button></div>'+
+    ((P.routes||[]).length || (W.route||[]).length>2 ? '<div class="limit" style="text-align:center;margin-top:8px"><button class="linkbtn'+(p.past?' on':'')+'" data-act="plan-past">A route you took</button></div>' : '')+
+    (p.err?'<div class="fixbar" style="margin-top:8px"><span>'+esc(p.err)+'</span></div>':'');
+  if(p.pick) h+='<div class="elog-h4">Which one</div>'+p.pick.places.map((x,i)=>'<button class="plan-pick" data-act="plan-pick" data-i="'+i+'">'+esc(x.name.split(',')[0])+'<small>'+esc(x.name.split(',').slice(1).join(',').trim()||x.kind)+'</small></button>').join('');
+  if(p.past){ const past=[]; if((W.route||[]).length>2 && W.t0) past.push({i:'w', name:(W.on?'Your trip in progress':'Your last trip')+', '+eT(W.t0), len:Math.round(W.dist||0)}); (P.routes||[]).forEach((r,i)=>past.push({i:String(i), name:r.name+', '+eT(r.t), len:r.len}));
+    h+='<div class="elog-h4">A route you took</div>'+past.map(x=>'<button class="plan-pick" data-act="plan-use" data-i="'+x.i+'">'+esc(x.name)+'<small>'+esc(miText(x.len))+'</small></button>').join(''); }
+  if(p.line){ const pts=routePoints(p.line);
+    h+=planSketch(p.line, pts)+'<div class="plan-sum"><b>'+esc(miText(p.len))+'</b>, about '+esc(walkDur(p.dur*1000))+' '+RT.word[p.mode]+'. '+(p.by==='streets'?'It follows the streets.':p.by==='drawn'?'As you drew it.':'A straight line between the two points.')+'</div>'+
+      '<div id="planScan"></div>'+
+      '<div class="plan-f" style="margin-top:12px"><label for="planEta" style="width:auto">Arrive by</label><input class="inp" id="planEta" type="time" value="'+esc(p.etaText||'')+'" style="flex:none;width:130px"></div>'+
+      '<p class="limit" style="margin:6px 2px 0">Ten minutes past this time, Halo raises a banner and Responder shows your emergency numbers, until you tap I arrived.</p>'+
+      '<div class="loc-bar"><button class="btn" data-act="plan-see">See it on the map</button><button class="btn primary mk" data-act="plan-confirm">Confirm and start</button></div>'; }
+  h+='<p class="limit" style="margin:10px 2px 0">'+((can.route||can.find)?'Halo asks its own server for '+(can.find?'the place and ':'')+'the streets between your points. The server keeps nothing. ':'')+esc([p.credit,p.credit2].filter(Boolean).join(' '))+'</p></div>';
+  box.innerHTML=h; if(p.line){ const b=el('planScan'); if(b){ b._h=''; planScan(); } } }
+function planPick(i){ const p=S.plan, x=p && p.pick && p.pick.places[i]; if(!x) return; planGrab(); const f=p.pick.field, short=x.name.split(',').slice(0,2).join(',').trim(); p[f+'Text']=short; p[f]={lat:x.lat, lon:x.lon, name:short, text:short}; p.pick=null; planRender(); planGo(); }
+function planUse(i){ const p=S.plan; if(!p) return; planGrab(); let line=null, name='';
+  if(i==='w'){ line=W.route.map(q=>[q.lon,q.lat]); name='Your last trip'; } else { const r=(P.routes||[])[+i]; if(r){ line=r.line; name=r.name; p.mode=r.mode||p.mode; } }
+  if(!line || line.length<2) return; p.past=false; p.err=''; p.line=line; p.len=Math.round(lineLen(line)); p.dur=Math.round(p.len/RT.speed[p.mode]); p.by='drawn'; p.log=null;
+  p.from={lat:line[0][1], lon:line[0][0], name:'Start'}; p.to={lat:line[line.length-1][1], lon:line[line.length-1][0], name}; p.toText=name; p.to.text=name; p.fromText=''; 
+  const due=new Date(Date.now()+p.dur*1000+5*60000); p.etaText=String(due.getHours()).padStart(2,'0')+':'+String(due.getMinutes()).padStart(2,'0');
+  ptsLoad(); routeLog(line).then(x=>{ if(S.plan===p){ p.log=x; planScan(); } }); planRender(); routeShow(); }
+// Drawing: the full map opens, each tap adds a point, and the points in order are the route.
+async function planDraw(){ const p=S.plan; if(!p) return; planGrab(); p.draw=true; p.pts=[]; p.line=null; p.err=''; p.pick=null; p.past=false; await mapFullOpen(); MF.follow=false; el('mfFollow').classList.remove('on'); planDrawBar(); routeShow(); }
+function planDrawBar(){ const b=el('mfDraw'), p=S.plan; if(!b) return; el('mapFull').classList.toggle('drawing', !!(p && p.draw)); if(!p || !p.draw){ b.classList.add('hidden'); b.innerHTML=''; return; } const n=p.pts.length;          // while you draw, the sheet is put away and a tap on your own mark counts as a tap on the map
+  b.classList.remove('hidden'); b.innerHTML='<b>Draw your route.</b> '+(n===0?'Tap where you start, then each turn, then where you finish.':n===1?'Now tap the next point.':n+' points, '+esc(miText(lineLen(p.pts.map(q=>[q.lon,q.lat]))))+'.')+
+    '<div class="formrow"><button class="btn sm" data-act="plan-undo"'+(n?'':' disabled')+'>Undo</button><button class="btn sm" data-act="plan-clear"'+(n?'':' disabled')+'>Clear</button><button class="btn sm primary" data-act="plan-done">'+(n>1?'Done':'Cancel')+'</button></div>'; }
+function planTap(lat, lon){ const p=S.plan; if(!p || !p.draw || p.pts.length>=40) return; p.pts.push({lat:+lat.toFixed(5), lon:+lon.toFixed(5)}); planDrawBar(); routeShow(); }
+async function planDrawDone(viaBack){ const p=S.plan; if(!p || !p.draw) return; p.draw=false; planDrawBar(); if(!viaBack && S.mapFull) mapFullClose(false);
+  if(p.pts.length>1){ p.from=null; p.to=null; p.fromText=p.pts[0].lat.toFixed(5)+', '+p.pts[0].lon.toFixed(5); const z=p.pts[p.pts.length-1]; p.toText=z.lat.toFixed(5)+', '+z.lon.toFixed(5); p.busy=true; planRender();
+    try{ await planLine(p.pts.slice(), true); if(S.plan===p){ p.from.text=p.fromText; p.to.text=p.toText; } }catch(e){ if(S.plan===p){ p.line=p.pts.map(q=>[q.lon,q.lat]); p.len=Math.round(lineLen(p.line)); p.dur=Math.round(p.len/RT.speed[p.mode]); p.by='drawn'; } }
+    finally{ if(S.plan===p) p.busy=false; } }
+  planRender(); routeShow(); const b=el('routeBox'); if(b && S.plan) b.scrollIntoView({block:'start'}); }
+function planConfirm(){ const p=S.plan; if(!p || !p.line) return; planGrab(); const now=Date.now(); let eta=now+p.dur*1000+5*60000;
+  { const m=/^(\d\d):(\d\d)$/.exec(p.etaText||''); if(m){ const d=new Date(); d.setHours(+m[1],+m[2],0,0); if(d.getTime()<now-60000) d.setDate(d.getDate()+1); eta=d.getTime(); } }
+  const step=Math.max(1,Math.ceil(p.line.length/400)), line=p.line.filter((c,i)=>i%step===0||i===p.line.length-1), name=(p.to&&p.to.name)||'your destination';
+  P.routeMode=p.mode; P.route={id:'R'+now.toString(36), t0:now, name, mode:p.mode, line, len:p.len, dur:p.dur, eta, by:p.by, from:{lat:line[0][1], lon:line[0][0]}, to:{lat:line[line.length-1][1], lon:line[line.length-1][0]}, pts:routePoints(line), ptsVer:PTS.ver, done:0};
+  P.routes=P.routes||[]; if(!P.routes.some(r=>r.name===name && Math.abs(r.len-p.len)<30)) P.routes.unshift({t:now, name, mode:p.mode, len:p.len, line:line.filter((c,i)=>i%Math.max(1,Math.ceil(line.length/150))===0||i===line.length-1)}); P.routes.length=Math.min(P.routes.length,8); save();
+  S.plan=null; planRender(); if(!W.on && mobileLive()) walkStart(); if(W.on){ W.plan=routeInfo(P.route); wEvent('note','Route set to '+name+': '+miText(p.len)+' '+RT.word[p.mode]+', due '+hhmm(eta)+'.'); wSave(true); }
+  routeShow(); renderVicinity(); toast('Route set. Halo follows it from here, and counts what is new since you set off.'); const b=el('locBox'); if(b) b.scrollIntoView({block:'start'}); }
+const routeInfo = R => ({id:R.id, name:R.name, len:R.len, mode:R.mode, eta:R.eta, cams:(R.pts||[]).filter(x=>x.k!=='site').length});
+function routeDone(how){ const R=routeLive(); if(!R) return; R.done=Date.now(); R.how=how; save(); if(W.on){ if(W.plan && W.plan.id===R.id){ W.plan.done=R.done; W.plan.how=how; } wEvent('note', how==='arrived'?'Arrived at '+R.name+'.':'Route to '+R.name+' ended by you.'); wSave(true); }
+  S.banners=(S.banners||[]).filter(b=>b.key!=='late:'+R.id); renderAlerts(); routeShow(); renderVicinity(); if(S.view==='responder') rerender(); toast(how==='arrived'?'Arrived. The route is closed.':'The route is ended.'); }
+// On the way: you have arrived when you are at the destination after having been away from it; ten minutes past the time you set, Halo says so once.
+function routeTick(){ const R=routeLive(); if(!R) return; const me=ePos(), now=Date.now();
+  if(R.ptsVer!==PTS.ver){ R.pts=routePoints(R.line); R.ptsVer=PTS.ver; }
+  if(me && now-me.t<30000){ const d=distLL(me.lat,me.lon,R.to.lat,R.to.lon); R.far=Math.max(R.far||0,d); if(d<=Math.max(RT.arrive, Math.min(100, me.acc||0)) && R.far>=Math.min(150, R.len/3)){ routeDone('arrived'); return; } }
+  if(now>R.eta+RT.grace && !R.late){ R.late=now; save(); if(W.on) wEvent('warn','Past the arrival time set for '+R.name+' ('+hhmm(R.eta)+').');
+    if(alertRaise('late:'+R.id, 'You are past your arrival time', 'You set '+hhmm(R.eta)+' for '+R.name+'. If you have arrived, tap I arrived on Location. Your emergency numbers are in Responder.', {view:'responder'})) buzz([300,150,300,150,300]);
+    if(S.view==='responder') rerender(); else if(S.view==='overview'||S.view==='watchers') renderVicinity(); } }
+// Since you set off on this route: what your log already held here, what is new, and what it held somewhere else.
+function routeSince(R){ if(!W.on || !W.plan || W.plan.id!==R.id || !ELOG.ready) return null; const o={fresh:0, here:0, away:0};
+  Object.values(W.devs||{}).forEach(r=>{ if(r.mine || !r.sig) return; const h=ELOG.hist.get(r.sig), old=h?h.pl.filter(q=>q[2]<R.t0):[];
+    if(!h || h.first>=R.t0-1000) o.fresh++; else if(r.at && old.length && !old.some(q=>distLL(r.at.lat,r.at.lon,q[0],q[1])<=ELOG.PLACE_M)) o.away++; else o.here++; });
+  return o; }
+function routeStrip(){ const R=routeLive(); if(!R) return ''; const me=ePos(), pr=me?onLine(me.lat,me.lon,R.line):null, off=pr && pr.d>RT.off, left=pr?Math.max(0,R.len-pr.at):R.len, late=Date.now()>R.eta+RT.grace;
+  const ahead=(R.pts||[]).filter(c=>c.k!=='site' && (!pr || c.at>pr.at+10)), nx=ahead[0], sn=routeSince(R);
+  return '<div class="rt-strip" id="rtStrip"'+(late?' style="border-color:var(--action);background:rgba(255,90,90,.10)"':'')+'><div class="rt-top"><b>Route to '+esc(R.name)+'</b><span class="mono">'+esc(miText(left))+(pr?' to go':'')+' · due '+hhmm(R.eta)+'</span></div>'+
+    '<div class="rt-sub">'+(late?'<b>You are past your arrival time.</b> ':'')+(off?'You are '+esc(miText(pr.d))+' off the route you planned. ':'')+
+      (ahead.length ? '<b>'+ahead.length+(ahead.length===1?' camera':' cameras')+' ahead.</b>'+(nx&&pr?' Next: '+esc(PT_WORD[nx.k].toLowerCase())+' in '+esc(miText(Math.max(0,nx.at-pr.at)))+'.':'') : ((R.pts||[]).some(c=>c.k!=='site')?'No camera ahead on the public record.':''))+'</div>'+
+    (sn?'<div class="rt-sub">Since you set off: <b>'+sn.fresh+'</b> first time · <b>'+sn.here+'</b> seen here before · <b style="'+(sn.away?'color:var(--route)':'')+'">'+sn.away+'</b> seen at another place</div>':'')+
+    '<div class="formrow"><button class="btn sm primary" data-act="route-arrived">I arrived</button><button class="btn sm" data-act="route-end">End the route</button><button class="btn sm" data-act="route-map">On the map</button></div></div>'; }
+/* The route on the maps: the plan while you make it, then the route you confirmed. */
+function routeData(){ const p=S.plan, f=[]; const L=routeLineNow();
+  if(L && L.length>1) f.push({type:'Feature', properties:{kind:'line'}, geometry:{type:'LineString', coordinates:L}});
+  if(p && p.draw) p.pts.forEach((q,i)=>f.push({type:'Feature', properties:{kind:'pt', end:(i===0||i===p.pts.length-1)?1:0}, geometry:{type:'Point', coordinates:[q.lon,q.lat]}}));
+  else if(L && L.length>1){ f.push({type:'Feature', properties:{kind:'pt', end:1}, geometry:{type:'Point', coordinates:L[0]}}); f.push({type:'Feature', properties:{kind:'pt', end:2}, geometry:{type:'Point', coordinates:L[L.length-1]}}); }
+  return {type:'FeatureCollection', features:f}; }
+function routeAttach(map){ if(!map || map._rt) return; try{ map.addSource('rt',{type:'geojson',data:routeData()});
+    map.addLayer({id:'rt-case',type:'line',source:'rt',filter:['==',['get','kind'],'line'],paint:{'line-color':'#070b16','line-width':7,'line-opacity':.7},layout:{'line-cap':'round','line-join':'round'}});
+    map.addLayer({id:'rt-line',type:'line',source:'rt',filter:['==',['get','kind'],'line'],paint:{'line-color':'#2dd4ea','line-width':3.5,'line-opacity':.95},layout:{'line-cap':'round','line-join':'round'}});
+    map.addLayer({id:'rt-pt',type:'circle',source:'rt',filter:['==',['get','kind'],'pt'],paint:{'circle-radius':['case',['>',['get','end'],0],7,4.5],'circle-color':['case',['==',['get','end'],2],'#e9f0ff','#0b1224'],'circle-stroke-width':2.5,'circle-stroke-color':'#e9f0ff'}});
+    map._rt=true; }catch(e){} }
+function routeShow(){ const d=routeData(); [MAP,MACRO,FULL].forEach(m=>{ if(!m) return; try{ if(!m._rt) routeAttach(m); const s=m.getSource('rt'); if(s) s.setData(d); }catch(e){} }); }
+function routeOnMap(){ const L=routeLineNow(); mapFullOpen().then(()=>{ routeShow(); if(!FULL || !L) return; MF.follow=false; el('mfFollow').classList.remove('on');
+  try{ let w=180,e2=-180,s=90,n=-90; L.forEach(c=>{ w=Math.min(w,c[0]); e2=Math.max(e2,c[0]); s=Math.min(s,c[1]); n=Math.max(n,c[1]); }); FULL.fitBounds([[w,s],[e2,n]],{padding:{top:120,bottom:160,left:40,right:70},duration:0,maxZoom:17}); }catch(e){} }); }
+document.addEventListener('keydown', ev=>{ if(ev.key==='Enter' && ev.target && (ev.target.id==='planTo' || ev.target.id==='planFrom')){ ev.preventDefault(); planGo(); } });
 const buzz = p => { try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} };
 
 /* ---------- Watchers and Attackers screens ---------- */
@@ -2516,6 +2680,11 @@ function renderResponder(){
   h+='<div class="limit" style="margin-bottom:14px">'+(away
       ? '<b>Away.</b> You are out. Halo raises a banner on your phone when a radar in your home reports a person there.'
       : '<b>Home.</b> You are in. Banners from your home radar are off. Set up the people, the rooms and the emergency numbers here.')+'</div>';
+  { const R=routeLive(); if(R){ const late=Date.now()>R.eta+RT.grace;
+      h+='<div class="card" id="routeCard" style="margin-bottom:14px'+(late?';border-color:var(--action)':'')+'"><h3>Your route <span class="n">'+(late?'past your time':'due '+hhmm(R.eta))+'</span></h3>'+
+        '<p class="limit" style="margin:0 0 10px">To '+esc(R.name)+', '+esc(miText(R.len))+' '+RT.word[R.mode]+'. '+(late?'You set '+hhmm(R.eta)+' as your arrival time. If you have arrived, tap I arrived. If you need help, call one of your numbers.':'Ten minutes past '+hhmm(R.eta)+', Halo raises a banner and lists your emergency numbers here, until you tap I arrived.')+'</p>'+
+        (late ? (H.contacts.length ? H.contacts.map(c=>'<div class="rowline"><span><b>'+esc(c.name)+'</b> <span class="mono" style="font-size:11.5px;color:var(--mut)">'+esc(c.phone)+'</span></span><a class="btn sm primary" style="text-decoration:none" href="tel:'+esc(c.phone)+'">Call</a></div>').join('') : '<div class="empty">No emergency number is listed. Switch to Home and add one.</div>') : '')+
+        '<div class="formrow"><button class="btn sm primary" data-act="route-arrived">I arrived</button><button class="btn sm" data-act="route-end">End the route</button></div></div>'; } }
   const radar=H.rooms.filter(r=>r.sensor==='radar').length, watches=H.people.filter(p=>p.watch).length;
   h+='<div class="ov"><div class="stack" style="gap:14px">';
   h+=roomsCard();
@@ -2761,7 +2930,7 @@ async function initMap(){
     MAP.addLayer({id:'zone-range',type:'line',source:'zones',filter:['==',['get','kind'],'range'],paint:{'line-color':['coalesce',['get','c'],'#9aa6c4'],'line-width':['case',['==',['get','sel'],1],2.4,1.1],'line-opacity':['case',['==',['get','sel'],1],.95,.5],'line-dasharray':[1.5,2.5]}});
     MAP.addLayer({id:'zone-arc',type:'line',source:'zones',filter:['==',['get','kind'],'arc'],paint:{'line-color':'#e8a84a','line-width':2,'line-opacity':.8}});
     if(VEC){ MAP.addSource('ringlab',{type:'geojson',data:ringLabData()}); MAP.addLayer({id:'rings-lab',type:'symbol',source:'ringlab',layout:{'text-field':['get','t'],'text-font':['Noto Sans Regular'],'text-size':10,'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'#b9cdf5','text-halo-color':'#070b16','text-halo-width':1.4}}); }
-    poiAttach(MAP); YOU=mark(MAP,'you-dot');
+    poiAttach(MAP); routeAttach(MAP); YOU=mark(MAP,'you-dot');
     fitRadius(true); renderVicinity();
   });
   MACRO=new window.maplibregl.Map(opt(el('macroMap')));
@@ -2772,7 +2941,7 @@ async function initMap(){
     MACRO.addLayer({id:'m-track',type:'line',source:'macro',filter:['==',['get','kind'],'track'],paint:{'line-color':'#9fc4ff','line-width':2,'line-opacity':.85}});
     MACRO.addLayer({id:'m-range',type:'line',source:'macro',filter:['==',['get','kind'],'range'],paint:{'line-color':['coalesce',['get','c'],'#9aa6c4'],'line-width':['case',['==',['get','sel'],1],2.4,1.1],'line-opacity':['case',['==',['get','sel'],1],.95,.5],'line-dasharray':[1.5,2.5]}});
     MACRO.addLayer({id:'m-heard',type:'circle',source:'macro',filter:['==',['get','kind'],'heard'],paint:{'circle-radius':3.5,'circle-color':['get','c'],'circle-opacity':.85,'circle-stroke-width':1,'circle-stroke-color':'#070b16'}});
-    poiAttach(MACRO); YOU2=mark(MACRO,'you-dot sm');
+    poiAttach(MACRO); routeAttach(MACRO); YOU2=mark(MACRO,'you-dot sm');
     macroUpdate();
   });
   if(window.ResizeObserver){ const ro=new ResizeObserver(()=>{ try{ MAP.resize(); MACRO.resize(); }catch(e){} _fitR=0; _fitM=0; fitRadius(true); macroFit(); });
@@ -2836,8 +3005,9 @@ const PT_Z=12, PT_LAYERS=['pts-plate','pts-cctv','pts-speed','pts-site','pts-sit
 const ptsOn = () => POI.pts===true && !!(S.features && S.features.poi);
 const ptTile = (lat,lon) => { const n=1<<PT_Z, r=lat*Math.PI/180; return {x:Math.min(n-1,Math.max(0,Math.floor((lon+180)/360*n))), y:Math.min(n-1,Math.max(0,Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n)))}; };
 const ptWidth = lat => 40075016*Math.cos(lat*Math.PI/180)/(1<<PT_Z);
-function ptsWant(){ const g=gz(); if(!g) return []; const c=ptTile(g.lat,g.lon), n=1<<PT_Z, rings=macroRadius()>ptWidth(g.lat)?2:1, out=[];
+function ptsWant(){ const g=gz(); if(!g) return routeTiles(); const c=ptTile(g.lat,g.lon), n=1<<PT_Z, rings=macroRadius()>ptWidth(g.lat)?2:1, out=[];
   for(let dy=-rings;dy<=rings;dy++) for(let dx=-rings;dx<=rings;dx++){ const y=c.y+dy; if(y<0||y>=n) continue; out.push({k:(((c.x+dx)%n+n)%n)+'/'+y, ring:Math.max(Math.abs(dx),Math.abs(dy))}); }
+  routeTiles().forEach(q=>{ if(!out.some(o=>o.k===q.k)) out.push(q); });          // the squares your planned route crosses
   return out.sort((a,b)=>a.ring-b.ring); }
 function ptsLoad(){ if(!ptsOn()) return; const now=Date.now(), want=ptsWant(), keep={}; want.forEach(q=>keep[q.k]=1);
   Object.keys(PTS.sq).forEach(k=>{ if(!keep[k] && PTS.sq[k].state!=='busy' && now-PTS.sq[k].t>3600000){ delete PTS.sq[k]; PTS.ver++; } });
@@ -3601,6 +3771,7 @@ async function fullEnsure(){ if(!MF.timer) MF.timer=setInterval(()=>mapFullTick(
     FULL=new window.maplibregl.Map({container:el('mfMap'), style:mapStyle(!!gz()), center:[g.lon,g.lat], zoom:17.2, attributionControl:false, fadeDuration:0, dragRotate:false, pitchWithRotate:false, touchPitch:false, maxZoom:20.5, minZoom:3});
     FULL.addControl(new window.maplibregl.ScaleControl({maxWidth:110, unit:'metric'}), 'top-left');
     FULL.on('dragstart',()=>{ MF.follow=false; el('mfFollow').classList.remove('on'); });
+    FULL.on('click', ev=>{ if(S.plan && S.plan.draw && ev && ev.lngLat) planTap(ev.lngLat.lat, ev.lngLat.lng); });          // drawing a route: each tap is its next point
     FULL.on('zoomend',ev=>{ if(ev && ev.originalEvent){ S.omR=0; if(S.oneMap) oneRender(); } });          // a zoom made by hand leaves the named scales
     FULL.on('error', e=>{ S.mfErr=String((e&&e.error&&(e.error.message||e.error))||'map error').slice(0,200); });
     FULL.once('style.load',()=>{
@@ -3620,10 +3791,10 @@ async function fullEnsure(){ if(!MF.timer) MF.timer=setInterval(()=>mapFullTick(
       FULL.addLayer({id:'mf-link-g',type:'line',source:'mfk',paint:{'line-color':['get','c'],'line-width':7,'line-opacity':.18,'line-blur':3},layout:{'line-cap':'round'}});
       FULL.addLayer({id:'mf-link',type:'line',source:'mfk',paint:{'line-color':['get','c'],'line-width':2.2,'line-opacity':.95},layout:{'line-cap':'round'}});
       const e=document.createElement('div'); e.className='you-dot'; e.innerHTML='<span class="cone off"></span>'; FULL_YOU=new window.maplibregl.Marker({element:e}).setLngLat([g.lon,g.lat]).addTo(FULL);
-      poiAttach(FULL); fullInline(!S.mapFull); if(oneMode() && !S.mapFull && gz()){ omFit(S.omR||OM_TRIP, false); setTimeout(omResize,150); } mapFullTick(true); });
+      poiAttach(FULL); routeAttach(FULL); fullInline(!S.mapFull); if(oneMode() && !S.mapFull && gz()){ omFit(S.omR||OM_TRIP, false); setTimeout(omResize,150); } mapFullTick(true); });
   } finally{ MF.making=false; }
 }
-function mapFullClose(viaBack){ if(!S.mapFull) return; S.mapFull=false;
+function mapFullClose(viaBack){ if(!S.mapFull) return; S.mapFull=false; if(S.plan && S.plan.draw) setTimeout(()=>planDrawDone(true),0);          // leaving the map ends the drawing and keeps the points
   if(oneMode() && (S.view==='overview'||S.view==='watchers')) oneSync();                    // back into the card, still running
   else { clearInterval(MF.timer); MF.timer=0; el('mapFull').classList.add('hidden'); }
   if(!viaBack){ try{ history.back(); }catch(e){} } }
@@ -4536,6 +4707,7 @@ function liveTick(){
   alertScan();
   try{ recogTick(); }catch(e){}
   try{ elogSweep(); elogCams(); }catch(e){}
+  try{ routeTick(); }catch(e){}
   if(mobileLive() && !(P.path&&P.path.heard) && [...LIVE.devs.values()].some(d=>d.present&&!d.sim)){ P.path=P.path||{}; P.path.heard=true; save(); }
   tripAuto(); walkTick();
   if(!booted) return;
@@ -4981,8 +5153,9 @@ const tripKeep = () => { if(!(W.t0 && W.t1) || W.kept) return; const st=walkStat
   P.trips=P.trips||[]; P.trips.unshift({t0:W.t0,t1:W.t1,m:st.distance_m,heard:st.heard,placed:st.placed,withYou:st.withYou}); P.trips.length=Math.min(P.trips.length,20); save(); };
 function walkStart(t0, a, at){
   tripKeep(); const back=!!at;
-  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false});
+  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null});
   if(a) W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10});
+  { const R=routeLive(); if(R) W.plan=routeInfo(R); }          // a trip that begins while a route is set belongs to that route
   wEvent('start','Trip started.','',W.t0);
   if(back) walkTick(at, [...LIVE.devs.keys()]); else { wLock(); walkTick(); }
   wSave(true); renderVicinity();
@@ -5127,8 +5300,9 @@ function walkDocHTML(){
   h+=H('What Halo recorded')+tbl(['Item','This trip'],[
     ['Listening',e(sensors.join(', ')||'Route only')],['Signals','Bluetooth: trackers, phones, watches, earbuds, laptops and beacons'+(W.aps&&Object.keys(W.aps).length?'. Wi-Fi: '+Object.keys(W.aps).length+' access points':'')+(W.cells&&Object.keys(W.cells).length?'. Cell: '+plural(Object.keys(W.cells).length,'tower','towers')+' used'+(W.g2?', with a drop to 2G':''):'')],
     ['Length',e(walkDur(durMs))+', '+e(miText(st.distance_m))],
+    ...(W.plan?[['Planned route','To '+e(W.plan.name)+', '+e(miText(W.plan.len))+' '+RT.word[W.plan.mode]+', due '+hhmm(W.plan.eta)+'. '+(W.plan.cams?plural(W.plan.cams,'camera','cameras')+' of the public record on it. ':'')+(W.plan.done?(W.plan.how==='arrived'?'Arrived at '+hhmm(W.plan.done)+'.':'Ended by you at '+hhmm(W.plan.done)+'.'):'Still open when this report was made.')]]:[]),
     ['Follower test',longEnough?'Complete: your route reached '+reach+' m end to end over '+e(walkDur(durMs)):'Your route reached '+reach+' m end to end. The test completes at '+FOLLOW.reach+' m and '+FOLLOW.mins+' minutes'],
-    ['Your position',rt.length?plural(rt.length,'point','points')+' recorded, typically within '+Math.round(median(rt.map(q=>q.acc)))+' m':'Starts with the first fix'],
+    ['Your position',rt.length?plural(rt.length,'point','points')+' recorded from GPS. The phone states its own accuracy as '+Math.round(median(rt.map(q=>q.acc)))+' m':'Starts with the first fix'],
     ['Record',W.gaps?'Continuous except for '+e(walkDur(W.gaps*1000)):'Continuous']]);
   // 3
   h+=H('Devices that moved with you');
@@ -5611,6 +5785,22 @@ document.addEventListener('click', e=>{
     case 'mark-x': S.mark=null; markRender(); renderVicinity(); break;
     case 'mark-tick': { const m=S.mark, d=m&&m.devs[+a.dataset.i]; if(d){ const x=val('markText'); d.on=!d.on; markRender(); const i=el('markText'); if(i) i.value=x; } break; }
     case 'mark-save': markSave(); break;
+    case 'plan-open': if(S.plan) planClose(); else planOpen(); break;
+    case 'plan-x': planClose(); break;
+    case 'plan-mode': if(S.plan){ planGrab(); S.plan.mode=a.dataset.m; if(S.plan.line && S.plan.by!=='drawn' && S.plan.from && S.plan.to){ S.plan.from.text=S.plan.fromText; S.plan.to.text=S.plan.toText; planGo(); } else if(S.plan.line){ S.plan.dur=Math.round(S.plan.len/RT.speed[S.plan.mode]); planRender(); } else planRender(); } break;
+    case 'plan-go': planGo(); break;
+    case 'plan-pick': planPick(+a.dataset.i); break;
+    case 'plan-past': if(S.plan){ planGrab(); S.plan.past=!S.plan.past; S.plan.pick=null; planRender(); } break;
+    case 'plan-use': planUse(a.dataset.i); break;
+    case 'plan-draw': planDraw(); break;
+    case 'plan-undo': if(S.plan && S.plan.draw){ S.plan.pts.pop(); planDrawBar(); routeShow(); } break;
+    case 'plan-clear': if(S.plan && S.plan.draw){ S.plan.pts=[]; planDrawBar(); routeShow(); } break;
+    case 'plan-done': planDrawDone(false); break;
+    case 'plan-see': planGrab(); routeOnMap(); break;
+    case 'plan-confirm': planConfirm(); break;
+    case 'route-arrived': routeDone('arrived'); break;
+    case 'route-end': routeDone('ended'); break;
+    case 'route-map': routeOnMap(); break;
     case 'elog-open': if(S.elog) S.elog=null; else S.elog={f:'all'}; elogRender().then(()=>{ if(S.elog){ const b=el('elogBox'); if(b) b.scrollIntoView({block:'start'}); } }); renderVicinity(); break;
     case 'elog-x': S.elog=null; elogRender(); renderVicinity(); break;
     case 'elog-f': if(S.elog){ S.elog={f:a.dataset.f}; elogRender(); } break;
