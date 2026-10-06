@@ -918,7 +918,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.24', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.25', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2889,12 +2889,17 @@ const rssiOf = dist => Math.round(-40-22*Math.log10(Math.max(1,dist)));
 const trendOf = v => v<-0.3?'Approaching':v>0.3?'Leaving':'Steady';
 const band = d => d.dist<30?'Very near':d.dist<=BLOCK_M?'Within one block':d.dist<=BASE_R?'Within two blocks':'Beyond two blocks';
 const labelOf = d => { const l=d && d.live && P.labels && P.labels[d.id]; return (typeof l==='string' && l) ? l : ''; };
-const devName = d => d.live ? (labelOf(d) || d.adv || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
-const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : d.cls+(d.hint?', '+d.hint:''))+(d.live && devName(d)!==d.name ? ' · '+d.name : '');
+// A name made by a machine: twenty or more letters and digits in mixed case with no word in it. Wi-Fi equipment gives itself such names for the links between its own units.
+const randName = n => { n=String(n||''); return n.length>=20 && /^[A-Za-z0-9]+$/.test(n) && /[a-z]/.test(n) && /[A-Z]/.test(n) && /\d/.test(n); };
+const nameShow = n => randName(n) ? n.slice(0,6)+'…'+n.slice(-4) : n;
+const KIND_SHOW={'Access point':'Wi-Fi network'};
+const devName = d => d.live ? (labelOf(d) || nameShow(d.adv) || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
+const kindText = d => (d.cls==='Unknown' ? (d.hint || 'Maker not broadcast') : (KIND_SHOW[d.cls]||d.cls)+(d.hint?', '+(d.band==='wifi'?d.hint.replace(/^Secured network/,'secured').replace(/^Open network/,'open'):d.hint):''))+(d.live && randName(d.adv) && !labelOf(d) ? ' · machine-made name, typical of a link between Wi-Fi units' : '')+(d.live && devName(d)!==d.name && d.band!=='wifi' ? ' · '+d.name : '');
 const flagOf = d => d.mine?'Yours':d.sigFit?'Fits your signature':d.withYou?'Moving with you':d.maybe?'Staying with you so far':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':d.verdict==='fixed'?'Stays in place':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
 // One tier per device, read straight from what it did: moving with you is Take Action, as in the bottom line.
 const DEV_TIER=['No flag','Watch','Warning','Take Action'];
+const NAME_NOTE='Names. Halo shows the name a device broadcasts, such as a computer, a headset, a car or a Wi-Fi network. Phones keep their owner\'s name private by design, so Halo names each by its maker and a short tag. Open a device to give it your own label.';
 function deviceThreat(d){ const s = (d.mine||d.sigFit) ? 0 : d.withYou ? 3 : (d.maybe||d.homeAway) ? 2 : d.onRoute ? 1 : 0;
   return {c:d.identity, s, tierIdx:s}; }
 const rosterState = d => !d.live||d.present ? d.trend : d.atHome ? 'heard at home' : 'out of earshot';
@@ -2918,7 +2923,8 @@ function renderRoster(){
       '<div class="pull-head" data-act="dev" data-id="'+d.id+'"><div class="glyph">'+d.glyph+'</div><div class="phd"><div class="plab">'+esc(devName(d))+'</div><div class="psum">'+esc(kindText(d))+' · '+distText(d)+' · '+rosterState(d)+' · '+flagOf(d)+(d.sim?' · test data':'')+'</div></div>'+
       '<div class="pmeta"><span class="pill" style="color:var('+tc+');border-color:var('+tc+')">'+DEV_TIER[th.tierIdx]+'</span><span class="chev">&#9662;</span></div></div>'+
       '<div class="pull-body">'+(S.openDevices.has(d.id)?(d.live?liveBody(d):deviceBody(d)):'')+'</div></div>'; }).join('')+
-    (extra?'<div class="empty" style="padding:10px 6px">'+extra+' more devices were heard and are not listed. Sort by Nearest to see those closest to you.</div>':'');
+    (extra?'<div class="empty" style="padding:10px 6px">'+extra+' more devices were heard and are not listed. Sort by Nearest to see those closest to you.</div>':'')+
+    (list.some(d=>d.live)?'<div class="limit" style="padding:8px 6px 0">'+NAME_NOTE+'</div>':'');
   S._rsig=sig;
 }
 const liveKV = d => '<span class="k">Distance</span><span class="v">'+Math.round(d.dist)+' m · '+band(d)+'</span><span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm</span>'+
@@ -3688,7 +3694,7 @@ function sigPull(){
   h+='<div class="dsec"><h4>Add what is yours</h4>';
   if(!live) h+='<p>'+esc(stateWords(V.mode).long)+'</p>'+(NATIVE()||isAndroid()?'<div class="formrow">'+(phPanel().html)+'</div>':'');
   else { const ds=V.devices.filter(d=>d.present||d.atHome).sort((a,b)=>(b.rssi||-200)-(a.rssi||-200)).slice(0,14), top=ds[0];
-    h+='<p style="margin-bottom:8px">Hold this phone against a device you own. It rises to the top of the list. Press Mine. Three or four presses and your signature is done.</p>'+
+    h+='<p style="margin-bottom:8px">Hold this phone against a device you own. It rises to the top of the list. Press Mine. Three or four presses and your signature is done.</p>'+'<div class="limit" style="margin:0 0 8px">'+NAME_NOTE+'</div>'+
       (ds.length?ds.map((d,i)=>'<div class="rowline"><span><b>'+esc(devName(d))+'</b>'+(i===0&&top.rssi>=-58?' <span class="chip pot">closest to this phone now</span>':'')+
           '<br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(kindText(d))+' · '+esc(distText(d))+(d.sigFit?' · fits your signature':'')+'</span></span>'+
           '<button class="btn sm '+(d.mine?'on':'primary')+'" data-act="sig-mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003;':'Mine')+'</button></div>').join('')
@@ -4376,6 +4382,16 @@ function toolWifi(){
     aps.slice(0,10).map(d=>'<div class="rowline"><span><b>'+esc(d.adv||'Hidden network')+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(d.hint)+'</span></span><span class="mono" style="font-size:11px;white-space:nowrap;color:var('+(/^Open/.test(d.hint)?'--warn':'--mut')+')">'+(/^Open/.test(d.hint)?'Open':'Locked')+' · '+Math.round(d.rssi)+' dBm</span></div>').join('')+
     (open.length?'<div class="limit" style="margin-top:8px">'+open.length+' open '+(open.length===1?'network':'networks')+' in earshot. On an open network, everything not encrypted by the app itself can be read by others on it.</div>':'')+'</div>';
 }
+// The kind a device states for itself in a Bluetooth search: the standard class of device.
+function codKind(cod){ cod=Number(cod)||0; const major=(cod>>8)&31, minor=(cod>>2)&63;
+  if(major===2) return {cls:'Phone', hint:'Phone, by its own Bluetooth class'};
+  if(major===1) return {cls:'Laptop', hint:'Computer, by its own Bluetooth class'};
+  if(major===7) return {cls:'Wearable', hint:'Wearable, by its own Bluetooth class'};
+  if(major===4) return minor===8 ? {cls:'Vehicle', hint:'Car audio'} : (minor===1||minor===2||minor===6) ? {cls:'Wearable', hint:'Headset or headphones'} : minor===5 ? {cls:'Unknown', hint:'Speaker'} : (minor>=9&&minor<=15) ? {cls:'Unknown', hint:'Television or display'} : {cls:'Unknown', hint:'Audio or video device'};
+  if(major===5) return {cls:'Unknown', hint:'Keyboard, mouse or controller'};
+  if(major===6) return {cls:'Unknown', hint:'Printer or imaging device'};
+  if(major===9) return {cls:'Wearable', hint:'Health device'};
+  return {cls:'Unknown', hint:'Bluetooth device'}; }
 const NATIVE = () => { const n=window.HaloNative; return (n && typeof n.drain==='function' && typeof n.start==='function') ? n : null; };
 const nativeStatus = () => { try{ return JSON.parse(NATIVE().status()); }catch(e){ return null; } };
 const phCan = () => !!NATIVE() || !!(navigator.bluetooth && navigator.bluetooth.requestLEScan);
@@ -4392,6 +4408,7 @@ async function nativeDrain(){
         else { const gate=posGate(q.lat,q.lon,acc,q.t||b.t,q.src); if(gate && !(acc>POS_MAX_ACC)){ trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc}, b.t); } } }
       const list=[];
       for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
+        if(x.cl){ const k=codKind(x.cod), nm=String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); list.push({id:'bc:'+hash32(String(x.a)).toString(36), rssi:x.r, band:'ble', cls:k.cls, name:nm, hint:k.hint, conf:nm?3:2, flags:[]}); PH.heard++; continue; }
         const ev={device:{id:x.a,name:x.n||''}, rssi:x.r, uuids:x.u||[],
           manufacturerData:new Map(Object.keys(x.m||{}).map(k=>[+k, dv(hexBytes(x.m[k]))])), serviceData:new Map(Object.keys(x.d||{}).map(k=>[k, dv(hexBytes(x.d[k]))]))};
         try{ const d=await phDescribe(ev); list.push({id:d.id, rssi:x.r, band:'ble', cls:d.cls, name:d.name, hint:d.hint, conf:d.conf, flags:d.flags}); PH.heard++; }catch(e){} }
@@ -4883,7 +4900,7 @@ function liveBody(d){
     '<div class="dsec"><h4>Follower test</h4><div class="kv"><span class="k">Result</span><span class="v '+(d.withYou?'warnc':'')+'">'+esc(ft)+'</span>'+
     '<span class="k">In earshot for</span><span class="v">'+(d.mins<1?'under a minute':Math.round(d.mins)+' min')+'</span><span class="k">While you moved</span><span class="v">'+Math.round(d.span||0)+' m</span></div></div>'+
     '<div class="dsec"><h4>History</h4><div class="kv"><span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span><span class="k">Reports</span><span class="v">'+d.timesSeen+'</span>'+
-    '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Advertised name</span><span class="v '+(d.adv?'':'unkc')+'">'+esc(d.adv||'None')+'</span>'+(d.hint?'<span class="k">Maker hint</span><span class="v">'+esc(d.hint)+'</span>':'')+
+    '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Name it broadcasts</span><span class="v '+(d.adv?'':'unkc')+'" style="word-break:break-all">'+esc(d.adv||'Kept private by the device')+'</span>'+(d.hint?'<span class="k">Maker hint</span><span class="v">'+esc(d.hint)+'</span>':'')+
     '<span class="k">Address</span><span class="v '+(d.randomizes?'warnc':'')+'">'+(d.randomizes?'Randomizes, held by signature':'Not reported as randomized')+'</span></div></div>'+
     '<div class="dev-acts"><button class="btn primary" data-act="capture" data-id="'+d.id+'">Capture Now</button>'+
     '<button class="btn'+(d.mine?' on':'')+'" data-act="mine" data-id="'+d.id+'">'+(d.mine?'Yours &#10003; Undo':'This is mine')+'</button>'+
