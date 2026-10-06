@@ -971,7 +971,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.29', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.30', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2186,7 +2186,7 @@ function renderVicinity(){
   el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : stateWords(V.mode).count;
   { const f=stateFix(V.mode), fb=el('fixBar'), noPos=!S.pos && !gz() && !whereFresh(); el('vicCount').classList.toggle('fix', !!f);
     const hb=(f?'<div class="fixbar"><span>'+esc(f.why)+'</span>'+fixBtn(f)+'</div>':'')+(noPos?'<div class="fixbar"><span>'+(S.geoErr?esc(geoHelp()):'Allow location and your map appears.')+'</span><button class="btn sm primary" data-act="geo-ask">Allow location</button></div>':'');
-    if(fb && fb._h!==hb){ fb.innerHTML=hb; fb._h=hb; } }
+    const hb2=hb+recogBars(); if(fb && fb._h!==hb2){ fb.innerHTML=hb2; fb._h=hb2; } }
   el('radLine').className='radline'+(rs.ext?' ext':'');
   el('sphMicro').classList.toggle('ext',!!rs.ext);
   const view=viewRadius();
@@ -4310,6 +4310,7 @@ function liveTick(){
   sigApply();
   LIVE.devs.forEach(d=>{ if(!d.sim && (d.withYou || d.homeAway)) autoLog(d); });
   alertScan();
+  try{ recogTick(); }catch(e){}
   if(mobileLive() && !(P.path&&P.path.heard) && [...LIVE.devs.values()].some(d=>d.present&&!d.sim)){ P.path=P.path||{}; P.path.heard=true; save(); }
   tripAuto(); walkTick();
   if(!booted) return;
@@ -4531,6 +4532,33 @@ const _pairH=new Map();
 async function pairId(addr){ addr=String(addr||'').toUpperCase(); let h=_pairH.get(addr);          // the fingerprint the app makes: the first twelve hex digits of the SHA-256 of the address
   if(!h){ const b=new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(addr))); h=[...b.slice(0,6)].map(x=>x.toString(16).padStart(2,'0')).join(''); if(_pairH.size>4000) _pairH.clear(); _pairH.set(addr,h); } return h; }
 const isPaired = async a => PAIRED.ids.size>0 && !!a && PAIRED.ids.has(await pairId(a));
+/* Recognised by habit. A device that keeps within arm's reach of this phone while you are not moving, for RECOG.mins minutes on RECOG.days
+   separate days out of the last RECOG.win, is very likely one of your own that has no name. Halo offers it to you with one tap.
+   It asks and never decides: a tag hidden in a bag would keep the same company, so the answer is yours to give. */
+const RECOG={m:1.5, mins:10, days:3, win:10, t:0, sv:0};
+const dayKey = t => { const d=new Date(t); return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); };
+const nearKey = d => d.adv ? 'n:'+d.adv : !d.randomizes ? 'i:'+d.sig : 'k:'+sigKey(d);
+function stillNow(){ const now=Date.now(), pts=TRACK.filter(p=>now-p.t2<180000); if(pts.length<2) return true;          // the last three minutes of your path stay within 15 m
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; pts.forEach(p=>{ x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); }); return Math.hypot(x1-x0,y1-y0)<15; }
+function recogTick(){ const now=Date.now(); if(now-RECOG.t<10000) return; const dt=RECOG.t?Math.min(30000, now-RECOG.t):10000; RECOG.t=now;
+  const V=vis(); if(V.mode!=='live' || V.test || !mobileLive() || W.on || !stillNow()) return;
+  P.near=P.near||{}; const day=dayKey(now), seen={}; let ch=false;
+  V.devices.forEach(d=>{ if(!d.present || d.sim || d.mine || d.sigFit || d.band==='wifi' || d.atHome || !(d.dist<=RECOG.m)) return; const k=nearKey(d); if(seen[k]) return; seen[k]=1;
+    const r=P.near[k]=P.near[k]||{s:{}}; r.n=devName(d); r.c=d.cls; r.kk=sigKey(d); r.kt=kindText(d).slice(0,60); r.t=now; r.s[day]=Math.round((r.s[day]||0)+dt/1000); ch=true; });
+  if(!ch) return; const min=dayKey(now-14*86400000), ks=Object.keys(P.near);
+  ks.forEach(k=>{ const r=P.near[k]; Object.keys(r.s).forEach(x=>{ if(+x<min) delete r.s[x]; }); if(!Object.keys(r.s).length && now-r.t>14*86400000) delete P.near[k]; });
+  if(ks.length>150) ks.sort((a,b)=>(P.near[a].t||0)-(P.near[b].t||0)).slice(0,ks.length-150).forEach(k=>delete P.near[k]);
+  if(now-RECOG.sv>60000){ RECOG.sv=now; save(); }
+  recogList().forEach(x=>{ if(!x.r.asked){ x.r.asked=now; save(); alertRaise('recog:'+x.k, 'Is this device yours?', x.r.n+' has kept within arm\'s reach of you on '+x.days+' days. Open Watchers to answer.', {view:'watchers'}, true); } }); }
+function recogList(){ const now=Date.now(), min=dayKey(now-RECOG.win*86400000);
+  return Object.keys(P.near||{}).map(k=>{ const r=P.near[k], days=Object.keys(r.s||{}).filter(x=>+x>=min && r.s[x]>=RECOG.mins*60).length; return {k, r, days}; }).filter(x=>x.days>=RECOG.days && !x.r.no && !x.r.yes); }
+function recogBars(){ return recogList().slice(0,2).map(x=>'<div class="fixbar" style="border-color:rgba(74,232,138,.55)"><span><b>Recognised by habit.</b> '+esc(x.r.n)+(x.r.kt?' ('+esc(x.r.kt)+')':'')+' has kept within arm\'s reach of you, while you were still, on '+x.days+' days. Is it yours?'+
+    (x.r.c==='Tag'?' A tag someone else placed would keep the same company: look at it before you answer.':'')+'</span><button class="btn sm primary" data-act="recog-yes" data-k="'+esc(x.k)+'">It is mine</button><button class="btn sm" data-act="recog-no" data-k="'+esc(x.k)+'">Not mine</button></div>').join(''); }
+function recogAnswer(k, mine){ const r=(P.near||{})[k]; if(!r) return; const now=Date.now();
+  if(!mine){ r.no=now; save(); logEvidence('note','Not yours: '+r.n+'. It has kept within arm\'s reach of you on several days, and Halo keeps testing it as it does any stranger.'); toast('Marked as not yours. Halo keeps testing it.'); return; }
+  r.yes=now; const d=[...LIVE.devs.values()].find(x=>x.live && !x.sim && nearKey(x)===k), g=sigGet();
+  if(d) sigAdd(d); else if(k.slice(0,2)==='n:'){ const nm=k.slice(2); if(g.names.indexOf(nm)<0) g.names.push(nm); g.t=now; } else if(r.kk){ g.counts[r.kk]=(g.counts[r.kk]||0)+1; g.t=now; }
+  save(); try{ nativeMine(); }catch(e){} logEvidence('note','Added to your signature, recognised by habit: '+r.n+'.'); toast('Added to your devices.'); liveTick(); }
 const NATIVE = () => { const n=window.HaloNative; return (n && typeof n.drain==='function' && typeof n.start==='function') ? n : null; };
 const nativeStatus = () => { try{ return JSON.parse(NATIVE().status()); }catch(e){ return null; } };
 const phCan = () => !!NATIVE() || !!(navigator.bluetooth && navigator.bluetooth.requestLEScan);
@@ -5159,6 +5187,8 @@ document.addEventListener('click', e=>{
     case 'upd-now': updApply(true); break;
     case 'inst-os': S.instOS=a.dataset.k; rerender(); break;
     case 'app-get': appGet(); break;
+    case 'recog-yes': recogAnswer(a.dataset.k, true); S._rsig=''; rerender(); if(el('rost')) renderRoster(); break;
+    case 'recog-no': recogAnswer(a.dataset.k, false); rerender(); break;
     case 'home-go': setView(a.dataset.v); break;
     case 'ios-get': { api('GET','/app/ios').then(r=>{ const u=r && r.s===200 && r.j && String(r.j.link||''); if(u && /^https:\/\/(testflight\.apple\.com|apps\.apple\.com)\//.test(u)) location.href=u; else toast('The iPhone app link was not reached. Try again in a moment.'); }).catch(()=>toast('The iPhone app link was not reached. Try again in a moment.')); break; }
     case 'upd-check': updCheck(true); break;
