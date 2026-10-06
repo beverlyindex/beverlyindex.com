@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.10', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.11', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1925,7 +1925,8 @@ function scopeHTML(a){
 function scopeTick(){ const box=el('scopePills'); if(!box || S.view!=='overview') return; const now=Date.now(); if(now-(S._scT||0)<900) return; S._scT=now;
   const h=scopeHTML(); if(box._h!==h){ box._h=h; box.innerHTML=h; } const ag=el('scopeAge'); if(ag) ag.textContent=scopeAge(); }
 /* ---------- Your path: five stages from the first visit to fully guarded. The next step is always one tap away. ----------
-   Each stage ends in a level. A finished step is ticked, counted in the percentage, and a finished stage is entered in Evidence. */
+   Each stage ends in a level. A finished step is ticked and counted, and a finished stage is entered in Evidence.
+   A device with no ear of its own (an iPhone or a computer in a browser) opens the full map as its third step. */
 const pathDef = id => { const t=T(id); return !t || scopeOf(t)===false || (scopeOf(t)===true && !isOpen(t)); };      // defended, or not real to you
 const pathReal = () => THREATS.filter(t=>t.shelf==='real' && scopeOf(t)===true && stepsOf(t).length>0);
 const pathTop = () => pathReal().filter(isOpen).sort((a,b)=>((rating(b)||{}).n||0)-((rating(a)||{}).n||0) || IMPACT_W(b.impact)-IMPACT_W(a.impact))[0] || null;
@@ -1933,7 +1934,7 @@ const PATH=[
  {k:'set', name:'Set up', rank:'Aware', steps:[
    {k:'profile', t:()=>'Answer your profile', why:'Halo then rates every threat for you, from 1 to 5.', ok:()=>PROFILE_Q.every(q=>pv(q.k)!==null), go:()=>({pull:'profile'})},
    {k:'alerts', t:()=>'Turn on alerts', why:'A banner reaches you the moment a new threat appears.', ok:()=>['granted','screen'].indexOf(alertState())>=0, go:()=>({act:'alert-ask'})},
-   {k:'listen', t:()=>'Start listening', why:'Halo shows the devices, towers and cameras around you.', ok:()=>!!(P.path&&P.path.heard), go:()=>({view:'watchers'})} ]},
+   {k:'listen', t:()=>canHear()?'Start listening':'Open the full map', get why(){ return canHear()?'Halo shows the devices and towers around you.':'Halo shows the cameras and tower sites around you.'; }, ok:()=>!!(P.path&&(P.path.heard||(!canHear()&&P.path.mapped))), go:()=>canHear()?({view:'watchers'}):({act:'map-full'})} ]},
  {k:'own', name:'Know what is yours', rank:'Prepared', steps:[
    {k:'sig', t:()=>'Add three of your own devices to Your Signature', why:'Halo then sets your own devices aside, and a stranger stands out.', ok:()=>sigSize()>=3, go:()=>({pull:'sig', view:'watchers'})},
    {k:'health', t:()=>'Run the Device Health Check', why:'A few seconds, and you know this device is in order.', ok:()=>healthCount().at>0, go:()=>({pull:'health'})} ]},
@@ -1943,9 +1944,9 @@ const PATH=[
    {k:'access', t:()=>'Finish the Assistant Access Review', why:'Your assistant reaches only what you chose.', ok:()=>pathDef('a_access'), go:()=>({res:'a_access'})},
    {k:'ext', t:()=>'Finish the Extension Audit', why:'Your browser carries only extensions you trust.', ok:()=>pathDef('a_ext'), go:()=>({res:'a_ext'})} ]},
  {k:'doors', name:'Close the common doors', rank:'Hardened', steps:[
-   {k:'imm', t:()=>{ const t=pathReal().filter(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4)[0]; return t?'Defend what is imminent: '+t.name:'Defend what is imminent'; }, why:'Anything rated 4 or 5 comes first.', ok:()=>!pathReal().some(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4), go:()=>{ const t=pathReal().filter(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4)[0]; return t?{res:t.id}:{view:'attackers'}; }},
-   {k:'half', t:()=>{ const t=pathTop(); return 'Defend half of the threats real to you'+(t?': next, '+t.name:''); }, why:'Each finished card moves its rating down to 1.', ok:()=>{ const r=pathReal(); return r.length>0 && r.filter(t=>!isOpen(t)).length*2>=r.length; }, go:()=>{ const t=pathTop(); return t?{res:t.id}:{view:'attackers'}; }},
-   {k:'all', t:()=>{ const t=pathTop(); return 'Defend every threat real to you'+(t?': next, '+t.name:''); }, why:'The bottom line then reads Clear.', ok:()=>{ const r=pathReal(); return r.length>0 && !r.some(isOpen); }, go:()=>{ const t=pathTop(); return t?{res:t.id}:{view:'attackers'}; }} ]},
+   {k:'imm', t:()=>{ const t=pathReal().filter(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4)[0]; return t?'Defend what is rated 4 or 5: '+t.name:'Defend what is rated 4 or 5'; }, why:'A finding or a sign comes first.', ok:()=>PROFILE_Q.every(q=>pv(q.k)!==null) && !pathReal().some(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4), go:()=>{ const t=pathReal().filter(t=>isOpen(t)&&((rating(t)||{}).n||0)>=4)[0]; return t?{res:t.id}:{view:'attackers'}; }},
+   {k:'half', t:()=>{ const t=pathTop(); return 'Defend half of the threats real to you'+(t?': next, '+t.name:''); }, why:'A card with every step ticked is rated 1, unless a finding or a sign is on record.', ok:()=>{ const r=pathReal(); return r.length>0 && r.filter(t=>!isOpen(t)).length*2>=r.length; }, go:()=>{ const t=pathTop(); return t?{res:t.id}:{view:'attackers'}; }},
+   {k:'all', t:()=>{ const t=pathTop(); return 'Defend every threat real to you'+(t?': next, '+t.name:''); }, why:'The bottom line then reads Clear, while nothing is rated 4 or 5.', ok:()=>{ const r=pathReal(); return r.length>0 && !r.some(isOpen); }, go:()=>{ const t=pathTop(); return t?{res:t.id}:{view:'attackers'}; }} ]},
  {k:'ahead', name:'Stay ahead', rank:'Ahead', steps:[
    {k:'trip', t:()=>'Take one trip with Halo listening', why:'Halo records what was around you and what stayed with you.', ok:()=>(P.trips||[]).length>0, go:()=>({view:'watchers'})},
    {k:'special', t:()=>'Complete one Special countermeasure', why:'A gold side marks every card that holds one.', ok:()=>THREATS.some(t=>spCount(t).dn>0), go:()=>{ const t=THREATS.find(t=>t.shelf==='real'&&scopeOf(t)===true&&spCount(t).n>spCount(t).dn); return t?{res:t.id}:{view:'watchers'}; }},
@@ -1958,26 +1959,27 @@ function pathState(){
   return {stages, rank, lvl, pct:Math.round(100*dn/all), dn, all, next:open?open.steps.find(x=>!x.ok):null, stage:open||null}; }
 function pathCard(){
   const ps=pathState(), nx=ps.next, open=S.open.has('path');
-  let h='<div class="pathc" id="pathCard"><div class="ph"><span class="pt">Your path</span><span class="prank">'+esc(ps.rank)+' · level '+ps.lvl+' of 5</span><span class="ppct">'+ps.pct+'% protected</span></div>'+
+  let h='<div class="pathc" id="pathCard"><div class="ph"><span class="pt">Your path</span><span class="prank">'+esc(ps.rank)+' · level '+ps.lvl+' of 5</span><span class="ppct">'+ps.dn+' of '+ps.all+' steps done</span></div>'+
     '<div class="pbar">'+ps.stages.map(x=>'<div class="pseg'+(x.full?' full':'')+'"><i style="width:'+Math.round(100*x.done/x.n)+'%"></i></div>').join('')+'</div>'+
     '<div class="pnames">'+ps.stages.map(x=>'<span class="'+(x.full?'on':'')+'">'+esc(x.rank)+'</span>').join('')+'</div>';
   h+= nx ? '<div class="pnext"><span><b>Next: '+esc(nx.t)+'.</b><i>'+esc(nx.why)+'</i></span><button class="btn sm primary" data-act="path-go">Go</button></div>'
-         : '<div class="pnext"><span><b>Every step is complete.</b><i>Halo keeps watch, and a new step appears here when a new threat does.</i></span></div>';
+         : '<div class="pnext"><span><b>Every step is complete.</b><i>Halo raises a banner when it flags something.</i></span></div>';
   h+='<button class="pmore'+(open?' on':'')+'" data-act="pull" data-id="path">'+(open?'Hide the steps':'See all '+ps.all+' steps, '+ps.dn+' done')+'</button>';
   if(open) h+='<div class="plist">'+ps.stages.map((x,i)=>'<div class="pst">'+(i+1)+'. '+esc(x.name)+' · level: '+esc(x.rank)+' · '+x.done+' of '+x.n+'</div>'+
       x.steps.map(y=>'<div class="pstep'+(y.ok?' ok':'')+'"><span class="bx">'+(y.ok?'&#10003;':'')+'</span><span>'+esc(y.t)+'</span></div>').join('')).join('')+'</div>';
   return h+'</div>'; }
 function pathGo(g){ if(!g) return;
-  if(g.act==='alert-ask') return void alertAsk(); if(g.act==='report-new') return void reportOpen(true);
+  if(g.act==='alert-ask') return void alertAsk(); if(g.act==='report-new') return void reportOpen(true); if(g.act==='map-full') return void mapFullOpen();
   const show=sel=>setTimeout(()=>{ const c=document.querySelector(sel); if(c) c.scrollIntoView({block:'start',behavior:'smooth'}); },120);
   if(g.res){ const t=T(g.res); if(!t) return; S.open.add(t.id); if(t.side==='a') S.shelf=t.shelf; const v=t.side==='w'?'watchers':'attackers'; if(S.view!==v) setView(v); else { navPush(t.id); rerender(); } return show('#tp-'+t.id); }
   if(g.pull){ S.open.add(g.pull); const v=g.view||'overview'; if(S.view!==v) setView(v); else { navPush(g.pull); rerender(); } return show('.tp-head[data-id="'+g.pull+'"]'); }
   if(g.view) setView(g.view); }
 // A step that has just been finished is announced once. A finished stage is entered in Evidence.
-function pathCheck(){ if(!booted) return; const ps=pathState(); P.path=P.path||{}; const d=P.path.done=P.path.done||{}, first=!P.path.init; let changed=false;
-  ps.stages.forEach(st=>{ st.steps.forEach(x=>{ if(x.ok && !d[x.k]){ d[x.k]=Date.now(); changed=true; if(!first) toast('Step complete: '+x.t+'. '+ps.pct+'% protected.'); } });
+function pathCheck(){ if(!booted) return; const ps=pathState(); P.path=P.path||{}; const d=P.path.done=P.path.done||{}, first=!P.path.init, fin=[]; let changed=false;
+  ps.stages.forEach(st=>{ st.steps.forEach(x=>{ if(x.ok && !d[x.k]){ d[x.k]=Date.now(); changed=true; if(!first) fin.push(x.t); } });
     if(st.full && !d['stage.'+st.k]){ d['stage.'+st.k]=Date.now(); changed=true;
-      if(!first){ logEvidence('note','Your path: stage '+st.name+' complete. Level reached: '+st.rank+'. '+ps.pct+'% protected.'); alertRaise('path:'+st.k, 'Level reached: '+st.rank, 'You finished the stage '+st.name+'. '+(ps.next?'Next: '+ps.next.t+'.':'Every step is complete.'), null, true); } } });
+      if(!first){ logEvidence('note','Your path: stage '+st.name+' complete. Level reached: '+st.rank+'. '+ps.dn+' of '+ps.all+' steps done.'); alertRaise('path:'+st.k, 'Level reached: '+st.rank, 'You finished the stage '+st.name+'. '+(ps.next?'Next: '+ps.next.t+'.':'Every step is complete.'), null, true); } } });
+  if(fin.length) toast('Step complete: '+fin[0]+(fin.length>1?', and '+(fin.length-1)+' more':'')+'. '+ps.dn+' of '+ps.all+' steps done.');      // one announcement, however many steps a single answer finished
   if(first){ P.path.init=true; changed=true; } if(changed) save(); }
 function renderOverview(){
   const a=assess(), tc=a.t<0?'--mut':TIER_VAR[a.t], g=S.global;
@@ -3192,7 +3194,7 @@ function mfData(){ const f=[], g=gz(); if(!g) return {type:'FeatureCollection',f
 // The ring labels live in their own source. Lettering needs a download, and a failed download must not take the rings and your route down with it.
 const mfLabels = () => { const g=gz(); return {type:'FeatureCollection',features:g?mfRingSteps.map(r=>({type:'Feature',properties:{t:r+' m'},geometry:{type:'Point',coordinates:[g.lon, g.lat+r/111320]}})):[]}; };
 const mfDevices = () => { const V=vis(); return (V.mode==='live'||V.mode==='sim') ? V.devices.filter(d=>d.present!==false && (V.mode==='sim'||!d.atHome) && !quietAp(d)).sort(bySeverity) : []; };
-async function mapFullOpen(){
+async function mapFullOpen(){ if(!(P.path&&P.path.mapped)){ P.path=P.path||{}; P.path.mapped=true; save(); }
   el('mapFull').classList.remove('hidden'); S.mapFull=true; NAVN++; try{ history.pushState(navSnap('map'),''); }catch(e){}
   headAsk(); startGeo();
   if(!FULL){ const ok=await loadMapLibre(); if(!ok){ setHTML(el('mfSum'),'The map needs a connection.'); return; }
@@ -3312,7 +3314,7 @@ function reportHTML(){
   const stepsAll=applies.reduce((n,r)=>n+r.n,0), stepsDone=applies.reduce((n,r)=>n+Math.min(r.dn,r.n),0), spAll=applies.reduce((n,r)=>n+r.sp.n,0), spDone=applies.reduce((n,r)=>n+r.sp.dn,0), hitsAll=THREATS.reduce((n,t)=>n+((P.hits||{})[t.id]||0),0);
   h+='<h2>4. The bottom line in detail</h2><p>The bottom line is set by three of the components below: a device that meets the test for moving with you, the highest rating among the threats real to you, and the number of threats with defence steps still to tick. The others are shown for your record.</p>'+
     tbl(['Component','Reading','What it means'],[
-      ['Your path',(ps=>ps.rank+', level '+ps.lvl+' of 5, '+ps.pct+'% protected')(pathState()),'Five stages, from set-up to staying ahead'],
+      ['Your path',(ps=>ps.rank+', level '+ps.lvl+' of 5, '+ps.dn+' of '+ps.all+' steps done')(pathState()),'Five stages, from set-up to staying ahead'],
       ['Threats real to you',answered?applies.length+' of '+R.length:'Profile to answer','Decided by your profile answers alone'],
       ['Defence steps complete',stepsAll?stepsDone+' of '+stepsAll:'None to count','Each step is one setting or habit that closes one path'],
       ['Special countermeasures complete',spAll?spDone+' of '+spAll:'None to count','Stronger steps, for a threat you believe is active'],
