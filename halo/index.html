@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.18', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.19', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1991,7 +1991,7 @@ function renderOverview(){
   if(NATIVE() && isAndroid()){ if(!APP.info) appInfo(); let v=''; try{ v=String(NATIVE().version()); }catch(e){}
     if(APP.info && verNum(APP.info.version)>verNum(v)) h+='<div class="instbar"><span><b>Halo app '+esc(APP.info.version)+' is ready.</b> You have '+esc(v)+'. The new one keeps listening through a long walk.</span><button class="btn sm primary" data-act="go-install">Get it</button></div>'; }
   if(!NATIVE() && !S.justInstalled && (isAndroid() || (!installed() && (INSTALL||isIOS()))) && !store.get('halo_inst_hide'))
-    h+='<div class="instbar"><span>'+(isAndroid() ? '<b>Get the Remiel Halo app.</b> It hears the devices around you, with the screen on or off.' : isIOS() ? '<b>Put Halo on your home screen.</b> It opens full screen, like an app.' : '<b>Install Halo on this computer.</b> It opens in a window of its own.')+'</span>'+
+    h+='<div class="instbar"><span>'+(isAndroid() ? '<b>Get the Remiel Halo app.</b> It hears the devices around you, and keeps hearing tracker tags with the screen off.' : isIOS() ? '<b>Put Halo on your home screen.</b> It opens full screen, like an app.' : '<b>Install Halo on this computer.</b> It opens in a window of its own.')+'</span>'+
        '<button class="btn sm primary" data-act="'+(INSTALL && !isAndroid()?'install':'go-install')+'">'+(isAndroid()?'Get the app':INSTALL?'Install':'Show me how')+'</button><button class="x" data-act="inst-hide" title="Not now">&times;</button></div>';
   if(!g) h+='<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'Halo keeps trying the live feed':'Reaching the live feed')+'</div>';
   const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
@@ -3840,7 +3840,7 @@ function installSection(){
          (newer?'<p style="margin-top:8px">Version '+esc(i.version)+' is ready. Open <b>beverly-index.com/halo</b> in Chrome on this phone, come to this section, and tap Download. It installs over this app and keeps your account and records.</p>':'');
       return h+'</div>'; }
     const ready=SY.status==='on' && (!S.features || S.features.app!==false), st=APP.state;
-    h+='<p style="margin:10px 0 8px">The Remiel Halo app is Halo with an ear: it hears the Bluetooth, Wi-Fi and cell signals around you, with the screen on or off.</p>'+
+    h+='<p style="margin:10px 0 8px">The Remiel Halo app is Halo with an ear: it hears the Bluetooth, Wi-Fi and cell signals around you, and with the screen off it keeps hearing tracker tags, devices from the major makers and Flock hardware.</p>'+
        '<div class="formrow" style="margin-top:0"><button class="btn '+(st==='sent'?'on':'primary')+'" data-act="app-get"'+(ready && st!=='asking'?'':' disabled')+'>'+(st==='asking'?'Preparing the file':st==='sent'?'Downloaded. Download again':'Download the Remiel Halo app')+'</button></div>'+
        '<p class="limit" style="margin:6px 0 0">'+(i?'Version '+esc(i.version)+' · '+fmtKB(i.size)+' · Android '+i.minAndroid+' or later · '+esc(i.file):'Android 10 or later.')+(ready?'':S.features && S.features.app===false?' The file is being published. Until it is here, Beverly Index sends it to you directly.':' The file is handed to a signed-in device: Halo is signing in.')+(isAndroid()?'':' On this device the file can be saved and sent to the phone; the direct way is to open beverly-index.com/halo on the phone itself.')+'</p>'+
        '<ol class="steps">'+
@@ -3866,7 +3866,7 @@ function installSection(){
     return h+'</div>'; }
   if(!isAndroid() && !isIOS() && installed()) return h+'<div class="kv" style="margin-top:10px"><span class="k">Installed</span><span class="v okc">Yes. This is the installed Halo</span></div></div>';
   if(S.justInstalled) return h+'<p style="margin-top:10px">Installed. Close this tab and open Remiel Halo from your applications. Your account and settings carry over.</p></div>';
-  h+='<p style="margin:10px 0 4px">On a computer Halo runs in the browser at <b>beverly-index.com/halo</b>, with nothing to install. A computer at home can also be your home listener: open Devices and sync, then Add sensor, then Home station.</p>'+
+  h+='<p style="margin:10px 0 4px">On a computer Halo runs in the browser at <b>beverly-index.com/halo</b>, with nothing to install.</p>'+
      (INSTALL && !isAndroid()?'<div class="formrow" style="margin-top:6px"><button class="btn primary" data-act="install">Install Remiel Halo as a window of its own</button></div>':'');
   return h+'</div>';
 }
@@ -4435,7 +4435,8 @@ function phPanel(){
   if(NATIVE()){ const st=PH.nstat||nativeStatus()||{};
     if(PH.on && !PH.lost && st.platform==='ios') return {ok:true, text:'This iPhone is listening to Bluetooth.', html:'This iPhone is listening to Bluetooth while Halo is open, and to tracker tags when Halo is behind another app. Listening starts by itself each time Halo opens.'+(st.always==='granted'?'':' <button class="btn sm gold" data-act="ph-always" style="margin:4px 6px 0 0">Keep listening behind other apps</button>')+' <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
     if(PH.on && !PH.lost){ const N=NATIVE(), bootable=typeof N.setBoot==='function' && typeof N.askAlways==='function', atBoot=bootable && st.boot!==false && st.always==='granted';
-      return {ok:true, text:'This phone is listening to Bluetooth, Wi-Fi and cell, with the screen on or off.', html:'This phone is listening to Bluetooth, Wi-Fi and cell, with the screen on or off. Listening starts by itself each time Halo opens'+(atBoot?', and each time the phone starts.':'.')+
+      const bands=['Bluetooth', st.wifi!==false?'Wi-Fi':'', st.cell!==false?'cell':''].filter(Boolean), bw=bands.length>1?bands.slice(0,-1).join(', ')+' and '+bands[bands.length-1]:bands[0];
+      return {ok:true, text:'This phone is listening to '+bw+'.', html:'This phone is listening to '+bw+'. With the screen off it keeps hearing tracker tags, devices from the major makers and Flock hardware. Listening starts by itself each time Halo opens'+(atBoot?', and each time the phone starts.':'.')+
         (bootable && !atBoot?' <button class="btn sm gold" data-act="ph-always" style="margin:4px 6px 0 0">Start with the phone</button>':'')+' <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'}; }
     const why = st.platform==='ios' && st.permission!=='granted' ? 'Allow Bluetooth and Location for Remiel Halo in the iPhone Settings, and this iPhone listens for you.'
       : st.permission==='denied' ? 'Allow Location and Nearby devices for Halo, and this phone listens for you.'
@@ -4446,7 +4447,7 @@ function phPanel(){
   if(PH.on && !PH.lost) return {ok:true, text:'This phone is listening.', html:'This phone is listening while Halo is on screen. <button class="btn sm" data-act="ph-stop" style="margin:4px 0 0">Stop listening</button>'};
   if(PH.on && PH.lost) return {ok:false, text:'Listening paused while Halo was off the screen.', html:'Listening paused while Halo was off the screen. '+btn('Resume listening')};
   if(!phCan()) return {ok:false, text:'', html: isAndroid()
-    ? '<b>This window is Halo on the web.</b> On this phone the Remiel Halo app listens, with the screen on or off: open it from your home screen, under the name Remiel Halo. <a class="btn sm primary" href="'+APP_LINK+'" style="margin:4px 6px 4px 0;text-decoration:none;display:inline-flex">Open the Halo app</a><button class="btn sm" data-act="go-install" style="margin:4px 0">Get the app</button><br>In Chrome, one setting gives the same ear for Bluetooth while Halo is on screen. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the Chrome steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app.</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Start listening.</li></ol></details>'
+    ? '<b>This window is Halo on the web.</b> On this phone the Remiel Halo app listens, and keeps hearing tracker tags with the screen off: open it from your home screen, under the name Remiel Halo. <a class="btn sm primary" href="'+APP_LINK+'" style="margin:4px 6px 4px 0;text-decoration:none;display:inline-flex">Open the Halo app</a><button class="btn sm" data-act="go-install" style="margin:4px 0">Get the app</button><br>In Chrome, one setting gives the same ear for Bluetooth while Halo is on screen. <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--ink);text-decoration:underline">Show me the Chrome steps</summary><ol style="margin:6px 0 0;padding-left:18px"><li>Open the Chrome app.</li><li>In the address bar type <b>chrome://flags</b> and press Go.</li><li>In the search box type <b>experimental web</b>.</li><li>Under Experimental Web Platform features choose <b>Enabled</b>.</li><li>Press <b>Relaunch</b> at the bottom.</li><li>Open Halo again and press Start listening.</li></ol></details>'
     : 'Listening runs in the Halo Android app, and on a computer at home.'};
   const why = PH.err==='NotAllowedError' ? 'Allow the scan when Chrome asks, and this phone listens for you.' : PH.err ? 'Switch Bluetooth and Location on, then press the button.' : 'This phone hears the Bluetooth devices around you.';
   return {ok:false, text:why, html:why+' '+btn('Start listening')};
@@ -4792,7 +4793,7 @@ async function sensorRemove(id){ if(SY.confirm!=='sn:'+id){ SY.confirm='sn:'+id;
 async function loadSensors(){ const r=await api('GET','/sensors'); if(r.s!==200) return; SY.sensorSeen={}; SY.sensorKind={}; (r.j.sensors||[]).forEach(s=>{ SY.sensorSeen[s.id]=s.lastSeen; SY.sensorKind[s.id]=s.kind; }); softRender(); }
 function sensorsSection(){
   const ids=Object.keys(P.sensors||{});
-  let h='<div class="dsec" id="sensorsSec"><h4>Sensors</h4><p style="margin-bottom:10px">Your phone listens for Bluetooth, Wi-Fi and cell signals with the Halo Android app. A computer at home listens too, and Halo then watches your home while you are out.</p>';
+  let h='<div class="dsec" id="sensorsSec"><h4>Sensors</h4><p style="margin-bottom:10px">An Android phone listens for Bluetooth, Wi-Fi and cell signals with the Remiel Halo app. A computer at home listens for Bluetooth, and Halo lists the devices it hears while you are out.</p>';
   h+='<div class="rowline"><span><b>This phone</b> <span class="chip '+(PH.on&&!PH.lost?'pot':'')+'">'+(PH.on&&!PH.lost?'Listening':'Ready')+'</span><br><span class="mono" style="font-size:11px;color:var(--mut)">What it hears stays on this phone.</span><div style="font-size:12.5px;line-height:1.45;margin-top:6px">'+phPanel().html+'</div></span></div>';
   const lost=Object.keys(SY.sensorKind||{}).filter(id=>!P.sensors[id]);
   if(!ids.length && !lost.length) h+='<div class="empty" style="padding:8px">No sensors on this account.</div>';
