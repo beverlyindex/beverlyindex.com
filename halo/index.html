@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.14', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.15', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3728,10 +3728,11 @@ async function healthRun(){
     else add('os','Windows version','att','Windows 10 or older. Free security updates for Windows 10 ended in October 2025.','Move to Windows 11, or enrol in Extended Security Updates.');
   } else add('os',k==='mac'?'macOS version':'System version','unk','Confirm it in ten seconds.', k==='mac'?'Apple menu, About This Mac. Then System Settings, General, Software Update.':'Check the system settings for updates.');
   // the browser
-  const nw=browserNewest(b.n), inApp=/; wv\)|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
-  if(inApp) add('br','Browser','att','Halo is open inside another app\'s built-in browser.','Open it in Chrome or Safari instead, so that the other app cannot see the page.');
+  const nw=browserNewest(b.n), inApp=!NATIVE() && /; wv\)|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
+  if(NATIVE()) add('br','Browser','ok','Halo is running inside the Remiel Halo app.','');
+  else if(inApp) add('br','Browser','att','Halo is open inside another app\'s built-in browser.','Open it in Chrome or Safari instead, so that the other app cannot see the page.');
   else if(b.n==='Safari') add('br','Browser', b.v&&b.v<18?'att':'ok', 'Safari '+(b.v||'')+'. Safari updates with the system.', b.v&&b.v<18?'Update the system to update Safari.':'');
-  else if(!b.v || !nw) add('br','Browser','unk',b.n+(b.v?' '+b.v:'')+'. Halo has no release calendar for it.','Update it in the app store.');
+  else if(!b.v || !nw) add('br','Browser','unk',b.n+(b.v?' '+b.v:'')+'.','Update it in the app store to stay current.');
   else { const gap=nw.v-b.v, tol=nw.sure?1:3;
     if(gap<=tol) add('br','Browser','ok',b.n+' '+b.v+'. Current, or close to it'+(nw.sure?'':', by the release calendar')+'.','');
     else add('br','Browser','att',b.n+' '+b.v+'. About '+gap+' releases behind'+(nw.sure?'':', by the release calendar')+'. Old browsers carry known flaws.', k==='android'?'Play Store, search for '+b.n+', Update.':k==='ios'?'App Store, your picture, Update.':'In the browser: the three dots, Help, About. It updates there.'); }
@@ -3786,7 +3787,7 @@ function healthPull(){
             (x.id==='keep'&&x.st!=='ok'?'<br><button class="btn sm" data-act="health-keep" style="margin-top:6px">Ask the browser to keep it</button>':'')+
             (x.id==='patch'||x.id==='kev'?'<br><button class="btn sm" data-act="res" data-id="p_patch" style="margin-top:6px">Open Patch Clock</button>':'')+
             (x.id==='acct'&&x.st==='att'?'<br><button class="btn sm" data-act="go-sensors" style="margin-top:6px">Open Devices and sync</button>':'')+'</span></div>').join('')
-         : '<p>Halo reads what this browser reports about the device: the system and browser versions, the screen lock, the clock, how safe your Halo data is here, and whether flaws under attack touch it. It takes a few seconds.</p>')+
+         : '<p>Halo reads what this browser reports about the device: the system and browser versions, the screen lock, the clock, how safe your Halo data is here, and whether flaws under attack name this kind of device. It takes a few seconds.</p>')+
       '<div class="formrow"><button class="btn sm primary" data-act="health-run"'+(S.healthBusy?' disabled':'')+'>'+(S.healthBusy?'Checking':a?'Run the check again':'Run the check')+'</button></div></div>';
     h+='<div class="dsec"><h4>What only you can read <span class="spsub">'+c.ticks+' of '+c.g+' confirmed</span></h4><p style="margin-bottom:8px">Open each setting, then tick it once it is true. Halo keeps the tick and counts it.</p>'+
       HEALTH_GUIDED[HK()].map((x,i)=>'<div class="chk '+(t[i]?'on':'')+'" data-act="health-tick" data-i="'+i+'"><span class="box">'+(t[i]?'&#10003;':(i+1))+'</span><span class="tx">'+esc(x[0])+'<span class="nt">'+esc(x[1])+'</span></span></div>').join('')+'</div>';
