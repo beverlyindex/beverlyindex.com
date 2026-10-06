@@ -851,7 +851,7 @@ a.tk:hover b{text-decoration:underline}
   </div>
   <div class="cap-stage">
     <video id="capVideo" playsinline muted></video>
-    <div class="cap-syn hidden" id="capSyn">Camera not available in this view.<br>The crosshair and bearing cone still work over a synthetic scene.</div>
+    <div class="cap-syn hidden" id="capSyn">Allow the camera for Halo, and the picture appears here.<br>The aim guide works without it.</div>
     <canvas id="capOverlay"></canvas>
     <div class="cap-hint">
       <div class="cap-status" id="capStatus"></div>
@@ -894,7 +894,7 @@ const store = {
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-06.15', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-06.16', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2895,12 +2895,11 @@ async function openCapture(target){
   capEl.classList.remove('hidden'); el('capTarget').textContent=S.capTarget?('Target: '+capName(S.capTarget)+capTag(S.capTarget)):'No device selected';
   try{ S.capStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false}); const v=el('capVideo'); v.srcObject=S.capStream; await v.play(); el('capSyn').classList.add('hidden'); }
   catch(e){ el('capSyn').classList.remove('hidden'); }
-  sizeOverlay(); capLoop(); if(window.DeviceOrientationEvent) window.addEventListener('deviceorientation', onOrient);
+  sizeOverlay(); headAsk(); capLoop();
 }
 function closeCapture(){ capEl.classList.add('hidden'); if(S.capStream){ S.capStream.getTracks().forEach(t=>t.stop()); S.capStream=null; }
-  cancelAnimationFrame(S.capRAF); window.removeEventListener('deviceorientation', onOrient); }
+  cancelAnimationFrame(S.capRAF); }
 el('capClose').onclick=closeCapture;
-function onOrient(e){ if(e.alpha!=null){ S.capAim=Math.round(e.alpha)%360; el('capAim').value=S.capAim; } }
 el('capAim').addEventListener('input',e=>{ S.capAim=+e.target.value; });
 el('capPick').onclick=()=>{ const pres=vis().devices.filter(d=>d.present).sort((a,b)=>b.rssi-a.rssi); if(!pres.length) return toast('No devices present.');
   S.capTarget=pres[(pres.indexOf(S.capTarget)+1)%pres.length]; el('capTarget').textContent='Target: '+capName(S.capTarget)+capTag(S.capTarget); };
@@ -2910,7 +2909,8 @@ const angDiff=(a,b)=>Math.abs(((a-b+540)%360)-180);
 function capLoop(){
   const c=el('capOverlay'), ctx=c.getContext('2d'), W=c.width, H=c.height, cx=W/2, cy=H/2, t=S.capTarget;
   ctx.clearRect(0,0,W,H);
-  const hasB=!!t&&t.bearing!=null&&(!t.live||!!t.fix), diff=hasB?angDiff(S.capAim,t.bearing):180, aligned=hasB&&diff<10, cone=Math.max(14,Math.min(90,diff))*Math.PI/180, dir=-Math.PI/2, rad=Math.min(W,H)*0.46;
+  { const hd=heading(); if(hd!=null){ S.capAim=Math.round(hd)%360; el('capAim').value=S.capAim; } }          // the compass heading the full map uses; the slider serves a device with no compass
+  const hasB=!!t&&t.bearing!=null&&(!t.live||!!t.fix), diff=hasB?angDiff(S.capAim,t.bearing):180, turn=hasB?(((t.bearing-S.capAim+540)%360)-180):0, aligned=hasB&&diff<10, cone=Math.max(14,Math.min(90,diff))*Math.PI/180, dir=-Math.PI/2, rad=Math.min(W,H)*0.46;
   const col=aligned?'74,232,138':'63,116,214';
   ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rad,dir-cone/2,dir+cone/2); ctx.closePath();
   const g=ctx.createRadialGradient(cx,cy,10,cx,cy,rad); g.addColorStop(0,'rgba('+col+',.28)'); g.addColorStop(1,'rgba('+col+',0)');
@@ -2918,13 +2918,14 @@ function capLoop(){
   ctx.strokeStyle='rgba('+col+',.9)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,26,0,Math.PI*2);
   ctx.moveTo(cx-40,cy); ctx.lineTo(cx-10,cy); ctx.moveTo(cx+10,cy); ctx.lineTo(cx+40,cy); ctx.moveTo(cx,cy-40); ctx.lineTo(cx,cy-10); ctx.moveTo(cx,cy+10); ctx.lineTo(cx,cy+40); ctx.stroke();
   el('capAimVal').textContent=S.capAim+'°';
-  el('capStatus').innerHTML=!t?'<span class="cold">Pick a device, then aim.</span>':!hasB?'<span class="cold">Move and make a turn, and Halo finds the direction of this device. You can also capture what is in front of you now.</span>':aligned?'<span class="warm">Aligned. Lock and capture.</span>':diff<45?'<span class="warm">Warmer. Keep turning.</span>':'<span class="cold">Colder. Turn to find the signal.</span>';
+  el('capStatus').innerHTML=!t?'<span class="cold">Pick a device, then aim.</span>':!hasB?'<span class="cold">Move and make a turn, and Halo finds the direction of this device. You can also capture what is in front of you now.</span>':aligned?'<span class="warm">Facing the place Halo has for this device. Lock and capture.</span>':'<span class="'+(diff<45?'warm':'cold')+'">Turn '+(turn>0?'right':'left')+', about '+Math.round(diff)+'°.</span>';
   S.capRAF=requestAnimationFrame(capLoop);
 }
 el('capShot').onclick=async ()=>{
   const t=S.capTarget, stage=capEl.querySelector('.cap-stage'), c=document.createElement('canvas'); c.width=stage.clientWidth; c.height=stage.clientHeight;
   const ctx=c.getContext('2d'), v=el('capVideo');
-  if(S.capStream && v.videoWidth) ctx.drawImage(v,0,0,c.width,c.height); else { ctx.fillStyle='#070b14'; ctx.fillRect(0,0,c.width,c.height); }
+  if(!(S.capStream && v.videoWidth)) return toast('Allow the camera for Halo, then press Lock and capture.');          // a capture is a camera frame: with no camera there is nothing to record
+  ctx.drawImage(v,0,0,c.width,c.height);
   ctx.drawImage(el('capOverlay'),0,0);
   if(t && t.live && !t.sim){ await logEvidence('capture','Capture of '+capName(t)+' ('+t.cls+'), '+distText(t)+'. Camera frame taken at '+new Date().toLocaleTimeString()+'.',{aim:S.capAim,sig:t.sig}); toast('Capture added to Evidence.'); }
   else toast('Capture saved to this device. Test data stays out of Evidence.');
