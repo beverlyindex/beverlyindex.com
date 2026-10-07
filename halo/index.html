@@ -207,7 +207,7 @@ select.inp{flex:none}
 .loc-log{width:100%;margin-top:10px;min-height:46px}
 .tripbar{margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line2);border-radius:14px;background:rgba(12,20,40,.7)} .tripbar.on{border-color:rgba(74,232,138,.6)}
 .tb-l{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:13px;color:var(--mut)} .tb-l b{color:var(--ink);font-family:var(--disp);font-size:17px;font-weight:600} .tb-l span:last-child{flex-basis:100%}
-.tripbar .btn.end{flex:1} .tripbar .btn.end.arm{background:var(--action);border-color:var(--action);color:#fff}
+.tripbar .btn.end{flex:1} .tripbar .btn.end.arm{background:var(--action);border-color:var(--action);color:#fff} .tripbar .btn.end.off{opacity:.4}
 .tripbar .btn.mk.on{background:#1f7a48;border-color:var(--clear);color:#fff}
 .tsk{margin:8px 0 0;border:1px solid var(--line);border-radius:12px;background:rgba(11,18,36,.7);overflow:hidden} .tsk svg{display:block;width:100%;height:auto} .tsk.none{padding:14px;text-align:center;font-size:12.5px;color:var(--mut)}
 .loc-t small.sw{white-space:normal;overflow:visible;color:var(--ink);opacity:.86;line-height:1.35}
@@ -220,7 +220,7 @@ select.inp{flex:none}
 .elog-line.sight span{flex:1} .elog-line small.sw{display:block;font-size:12.5px;color:var(--mut);margin-top:2px}
 .wp{margin:0 0 10px;padding:10px;border:1px solid rgba(197,165,90,.5);border-radius:12px;background:rgba(197,165,90,.06)}
 .wp-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 9px;font-size:13px;color:var(--mut);margin-bottom:6px} .wp-h b{color:var(--ink);font-size:14.5px} .wp-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#C5A55A;color:#1A1A2E;font-weight:700;font-size:13px}
-.wp-note{margin:2px 0 8px;font-size:14px;color:var(--ink)}
+.wp-note{margin:2px 0 8px;font-size:14px;color:var(--ink)} .wp-g{margin:8px 2px 6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#C5A55A}
 .fixbar.unitask{flex-wrap:wrap}
 #vicCard.listv .mapkey{display:none}
 .plan-f{display:flex;align-items:center;gap:10px;margin-top:8px} .plan-f label{width:44px;flex:none;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--wat2)} .plan-f .inp{flex:1;min-width:0;min-height:46px;font-size:15px}
@@ -1046,7 +1046,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-07.42', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-07.43', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2358,7 +2358,8 @@ async function elogMigrate(devs){ if(store.get('halo_elog_v')==='2') return;
       r.occ=occ; r.places=places.slice(-30); ds.put(r); });
     await new Promise(res=>{ tx.oncomplete=res; tx.onerror=res; tx.onabort=res; }); }catch(e){}
   store.set('halo_elog_v','2'); }
-async function elogLoad(){ const devs=await elogAll('dev'); await elogMigrate(devs); devs.forEach(elogCache); ELOG.n.dev=devs.length; ELOG.n.enc=await elogCount('enc'); ELOG.n.cam=await elogCount('cam'); ELOG.ready=true;
+function markCleanup(){ if(!P.marked) return; Object.keys(P.marked).forEach(id=>{ const m=P.marked[id]; if(P.labels && m && P.labels[id]===m.text) delete P.labels[id]; }); delete P.marked; save(); }
+async function elogLoad(){ const devs=await elogAll('dev'); await elogMigrate(devs); devs.forEach(elogCache); try{ markCleanup(); }catch(e){} ELOG.n.dev=devs.length; ELOG.n.enc=await elogCount('enc'); ELOG.n.cam=await elogCount('cam'); ELOG.ready=true;
   try{ const old=IDBKeyRange.upperBound(Date.now()-ELOG.KEEP_MS), tx=elogTx(['enc','cam'],'readwrite'); tx.objectStore('enc').index('t0').openCursor(old).onsuccess=ev=>{ const c=ev.target.result; if(c){ c.delete(); c.continue(); } }; tx.objectStore('cam').index('t').openCursor(old).onsuccess=ev=>{ const c=ev.target.result; if(c){ c.delete(); c.continue(); } }; }catch(e){}
   try{ tripRecover(); }catch(e){}
   if(booted) renderVicinity(); }
@@ -2484,12 +2485,17 @@ const isYours = d => !!(d.mine || d.sigFit || d.paired);
 const neverLocal = cls => cls==='Tag' || cls==='Vehicle' || cls==='Camera';
 // A different place needs two things: you are well away from where the device was recorded, and it has been heard since you came here.
 // The second is read from the sighting now open: where you stood when it was nearest. A device last heard a moment ago, back where you were, does not count.
-function seenInfo(sig, me, t0, ref){ const h=ELOG.ready?ELOG.hist.get(sig):null; if(!h) return null; let near=null, far=null;
+const NAME_ID=/^(?=.*[A-Za-z])(?=.*\d{3}).{6,}$/;          // letters with a run of digits: a model with its serial, a car with its number
+function nameSigs(name, sig){ if(!name || !NAME_ID.test(name) || HOUSE_RE.test(name)) return []; const ks=ELOG.names.get(name); return ks ? [...ks].filter(k=>k!==sig).slice(0,6) : []; }
+function histFor(sig, name){ if(!ELOG.ready) return null; const own=ELOG.hist.get(sig), ks=nameSigs(name, sig).map(k=>ELOG.hist.get(k)).filter(Boolean); if(!ks.length) return own||null;
+  const all=(own?[own]:[]).concat(ks), h={enc:0, occ:0, fx:0, days:0, pl:[], first:Infinity, last:0, byName:true};
+  all.forEach(x=>{ h.enc+=x.enc; h.occ+=(x.occ||1); h.fx+=(x.fx||0); h.days=Math.max(h.days,x.days); h.first=Math.min(h.first,x.first); h.last=Math.max(h.last,x.last); x.pl.forEach(p=>h.pl.push(p)); }); return h; }
+function seenInfo(sig, me, t0, ref, name){ const h=histFor(sig, name); if(!h) return null; let near=null, far=null;
   if(me) h.pl.forEach(p=>{ const m=distLL(me.lat,me.lon,p[0],p[1]);
     if(m>ELOG.FAR_M){ if(ref && distLL(ref.lat,ref.lon,p[0],p[1])>ELOG.FAR_M && (!far || p[3]>far.p[3])) far={p,m}; } else if(!near || m<near.m) near={p,m}; });
   return {h, near, far, again:(t0-h.last>=ELOG.OCC_MS) || (h.occ||1)>=2}; }
 function tagOf(d){ d._seen=null; if(isYours(d)) return 'yours'; if(d.withYou) return 'with';
-  const o=ELOG.open.get(d.sig), s=seenInfo(d.sig, ePos(), o?o.t0:Date.now(), (o && o.la!=null)?{lat:o.la, lon:o.lo}:null); d._seen=s;
+  const o=ELOG.open.get(d.sig), s=seenInfo(d.sig, ePos(), o?o.t0:Date.now(), (o && o.la!=null)?{lat:o.la, lon:o.lo}:null, d.adv); d._seen=s;
   if(s && s.far) return 'place';
   if((P.watch||{})[d.sig]) return 'watch';
   if(!s || !s.again) return 'fresh';
@@ -2502,6 +2508,7 @@ function seenWords(d, tag){ const s=d._seen, h=s&&s.h, wp=(P.wp||{})[d.sig];
     : tag==='local' ? 'Local · seen here '+timesW(h)
     : tag==='watch' ? 'On your Watch list'+(h?' · last seen '+whenW(h.last):'')
     : 'First sighting';
+  if(h && h.byName && (tag==='place'||tag==='again'||tag==='local')) x='By its name · '+x.charAt(0).toLowerCase()+x.slice(1);
   if(wp && tag!=='yours') x+=' · at your waypoint '+whenW(wp.t);
   return x; }
 function nowModel(){ const V=vis(), live=V.mode==='live'||V.mode==='sim', rows=(live?mfDevices():[]).map(d=>({d, tag:tagOf(d)})), pick=t=>rows.filter(r=>r.tag===t), byD=(a,b)=>a.d.dist-b.d.dist;
@@ -2549,8 +2556,11 @@ function tripSketch(R, o){ const rt=R.route||[], H0=(o&&o.h)||150, W0=320; if(rt
     '<path d="M12 '+(H0-8)+' h'+(L*sc).toFixed(1)+'" stroke="#93a6cc" stroke-width="1.5"/><text x="'+(18+L*sc).toFixed(1)+'" y="'+(H0-4)+'" font-size="10.5" fill="#93a6cc">'+esc(du(L))+'</text></svg></div>'; }
 function tripStrip(){ if(W.on){ const st=walkStats(), wp=W.wps||[], open=wp.find(x=>!x.done), idle=W.idle && Date.now()-W.idle.t>10*60000, arm=S.endArm && Date.now()-S.endArm<5000;
     return '<div class="tripbar on" id="tripBar"><div class="tb-l"><span class="dot live"></span><b>Trip recording</b><span>'+esc(walkDur(Date.now()-W.t0))+' · '+esc(du(st.distance_m))+' · '+st.heard+' heard'+(wp.length?' · '+wp.length+(wp.length===1?' waypoint':' waypoints'):'')+(idle?' · in one place for '+Math.round((Date.now()-W.idle.t)/60000)+' minutes':'')+(W.test?' · test data':'')+'</span></div>'+
-      tripSketch(W,{h:130})+'<div class="loc-bar"><button class="btn primary mk'+(open?' on':'')+'" data-act="trip-wp">'+(open?'Waypoint '+open.n+' saved':'Waypoint')+'</button><button class="btn end'+(arm?' arm':'')+'" data-act="trip-end">'+(arm?'Tap again to end':'End')+'</button></div></div>'; }
+      tripSketch(W,{h:130})+'<div class="loc-bar"><button class="btn primary mk'+(open?' on':'')+'" data-act="trip-wp">'+(open?'Waypoint '+open.n+' saved':'Waypoint')+'</button><button class="btn end'+(open?' off':arm?' arm':'')+'" data-act="trip-end">'+(open?'End trip':arm?'Tap again to end the trip':'End trip')+'</button></div>'+
+      (open?'<div class="limit" style="margin:8px 2px 0">Waypoint '+open.n+' closes by itself after one minute. The trip keeps recording.</div>':'')+'</div>'; }
   return '<div class="tripbar" id="tripBar"><div class="loc-bar" style="margin-top:0"><button class="btn primary mk" data-act="trip-start">Start a trip</button><button class="btn'+(S.trips?' on':'')+'" data-act="trips-open">Trips'+((P.trips||[]).length?' · '+P.trips.length:'')+'</button></div></div>'; }
+// A device passed you at a waypoint when it came into earshot around that moment and was gone within two minutes. One that was there before, and stayed, was already around you.
+function wpPassed(R, w, x){ const r=(R.devs||{})[x.id]; return !!r && r.first>=w.t-90000 && r.first<=w.t+WP_MS && r.last-r.first<120000; }
 function tripStart(){ if(W.on) return; const me=ePos(), fresh=me && Date.now()-me.t<20000 && me.acc<=POS_MAX_ACC; S.trips=null; tripsRender();
   walkStart(Date.now(), fresh?me:null, 0); if(!S.pos) geoAsk().then(()=>renderVicinity());
   toast('Trip started. Halo is recording your path and every device along it.'); }
@@ -2568,7 +2578,9 @@ function tripWaypoint(){ if(!W.on) return; W.wps=W.wps||[]; const open=W.wps.fin
   const now=Date.now(), me=ePos(), w={n:W.wps.length+1, t:now, pos:me?{lat:+me.lat.toFixed(6), lon:+me.lon.toFixed(6)}:null, devs:{}, note:'', done:false}; W.wps.push(w);
   wpSweep(w); wEvent('mark','Waypoint '+w.n+' set.','',now); wSave(true); buzz(60); renderVicinity();
   toast('Waypoint '+w.n+' saved at '+hhmm(now)+'. Halo records every device within '+du(WP_M)+' for one minute.'); }
-function tripEnd(){ if(!W.on) return;
+function tripEnd(){ if(!W.on) return; const open=(W.wps||[]).find(x=>!x.done);
+  if(open){ S.endArm=0; const c=new Date(open.t+WP_MS); return toast('Waypoint '+open.n+' is saved, and the trip keeps recording. End trip is ready again at '+hhmm(open.t+WP_MS)+':'+String(c.getSeconds()).padStart(2,'0')+', when the waypoint closes.'); }
+  if(S.endArm && Date.now()-S.endArm<400) return;          // two taps in one motion count as one
   if(!(S.endArm && Date.now()-S.endArm<5000)){ S.endArm=Date.now(); renderVicinity(); setTimeout(()=>{ if(S.endArm && Date.now()-S.endArm>=5000){ S.endArm=0; renderVicinity(); } },5200); return; }
   S.endArm=0; const t0=W.t0; walkStop(); toast('Trip ended and saved.'); tripFinish(t0, true); }
 // The moment a trip ends: what it recorded is set against the record of earlier days, and the whole trip is kept on this phone.
@@ -2612,18 +2624,19 @@ async function tripRecover(){ if(!ELOG.ok || TRIP_AUTO) return;
   if(!W.t0 || W.test) return;
   if(!W.on && W.t1 && !W.arch){ tripCut(W); tripFinish(W.t0, false); } }
 async function tripCorrelate(R){ const ds=Object.values(R.devs||{}), tags={}, hw={}, cnt={with:0,place:0,watch:0,again:0,local:0,fresh:0,yours:0};
-  for(const r of ds){ let tag='fresh', words='First sighting'; const h=ELOG.ready&&r.sig?ELOG.hist.get(r.sig):null;
+  for(const r of ds){ let tag='fresh', words='First sighting'; const h=r.sig?histFor(r.sig, r.adv):null;
     if(r.mine || r.pr || (P.mine||{})[r.id]){ tag='yours'; words='Yours'; }
     else if(r.withYou){ tag='with'; words='Moved with you'+(r.mins?' for '+(r.mins<1.5?'a minute':Math.round(r.mins)+' minutes'):'')+(r.span?', across '+du(r.span):''); }
-    else if(h && ELOG.ok){ const enc=await elogAll('enc','k',r.sig), prior=enc.filter(x=>x.trip!==R.t0 && x.t1<r.first), mine=enc.filter(x=>x.trip===R.t0 && x.la!=null), at=r.at; let far=null, split=null;
+    else if(h && ELOG.ok){ let enc=await elogAll('enc','k',r.sig); if(h.byName) for(const k of nameSigs(r.adv, r.sig)) enc=enc.concat(await elogAll('enc','k',k));
+      const pre=h.byName?'By its name · ':'', prior=enc.filter(x=>x.trip!==R.t0 && x.t1<r.first), mine=enc.filter(x=>x.trip===R.t0 && x.la!=null), at=r.at; let far=null, split=null;
       if(at) prior.forEach(x=>{ if(x.la==null) return; const m=distLL(at.lat,at.lon,x.la,x.lo); if(m>ELOG.FAR_M && (!far || x.t1>far.x.t1)) far={x,m}; });
       for(let i=0;i<mine.length && !split;i++) for(let j=i+1;j<mine.length;j++){ const m=distLL(mine[i].la,mine[i].lo,mine[j].la,mine[j].lo); if(m>ELOG.FAR_M){ split={m}; break; } }
       const lastP=prior.slice().sort((a,b)=>b.t1-a.t1)[0], again=prior.some(x=>x.t1<=r.first-ELOG.OCC_MS), days=new Set(prior.map(x=>dayKey(x.t0))).size;
-      if(far){ tag='place'; words='Seen before '+whenW(far.x.t0)+', '+du(far.m)+' from where you met it on this trip'; }
+      if(far){ tag='place'; words=pre+(pre?'seen before ':'Seen before ')+whenW(far.x.t0)+', '+du(far.m)+' from where you met it on this trip'; }
       else if(split){ tag='place'; words='Heard at two places on this trip, '+du(split.m)+' apart'; }
       else if((P.watch||{})[r.sig]){ tag='watch'; words='On your Watch list'+(lastP?' · last seen '+whenW(lastP.t0):''); }
       else if(again){ const local=!neverLocal(r.cls) && (r.v==='fixed' || h.fx>0 || h.days>=3 || HOUSE_RE.test((r.hint||'')+' '+(r.adv||''))); tag=local?'local':'again';
-        words=(local?'Local · seen here before, on ':'Seen here before, on ')+days+(days===1?' earlier day':' earlier days')+' · last '+whenW(lastP.t0); } }
+        words=pre+(local?'Local · seen here before on ':pre?'seen here before on ':'Seen here before on ')+days+(days===1?' day':' days')+' · last '+whenW(lastP.t0); } }
     else if((P.watch||{})[r.sig]){ tag='watch'; words='On your Watch list'; }
     tags[r.id]=tag; hw[r.id]=words; cnt[tag]++; }
   let cams=[]; if(ELOG.ok){ const by={}; (await elogAll('cam')).filter(c=>c.trip===R.t0).forEach(c=>{ const g=by[c.pid]; if(!g || c.d<g.d) by[c.pid]={kind:c.kind, name:c.name||'', op:c.op||'', d:c.d, t:c.t, la:c.la, lo:c.lo}; }); cams=Object.values(by).sort((a,b)=>a.t-b.t).slice(0,60); }
@@ -2674,10 +2687,11 @@ function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},h
   if(seen.length) h+='<div class="elog-h4">Seen before · '+seen.length+'</div>'+seen.slice(0,40).map(row).join('')+(seen.length>40?'<p class="limit" style="margin:6px 2px 0">The first 40 of '+seen.length+'. The data file holds them all.</p>':'');
   if(trk.length) h+='<div class="elog-h4">Trackers heard · '+trk.length+'</div>'+trk.slice(0,20).map(row).join('');
   const wps=R.wps||[];
-  h+='<div class="elog-h4">Waypoints · '+wps.length+'</div>'+(wps.length ? wps.map(w=>{ const wd=Object.values(w.devs||{}).filter(x=>!x.yours).sort((a,b)=>a.m-b.m);
+  const wRow=x=>'<div class="t-row"><button class="loc-row" data-act="art" data-k="'+esc(x.sig)+'"><span class="sdot'+(x.cls==='Tag'?' k-tag':'')+'" style="--mk:'+TAG[C.tags[x.id]||'fresh'].c+'"></span><span class="loc-t"><b>'+esc((P.labels||{})[x.id]||[x.name, (R.devs[x.id]||{}).adv||''].sort((p,q)=>q.length-p.length)[0])+'</b><small>'+esc(x.kind)+'</small><small class="sw">'+esc(C.hw[x.id]||'')+((r=>r?' · in earshot '+hhmm(r.first)+' to '+hhmm(r.last)+', '+walkDur(r.last-r.first):'')(R.devs[x.id]))+'</small></span><span class="loc-d"><b>'+esc(du(x.m))+'</b><small>nearest</small></span></button>'+watchBtn(x.sig)+'</div>';
+  h+='<div class="elog-h4">Waypoints · '+wps.length+'</div>'+(wps.length ? wps.map(w=>{ const wd=Object.values(w.devs||{}).filter(x=>!x.yours).sort((a,b)=>a.m-b.m), pass=wd.filter(x=>wpPassed(R,w,x)), rest=wd.filter(x=>!wpPassed(R,w,x));
       return '<div class="wp"><div class="wp-h"><span class="wp-n">'+w.n+'</span><b>'+hhmm(w.t)+' · '+minsIn(w.t,R.t0)+'</b><span>'+(w.pos?whSpan(w.pos.lat,w.pos.lon):'place not recorded')+'</span></div>'+
         (w.note ? '<div class="wp-note">'+esc(w.note)+'</div>' : '<div class="formrow" style="margin:6px 0 2px"><input class="inp" id="wpn-'+w.n+'" maxlength="80" placeholder="Add what you saw, if you wish" autocomplete="off" style="flex:1;min-width:0"><button class="btn sm" data-act="wp-note" data-n="'+w.n+'">Save</button></div>')+
-        (wd.length ? wd.map(x=>'<div class="t-row"><button class="loc-row" data-act="art" data-k="'+esc(x.sig)+'"><span class="sdot'+(x.cls==='Tag'?' k-tag':'')+'" style="--mk:'+TAG[C.tags[x.id]||'fresh'].c+'"></span><span class="loc-t"><b>'+esc((P.labels||{})[x.id]||x.name)+'</b><small>'+esc(x.kind)+'</small><small class="sw">'+esc(C.hw[x.id]||'')+'</small></span><span class="loc-d"><b>'+esc(du(x.m))+'</b><small>nearest</small></span></button>'+watchBtn(x.sig)+'</div>').join('')
+        (wd.length ? (pass.length?'<div class="wp-g">Passed you in that minute · '+pass.length+'</div>'+pass.map(wRow).join(''):'')+(rest.length?'<div class="wp-g">Already around you · '+rest.length+'</div>'+rest.map(wRow).join(''):'')
           : '<div class="loc-none">No device came within '+esc(du(WP_M))+' in that minute.</div>')+'</div>'; }).join('')
     : '<div class="loc-none">No waypoint was set on this trip. Press Waypoint during a trip, and Halo keeps the time, the place and every device within '+esc(du(WP_M))+'.</div>');
   if((C.cams||[]).length) h+='<div class="elog-h4">Cameras passed · '+C.cams.length+'</div>'+C.cams.map(x=>'<div class="elog-line"><span><b>'+esc(x.kind+(x.name?', '+x.name:''))+'</b> · '+hhmm(x.t)+', '+minsIn(x.t,R.t0)+' · '+whSpan(x.la,x.lo)+'</span><span class="mono">'+esc(du(x.d))+'</span></div>').join('');
@@ -2685,7 +2699,7 @@ function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},h
     '<div class="limit" style="text-align:center;margin-top:8px"><button class="linkbtn'+(T.ren?' on':'')+'" data-act="trip-ren">'+(R.name?'Change the name':'Name this trip')+'</button> · The data file holds every device and every reading of this trip.</div>'; }
 async function tripFile(R){ const rep=withTrip(R, walkReport), iso=t=>new Date(t).toISOString(), C=R.cor||{tags:{},hw:{},cams:[]};
   rep.version=2; rep.name=tripName(R); rep.devices.forEach(x=>{ x.tag=(TAG[C.tags[x.id]]||TAG.fresh).w; x.record=C.hw[x.id]||''; });
-  rep.waypoints=(R.wps||[]).map(w=>({n:w.n, t:iso(w.t), youWereAt:w.pos, note:w.note||'', devices:Object.values(w.devs||{}).map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, yours:!!x.yours, tag:(TAG[C.tags[x.id]]||TAG.fresh).w}))}));
+  rep.waypoints=(R.wps||[]).map(w=>({n:w.n, t:iso(w.t), youWereAt:w.pos, note:w.note||'', devices:Object.values(w.devs||{}).map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, yours:!!x.yours, tag:(TAG[C.tags[x.id]]||TAG.fresh).w, passedYou:wpPassed(R,w,x)}))}));
   rep.camerasPassed=(C.cams||[]).map(x=>({kind:x.kind, name:x.name, operator:x.op, nearest_m:x.d, t:iso(x.t), lat:x.la, lon:x.lo}));
   const text=JSON.stringify(rep,null,1), d=new Date(R.t0), name='halo-trip-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
   const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -4921,7 +4935,7 @@ function ingestReport(sid, rowT, p, off){
     if(!d){ if(LIVE.devs.size>=DEVS_MAX) continue;
       const hsh=hash32(s.id), h2=hash32('~'+s.id);
       d={ id:'L'+hsh.toString(36)+h2.toString(36), sig:s.id, live:true, name:callsign(hsh,h2), glyph:GLY[hsh%GLY.length], firstSeen:at, timesSeen:0, samples:[], hist:[], handleBrg:hsh%360, fix:null, sector:null, fresh:0, seenMobile:0, seenStation:0 }; LIVE.devs.set(s.id,d); }
-    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; d.adv=typeof s.name==='string'?s.name.slice(0,40):''; d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; d.name=autoName(d); d.rssi=rssi!==null?rssi:rssiOf(reading);
+    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; { const nw=typeof s.name==='string' ? s.name.replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40) : ''; if(nw && (!d.adv || nw.length>d.adv.length || !d.advT || at-d.advT>86400000)){ d.adv=nw; d.advT=at; } else if(!d.adv) d.adv=''; } d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; d.name=autoName(d); d.rssi=rssi!==null?rssi:rssiOf(reading);
     d.lastSeen=Math.max(d.lastSeen||0, at); d.firstSeen=Math.min(d.firstSeen, at); d.timesSeen++; d.sensor=sid; d.identity=Math.max(1,Math.min(3,(s.conf|0)||2));
     if(station) d.seenStation=Math.max(d.seenStation, at); else { d.seenMobile=Math.max(d.seenMobile, at); if(away) d.seenAway=Math.max(d.seenAway||0, at); }
     d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
