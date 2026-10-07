@@ -1079,7 +1079,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-07.46', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-07.47', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2033,10 +2033,10 @@ function fmtDT(iso){ const d=new Date(iso); if(isNaN(d)) return ''; return d.get
 const KEV_FOR={android:['android','browser'], iphone:['apple']};
 // "Apple Multiple Products" and "1900 Series Switches is" come straight from the register. Halo says them as a person would.
 function kevWords(v){ const ven=String(v.vendor||'').trim(), pr=String(v.product||'').trim();
-  if(/^multiple (products|devices|versions)$/i.test(pr) || !pr) return {name:'Several '+ven+' products', are:'are', it:'them'};
+  if(/^multiple (products|devices|versions)$/i.test(pr) || !pr) return {name:LK('Several '+ven+' products'), are:'are', it:'them'};
   const name=(pr.toLowerCase().indexOf(ven.toLowerCase())===0 ? pr : ven+' '+pr).replace(/\s+/g,' ').trim();
   const many=/(products|switches|routers|devices|firewalls|appliances|cameras|phones|gateways|servers|controllers|printers|drivers|chipsets|processors|modems|extenders|adapters|browsers|recorders|systems)$/i.test(pr);
-  return {name, are:many?'are':'is', it:many?'them':'it'}; }
+  return {name:LK(name), are:many?'are':'is', it:many?'them':'it'}; }
 // The exploited list is matched on a family of products: the kind of phone in the profile, and home network equipment. The words say so.
 const kevFam = () => (plat()==='iphone'?'Apple products':'Android phones and browsers')+(pv('wifihome')!==false?' and home network equipment':'');
 function kevMine(){
@@ -2292,7 +2292,7 @@ const distText = d => (d.live && !(d.fix && d.bearing!=null) ? 'about ' : '')+Ma
 const mkClass = d => (!d.live||d.fix ? '' : d.sector ? ' rough' : ' hollow')+(d.live && d.mov && motionOf(d).m==='moving' ? ' mv' : '');          // placed, direction rough, or direction not known
 const dirNote = d => !d.live ? '' : d.fix ? whereWords(d) : d.sector ? 'direction rough, '+whereWords(d) : 'direction pending';
 function renderVicinity(){
-  oneSync(); locRender(); if(S.plan && S.plan.line) planScan();
+  langSeed(); oneSync(); locRender(); if(S.plan && S.plan.line) planScan();
   const V=vis(), shown=V.mode==='live'||V.mode==='sim', rs=radiusState(), blocks=rs.r/BLOCK_M, sus=shown?inRadius():[];
   el('vicCount').textContent = V.mode==='live' ? sus.length+(V.test?' test':' live') : stateWords(V.mode).count;
   { const f=stateFix(V.mode), fb=el('fixBar'), noPos=!S.pos && !gz() && !whereFresh(); el('vicCount').classList.toggle('fix', !!f);
@@ -2766,49 +2766,79 @@ function watchToggle(sig){ if(!sig) return; P.watch=P.watch||{}; P.watchSeen=P.w
    the language on screen. Every word that reaches the screen, a banner or a printed page is put into the chosen language at that moment.
    A text is first reduced to its shape: numbers become #, dates become @, and names that belong to the user or to a device become §. The shape is
    looked up, and the numbers, dates and names are set back in their places. A long text is read sentence by sentence. ---------- */
-const LANG={cur:'en', target:'en', S:null, R:[], N:[], data:new Set(), dsort:null, cache:new Map(), orig:new WeakMap(), out:new WeakMap(), attr:new WeakMap(), obs:null, miss:new Map(), sent:new Set(), probe:window.HALO_LANG_PROBE||null, on:false};
+const LANG={cur:'en', target:'en', S:null, R:[], N:[], keep:new Set(), terms:new Set(), seedAt:0, seedG:null, data:new Set(), dsort:null, cache:new Map(), orig:new WeakMap(), out:new WeakMap(), attr:new WeakMap(), obs:null, miss:new Map(), sent:new Set(), probe:window.HALO_LANG_PROBE||null, on:false};
 const LANG_NAMES={en:'English', it:'Italiano'}, LANG_ATTRS=['placeholder','title','aria-label','alt'];
 const L_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], L_DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const L_IT={mon:['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'], dow:['dom','lun','mar','mer','gio','ven','sab']};
-const L_TOK=new RegExp('(\\d{4}-\\d{2}-\\d{2}(?:[.T][\\d:.]+Z?)?)|\\b(?:('+L_DOW.join('|')+') )?(\\d{1,2}) ('+L_MON.join('|')+')(?: (\\d{4}))?\\b|(-?\\d+(?:[.,:\\/]\\d+)*(?![A-Za-z_\\d])(?: ?[AP]M\\b)?)','g');
+const L_MONF=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const L_IT={mon:['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'], monf:['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'], dow:['dom','lun','mar','mer','gio','ven','sab']};
+const lcIdx = (a,x) => { x=String(x).toLowerCase(); return a.findIndex(y=>y.toLowerCase()===x); };
+const L_TOK=new RegExp('(\\d{4}-\\d{2}-\\d{2}(?:[.T][\\d:.]+Z?)?)|\\b(?:('+L_DOW.join('|')+') )?(\\d{1,2}) ('+L_MONF.join('|')+'|'+L_MON.join('|')+')(?: (\\d{4}))?\\b|(\\b(?=[0-9a-f]*\\d)(?=[0-9a-f]*[a-f])[0-9a-f]{12,}\\b|-?\\d+(?:[.,:\\/]\\d+)*(?![A-Za-z_\\d])(?: ?[AP]M\\b)?)','gi');
 const L_UNIT=/^ ?(km|mi|m|ft|dB|dBm|GHz|m\/s|MB|GB)\b/;
 const langHas = l => { if(l==='en') return true; const e=document.getElementById('lang-'+l); return !!e && (e.textContent||'').length>400; };          // a language is offered once its text is in the page
 function langPick(){ const s=store.get('halo_lang'); if((s==='it' || s==='en') && langHas(s)) return s; return (/^it\b/i.test(navigator.language||'') && langHas('it')) ? 'it' : 'en'; }
 // A name that must be shown exactly as it was given: a device's broadcast name, a label the user chose, a street, a person.
-const LK = s => { if(LANG.on && s && typeof s==='string' && s.length>1 && !LANG.data.has(s)){ if(LANG.data.size>4000){ LANG.data=new Set([...LANG.data].slice(-2000)); } LANG.data.add(s); LANG.dsort=null; } return s; };
+const LK = s => { if(LANG.on && s && typeof s==='string' && s.length>1 && !LANG.data.has(s)){ if(LANG.data.size>9000){ LANG.data=new Set([...LANG.data].slice(-5000)); } LANG.data.add(s); LANG.dsort=null; } return s; };
 function langTokens(t){ const v=[]; const s=t.replace(L_TOK,(m,iso,dw,d,mo,y,num,off)=>{ if(iso!==undefined){ v.push({k:'i',m}); return '#'; } if(d!==undefined && mo!==undefined){ v.push({k:'d',dw,d,mo,y}); return '@'; }
     const pc=off>0?t[off-1]:''; let pre='';
     if(m[0]==='-' && /[A-Za-z0-9]/.test(pc)){ pre='-'; m=m.slice(1); }          // a hyphen between two parts of a code, not a minus sign
     else if(/[A-Za-z0-9_#]/.test(pc)) return m;          // the tail of a name or a code
     v.push({k:'n',m,unit:L_UNIT.test(t.slice(off+pre.length+m.length))}); return pre+'#'; }); return {s, v}; }
-function langNames(t){ if(!LANG.data.size) return null; if(!LANG.dsort) LANG.dsort=[...LANG.data].sort((a,b)=>b.length-a.length); const hits=[];
+function langNames(t){ const hits=[]; let am; L_AUTO.lastIndex=0; while((am=L_AUTO.exec(t))) hits.push({i:am.index, e:am.index+am[0].length, nm:am[0]});
+  if(!LANG.dsort) LANG.dsort=[...LANG.data].sort((a,b)=>b.length-a.length);
   for(const nm of LANG.dsort){ if(nm.length>t.length) continue; let i=t.indexOf(nm); while(i>=0){ const a=i>0?t[i-1]:'', b=t[i+nm.length]||'';
       if(!/[A-Za-z0-9]/.test(a) && !/[A-Za-z0-9]/.test(b) && !hits.some(h=>i<h.e && i+nm.length>h.i)) hits.push({i, e:i+nm.length, nm}); i=t.indexOf(nm, i+nm.length); }
     if(hits.length>12) break; }
   if(!hits.length) return null; hits.sort((a,b)=>a.i-b.i); let s='', p=0; hits.forEach(h=>{ s+=t.slice(p,h.i)+'§'; p=h.e; }); return {s:s+t.slice(p), names:hits.map(h=>h.nm)}; }
-const langVal = x => x.k==='d' ? (x.dw?L_IT.dow[L_DOW.indexOf(x.dw)]+' ':'')+x.d+' '+L_IT.mon[L_MON.indexOf(x.mo)]+(x.y?' '+x.y:'') : (x.k==='n' && x.unit && /^-?\d+\.\d+$/.test(x.m)) ? x.m.replace('.',',') : x.m;
+const langVal = x => x.k==='d' ? ((r,up)=>up?r.toUpperCase():r)((x.dw?L_IT.dow[lcIdx(L_DOW,x.dw)]+' ':'')+x.d+' '+(lcIdx(L_MONF,x.mo)>=0?L_IT.monf[lcIdx(L_MONF,x.mo)]:L_IT.mon[lcIdx(L_MON,x.mo)])+(x.y?' '+x.y:''), x.mo.length>1 && x.mo===x.mo.toUpperCase()) : (x.k==='n' && x.unit && /^-?\d+\.\d+$/.test(x.m)) ? x.m.replace('.',',') : x.m;
 // Fill a translated shape: # and @ take the numbers and dates in order, § the names in order, {2} the second of all of them wherever it stands.
 function langFill(tpl, v, names){ if(typeof tpl!=='string'){ const n=v.find(x=>x.k==='n'); tpl=(n && Math.abs(parseFloat(n.m))===1) ? tpl[0] : tpl[1]; }
   let a=0, b=0; const used=new Set(); tpl=tpl.replace(/\{(\d+)\}/g,(m,i)=>{ const x=v[+i-1]; if(!x) return m; used.add(x); return '\u0001'+(+i-1)+'\u0002'; });
   tpl=tpl.replace(/[#@]/g,()=>{ while(a<v.length && used.has(v[a])) a++; const x=v[a++]; return x?langVal(x):'#'; }).replace(/\u0001(\d+)\u0002/g,(m,i)=>langVal(v[+i]));
   return names ? tpl.replace(/§/g,()=>langName(names[b++]||'')) : tpl; }
 // A name Halo made up itself is put into the language; a name that was broadcast or given is left exactly as it is.
-function langName(n){ for(const r of LANG.N){ const m=r[0].exec(n); if(m) return r[1](m); } return n; }
-function langOne(t){ const S=LANG.S; if(S[t]!==undefined) return typeof S[t]==='string' ? S[t] : S[t][1];
+function langName(n){ for(const r of LANG.N){ const m=r[0].exec(n); if(m) return r[1](m); } const x=LANG.terms.has(n) ? LANG.S[n] : undefined; return typeof x==='string' ? x : n; }
+// Names from outside Halo are gathered every few seconds, so that a sentence built around one is still recognised: people, rooms, sensors, streets, and everything in the news feed.
+function langSeed(){ if(!LANG.on) return; const now=Date.now(); if(LANG.seedAt && now-LANG.seedAt<4000) return; LANG.seedAt=now;
+  try{ LANG.terms.forEach(LK); const H=P.home||{}; (H.people||[]).forEach(p=>{ LK(p.name); LK(p.rel); }); (H.rooms||[]).forEach(r=>LK(r.name)); (H.contacts||[]).forEach(c=>{ LK(c.name); LK(c.phone); });
+    Object.values(P.sensors||{}).forEach(x=>LK(x&&x.name)); Object.values(P.labels||{}).forEach(LK); (P.trips||[]).forEach(x=>LK(x.name)); (SY.devices||[]).forEach(d=>LK(d.name));
+    if(ELOG.names) ELOG.names.forEach((v,k)=>LK(k)); LIVE.devs.forEach(d=>{ LK(d.adv); });
+    Object.values(whLoad()).forEach(v=>{ LK(v.r); LK(v.a); LK(v.c); });
+    if(S.global && S.global!==LANG.seedG){ LANG.seedG=S.global; let n=0; const walk=(v,d)=>{ if(n>2500 || d>6 || v==null) return; if(typeof v==='string'){ if(v.length>2 && v.length<400 && !/^https?:/.test(v) && /[A-Za-z]/.test(v)){ LK(v); n++; } } else if(typeof v==='object') Object.values(v).forEach(x=>walk(x,d+1)); }; walk(S.global,0); }
+  }catch(e){} }
+const L_AUTO=/(?:Unidentified )?(?:[A-Z][\w.&'-]* )?(?:phone|wearable|tracker|computer|vehicle|Wi-Fi access point|cell tower|surveillance device|device) #[A-Z0-9]{3}(?![A-Za-z0-9])|\bL(?=[a-z]*\d)[a-z0-9]{9,16}\b|\b[\w-]+(?:\.[\w-]+)*\.(?:apk|json|pdf|csv)\b|\bhalo1\.[\w.-]{20,}/g;
+const L_KEEP=/^(?:sha256 [0-9a-f]+|[0-9a-f]{12,}|https?:\/\/\S+|\S+@\S+\.\S+|RH-[A-Z0-9X]{4}-\d{4}|[A-Z0-9]{2,}(?:[-_:][A-Z0-9]+)+|[^A-Za-z]*[A-Za-z]?[^A-Za-z]*)$/i;
+function langLook(t){ const S=LANG.S, x=S[t]; if(x!==undefined) return typeof x==='string' ? x : x[1];
   const k=langTokens(t); if(k.v.length && S[k.s]!==undefined) return langFill(S[k.s], k.v);
-  for(const r of LANG.R){ const m=r[0].exec(t); if(m) return r[1].replace(/\$(t|n)?(\d)/g,(x,f,i)=>{ const g=m[+i]||''; return f==='t'?langText(g):f==='n'?langName(g):g; }); }
-  const nm=langNames(t); if(nm){ const k2=langTokens(nm.s); if(S[k2.s]!==undefined) return langFill(S[k2.s], k2.v, nm.names); if(!/[A-Za-z]{2}/.test(nm.s.replace(/§/g,''))) return nm.s.replace(/§/g,()=>langName(nm.names.shift()||'')); return {miss:k2.s}; }
+  for(const r of LANG.R){ const m=r[0].exec(t); if(m) return r[1].replace(/\$(t|n)?(\d)/g,(z,f,i)=>{ const g=m[+i]||''; return f==='t'?langText(g):f==='n'?langName(g):g; }); }
+  const nm=langNames(t); if(nm){ const k2=langTokens(nm.s); if(S[k2.s]!==undefined) return langFill(S[k2.s], k2.v, nm.names); if(!/[A-Za-z]{2}/.test(nm.s.replace(/§/g,''))) return langFill(nm.s, k2.v.length?langTokens(nm.s).v:[], nm.names); return {miss:k2.s}; }
   return {miss:k.s}; }
-function langMiss(shape, sample){ if(!/[A-Za-z]{2}/.test(shape) || LANG.miss.has(shape) || LANG.sent.has(shape)) return; if(LANG.miss.size<5000) LANG.miss.set(shape, sample); }
+// One piece of text with nothing left to split off: looked up as it stands, then as a name Halo made, then with its first letter in the other case.
+function langOne(t){ const r=langLook(t); if(typeof r==='string') return r;
+  for(const n of LANG.N){ const m=n[0].exec(t); if(m) return n[1](m); }
+  if(L_KEEP.test(t) || LANG.keep.has(t)) return t;
+  const c=t.charAt(0), f=c===c.toLowerCase() ? c.toUpperCase() : c.toLowerCase();
+  if(f!==c){ const r2=langLook(f+t.slice(1)); if(typeof r2==='string') return (c===c.toLowerCase() ? r2.charAt(0).toLowerCase() : r2.charAt(0).toUpperCase())+r2.slice(1); }
+  if(t===t.toUpperCase() && t!==t.toLowerCase() && /[A-Z]{3}/.test(t)){ const r3=langOne(t.toLowerCase()); if(typeof r3==='string') return r3.toUpperCase(); }          // a line set in capitals is read in small letters, and set in capitals again
+  return r; }
+// A list is split at its commas, and a comma inside brackets is left alone.
+function langList(x){ const out=[]; let d=0, p=0; for(let i=0;i<x.length;i++){ const c=x[i]; if(c==='(') d++; else if(c===')') d=Math.max(0,d-1); else if(c===',' && x[i+1]===' ' && d===0){ out.push(x.slice(p,i)); p=i+2; } } out.push(x.slice(p)); return out; }
+// A unit that is not in the book as a whole is tried as a label and what follows it, as a list, and as a text with a note in brackets.
+function langRes(x, depth){ const r=langOne(x); if(typeof r==='string') return r; if((depth||0)>3) return null;
+  const ci=x.indexOf(': '); if(ci>0 && ci<x.length-2){ const a=langRes(x.slice(0,ci+1),(depth||0)+1), b=a===null?null:langRes(x.slice(ci+2).trim(),(depth||0)+1); if(a!==null && b!==null) return a+' '+b; }
+  const ps=langList(x); if(ps.length>1 && ps.every(p=>p.trim().split(/\s+/).length<=9 && !/[.!?] /.test(p))){ const rs=ps.map(p=>langRes(p.trim(),(depth||0)+1)); if(rs.every(q=>q!==null)) return rs.join(', '); }
+  const pm=/^(.+?) \((.+)\)([.,:;]?)$/.exec(x); if(pm){ const a=langRes(pm[1],(depth||0)+1), b=a===null?null:langRes(pm[2],(depth||0)+1); if(a!==null && b!==null) return a+' ('+b+')'+pm[3]; }
+  for(const w of [' and ',' or ']){ const ai=x.indexOf(w), J=LANG.S[w.trim()]; if(ai>0 && typeof J==='string' && x.split(/\s+/).length<=14){ const tl=/[.,:;]$/.exec(x), y=tl?x.slice(0,-1):x, a=langRes(y.slice(0,ai),(depth||0)+1), b=a===null?null:langRes(y.slice(ai+w.length),(depth||0)+1); if(a!==null && b!==null) return a+' '+J+' '+b+(tl?tl[0]:''); } }
+  return null; }
+function langMiss(x){ const nm=langNames(x), shape=langTokens(nm?nm.s:x).s; if(!/[A-Za-z]{2}/.test(shape) || LANG.miss.has(shape) || LANG.sent.has(shape)) return; if(LANG.miss.size<5000) LANG.miss.set(shape, x); }
 // One text: whole, then by its parts between middle dots, then sentence by sentence. What has no words in it is left alone.
 function langText(t){ if(LANG.target==='en' || !t || !/[A-Za-z]{2}/.test(t)) return t; const c=LANG.cache.get(t); if(c!==undefined) return c;
-  const lead=/^\s*/.exec(t)[0], tail=/\s*$/.exec(t)[0], core=t.slice(lead.length, t.length-tail.length); let out;
-  const whole=langOne(core);
-  if(typeof whole==='string') out=whole;
-  else { const unit=x=>{ if(!/[A-Za-z]{2}/.test(x)) return x; const r=langOne(x.trim()); if(typeof r==='string') return x.replace(x.trim(), ()=>r); langMiss(r.miss, x.trim()); return x; };
-    const parts=core.split(/( · | \| )/); out=parts.map((p,i)=>{ if(i%2) return p; const r=parts.length>1 ? langOne(p.trim()) : null; if(typeof r==='string') return p.replace(p.trim(), ()=>r);
+  const lead=/^[\s·|‹›«»✓×→←•]*/.exec(t)[0], tail=/[\s·|‹›«»✓×→←•]*$/.exec(t.slice(lead.length))[0], core=t.slice(lead.length, t.length-tail.length); let out, clean=true; if(!core) return t;
+  const whole=langRes(core);
+  if(whole!==null) out=whole;
+  else { const unit=x=>{ const y=x.trim(); if(!/[A-Za-z]{2}/.test(y)) return x; const r=langRes(y); if(r!==null) return x.replace(y, ()=>r); clean=false; langMiss(y); return x; };
+    const parts=core.split(/( · | \| )/); out=parts.map((p,i)=>{ if(i%2) return p; if(parts.length>1){ const r=langRes(p.trim()); if(r!==null) return p.replace(p.trim(), ()=>r); }
       const ss=p.replace(/(\S+?)([.!?:])\s+(?=[A-Z§#@0-9"'(])/g,(m,w,q)=>(q==='.' && /^(No|no|e\.g|i\.e|vs|St|approx)$/.test(w)) ? m : w+q+'\u0000').split('\u0000'); return ss.length>1 ? ss.map(unit).join(' ') : unit(p); }).join(''); }
-  out=lead+out+tail; if(LANG.cache.size>6000) LANG.cache.clear(); if(!LANG.data.size || out!==t) LANG.cache.set(t,out); return out; }
+  out=lead+out+tail; if(LANG.cache.size>6000) LANG.cache.clear(); if(clean) LANG.cache.set(t,out); return out; }
 const langSkip = p => !p || p.nodeType!==1 || !!p.closest('script,style,textarea,[translate="no"],.notr,.maplibregl-map,.wp-note');
 function langNode(n){ const p=n.parentNode; if(langSkip(p)) return; const cur=n.nodeValue; if(LANG.out.get(n)===cur && LANG.orig.has(n)) return;
   LANG.orig.set(n, cur); LANG.out.delete(n); if(LANG.target==='en') return; const t=langText(cur); if(LANG.cur!=='en' && t!==cur){ LANG.out.set(n,t); n.nodeValue=t; } }
@@ -2828,10 +2858,10 @@ function langWatch(){ if(LANG.obs || !window.MutationObserver) return;
   LANG.obs=new MutationObserver(ms=>{ for(const m of ms){ if(m.type==='characterData') langNode(m.target); else if(m.type==='attributes') langEl(m.target); else m.addedNodes.forEach(langWalk); } });
   LANG.obs.observe(document.documentElement,{subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:LANG_ATTRS}); }
 function langUse(l){ LANG.cur=l; LANG.target=LANG.probe ? 'it' : l; LANG.on=LANG.target!=='en';
-  if(LANG.on && !LANG.S){ let j={s:{},r:[]}; try{ j=JSON.parse(document.getElementById('lang-'+LANG.target).textContent); }catch(e){} LANG.S=j.s||{}; LANG.R=(j.r||[]).map(r=>[new RegExp(r[0]), r[1]]);
+  if(LANG.on && !LANG.S){ let j={s:{},r:[]}; try{ j=JSON.parse(document.getElementById('lang-'+LANG.target).textContent); }catch(e){} LANG.S=j.s||{}; LANG.R=(j.r||[]).map(r=>[new RegExp(r[0]), r[1]]); LANG.keep=new Set(j.keep||[]);
     const kw=j.kind||{}, un=j.unid||'Unidentified'; LANG.N=[[/^(Unidentified )?(?:(.+?) )?(phone|wearable|tracker|computer|vehicle|Wi-Fi access point|cell tower|surveillance device|device) (#[A-Z0-9]{2,4})$/, m=>{ const k=kw[m[3]]||[m[3],'m']; return k[0].charAt(0).toUpperCase()+k[0].slice(1)+(m[2]?' '+m[2]:'')+(m[1]?' '+(k[1]==='f'?(j.unidF||un):un):'')+' '+m[4]; }],
       [/^Drone (#[A-Z0-9]{2,4})$/, m=>(j.drone||'Drone')+' '+m[1]], [/^(.+) (#[A-Z0-9]{3})$/, m=>{ const x=LANG.S[m[1]]; return (typeof x==='string'?x:m[1])+' '+m[2]; }], [/^Trip, (Sun|Mon|Tue|Wed|Thu|Fri|Sat) (\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec), (\d\d:\d\d)$/, m=>(j.trip||'Trip')+', '+L_IT.dow[L_DOW.indexOf(m[1])]+' '+m[2]+' '+L_IT.mon[L_MON.indexOf(m[3])]+', '+m[4]]]; }
-  if(LANG.on) langWatch(); }
+  if(LANG.on){ try{ THREATS.forEach(t=>LANG.terms.add(t.name)); PATH.forEach(p=>{ LANG.terms.add(p.name); LANG.terms.add(p.rank); }); }catch(e){} LANG.seedAt=0; langWatch(); } }
 function langSet(l){ if(!langHas(l)) return; const was=LANG.cur; store.set('halo_lang', l); langUse(l); if(l==='it' && typeof P!=='undefined' && P && P.units!=='mi' && P.units!=='km'){ P.units='km'; try{ save(); }catch(e){} }
   langApply(); langButtons(); if(typeof booted!=='undefined' && booted){ try{ rerender(); renderVicinity(); }catch(e){} }
   if(was!==l) toast(l==='it' ? 'Lingua: Italiano.' : 'Language: English.'); }
@@ -2849,6 +2879,9 @@ const langOut = s => { if(!LANG.on) return s; const t=langText(String(s)); retur
 const BILL={prices:null, at:0, me:null, busy:''};
 const billOn = () => !!(S.features && S.features.billing);
 const money = (amount, cur) => { try{ return new Intl.NumberFormat(LANG.cur==='it'?'it-IT':'en-US',{style:'currency', currency:cur}).format(amount/100); }catch(e){ return (amount/100).toFixed(2)+' '+cur; } };
+// English is charged in US dollars and Italian in euros, where the price in Stripe holds that currency. Otherwise the price is shown in the currency it has.
+const billCur = () => LANG.cur==='it' ? 'EUR' : 'USD';
+const billAmt = q => { const c=billCur(); return (q.options && q.options[c]!==undefined) ? [q.options[c], c] : [q.amount, q.currency]; };
 function plansRefresh(){ const b=el('plansBody'); if(!b || el('plans').classList.contains('hidden')) return; const k=el('planKey'), v=k?k.value:''; b.innerHTML=plansHTML(S.planNeed); if(v && el('planKey')) el('planKey').value=v; }
 async function billLoad(force){ if(!billOn()) return; if(!force && BILL.prices && Date.now()-BILL.at<300000) return;
   try{ const r=await fetch(API+'/billing/prices'); if(r.status===200){ BILL.prices=(await r.json()).plans||{}; BILL.at=Date.now(); } }catch(e){}
@@ -2857,10 +2890,10 @@ async function billLoad(force){ if(!billOn()) return; if(!force && BILL.prices &
 function billRow(k){ if(k==='free' || !billOn() || !BILL.prices) return ''; const p=BILL.prices[k], me=BILL.me||{}; if(!p) return '';
   if(me.subscribed) return me.paidPlan===k ? '<div class="plan-buy"><span class="limit" style="margin:0">You pay for this plan by card'+(me.periodEnd?'. Paid up to '+esc((d=>d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear())(new Date(me.periodEnd))):'')+'.</span><button class="btn sm" data-act="bill-portal">Manage or cancel</button></div>'
     : '<div class="plan-buy"><button class="btn sm" data-act="bill-portal">Change to this plan</button></div>';
-  return '<div class="plan-buy">'+['month','year'].filter(x=>p[x]).map(x=>'<button class="btn sm primary'+(BILL.busy===k+x?' on':'')+'" data-act="bill-go" data-plan="'+k+'" data-per="'+x+'">'+(BILL.busy===k+x?'Opening the payment page':esc(money(p[x].amount,p[x].currency))+(x==='month'?' a month':' a year'))+'</button>').join('')+'</div>'; }
+  return '<div class="plan-buy">'+['month','year'].filter(x=>p[x]).map(x=>'<button class="btn sm primary'+(BILL.busy===k+x?' on':'')+'" data-act="bill-go" data-plan="'+k+'" data-per="'+x+'">'+(BILL.busy===k+x?'Opening the payment page':esc(money.apply(null, billAmt(p[x])))+(x==='month'?' a month':' a year'))+'</button>').join('')+'</div>'; }
 const billSay = m => { S.planMsg=m; const x=el('planMsg'); if(x) x.textContent=m; };
 async function billGo(plan, per){ if(BILL.busy) return; if(!Y.refresh || Y.signedOut) return billSay('Halo has not reached your account yet. Try again in a moment.');
-  BILL.busy=plan+per; plansRefresh(); let r=null; try{ r=await api('POST','/billing/checkout',{plan, period:per}); }catch(e){}
+  BILL.busy=plan+per; plansRefresh(); let r=null; try{ r=await api('POST','/billing/checkout',{plan, period:per, currency:billAmt(((BILL.prices||{})[plan]||{})[per]||{})[1].toLowerCase()}); }catch(e){}
   if(r && r.s===200 && r.j.url){ Y.payAt=Date.now(); ysave(); location.href=r.j.url; setTimeout(()=>{ BILL.busy=''; plansRefresh(); }, 6000); return; }
   BILL.busy=''; if(r && r.s===409){ await billLoad(true); return billSay('This account already pays for a plan by card. Use Manage or cancel to change it.'); }
   plansRefresh(); billSay('The payment page could not be opened. Try again in a moment.'); }
@@ -5387,7 +5420,7 @@ function liveDerive(d, nowS){
   d.homeAway = !d.mine && d.seenStation>0 && (d.seenAway||0)>0;         // heard by your home listener, and by a sensor with you away from home
   d.onRoute = !d.mine && (!!d.fRoute || d.homeAway); d.knownBefore = d.mine || !!d.fKnown;
 }
-const sensorName = id => id==='this-phone' ? 'this phone' : ((P.sensors[id]||{}).name||'a sensor');
+const sensorName = id => id==='this-phone' ? 'this phone' : (LK((P.sensors[id]||{}).name)||'a sensor');
 const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : (d.tested||d.maybe) ? 'has stayed in earshot for '+(d.mins<1.5?'a minute':Math.round(d.mins)+' minutes')+' across '+Math.round(d.span)+' m of your movement, at an even strength on '+d.leg.legs+' legs of your route' : 'was reported as moving with you by '+sensorName(d.sensor);
 // The phone's scanner has gone quiet (the app says how long). The last picture is held for that long, up to three minutes.
 function scanQuiet(){ const st=PH.native && PH.on ? PH.nstat : null, a=st && typeof st.scanAge==='number' ? st.scanAge : 0; return a>FOLLOW.quiet ? Math.min(a, 180000) : 0; }
@@ -6363,7 +6396,7 @@ function setView(v){
   if(was!==v) navPush(); else backBar();
 }
 function render(){
-  planMarks();
+  planMarks(); langSeed();
   if(!can(VIEW_PLAN[S.view])){ backRows(); return; }
   if(S.view==='overview') renderOverview();
   else if(S.view==='watchers') renderWatchers();
