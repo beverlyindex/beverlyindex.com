@@ -1046,7 +1046,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Halo Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-07.41', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-07.42', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2391,7 +2391,7 @@ function elogCamsAt(lat, lon, t){ if(!ELOG.ok || vis().test) return; const a=ELO
     try{ elogTx(['cam'],'readwrite').objectStore('cam').add({pid:c.pid, kind:c.kind, name:c.name, op:c.op, t, d:Math.round(c.d), la:+c.lat.toFixed(5), lo:+c.lon.toFixed(5), meLa:+lat.toFixed(5), meLo:+lon.toFixed(5), trip:W.on?W.t0:0}); ELOG.n.cam++; }catch(e){} }); }
 function elogCams(){ const p=S.pos; if(!p || p.src==='net' || Date.now()-p.t>20000 || !(p.acc<=POS_MAX_ACC)) return; elogCamsAt(p.lat, p.lon, Date.now()); }
 // What the log holds on a device, for the screens. By its own identity first; failing that, by the name it broadcasts, and the words say so.
-const ePos = () => (S.pos && S.pos.src!=='net') ? S.pos : null;
+const ePos = () => (S.pos && S.pos.src!=='net' && Date.now()-S.pos.t<=60000) ? S.pos : null;          // a position a minute old says nothing of where you are now
 function histOf(d){ if(!ELOG.ready) return undefined; const h=ELOG.hist.get(d.sig); if(h) return h;
   if(d.adv){ const ks=ELOG.names.get(d.adv); if(ks && ks.size){ let enc=0, days=0; const pl=[]; ks.forEach(k=>{ const x=ELOG.hist.get(k); if(!x) return; enc+=x.enc; days=Math.max(days,x.days); x.pl.forEach(p=>{ if(!pl.some(q=>distLL(q[0],q[1],p[0],p[1])<=ELOG.PLACE_M)) pl.push(p); }); }); if(enc) return {enc, days, pl, name:true}; } }
   return null; }
@@ -2591,12 +2591,26 @@ let _tripBk=0;
 function tripBackup(force){ if(!ELOG.ok || !W.on || W.test || TRIP_AUTO) return; const n=Date.now(); if(!force && n-_tripBk<60000) return; _tripBk=n;
   try{ const rec=JSON.parse(JSON.stringify(W)); rec.live=1; elogTx(['trip'],'readwrite').objectStore('trip').put(rec); }catch(e){} }
 const tripLast = () => new Promise(res=>{ try{ const rq=elogTx(['trip'],'readonly').objectStore('trip').openCursor(null,'prev'); rq.onsuccess=()=>res(rq.result?rq.result.value:null); rq.onerror=()=>res(null); }catch(e){ res(null); } });
+// The last moment a trip recorded anything: a device, a point of the path, or a waypoint.
+function tripTail(R){ let last=R.t0; Object.values(R.devs||{}).forEach(r=>{ if(r.last>last) last=r.last; }); const rt=R.route||[]; if(rt.length) last=Math.max(last, rt[rt.length-1].t); (R.wps||[]).forEach(w=>{ last=Math.max(last,w.t); }); return last; }
+// A trip kept with hours of nothing at its end is cut back to its last reading. A last point of the path that stands alone, well away from
+// the one before it, is a stray fix: it leaves the path, and so does every place stamped from it.
+function tripCut(R){ if(!R.t1 || R.cut) return false; let ch=false; const rt=R.route||[];
+  if(rt.length>=2){ const a=rt[rt.length-2], b=rt[rt.length-1]; if(b.t-a.t>=GAP_S*1000 && distLL(a.lat,a.lon,b.lat,b.lon)>JUMP_M){ rt.pop(); ch=true;
+      Object.values(R.devs||{}).forEach(r=>{ if(r.at && distLL(r.at.lat,r.at.lon,b.lat,b.lon)<30) r.at=null; }); (R.wps||[]).forEach(w=>{ if(w.pos && distLL(w.pos.lat,w.pos.lon,b.lat,b.lon)<30) w.pos=null; });
+      let m=0; for(let j=1;j<rt.length;j++){ const d=distLL(rt[j-1].lat,rt[j-1].lon,rt[j].lat,rt[j].lon); if(d<500) m+=d; } R.dist=m; } }
+  const last=tripTail(R); if(R.t1-last>TRIP_STALE_MS){ R.t1=last+1000; R.events=(R.events||[]).filter(e=>e.t<=R.t1 && e.k!=='stop'); R.events.push({t:R.t1, k:'stop', text:'Trip ended.', id:''}); ch=true; }
+  R.cut=1; if(ch){ R.cor=null; R.saved=''; } return ch; }
+function tripStale(){ if(!W.on) return; const t0=W.t0, end=Math.max(W.act||0, tripTail(W)); W.staleAt=0; walkStop(end+1000);
+  toast('Your trip ended at '+hhmm(end)+', when the phone stopped listening. It is kept in Trips.'); tripFinish(t0, false); }
 // A trip left unfinished or unkept by an earlier session is finished at its last reading and kept.
 async function tripRecover(){ if(!ELOG.ok || TRIP_AUTO) return;
   if(!W.t0){ const r=await tripLast(); if(r && r.live && r.on && !W.t0){ delete r.live; Object.assign(W, r); wSave(true); if(booted) renderVicinity(); } }
+  if(W.on && !W.act) W.act=tripTail(W);
+  try{ for(const x of (P.trips||[]).filter(x=>x.t1-x.t0>2*3600000).slice(0,6)){ const R=await tripGet(x.t0); if(!R || R.on) continue; const had=R.cut;
+      if(tripCut(R)){ await tripCorrelate(R); tripPut(R); tripMeta(R); } else if(!had) tripPut(R); } if(booted) renderVicinity(); }catch(e){}
   if(!W.t0 || W.test) return;
-  if(W.on){ const r=W.route||[], e=W.events||[], last=Math.max(W.t0, r.length?r[r.length-1].t:0, e.length?e[e.length-1].t:0); if(Date.now()-last<6*3600000) return; const t0=W.t0; walkStop(last+1000); tripFinish(t0, false); }
-  else if(W.t1 && !W.arch){ tripFinish(W.t0, false); } }
+  if(!W.on && W.t1 && !W.arch){ tripCut(W); tripFinish(W.t0, false); } }
 async function tripCorrelate(R){ const ds=Object.values(R.devs||{}), tags={}, hw={}, cnt={with:0,place:0,watch:0,again:0,local:0,fresh:0,yours:0};
   for(const r of ds){ let tag='fresh', words='First sighting'; const h=ELOG.ready&&r.sig?ELOG.hist.get(r.sig):null;
     if(r.mine || r.pr || (P.mine||{})[r.id]){ tag='yours'; words='Yours'; }
@@ -2642,6 +2656,7 @@ async function tripsRender(){ const box=el('tripBox'); if(!box) return; const T=
         : '<div class="loc-none">No trip yet. Press Start a trip, and Halo records your path and every device along it.</div>')+'</div>'; return; }
   const R=await tripGet(T.t0); if(S.trips!==T) return;
   if(!R){ const x=(P.trips||[]).find(q=>q.t0===T.t0); box.innerHTML=head(esc(x?tripName(x):'Trip'),true)+'<p class="limit" style="margin:8px 2px 0">'+(x?esc(walkDur(x.t1-x.t0))+', '+esc(du(x.m||0))+', '+(x.heard||0)+' devices heard. ':'')+'This trip was taken before Halo began keeping trips in full. Every trip from this build onwards opens here with all of its detail.</p></div>'; return; }
+  if(!R.on && tripCut(R)){ try{ await tripCorrelate(R); tripPut(R); tripMeta(R); renderVicinity(); }catch(e){} if(S.trips!==T) return; }
   if(!R.cor){ try{ await tripCorrelate(R); tripPut(R); }catch(e){} if(S.trips!==T) return; }
   box.innerHTML=head(esc(tripName(R)),true)+tripSumHTML(R, T)+'</div>'; }
 function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},hw:{},cnt:{},cams:[]}, ds=Object.values(R.devs||{}), c=C.cnt||{}, d0=new Date(R.t0);
@@ -3454,9 +3469,9 @@ function geoFix(p){
       if(first && MAP && MAP_CENTER && !_centred){ _centred=true; recentre(la, lo); }
       if(S.view==='overview'||S.view==='watchers') renderVicinity(); }
     return -1; }
-  const gate=posGate(la, lo, p.coords.accuracy, Date.now(), p.src);
+  const app=typeof p.ft==='number' && p.ft>0, ft=app ? p.ft : Date.now(), gate=posGate(la, lo, p.coords.accuracy, ft, p.src, p.wl, app);          // the app gives each fix its own time, so the same fix read twice is not taken for two
   if(!gate){ clearTimeout(GATE.tm); GATE.tm=setTimeout(()=>{ if(GATE.pend){ const q=GATE.pend; geoFix({coords:{latitude:q.la, longitude:q.lo, accuracy:q.acc}}); } }, GATE_MS+200); S.geoErr=0; return 0; }
-  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:Date.now(), lat:la, lon:lo, spd:(typeof p.coords.speed==='number' && !isNaN(p.coords.speed))?p.coords.speed:null}; if(!(p.coords.accuracy>POS_MAX_ACC)) trackPush(la, lo, p.coords.accuracy, undefined, gate===2); walkPos(); whereTick();
+  S.geoErr=0; S.pos={acc:p.coords.accuracy, t:ft, lat:la, lon:lo, spd:(typeof p.coords.speed==='number' && !isNaN(p.coords.speed))?p.coords.speed:null}; if(!(p.coords.accuracy>POS_MAX_ACC)) trackPush(la, lo, p.coords.accuracy, undefined, gate===2); walkPos(); whereTick();
   if(typeof p.coords.heading==='number' && !isNaN(p.coords.heading) && p.coords.speed>0.8){ HEAD.gps=p.coords.heading; HEAD.gt=Date.now(); }
   if(MAP && MAP_CENTER){ const moved=Math.hypot((la-MAP_CENTER.lat)*111320, (lo-MAP_CENTER.lon)*111320*Math.cos(MAP_CENTER.lat*Math.PI/180));
     if(!_centred || moved>6){ _centred=true; recentre(la, lo); } }      // ignore position jitter under 6 metres
@@ -4780,10 +4795,43 @@ function reanchor(lat,lon){ GEO.o={lat,lon}; TRACK.length=0; LIVE.devs.forEach(d
 // A phone's position sometimes leaps to a rough fix far away and back. A fix that would need impossible speed is held; if the next fix returns, it is dropped.
 // If the phone really is in the new place (three fixes agree, or twelve seconds pass), it is taken, and the route starts a new line there.
 const GATE={last:null, pend:null, n:0, tm:0};
-function posGate(la,lo,acc,t,src){ acc=(typeof acc==='number'&&acc>0)?acc:50; const L=GATE.last, rough=a=>a>=30;
+/* Networks that stay in one place. A Wi-Fi network heard at full strength was last met where you stood then. When a fix puts you far from
+   there while the same network is still at full strength, the fix is wrong: satellite positions indoors can be wrong by hundreds of metres.
+   A network that keeps its strength while your fixes move on one after another is travelling with you, in a car or a bus, and is left out. */
+const APK={m:null, cx:{}, at:0}, AP_STRONG=-62, AP_FAR=150;
+function apkLoad(){ if(!APK.m){ APK.m=new Map(); try{ const j=JSON.parse(store.get('halo_aps')||'{}')||{}; Object.keys(j).forEach(k=>{ if(Array.isArray(j[k])) APK.m.set(k,j[k]); }); }catch(e){} } return APK.m; }
+function apkSave(){ const n=Date.now(); if(n-APK.at<30000) return; APK.at=n; const o={}; [...apkLoad().entries()].filter(e=>n-e[1][2]<60*86400000).sort((a,b)=>b[1][2]-a[1][2]).slice(0,400).forEach(e=>{ o[e[0]]=e[1]; }); store.set('halo_aps', JSON.stringify(o)); }
+function apStrong(t, wl){ if(Array.isArray(wl) && wl.length) return wl.filter(x=>x && x.b && typeof x.r==='number' && x.r>=AP_STRONG).map(x=>String(x.b).toLowerCase());
+  const out=[], ts=t+LIVE.skew; LIVE.devs.forEach(d=>{ if(d.band==='wifi' && !d.sim && d.sig.indexOf('ap:')===0 && d.rssi>=AP_STRONG && Math.abs(ts-d.seenMobile)<45000) out.push(d.sig.slice(3)); }); return out; }
+function apCheck(la,lo,t,wl){ const M=apkLoad(), strong=apStrong(t,wl); if(!strong.length) return true; let agree=0; const against=[];
+  strong.forEach(b=>{ const a=M.get(b); if(!a || a[3] || !(a[4]>=3)) return; if(distLL(a[0],a[1],la,lo)<=AP_FAR){ agree++; delete APK.cx[b]; } else against.push(b); });
+  if(!against.length || agree) return true; let held=false;
+  against.forEach(b=>{ const c=(APK.cx[b]||(APK.cx[b]=[])).filter(x=>t-x[2]<15*60000); c.push([la,lo,t]); if(c.length>14) c.shift(); APK.cx[b]=c;
+    const f=c[0], l=c[c.length-1], net=distLL(f[0],f[1],l[0],l[1]), span=l[2]-f[2]; let wide=0; c.forEach(x=>{ wide=Math.max(wide, distLL(f[0],f[1],x[0],x[1])); });
+    if(c.length>=4 && net>=60 && span>=8000){ const a=M.get(b); a[3]=1; delete APK.cx[b]; }                  // it travels with you
+    else if(c.length>=10 && span>=300000 && wide<=60){ M.delete(b); delete APK.cx[b]; }                      // it has moved house: learn its place again
+    else held=true; });
+  return !held; }
+function apLearn(la,lo,acc,t,wl){ if(!(acc<=25)) return; const M=apkLoad(); apStrong(t,wl).forEach(b=>{ const a=M.get(b);
+    if(!a){ M.set(b,[+la.toFixed(5),+lo.toFixed(5),t,0,1,t]); return; } if(a[3]) return;
+    if(distLL(a[0],a[1],la,lo)<=60){ a[2]=t; if(a[4]<3 && t-a[5]>=30000) a[4]=3; else if(a[4]<2) a[4]=2; }
+    else if(a[4]<3) M.set(b,[+la.toFixed(5),+lo.toFixed(5),t,0,1,t]); });
+  apkSave(); }
+const GAP_S=20, JUMP_M=60;
+function posGate(la,lo,acc,t,src,wl,app){ if(src!=='net' && !apCheck(la,lo,t,wl)) return 0;
+  const g=posGate0(la,lo,acc,t,src,app); if(g>0 && src!=='net') apLearn(la,lo,(typeof acc==='number'&&acc>0)?acc:50,t,wl); return g; }
+function posGate0(la,lo,acc,t,src,app){ acc=(typeof acc==='number'&&acc>0)?acc:50; const L=GATE.last, rough=a=>a>=30;
   const keep=v=>{ GATE.last={la,lo,acc,t}; GATE.pend=null; GATE.n=0; clearTimeout(GATE.tm); if(v!=null) GATE.v=(GATE.v==null?v:0.6*GATE.v+0.4*v); };
   if(!L){ keep(null); return 1; }
   const d=distLL(L.la,L.lo,la,lo), dt=Math.max(1,(t-L.t)/1000), v=d/dt;
+  // In the app, where each fix carries its own time: after a gap, a fix well away from the last one waits for a second, later fix beside it.
+  // One stray fix never moves you. A short gap at a speed already established is ordinary travel on a slow listening rate, and passes.
+  if(app && src!=='net' && dt>=GAP_S && d>JUMP_M && !rough(L.acc) && !(dt<=45 && d<=40+2.5*(GATE.v||0)*dt)){
+    const Q=GATE.jp, near=Q && t-Q.t<=120000 && distLL(Q.la,Q.lo,la,lo)<=40+45*Math.max(0,(t-Q.t)/1000);
+    if(near && t-Q.t>=3000){ GATE.jp=null; keep(null); GATE.v=v; return 2; }
+    if(!near) GATE.jp={la,lo,acc,t};
+    return 0; }
+  GATE.jp=null;
   if(rough(L.acc) && acc<=L.acc/3){ GATE.v=null; keep(null); return d>60?2:1; }                  // the first sharp fix replaces a rough one
   if(!rough(L.acc) && dt<90 && (src==='net' || (rough(acc) && acc>=4*L.acc))) return 0;        // a rough fix soon after a sharp one says nothing new
   if((d>2.5*Math.max(acc,L.acc,4) && v>75) || (d>12 && d>1.5*Math.max(acc,L.acc) && v>4 && (v-(GATE.v||0))/dt>5)){          // a leap: faster than any journey, or a start no person or vehicle makes
@@ -5257,11 +5305,11 @@ async function nativeDrain(){
   try{ PH.nstat=nativeStatus();
     let batches=[]; try{ batches=JSON.parse(N.drain())||[]; }catch(e){ batches=[]; }
     pairedLoad();
-    for(const b of batches){ if(!b || !Number.isFinite(b.t)) continue; const q=b.pos, live=Date.now()-b.t<8000; let used=false;          // used: this batch's own fix passed Halo's checks
+    for(const b of batches){ if(!b || !Number.isFinite(b.t)) continue; const q=b.pos, live=Date.now()-b.t<8000; let used=false; if(W.on && !TRIP_AUTO && !live) W.act=Math.max(W.act||0, b.t);          // used: this batch's own fix passed Halo's checks
       if(okLL(q)){ const acc=typeof q.acc==='number'?q.acc:25;
         GATE.nat=Date.now(); used=false;
-        if(live) used = geoFix({coords:{latitude:q.lat, longitude:q.lon, accuracy:acc, heading:q.heading, speed:q.speed}, src:q.src})>0 && !(acc>POS_MAX_ACC);
-        else if(q.src!=='net'){ const gate=posGate(q.lat,q.lon,acc,q.t||b.t,q.src); if(gate && !(acc>POS_MAX_ACC)){ used=true; try{ elogCamsAt(q.lat, q.lon, b.t); }catch(e){} const spd=(typeof q.speed==='number' && !isNaN(q.speed))?q.speed:null; trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc,spd}, b.t); } } }
+        if(live) used = geoFix({coords:{latitude:q.lat, longitude:q.lon, accuracy:acc, heading:q.heading, speed:q.speed}, src:q.src, wl:b.w, ft:q.t||b.t})>0 && !(acc>POS_MAX_ACC);
+        else if(q.src!=='net'){ const gate=posGate(q.lat,q.lon,acc,q.t||b.t,q.src,b.w,true); if(gate && !(acc>POS_MAX_ACC)){ used=true; try{ elogCamsAt(q.lat, q.lon, b.t); }catch(e){} const spd=(typeof q.speed==='number' && !isNaN(q.speed))?q.speed:null; trackPush(q.lat,q.lon,acc,q.t||b.t,gate===2); tripStep({lat:q.lat,lon:q.lon,acc}, b.t, true, true); walkPos({lat:q.lat,lon:q.lon,acc,spd}, b.t); } } }
       const list=[];
       for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
         if(x.cl){ let k=codKind(x.cod); const nm=String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); let pr=false; try{ pr=await isPaired(x.a); }catch(e){}
@@ -5288,7 +5336,7 @@ async function nativeDrain(){
     rayTick(); alertNativeTick();
     const lost = !!PH.nstat && !PH.nstat.listening && Date.now()-PH.asked>6000;
     if(lost!==PH.lost){ PH.lost=lost; softRender(); renderVicinity(); }
-  } finally { PH.busy=false; } }
+  } finally { PH.busy=false; PH.drainedAt=Date.now(); } }
 const COMPANY={0x004C:'Apple',0x0006:'Microsoft',0x0075:'Samsung',0x00E0:'Google',0x0087:'Garmin',0x009E:'Bose',0x012D:'Sony',0x0057:'Harman',0x0171:'Amazon',0x038F:'Xiaomi',0x027D:'Huawei',0x00C4:'LG',0x0157:'Huami',0x02E5:'Espressif',0x0001:'Nokia',0x0002:'Intel',0x01AB:'Meta'};
 const FLOCK_BLE=/^(fs ext battery|penguin[- ]?\d{4,}|pigvision|flock[- _]?[0-9a-z]{0,12})$/i, FLOCK_SSID=/^flock[-_ ]?[0-9a-f]{4,}/i, FLOCK_OUI='b4:1e:52', RAVEN_SVC=['3100','3200','3300','3400','3500'];
 const PH_TRACKERS={feed:'Tile',feec:'Tile',fd5a:'Samsung SmartTag',fe33:'Chipolo',feaa:'Find My Device network or beacon',fd84:'Tile',fcb2:'DULT tracker'};
@@ -5403,6 +5451,7 @@ function phPanel(){
 /* ---------- Walk: a record of what changed around you as you moved, kept for review afterwards ---------- */
 const W = (()=>{ try{ const j=JSON.parse(store.get('halo_walk')||'null'); if(j && j.t0 && (j.on || (j.t1 && !j.arch) || Date.now()-j.t0<6*3600000)) return j; }catch(e){} return {on:false}; })();
 const TRIP_AUTO = window.HALO_TRIP_AUTO===true;          // a trip begins and ends on your own press of Start and End
+const TRIP_STALE_MS=30*60000;
 let _wLock=null, _wSaved=0, _wHidden=0;
 const wSave = force => { const n=Date.now(); if(!force && n-_wSaved<8000) return; _wSaved=n; try{ store.set('halo_walk', JSON.stringify(W)); }catch(e){} try{ tripBackup(false); }catch(e){} };
 async function wLock(){ W.awake=false; if(NATIVE()){ W.awake=true; return; } try{ if('wakeLock' in navigator && document.visibilityState==='visible'){ _wLock=await navigator.wakeLock.request('screen'); W.awake=true; } }catch(e){} }
@@ -5417,7 +5466,7 @@ let TRIP_START_M=60, TRIP_IDLE_MS=5*60000; const TRIP={a:null}, TRIP_STILL_M=25,
 const tripKeep = () => { if(!(W.t0 && W.t1)) return; if(TRIP_AUTO){ const st=walkStats(); if(!st.heard && !st.distance_m) return; } W.kept=true; tripMeta(W); if(!W.arch) tripArchive(); };
 function walkStart(t0, a, at){
   tripKeep(); const back=!!at;
-  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null});
+  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0});
   if(a) W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10});
   { const R=routeLive(); if(R) W.plan=routeInfo(R); }          // a trip that begins while a route is set belongs to that route
   wEvent('start','Trip started.','',W.t0);
@@ -5463,7 +5512,14 @@ function walkPos(q, at){
     else if(good && W.rough){ W.rough=false; wEvent('note','Your position is good again, within '+Math.round(S.pos.acc)+' m.'); } }
 }
 function walkTick(at, only, q){
-  if(!W.on) return; const back=!!at, now=at||Date.now(), nowS=now+LIVE.skew, here=q||((S.pos && S.pos.src!=='net')?S.pos:null); _wAt=back?now:0;
+  if(!W.on) return; const back=!!at, now=at||Date.now(), nowS=now+LIVE.skew, here=q||(back?null:ePos()); _wAt=back?now:0;
+  if(!TRIP_AUTO){          // a trip left running while the phone was not listening ends at its last reading
+    if(back) W.act=Math.max(W.act||0, at);
+    else { if(W.act && now-W.act>TRIP_STALE_MS){          // first let the app hand over what it heard while Halo was off the screen
+        if(!W.staleAt){ W.staleAt=now; if(PH.native && PH.on) nativeDrain(); return; }
+        if((PH.native && PH.on) ? !(PH.drainedAt>=W.staleAt) : now-W.staleAt<4000){ if(PH.native && PH.on && !PH.busy) nativeDrain(); return; }
+        if(now-W.act>TRIP_STALE_MS){ tripStale(); return; } }
+      W.act=now; W.staleAt=0; } }
   if(!back){ walkPos();
     const sen=mobileLive();
     if(!sen && !W.silent && now-W.t0>20000){ W.silent=true; wEvent('warn','Listening paused. Halo resumes as soon as the sensor reports again.'); }
