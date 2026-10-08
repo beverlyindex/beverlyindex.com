@@ -893,6 +893,9 @@ a.tk:hover b{text-decoration:underline}
 .nav button.lk{position:relative} .nav button.lk::after{content:"";position:absolute;top:5px;left:calc(50% + 8px);width:11px;height:11px;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23C5A55A' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='10.5' width='14' height='10' rx='2'/%3E%3Cpath d='M8 10.5V7.8a4 4 0 0 1 8 0v2.7'/%3E%3C/svg%3E")}
 #app:not([data-plan="full"]) .acctbtn.rep{display:none} #app[data-plan="free"] #covCard,#app[data-plan="free"] #homeMini{display:none !important}
 #terms{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(3,6,14,.8);backdrop-filter:blur(6px)}
+.terms-card.ovcard{padding-top:0}
+.ovhead{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 -20px 10px;padding:16px 20px 10px;background:#151e35;border-bottom:1px solid var(--line2)}
+.ovhead h3{margin:0}
 .terms-card{width:100%;max-width:560px;max-height:86vh;overflow:auto;background:var(--panel2);border:1px solid var(--line2);border-radius:var(--r);padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
 .terms-card h3{margin:0 0 8px;font-family:var(--mono);font-weight:600;letter-spacing:.16em;text-transform:uppercase;font-size:12px;color:#fff}
 .gate-terms{margin-top:14px;color:var(--mut);font-size:11.5px;line-height:1.5}
@@ -1162,15 +1165,15 @@ button.loc-row:active{transform:translateY(2px);box-shadow:inset 0 2px 7px rgba(
   <div class="mf-sheet"><div id="mfInfo"></div><div class="mf-sum" id="mfSum"></div><div class="layers" id="mfLayers"></div><div class="mf-chips" id="mfChips"></div></div></div>
 <div id="report" class="hidden"><div class="rp-bar"><span><span id="rpTitle">Remiel Technologies Full Report</span><i id="rpMeta"></i></span><button class="btn sm gold" data-act="report-new">New report</button><button class="btn sm" data-act="report-print">Print or save as PDF</button><button class="btn sm" data-act="report-close">Close</button></div><div class="rp-paper" id="rpPaper"></div></div>
 <div id="plans" class="hidden">
-  <div class="terms-card plans-card">
-    <h3>Plans</h3>
+  <div class="terms-card plans-card ovcard">
+    <div class="ovhead"><h3>Plans</h3><button class="btn sm" data-act="plans-x">Close</button></div>
     <div id="plansBody"></div>
     <div class="formrow" style="justify-content:flex-end;margin-top:14px"><button class="btn primary" data-act="plans-close">Close</button></div>
   </div>
 </div>
 <div id="terms" class="hidden">
-  <div class="terms-card">
-    <h3 id="termsTitle">Terms of use</h3>
+  <div class="terms-card ovcard">
+    <div class="ovhead"><h3 id="termsTitle">Terms of use</h3><button class="btn sm" data-act="terms-x">Close</button></div>
     <div id="termsBody"></div>
     <div class="formrow" style="justify-content:flex-end;margin-top:14px"><button class="btn primary" data-act="terms-close">Close</button></div>
   </div>
@@ -1203,7 +1206,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-08.62', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-08.63', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -1326,6 +1329,7 @@ function splashRun(){ return new Promise(done=>{
   snd.onclick=()=>{ v.muted=!v.muted; snd.textContent=v.muted?'Sound on':'Sound off'; snd.classList.toggle('on',!v.muted); };
   v.muted=true; snd.textContent='Sound on'; snd.classList.remove('on'); box.classList.remove('hidden'); next(); }); }
 el('gateGo').addEventListener('click', tryUnlock);
+['plans','terms','wnote'].forEach(id=>{ const o=el(id); if(o) o.addEventListener('click', e=>{ if(e.target===o) ovHide(id); }); });
 el('gateKey').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
 el('gateKey').addEventListener('input', gateLabel);
 el('gateFree').addEventListener('click', ()=>{ el('gateKey').value=''; el('gateErr').textContent=''; gateLabel(); tryUnlock(); }); if(el('gateLink')) el('gateLink').addEventListener('input', gateLabel);
@@ -2177,7 +2181,7 @@ function openDoc(k){ const d=DOCS[k]; if(!d) return; const legal=(k==='terms'||k
   el('termsTitle').textContent=DOC_T[k]; S.doc=k;
   el('termsBody').innerHTML=(legal && LANG.cur!=='en' ? '<p class="limit">This document is in English, and the English text governs.</p>' : '')+'<div class="docb'+(legal?' notr':'')+'"'+(legal?' translate="no"':'')+'>'+d()+'</div>'+
     (DOC_SAVE[k]?'<div class="formrow"><button class="btn sm" data-act="doc-save" data-k="'+k+'">Save a copy</button></div>':'');
-  el('terms').classList.remove('hidden'); }
+  ovShow('terms'); }
 function openTerms(){ openDoc('terms'); }
 function docSave(b){ const k=b.dataset.k, box=el('termsBody').querySelector('.docb'); if(!box) return;
   saveOut('remiel-'+k+'.txt', 'text/plain', DOC_T[k]+'\n\n'+box.innerText+'\n'); b.classList.add('on'); b.textContent='Saved'; }
@@ -3015,7 +3019,7 @@ function watchToggle(sig){ if(!sig) return; P.watch=P.watch||{}; P.watchSeen=P.w
   if(on){ const why=watchWhy(sig);
     if(!why){ document.querySelectorAll('.wbtn').forEach(b=>{ if(b.dataset.k===sig){ b.classList.remove('nudge'); void b.offsetWidth; b.classList.add('nudge'); } }); return toast(WATCH_WAIT); }
     if(Object.keys(P.watch).length>=WATCH.max) return toast('Your Watch list holds '+WATCH.max+' devices. Take one off to add another.');
-    if(!P.watchOk){ S.wPend=sig; el('wnote').classList.remove('hidden'); return; }          // the first time, the purpose of the list is read and confirmed
+    if(!P.watchOk){ S.wPend=sig; ovShow('wnote'); return; }          // the first time, the purpose of the list is read and confirmed
     P.watch[sig]=Date.now(); P.watchWhy[sig]=why; if(w.d && w.d.present) P.watchSeen[sig]=Date.now();
     if(!test) logEvidence('note','Added to your Watch list: '+name+'. '+why); }
   else { delete P.watch[sig]; delete P.watchSeen[sig]; delete P.watchWhy[sig]; if(!test) logEvidence('note','Taken off your Watch list: '+name+'.'); }
@@ -3254,7 +3258,7 @@ function plansHTML(need){ const p=planNow();
   h+='<div class="plan-key"><b>Open a plan with its key</b><div class="formrow" style="margin-top:8px"><input class="inp" id="planKey" maxlength="32" placeholder="RH-XXXX-2026" autocomplete="off" autocapitalize="characters" spellcheck="false" style="flex:1;min-width:0"><button class="btn primary" data-act="plan-apply">Apply the key</button></div>'+
     '<div class="limit" id="planMsg" style="margin-top:8px">'+esc(S.planMsg||(inApp() || (billOn() && BILL.prices && Object.keys(BILL.prices).length)?'A plan can also be opened with its own key.':'While Remiel is in testing, each plan is opened with its own key.'))+'</div></div>';
   return h; }
-function plansOpen(need){ S.planNeed=need||''; S.planMsg=''; billLoad(!!(BILL.me && Y.payAt)); el('plansBody').innerHTML=plansHTML(S.planNeed); el('plans').classList.remove('hidden'); const c=el('plans').querySelector('.terms-card'); if(c) c.scrollTop=0;
+function plansOpen(need){ S.planNeed=need||''; S.planMsg=''; billLoad(!!(BILL.me && Y.payAt)); el('plansBody').innerHTML=plansHTML(S.planNeed); ovShow('plans'); const c=el('plans').querySelector('.terms-card'); if(c) c.scrollTop=0;
   if(need){ const w=el('plansBody').querySelector('.plan.want'); if(w) w.scrollIntoView({block:'start'}); } }
 function planChanged(was){ const p=planNow();
   if(W.on && !can('watchers')){ const t0=W.t0; walkStop(); tripFinish(t0, false); }          // a trip in progress is ended and kept
@@ -5194,6 +5198,12 @@ function reportOpen(fresh){
   if(booted && S.view==='overview') softRender();
 }
 const tripDocShow = () => paperShow('Remiel Technologies Trip Report', walkDocHTML()+'<div class="formrow" style="margin-top:14px"><button class="btn sm primary" data-act="walk-save">Save the data file</button>'+(navigator.share||NATIVE()?'<button class="btn sm" data-act="walk-share">Share the data file</button>':'')+'</div>', {kind:'trip', line:'made '+new Date().toLocaleTimeString()});
+// An overlay window (Plans, a document, the Watch notice) is a step in the history, so the phone's Back closes it, as it closes a report.
+// Its Close buttons and a tap outside the card close it too, and take that step back, so the history stays in order.
+function ovShow(id){ const o=el(id); if(!o) return; if(!o.classList.contains('hidden')) return; o.classList.remove('hidden');
+  S.ovs=(S.ovs||[]).filter(x=>x!==id); S.ovs.push(id); try{ history.pushState(Object.assign({}, history.state||{}, {ov:id}), ''); }catch(e){} }
+function ovHide(id, viaBack){ const o=el(id); if(!o || o.classList.contains('hidden')) return; o.classList.add('hidden'); if(id==='wnote') S.wPend=null;
+  const i=(S.ovs||[]).indexOf(id); if(i<0) return; S.ovs.splice(i,1); if(!viaBack){ S.ovSkip=(S.ovSkip||0)+1; try{ history.back(); }catch(e){ S.ovSkip--; } } }
 function reportClose(viaBack){ if(!S.reportOpen) return; S.reportOpen=false; el('report').classList.add('hidden'); if(!viaBack){ try{ history.back(); }catch(e){} } }
 
 /* ---------- Agent Trap Check. Text, a web page's source, a file or a link can carry instructions written for an AI agent
@@ -6849,6 +6859,8 @@ function closeRecord(id){
   const c=document.querySelector('.tp-head[data-id="'+id+'"]'); if(c) c.scrollIntoView({block:'nearest'});
 }
 window.addEventListener('popstate', e=>{
+  if(S.ovSkip>0){ S.ovSkip--; return; }                                            // the step back taken by a Close button
+  if(S.ovs && S.ovs.length){ ovHide(S.ovs[S.ovs.length-1], true); return; }          // Back closes the window on top, and nothing else
   if(el('app').classList.contains('hidden')) return;
   if(S.reportOpen) reportClose(true);
   if(S.mapFull) mapFullClose(true);
@@ -6911,7 +6923,7 @@ document.addEventListener('click', e=>{
   switch(act){
     case 'lang': langSet(a.dataset.l); break;
     case 'plans': plansOpen(a.dataset.need||''); break;
-    case 'plans-close': el('plans').classList.add('hidden'); break;
+    case 'plans-close': case 'plans-x': ovHide('plans'); break;
     case 'plan-apply': planApply(); break;
     case 'bill-go': billGo(a.dataset.plan, a.dataset.per); break;
     case 'bill-portal': billPortal(); break;
@@ -6936,7 +6948,7 @@ document.addEventListener('click', e=>{
     case 'acct-delete': accountDelete(); break;
     case 'sync-now': syncNow().then(()=>toast(SY.status==='on'?'Synced.':'Remiel syncs as soon as it connects.')); break;
     case 'sync-reconnect': syncReconnect(); break;
-    case 'terms-close': el('terms').classList.add('hidden'); break;
+    case 'terms-close': case 'terms-x': ovHide('terms'); break;
     case 'pull': { const id=a.dataset.id; if(S.open.has(id)){ closeRecord(id); break; }
       S.open.add(id); navPush(id); rerender(); if(el('rost')) renderRoster(); break; }
     case 'install': { if(!INSTALL) break; const ev=INSTALL; INSTALL=null; ev.prompt(); (ev.userChoice||Promise.resolve({})).then(c=>{ if(!c||c.outcome!=='accepted') toast('Not installed. The steps to install from the browser menu are shown here.'); rerender(); }).catch(()=>rerender()); break; }
@@ -7057,8 +7069,8 @@ document.addEventListener('click', e=>{
     case 'art': if(a.dataset.k) artOpen(a.dataset.k); break;
     case 'watch': watchToggle(a.dataset.k); if(S.elog && S.elog.k) elogRender(); break;
     case 'watch-renew': watchRenew(a.dataset.k); break;
-    case 'wnote-yes': { const k=S.wPend; S.wPend=null; el('wnote').classList.add('hidden'); P.watchOk=Date.now(); save(); logEvidence('note','You confirmed that the Watch list is for devices that appear to follow you, and not for following a person.'); if(k){ watchToggle(k); if(S.elog && S.elog.k) elogRender(); } break; }
-    case 'wnote-no': S.wPend=null; el('wnote').classList.add('hidden'); break;
+    case 'wnote-yes': { const k=S.wPend; ovHide('wnote'); P.watchOk=Date.now(); save(); logEvidence('note','You confirmed that the Watch list is for devices that appear to follow you, and not for following a person.'); if(k){ watchToggle(k); if(S.elog && S.elog.k) elogRender(); } break; }
+    case 'wnote-no': ovHide('wnote'); break;
     case 'plan-open': if(S.plan) planClose(); else planOpen(); break;
     case 'plan-x': planClose(); break;
     case 'plan-mode': if(S.plan){ planGrab(); S.plan.mode=a.dataset.m; if(S.plan.line && S.plan.by!=='drawn' && S.plan.from && S.plan.to){ S.plan.from.text=S.plan.fromText; S.plan.to.text=S.plan.toText; planGo(); } else if(S.plan.line){ S.plan.dur=Math.round(S.plan.len/RT.speed[S.plan.mode]); planRender(); } else planRender(); } break;
