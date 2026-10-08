@@ -1,8 +1,8 @@
-/* Remiel Halo service worker.
-   The network always comes first, so an installed Halo is never older than the site.
+/* Remiel service worker.
+   The network always comes first, so an installed Remiel is never older than the site.
    The saved copy is used only when the network cannot be reached, so the console still opens. */
-const SHELL = 'halo-shell-v1';
-const KEEP = ['./', 'halo-logo.png', 'icon-192.png', 'manifest.webmanifest'];
+const SHELL = 'remiel-shell-v1';
+const KEEP = ['./', 'remiel-technologies-logo.png', 'icon-192.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(KEEP)).catch(() => {}).then(() => self.skipWaiting()));
@@ -23,7 +23,7 @@ self.addEventListener('fetch', e => {
   );
 });
 
-/* A tap on a Halo alert banner brings Halo to the front and tells the page which alert it was. */
+/* A tap on a Remiel alert banner brings Remiel to the front and tells the page which alert it was. */
 self.addEventListener('notificationclick', e => {
   const key = (e.notification.data && e.notification.data.key) || e.notification.tag || '';
   e.notification.close();
