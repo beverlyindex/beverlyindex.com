@@ -1,4 +1,4 @@
-// Remiel Halo: Global scan feed builder.
+// Remiel Technologies: global scan feed builder.
 // Reads public government and public-interest sources, writes one JSON file the console reads.
 // Each source is independent: a source that fails is recorded as failed and the rest still publish.
 // Only titles, dates, identifiers and links are kept. No article text is copied.
@@ -6,7 +6,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 const OUT = process.argv[2] || 'out/global.json';
-const UA = 'RemielHalo-GlobalFeed/1.0 (+https://beverly-index.com/halo/)';
+const UA = 'RemielTechnologies-GlobalFeed/1.0 (+https://beverly-index.com/halo/; support@remielengine.ai)';
 const DAYS = 45;
 
 async function get(url, ms = 25000) {
@@ -96,7 +96,7 @@ const SOURCES = [
 ];
 
 export async function build() {
-  const out = { product: 'Remiel Halo', feed: 'global', version: 1, generated: new Date().toISOString(), sources: [] };
+  const out = { product: 'Remiel Technologies', feed: 'global', version: 1, generated: new Date().toISOString(), sources: [] };
   for (const s of SOURCES) {
     try {
       const { text, url } = await firstOk(s.urls);
