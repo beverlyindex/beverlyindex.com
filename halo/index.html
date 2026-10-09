@@ -1216,7 +1216,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-08.72', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-08.73', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3320,9 +3320,12 @@ function playBoot(){ if(PLAY.booted || !playApp()) return; PLAY.booted=true; PLA
 function playRow(k){ if(k==='free' || !playApp()) return ''; const id=PLAY_PRODUCT[k], pr=((PLAY.prod&&PLAY.prod.products)||[]).find(p=>p.id===id), sub=PLAY.info&&PLAY.info.sub;
   if(sub && sub.product===id) return '<div class="plan-buy"><span class="limit" style="margin:0">'+esc(sub.autoRenew?'Through Google Play. Renews '+playDate(sub.expiry)+'.':'Through Google Play. Ends '+playDate(sub.expiry)+'.')+'</span><button class="btn sm" data-act="play-manage" data-p="'+id+'">Manage in Google Play</button></div>';
   if(!pr || !(pr.offers||[]).length) return '<div class="plan-buy"><span class="limit" style="margin:0">'+(PLAY.prod && PLAY.prod.error && PLAY.prod.error!=='' ? 'Google Play prices are not available right now.' : 'Asking Google Play for the price.')+'</span></div>';
-  const per=b=>b==='yearly'?' a year':' a month';
-  return '<div class="plan-buy">'+pr.offers.filter(o=>o.basePlan==='monthly'||o.basePlan==='yearly').sort((x,y)=>x.basePlan==='monthly'?-1:1)
-    .map(o=>'<button class="btn sm '+(PLAY.busy===id+o.basePlan?'on':'primary')+'" data-act="play-buy" data-p="'+id+'" data-b="'+o.basePlan+'">'+esc((sub?'Change to this plan, ':'')+o.price+per(o.basePlan))+'</button>').join('')+'</div>'; }
+  // A base plan is monthly or yearly by the billing period Google Play gives (P1M, P1Y); its ID only decides when Google gives no period.
+  const pk=o=>o.period==='P1Y'||o.period==='P12M' ? 'y' : o.period==='P1M' ? 'm' : !o.period ? (o.basePlan==='yearly'?'y':o.basePlan==='monthly'?'m':'') : '', one={};
+  pr.offers.forEach(o=>{ const k=pk(o); if(k && !one[k]) one[k]=o; });
+  const offs=['m','y'].filter(k=>one[k]).map(k=>one[k]);
+  if(!offs.length) return '<div class="plan-buy"><span class="limit" style="margin:0">Google Play prices are not available right now.</span></div>';
+  return '<div class="plan-buy">'+offs.map(o=>'<button class="btn sm '+(PLAY.busy===id+o.basePlan?'on':'primary')+'" data-act="play-buy" data-p="'+id+'" data-b="'+o.basePlan+'">'+esc((sub?'Change to this plan, ':'')+o.price+(pk(o)==='y'?' a year':' a month'))+'</button>').join('')+'</div>'; }
 function playBuy(a){ const N=playBridge(), id=a.dataset.p, base=a.dataset.b;
   if(!N || !PLAY.info || !PLAY.info.tag){ PLAY.msg='Google Play is still connecting. Try again in a moment.'; return playRedraw(); }
   const cur=PLAY.info.sub && PLAY.info.sub.product, old=cur && cur!==id ? (PLAY.tokens[cur]||'') : '';
