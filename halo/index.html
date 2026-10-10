@@ -1217,7 +1217,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-08.79', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-08.80', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3462,6 +3462,11 @@ function contactScan(nowS){ if(!nowS && scanQuiet()) return; nowS=nowS||Date.now
       devs:mem.map(c=>({id:c.d.id, sig:c.d.sig, name:devName(c.d), kind:kindShort(c.d), cls:c.d.cls, m:Math.max(1,Math.round(distOf(c.pk.r,'ble'))), worn:isWorn(c.d), mv:c.mv?1:0})).sort((a,b)=>a.m-b.m).slice(0,12)};
     S.contacts=S.contacts||[]; S.contacts.unshift(C); if(S.contacts.length>30) S.contacts.length=30;
     if(W.on && C.t>=W.t0){ W.contacts=W.contacts||[]; W.contacts.push(C); if(W.contacts.length>150) W.contacts.shift(); wEvent('contact','Contact: '+contactLine(C)+'. '+C.devs.map(x=>x.name).join(', ')+'.', L.d.id, C.t); } }); }
+// A device set down in a contact as having come and gone, or passed you, that then stays with you did not go: a dip in its strength
+// looked like its leaving. It leaves the contact (a contact left with no device is removed), and the trip says so.
+function ctStayed(d){ d.ctOut=1; let hit=false;
+  [S.contacts||[], (W.on && W.contacts) || []].forEach(L=>{ for(let i=L.length-1;i>=0;i--){ const C=L[i]; if(C.id!==d.ct) continue; const n=C.devs.length; C.devs=C.devs.filter(x=>x.id!==d.id); if(C.devs.length<n || !C.devs.length) hit=true; if(!C.devs.length) L.splice(i,1); } });
+  if(hit && W.on) wEvent('note','Did not go: '+walkName(d)+' was set down as having come and gone, then stayed with you.', d.id); }
 const contactLine = C => { const n=C.devs.length, near=Math.min(...C.devs.map(x=>x.m)), p=C.mv?paceW(C.v):'';
   return (C.mv ? (n===1?'1 device passed you':n+' devices passed you together') : (n===1?'1 device came and went':n+' devices came and went together'))+', nearest '+du(near)+(p?', '+p:'')+(C.mv&&C.still?', while you stood still':'')+(!C.mv?(C.stood?', while you stood still':', as you moved'):'')+(C.s?', in earshot '+(C.s<90?C.s+(C.s===1?' second':' seconds'):Math.round(C.s/60)+' minutes'):''); };
 function contactCard(C, tags){ const row=x=>'<div class="t-row"><button class="loc-row" data-act="art" data-k="'+esc(x.sig)+'"><span class="sdot'+(x.cls==='Tag'?' k-tag':'')+'" style="--mk:'+TAG[(tags&&tags[x.id])||'fresh'].c+'"></span><span class="loc-t"><b>'+esc((P.labels||{})[x.id]||x.name)+'</b><small>'+esc(x.kind)+'</small>'+((x.mv||x.worn)?'<small class="chips">'+(x.mv?'<i class="mchip m-mv">Moving</i>':'')+(x.worn?'<i class="mchip m-wn">Worn or carried</i>':'')+'</small>':'')+'</span><span class="loc-d"><b>'+esc(du(x.m))+'</b><small>nearest</small></span></button>'+watchBtn(x.sig)+'</div>';
@@ -6106,23 +6111,28 @@ function liveDerive(d, nowS){
   d.atHome = sta && !d.present;
   d.mine = !!(P.mine && P.mine[d.id]);
   const me=posNow();
+  if((d.fix || d.sector) && d.band==='ble' && nearWith(d)){ d.fix=null; d.sector=null; }          // near you at places far apart: it has no place of its own
   if(d.fix && me){ d.dist=Math.max(1,Math.hypot(d.fix.x-me.x,d.fix.y-me.y)); d.bearing=(Math.atan2(d.fix.x-me.x,d.fix.y-me.y)*180/Math.PI+360)%360; }
   else { d.dist=Math.max(1,median(d.hist.slice(-3))); d.bearing=d.sector?d.sector.brg:null; }
   const h=d.hist, a=h.length>=4?median(h.slice(0,Math.floor(h.length/2))):null, b=h.length>=4?median(h.slice(Math.floor(h.length/2))):null;
   d.vel = (a===null)?0:((b-a)/a < -0.35 ? -1 : (b-a)/a > 0.5 ? 1 : 0); d.trend=trendOf(d.vel);       // a clear change only: single readings jump about
   // follower test: heard on nearly every leg of your route, at about the same strength, after you have moved a long way
   const lr=legRead(d), tag=d.cls==='Tag', radio=isFinite(followSpan(d)) && d.band!=='wifi';
-  if(!d.retFix && radio){ const rp=retPass(d); if(rp){ d.retFix=rp; d.mov=null; } }          // came back to it: it stays where it is, and no change of its strength makes it moving
+  const nw=radio && nearWith(d); d.nearW=nw;
+  if(nw && d.retFix) d.retFix=null;          // near you at places far apart: it is not standing still, whatever an earlier pass suggested
+  if(!d.retFix && radio && !nw){ const rp=retPass(d); if(rp){ d.retFix=rp; d.mov=null; } }          // came back to it: it stays where it is, and no change of its strength makes it moving
   d.span=lr.reach; d.steady=lr.legs>=2 && lr.spread<=FOLLOW.spread; d.leg=lr;
   d.mins=(d.lastSeen-Math.max(d.firstSeen, (d.trk && d.trk.t0) || 0))/60000;          // the minutes over which its legs were gathered
   d.need=tag?FOLLOW.tagReach:followSpan(d);
   const even=lr.share>=FOLLOW.share && lr.spread<=FOLLOW.spread && Math.abs(lr.drift)<=FOLLOW.drift && lr.level>=FOLLOW.level && lr.rate>=FOLLOW.rate;      // heard on nearly every leg, evenly, clearly, and in at least three reports in ten
+  const close=nw && lr.share>=FOLLOW.share && lr.rate>=FOLLOW.rate;          // or kept within a few meters of you at places far apart, on nearly every leg
   d.verdict = !radio ? 'near'
     : d.retFix ? 'fixed'
-    : even && lr.legs>=(tag?FOLLOW.tagLegs:FOLLOW.legs) && lr.reach>=d.need && d.mins>=(tag?FOLLOW.tagMins:FOLLOW.mins) ? 'with'
-    : even && lr.spread<=FOLLOW.maybeSpread && Math.abs(lr.drift)<=FOLLOW.maybeDrift && lr.legs>=FOLLOW.maybeLegs && lr.reach>=FOLLOW.maybeReach && d.mins>=FOLLOW.maybeMins ? 'maybe'      // the early call asks for a flatter signal
-    : lr.span>=3 && (lr.spread>=FOLLOW.fixedSpread || lr.share<FOLLOW.fixedShare) ? 'fixed'
+    : (even || close) && lr.legs>=(tag?FOLLOW.tagLegs:FOLLOW.legs) && lr.reach>=d.need && d.mins>=(tag?FOLLOW.tagMins:FOLLOW.mins) ? 'with'
+    : (even && lr.spread<=FOLLOW.maybeSpread && Math.abs(lr.drift)<=FOLLOW.maybeDrift || close) && lr.legs>=FOLLOW.maybeLegs && lr.reach>=FOLLOW.maybeReach && d.mins>=FOLLOW.maybeMins ? 'maybe'      // the early call asks for a flatter signal
+    : !nw && lr.span>=3 && (lr.spread>=FOLLOW.fixedSpread || lr.share<FOLLOW.fixedShare) ? 'fixed'
     : d.mins<2 ? 'passing' : 'near';
+  d.closeW = (d.verdict==='with' || d.verdict==='maybe') && close && !even;          // said so in its sentence
   d.tested = d.verdict==='with';                         // this console's own test
   d.maybe = !d.mine && d.present && d.verdict==='maybe';
   d.withYou = !d.mine && d.present && (d.tested || d.fFollow) && !houseDev(d) && !d.retFix;
@@ -6143,8 +6153,18 @@ function retPass(d){ const sm=d.samples; if(d.band!=='ble' || !sm || sm.length<6
     const away=sm.filter(c=>c.t>A.t && c.t<B.t && Math.hypot(c.x-A.x,c.y-A.y)>=RET.away);
     if(away.length>=RET.minAway && away.filter(c=>c.rssi<=mx-RET.fade).length>=RET.most*away.length) return {x:(A.x+B.x)/2, y:(A.y+B.y)/2, t0:A.t, t:B.t}; }
   return null; }
+// A device kept near you at places far apart travels with you. Most of the places you stood heard it within 4 m, and two of those
+// places lie 80 m or more apart. Nothing standing still is that near at both, so this holds however much a body or a pocket swings
+// its strength, which the even-strength test cannot allow for. It also rules out "stays in place".
+const NEARW={m:4, apart:80, most:.6, min:6};
+function nearWith(d){ const sm=d.samples; if(d.band!=='ble' || !sm || sm.length<NEARW.min) return false;
+  const key=sm.length+':'+sm[sm.length-1].t+':'+sm[sm.length-1].rssi; if(d._nwK===key) return d._nw; d._nwK=key;
+  const lim=-55-25*Math.log10(NEARW.m), near=sm.filter(s=>s.rssi>=lim); let ok=false;          // the same reading of distance as distOf
+  if(near.length>=NEARW.min && near.length>=NEARW.most*sm.length)
+    for(let i=0;i<near.length && !ok;i++) for(let j=near.length-1;j>i;j--){ if(Math.hypot(near[i].x-near[j].x,near[i].y-near[j].y)>=NEARW.apart){ ok=true; break; } }
+  return d._nw=ok; }
 const sensorName = id => id==='this-phone' ? 'this phone' : (LK((P.sensors[id]||{}).name)||'a sensor');
-const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : (d.tested||d.maybe) ? 'has stayed in earshot for '+(d.mins<1.5?'a minute':Math.round(d.mins)+' minutes')+' across '+du(d.span)+' of your movement, at an even strength on '+d.leg.legs+' legs of your route' : 'was reported as moving with you by '+sensorName(d.sensor);
+const followText = d => (!d.withYou && d.homeAway) ? 'was heard near you away from home, and by your home listener' : (d.tested||d.maybe) ? 'has stayed in earshot for '+(d.mins<1.5?'a minute':Math.round(d.mins)+' minutes')+' across '+du(d.span)+' of your movement, '+(d.closeW?'within '+du(NEARW.m)+' of you at places '+du(NEARW.apart)+' or more apart, ':'at an even strength ')+'on '+d.leg.legs+' legs of your route' : 'was reported as moving with you by '+sensorName(d.sensor);
 // The phone's scanner has gone quiet (the app says how long). The last picture is held for that long, up to three minutes.
 function scanQuiet(){ const st=PH.native && PH.on ? PH.nstat : null, a=st && typeof st.scanAge==='number' ? st.scanAge : 0; return a>FOLLOW.quiet ? Math.min(a, 180000) : 0; }
 // One Evidence entry per device per day, and only a few per hour, so a faulty sensor cannot bury the record.
@@ -6707,6 +6727,7 @@ function walkTick(at, only, q){
       if(was) wEvent('note','Stays in place: '+walkName(d)+'. You passed the same spot twice and it was strongest there both times, so it is not with you.', d.id); }
     if(d.withYou && !r.withYou){ r.withYou=now; wEvent('with','Moving with you: '+walkName(d)+' '+followText(d), d.id); }
     else if(d.maybe && !r.maybe){ r.maybe=now; wEvent('maybe','Staying with you so far: '+walkName(d)+' '+followText(d), d.id); }
+    if((d.withYou || d.maybe) && d.ct && !d.ctOut) ctStayed(d);
     r.mins=+(d.mins||0).toFixed(1); r.span=Math.round(d.span||0); r.steady=!!d.steady; r.rssi=Math.round(d.rssi); r.tested=!!d.tested; r.wy=d.withYou?1:0;
     if(d.mov && d.mov.v && Math.abs(nowS-d.mov.t)<20000){ const db=Math.round(Math.abs(d.mov.db));
       if(!(r.mvDb>=db)){ r.mv=+d.mov.v.toFixed(1); r.mvDb=db; r.mvS=d.mov.still?1:0; }
@@ -6736,12 +6757,12 @@ function tripReach(){ const rt=W.route||[]; if(rt.length<2) return 0; const k=Ma
 // A device that travels with you (yours, moving with you, or staying with you) has no one place, and is not located.
 const SPOT_M=8;
 function tripSpot(r){ if(!r || !r.at || !(r.min<=SPOT_M) || !okLL(r.at) || r.mine || r.withYou || r.v==='maybe') return null; return {lat:r.at.lat, lon:r.at.lon, unc:Math.round(Math.max(4, r.min+Math.min(15, r.atAcc||5))), t:r.minT||0}; }
-function tripWhere(r){ const s=tripSpot(r), p=r.placed; if(p && okLL(p) && (!s || p.unc<=s.unc)) return {lat:p.lat, lon:p.lon, unc:p.unc, how:'placed', n:p.n||0}; return s ? Object.assign({how:'strongest'}, s) : null; }
+function tripWhere(r){ if(!r || r.withYou) return null; const s=tripSpot(r), p=r.placed; if(p && okLL(p) && (!s || p.unc<=s.unc)) return {lat:p.lat, lon:p.lon, unc:p.unc, how:'placed', n:p.n||0}; return s ? Object.assign({how:'strongest'}, s) : null; }
 function walkStats(){ const ds=Object.values(W.devs||{}); return {heard:ds.length, here:ds.filter(r=>r.here).length, placed:ds.filter(r=>r.placed).length, located:ds.filter(r=>!r.sim&&tripWhere(r)).length, withYou:ds.filter(r=>r.withYou&&!r.mine).length, staying:ds.filter(tripMaybe).length, inPlace:ds.filter(r=>r.v==='fixed'&&!r.withYou).length, reach_m:tripReach(), minutes:+(((W.t1||Date.now())-W.t0)/60000).toFixed(1), distance_m:Math.round(W.dist||0)}; }
 function walkReport(){
   const iso=t=>new Date(t).toISOString();
   return {product:'Remiel Technologies', kind:'trip report', version:1, testData:!!W.test, started:iso(W.t0), stopped:iso(W.t1||Date.now()), summary:walkStats(), screenOffSeconds:W.gaps||0,
-    method:'Remiel hears Bluetooth and cuts your route into legs of '+FOLLOW.leg+' m. Moving with you: heard on at least '+Math.round(FOLLOW.share*100)+' percent of your legs, at leg strengths within '+FOLLOW.spread+' dB of one another, in at least three reports in ten, across '+du(FOLLOW.reach)+' end to end and '+FOLLOW.mins+' minutes ('+du(FOLLOW.tagReach)+' and '+FOLLOW.tagMins+' minutes for a tracker tag). Stays in place: strong near it, fading or missing on the legs beyond. Distance is read from signal strength.',
+    method:'Remiel hears Bluetooth and cuts your route into legs of '+du(FOLLOW.leg)+'. Moving with you: heard on at least '+Math.round(FOLLOW.share*100)+' percent of your legs, at leg strengths within '+FOLLOW.spread+' dB of one another or within '+du(NEARW.m)+' of you at places '+du(NEARW.apart)+' or more apart, in at least three reports in ten, across '+du(FOLLOW.reach)+' end to end and '+FOLLOW.mins+' minutes ('+du(FOLLOW.tagReach)+' and '+FOLLOW.tagMins+' minutes for a tracker tag). Stays in place: strong near it, fading or missing on the legs beyond, and never near you at places far apart. Distance is read from signal strength.',
     engine:{FOLLOW, FIX_MIN_SAMPLES, FIX_MIN_BASELINE, FIX_MAX_UNC, POS_MAX_ACC, LIVE_PRESENT},
     sensors:(PH.on?[{name:'This phone', kind:PH.native?'Remiel app':'phone browser'}]:[]).concat(carriedIds().map(k=>({name:P.sensors[k].name, kind:P.sensors[k].kind}))),
     devices:Object.values(W.devs).sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0) || (b.placed?1:0)-(a.placed?1:0) || b.n-a.n)
@@ -7039,7 +7060,7 @@ function liveBody(d){
   const rel = d.fix && d.bearing!=null, atStation=(P.sensors[d.sensor]||{}).kind==='station';
   const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+du(d.fix.unc) : 'about '+Math.round(d.dist)+' m'+(atStation?' from your home listener':'')+', from signal strength. It sharpens each time the device is heard again';
   const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side' : (d.base>=FIX_MIN_BASELINE ? 'Keep moving and make a turn, and Remiel fixes its place' : 'Move about '+FIX_MIN_BASELINE+' m and make a turn, and Remiel finds its direction');
-  const ft = d.mine ? 'Yours' : d.withYou ? 'Moving with you' : (!isFinite(d.need) ? 'Tracked in Tower Watch' : d.maybe ? 'Staying with you so far: even strength on '+d.leg.legs+' legs. The test completes at '+du(d.need)+' and '+(d.cls==='Tag'?FOLLOW.tagMins:FOLLOW.mins)+' minutes' : d.fix ? 'Stays in one place' : d.verdict==='fixed' ? 'Stays in place: its strength rises and falls as you pass, as a fixed transmitter does' : 'Testing: completes at '+du(d.need)+' of your movement and '+(d.cls==='Tag'?FOLLOW.tagMins:FOLLOW.mins)+' minutes');
+  const ft = d.mine ? 'Yours' : d.withYou ? 'Moving with you' : (!isFinite(d.need) ? 'Tracked in Tower Watch' : d.maybe ? 'Staying with you so far: '+(d.closeW?'within '+du(NEARW.m)+' of you':'even strength')+' on '+d.leg.legs+' legs. The test completes at '+du(d.need)+' and '+(d.cls==='Tag'?FOLLOW.tagMins:FOLLOW.mins)+' minutes' : d.fix ? 'Stays in one place' : d.verdict==='fixed' ? 'Stays in place: its strength rises and falls as you pass, as a fixed transmitter does' : 'Testing: completes at '+du(d.need)+' of your movement and '+(d.cls==='Tag'?FOLLOW.tagMins:FOLLOW.mins)+' minutes');
   return '<div class="dsec"><h4>Proximity</h4><div class="kv"><span class="k">Distance</span><span class="v">'+esc(where)+'</span><span class="k">Direction</span><span class="v '+(rel?'':'unkc')+'">'+esc(dir)+'</span>'+
     '<span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm · '+esc(d.band==='wifi'?'Wi-Fi':d.band==='cell'?'Cellular':'Bluetooth')+'</span>'+
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></div></div>'+
