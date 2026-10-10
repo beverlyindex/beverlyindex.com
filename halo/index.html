@@ -1217,7 +1217,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-08.81', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-08.82', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2924,7 +2924,7 @@ function tripSummaryLines(R, C){
   if(tw.length) L.push({hot:true, text:tw.length===1?'A tracker moved with you.':tw.length+' trackers moved with you.', next:'Open it for the steps to find it, and check your bag, your coat and your car.', devs:tw.slice(0,3)});
   else if(tg.length){ const near=tg.filter(r=>(r.share||0)>=0.75 && (r.legs||0)>=2).sort((a,b)=>(b.span||0)-(a.span||0))[0];
     L.push({text:(tg.length===1?'1 tracker was heard, and it did not follow you.':tg.length+' trackers were heard, and none followed you.')+
-      (near ? ' The closest was '+nm(near)+', heard on '+((near.share||0)>=0.99?'every leg':'most legs')+' of '+du(near.span||0)+' of your route for '+mins(near.mins)+'. A tracker needs '+du(FOLLOW.tagReach)+' before Remiel calls it traveling with you.'
+      (near ? ' The closest was '+nm(near)+', heard on '+((near.share||0)>=0.99?'every leg':'most legs')+' of '+du(st.distance_m ? Math.min(near.span||0, st.distance_m) : (near.span||0))+' of your route for '+mins(near.mins)+'. A tracker needs '+du(FOLLOW.tagReach)+' before Remiel calls it traveling with you.'
             : ' Each was near you only briefly, or stayed in one place.'), devs:near?[near]:[]}); }
   // a device heard for most of the trip that is not a follower, and why
   const home=!!(P.home && P.home.loc && rt.length && distLL(P.home.loc.lat,P.home.loc.lon,rt[0].lat,rt[0].lon)<200);
@@ -2993,7 +2993,7 @@ function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},h
 async function tripFile(R){ const rep=withTrip(R, walkReport), iso=t=>new Date(t).toISOString(), C=R.cor||{tags:{},hw:{},cams:[]};
   rep.version=2; rep.name=tripName(R); rep.devices.forEach(x=>{ x.tag=(TAG[C.tags[x.id]]||TAG.fresh).w; x.record=C.hw[x.id]||''; const r=(R.devs||{})[x.id]||{};
     x.motion=r.mv?'moving':r.v==='fixed'?'stays in place':'not yet known'; if(r.mv){ x.speed_mps=r.mv; x.speedClass=speedClass(r.mv); x.signalChange_dB=r.mvDb||0; x.youStoodStill=!!r.mvS; } x.wornOrCarried=!!r.wn; if(r.dr) x.drone=r.rid||true; });
-  rep.contacts=(R.contacts||[]).map(c=>({t:iso(c.t), youWereAt:c.pos, provedMoving:!!c.mv, youStoodStill:!!(c.mv ? c.still : c.stood), speed_mps:c.v||0, inEarshot_s:c.s||0, words:contactLine(c), devices:c.devs.map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, wornOrCarried:!!x.worn, provedMoving:!!x.mv}))}));
+  rep.contacts=(R.contacts||[]).map(c=>({t:iso(c.t), youWereAt:c.pos, provedMoving:!!c.mv, youStoodStill:c.mv ? !!c.still : (c.stood==null ? null : !!c.stood), speed_mps:c.v||0, inEarshot_s:c.s||0, words:contactLine(c), devices:c.devs.map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, wornOrCarried:!!x.worn, provedMoving:!!x.mv}))}));
   rep.waypoints=(R.wps||[]).map(w=>({n:w.n, t:iso(w.t), youWereAt:w.pos, note:w.note||'', devices:Object.values(w.devs||{}).map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, yours:!!x.yours, tag:(TAG[C.tags[x.id]]||TAG.fresh).w, passedYou:wpPassed(R,w,x)}))}));
   rep.camerasPassed=(C.cams||[]).map(x=>({kind:x.kind, name:x.name, operator:x.op, nearest_m:x.d, t:iso(x.t), lat:x.la, lon:x.lo}));
   const text=JSON.stringify(rep,null,1), d=new Date(R.t0), name='remiel-trip-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
@@ -3451,13 +3451,13 @@ function contactScan(nowS){ if(!nowS && scanQuiet()) return; nowS=nowS||Date.now
     if(pk.t-pk.first>CONTACT.arrive || d.verdict==='fixed') return; const h=ELOG.ready?ELOG.hist.get(d.sig):null; if(h && h.fx>0) return;
     const gone=heard>=pk.last+4000 ? nowS-pk.last : 0, drop=pk.r-pk.lastR, mv=!!(d.mov && d.mov.v), M=d.ms, a=M.find(q=>q[2]!==null), z=[...M].reverse().find(q=>q[2]!==null);
     const fixture=houseDev(d) || !!h, carried=isWorn(d) || d.cls==='Vehicle' || d.cls==='Tag';          // a device already on record at this place is part of the place
-    cand.push({d, pk, mv, fixture, carried, still:!!a && a!==z && (z[0]-a[0])>=0.5*(M[M.length-1][0]-M[0][0]) && Math.hypot(z[2]-a[2], z[3]-a[3])<6, done:nowS-pk.t>=CONTACT.wait && (gone>=CONTACT.wait || drop>=CONTACT.fade), part:gone>=8000 || drop>=CONTACT.mfade,
+    cand.push({d, pk, mv, fixture, carried, still:!!a && a!==z && (z[0]-a[0])>=0.5*(M[M.length-1][0]-M[0][0]) && Math.hypot(z[2]-a[2], z[3]-a[3])<6, moved:!!a && a!==z && Math.hypot(z[2]-a[2], z[3]-a[3])>=6, done:nowS-pk.t>=CONTACT.wait && (gone>=CONTACT.wait || drop>=CONTACT.fade), part:gone>=8000 || drop>=CONTACT.mfade,
       lead:mv || ((isWorn(d) || d.cls==='Vehicle') && !fixture && distOf(pk.r,'ble')<=CONTACT.near)}); });
   cand.filter(c=>c.lead && c.done).sort((a,b)=>b.pk.r-a.pk.r).forEach(L=>{ if(L.d.ct) return;
     const mem=cand.filter(c=>!c.d.ct && (c===L || (c.part && Math.abs(c.pk.t-L.pk.t)<=CONTACT.peak && Math.abs(c.pk.first-L.pk.first)<=20000 && c.pk.r>=L.pk.r-10 && (c.mv || (!c.fixture && (L.still || c.carried)))))), id='C'+Math.round(L.pk.t-LIVE.skew).toString(36)+L.d.id.slice(-2);
     const mvs=mem.filter(c=>c.mv), ll=L.pk.x!==null?toLL(L.pk.x,L.pk.y):null, t0=Math.min(...mem.map(c=>c.pk.first)), t1=Math.max(...mem.map(c=>c.pk.last));
     mem.forEach(c=>{ c.d.ct=id; });
-    const C={id, t:Math.round(L.pk.t-LIVE.skew), mv:mvs.length>0, still:mvs.some(c=>c.d.mov.still), stood:L.still?1:0, v:mvs.length?+Math.max(...mvs.map(c=>c.d.mov.v)).toFixed(1):0, s:Math.max(1,Math.round((t1-t0)/1000)),
+    const C={id, t:Math.round(L.pk.t-LIVE.skew), mv:mvs.length>0, still:mvs.some(c=>c.d.mov.still), stood:L.still?1:L.moved?0:null, v:mvs.length?+Math.max(...mvs.map(c=>c.d.mov.v)).toFixed(1):0, s:Math.max(1,Math.round((t1-t0)/1000)),
       pos:ll?{lat:+ll.lat.toFixed(6), lon:+ll.lon.toFixed(6)}:null,
       devs:mem.map(c=>({id:c.d.id, sig:c.d.sig, name:devName(c.d), kind:kindShort(c.d), cls:c.d.cls, m:Math.max(1,Math.round(distOf(c.pk.r,'ble'))), worn:isWorn(c.d), mv:c.mv?1:0})).sort((a,b)=>a.m-b.m).slice(0,12)};
     S.contacts=S.contacts||[]; S.contacts.unshift(C); if(S.contacts.length>30) S.contacts.length=30;
@@ -3468,7 +3468,7 @@ function ctStayed(d){ d.ctOut=1; let hit=false;
   [S.contacts||[], (W.on && W.contacts) || []].forEach(L=>{ for(let i=L.length-1;i>=0;i--){ const C=L[i]; if(C.id!==d.ct) continue; const n=C.devs.length; C.devs=C.devs.filter(x=>x.id!==d.id); if(C.devs.length<n || !C.devs.length) hit=true; if(!C.devs.length) L.splice(i,1); } });
   if(hit && W.on) wEvent('note','Did not go: '+walkName(d)+' was set down as having come and gone, then stayed with you.', d.id); }
 const contactLine = C => { const n=C.devs.length, near=Math.min(...C.devs.map(x=>x.m)), p=C.mv?paceW(C.v):'';
-  return (C.mv ? (n===1?'1 device passed you':n+' devices passed you together') : (n===1?'1 device came and went':n+' devices came and went together'))+', nearest '+du(near)+(p?', '+p:'')+(C.mv&&C.still?', while you stood still':'')+(!C.mv?(C.stood?', while you stood still':', as you moved'):'')+(C.s?', in earshot '+(C.s<90?C.s+(C.s===1?' second':' seconds'):Math.round(C.s/60)+' minutes'):''); };
+  return (C.mv ? (n===1?'1 device passed you':n+' devices passed you together') : (n===1?'1 device came and went':n+' devices came and went together'))+', nearest '+du(near)+(p?', '+p:'')+(C.mv&&C.still?', while you stood still':'')+(!C.mv?(C.stood===1?', while you stood still':C.stood===0?', as you moved':''):'')+(C.s?', in earshot '+(C.s<90?C.s+(C.s===1?' second':' seconds'):Math.round(C.s/60)+' minutes'):''); };
 function contactCard(C, tags){ const row=x=>'<div class="t-row"><button class="loc-row" data-act="art" data-k="'+esc(x.sig)+'"><span class="sdot'+(x.cls==='Tag'?' k-tag':'')+'" style="--mk:'+TAG[(tags&&tags[x.id])||'fresh'].c+'"></span><span class="loc-t"><b>'+esc((P.labels||{})[x.id]||x.name)+'</b><small>'+esc(x.kind)+'</small>'+((x.mv||x.worn)?'<small class="chips">'+(x.mv?'<i class="mchip m-mv">Moving</i>':'')+(x.worn?'<i class="mchip m-wn">Worn or carried</i>':'')+'</small>':'')+'</span><span class="loc-d"><b>'+esc(du(x.m))+'</b><small>nearest</small></span></button>'+watchBtn(x.sig)+'</div>';
   return '<div class="wp contact"><div class="wp-h"><span class="wp-n ct-n">'+C.devs.length+'</span><b>'+hhmm(C.t)+'</b><span>'+(C.pos?whSpan(C.pos.lat,C.pos.lon):'')+'</span></div><div class="wp-note">'+esc(contactLine(C))+'</div>'+C.devs.map(row).join('')+'</div>'; }
 function nowContacts(){ const now=Date.now(), cs=(S.contacts||[]).filter(C=>now-C.t<CONTACT.show); if(!cs.length) return ''; const open=!!(S.locOpen||{}).ct, tags={};
@@ -6178,6 +6178,7 @@ function liveState(){
   if(!hasSensors()) return 'none';
   const nowS=Date.now()+LIVE.skew, mob=LIVE.seen.mobile>0 && nowS-LIVE.seen.mobile<LIVE_SILENT, sta=LIVE.seen.station>0 && nowS-LIVE.seen.station<LIVE_SILENT;
   if(mob || (sta && nearHome())) return 'live';
+  if(PH.on && PH.asked && Date.now()-PH.asked<LIVE_SILENT && !(LIVE.seen.mobile-LIVE.skew>=PH.asked)) return 'waiting';          // just started: the first report is on its way
   if(LIVE.err) return 'offline';                         // the account was not reached, so nothing can be said about the sensor
   if(sta) return 'homeonly';                             // the home station reports, but nothing is with you
   return liveLast() ? 'silent' : 'waiting';
@@ -6600,7 +6601,7 @@ async function phStart(){
   try{ PH.scan=await navigator.bluetooth.requestLEScan({acceptAllAdvertisements:true, keepRepeatedDevices:true}); }
   catch(e){ PH.on=false; PH.err=(e&&e.name)||'Error'; PH.msg=String((e&&e.message)||''); renderVicinity(); return; }
   if(!PH.bound){ navigator.bluetooth.addEventListener('advertisementreceived', phAdv); PH.bound=true; }
-  PH.on=true; PH.lost=false; if(!PH.timer) PH.timer=setInterval(phFlush, 2000);
+  PH.on=true; PH.lost=false; PH.asked=Date.now(); if(!PH.timer) PH.timer=setInterval(phFlush, 2000);
   if(W.on) wEvent('note','This phone is listening.');
   toast('This phone is listening for Bluetooth devices.'); softRender(); renderVicinity();
 }
