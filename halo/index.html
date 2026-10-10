@@ -1217,7 +1217,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-08.82', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-08.83', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -6721,14 +6721,16 @@ function walkTick(at, only, q){
     if(!r.here){ r.here=true; if(r.last>(r.goneL||0)) wEvent('back','Back in earshot: '+walkName(d)+', '+distText(d), d.id); }          // heard again after it left, not the same sighting read a second time
     if(d.dist<=r.min || !r.at){ r.min=Math.round(Math.min(r.min,d.dist)); r.minT=now; if(here){ r.at={lat:+here.lat.toFixed(6),lon:+here.lon.toFixed(6)}; r.atAcc=Math.round(here.acc||5); } }
     if(r.n>=8){ const L=r.dl||(r.dl=[]), l=L[L.length-1]; if(!l || now-l[0]>=10000){ L.push([now, Math.round(d.dist)]); if(L.length>120) r.dl=L.filter((x,i)=>i%2===0); } }      // its distance through the trip, every ten seconds
-    if(d.fix){ const first=!r.placed; r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n};
+    if(d.fix && !(r.withYou || r.maybe)){ const first=!r.placed; r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n};
       if(first) wEvent('placed','Placed: '+walkName(d)+', '+(d.bearing!=null && d.fix.unc<d.dist ? du(d.dist)+' '+compass(d.bearing)+', likely within '+du(d.fix.unc) : 'within '+du(d.dist+d.fix.unc)+' of where you were'), d.id); }          // a direction means nothing while the circle is wider than the distance
-    else if(d.sector && !r.rough && !r.placed){ r.rough={brg:Math.round(d.sector.brg)}; wEvent('rough','Direction found: '+walkName(d)+', roughly '+compass(d.sector.brg), d.id); }
+    else if(d.sector && !r.rough && !r.placed && !(r.withYou || r.maybe)){ r.rough={brg:Math.round(d.sector.brg)}; wEvent('rough','Direction found: '+walkName(d)+', roughly '+compass(d.sector.brg), d.id); }
     if(d.retFix && !r.ret){ r.ret=now; const was=r.withYou||r.maybe||r.mv; r.withYou=0; r.wy=0; r.maybe=0; r.mv=0; r.mvDb=0; r.mvS=0;
       if(was) wEvent('note','Stays in place: '+walkName(d)+'. You passed the same spot twice and it was strongest there both times, so it is not with you.', d.id); }
     if(d.withYou && !r.withYou){ r.withYou=now; wEvent('with','Moving with you: '+walkName(d)+' '+followText(d), d.id); }
     else if(d.maybe && !r.maybe){ r.maybe=now; wEvent('maybe','Staying with you so far: '+walkName(d)+' '+followText(d), d.id); }
     if((d.withYou || d.maybe) && d.ct && !d.ctOut) ctStayed(d);
+    if((d.withYou || d.maybe) && (r.placed || r.rough)){ r.placed=null; r.rough=null; d.fix=null; d.sector=null;
+      wEvent('note','Place withdrawn: '+walkName(d)+' is staying with you, so the place and direction given for it earlier on this trip were wrong.', d.id); }
     r.mins=+(d.mins||0).toFixed(1); r.span=Math.round(d.span||0); r.steady=!!d.steady; r.rssi=Math.round(d.rssi); r.tested=!!d.tested; r.wy=d.withYou?1:0;
     if(d.mov && d.mov.v && Math.abs(nowS-d.mov.t)<20000){ const db=Math.round(Math.abs(d.mov.db));
       if(!(r.mvDb>=db)){ r.mv=+d.mov.v.toFixed(1); r.mvDb=db; r.mvS=d.mov.still?1:0; }
@@ -6744,7 +6746,7 @@ function walkTick(at, only, q){
 // A trip that ended inside the app's own record: what Remiel placed from those readings is entered once the record has been read.
 function walkSettle(){ if(W.on || !W.t1 || W.settled || !W.devs) return; W.settled=true; const by={}; LIVE.devs.forEach(d=>{ by[d.id]=d; });
   Object.values(W.devs).forEach(r=>{ const d=by[r.id]; if(!d || r.placed) return;
-    if(d.fix){ r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n}; wEvent('placed','Placed: '+walkName(d)+', likely within '+du(d.fix.unc), d.id, W.t1-1); }
+    if(d.fix && !(r.withYou || r.maybe)){ r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n}; wEvent('placed','Placed: '+walkName(d)+', likely within '+du(d.fix.unc), d.id, W.t1-1); }
     else if(d.sector && !r.rough){ r.rough={brg:Math.round(d.sector.brg)}; wEvent('rough','Direction found: '+walkName(d)+', roughly '+compass(d.sector.brg), d.id, W.t1-1); } });
   W.kept=false; W.arch=false; tripKeep(); wSave(true); renderVicinity(); }
 const wEvents = () => [...(W.events||[])].sort((a,b)=>a.t-b.t);
@@ -6758,7 +6760,7 @@ function tripReach(){ const rt=W.route||[]; if(rt.length<2) return 0; const k=Ma
 // A device that travels with you (yours, moving with you, or staying with you) has no one place, and is not located.
 const SPOT_M=8;
 function tripSpot(r){ if(!r || !r.at || !(r.min<=SPOT_M) || !okLL(r.at) || r.mine || r.withYou || r.v==='maybe') return null; return {lat:r.at.lat, lon:r.at.lon, unc:Math.round(Math.max(4, r.min+Math.min(15, r.atAcc||5))), t:r.minT||0}; }
-function tripWhere(r){ if(!r || r.withYou) return null; const s=tripSpot(r), p=r.placed; if(p && okLL(p) && (!s || p.unc<=s.unc)) return {lat:p.lat, lon:p.lon, unc:p.unc, how:'placed', n:p.n||0}; return s ? Object.assign({how:'strongest'}, s) : null; }
+function tripWhere(r){ if(!r || r.withYou || r.maybe) return null; const s=tripSpot(r), p=r.placed; if(p && okLL(p) && (!s || p.unc<=s.unc)) return {lat:p.lat, lon:p.lon, unc:p.unc, how:'placed', n:p.n||0}; return s ? Object.assign({how:'strongest'}, s) : null; }
 function walkStats(){ const ds=Object.values(W.devs||{}); return {heard:ds.length, here:ds.filter(r=>r.here).length, placed:ds.filter(r=>r.placed).length, located:ds.filter(r=>!r.sim&&tripWhere(r)).length, withYou:ds.filter(r=>r.withYou&&!r.mine).length, staying:ds.filter(tripMaybe).length, inPlace:ds.filter(r=>r.v==='fixed'&&!r.withYou).length, reach_m:tripReach(), minutes:+(((W.t1||Date.now())-W.t0)/60000).toFixed(1), distance_m:Math.round(W.dist||0)}; }
 function walkReport(){
   const iso=t=>new Date(t).toISOString();
