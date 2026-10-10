@@ -1217,7 +1217,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-08.80', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-08.81', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2503,7 +2503,7 @@ function renderVicinity(){ if(touchBusy()) return holdLater('v');
     const near=shown&&sus.length?Math.min(...sus.map(d=>d.dist)):0, wy=shown?sus.filter(d=>d.withYou).length:0, my=shown?sus.filter(d=>d.maybe).length:0;
     setHTML(el('microNote'), !shown||!sus.length ? '' : sus.length+' near you · nearest about '+du(near)+(wy?'<br><b style="color:#ff8d8d">'+wy+' moving with you</b>':my?'<br><b style="color:#ffb27a">'+my+' staying with you so far</b>':'')+(out?'<br>'+out+' on the rim, beyond this view':'')); }
   setHTML(el('radLine'), (rs.ext
-    ? '<b>Radius extended to '+blocks+' blocks, about '+rs.r+' m.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
+    ? '<b>Radius extended to '+blocks+' blocks, about '+du(rs.r)+'.</b> '+esc(devName(rs.ext))+' is a known threat, '+esc(distText(rs.ext))+' out and closing.'
     : '<b>'+(shown ? sus.length+(sus.length===1?' device':' devices')+' within 2 blocks'+(sus.length?', the nearest about '+du(Math.min(...sus.map(d=>d.dist))):'')+'.' : 'Radius: 2 blocks, about '+du(BASE_R)+'.')+'</b>'+((n=>n?' <b style="color:#ff8d8d">'+n+' moving with you.</b>':'')(shown?sus.filter(d=>d.withYou).length:0))+(oneMode() ? '' : view<BASE_R ? (shown||S.microV?' Micro is zoomed to '+du(view)+'.':'') : view>BASE_R ? ' Micro is widened to '+du(view)+'; the inner line is your radius.' : ''))+
     ' <span class="steps">Micro view '+[0].concat(MICRO_VIEWS).map(m=>'<button class="chipbtn '+((S.microV||0)===m?'on':'')+'" data-act="micro-v" data-m="'+m+'">'+(m?du(m):'Auto')+'</button>').join(' ')+'</span>');
   const sq=scanQuiet(), sa=PH.native && PH.on && PH.nstat && typeof PH.nstat.scanAge==='number' ? PH.nstat.scanAge : null;
@@ -2683,7 +2683,7 @@ async function elogRender(){ const box=el('elogBox'); if(!box) return; const E=S
       : '<div class="loc-none">'+(f==='rep'?'No device has shown a pattern yet. A device enters here when Remiel meets it on a second occasion, or at a second place.':f==='watch'?'Your Watch list is empty. Open a device and press Watch.':f==='trk'?'No tracker is on record.':f==='local'?'No local device is on record yet.':'The record is empty. The first sighting is written two minutes after a device leaves earshot.')+'</div>'; }
   box.innerHTML=head('Artifacts')+'<div class="idsub">'+ELOG.n.dev+(ELOG.n.dev===1?' device':' devices')+' on record'+(f!=='cams'?' · '+rep+(rep===1?' repeater':' repeaters'):'')+' · '+ELOG.n.cam+(ELOG.n.cam===1?' camera pass':' camera passes')+' · kept on this phone</div>'+chips+body+foot; }
 async function elogFile(){ const devices=await elogAll('dev'), encounters=await elogAll('enc'), cameras=await elogAll('cam'), d=new Date();
-  const text=JSON.stringify({product:'Remiel Technologies', kind:'encounter log', version:1, build:BUILD, saved:d.toISOString(), note:'One encounter is one stretch of time a device stayed in earshot of the phone you carried. Places are where you were at the nearest moment, to five decimal places. A place groups encounters within '+ELOG.PLACE_M+' m.', labels:P.labels||{}, yours:Object.keys(P.mine||{}), devices, encounters, cameras},null,1);
+  const text=JSON.stringify({product:'Remiel Technologies', kind:'encounter log', version:1, build:BUILD, saved:d.toISOString(), note:'One encounter is one stretch of time a device stayed in earshot of the phone you carried. Places are where you were at the nearest moment, to five decimal places. A place groups encounters within '+du(ELOG.PLACE_M)+'.', labels:P.labels||{}, yours:Object.keys(P.mine||{}), devices, encounters, cameras},null,1);
   const name='remiel-encounters-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
   const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join('');
   return {text, name, hash, n:[devices.length, encounters.length, cameras.length]}; }
@@ -3618,8 +3618,8 @@ function planScanHTML(){ const p=S.plan; if(!p || !p.line) return ''; const pts=
   const row=(a,b)=>'<div class="elog-line" style="display:block"><b>'+a+'</b><div class="limit" style="margin:2px 0 0">'+b+'</div></div>';
   let h='<div class="elog-h4">Along this route now</div>';
   if(loaded===null) h+=row('Cameras', 'The public record of cameras is switched off in this build.');
-  else h+=row(cw.length?esc(cw.join(', ')):(loaded?'No camera on the public record':'Reading the public record'), (loaded?'Within '+RT.cam+' m of the route, from the public record.':'The record for part of this route is still arriving.')+(cams.length?' First: '+esc(PT_WORD[cams[0].k].toLowerCase())+' '+esc(miText(cams[0].at))+' from the start.':''))+
-    (sites?row(sites+(sites===1?' tower site':' tower sites'), 'Within '+RT.site+' m of the route, from the public record.'):'');
+  else h+=row(cw.length?esc(cw.join(', ')):(loaded?'No camera on the public record':'Reading the public record'), (loaded?'Within '+du(RT.cam)+' of the route, from the public record.':'The record for part of this route is still arriving.')+(cams.length?' First: '+esc(PT_WORD[cams[0].k].toLowerCase())+' '+esc(miText(cams[0].at))+' from the start.':''))+
+    (sites?row(sites+(sites===1?' tower site':' tower sites'), 'Within '+du(RT.site)+' of the route, from the public record.'):'');
   h+= !ELOG.ok ? '' : !p.log ? row('Reading your encounter log','') : row(p.log.n+(p.log.n===1?' device':' devices')+' on record along it', p.log.n ? 'From your own encounter log.'+(p.log.trk.length?' Trackers: '+esc(p.log.trk.join(', '))+'.':'')+(p.log.multi?' '+p.log.multi+' of them seen at more than one place.':'') : 'Your encounter log holds nothing along this route yet. This trip is its first record.');
   return h; }
 function planScan(){ const b=el('planScan'); if(b && S.plan) { const h=planScanHTML(); if(b._h!==h){ b.innerHTML=h; b._h=h; } } }
@@ -4005,7 +4005,7 @@ function renderResponder(){
        '<button class="btn sm primary" data-act="h-radd">Add room</button></div>'+
        '<div class="limit" style="margin-top:8px">Name each room as your home listener names its radar, so that its readings find the room.</div></div>';
     h+=rulesCard();
-    h+='<div class="card"><h3>Home location</h3><div class="kv"><span class="k">Position</span><span class="v '+(H.loc?'okc':'unkc')+'" id="homeLocV">'+(H.loc?'Set '+new Date(H.loc.t).toLocaleDateString()+', within '+Math.round(H.loc.acc)+' m':'Not set')+'</span></div>'+
+    h+='<div class="card"><h3>Home location</h3><div class="kv"><span class="k">Position</span><span class="v '+(H.loc?'okc':'unkc')+'" id="homeLocV">'+(H.loc?'Set '+new Date(H.loc.t).toLocaleDateString()+', within '+du(H.loc.acc):'Not set')+'</span></div>'+
        '<div class="formrow"><button class="btn sm primary" data-act="home-loc">Set to where I am now</button>'+(H.loc?'<button class="btn sm" data-act="home-loc-clear">Clear</button>':'')+'</div>'+
        (S.homeMsg?'<div class="limit" style="margin-top:10px;color:#ffdfae">'+esc(S.homeMsg)+'</div>':'')+
        '<div class="limit" style="margin-top:10px">Do this while you are at home. It lets Remiel tell from your position when you are home and when you are away. Until it is set, Remiel goes by the Home and Away switch above. It is stored sealed in your account.</div></div>';
@@ -4677,7 +4677,7 @@ function renderRoster(){
     (list.some(d=>d.live)?'<div class="limit" style="padding:8px 6px 0">'+NAME_NOTE+'</div>':'');
   S._rsig=sig;
 }
-const liveKV = d => '<span class="k">Distance</span><span class="v">'+Math.round(d.dist)+' m · '+band(d)+'</span><span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm</span>'+
+const liveKV = d => '<span class="k">Distance</span><span class="v">'+du(d.dist)+' · '+band(d)+'</span><span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm</span>'+
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span><span class="k">Identity</span><span class="v">'+strengthHTML(d.identity)+'</span>';
 function deviceBody(d){
   return '<div class="dsec"><h4>Proximity</h4><div class="kv" data-live>'+liveKV(d)+'</div></div>'+
@@ -6354,7 +6354,7 @@ function toolTower(){
   const tech=c=>(CELL_GEN[c.k]||'')+(c.k==='nr'?' (5G)':'');
   const row=(c,i)=>{ const use=!!c.reg, tc=use?(ts.level==='suspect'?'var(--r5)':ts.level==='watch'?'var(--r3)':'var(--clear)'):'var(--mut)';
     return '<div class="twr"><span class="tk" style="--tc:'+tc+'">'+(use?(ts.level==='suspect'?'In use · signs present':'In use'):'Neighbor')+'</span><span><b>'+esc(tech(c))+'</b>'+(c.mcc!=null?' · network '+esc(c.mcc+'-'+(c.mnc==null?'':c.mnc)):'')+'</span><span class="ts">'+(c.r==null?'':c.r+' dBm')+'</span>'+
-      '<span class="td">'+[c.ci?'cell '+esc(String(c.ci)):'', c.tac!=null?'area '+c.tac:'', c.pci!=null?'PCI '+c.pci:'', c.ch!=null?'channel '+c.ch:'', (use&&c.ta!=null&&(c.k==='lte'||c.k==='gsm'))?'about '+Math.round(c.ta*(c.k==='lte'?78:554))+' m by timing':''].filter(Boolean).join(' · ')+'</span></div>'; };
+      '<span class="td">'+[c.ci?'cell '+esc(String(c.ci)):'', c.tac!=null?'area '+c.tac:'', c.pci!=null?'PCI '+c.pci:'', c.ch!=null?'channel '+c.ch:'', (use&&c.ta!=null&&(c.k==='lte'||c.k==='gsm'))?'about '+du(c.ta*(c.k==='lte'?78:554))+' by timing':''].filter(Boolean).join(' · ')+'</span></div>'; };
   let h='<div class="dsec"><h4>The cells your phone reports, live <span class="chip pot" style="margin-left:6px">'+CELL.list.length+' reported</span></h4>'+
     '<div class="hrow"><span class="hs '+(ts.level==='ok'&&!only2g?'ok':'att')+'" style="'+(ts.level==='ok'&&!only2g?'':'color:var('+col+');border-color:var('+col+')')+'">'+word+'</span><span>'+
       (only2g ? 'Your phone is on 2G. On 2G a phone has no way to check that a tower is genuine. If 2G is unusual where you are, switch to airplane mode, move a few streets, and call through an end-to-end encrypted app.'
@@ -6690,8 +6690,8 @@ function walkPos(q, at){
   { const S={pos:sp}, l=W.route[W.route.length-1], dm=l?distLL(l.lat,l.lon,S.pos.lat,S.pos.lon):Infinity, good=S.pos.acc<=POS_MAX_ACC;
     if(l && now<l.t) return;
     if(!l || (good && dm>=step)){ if(l && dm<500) W.dist+=dm; W.route.push({t:now,lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6),acc:Math.round(S.pos.acc)}); if(W.route.length>4000) W.route.shift(); }
-    if(!good && !W.rough){ W.rough=true; wEvent('warn','Your position is good to '+Math.round(S.pos.acc)+' m just now. Placement resumes as it sharpens.'); }
-    else if(good && W.rough){ W.rough=false; wEvent('note','Your position is good again, within '+Math.round(S.pos.acc)+' m.'); } }
+    if(!good && !W.rough){ W.rough=true; wEvent('warn','Your position is good to '+du(S.pos.acc)+' just now. Placement resumes as it sharpens.'); }
+    else if(good && W.rough){ W.rough=false; wEvent('note','Your position is good again, within '+du(S.pos.acc)+'.'); } }
 }
 function walkTick(at, only, q){
   if(!W.on) return; const back=!!at, now=at||Date.now(), nowS=now+LIVE.skew, here=q||(back?null:ePos()); _wAt=back?now:0;
@@ -6721,7 +6721,7 @@ function walkTick(at, only, q){
     if(d.dist<=r.min || !r.at){ r.min=Math.round(Math.min(r.min,d.dist)); r.minT=now; if(here){ r.at={lat:+here.lat.toFixed(6),lon:+here.lon.toFixed(6)}; r.atAcc=Math.round(here.acc||5); } }
     if(r.n>=8){ const L=r.dl||(r.dl=[]), l=L[L.length-1]; if(!l || now-l[0]>=10000){ L.push([now, Math.round(d.dist)]); if(L.length>120) r.dl=L.filter((x,i)=>i%2===0); } }      // its distance through the trip, every ten seconds
     if(d.fix){ const first=!r.placed; r.placed={lat:+d.fix.lat.toFixed(6),lon:+d.fix.lon.toFixed(6),unc:Math.round(d.fix.unc),n:d.fix.n};
-      if(first) wEvent('placed','Placed: '+walkName(d)+', '+du(d.dist)+(d.bearing!=null?' '+compass(d.bearing):'')+', likely within '+du(d.fix.unc), d.id); }
+      if(first) wEvent('placed','Placed: '+walkName(d)+', '+(d.bearing!=null && d.fix.unc<d.dist ? du(d.dist)+' '+compass(d.bearing)+', likely within '+du(d.fix.unc) : 'within '+du(d.dist+d.fix.unc)+' of where you were'), d.id); }          // a direction means nothing while the circle is wider than the distance
     else if(d.sector && !r.rough && !r.placed){ r.rough={brg:Math.round(d.sector.brg)}; wEvent('rough','Direction found: '+walkName(d)+', roughly '+compass(d.sector.brg), d.id); }
     if(d.retFix && !r.ret){ r.ret=now; const was=r.withYou||r.maybe||r.mv; r.withYou=0; r.wy=0; r.maybe=0; r.mv=0; r.mvDb=0; r.mvS=0;
       if(was) wEvent('note','Stays in place: '+walkName(d)+'. You passed the same spot twice and it was strongest there both times, so it is not with you.', d.id); }
@@ -6780,7 +6780,7 @@ function walkDocHTML(){
   const tbl=(head,rows)=>'<div class="rp-wide"><table><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+'</table></div>';
   const chunks=(head,rows,n)=>{ let o=''; for(let i=0;i<rows.length;i+=n) o+=tbl(head,rows.slice(i,i+n)); return o; };
   const nm=r=>e(r.label||r.adv||r.call), kind=r=>e([r.cls==='Unknown'?'':r.cls, r.hint].filter(Boolean).join(', ')||'Maker not broadcast');
-  const place=r=>r.placed?'Placed, within '+r.placed.unc+' m':r.rough?'Direction only: '+compass(r.rough.brg):'Distance only';
+  const place=r=>r.placed?'Placed, within '+du(r.placed.unc):r.rough?'Direction only: '+compass(r.rough.brg):'Distance only';
   const stand=tripReading;
   const withYou=ds.filter(r=>r.withYou&&!r.mine), maybe=ds.filter(tripMaybe), fixed=ds.filter(r=>r.v==='fixed'&&!r.withYou&&!r.mine&&!tripMaybe(r)), passed=ds.filter(r=>!r.mine&&tripReading(r)==='Passed by'), nearby=ds.filter(r=>!r.mine&&tripReading(r)==='Near your route'), mine=ds.filter(r=>r.mine), placed=ds.filter(r=>r.placed);
   const reach=tripReach(), longEnough=st.minutes>=FOLLOW.mins && reach>=FOLLOW.reach, sensors=(PH.on?['This phone']:[]).concat(carriedIds().map(k=>P.sensors[k].name));
@@ -6788,8 +6788,8 @@ function walkDocHTML(){
   let sec=0; const H=t=>'<h2>'+(++sec)+'. '+t+'</h2>';
   const spark=r=>{ const L=r.dl||[]; if(L.length<3) return ''; const ta=L[0][0], tb=L[L.length-1][0], mx=Math.max(40,...L.map(x=>x[1]));
     return '<svg viewBox="0 0 150 34" style="width:150px;height:34px;display:block" role="img" aria-label="Distance through the trip"><line x1="0" y1="33" x2="150" y2="33" stroke="#b9b3a0" stroke-width="1"/><polyline fill="none" stroke="#1A1A2E" stroke-width="1.6" points="'+
-      L.map(x=>(tb>ta?(x[0]-ta)/(tb-ta)*148+1:1).toFixed(1)+','+(32-Math.min(1,x[1]/mx)*29).toFixed(1)).join(' ')+'"/></svg><span style="font-size:10px;color:#55556b">0 to '+mx+' m, higher is further</span>'; };
-  const dline=r=>{ const L=r.dl||[]; if(!L.length) return 'about '+r.min+' m'; const n=Math.min(6,L.length), pick=[]; for(let i=0;i<n;i++) pick.push(L[Math.round(i*(L.length-1)/Math.max(1,n-1))]); return pick.map(x=>hhmm(x[0])+' '+x[1]+' m').join(' · '); };
+      L.map(x=>(tb>ta?(x[0]-ta)/(tb-ta)*148+1:1).toFixed(1)+','+(32-Math.min(1,x[1]/mx)*29).toFixed(1)).join(' ')+'"/></svg><span style="font-size:10px;color:#55556b">0 to '+du(mx)+', higher is further</span>'; };
+  const dline=r=>{ const L=r.dl||[]; if(!L.length) return 'about '+du(r.min); const n=Math.min(6,L.length), pick=[]; for(let i=0;i<n;i++) pick.push(L[Math.round(i*(L.length-1)/Math.max(1,n-1))]); return pick.map(x=>hhmm(x[0])+' '+du(x[1])).join(' · '); };
   let h='<h1>Remiel Technologies Trip Report</h1><p class="rp-sub">What was around you, and what stayed with you</p>'+
     '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded '+(PH.native?'in the Remiel app on this phone':'on '+e(Y.name||'this device'))+(W.test?' &nbsp;·&nbsp; <b>Test data</b>':'')+'</div>';
   // 1
@@ -6813,7 +6813,7 @@ function walkDocHTML(){
       '<polyline points="'+rp.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')+'" fill="none" stroke="#1A1A2E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'+
       '<circle cx="'+rp[0][0].toFixed(1)+'" cy="'+rp[0][1].toFixed(1)+'" r="6" fill="#fff" stroke="#1A1A2E" stroke-width="2"/><circle cx="'+rp[rp.length-1][0].toFixed(1)+'" cy="'+rp[rp.length-1][1].toFixed(1)+'" r="6" fill="#1A1A2E"/>'+
       placed.map((r,i)=>{ const q=px([X(r.placed),Yy(r.placed)]); return '<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+Math.max(5,r.placed.unc*sc).toFixed(1)+'" fill="rgba(197,165,90,.22)" stroke="#C5A55A"/><text x="'+q[0].toFixed(1)+'" y="'+(q[1]+4).toFixed(1)+'" font-family="Georgia,serif" font-size="12" text-anchor="middle" fill="#1A1A2E">'+(i+1)+'</text>'; }).join('')+
-      '<line x1="40" y1="290" x2="'+(40+bar*sc).toFixed(1)+'" y2="290" stroke="#55556b" stroke-width="2"/><text x="'+(46+bar*sc).toFixed(1)+'" y="294" font-family="Georgia,serif" font-size="11" fill="#55556b">'+bar+' m</text>'+
+      '<line x1="40" y1="290" x2="'+(40+bar*sc).toFixed(1)+'" y2="290" stroke="#55556b" stroke-width="2"/><text x="'+(46+bar*sc).toFixed(1)+'" y="294" font-family="Georgia,serif" font-size="11" fill="#55556b">'+du(bar)+'</text>'+
       '<text x="590" y="16" font-family="Georgia,serif" font-size="11" text-anchor="end" fill="#55556b">North is up. Open circle: start. Filled circle: end. Gold: placed devices, numbered as in section 5.</text></svg>'+
       '<p class="rp-sub" style="font-size:12px;margin-top:4px">The shape of your route, with each placed device and its zone.</p>'; }
   // 2
@@ -6822,7 +6822,7 @@ function walkDocHTML(){
     ['Length',e(walkDur(durMs))+', '+e(miText(st.distance_m))],
     ...(W.plan?[['Planned route','To '+e(W.plan.name)+', '+e(miText(W.plan.len))+' '+RT.word[W.plan.mode]+', due '+hhmm(W.plan.eta)+'. '+(W.plan.cams?plural(W.plan.cams,'camera','cameras')+' of the public record on it. ':'')+(W.plan.done?(W.plan.how==='arrived'?'Arrived at '+hhmm(W.plan.done)+'.':'Ended by you at '+hhmm(W.plan.done)+'.'):'Still open when this report was made.')]]:[]),
     ['Follower test',longEnough?'Complete: your route reached '+du(reach)+' end to end over '+e(walkDur(durMs)):'Your route reached '+du(reach)+' end to end. The test completes at '+du(FOLLOW.reach)+' and '+FOLLOW.mins+' minutes'],
-    ['Your position',rt.length?plural(rt.length,'point','points')+' recorded from GPS. The phone states its own accuracy as '+Math.round(median(rt.map(q=>q.acc)))+' m':'Starts with the first fix'],
+    ['Your position',rt.length?plural(rt.length,'point','points')+' recorded from GPS. The phone states its own accuracy as '+du(median(rt.map(q=>q.acc))):'Starts with the first fix'],
     ['Record',W.gaps?'Continuous except for '+e(walkDur(W.gaps*1000)):'Continuous']]);
   // 3
   h+=H('Devices that moved with you');
@@ -6839,16 +6839,16 @@ function walkDocHTML(){
   { const key=[...withYou, ...maybe, ...ds.filter(r=>!r.mine && !r.withYou && !tripMaybe(r) && (r.dl||[]).length>=3).sort((a,b)=>a.min-b.min).slice(0,8)];
     h+=H('How close each one came');
     h+=key.length ? '<p>For the devices that moved with you, and the eight that came closest: the closest distance, when, where you were, and the distance through the trip. Distance is read from signal strength, so it is given as about so many meters.</p>'+
-        chunks(['Device','Reading','Closest','Where you were','Distance through the trip'], key.map(r=>['<b>'+nm(r)+'</b><br><span style="font-size:11px">'+kind(r)+'</span>', e(stand(r)), 'about '+r.min+' m'+(r.minT?' at '+hms(r.minT):''), r.at?r.at.lat.toFixed(5)+', '+r.at.lon.toFixed(5):'Position pending', spark(r)+'<div style="font-size:11px">'+e(dline(r))+'</div>']), 6)
+        chunks(['Device','Reading','Closest','Where you were','Distance through the trip'], key.map(r=>['<b>'+nm(r)+'</b><br><span style="font-size:11px">'+kind(r)+'</span>', e(stand(r)), 'about '+du(r.min)+(r.minT?' at '+hms(r.minT):''), r.at?r.at.lat.toFixed(5)+', '+r.at.lon.toFixed(5):'Position pending', spark(r)+'<div style="font-size:11px">'+e(dline(r))+'</div>']), 6)
       : '<p>Remiel logs a distance every ten seconds for each device heard at least eight times. None reached that on this trip.</p>'; }
   // 5
   h+=H('Devices placed on the map')+(placed.length?'<p>A placed device was heard from several of your positions, and those readings agree on one location. The zone is where it most likely is.</p>'+
-    tbl(['','Device','Maker and kind','Zone','Closest you came','Location'],placed.map((r,i)=>[String(i+1),'<b>'+nm(r)+'</b>',kind(r),'Within '+r.placed.unc+' m','about '+r.min+' m',r.placed.lat.toFixed(5)+', '+r.placed.lon.toFixed(5)]))
+    tbl(['','Device','Maker and kind','Zone','Closest you came','Location'],placed.map((r,i)=>[String(i+1),'<b>'+nm(r)+'</b>',kind(r),'Within '+du(r.placed.unc),'about '+du(r.min),r.placed.lat.toFixed(5)+', '+r.placed.lon.toFixed(5)]))
     :'<p>Remiel places a device once it is heard from several of your positions, with a turn between them, at a steady position. No device met that on this trip, so each is given by distance.</p>');
   // 6
   const all=[...ds].sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0)||(tripMaybe(b)?1:0)-(tripMaybe(a)?1:0)||a.min-b.min);
   const onRec=ELOG.ready && all.some(r=>r.sig);
-  h+=H('Every device heard')+(all.length?chunks(['Device','Maker and kind','First heard','Heard for','Closest','Placement','Reading'].concat(onRec?['On record']:[]),all.map(r=>[nm(r),kind(r),hms(r.first),e(walkDur(r.last-r.first)),'about '+r.min+' m',place(r),stand(r)].concat(onRec?[r.sig?e(histRec(r.sig)):'']:[])),12):'<p>None.</p>');
+  h+=H('Every device heard')+(all.length?chunks(['Device','Maker and kind','First heard','Heard for','Closest','Placement','Reading'].concat(onRec?['On record']:[]),all.map(r=>[nm(r),kind(r),hms(r.first),e(walkDur(r.last-r.first)),'about '+du(r.min),place(r),stand(r)].concat(onRec?[r.sig?e(histRec(r.sig)):'']:[])),12):'<p>None.</p>');
   if(onRec){ const met=all.map(r=>({r, h:ELOG.hist.get(r.sig)})).filter(x=>x.h && !x.r.mine && (x.h.days>=2 || x.h.pl.length>=2)).sort((a,b)=>b.h.pl.length-a.h.pl.length||b.h.days-a.h.days||b.h.enc-a.h.enc);
     const fresh=x=>{ const at=x.r.at; if(!at || x.h.pl.length<2) return 'No'; const p=x.h.pl.find(q=>distLL(at.lat,at.lon,q[0],q[1])<=ELOG.PLACE_M); return (p && p[2]>=W.t0-60000) ? 'Yes' : 'No'; };
     h+=H('Devices seen before')+(met.length ? '<p>Of the devices on this trip, these are on record from more than one day or more than one place. A device seen at a new place on this trip was at a place where your log had not recorded it before.</p>'+
@@ -6878,7 +6878,7 @@ function walkDocHTML(){
      'Passed by: heard for under two minutes.',
      'Near your route: heard for two minutes or more, with too few legs to tell whether it stays in place.',
      'Placed: the device was heard from several of your positions, and the readings agree on one zone.',
-     'On record: the encounters your log holds for the device, this trip included, with the days and places they fall on. A place groups encounters within '+ELOG.PLACE_M+' m of one another.',
+     'On record: the encounters your log holds for the device, this trip included, with the days and places they fall on. A place groups encounters within '+du(ELOG.PLACE_M)+' of one another.',
      'Cell towers: each tower your phone used, and each change. A change counts as a sign only when your own path shows you stayed in one place for the three minutes before it.',
      'Distance: read from signal strength every ten seconds. A device in a pocket or behind a wall reads further away than it is.',
      'These are Remiel\'s working rules. The data file holds the figures for every device, so each reading can be checked.',
@@ -6978,9 +6978,9 @@ function alertFeed(){ let list=[]; try{ list=kevMine(); }catch(e){ return; }
 // What the app itself raised while the screen was off, and which banner you tapped.
 function alertNativeTick(){ const N=NATIVE(); if(!N) return;
   try{ if(typeof N.takeAlerts==='function'){ const xs=JSON.parse(N.takeAlerts()||'[]')||[];
-      xs.forEach(a=>{ if(!a || !a.key) return; const title='A tracker is traveling with you', text=String(a.label||'A tracker')+' stayed with you for '+Math.round(a.minutes||0)+' minutes across '+Math.round(a.meters||0)+' m. Open it and decide whether it is yours.';
+      xs.forEach(a=>{ if(!a || !a.key) return; const title='A tracker is traveling with you', text=String(a.label||'A tracker')+' stayed with you for '+Math.round(a.minutes||0)+' minutes across '+du(a.meters||0)+'. Open it and decide whether it is yours.';
         const d=LIVE.devs.get(a.key);
-        if(alertRaise('with:'+a.key, title, text, d?{dev:d.id}:{view:'watchers'}, true)) logEvidence('finding','Alert raised by the Remiel app with the screen off: '+String(a.label||'a tracker')+' stayed with you for '+Math.round(a.minutes||0)+' minutes across '+Math.round(a.meters||0)+' m.'); }); }
+        if(alertRaise('with:'+a.key, title, text, d?{dev:d.id}:{view:'watchers'}, true)) logEvidence('finding','Alert raised by the Remiel app with the screen off: '+String(a.label||'a tracker')+' stayed with you for '+Math.round(a.minutes||0)+' minutes across '+du(a.meters||0)+'.'); }); }
     if(typeof N.takeOpen==='function'){ const k=N.takeOpen(); if(k) alertGo(k); } }catch(e){} }
 function nativeMine(){ const N=NATIVE(); if(!N || typeof N.setMine!=='function') return; try{ N.setMine(JSON.stringify(Object.keys(sigGet().keys||{}).slice(0,300))); }catch(e){} }
 
@@ -7057,15 +7057,15 @@ function sensorsSection(){
 /* ----- a live device, opened ----- */
 function liveBody(d){
   const sn=sensorName(d.sensor);
-  const rel = d.fix && d.bearing!=null, atStation=(P.sensors[d.sensor]||{}).kind==='station';
-  const where = rel ? Math.round(d.dist)+' m, placed from readings at '+d.fix.n+' of your positions, likely within '+du(d.fix.unc) : 'about '+Math.round(d.dist)+' m'+(atStation?' from your home listener':'')+', from signal strength. It sharpens each time the device is heard again';
-  const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side' : (d.base>=FIX_MIN_BASELINE ? 'Keep moving and make a turn, and Remiel fixes its place' : 'Move about '+FIX_MIN_BASELINE+' m and make a turn, and Remiel finds its direction');
+  const rel = d.fix && d.bearing!=null && d.fix.unc<d.dist, atStation=(P.sensors[d.sensor]||{}).kind==='station';
+  const where = rel ? du(d.dist)+', placed from readings at '+d.fix.n+' of your positions, likely within '+du(d.fix.unc) : 'about '+du(d.dist)+(atStation?' from your home listener':'')+', from signal strength. It sharpens each time the device is heard again';
+  const dir = rel ? compass(d.bearing)+', '+Math.round(d.bearing)+'°' : d.fix ? 'Placed on the map' : d.sector ? 'Roughly '+compass(d.sector.brg)+', within about '+d.sector.half+'° either side' : (d.base>=FIX_MIN_BASELINE ? 'Keep moving and make a turn, and Remiel fixes its place' : 'Move about '+du(FIX_MIN_BASELINE)+' and make a turn, and Remiel finds its direction');
   const ft = d.mine ? 'Yours' : d.withYou ? 'Moving with you' : (!isFinite(d.need) ? 'Tracked in Tower Watch' : d.maybe ? 'Staying with you so far: '+(d.closeW?'within '+du(NEARW.m)+' of you':'even strength')+' on '+d.leg.legs+' legs. The test completes at '+du(d.need)+' and '+(d.cls==='Tag'?FOLLOW.tagMins:FOLLOW.mins)+' minutes' : d.fix ? 'Stays in one place' : d.verdict==='fixed' ? 'Stays in place: its strength rises and falls as you pass, as a fixed transmitter does' : 'Testing: completes at '+du(d.need)+' of your movement and '+(d.cls==='Tag'?FOLLOW.tagMins:FOLLOW.mins)+' minutes');
   return '<div class="dsec"><h4>Proximity</h4><div class="kv"><span class="k">Distance</span><span class="v">'+esc(where)+'</span><span class="k">Direction</span><span class="v '+(rel?'':'unkc')+'">'+esc(dir)+'</span>'+
     '<span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm · '+esc(d.band==='wifi'?'Wi-Fi':d.band==='cell'?'Cellular':'Bluetooth')+'</span>'+
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span></div></div>'+
     '<div class="dsec"><h4>Follower test</h4><div class="kv"><span class="k">Result</span><span class="v '+(d.withYou?'warnc':'')+'">'+esc(ft)+'</span>'+
-    '<span class="k">In earshot for</span><span class="v">'+(d.mins<1?'under a minute':Math.round(d.mins)+' min')+'</span><span class="k">While you moved</span><span class="v">'+Math.round(d.span||0)+' m</span></div></div>'+
+    '<span class="k">In earshot for</span><span class="v">'+(d.mins<1?'under a minute':Math.round(d.mins)+' min')+'</span><span class="k">While you moved</span><span class="v">'+du(d.span||0)+'</span></div></div>'+
     '<div class="dsec"><h4>History</h4><div class="kv"><span class="k">First heard</span><span class="v">'+new Date(d.firstSeen).toLocaleString()+'</span><span class="k">Reports</span><span class="v">'+d.timesSeen+'</span>'+
     '<span class="k">Heard by</span><span class="v">'+esc(sn)+'</span><span class="k">Identified by</span><span class="v">'+esc(identBy(d))+'</span><span class="k">Name it broadcasts</span><span class="v '+(d.adv?'':'unkc')+'" style="word-break:break-all">'+esc(d.adv||'Kept private by the device')+'</span>'+(d.hint?'<span class="k">Maker hint</span><span class="v">'+esc(d.hint)+'</span>':'')+
     '<span class="k">Address</span><span class="v '+(d.randomizes?'warnc':'')+'">'+(d.randomizes?'Randomizes, held by signature':'Not reported as randomized')+'</span></div></div>'+
@@ -7425,7 +7425,7 @@ document.addEventListener('click', e=>{
     case 'home-loc': { S.homeMsg='Finding your position.'; rerender();
       (S.pos && !S.geoErr ? Promise.resolve(true) : geoAsk()).then(ok=>{       // a position already held is current: the browser reports again only when you move
         if(!ok || !S.pos) S.homeMsg=geoHelp()||'The position could not be found.';
-        else if(S.pos.acc>200) S.homeMsg='Your position is only known to within '+Math.round(S.pos.acc)+' m, which is too rough to mark home. Switch Wi-Fi on, or do this on your phone at home.';
+        else if(S.pos.acc>200) S.homeMsg='Your position is only known to within '+du(S.pos.acc)+', which is too rough to mark home. Switch Wi-Fi on, or do this on your phone at home.';
         else { P.home.loc={lat:S.pos.lat,lon:S.pos.lon,acc:S.pos.acc,t:Date.now()}; S.homeMsg=''; save(); toast('Home location set.'); }
         rerender(); });
       break; }
