@@ -5941,7 +5941,7 @@ function devicesPull(){
    A sensor is the Remiel phone app, a carried sensor or a home station. Each seals its reports with its own key.
    Placement uses, in order of reliability: that a device is heard at all; how far (from signal strength, rough);
    which direction (only from movement: the same device heard from many of your positions); and whether it keeps up with you. */
-const LIVE={ after:0, started:false, seen:{mobile:0,station:0}, devs:new Map(), err:false, skew:0, bands:{}, polledAt:0, autoLog:[], home:false };
+const LIVE={ alias:{}, after:0, started:false, seen:{mobile:0,station:0}, devs:new Map(), err:false, skew:0, bands:{}, polledAt:0, autoLog:[], home:false };
 const liveLast = () => Math.max(LIVE.seen.mobile, LIVE.seen.station);
 let LIVE_POLL=5000, LIVE_PRESENT=30000, LIVE_SILENT=60000;
 // The follower test. Your route is cut into legs of 30 m. A device that moves with you is heard on nearly every leg at about the same strength.
@@ -6105,7 +6105,9 @@ function ingestReport(sid, rowT, p, off){
   if(!station) LIVE.repN=(LIVE.repN||0)+1;                 // one more report from a sensor that is with you
   let away=false;                                        // was this heard by a sensor that is with you, well away from home?
   if(!station && pos && okLL(P.home.loc)){ const hq=toXY(P.home.loc.lat,P.home.loc.lon); away=Math.hypot(pos.x-hq.x,pos.y-hq.y)>AWAY_M; }
-  for(const s of p.s.slice(0,150)){ if(!s || typeof s.id!=='string' || !s.id || s.id.length>80) continue;
+  const stitchOn=!station && W.on && !p.sim; if(stitchOn) stitchPlan(p.s.slice(0,150), at);
+  for(const s0 of p.s.slice(0,150)){ if(!s0 || typeof s0.id!=='string' || !s0.id || s0.id.length>80) continue;
+    const s=(stitchOn && LIVE.alias[s0.id]) ? Object.assign({}, s0, {id:LIVE.alias[s0.id]}) : s0;          // a phone that changed its address on this trip keeps its first name
     const band=['ble','wifi','cell'].indexOf(s.band)>=0?s.band:'ble';
     const rssi=(typeof s.rssi==='number'&&Number.isFinite(s.rssi))?Math.max(-120,Math.min(-10,s.rssi)):null;
     const reading=(typeof s.dist==='number'&&Number.isFinite(s.dist)&&s.dist>0)?Math.min(s.dist,50000):(rssi!==null?distOf(rssi,band):null);
@@ -6127,6 +6129,26 @@ function ingestReport(sid, rowT, p, off){
     if(!station && !p.sim) elogHear(d, at-LIVE.skew, reading, (pos && !(pos.acc>POS_MAX_ACC))?pos:null);
   }
 }
+/* One name for a phone through the whole trip. Phones, watches and earphones change their Bluetooth address every few minutes.
+   When one goes silent and, within 3.5 seconds, a new address of the same maker, kind and name appears at a strength within 6 dB of it,
+   close enough to read well (-85 dBm or stronger), the new address is the same device, and its readings join the old one for the rest of the trip.
+   Never joined: two addresses heard in the same moment, a silence longer than that, a match that more than one device could make, or anything across trips. */
+const STITCH={gap:3500, db:6, min:-85};
+function stitchFrom(s, r, at, busy){ const cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown', hint=typeof s.hint==='string'?s.hint.slice(0,40):'', nm=typeof s.name==='string'?s.name.trim().slice(0,40):'';
+  if(r<STITCH.min || (cls==='Unknown' && !makerOf({hint}))) return null;          // a device that says nothing of what it is could be anyone's
+  let hit=null, n=0;
+  LIVE.devs.forEach(c=>{ if(c.band!=='ble' || c.sim || c.mine || busy.has(c.sig) || (c.cls||'Unknown')!==cls || (c.hint||'')!==hint) return;
+    if(nm && c.adv && nm!==c.adv) return;
+    const gap=at-(c.seenMobile||0); if(!(gap>0 && gap<=STITCH.gap) || (c.seenMobile||0)<W.t0+LIVE.skew) return;
+    if(typeof c.rssi!=='number' || c.rssi<STITCH.min || Math.abs(c.rssi-r)>STITCH.db) return;
+    n++; hit=c; });
+  return n===1 ? hit : null; }
+function stitchPlan(list, at){ LIVE.alias=LIVE.alias||{}; const A=LIVE.alias, ids=new Set(list.map(x=>x && x.id).filter(Boolean));
+  Object.keys(A).forEach(k=>{ if(ids.has(k) && ids.has(A[k])) delete A[k]; });          // the old address is heard again beside the new one: they were two devices after all
+  const busy=new Set([...ids].map(k=>A[k]||k)), claim=new Map();
+  list.forEach(x=>{ if(!x || typeof x.id!=='string' || A[x.id] || LIVE.devs.has(x.id) || (x.band && x.band!=='ble') || typeof x.rssi!=='number') return;
+    const c=stitchFrom(x, x.rssi, at, busy); if(c){ const L=claim.get(c)||[]; L.push(x.id); claim.set(c,L); } });
+  claim.forEach((L,c)=>{ if(L.length===1){ A[L[0]]=c.sig; c.ids=(c.ids||1)+1; } }); }
 // Your legs: a new leg begins each time you are 30 m from where the last one began. Each device keeps its readings by leg.
 function legNow(pos){ const g=LIVE.leg||(LIVE.leg={i:0,x:null,y:null});
   if(pos){ if(g.x===null){ g.x=pos.x; g.y=pos.y; } else if(Math.hypot(pos.x-g.x,pos.y-g.y)>=FOLLOW.leg){ g.i++; g.x=pos.x; g.y=pos.y; } }
@@ -6559,7 +6581,7 @@ async function nativeDrain(){
       LIVE.seen.mobile=Math.max(LIVE.seen.mobile, b.t+LIVE.skew);      // the phone reported, whether or not anything was in earshot
       if(typeof b.sa==='number') LIVE.sa=b.sa;
       if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:used?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew);          // a sighting is placed at this fix only when the fix passed Remiel's checks; otherwise at the last position that did
-      if(!live && W.on && list.length) walkTick(b.t, list.map(x=>x.id), used?q:null);
+      if(!live && W.on && list.length) walkTick(b.t, [...new Set(list.map(x=>(LIVE.alias||{})[x.id]||x.id))], used?q:null);
       if(!live){ try{ contactScan(b.t+LIVE.skew); }catch(e){} }
       if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
     if(batches.length){ liveTick(); walkSettle(); }
@@ -6700,7 +6722,7 @@ const carriedIds = () => Object.keys(P.sensors||{}).filter(k=>P.sensors[k].kind!
 let TRIP_START_M=60, TRIP_IDLE_MS=5*60000; const TRIP={a:null}, TRIP_STILL_M=25, TRIP_MOVE_M=40, TRIP_START_N=3, TRIP_START_MS=(typeof window.HALO_TRIP_MS==='number') ? window.HALO_TRIP_MS : 10000;
 const tripKeep = () => { if(!(W.t0 && W.t1)) return; if(TRIP_AUTO){ const st=walkStats(); if(!st.heard && !st.distance_m) return; } W.kept=true; tripMeta(W); if(!W.arch) tripArchive(); };
 function walkStart(t0, a, at){
-  tripKeep(); const back=!!at;
+  tripKeep(); const back=!!at; LIVE.alias={};
   Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, off:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0, contacts:[]});
   if(a) W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10});
   { const R=routeLive(); if(R) W.plan=routeInfo(R); }          // a trip that begins while a route is set belongs to that route
@@ -6708,7 +6730,7 @@ function walkStart(t0, a, at){
   if(back) walkTick(at, [...LIVE.devs.keys()]); else { wLock(); walkTick(); }
   wSave(true); renderVicinity();
 }
-function walkStop(t1){ if(!W.on) return; if(!t1) walkTick(); W.on=false; W.t1=Math.max(W.t0+1000, t1||Date.now()); if(!(W.route||[]).length){ const why=phNoHear(); wEvent('warn','No position was received during this trip.'+(why?' '+why:''), '', W.t1-1); } wEvent('stop','Trip ended.','',W.t1); try{ if(_wLock) _wLock.release(); }catch(e){} _wLock=null; TRIP.a=null; tripKeep(); wSave(true); renderVicinity(); }
+function walkStop(t1){ if(!W.on) return; if(!t1) walkTick(); W.on=false; LIVE.alias={}; W.t1=Math.max(W.t0+1000, t1||Date.now()); if(!(W.route||[]).length){ const why=phNoHear(); wEvent('warn','No position was received during this trip.'+(why?' '+why:''), '', W.t1-1); } wEvent('stop','Trip ended.','',W.t1); try{ if(_wLock) _wLock.release(); }catch(e){} _wLock=null; TRIP.a=null; tripKeep(); wSave(true); renderVicinity(); }
 // Positions in time order, live or from the app's own record. A trip taken with the screen off is recognized and recorded in full.
 function tripStep(q, t, hearing, back){
   if(!q || !(q.acc<=POS_MAX_ACC) || q.src==='net') return;
@@ -6769,7 +6791,7 @@ function walkTick(at, only, q){
       if(d.sim) W.test=true;
       wEvent('new','New: '+walkName(d)+', '+distText(d), d.id); }
     if(!heard){ if(r.here){ r.here=false; const gt=Math.min(now, r.last+LIVE_PRESENT); if(r.n>=3 && r.last>(r.goneL||0)){ r.goneL=r.last; if(r.last-r.first>=2000) wEvent('gone','Gone: '+(r.label||r.call)+', heard for '+walkDur(r.last-r.first)+(r.span?' across '+du(r.span)+' of your movement':''), d.id, gt); } } return; }
-    r.last=Math.max(r.first, Math.min(now, Math.round(d.seenMobile-LIVE.skew))); r.n++; r.label=labelOf(d)||''; r.call=d.name; r.cls=d.cls; r.hint=d.hint||''; r.adv=d.adv||''; r.mine=!!d.mine; r.pr=!!d.paired; r.sim=r.sim&&!!d.sim;
+    r.last=Math.max(r.first, Math.min(now, Math.round(d.seenMobile-LIVE.skew))); r.n++; if(d.ids>1) r.ids=d.ids; r.label=labelOf(d)||''; r.call=d.name; r.cls=d.cls; r.hint=d.hint||''; r.adv=d.adv||''; r.mine=!!d.mine; r.pr=!!d.paired; r.sim=r.sim&&!!d.sim;
     if(!r.here){ r.here=true; if(r.last>(r.goneL||0)) wEvent('back','Back in earshot: '+walkName(d)+', '+distText(d), d.id); }          // heard again after it left, not the same sighting read a second time
     if(d.dist<=r.min || !r.at){ r.min=Math.round(Math.min(r.min,d.dist)); r.minT=now; if(here){ r.at={lat:+here.lat.toFixed(6),lon:+here.lon.toFixed(6)}; r.atAcc=Math.round(here.acc||5); } }
     if(r.n>=8){ const L=r.dl||(r.dl=[]), l=L[L.length-1]; if(!l || now-l[0]>=10000){ L.push([now, Math.round(d.dist)]); if(L.length>120) r.dl=L.filter((x,i)=>i%2===0); } }      // its distance through the trip, every ten seconds
@@ -6825,7 +6847,7 @@ function walkReport(){
     devices:Object.values(W.devs).sort((a,b)=>(b.withYou?1:0)-(a.withYou?1:0) || (b.placed?1:0)-(a.placed?1:0) || b.n-a.n)
       .map(r=>({id:r.id, callSign:r.call, yourName:r.label||'', markedMine:!!r.mine, class:r.cls, maker:r.hint, broadcastName:r.adv, band:r.band, testData:!!r.sim, firstHeard:iso(Math.min(r.first, r.last)), lastHeard:iso(r.last), reports:r.n,
         closest_m:r.min, closestAt:r.minT?iso(r.minT):null, youWereAt:r.at, placed:r.placed, located:tripWhere(r), directionRough:r.rough, reading:tripReading(r), withYou:r.withYou?iso(r.withYou):null, stayingSince:r.maybe?iso(r.maybe):null, minutesHeard:r.mins||0, yourMovement_m:r.span||0,
-        legsHeard:r.legs||0, legShare:r.share||0, legSpread_dB:r.spread||0, legLevel_dBm:r.level||0, legDrift_dB:r.drift||0, reportShare:r.rate||0, steadySignal:!!r.steady, lastSignal_dBm:r.rssi, distance:(r.dl||[]).map(x=>({t:iso(x[0]), m:x[1]}))})),
+        identities:r.ids||1, legsHeard:r.legs||0, legShare:r.share||0, legSpread_dB:r.spread||0, legLevel_dBm:r.level||0, legDrift_dB:r.drift||0, reportShare:r.rate||0, steadySignal:!!r.steady, lastSignal_dBm:r.rssi, distance:(r.dl||[]).map(x=>({t:iso(x[0]), m:x[1]}))})),
     events:wEvents().map(e=>({t:iso(e.t), kind:e.k, text:e.text, id:e.id})), route:W.route.map(q=>({t:iso(q.t), lat:q.lat, lon:q.lon, acc_m:q.acc})), wifi:Object.values(W.aps||{}).filter(a=>a && a!==1).map(a=>({network:a.ssid||'', kind:a.hint||'', firstHeard:iso(a.first), lastHeard:iso(a.last), closest_m:a.min, youWereAt:a.at, located:apWhere(a)}))};
 }
 /* The trip, written out so it can be read: the bottom line first, then what Remiel recorded,
