@@ -2608,7 +2608,8 @@ function elogInit(){ try{ if(!window.indexedDB) return; const rq=indexedDB.open(
       if(!has('cam')){ const cm=db.createObjectStore('cam',{keyPath:'id',autoIncrement:true}); cm.createIndex('t','t'); }
       if(!has('trip')) db.createObjectStore('trip',{keyPath:'t0'});
       if(!has('ph')) db.createObjectStore('ph',{keyPath:'k'}); };
-    rq.onsuccess=()=>{ ELOG.db=rq.result; ELOG.ok=true; try{ JSON.parse(store.get('halo_elog_open')||'[]').forEach(o=>{ if(o && o.k && Date.now()-o.t1<6*3600000) ELOG.open.set(o.k,o); }); }catch(e){} elogLoad(); };
+    rq.onblocked=()=>{ try{ toast('Remiel is open in another tab. Close it, and this one opens your record.'); }catch(e){} };
+    rq.onsuccess=()=>{ ELOG.db=rq.result; ELOG.ok=true; ELOG.db.onversionchange=()=>{ try{ ELOG.db.close(); }catch(e){} ELOG.ok=false; }; try{ JSON.parse(store.get('halo_elog_open')||'[]').forEach(o=>{ if(o && o.k && Date.now()-o.t1<6*3600000) ELOG.open.set(o.k,o); }); }catch(e){} elogLoad(); };
     rq.onerror=()=>{}; }catch(e){} }
 const elogTx = (stores, mode) => ELOG.db.transaction(stores, mode);
 const elogAll = (name, index, key) => new Promise(res=>{ try{ const s=elogTx([name],'readonly').objectStore(name), rq=index?s.index(index).getAll(key):s.getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); }catch(e){ res([]); } });
@@ -3124,7 +3125,12 @@ async function tripFile(R){ const rep=withTrip(R, walkReport), iso=t=>new Date(t
    and the devices Remiel heard near you at that moment. Devices present at two sightings or more are listed first. Kept on this phone; your
    sealed sync carries the words and the sightings, and the photos stay on the phone. ---------- */
 const SUBJ_DID=[['parked','Parked'],['waited','Waited'],['passed','Passed me'],['followed','Followed me'],['other','Something else']];
-const subjGet = () => { const g=P.subj=P.subj||{}; g.list=g.list||[]; g.sights=g.sights||[]; return g; };
+const subjGet = () => { const g=P.subj=P.subj||{}; g.list=g.list||[]; g.sights=g.sights||[]; g.gone=g.gone||[]; return g; };
+// Another device's copy, or a saved record, joins this one by id. What was deleted on either stays deleted.
+function subjMerge(v){ if(!v || typeof v!=='object') return; const g=subjGet(), gone=new Set(g.gone.concat(Array.isArray(v.gone)?v.gone:[]));
+  (Array.isArray(v.list)?v.list:[]).forEach(x=>{ if(!x || !x.id || gone.has(x.id)) return; const i=g.list.findIndex(y=>y.id===x.id); if(i<0) g.list.push(x); else if((x.last||0)>(g.list[i].last||0)) g.list[i]=Object.assign({}, g.list[i], x); });
+  (Array.isArray(v.sights)?v.sights:[]).forEach(x=>{ if(x && x.id && !gone.has(x.id) && !g.sights.some(y=>y.id===x.id)) g.sights.push(x); });
+  g.list=g.list.filter(x=>!gone.has(x.id)); g.sights=g.sights.filter(x=>!gone.has(x.id) && !gone.has(x.s)); g.gone=[...gone].slice(-600); }
 const subjOf = id => subjGet().list.find(x=>x.id===id)||null;
 const subjSights = id => subjGet().sights.filter(x=>x.s===id).sort((a,b)=>a.t-b.t);
 const subjDidW = k => (SUBJ_DID.find(x=>x[0]===k)||['',''])[1];
@@ -3195,8 +3201,8 @@ function subjRepeats(ss){ const by={}; ss.forEach(sg=>{ const seen=new Set(); (s
     const b=by[k]||(by[k]={d, n:0, at:[]}); b.n++; b.at.push(sg.t); }); });
   return Object.values(by).filter(b=>b.n>=2).sort((a,b)=>b.n-a.n); }
 // What the phone recorded around a sighting: the trip's own findings at that waypoint, or about the devices near you then.
-async function subjRecorded(sg){ S.subjF=S.subjF||{}; if(S.subjF[sg.id]) return S.subjF[sg.id]; if(!sg.trip) return (S.subjF[sg.id]=[]);
-  const R=await tripGet(sg.trip); if(!R) return (S.subjF[sg.id]=[]); if(!R.cor){ try{ await tripCorrelate(R); }catch(e){} }
+async function subjRecorded(sg){ S.subjF=S.subjF||{}; const live=W.on && sg.trip===W.t0; if(S.subjF[sg.id] && !live) return S.subjF[sg.id]; if(!sg.trip) return (S.subjF[sg.id]=[]);
+  const R=live ? W : await tripGet(sg.trip); if(!R) return (S.subjF[sg.id]=[]); if(!R.cor){ try{ await tripCorrelate(R); }catch(e){} }
   const ids=new Set((sg.devs||[]).map(d=>d.id)), F=tripFindings(R, R.cor||{}).filter(f=>(sg.wp && f.at===sg.wp) || (f.devs||[]).some(r=>ids.has(r.id)));
   return (S.subjF[sg.id]=F.map(f=>f.text)); }
 async function subjRender(){ const box=el('subjBox'); if(!box) return; const V=S.subj; if(!V){ box.innerHTML=''; return; } const g=subjGet();
@@ -3220,10 +3226,10 @@ async function subjRender(){ const box=el('subjBox'); if(!box) return; const V=S
     '<div class="limit" style="text-align:center;margin-top:10px"><button class="linkbtn" data-act="subj-del" data-id="'+esc(x.id)+'">Delete '+esc(LK(x.name))+' and its sightings</button></div></div>';
   box.innerHTML=h; box.querySelectorAll('img[data-ph]').forEach(async im=>{ const u=await subjPhGet(im.dataset.ph); if(u) im.src=u; else im.remove(); }); }
 function subjDelete(id){ const g=subjGet(), x=subjOf(id); if(!x) return; confirmAsk({title:'Delete '+LK(x.name)+'?', danger:true, yes:'Delete', no:'Keep it', kept:'Kept.', text:'Its sightings and photos are removed from this phone. What was written to Evidence stays there.',
-  go:()=>{ subjSights(id).forEach(sg=>{ if(sg.ph) subjPhDel('sp:'+sg.id); }); g.sights=g.sights.filter(sg=>sg.s!==id); g.list=g.list.filter(y=>y.id!==id); save(); logEvidence('note','Deleted from Cars and people: '+x.name+'.'); S.subj={}; subjRender(); } }); }
+  go:()=>{ subjSights(id).forEach(sg=>{ if(sg.ph) subjPhDel('sp:'+sg.id); g.gone.push(sg.id); }); g.gone.push(id); g.sights=g.sights.filter(sg=>sg.s!==id); g.list=g.list.filter(y=>y.id!==id); save(); logEvidence('note','Deleted from Cars and people: '+x.name+'.'); S.subj={}; subjRender(); } }); }
 function subjSightDelete(id){ const g=subjGet(), sg=g.sights.find(y=>y.id===id); if(!sg) return; const x=subjOf(sg.s);
   confirmAsk({title:'Delete this sighting?', danger:true, yes:'Delete', no:'Keep it', kept:'Kept.', text:'This sighting is removed from this phone. What was written to Evidence stays there.',
-    go:()=>{ if(sg.ph) subjPhDel('sp:'+sg.id); g.sights=g.sights.filter(y=>y.id!==id); save(); subjRender(); } }); }
+    go:()=>{ if(sg.ph) subjPhDel('sp:'+sg.id); g.gone.push(id); g.sights=g.sights.filter(y=>y.id!==id); save(); subjRender(); } }); }
 /* ---------- Report for the police. One car or person, every sighting in time order: when and where, what you saw in your own words,
    your photo, what the phone recorded, and the devices near you each time. Facts only. Printed or saved as a PDF from the report bar,
    or shared as one file that carries the trip files with it. Nothing is sent by Remiel. ---------- */
@@ -3242,7 +3248,7 @@ function subjMap(R, la, lo){ const raw=(R && R.route||[]).filter(okLL); if(la==n
     '<text x="'+(Wd-14)+'" y="22" text-anchor="end" font-family="Georgia,serif" font-size="12" fill="#55556b">N ↑</text>'+
     '<line x1="'+pad+'" y1="'+(Hd-10)+'" x2="'+(pad+bar*sc).toFixed(1)+'" y2="'+(Hd-10)+'" stroke="#55556b" stroke-width="2"/><text x="'+(pad+bar*sc+6).toFixed(1)+'" y="'+(Hd-6)+'" font-family="Georgia,serif" font-size="11" fill="#55556b">'+du(bar)+'</text></svg>'; }
 async function subjReportHTML(id){ const x=subjOf(id); if(!x) return null; const ss=subjSights(id), rep=subjRepeats(ss), trips={};
-  for(const sg of ss){ if(sg.trip && !trips[sg.trip]){ const R=await tripGet(sg.trip); if(R){ if(!R.cor){ try{ await tripCorrelate(R); }catch(e){} } trips[sg.trip]=R; } } }
+  for(const sg of ss){ if(sg.trip && !trips[sg.trip]){ const R=(W.on && sg.trip===W.t0) ? W : await tripGet(sg.trip); if(R){ if(!R.cor){ try{ await tripCorrelate(R); }catch(e){} } trips[sg.trip]=R; } } }
   const rec={}; for(const sg of ss) rec[sg.id]=await subjRecorded(sg);
   const ph={}; for(const sg of ss) if(sg.ph) ph[sg.id]=await subjPhGet('sp:'+sg.id);
   const e=esc, who=(P.repName||'').trim(), first=ss[0], last=ss[ss.length-1], cover=ss.find(sg=>ph[sg.id]);
@@ -3262,7 +3268,7 @@ async function subjReportHTML(id){ const x=subjOf(id); if(!x) return null; const
       ((rec[sg.id]||[]).length?'<p><b>Recorded by the phone</b></p><ul class="rp-sum">'+rec[sg.id].map(t=>'<li>'+e(t)+'</li>').join('')+'</ul>':'')+
       (devs.length?'<p><b>Devices within '+du(30)+' of the phone at that moment: '+devs.length+'</b></p><ul class="rp-sum">'+devs.slice(0,12).map(d=>'<li>'+e(LK(d.name))+', about '+du(d.m)+' away</li>').join('')+'</ul>':'')+'</div>'; });
   if(rep.length) h+='<h2>3. Devices present at two sightings or more</h2><ul class="rp-sum">'+rep.map(b=>'<li>'+e(LK(b.d.name))+' was near you at '+b.n+' sightings:<ul>'+b.at.map(t=>'<li>'+e(dateLong(t))+', '+hhmm(t)+'</li>').join('')+'</ul></li>').join('')+'</ul>';
-  const tf=[]; for(const t0 of Object.keys(trips)){ try{ const f=await tripFile(trips[t0]); const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(f.text)))].map(z=>z.toString(16).padStart(2,'0')).join(''); tf.push({name:f.name, text:f.text, hash}); }catch(err){} }
+  const tf=[]; for(const t0 of Object.keys(trips)){ if(trips[t0]===W && W.on) continue; try{ const f=await tripFile(trips[t0]); const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(f.text)))].map(z=>z.toString(16).padStart(2,'0')).join(''); tf.push({name:f.name, text:f.text, hash}); }catch(err){} }
   h+='<h2>'+(rep.length?'4':'3')+'. How this was recorded</h2><p>Remiel Technologies is an app on the phone of the person named above. On a trip it records the phone\'s position and the Bluetooth signals of the devices around it, and estimates each device\'s distance from the strength of its signal. Each sighting in this report was entered by that person at the time shown. '+(tf.length?'The phone\'s record of each trip is attached as a data file:':'')+'</p>'+
     (tf.length?'<ul class="rp-sum">'+tf.map(f=>'<li>'+e(f.name)+' · SHA-256 '+e(f.hash)+'</li>').join('')+'</ul>':'');
   h+='<div class="rp-noprint subj-row" style="margin-top:16px"><button class="btn sm primary" data-act="rep-share" data-id="'+e(id)+'">Share the report and its trip files</button></div>';
@@ -3708,7 +3714,8 @@ const houseDev = d => HOUSE_RE.test((d.hint||'')+' '+(d.adv||''));
 const isWorn = d => (d.cls==='Wearable' || d.cls==='Phone' || WORN_RE.test((d.hint||'')+' '+(d.adv||''))) && !houseDev(d);
 // A thing that stays put: an appliance, a TV, a speaker or a printer by its name, or a device nobody carries that the record already holds at this place on three days or more.
 // Its strength swings with doors, walls and people in between, and none of that is movement, so it is never called moving and never said to have passed you.
-const stayPut = d => { if(houseDev(d)) return true; if(isWorn(d) || neverLocal(d.cls) || d.cls==='Phone') return false; const h=ELOG.ready?histFor(d.sig, d.adv):null; return !!h && ((h.fx||0)>0 || (h.days||0)>=3); };
+const stayPut = d => { if(houseDev(d)) return true; if(isWorn(d) || neverLocal(d.cls) || d.cls==='Phone') return false; const h=ELOG.ready?histFor(d.sig, d.adv):null, me=ePos();
+  return !!h && !!me && ((h.fx||0)>0 || (h.days||0)>=3) && (h.pl||[]).length>0 && h.pl.every(p=>distLL(me.lat,me.lon,p[0],p[1])<=ELOG.FAR_M); };
 const isDrone = d => !!d.rid || (d.cls==='Camera' && /^Drone/.test(d.hint||''));
 function motionChips(d){ const mo=motionOf(d), out=[];
   if(mo.m==='moving') out.push('<i class="mchip m-mv">Moving'+paceChip(mo.v)+'</i>');
@@ -3731,7 +3738,7 @@ function contactScan(nowS){ if(!nowS && scanQuiet()) return; nowS=nowS||Date.now
   LIVE.devs.forEach(d=>{ if(d.band==='ble' && d.ms && d.ms.length) heard=Math.max(heard, d.ms[d.ms.length-1][0]); });
   LIVE.devs.forEach(d=>{ if(d.band!=='ble' || !d.ms || d.ct || d.sim || d.mine || isYours(d) || d.withYou) return; const pk=devPeak(d); if(!pk || nowS-pk.t>90000 || nowS<pk.last) return;
     if(pk.t-pk.first>CONTACT.arrive || d.verdict==='fixed') return; const h=ELOG.ready?ELOG.hist.get(d.sig):null; if(h && h.fx>0) return;
-    const gone=heard>=pk.last+4000 ? nowS-pk.last : 0, drop=pk.r-pk.lastR, mv=!!(d.mov && d.mov.v), M=d.ms, a=M.find(q=>q[2]!==null), z=[...M].reverse().find(q=>q[2]!==null);
+    const gone=heard>=pk.last+4000 ? nowS-pk.last : 0, drop=pk.r-pk.lastR, mv=!!(d.mov && d.mov.v) && !stayPut(d), M=d.ms, a=M.find(q=>q[2]!==null), z=[...M].reverse().find(q=>q[2]!==null);
     const fixture=houseDev(d) || !!h || stayPut(d), carried=isWorn(d) || d.cls==='Vehicle' || d.cls==='Tag';          // a device already on record at this place is part of the place
     cand.push({d, pk, mv, fixture, carried, still:!!a && a!==z && (z[0]-a[0])>=0.5*(M[M.length-1][0]-M[0][0]) && Math.hypot(z[2]-a[2], z[3]-a[3])<6, moved:!!a && a!==z && Math.hypot(z[2]-a[2], z[3]-a[3])>=6, done:nowS-pk.t>=CONTACT.wait && (gone>=CONTACT.wait || drop>=CONTACT.fade), part:gone>=8000 || drop>=CONTACT.mfade,
       lead:mv || ((isWorn(d) || d.cls==='Vehicle') && !fixture && distOf(pk.r,'ble')<=CONTACT.near)}); });
@@ -5122,7 +5129,7 @@ async function api(method, path, body, auth){
 /* ----- what syncs: one section per subject, last edit wins ----- */
 const hashStr = s => { let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))>>>0; return h.toString(36)+':'+s.length; };
 function sectionsNow(){
-  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{}, labels:P.labels||{}, where:P.where||null, sig:P.sig||null, subj:{list:subjGet().list, sights:subjGet().sights} };
+  const o={ profile:P.profile||{}, platform:P.platform||null, aliases:P.aliases||[], patch:P.patch||[], home:P.home, sensors:P.sensors||{}, mine:P.mine||{}, labels:P.labels||{}, where:P.where||null, sig:P.sig||null, subj:{list:subjGet().list, sights:subjGet().sights, gone:subjGet().gone} };
   Object.keys(P.done||{}).forEach(id=>{ const d=P.done[id]; if(d && !Array.isArray(d)) o['done.'+id]=d; });
   Object.keys(P.hits||{}).forEach(id=>{ o['hits.'+id]=P.hits[id]|0; });
   return o; }
@@ -5135,7 +5142,7 @@ function applySection(k,v){
   else if(k==='mine') P.mine=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='labels') P.labels=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
   else if(k==='sig') P.sig=(v&&typeof v==='object'&&!Array.isArray(v))?v:null;
-  else if(k==='subj') P.subj={list:(v&&Array.isArray(v.list))?v.list:[], sights:(v&&Array.isArray(v.sights))?v.sights:[]};
+  else if(k==='subj') subjMerge(v);
   else if(k==='where') P.where=(v&&typeof v==='object'&&okLL(v)&&Number.isFinite(v.t))?v:null;
   else if(k==='home'){ const b=blank().home; P.home=Object.assign(b, (v&&typeof v==='object')?v:{}); P.home.rules=Object.assign(blank().home.rules,(v&&v.rules)||{}); }
   else if(k.indexOf('done.')===0) P.done[k.slice(5)]=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
@@ -5143,7 +5150,7 @@ function applySection(k,v){
 // Compare each section with what was last seen. A changed section is stamped with the time of the edit.
 function trackLocal(ts){ const o=sectionsNow(); Y.local=Y.local||{}; let changed=false;
   Object.keys(o).forEach(k=>{ const hsh=hashStr(JSON.stringify(o[k])), L=Y.local[k];
-    if(!L){ Y.local[k]={h:hsh,t:ts!=null?ts:Date.now(),d:true}; changed=true; }
+    if(!L){ const empty=k==='subj' && !o[k].list.length && !o[k].sights.length; Y.local[k]={h:hsh,t:ts!=null?ts:(empty?1:Date.now()),d:true}; changed=true; }          // a section new to this device and still empty is older than any other device's copy
     else if(L.h!==hsh){ L.h=hsh; L.t=Date.now(); L.d=true; changed=true; } });
   return changed; }
 function onLocalChange(){ if(!Y.refresh||Y.signedOut) return; const sec=trackLocal(), ev=(P.evSeq||0)>(Y.pushedSeq||0); if(sec) ysave(); if(sec||ev) schedulePush(); }
@@ -6157,7 +6164,7 @@ async function recordRestore(file){ let f=null; try{ f=JSON.parse(await file.tex
     tx.oncomplete=res; tx.onerror=res; tx.onabort=res; });
   const tl=(P.trips||[]).slice(); (f.trips||[]).forEach(x=>{ if(x && x.t0 && !tl.some(y=>y.t0===x.t0)) tl.push(x); }); tl.sort((a,b)=>b.t0-a.t0); P.trips=tl;
   P.labels=Object.assign({}, f.labels||{}, P.labels||{}); P.mine=Object.assign({}, f.mine||{}, P.mine||{});
-  if(f.subj && Array.isArray(f.subj.list)){ const g=subjGet(); f.subj.list.forEach(x=>{ if(x && x.id && !subjOf(x.id)) g.list.push(x); }); (f.subj.sights||[]).forEach(x=>{ if(x && x.id && !g.sights.some(y=>y.id===x.id)) g.sights.push(x); }); }
+  if(f.subj) subjMerge(f.subj);
   save();
   ELOG.hist.clear(); ELOG.names.clear(); await elogLoad(); try{ pathCheck(); }catch(e){}
   toast('Restored: '+nd+(nd===1?' device':' devices')+' new to this phone, '+ne+(ne===1?' encounter':' encounters')+' and '+nt+(nt===1?' trip':' trips')+' added. Nothing on this phone was replaced.'); rerender(); }
@@ -6258,9 +6265,9 @@ function apLearn(la,lo,acc,t,wl){ if(!(acc<=25)) return; const M=apkLoad(); apSt
 const GAP_S=20, JUMP_M=60;
 function posGate(la,lo,acc,t,src,wl,app){
   // The same fix handed over again with a later batch says nothing new: it gets the answer it got the first time, and counts for nothing.
-  if(app && GATE.ft===t && GATE.fla===la && GATE.flo===lo) return GATE.fg||0;
+  if(app && GATE.ft===t && GATE.fla===la && GATE.flo===lo) return 0;
   if(src!=='net' && !apCheck(la,lo,t,wl)) return 0;
-  const g=posGate0(la,lo,acc,t,src,app); if(app){ GATE.ft=t; GATE.fla=la; GATE.flo=lo; GATE.fg=g>0?1:0; } if(g>0 && src!=='net') apLearn(la,lo,(typeof acc==='number'&&acc>0)?acc:50,t,wl); return g; }
+  const g=posGate0(la,lo,acc,t,src,app); if(app){ GATE.ft=t; GATE.fla=la; GATE.flo=lo; } if(g>0 && src!=='net') apLearn(la,lo,(typeof acc==='number'&&acc>0)?acc:50,t,wl); return g; }
 function posGate0(la,lo,acc,t,src,app){ acc=(typeof acc==='number'&&acc>0)?acc:50; const L=GATE.last, rough=a=>a>=30;
   const keep=v=>{ GATE.last={la,lo,acc,t}; GATE.pend=null; GATE.n=0; clearTimeout(GATE.tm); if(v!=null) GATE.v=(GATE.v==null?v:0.6*GATE.v+0.4*v); };
   if(!L){ keep(null); return 1; }
@@ -6404,7 +6411,7 @@ function stitchFrom(s, r, at, busy){ const cls=CLS.indexOf(s.cls)>=0?s.cls:'Unkn
     n++; hit=c; });
   return n===1 ? hit : null; }
 function stitchPlan(list, at){ LIVE.alias=LIVE.alias||{}; const A=LIVE.alias, ids=new Set(list.map(x=>x && x.id).filter(Boolean));
-  Object.keys(A).forEach(k=>{ if(ids.has(k) && ids.has(A[k])) delete A[k]; });          // the old address is heard again beside the new one: they were two devices after all
+  Object.keys(A).forEach(k=>{ if(ids.has(A[k])) delete A[k]; });          // a changed address never comes back: the old one heard again means they were two devices after all
   const busy=new Set([...ids].map(k=>A[k]||k)), claim=new Map();
   list.forEach(x=>{ if(!x || typeof x.id!=='string' || A[x.id] || LIVE.devs.has(x.id) || (x.band && x.band!=='ble') || typeof x.rssi!=='number') return;
     const c=stitchFrom(x, x.rssi, at, busy); if(c){ const L=claim.get(c)||[]; L.push(x.id); claim.set(c,L); } });
@@ -6442,7 +6449,7 @@ function liveDerive(d, nowS){
   d.linger = !mob && d.seenMobile>0 && nowS-held-d.seenMobile<FOLLOW.linger;              // just lost: it fades on the map instead of vanishing
   d.present = mob || (sta && LIVE.home);                 // near you. What only the home station hears is near you only when you are home
   d.atHome = sta && !d.present;
-  d.mine = !!(P.mine && P.mine[d.id]) || !!d.paired || (!!d.adv && sigGet().names.indexOf(d.adv)>=0);          // yours by your mark, by pairing, or by a name you marked: a new address does not make it a stranger
+  d.mine = !!(P.mine && P.mine[d.id]) || !!d.paired || (!!d.adv && ((P.sig&&P.sig.names)||[]).indexOf(d.adv)>=0);          // yours by your mark, by pairing, or by a name you marked: a new address does not make it a stranger
   const me=posNow();
   if((d.fix || d.sector) && d.band==='ble' && nearWith(d)){ d.fix=null; d.sector=null; }          // near you at places far apart: it has no place of its own
   if(d.fix && me){ d.dist=Math.max(1,Math.hypot(d.fix.x-me.x,d.fix.y-me.y)); d.bearing=(Math.atan2(d.fix.x-me.x,d.fix.y-me.y)*180/Math.PI+360)%360; }
@@ -6982,7 +6989,7 @@ const carriedIds = () => Object.keys(P.sensors||{}).filter(k=>P.sensors[k].kind!
 let TRIP_START_M=60, TRIP_IDLE_MS=5*60000; const TRIP={a:null}, TRIP_STILL_M=25, TRIP_MOVE_M=40, TRIP_START_N=3, TRIP_START_MS=(typeof window.HALO_TRIP_MS==='number') ? window.HALO_TRIP_MS : 10000;
 const tripKeep = () => { if(!(W.t0 && W.t1)) return; if(TRIP_AUTO){ const st=walkStats(); if(!st.heard && !st.distance_m) return; } W.kept=true; tripMeta(W); if(!W.arch) tripArchive(); };
 function walkStart(t0, a, at){
-  tripKeep(); const back=!!at; LIVE.alias={};
+  tripKeep(); const back=!!at; LIVE.alias={}; LIVE.devs.forEach(d=>{ d.ids=1; });
   Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, off:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0, contacts:[]});
   if(a) W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10});
   { const R=routeLive(); if(R) W.plan=routeInfo(R); }          // a trip that begins while a route is set belongs to that route
