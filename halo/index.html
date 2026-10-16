@@ -2977,14 +2977,86 @@ function tripSummaryLines(R, C){
   const lastMove=rt.length?rt[rt.length-1].t:R.t0; if(R.t1-lastMove>=3*60000) L.push({text:'The trip ended at '+hhmm(R.t1)+', '+Math.round((R.t1-lastMove)/60000)+' minutes after you last moved.'});
   if((R.gaps||0)>=60) L.push({text:'Remiel was off the screen for '+walkDur(R.gaps*1000)+', and the record has a gap there.'});
   return L; }
+/* ----- What happened: what the trip found, one plain sentence each, in time order. Only findings are written; what Remiel could not tell is left out. ----- */
+// What a device is, in the words a person uses: a phone, an AirTag, headphones, a car tracker. Nothing more is claimed than the device says of itself.
+function plainKind(r){ const h=r.hint||'', x=h+' '+(r.adv||''), c=r.cls||'Unknown';
+  if(/AirTag/i.test(x)) return 'an AirTag';
+  if(/SmartTag/i.test(x)) return 'a Samsung SmartTag';
+  if(/\bTile\b/i.test(x)) return 'a Tile tracker';
+  if(/vehicle GPS tracker/i.test(x)) return 'a car tracker';
+  if(c==='Tag') return 'a tracker';
+  if(c==='Vehicle') return /scooter|e-bike/i.test(x) ? 'a scooter or e-bike' : /motorcycle|rider/i.test(x) ? 'motorcycle gear' : 'a car';
+  if(c==='Camera') return /drone/i.test(x) ? 'a drone' : 'a camera';
+  if(HOUSE_RE.test(x)) return /tv\b|television|qled|oled|webos|display|uhd/i.test(x) ? 'a TV' : /speaker|soundbar|\[av\]/i.test(x) ? 'a speaker' : /printer|laserjet/i.test(x) ? 'a printer' : /computer/i.test(x) ? 'a computer' : 'an appliance';
+  if(/buds|airpods|earbud|earphone|headphone|headset|beats|\bw[hf]-|bose|soundli|jabra|jlab/i.test(x)) return 'headphones';
+  if(/^Apple/.test(h) && /iPhone|iPad|Mac|device/.test(h)) return 'an Apple device';          // Apple's own broadcast does not say which of its devices it is
+  if(/watch|smart band|\bband \d|fitbit|garmin|amazfit|whoop|oura|polar |suunto|coros/i.test(x)) return 'a watch';
+  if(c==='Phone' || /galaxy [sazn]\d|pixel \d/i.test(x)) return 'a phone';
+  if(c==='Laptop') return 'a computer';
+  if(c==='Access point') return 'a Wi-Fi network';
+  if(/^Apple/.test(h)) return 'an Apple device';
+  if(c==='Wearable') return 'a wearable';
+  const m=makerOf(r); return m ? (/^[AEIOU]/.test(m)?'an ':'a ')+m+' device' : 'a device'; }
+// The kind, and the short name that tells it apart: your own name for it, the name it broadcasts, or its three-letter code.
+const plainName = r => { const own=(P.labels||{})[r.id]||r.label||'', code=((r.call||'').match(/#([A-Z0-9]{3})$/)||[])[1]||'', tag=own||(r.adv && !/^[0-9a-f:-]{8,}$/i.test(r.adv) ? r.adv : code);
+  return plainKind(r)+(tag?' ('+tag+')':''); };
+// Where you were at a moment of the trip, from its own route.
+function tripPosAt(R, t){ const rt=R.route||[]; if(!rt.length) return null; let i=rt.length-1; while(i>0 && rt[i].t>t) i--; const a=rt[i], b=rt[i+1];
+  if(t<=a.t || !b) return a; const f=(t-a.t)/Math.max(1,b.t-a.t); return {lat:a.lat+(b.lat-a.lat)*f, lon:a.lon+(b.lon-a.lon)*f, t}; }
+// The places you stopped: each waypoint, and each stretch of a minute or more in which your route moved less than 25 m.
+function tripStops(R){ const rt=R.route||[], out=(R.wps||[]).filter(w=>w.pos).map(w=>({t:w.t, end:w.t, pos:w.pos, label:'waypoint '+w.n}));
+  for(let i=0;i+1<rt.length;i++){ const a=rt[i], b=rt[i+1]; if(b.t-a.t>=60000 && distLL(a.lat,a.lon,b.lat,b.lon)<25 && !out.some(o=>Math.abs(o.t-a.t)<90000)) out.push({t:a.t, end:b.t, pos:{lat:a.lat,lon:a.lon}, label:'where you stopped for '+walkDur(b.t-a.t)}); }
+  return out.sort((a,b)=>a.t-b.t); }
+/* Went your way when you left. A device within 20 m of you at a stop, heard without a break from the moment you left it, that kept a steady distance
+   from you while you moved on at least 46 m (150 ft). Something left behind at the stop would fall away as you went, and soon out of earshot;
+   this one, once you were 46 m on, stayed at no more than four tenths of the distance you had covered, so it left when you did, and the same way. */
+const WENT={near:20, leave:15, move:46, gap:60000, first:30000, spread:30, ratio:0.4};
+function tripWent(R, r, stops){ const L=r.dl||[]; if(L.length<3) return null;
+  for(const A of stops){ const near=L.filter(x=>x[0]>=A.t-120000 && x[0]<=A.end+30000 && x[1]<=WENT.near); if(!near.length) continue; const mA=Math.min(...near.map(x=>x[1]));
+    const rt=R.route||[], lp=rt.find(q=>q.t>A.end && distLL(q.lat,q.lon,A.pos.lat,A.pos.lon)>=WENT.leave); if(!lp) continue;
+    const before=L.filter(x=>x[0]<lp.t), from=before.length?before[before.length-1][0]:0, win=[];
+    for(const x of L){ if(x[0]<lp.t) continue; const prev=win.length?win[win.length-1][0]:from; if(x[0]-prev>(win.length?WENT.gap:WENT.first+(lp.t-from))) break; win.push(x); }          // heard without a break from the moment you left
+    if(win.length<3 || win[0][0]-lp.t>WENT.first) continue;
+    const U=x=>{ const q=tripPosAt(R,x[0]); return q?distLL(q.lat,q.lon,A.pos.lat,A.pos.lon):0; }; let k=win.length-1; while(k>=2 && U(win[k])<WENT.move) k--;
+    const use=win.slice(0, k+1).filter(x=>U(x)>=WENT.leave), far=use.filter(x=>U(x)>=WENT.move), last=win[k], uEnd=U(last); if(use.length<3 || far.length<2) continue;
+    const ms=use.map(x=>x[1]), keep=ms.reduce((a,b)=>a+b,0)/ms.length, fk=far.reduce((a,x)=>a+x[1],0)/far.length, fu=far.reduce((a,x)=>a+U(x),0)/far.length;
+    if(uEnd<WENT.move || Math.max(...ms)-Math.min(...ms)>WENT.spread || fk>WENT.ratio*fu) continue;
+    return {t0:Math.min(near[0][0], A.t), t1:last[0], near:mA, keep:Math.round(keep), walked:uEnd, at:A}; }
+  return null; }
+function tripFindings(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, ds=Object.values(R.devs||{}).filter(r=>!r.sim && !r.mine && tags[r.id]!=='yours' && !r.pr), F=[], stops=tripStops(R);
+  const span=(a,b)=>hhmm(a)+(hhmm(b)!==hhmm(a)?' to '+hhmm(b):''), mins=ms=>{ const m=Math.round(ms/60000); return m<=1?'about a minute':m+' minutes'; };
+  // stayed with you
+  ds.filter(r=>tags[r.id]==='with' || (r.withYou && r.wy)).forEach(r=>F.push({t:r.withYou||r.first, hot:true, devs:[r],
+    text:span(r.first, r.last)+': '+plainName(r)+' stayed with you for '+mins(r.last-r.first)+(r.span?', across '+du(r.span)+' of your route':'')+'.'}));
+  const done=new Set(F.map(f=>f.devs[0].id));
+  // went your way when you left
+  ds.filter(r=>!done.has(r.id) && !HOUSE_RE.test((r.hint||'')+' '+(r.adv||'')) && tags[r.id]!=='local').forEach(r=>{ const w=tripWent(R, r, stops); if(!w) return; done.add(r.id);
+    F.push({t:w.t0, hot:true, devs:[r], text:span(w.t0, w.t1)+': '+plainName(r)+' came within about '+du(w.near)+' of you at '+w.at.label+', then went your way when you left: it stayed about '+du(w.keep)+' from you while you walked '+du(w.walked)+', until '+hhmm(w.t1)+'.'}); });
+  // a tracker came close
+  ds.filter(r=>r.cls==='Tag' && !done.has(r.id) && (r.min<=4 || (r.min<=10 && r.last-r.first>=120000))).forEach(r=>F.push({t:r.minT||r.first, hot:true, devs:[r],
+    text:hhmm(r.minT||r.first)+': '+plainName(r)+' came within '+du(r.min)+' of you'+(r.last-r.first>=60000?', and was in earshot for '+mins(r.last-r.first):'')+'.'}));
+  // passed you twice
+  const cts=(R.contacts||[]).slice().sort((a,b)=>a.t-b.t), byDev={};
+  cts.forEach(c=>c.devs.forEach(x=>{ (byDev[x.id]=byDev[x.id]||[]).push(c); }));
+  Object.keys(byDev).forEach(id=>{ const L=byDev[id], r=(R.devs||{})[id]; if(!r || L.length<2 || r.mine || tags[id]==='yours') return; const a=L[0], b=L[L.length-1];
+    if(b.t-a.t<120000 || !a.pos || !b.pos) return; const apart=distLL(a.pos.lat,a.pos.lon,b.pos.lat,b.pos.lon); if(apart<30) return;          // twice at one spot is someone who lives or works there
+    F.push({t:a.t, hot:true, devs:[r], text:hhmm(a.t)+' and '+hhmm(b.t)+': '+plainName(r)+' passed you twice, at places '+du(apart)+' apart.'}); });
+  // seen at another of your places, or on your Watch list
+  ds.filter(r=>tags[r.id]==='place').forEach(r=>F.push({t:r.minT||r.first, hot:true, devs:[r], text:hhmm(r.minT||r.first)+': '+plainName(r)+' near you here, about '+du(r.min)+' away. '+(C.hw&&C.hw[r.id]?C.hw[r.id].replace(/^By its name · /,'Known by its name: ')+'.':'')}));
+  ds.filter(r=>tags[r.id]==='watch').forEach(r=>F.push({t:r.minT||r.first, hot:true, devs:[r], text:hhmm(r.minT||r.first)+': '+plainName(r)+', on your Watch list, came within '+du(r.min)+' of you.'}));
+  F.sort((a,b)=>a.t-b.t);
+  return F; }
+const NOTHING_FOUND='Nothing followed you, stayed near you, or passed you twice.';
+function tripWhatHTML(R, C){ const F=tripFindings(R, C);
+  return '<div class="elog-h4">What happened</div><ul class="tsum-l what">'+(F.length ? F.map(f=>'<li class="'+(f.hot?'hot':'')+'">'+esc(f.text)+((f.devs||[]).filter(r=>r.sig).length?'<span class="tsum-a">'+f.devs.filter(r=>r.sig).map(r=>'<button class="btn sm" data-act="art" data-k="'+esc(r.sig)+'">Open</button>').join('')+'</span>':'')+'</li>').join('') : '<li>'+esc(NOTHING_FOUND)+'</li>')+'</ul>'; }
 function tripSummaryHTML(R, C){ const L=tripSummaryLines(R, C), nm=r=>(P.labels||{})[r.id]||r.label||r.adv||r.call||'Unidentified device';
-  return '<div class="tsum" id="tripSummary"><div class="elog-h4">Trip Summary</div><ul class="tsum-l">'+L.map(l=>'<li class="'+(l.hot?'hot':'')+(l.lead?' lead':'')+'">'+
+  return '<div class="tsum" id="tripSummary">'+tripWhatHTML(R, C)+'<div class="elog-h4">Trip Summary</div><ul class="tsum-l">'+L.map(l=>'<li class="'+(l.hot?'hot':'')+(l.lead?' lead':'')+'">'+
     (l.lead?'<b>'+esc(l.text)+'</b> ':esc(l.text)+' ')+(l.bold?'<b class="tsum-k">'+esc(l.bold)+'</b> ':'')+(l.next?'<span class="tsum-n">'+esc(l.next)+'</span>':'')+
     ((l.devs||[]).filter(r=>r.sig).length?'<span class="tsum-a">'+l.devs.filter(r=>r.sig).map(r=>'<button class="btn sm" data-act="art" data-k="'+esc(r.sig)+'">'+esc(nm(r))+'</button>').join('')+'</span>':'')+'</li>').join('')+'</ul>'+
     '<p class="limit" style="margin:6px 2px 0">Written by Remiel from this trip\'s own record. Devices are identified, not people.</p></div>'; }
-function tripSummaryPaper(R, C, H){ const L=tripSummaryLines(R, C);
+function tripSummaryPaper(R, C, H){ const L=tripSummaryLines(R, C), F=tripFindings(R, C);
   const nm=r=>(P.labels||{})[r.id]||r.label||r.adv||r.call||'Unidentified device';
-  return H('Trip Summary')+'<ul class="rp-sum">'+L.map(l=>'<li>'+(l.lead?'<b>'+esc(l.text)+'</b> ':esc(l.text)+' ')+(l.bold?'<b>'+esc(l.bold)+'</b> ':'')+(l.next?esc(l.next)+' ':'')+((l.devs||[]).length?'<span class="rp-names">'+l.devs.map(r=>esc(nm(r))).join(', ')+'</span>':'')+'</li>').join('')+'</ul>'; }
+  return H('What happened')+'<ul class="rp-sum">'+(F.length?F.map(f=>'<li>'+esc(f.text)+'</li>').join(''):'<li>'+esc(NOTHING_FOUND)+'</li>')+'</ul>'+H('Trip Summary')+'<ul class="rp-sum">'+L.map(l=>'<li>'+(l.lead?'<b>'+esc(l.text)+'</b> ':esc(l.text)+' ')+(l.bold?'<b>'+esc(l.bold)+'</b> ':'')+(l.next?esc(l.next)+' ':'')+((l.devs||[]).length?'<span class="rp-names">'+l.devs.map(r=>esc(nm(r))).join(', ')+'</span>':'')+'</li>').join('')+'</ul>'; }
 function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},hw:{},cnt:{},cams:[]}, ds=Object.values(R.devs||{}), c=C.cnt||{}, d0=new Date(R.t0);
   const of=t=>ds.filter(r=>C.tags[r.id]===t), red=of('with').concat(of('place')), amber=of('again'), wat=of('watch'), seen=red.concat(wat, amber), trk=ds.filter(r=>r.cls==='Tag' && C.tags[r.id]!=='yours' && seen.indexOf(r)<0);
   const nm=r=>esc((P.labels||{})[r.id]||r.label||r.adv||r.call||'Unidentified device'), kd=r=>esc([r.cls==='Unknown'?'':r.cls, r.hint].filter(Boolean).join(', ')||'Maker not broadcast');
@@ -3017,6 +3089,7 @@ async function tripFile(R){ const rep=withTrip(R, walkReport), iso=t=>new Date(t
     x.motion=r.mv?'moving':r.v==='fixed'?'stays in place':'not yet known'; if(r.mv){ x.speed_mps=r.mv; x.speedClass=speedClass(r.mv); x.signalChange_dB=r.mvDb||0; x.youStoodStill=!!r.mvS; } x.wornOrCarried=!!r.wn; if(r.dr) x.drone=r.rid||true; });
   rep.contacts=(R.contacts||[]).map(c=>({t:iso(c.t), youWereAt:c.pos, provedMoving:!!c.mv, youStoodStill:c.mv ? !!c.still : (c.stood==null ? null : !!c.stood), speed_mps:c.v||0, inEarshot_s:c.s||0, words:contactLine(c), devices:c.devs.map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, wornOrCarried:!!x.worn, provedMoving:!!x.mv}))}));
   rep.waypoints=(R.wps||[]).map(w=>({n:w.n, t:iso(w.t), youWereAt:w.pos, note:w.note||'', devices:Object.values(w.devs||{}).map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, yours:!!x.yours, tag:(TAG[C.tags[x.id]]||TAG.fresh).w, passedYou:wpPassed(R,w,x)}))}));
+  rep.whatHappened=tripFindings(R, C).map(f=>({t:iso(f.t), text:f.text, devices:(f.devs||[]).map(r=>r.id)}));
   rep.camerasPassed=(C.cams||[]).map(x=>({kind:x.kind, name:x.name, operator:x.op, nearest_m:x.d, t:iso(x.t), lat:x.la, lon:x.lo}));
   const text=JSON.stringify(rep,null,1), d=new Date(R.t0), name='remiel-trip-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
   const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -6871,6 +6944,7 @@ function walkDocHTML(){
   const dline=r=>{ const L=r.dl||[]; if(!L.length) return 'about '+du(r.min); const n=Math.min(6,L.length), pick=[]; for(let i=0;i<n;i++) pick.push(L[Math.round(i*(L.length-1)/Math.max(1,n-1))]); return pick.map(x=>hhmm(x[0])+' '+du(x[1])).join(' · '); };
   let h='<h1>Remiel Technologies Trip Report</h1><p class="rp-sub">What was around you, and what stayed with you</p>'+
     '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded '+(PH.native?'in the Remiel app on this phone':'on '+e(Y.name||'this device'))+(W.test?' &nbsp;·&nbsp; <b>Test data</b>':'')+'</div>';
+  { const F=tripFindings(W, W.cor||{}); h+='<h2>What happened</h2><ul class="rp-sum">'+(F.length?F.map(f=>'<li>'+e(f.text)+'</li>').join(''):'<li>'+e(NOTHING_FOUND)+'</li>')+'</ul>'; }
   // 1
   const bottom = !ds.length ? 'Route recorded' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : maybe.length ? plural(maybe.length,'device','devices')+' stayed with you for part of the trip' : longEnough ? 'No device moved with you' : 'A short route: '+du(reach)+' end to end';
   h+=H('Summary')+'<p>Bottom line: <span class="rp-tier">'+e(bottom)+'</span></p>'+
