@@ -3034,6 +3034,7 @@ function tripStops(R){ const rt=R.route||[], out=(R.wps||[]).filter(w=>w.pos).ma
    this one, once you were 46 m on, stayed at no more than four tenths of the distance you had covered, so it left when you did, and the same way. */
 const WENT={near:20, leave:15, move:46, gap:60000, first:30000, spread:30, ratio:0.4};
 function tripWent(R, r, stops){ const L=r.dl||[]; if(L.length<3) return null;
+  if(r.first<=R.t0+60000 && r.last-r.first>=0.6*(R.t1-R.t0)) return null;          // heard from the start and for most of the trip: part of where you set out from, not something that joined you
   for(const A of stops){ const near=L.filter(x=>x[0]>=A.t-120000 && x[0]<=A.end+30000 && x[1]<=WENT.near); if(!near.length) continue; const mA=Math.min(...near.map(x=>x[1]));
     const rt=R.route||[], lp=rt.find(q=>q.t>A.end && distLL(q.lat,q.lon,A.pos.lat,A.pos.lon)>=WENT.leave); if(!lp) continue;
     const before=L.filter(x=>x[0]<lp.t), from=before.length?before[before.length-1][0]:0, win=[];
