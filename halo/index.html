@@ -2726,7 +2726,7 @@ const minsIn = (t, t0) => { const m=Math.round((t-t0)/60000); return m<1?'at the
 const kindShort = d => kindText(d).replace(/^Tag, (?=[A-Z])/,'').split(' · ')[0];
 /* Tags. Red: moving with you, or on record at a place well away from here. Blue: on your Watch list. Amber: seen here on an earlier occasion.
    Green: yours. Gray: local, a device that lives in this area. White: first sighting. A tracker or a vehicle is never set aside as local. */
-const HOUSE_RE=/television|display|speaker|printer|soundbar|qled|oled|\buhd\b|laserjet|webos|echo dot|set-top|\btv\b|fridge|dishwasher|washer|oven|desktop computer|xbox|keyboard|bulb|lamp|light strip|thermostat|air condition/i;
+const HOUSE_RE=/television|display|speaker|printer|soundbar|qled|oled|\buhd\b|laserjet|webos|echo dot|set-top|\btv\b|\[av\]|fridge|refrigerator|freezer|dishwasher|washer|dryer|oven|microwave|cooktop|hob\b|vacuum|desktop computer|xbox|playstation|keyboard|bulb|lamp|light strip|thermostat|air condition|air purifier|living room|dining room|kitchen|bedroom|bathroom|soggiorno|salotto|sala da pranzo|cucina|camera da letto|bagno|lavastoviglie|lavatrice|frigorifero|forno/i;
 const TAG={ with:{c:'var(--action)', w:'With you'}, place:{c:'var(--action)', w:'Seen in a different place'}, watch:{c:'var(--watch)', w:'Watch'}, again:{c:'var(--warn)', w:'Seen here before'},
   yours:{c:'var(--clear)', w:'Yours'}, local:{c:'#8a94a8', w:'Local'}, fresh:{c:'#e9f0ff', w:'New'} };
 const TAG_KEY='<div class="loc-key"><span><i class="sdot" style="--mk:var(--action)"></i>With you, or seen in a different place</span><span><i class="sdot" style="--mk:var(--warn)"></i>Seen here before</span><span><i class="sdot" style="--mk:var(--watch)"></i>Watch</span><span><i class="sdot" style="--mk:var(--clear)"></i>Yours</span><span><i class="sdot" style="--mk:#8a94a8"></i>Local</span><span><i class="sdot" style="--mk:#e9f0ff"></i>New</span><span><i class="sdot k-tag" style="--mk:var(--mut)"></i>Square: tracker</span></div>';
@@ -2814,8 +2814,11 @@ function tripStrip(){ if(W.on){ const st=walkStats(), wp=W.wps||[], open=wp.find
 // A device passed you at a waypoint when it came into earshot around that moment and was gone within two minutes. One that was there before, and stayed, was already around you.
 function wpPassed(R, w, x){ const r=(R.devs||{})[x.id]; return !!r && r.first>=w.t-90000 && r.first<=w.t+WP_MS && r.last-r.first<120000; }
 function tripStart(){ if(W.on) return; const me=ePos(), fresh=me && Date.now()-me.t<20000 && me.acc<=POS_MAX_ACC; S.trips=null; tripsRender();
+  { const N=NATIVE(), st=N?(nativeStatus()||{}):null;          // a trip listens: if the phone is not listening and nothing stands in the way, listening starts with the trip
+    if(N && st.permission==='granted' && st.locationOn!==false && (!PH.on || PH.lost || st.listening===false)){ try{ N.start(); }catch(e){} PH.native=true; PH.on=true; PH.lost=false; PH.asked=Date.now(); store.set('halo_listen','1'); if(!PH.timer) PH.timer=setInterval(phFlush, 2000); S.tripListen=Date.now(); } }
   LIVE.leg=null; LIVE.devs.forEach(d=>{ d.trk=null; d.withYou=false; d.maybe=false; d.tested=false; d.verdict='near'; });          // "moving with you" on this trip is read from this trip's own legs
   walkStart(Date.now(), fresh?me:null, 0); if(!S.pos) geoAsk().then(()=>renderVicinity());
+  if(S.tripListen && Date.now()-S.tripListen<2000){ wEvent('note','Listening started with the trip.'); setTimeout(()=>{ if(!W.on) return; PH.nstat=nativeStatus(); if(PH.nstat && PH.nstat.listening===false){ PH.lost=true; wEvent('warn','This phone did not start listening. Open Remiel and press Start listening.'); renderVicinity(); } }, 8000); }
   toast('Trip started. Remiel is recording your path and every device along it.'); }
 function wpSweep(w){ LIVE.devs.forEach(d=>{ if(!d.present || d.band==='cell' || quietAp(d) || !(d.dist<=WP_M || (d.cls==='Vehicle' && d.dist<=40))) return; const e=w.devs[d.id], m=Math.max(1,Math.round(d.dist));
     if(!e || m<e.m) w.devs[d.id]={id:d.id, sig:d.sig, name:devName(d), kind:kindShort(d), cls:d.cls, m, yours:isYours(d)}; }); }
@@ -3427,7 +3430,7 @@ function commonShift(d, t0, t1, db){ const xs=[]; LIVE.devs.forEach(x=>{ if(x===
   xs.sort((a,b)=>a-b); return {n:xs.length, med:xs.length?xs[Math.floor(xs.length/2)]:0, opp:xs.filter(x=>db>0?x<=-7:x>=7).length}; }
 // The fix of your own nearest in time to a reading, within eight seconds of it.
 function msFix(M,k){ for(const o of [0,-1,1,-2,2,-3,3]){ const q=M[k+o]; if(q && q[2]!==null && Math.abs(q[0]-M[k][0])<=8000) return q; } return null; }
-function motionRead(d){ const M=d.ms, n=M.length; if(n<6 || d.band!=='ble' || d.retFix) return; const hx=ELOG.ready?ELOG.hist.get(d.sig):null; if(hx && hx.fx>0) return;          // one that has stayed in place before is not called moving on a change of strength
+function motionRead(d){ const M=d.ms, n=M.length; if(n<6 || d.band!=='ble' || d.retFix || stayPut(d)) return; const hx=ELOG.ready?ELOG.hist.get(d.sig):null; if(hx && hx.fx>0) return;          // one that has stayed in place before is not called moving on a change of strength
   const j=n-1, tj=M[j][0], rj=med3(M,j), lo3=k=>Math.min(M[k][1],M[k-1][1],M[k-2][1]), hi3=k=>Math.max(M[k][1],M[k-1][1],M[k-2][1]); let best=null; const vs=[];
   for(let i=j-3;i>=2;i--){ const dt=tj-M[i][0]; if(dt>MOVE.win) break; if(dt<3000) continue; const ri=med3(M,i), db=rj-ri; if(Math.abs(db)<MOVE.db) continue;
     if(db>0 ? lo3(j)-hi3(i)<3 : lo3(i)-hi3(j)<3) continue;          // the two sets of readings must stand clear of one another
@@ -3446,6 +3449,9 @@ function motionOf(d){ if(d.withYou) return {m:'with'}; const now=Date.now()+LIVE
 const WORN_RE=/airpods|beats|buds|earbud|earphone|headset|headphone|hearing aid|watch|smart band|fitness|garmin|fitbit|whoop|amazfit|jlab|jabra|bose|sony w[hf]|\bw[hf]-\d|oura|polar |suunto|coros|iphone|pixel \d|galaxy [sazn]/i;
 const houseDev = d => HOUSE_RE.test((d.hint||'')+' '+(d.adv||''));
 const isWorn = d => (d.cls==='Wearable' || d.cls==='Phone' || WORN_RE.test((d.hint||'')+' '+(d.adv||''))) && !houseDev(d);
+// A thing that stays put: an appliance, a TV, a speaker or a printer by its name, or a device nobody carries that the record already holds at this place on three days or more.
+// Its strength swings with doors, walls and people in between, and none of that is movement, so it is never called moving and never said to have passed you.
+const stayPut = d => { if(houseDev(d)) return true; if(isWorn(d) || neverLocal(d.cls) || d.cls==='Phone') return false; const h=ELOG.ready?histFor(d.sig, d.adv):null; return !!h && ((h.fx||0)>0 || (h.days||0)>=3); };
 const isDrone = d => !!d.rid || (d.cls==='Camera' && /^Drone/.test(d.hint||''));
 function motionChips(d){ const mo=motionOf(d), out=[];
   if(mo.m==='moving') out.push('<i class="mchip m-mv">Moving'+paceChip(mo.v)+'</i>');
@@ -3469,7 +3475,7 @@ function contactScan(nowS){ if(!nowS && scanQuiet()) return; nowS=nowS||Date.now
   LIVE.devs.forEach(d=>{ if(d.band!=='ble' || !d.ms || d.ct || d.sim || d.mine || isYours(d) || d.withYou) return; const pk=devPeak(d); if(!pk || nowS-pk.t>90000 || nowS<pk.last) return;
     if(pk.t-pk.first>CONTACT.arrive || d.verdict==='fixed') return; const h=ELOG.ready?ELOG.hist.get(d.sig):null; if(h && h.fx>0) return;
     const gone=heard>=pk.last+4000 ? nowS-pk.last : 0, drop=pk.r-pk.lastR, mv=!!(d.mov && d.mov.v), M=d.ms, a=M.find(q=>q[2]!==null), z=[...M].reverse().find(q=>q[2]!==null);
-    const fixture=houseDev(d) || !!h, carried=isWorn(d) || d.cls==='Vehicle' || d.cls==='Tag';          // a device already on record at this place is part of the place
+    const fixture=houseDev(d) || !!h || stayPut(d), carried=isWorn(d) || d.cls==='Vehicle' || d.cls==='Tag';          // a device already on record at this place is part of the place
     cand.push({d, pk, mv, fixture, carried, still:!!a && a!==z && (z[0]-a[0])>=0.5*(M[M.length-1][0]-M[0][0]) && Math.hypot(z[2]-a[2], z[3]-a[3])<6, moved:!!a && a!==z && Math.hypot(z[2]-a[2], z[3]-a[3])>=6, done:nowS-pk.t>=CONTACT.wait && (gone>=CONTACT.wait || drop>=CONTACT.fade), part:gone>=8000 || drop>=CONTACT.mfade,
       lead:mv || ((isWorn(d) || d.cls==='Vehicle') && !fixture && distOf(pk.r,'ble')<=CONTACT.near)}); });
   cand.filter(c=>c.lead && c.done).sort((a,b)=>b.pk.r-a.pk.r).forEach(L=>{ if(L.d.ct) return;
@@ -5990,8 +5996,11 @@ function apLearn(la,lo,acc,t,wl){ if(!(acc<=25)) return; const M=apkLoad(); apSt
     else if(a[4]<3) M.set(b,[+la.toFixed(5),+lo.toFixed(5),t,0,1,t]); });
   apkSave(); }
 const GAP_S=20, JUMP_M=60;
-function posGate(la,lo,acc,t,src,wl,app){ if(src!=='net' && !apCheck(la,lo,t,wl)) return 0;
-  const g=posGate0(la,lo,acc,t,src,app); if(g>0 && src!=='net') apLearn(la,lo,(typeof acc==='number'&&acc>0)?acc:50,t,wl); return g; }
+function posGate(la,lo,acc,t,src,wl,app){
+  // The same fix handed over again with a later batch says nothing new: it gets the answer it got the first time, and counts for nothing.
+  if(app && GATE.ft===t && GATE.fla===la && GATE.flo===lo) return GATE.fg||0;
+  if(src!=='net' && !apCheck(la,lo,t,wl)) return 0;
+  const g=posGate0(la,lo,acc,t,src,app); if(app){ GATE.ft=t; GATE.fla=la; GATE.flo=lo; GATE.fg=g>0?1:0; } if(g>0 && src!=='net') apLearn(la,lo,(typeof acc==='number'&&acc>0)?acc:50,t,wl); return g; }
 function posGate0(la,lo,acc,t,src,app){ acc=(typeof acc==='number'&&acc>0)?acc:50; const L=GATE.last, rough=a=>a>=30;
   const keep=v=>{ GATE.last={la,lo,acc,t}; GATE.pend=null; GATE.n=0; clearTimeout(GATE.tm); if(v!=null) GATE.v=(GATE.v==null?v:0.6*GATE.v+0.4*v); };
   if(!L){ keep(null); return 1; }
@@ -6006,11 +6015,14 @@ function posGate0(la,lo,acc,t,src,app){ acc=(typeof acc==='number'&&acc>0)?acc:5
   GATE.jp=null;
   if(rough(L.acc) && acc<=L.acc/3){ GATE.v=null; keep(null); return d>60?2:1; }                  // the first sharp fix replaces a rough one
   if(!rough(L.acc) && dt<90 && (src==='net' || (rough(acc) && acc>=4*L.acc))) return 0;        // a rough fix soon after a sharp one says nothing new
-  if((d>2.5*Math.max(acc,L.acc,4) && v>75) || (d>12 && d>1.5*Math.max(acc,L.acc) && v>4 && (v-(GATE.v||0))/dt>5)){          // a leap: faster than any journey, or a start no person or vehicle makes
+  // A leap: faster than any journey; a start no person or vehicle makes; or a step to more than four times your pace and over 8 m/s
+  // (the phone that read 300 m in 8 seconds and back again on 16 October). A journey that speeds up does so over several fixes, and passes.
+  if((d>2.5*Math.max(acc,L.acc,4) && v>75) || (d>12 && d>1.5*Math.max(acc,L.acc) && v>4 && (v-(GATE.v||0))/dt>5) || (d>2.5*Math.max(acc,L.acc,4) && v>8 && v>4*(GATE.v||1.5)+6)){
     const Q=GATE.pend, same=Q && distLL(Q.la,Q.lo,la,lo)<Math.max(30,2*acc)+40*Math.max(1,(t-Q.t)/1000);
     if(same){ GATE.n++; GATE.pv=distLL(Q.la,Q.lo,la,lo)/Math.max(1,(t-Q.t)/1000); } else { GATE.n=1; GATE.since=t; GATE.pv=null; }
     GATE.pend={la,lo,acc,t};
-    if(GATE.n>=3 || t-GATE.since>=GATE_MS){ const pv=GATE.pv; keep(null); GATE.v=pv; return d>150?2:1; }
+    const runaway=GATE.pv>8 && GATE.pv>4*(GATE.v||1.5)+6;          // fixes that agree with one another while racing away at a speed you were not making are one fault, not a journey
+    if((GATE.n>=3 && !runaway) || t-GATE.since>=GATE_MS){ const pv=GATE.pv; keep(null); GATE.v=pv; return d>150?2:1; }
     return 0; }
   keep(v); return 1; }
 const GATE_MS=(typeof window.HALO_GATE_MS==='number') ? window.HALO_GATE_MS : 12000, NET_AFTER_GPS_MS=60000;
@@ -6148,7 +6160,7 @@ function liveDerive(d, nowS){
   d.linger = !mob && d.seenMobile>0 && nowS-held-d.seenMobile<FOLLOW.linger;              // just lost: it fades on the map instead of vanishing
   d.present = mob || (sta && LIVE.home);                 // near you. What only the home station hears is near you only when you are home
   d.atHome = sta && !d.present;
-  d.mine = !!(P.mine && P.mine[d.id]);
+  d.mine = !!(P.mine && P.mine[d.id]) || !!d.paired || (!!d.adv && sigGet().names.indexOf(d.adv)>=0);          // yours by your mark, by pairing, or by a name you marked: a new address does not make it a stranger
   const me=posNow();
   if((d.fix || d.sector) && d.band==='ble' && nearWith(d)){ d.fix=null; d.sector=null; }          // near you at places far apart: it has no place of its own
   if(d.fix && me){ d.dist=Math.max(1,Math.hypot(d.fix.x-me.x,d.fix.y-me.y)); d.bearing=(Math.atan2(d.fix.x-me.x,d.fix.y-me.y)*180/Math.PI+360)%360; }
@@ -6689,7 +6701,7 @@ let TRIP_START_M=60, TRIP_IDLE_MS=5*60000; const TRIP={a:null}, TRIP_STILL_M=25,
 const tripKeep = () => { if(!(W.t0 && W.t1)) return; if(TRIP_AUTO){ const st=walkStats(); if(!st.heard && !st.distance_m) return; } W.kept=true; tripMeta(W); if(!W.arch) tripArchive(); };
 function walkStart(t0, a, at){
   tripKeep(); const back=!!at;
-  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0, contacts:[]});
+  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, off:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0, contacts:[]});
   if(a) W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10});
   { const R=routeLive(); if(R) W.plan=routeInfo(R); }          // a trip that begins while a route is set belongs to that route
   wEvent('start','Trip started.','',W.t0); { const why=phNoHear(); if(why) wEvent('warn', why+' Nothing is heard and no position is recorded until it is fixed.'); }
@@ -6722,7 +6734,7 @@ function tripAuto(){ if(!W.on && TRIP.a && S.pos && S.pos.t<TRIP.a.t) return;   
 document.addEventListener('visibilitychange', ()=>{ if(!W.on) return;
   if(document.visibilityState==='hidden'){ _wHidden=Date.now(); wSave(true); }
   else { if(_wHidden){ const sec=Math.round((Date.now()-_wHidden)/1000); _wHidden=0;
-      if(sec>=8 && PH.native && PH.on) wEvent('note','Remiel was off the screen for '+walkDur(sec*1000)+'. The app kept listening, and what it heard is added now.');
+      if(sec>=8 && PH.native && PH.on){ W.off=(W.off||0)+sec; wEvent('note','Remiel was off the screen for '+walkDur(sec*1000)+'. The app kept listening, and what it heard is added now.'); }
       else if(sec>=8){ W.gaps+=sec; wEvent('gap','Remiel was off the screen for '+walkDur(sec*1000)+'. The record resumes from here.'); } }
     if(PH.native && PH.on) nativeDrain();
     wLock(); } });
@@ -6775,6 +6787,8 @@ function walkTick(at, only, q){
     if(d.mov && d.mov.v && Math.abs(nowS-d.mov.t)<20000){ const db=Math.round(Math.abs(d.mov.db));
       if(!(r.mvDb>=db)){ r.mv=+d.mov.v.toFixed(1); r.mvDb=db; r.mvS=d.mov.still?1:0; }
       if(!r.mvT){ r.mvT=now; wEvent('move','Moving: '+walkName(d)+'. Its signal '+(d.mov.db>0?'rose ':'fell ')+db+' dB in '+Math.round(d.mov.dt/1000)+' seconds'+(d.mov.still?' while you stood still':', faster than your own movement explains')+(paceW(d.mov.v)?', '+paceW(d.mov.v):'')+'.', d.id); } }
+    if((P.watch||{})[d.sig] && !isYours(d) && (!r.wt || now-r.last0>ELOG.OCC_MS)){ r.wt=now; wEvent('watch','On your Watch list: '+walkName(d)+' is near you, '+distText(d)+'.', d.id); if(!back) alertRaise('watch:'+d.sig+':'+Math.floor(now/ELOG.OCC_MS), 'A device on your Watch list is near you', devName(d)+' is '+duAbout(d)+' from you.', {art:d.sig}); }
+    r.last0=now;
     if(isWorn(d)) r.wn=1; if(isDrone(d)){ r.dr=1; if(d.rid) r.rid=d.rid; }
     if(d.leg){ r.v=d.verdict||''; r.legs=d.leg.legs; r.share=+d.leg.share.toFixed(2); r.spread=Math.round(d.leg.spread); r.level=Math.round(d.leg.level); r.drift=Math.round(d.leg.drift); r.rate=+d.leg.rate.toFixed(2); } };
   if(back) (only||[]).forEach(sig=>{ const d=LIVE.devs.get(sig); if(d){ liveDerive(d,nowS); each(d); } });      // the app's own record: each device is entered at the time the app heard it
@@ -6804,7 +6818,7 @@ function tripWhere(r){ if(!r || r.withYou || r.maybe) return null; const s=tripS
 function walkStats(){ const ds=Object.values(W.devs||{}); return {heard:ds.length, here:ds.filter(r=>r.here).length, placed:ds.filter(r=>r.placed).length, located:ds.filter(r=>!r.sim&&tripWhere(r)).length, withYou:ds.filter(r=>r.withYou&&!r.mine).length, staying:ds.filter(tripMaybe).length, inPlace:ds.filter(r=>r.v==='fixed'&&!r.withYou).length, reach_m:tripReach(), minutes:+(((W.t1||Date.now())-W.t0)/60000).toFixed(1), distance_m:Math.round(W.dist||0)}; }
 function walkReport(){
   const iso=t=>new Date(t).toISOString();
-  return {product:'Remiel Technologies', kind:'trip report', version:1, testData:!!W.test, started:iso(W.t0), stopped:iso(W.t1||Date.now()), summary:walkStats(), screenOffSeconds:W.gaps||0,
+  return {product:'Remiel Technologies', kind:'trip report', version:1, testData:!!W.test, started:iso(W.t0), stopped:iso(W.t1||Date.now()), summary:walkStats(), screenOffSeconds:(W.gaps||0)+(W.off||0), recordGapSeconds:W.gaps||0,
     method:'Remiel hears Bluetooth and cuts your route into legs of '+du(FOLLOW.leg)+'. Moving with you: heard on at least '+Math.round(FOLLOW.share*100)+' percent of your legs, at leg strengths within '+FOLLOW.spread+' dB of one another or within '+du(NEARW.m)+' of you at places '+du(NEARW.apart)+' or more apart, in at least three reports in ten, across '+du(FOLLOW.reach)+' end to end and '+FOLLOW.mins+' minutes ('+du(FOLLOW.tagReach)+' and '+FOLLOW.tagMins+' minutes for a tracker tag). Stays in place: strong near it, fading or missing on the legs beyond, and never near you at places far apart. Distance is read from signal strength.',
     engine:{FOLLOW, FIX_MIN_SAMPLES, FIX_MIN_BASELINE, FIX_MAX_UNC, POS_MAX_ACC, LIVE_PRESENT},
     sensors:(PH.on && !PH.lost?[{name:'This phone', kind:PH.native?'Remiel app':'phone browser'}]:[]).concat(carriedIds().map(k=>({name:P.sensors[k].name, kind:P.sensors[k].kind}))),
