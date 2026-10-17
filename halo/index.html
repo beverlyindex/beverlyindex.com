@@ -1201,8 +1201,8 @@ button.loc-row:active{transform:translateY(2px);box-shadow:inset 0 2px 7px rgba(
 
 <!-- ============ TERMS OF USE ============ -->
 <div id="mapFull" class="hidden"><div class="mf-map" id="mfMap"></div><canvas id="mfRadar" class="hidden" aria-label="Radar of the devices around you"></canvas>
-  <div class="mf-top"><button class="btn sm" data-act="mf-close">&#8249; Back</button><b>Map</b><span class="mf-pos" id="mfPos"></span></div>
-  <div class="mf-ctl"><button data-act="mf-follow" id="mfFollow" class="on" title="Keep me in the center">&#9678;</button><button data-act="mf-north" id="mfNorth" title="North up, or the way I face up"><small>N UP</small></button><button data-act="mf-radar" id="mfRadarBtn" title="Radar: every device around you, named"><small>RADAR</small></button><button data-act="mf-3d" id="mf3dBtn" title="Buildings in 3D"><small>3D</small></button><button data-act="mf-turn" id="mfTurnBtn" title="Turn check: find which way devices are"><small>TURN</small></button><button data-act="mf-zin" title="Closer">+</button><button data-act="mf-zout" title="Wider">&minus;</button><button data-act="mf-expand" id="mfExpand" title="Full screen, and back">&#10530;</button></div>
+  <div class="mf-top"><button class="btn sm" data-act="mf-close">&#8249; Back</button><b>Remiel Radar</b><span class="mf-pos" id="mfPos"></span></div>
+  <div class="mf-ctl"><button data-act="mf-follow" id="mfFollow" class="on" title="Keep me in the center">&#9678;</button><button data-act="mf-north" id="mfNorth" class="on" title="North up, or the way I face up"><small>FACE UP</small></button><button data-act="mf-radar" id="mfRadarBtn" class="on" title="Radar: every device around you, named"><small>RADAR</small></button><button data-act="mf-3d" id="mf3dBtn" title="Buildings in 3D"><small>3D</small></button><button data-act="mf-turn" id="mfTurnBtn" title="Turn check: find which way devices are"><small>TURN</small></button><button data-act="mf-zin" title="Closer">+</button><button data-act="mf-zout" title="Wider">&minus;</button><button data-act="mf-expand" id="mfExpand" title="Full screen, and back">&#10530;</button></div>
   <div class="mf-draw hidden" id="mfDraw"></div>
   <div class="mf-sheet" id="mfSheet"><div id="mfInfo"></div><div class="mf-sum" id="mfSum"></div><div class="layers" id="mfLayers"></div><div class="mf-chips" id="mfChips"></div></div></div>
 <div id="renSheet" class="hidden"></div>
@@ -5443,7 +5443,7 @@ const whereWords = d => d.bearing==null ? '' : (relWords(d.bearing) || compass(d
 
 /* ---------- The full map. Both spheres stay small and still; this one fills the screen, can be moved and zoomed,
    follows you, and can turn so that the way you face is up. It draws only what Remiel can place. ---------- */
-let FULL=null, FULL_YOU=null, FULL_HOME=null; const FULL_MARKERS={}; const MF={follow:true, headUp:false, sel:null, pt:null, timer:0};
+let FULL=null, FULL_YOU=null, FULL_HOME=null; const FULL_MARKERS={}; const MF={follow:true, headUp:true, sel:null, pt:null, timer:0};
 const mfRingSteps=[25,50,100,200];
 function mfData(){ const f=[], g=gz(); if(!g) return {type:'FeatureCollection',features:f};
   { const h=heading(); if(MF.headUp && h!=null) f.push({type:'Feature',properties:{kind:'behind'},geometry:{type:'Polygon',coordinates:[behindPoly(g,h,120)]}}); }
@@ -5471,7 +5471,7 @@ const mfDevices = () => { const V=vis(); return (V.mode==='live'||V.mode==='sim'
    Near, Trip, Streets, Area and Wide set the scale. Trip, 75 m around you, is where it starts: Bluetooth carries about that far, so it is the scale at which a follower shows.
    The legend counts what is in view and filters the devices; the list is sorted by concern; a line runs from you to each device
    that is moving with you. The three spheres remain as the classic view. ---------- */
-const wview = () => window.HALO_WVIEW || S.wview || 'list';          // the list is where Location opens; Map is the three spheres
+const wview = () => window.HALO_WVIEW || S.wview || 'one';          // Remiel Radar, the radar on the map, is where Location opens; the list is one tap away
 const oneMode = () => wview()==='one', locMode = () => wview()==='list';
 const OM_PRE=[[25,'Near'],[75,'Trip'],[300,'Streets'],[1609.344,'Area'],[5*1609.344,'Wide']], OM_TRIP=75;
 const isTouch = () => ('ontouchstart' in window) || navigator.maxTouchPoints>0;
@@ -5655,7 +5655,7 @@ function mapFullTick(force){ if(force) mfScale();
 /* ---------- The radar. It sits over the full map and shows every device in earshot around you at once. Distance is measured; direction is not,
    so here the side of the circle says who a device is: flagged at the top, new on the right, known and yours on the left. Every dot carries its name
    and distance. Each pulses with its signal: the stronger, the faster. A short tail shows whether it is closing on you or moving off. ---------- */
-const RAD={on:false, mode:'off', raf:0, hits:[], trail:new Map(), last:0, only:'', more:[]};          // mode: off, map (the live map is the radar), who (who is around, by kind)
+const RAD={on:true, mode:'map', raf:0, hits:[], trail:new Map(), last:0, only:'', more:[]};          // mode: off, map (the live map is the radar), who (who is around, by kind)
 const radCat = d => { const t=tagOf(d); return t==='yours'?'Y':(t==='with'||t==='place'||t==='watch'||d.maybe)?'F':(t==='local'||t==='again')?'K':'N'; };
 const RAD_W={Y:'Yours',K:'Known here',N:'New',F:'Flagged'};
 const radHash = s => { let x=2166136261; for(const ch of String(s)){ x^=ch.charCodeAt(0); x=Math.imul(x,16777619)>>>0; } return x/4294967296; };
