@@ -5447,7 +5447,12 @@ const whereWords = d => d.bearing==null ? '' : (relWords(d.bearing) || compass(d
 
 /* ---------- The full map. Both spheres stay small and still; this one fills the screen, can be moved and zoomed,
    follows you, and can turn so that the way you face is up. It draws only what Remiel can place. ---------- */
-let FULL=null, FULL_YOU=null, FULL_HOME=null; const FULL_MARKERS={}; const MF={follow:true, headUp:true, sel:null, pt:null, timer:0};
+let FULL=null, FULL_YOU=null, FULL_HOME=null; const FULL_MARKERS={}; const MF={follow:true, headUp:true, sel:null, pt:null, timer:0, d3:true};
+const BASE_FT=200, BASE_PITCH=52;
+// Base view's camera: tilted, and close enough that its outer ring, 200 ft, fills the screen across.
+function baseZoom(){ const g=gz(), m=el('mfMap'); if(!g || !m) return 18.2; const w=m.clientWidth||400, h=m.clientHeight||700, Rpx=Math.max(100, Math.min(w/2-70, h/2-150))*(MF.d3?0.74:1);          // tilted, the near half of the ring grows: allow for it
+  return Math.max(17.5, Math.min(19.5, Math.log2(156543.03*Math.cos(g.lat*Math.PI/180)*Rpx/(BASE_FT/3.281)))); }
+function baseFrame(){ if(!FULL || !S.mapFull) return; const g=gz(); try{ FULL.jumpTo(Object.assign({zoom:baseZoom(), pitch:MF.d3?BASE_PITCH:0}, g?{center:[g.lon,g.lat]}:{})); }catch(e){} }
 const mfRingSteps=[25,50,100,200];
 function mfData(){ const f=[], g=gz(); if(!g) return {type:'FeatureCollection',features:f};
   { const h=heading(); if(MF.headUp && h!=null) f.push({type:'Feature',properties:{kind:'behind'},geometry:{type:'Polygon',coordinates:[behindPoly(g,h,120)]}}); }
@@ -5515,7 +5520,7 @@ function oneRender(){ if(!oneMode() || !el('omLegend')) return; const V=vis(), l
   put('omPre',pre); put('omLegend',leg); put('omList',rows); }
 async function mapFullOpen(){ if(!(P.path&&P.path.mapped)){ P.path=P.path||{}; P.path.mapped=true; save(); }
   { const mf=el('mapFull'); if(mf.parentNode!==document.body) document.body.appendChild(mf); mf.classList.remove('hidden','inline'); } S.mapFull=true; NAVN++; try{ history.pushState(navSnap('map'),''); }catch(e){}
-  headAsk(); startGeo(); await fullEnsure(); fullInline(false); setTimeout(()=>{ try{ if(FULL) FULL.resize(); }catch(e){} mapFullTick(true); },60);
+  headAsk(); startGeo(); await fullEnsure(); fullInline(false); setTimeout(()=>{ try{ if(FULL) FULL.resize(); }catch(e){} baseFrame(); mapFullTick(true); },60);
 }
 async function fullEnsure(){ if(!MF.timer) MF.timer=setInterval(()=>mapFullTick(false), 1000);
   if(FULL || MF.making) return; MF.making=true;
@@ -5549,7 +5554,7 @@ async function fullEnsure(){ if(!MF.timer) MF.timer=setInterval(()=>mapFullTick(
       FULL.addLayer({id:'mf-link-g',type:'line',source:'mfk',paint:{'line-color':['get','c'],'line-width':7,'line-opacity':.18,'line-blur':3},layout:{'line-cap':'round'}});
       FULL.addLayer({id:'mf-link',type:'line',source:'mfk',paint:{'line-color':['get','c'],'line-width':2.2,'line-opacity':.95},layout:{'line-cap':'round'}});
       const e=document.createElement('div'); e.className='you-dot'; e.innerHTML='<span class="cone off"></span>'; FULL_YOU=new window.maplibregl.Marker({element:e}).setLngLat([g.lon,g.lat]).addTo(FULL);
-      poiAttach(FULL); routeAttach(FULL); if(MF.d3) map3d(true); fullInline(!S.mapFull); if(oneMode() && !S.mapFull && gz()){ omFit(S.omR||OM_TRIP, false); setTimeout(omResize,150); } mapFullTick(true); });
+      poiAttach(FULL); routeAttach(FULL); if(MF.d3) map3d(true); baseFrame(); fullInline(!S.mapFull); if(oneMode() && !S.mapFull && gz()){ omFit(S.omR||OM_TRIP, false); setTimeout(omResize,150); } mapFullTick(true); });
   } finally{ MF.making=false; }
 }
 function mapFullClose(viaBack){ if(!S.mapFull) return; tripViewEnd(false); S.mapFull=false; if(S.plan && S.plan.draw) setTimeout(()=>planDrawDone(true),0);          // leaving the map ends the drawing and keeps the points
@@ -5677,8 +5682,14 @@ function radList(devs){ if(Date.now()<(MF.hold||0) && RAD.list) return;         
   RAD.list=devs.map(d=>{ const here=d.present!==false, age=fadeAge(d); return {d, c:radCat(d), lk:lookOf(d), name:shortName(d), rng:here?rangeW(d):'last heard '+agoW(age), m:Math.max(0.6, d.dist||30), fade:fadeOf(d), arr:(RAD.arr.get(d.id)||{t:0}).t}; }); }
 function radSync(){ RAD.on=RAD.mode!=='off'; const on=RAD.on && (S.mapFull||S.oneMap); const c=el('mfRadar'); if(!c) return; c.classList.toggle('hidden', !on); c.classList.toggle('onmap', RAD.mode==='map');
   const b=el('mfRadarBtn'); if(b){ b.classList.toggle('on', RAD.on); const t='<small>'+(RAD.mode==='who'?'CORE':'BASE')+'</small>'; if(b._h!==t){ b.innerHTML=t; b._h=t; } }
-  { const v=el('mfView'), vt=RAD.mode==='who'?'Core view':'Base view'; if(v && v._t!==vt){ v.textContent=vt; v._t=vt; } const mi=el('mfMini'), sh=el('mfSheet'); if(mi){ mi.classList.toggle('hidden', !on); if(sh) mi.style.bottom=(sh.offsetHeight+10)+'px'; } }
+  { const v=el('mfView'), vt=RAD.mode==='who'?'Core view':'Base view'; if(v && v._t!==vt){ v.textContent=vt; v._t=vt; } const mi=el('mfMini'), sh=el('mfSheet'); if(mi){ mi.classList.toggle('hidden', !on); { const sc=document.querySelector('#mapFull .maplibregl-ctrl-scale'), mf=el('mapFull'); if(sc && mf && sc.offsetHeight){ mi.style.top=Math.round(sc.getBoundingClientRect().bottom-mf.getBoundingClientRect().top+10)+'px'; mi.style.bottom='auto'; } else if(sh){ mi.style.top='auto'; mi.style.bottom=(sh.offsetHeight+10)+'px'; } } } }
   if(on && !RAD.raf){ const loop=now=>{ RAD.raf=0; if(!(RAD.on && (S.mapFull||S.oneMap)) || document.hidden) return; if(now-RAD.last>=33){ RAD.last=now; try{ if(RAD.mode==='map') radDrawMap(now); else radDraw(now); radDrawMini(now); }catch(e){} } RAD.raf=requestAnimationFrame(loop); }; RAD.raf=requestAnimationFrame(loop); } }
+// The sweep: one turn every 4 seconds. A target lights as the beam crosses it and fades over the next third of a turn, as on a real scope.
+const SWEEP_S=4, sweepA = now => ((now/1000)%SWEEP_S)/SWEEP_S*Math.PI*2-Math.PI/2;
+const sweepLit = (now, a) => { const lag=((sweepA(now)-a)%(Math.PI*2)+Math.PI*2)%(Math.PI*2); return Math.exp(-lag/1.1); };
+function sweepPaint(x, cx, cy, R, now){ const a=sweepA(now);
+  if(x.createConicGradient){ const g=x.createConicGradient(a-1.25,cx,cy); g.addColorStop(0,'rgba(211,181,119,0)'); g.addColorStop(.17,'rgba(211,181,119,.16)'); g.addColorStop(.197,'rgba(232,206,140,.38)'); g.addColorStop(.199,'rgba(211,181,119,0)'); g.addColorStop(1,'rgba(211,181,119,0)'); x.fillStyle=g; x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.fill(); }
+  x.save(); x.shadowColor='rgba(255,226,160,.9)'; x.shadowBlur=8; x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx+R*Math.cos(a),cy+R*Math.sin(a)); x.strokeStyle='rgba(255,232,178,.9)'; x.lineWidth=1.6; x.stroke(); x.restore(); }
 function radDraw(now){ const cv=el('mfRadar'); if(!cv) return; const r=cv.getBoundingClientRect(); if(!r.width) return; const dp=Math.min(3,window.devicePixelRatio||1);
   if(cv.width!==Math.round(r.width*dp) || cv.height!==Math.round(r.height*dp)){ cv.width=Math.round(r.width*dp); cv.height=Math.round(r.height*dp); }
   const x=cv.getContext('2d'); x.setTransform(dp,0,0,dp,0,0); const W=r.width, H=r.height, C=radColors(), reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -5699,7 +5710,7 @@ function radDraw(now){ const cv=el('mfRadar'); if(!cv) return; const r=cv.getBou
   x.font='700 11px '+C.disp; x.textAlign='center';
   const lab=(deg,t,col)=>{ const a=(deg-90)*Math.PI/180; const tx=cx+(R+15)*Math.cos(a), ty=cy+(R+15)*Math.sin(a); x.save(); x.shadowColor=col; x.shadowBlur=10; x.fillStyle=col; x.fillText(langText(t).toUpperCase(), tx, ty); x.restore(); };
   lab(140,'New',C.N); lab(220,'Known',C.K);          // nothing above the radar: colour says what a dot is
-  if(!reduce && x.createConicGradient){ const a=((now/1000)%4)/4*Math.PI*2-Math.PI/2, g=x.createConicGradient(a-0.6,cx,cy); g.addColorStop(0,'rgba(211,181,119,0)'); g.addColorStop(.09,'rgba(211,181,119,.24)'); g.addColorStop(.0955,'rgba(255,230,170,.55)'); g.addColorStop(.0965,'rgba(211,181,119,0)'); x.fillStyle=g; x.beginPath(); x.arc(cx,cy,R-2,0,Math.PI*2); x.fill(); }
+  if(!reduce) sweepPaint(x, cx, cy, R-2, now);
   // the dots
   const nowS=Date.now()+LIVE.skew, devs=RAD.list||[], dots=[]; RAD.hits=[];
   devs.forEach(e=>{ const d=e.d, m=e.m, c=e.c, a=(radBrg(d,c)-90)*Math.PI/180, rr=rad(m), px=cx+rr*Math.cos(a), py=cy+rr*Math.sin(a);
@@ -5712,7 +5723,8 @@ function radDraw(now){ const cv=el('mfRadar'); if(!cv) return; const r=cv.getBou
     const rs=typeof d.rssi==='number'?d.rssi:-90, period=0.5+2.6*Math.min(1,Math.max(0,(-45-rs)/50)), ph=((now/1000+radHash('p'+d.id)*period)%period)/period;
     const lk=o.lk, blink=lk.flash && !reduce ? .35+.65*Math.abs(Math.cos(now/1000*Math.PI*(lk.threat?1.6:1.1)+radHash('b'+d.id)*6)) : 1;
     if(lk.flash && (!reduce || sel)){ x.beginPath(); x.arc(px,py,s+ph*(8+28*near*near),0,Math.PI*2); x.strokeStyle=col; x.globalAlpha=ga*(1-ph)*(.3+.65*near); x.lineWidth=1.5; x.stroke(); x.globalAlpha=ga; }
-    { const gl=x.createRadialGradient(px,py,0,px,py,s*2.6); gl.addColorStop(0,col); gl.addColorStop(.45,col+'66'); gl.addColorStop(1,col+'00'); x.globalAlpha=ga*(.5+.5*near)*blink; x.fillStyle=gl; x.beginPath(); x.arc(px,py,s*2.6,0,Math.PI*2); x.fill();
+    const lit=reduce?1:sweepLit(now,a); if(lit>.25){ x.beginPath(); x.arc(px,py,s+3+(1-lit)*14,0,Math.PI*2); x.strokeStyle=col; x.globalAlpha=ga*lit*.8; x.lineWidth=1.4; x.stroke(); x.globalAlpha=ga; }
+    { const gl=x.createRadialGradient(px,py,0,px,py,s*(2.6+1.4*lit)); gl.addColorStop(0,col); gl.addColorStop(.45,col+'66'); gl.addColorStop(1,col+'00'); x.globalAlpha=ga*Math.min(1,(.5+.5*near)*blink*(reduce?1:.55+.6*lit)); x.fillStyle=gl; x.beginPath(); x.arc(px,py,s*(2.6+1.4*lit),0,Math.PI*2); x.fill();
       const core=x.createRadialGradient(px-s*.3,py-s*.3,0,px,py,s); core.addColorStop(0,'#ffffff'); core.addColorStop(.35,col); core.addColorStop(1,col); x.fillStyle=core; x.beginPath(); x.arc(px,py,s,0,Math.PI*2); x.fill(); x.globalAlpha=ga; }
     if(lk.threat){ x.beginPath(); x.arc(px,py,s+4,0,Math.PI*2); x.strokeStyle=col; x.lineWidth=1.8; x.stroke(); }
     if(lk.mine){ x.beginPath(); x.arc(px,py,s+3,0,Math.PI*2); x.strokeStyle='#ffffff'; x.globalAlpha=ga*.8; x.lineWidth=1.2; x.stroke(); x.globalAlpha=ga; }
@@ -5778,7 +5790,7 @@ function radDrawMap(now){ const cv=el('mfRadar'); if(!cv || !FULL) return; const
   const x=cv.getContext('2d'); x.setTransform(dp,0,0,dp,0,0); x.clearRect(0,0,r.width,r.height); const g=gz(); if(!g) return; const C=radColors(), reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let P0; try{ P0=FULL.project([g.lon,g.lat]); }catch(e){ return; }
   const ring=m=>arcLine(g.lat,g.lon,m,0,360).map(q=>FULL.project(q)), pathOf=pts=>{ x.beginPath(); pts.forEach((p,i)=>i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y)); x.closePath(); };
-  const steps=unitNow()==='km'?[10,30,100]:[30/3.281,100/3.281,300/3.281], outer=ring(steps[2]);
+  const steps=unitNow()==='km'?[15,30,60]:[50/3.281,100/3.281,BASE_FT/3.281], outer=ring(steps[2]);
   x.font='600 11px '+C.mono; x.textBaseline='middle'; x.textAlign='left';
   steps.forEach((m,i)=>{ const pts=i===2?outer:ring(m); pathOf(pts); x.strokeStyle=C.gold; x.globalAlpha=i===2?.7:.5; x.lineWidth=i===2?1.6:1.1; x.setLineDash(i===2?[]:[4,5]); x.stroke(); x.setLineDash([]);
     const q=pts[Math.round(pts.length*0.125)]||pts[0]; x.globalAlpha=1; x.lineWidth=3; x.strokeStyle='rgba(7,11,22,.85)'; x.strokeText(du(m),q.x+4,q.y-6); x.fillStyle=C.gold; x.fillText(du(m),q.x+4,q.y-6); });
@@ -5795,11 +5807,12 @@ function radDrawMini(now){ const cv=el('mfMini'); if(!cv || cv.classList.contain
   x.clearRect(0,0,W,W); x.save(); x.beginPath(); x.arc(c,c,R,0,Math.PI*2); x.clip();
   const bg=x.createRadialGradient(c,c,0,c,c,R); bg.addColorStop(0,'#0e2147'); bg.addColorStop(1,'#040912'); x.fillStyle=bg; x.fillRect(0,0,W,W);
   [0.33,0.66,1].forEach(f=>{ x.beginPath(); x.arc(c,c,R*f-1,0,Math.PI*2); x.strokeStyle='rgba(143,180,255,.35)'; x.lineWidth=1; x.stroke(); });
-  if(RAD.mode==='map'){          // Core: who is around, by side
-    const FMIN=0.6, FMAX=200, fr=m=>Math.min(1,Math.max(0,Math.log(Math.max(FMIN,m)/FMIN)/Math.log(FMAX/FMIN)));
+  if(RAD.mode==='map'){          // Core: who is around, by side, with its sweep
+    const FMIN=0.6, FMAX=200, fr=m=>Math.min(1,Math.max(0,Math.log(Math.max(FMIN,m)/FMIN)/Math.log(FMAX/FMIN))); if(!reduce) sweepPaint(x, c, c, R-1, now);
     (RAD.list||[]).forEach(e=>{ const a=(radBrg(e.d,e.c)-90)*Math.PI/180, rr=6+(R-10)*fr(e.m), px=c+rr*Math.cos(a), py=c+rr*Math.sin(a), lk=e.lk, near=1-fr(e.m);
       const blink=lk.flash && !reduce ? .4+.6*Math.abs(Math.cos(now/1000*Math.PI*(lk.threat?1.6:1.1)+radHash('b'+e.d.id)*6)) : 1;
-      x.globalAlpha=e.fade*blink; x.beginPath(); x.arc(px,py,1.6+3.2*near,0,Math.PI*2); x.fillStyle=lk.c; x.fill(); if(lk.threat){ x.beginPath(); x.arc(px,py,4+3.2*near,0,Math.PI*2); x.strokeStyle=lk.c; x.lineWidth=1.2; x.stroke(); } x.globalAlpha=1; });
+      const lit=reduce?1:sweepLit(now,a); x.globalAlpha=e.fade*Math.min(1,blink*(.45+.7*lit)); x.beginPath(); x.arc(px,py,(1.6+3.2*near)*(1+.5*lit),0,Math.PI*2); x.fillStyle=lk.c; x.fill();
+      if(lit>.3){ x.beginPath(); x.arc(px,py,3+3.2*near+(1-lit)*8,0,Math.PI*2); x.strokeStyle=lk.c; x.globalAlpha=e.fade*lit*.7; x.lineWidth=1; x.stroke(); } if(lk.threat){ x.beginPath(); x.arc(px,py,4+3.2*near,0,Math.PI*2); x.strokeStyle=lk.c; x.lineWidth=1.2; x.stroke(); } x.globalAlpha=1; });
   } else {          // Base: your route and the devices placed round you, north up
     const g=gz(); if(g){ const span=160, k=(R-6)/span, me=toXY(g.lat,g.lon), X=p=>c+(p.x-me.x)*k, Y=p=>c-(p.y-me.y)*k;
       const rt=(W_route()||[]).map(q=>toXY(q.lat,q.lon)); if(rt.length>1){ x.beginPath(); rt.forEach((p,i)=>i?x.lineTo(X(p),Y(p)):x.moveTo(X(p),Y(p))); x.strokeStyle='#e7c45a'; x.lineWidth=2; x.stroke(); }
@@ -5863,7 +5876,7 @@ function map3d(on){ MF.d3=!!on; const b=el('mf3dBtn'); if(b) b.classList.toggle(
   try{ if(on && !FULL.getLayer('mf-bldg3d') && FULL.getSource('base')) FULL.addLayer({id:'mf-bldg3d', type:'fill-extrusion', source:'base', 'source-layer':'building', minzoom:14,
         paint:{'fill-extrusion-color':'#1d3d78', 'fill-extrusion-height':['coalesce',['get','render_height'],12], 'fill-extrusion-base':['coalesce',['get','render_min_height'],0], 'fill-extrusion-opacity':.82}}, FULL.getLayer('mf-acc')?'mf-acc':undefined);
     if(FULL.getLayer('mf-bldg3d')) FULL.setLayoutProperty('mf-bldg3d','visibility', on?'visible':'none');
-    FULL.easeTo({pitch:on?52:0, duration:500}); }catch(e){} }
+    FULL.easeTo({pitch:on?BASE_PITCH:0, duration:500}); }catch(e){} }
 const behindPoly = (g,h,m) => { const pts=[[g.lon,g.lat]]; arcLine(g.lat,g.lon,m,h+135,h+225).forEach(p=>pts.push(p)); pts.push([g.lon,g.lat]); return pts; };
 { const c=el('mfRadar'); if(c) c.addEventListener('click', radTap); const mi=el('mfMini'); if(mi) mi.addEventListener('click', ()=>{ RAD.mode=RAD.mode==='map'?'who':'map'; RAD.only=''; radSync(); mapFullTick(false); }); }
 
