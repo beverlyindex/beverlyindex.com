@@ -6950,10 +6950,13 @@ function ingestReport(sid, rowT, p, off){
    When one goes silent and, within 3.5 seconds, a new address of the same maker, kind and name appears at a strength within 6 dB of it,
    close enough to read well (-85 dBm or stronger), the new address is the same device, and its readings join the old one for the rest of the trip.
    Never joined: two addresses heard in the same moment, a silence longer than that, a match that more than one device could make, or anything across trips. */
-const STITCH={gap:3500, db:6, min:-85};
+const STITCH={gap:3500, db:6, min:-85, nameGap:10*60000};
 function stitchFrom(s, r, at, busy){ const cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown', hint=typeof s.hint==='string'?s.hint.slice(0,40):'', nm=typeof s.name==='string'?s.name.trim().slice(0,40):'';
-  if(r<STITCH.min || (cls==='Unknown' && !makerOf({hint}))) return null;          // a device that says nothing of what it is could be anyone's
   let hit=null, n=0;
+  // a name with a serial in it (VOLVO373, a car; DESKTOP-KS7PU98, a computer) is one device, unless it is only a model's name, such as a tracker's (GV300TP), which many units share: a new address with that same name, heard after the old one fell silent, is it again
+  if(nm && NAME_ID.test(nm) && !trackerName(nm) && !HOUSE_RE.test(nm)){ LIVE.devs.forEach(c=>{ if(c.band!=='ble' || c.sim || c.mine || busy.has(c.sig) || c.adv!==nm) return; const gap=at-(c.seenMobile||0);
+      if(gap>=1000 && gap<=STITCH.nameGap && (c.seenMobile||0)>=W.t0+LIVE.skew){ n++; hit=c; } }); if(n===1) return hit; hit=null; n=0; }
+  if(r<STITCH.min || (cls==='Unknown' && !makerOf({hint}))) return null;          // a device that says nothing of what it is could be anyone's
   LIVE.devs.forEach(c=>{ if(c.band!=='ble' || c.sim || c.mine || busy.has(c.sig) || (c.cls||'Unknown')!==cls || (c.hint||'')!==hint) return;
     if(nm && c.adv && nm!==c.adv) return;
     const gap=at-(c.seenMobile||0); if(!(gap>0 && gap<=STITCH.gap) || (c.seenMobile||0)<W.t0+LIVE.skew) return;
