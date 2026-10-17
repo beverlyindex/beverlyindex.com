@@ -3902,7 +3902,7 @@ function nowContacts(){ const now=Date.now(), cs=(S.contacts||[]).filter(C=>now-
 /* Vehicles, and the things riders carry, by the names they give. */
 const VEH_NAMES=[[/^(lime|bird|dott|tier|voi|bolt|ridemovi|helbiz)[-_ ]?[0-9a-f]{5,}/i,'Shared scooter or e-bike, by its name'],[/(^|[^a-z])(ninebot|segway|kickscooter|miscooter|nbscooter|mi electric scooter|okai|super ?soco|gogoro|askoll|helbiz|cityscoot|cooltra)(?![a-z])/i,'Scooter or e-bike, by its name'],
   [/(^|[^a-z])(sena|cardo|packtalk|freecom|interphone|fodsports|lexin|ejeas|n-?com|bmw motorrad|ducati|harley|kawasaki|vespa|piaggio|aprilia|moto guzzi|zumo|tomtom rider)(?![a-z])/i,'Motorcycle or rider gear, by its name'],
-  [/(^|[^a-z])(volvo|bmw|audi|mercedes|volkswagen|skoda|cupra|renault|peugeot|citroen|lancia|jeep|opel|hyundai|nissan|mazda|subaru|lexus|toyota|tesla|byd|polestar|dacia|porsche|jaguar|land rover|suzuki|mitsubishi|uconnect|carplay|obd ?ii|obd2?|elm327|v-?link|honda|ford|sync ?\d|mbux|kia|fiat)(?![a-z])/i,'Car, by its name']];
+  [/(^|[^a-z])(volvo|bmw|audi|mercedes|volkswagen|vw|skoda|cupra|renault|peugeot|citroen|lancia|jeep|opel|hyundai|nissan|mazda|subaru|lexus|toyota|tesla|byd|polestar|dacia|porsche|jaguar|land rover|suzuki|mitsubishi|uconnect|carplay|obd ?ii|obd2?|elm327|v-?link|honda|ford|sync ?\d|mbux|kia|fiat)(?![a-z])/i,'Car, by its name']];
 const vehName = n => { const x=n && VEH_NAMES.find(r=>r[0].test(n)); return x?x[1]:''; };
 const RIDS=new Map();
 const DRONE_SSID=/^(DJI[-_ ]|TELLO-|Mavic[-_ ]|Spark-|Phantom[-_ ]\d|ANAFI[-_ ]|Parrot[-_ ]|Bebop2?-|Skydio|Autel[-_ ]|EVO[-_ ]II|RID-)/i;
@@ -6749,7 +6749,7 @@ function ingestReport(sid, rowT, p, off){
     if(!d){ if(LIVE.devs.size>=DEVS_MAX) continue;
       const hsh=hash32(s.id), h2=hash32('~'+s.id);
       d={ id:'L'+hsh.toString(36)+h2.toString(36), sig:s.id, live:true, name:callsign(hsh,h2), glyph:GLY[hsh%GLY.length], firstSeen:at, timesSeen:0, samples:[], hist:[], handleBrg:hsh%360, fix:null, sector:null, fresh:0, seenMobile:0, seenStation:0 }; LIVE.devs.set(s.id,d); }
-    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; { const nw=typeof s.name==='string' ? s.name.replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40) : ''; if(nw && (!d.adv || nw.length>d.adv.length || !d.advT || at-d.advT>86400000)){ d.adv=nw; d.advT=at; } else if(!d.adv) d.adv=''; } d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; { const vn=(band==='ble' && (d.cls==='Unknown'||d.cls==='Vehicle')) ? vehName(d.adv) : ''; if(vn){ d.cls='Vehicle'; d.hint=vn; } } if(s.rid && typeof s.rid==='object') d.rid=s.rid; d.name=isDrone(d)?'Drone #'+d.id.slice(-3).toUpperCase():autoName(d); d.rssi=rssi!==null?rssi:rssiOf(reading);
+    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; { const nw=typeof s.name==='string' ? s.name.replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40) : ''; if(nw && (!d.adv || nw.length>d.adv.length || !d.advT || at-d.advT>86400000)){ d.adv=nw; d.advT=at; } else if(!d.adv) d.adv=''; } d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; { const vn=(band==='ble' && (d.cls==='Unknown'||d.cls==='Vehicle'||d.cls==='Wearable')) ? vehName(d.adv) : ''; if(vn && (d.cls!=='Wearable' || vn==='Car, by its name')){ d.cls='Vehicle'; d.hint=vn; } } if(s.rid && typeof s.rid==='object') d.rid=s.rid; d.name=isDrone(d)?'Drone #'+d.id.slice(-3).toUpperCase():autoName(d); d.rssi=rssi!==null?rssi:rssiOf(reading);
     d.lastSeen=Math.max(d.lastSeen||0, at); d.firstSeen=Math.min(d.firstSeen, at); d.timesSeen++; d.sensor=sid; d.identity=Math.max(1,Math.min(3,(s.conf|0)||2));
     if(station) d.seenStation=Math.max(d.seenStation, at); else { d.seenMobile=Math.max(d.seenMobile, at); if(away) d.seenAway=Math.max(d.seenAway||0, at); }
     d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
@@ -7396,11 +7396,15 @@ document.addEventListener('visibilitychange', ()=>{ if(!W.on) return;
       else if(sec>=8){ W.gaps+=sec; wEvent('gap','Remiel was off the screen for '+walkDur(sec*1000)+'. The record resumes from here.'); } }
     if(PH.native && PH.on) nativeDrain();
     wLock(); } });
+// A single fix that jumps out and straight back (a reflection off a building) is no part of your route, and adds nothing to your distance.
+function routeSpike(){ const R=W.route, n=R.length; if(n<3) return; const a=R[n-3], b=R[n-2], c=R[n-1], ab=distLL(a.lat,a.lon,b.lat,b.lon), bc=distLL(b.lat,b.lon,c.lat,c.lon), ac=distLL(a.lat,a.lon,c.lat,c.lon);
+  if(ab<40 || bc<40 || ab+bc<3*ac+40) return; if(Math.max(ab/Math.max(1,(b.t-a.t)/1000), bc/Math.max(1,(c.t-b.t)/1000))<10) return;
+  R.splice(n-2,1); W.dist=Math.max(0,(W.dist||0)-(ab<500?ab:0)-(bc<500?bc:0)+(ac<500?ac:0)); }
 function walkPos(q, at){
   const sp=q||S.pos; if(!W.on || !sp || sp.src==='net') return; const now=at||Date.now(), step=(typeof sp.spd==='number' && sp.spd<SLOW_MPS) ? Math.max(SLOW_STEP_M, 2*(sp.acc||0)) : 8;          // the phone says it is hardly moving: a new route point needs real distance
   { const S={pos:sp}, l=W.route[W.route.length-1], dm=l?distLL(l.lat,l.lon,S.pos.lat,S.pos.lon):Infinity, good=S.pos.acc<=POS_MAX_ACC;
     if(l && now<l.t) return;
-    if(!l || (good && dm>=step)){ if(l && dm<500) W.dist+=dm; W.route.push({t:now,lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6),acc:Math.round(S.pos.acc)}); if(W.route.length>4000) W.route.shift(); }
+    if(!l || (good && dm>=step)){ if(l && dm<500) W.dist+=dm; W.route.push({t:now,lat:+S.pos.lat.toFixed(6),lon:+S.pos.lon.toFixed(6),acc:Math.round(S.pos.acc)}); if(W.route.length>4000) W.route.shift();  routeSpike(); }
     if(!good && !W.rough){ W.rough=true; wEvent('warn','Your position is good to '+du(S.pos.acc)+' just now. Placement resumes as it sharpens.'); }
     else if(good && W.rough){ W.rough=false; wEvent('note','Your position is good again, within '+du(S.pos.acc)+'.'); } }
 }
