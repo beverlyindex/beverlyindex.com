@@ -1276,7 +1276,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-18.94', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-18.95', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2657,7 +2657,7 @@ function elogInit(){ try{ if(!window.indexedDB) return; const rq=indexedDB.open(
 const elogTx = (stores, mode) => ELOG.db.transaction(stores, mode);
 const elogAll = (name, index, key) => new Promise(res=>{ try{ const s=elogTx([name],'readonly').objectStore(name), rq=index?s.index(index).getAll(key):s.getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); }catch(e){ res([]); } });
 const elogCount = name => new Promise(res=>{ try{ const rq=elogTx([name],'readonly').objectStore(name).count(); rq.onsuccess=()=>res(rq.result||0); rq.onerror=()=>res(0); }catch(e){ res(0); } });
-function elogCache(r){ ELOG.hist.set(r.k,{id:r.id, name:r.name||'', hint:r.hint||'', cls:r.cls||'Unknown', enc:r.enc, occ:r.occ||1, fx:r.fx||0, days:(r.days||[]).length, pl:(r.places||[]).map(p=>[p.la,p.lo,p.first,p.last,p.occ||1]), first:r.first, last:r.last});
+function elogCache(r){ if(String(r.k).slice(0,4)==='imp:') ELOG.imp=true; ELOG.hist.set(r.k,{id:r.id, name:r.name||'', hint:r.hint||'', cls:r.cls||'Unknown', enc:r.enc, occ:r.occ||1, fx:r.fx||0, days:(r.days||[]).length, pl:(r.places||[]).map(p=>[p.la,p.lo,p.first,p.last,p.occ||1]), first:r.first, last:r.last});
   if(r.name){ let s=ELOG.names.get(r.name); if(!s) ELOG.names.set(r.name, s=new Set()); s.add(r.k); } }
 // The record of earlier builds grouped sightings within 250 m. It is read again once: an occasion begins half an hour after the last one ended, and a place is 46 m across.
 async function elogMigrate(devs){ if(store.get('halo_elog_v')==='2') return;
@@ -2815,8 +2815,11 @@ const neverLocal = cls => cls==='Tag' || cls==='Vehicle' || cls==='Camera';
 // The second is read from the sighting now open: where you stood when it was nearest. A device last heard a moment ago, back where you were, does not count.
 const NAME_ID=/^(?=.*[A-Za-z])(?=.*\d{3}).{6,}$/;          // letters with a run of digits: a model with its serial, a car with its number
 function nameSigs(name, sig){ if(!name || !NAME_ID.test(name) || HOUSE_RE.test(name)) return []; const ks=ELOG.names.get(name); return ks ? [...ks].filter(k=>k!==sig).slice(0,6) : []; }
-function histFor(sig, name){ if(!ELOG.ready) return null; const own=ELOG.hist.get(sig), ks=nameSigs(name, sig).map(k=>ELOG.hist.get(k)).filter(Boolean); if(!ks.length) return own||null;
-  const all=(own?[own]:[]).concat(ks), h={enc:0, occ:0, fx:0, days:0, pl:[], first:Infinity, last:0, byName:true};
+// A record rebuilt from trip reports knows each device by the name Remiel gives it on the screen, not by its radio address; it is read alongside the phone's own.
+const sigId = sig => 'L'+hash32(sig).toString(36)+hash32('~'+sig).toString(36);
+function histFor(sig, name){ if(!ELOG.ready) return null; const ik=ELOG.imp ? 'imp:'+sigId(sig) : '', own=ELOG.hist.get(sig), imp=ik ? ELOG.hist.get(ik) : null, ks=nameSigs(name, sig).filter(k=>k!==ik).map(k=>ELOG.hist.get(k)).filter(Boolean), base=[own,imp].filter(Boolean);
+  if(!ks.length && base.length<2) return base[0]||null;
+  const all=base.concat(ks), h={enc:0, occ:0, fx:0, days:0, pl:[], first:Infinity, last:0, byName:ks.length>0};
   all.forEach(x=>{ h.enc+=x.enc; h.occ+=(x.occ||1); h.fx+=(x.fx||0); h.days=Math.max(h.days,x.days); h.first=Math.min(h.first,x.first); h.last=Math.max(h.last,x.last); x.pl.forEach(p=>h.pl.push(p)); }); return h; }
 function seenInfo(sig, me, t0, ref, name){ const h=histFor(sig, name); if(!h) return null; let near=null, far=null;
   if(me) h.pl.forEach(p=>{ const m=distLL(me.lat,me.lon,p[0],p[1]);
