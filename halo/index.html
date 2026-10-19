@@ -250,6 +250,7 @@ select.inp{flex:none}
 .loc-key{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 2px 0;font-size:11.5px;color:var(--mut)} .loc-key span{display:inline-flex;align-items:center;gap:6px} .loc-key .sdot{width:9px;height:9px}
 .loc-bar{display:flex;gap:10px;margin-top:12px}
 .loc-bar.tb-btns{gap:8px} .loc-bar.tb-btns .btn{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:10px 4px;text-align:center;font-size:clamp(13px,4vw,15px)}          /* trip buttons: one word each, equal widths, never wrapping or growing with their words */ .loc-bar .btn{min-height:52px;font-size:15px;padding:10px 18px;border-radius:14px} .loc-bar .mk{flex:1}
+.loc-bar.trip-save{position:sticky;bottom:0;z-index:6;margin:12px -12px 0;padding:10px 12px;background:rgba(7,11,22,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid var(--line2);box-shadow:0 -10px 22px rgba(0,0,0,.4)}          /* a trip's Save, Share and Print stay at the foot of the screen while its lists scroll beneath */
 .mark{margin-top:12px;padding:12px;border:1px solid var(--chrome2);border-radius:14px;background:rgba(22,40,90,.35)}
 .mark-h{display:flex;align-items:baseline;gap:10px} .mark-h b{font-family:var(--disp);font-size:18px;font-weight:600;flex:1} .mark-h span{font-size:12px;color:var(--mut)}
 .mark .inp{width:100%;min-height:48px;font-size:15px}
@@ -1286,7 +1287,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-19.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-19.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3205,7 +3206,7 @@ function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},h
   { const cts=R.contacts||[]; if(cts.length) h+='<div class="elog-h4">Contacts · '+cts.length+'</div><p class="limit" style="margin:0 2px 8px">Devices that arrived together, reached their nearest point to you in the same ten seconds, and faded again. Each card is what one person, or one vehicle, carries.</p>'+cts.slice(0,12).map(x=>contactCard(x,C.tags)).join('')+(cts.length>12?'<p class="limit" style="margin:6px 2px 0">The first 12 of '+cts.length+'. The printed page and the data file hold them all.</p>':''); }
   { const drs=ds.filter(r=>r.dr); if(drs.length) h+='<div class="elog-h4">Drones heard · '+drs.length+'</div>'+drs.map(r=>row(r)+((q=>q.length?'<div class="kv" style="margin:0 2px 10px">'+q.map(x=>'<span class="k">'+x[0]+'</span><span class="v">'+x[1]+'</span>').join('')+'</div>':'')(droneRows(r.rid, null)))).join(''); }
   if((C.cams||[]).length) h+='<div class="elog-h4">Cameras passed · '+C.cams.length+'</div>'+C.cams.map(x=>'<div class="elog-line"><span><b>'+esc(x.kind+(x.name?', '+x.name:''))+'</b> · '+hhmm(x.t)+', '+minsIn(x.t,R.t0)+' · '+whSpan(x.la,x.lo)+'</span><span class="mono">'+esc(du(x.d))+'</span></div>').join('');
-  return h+'<div class="loc-bar"><button class="btn primary mk" data-act="trip-save">Save the data file</button><button class="btn" data-act="trip-share">Share</button><button class="btn" data-act="trip-print">Print</button></div>'+
+  return h+'<div class="loc-bar trip-save"><button class="btn primary mk" data-act="trip-save">Save the data file</button><button class="btn" data-act="trip-share">Share</button><button class="btn" data-act="trip-print">Print</button></div>'+
     '<div class="limit" style="text-align:center;margin-top:8px"><button class="linkbtn'+(T.ren?' on':'')+'" data-act="trip-ren">'+(R.name?'Change the name':'Name this trip')+'</button> · The data file holds every device and every reading of this trip.</div>'; }
 async function tripFile(R){ const rep=withTrip(R, walkReport), iso=t=>new Date(t).toISOString(), C=R.cor||{tags:{},hw:{},cams:[]};
   rep.version=2; rep.name=tripName(R); rep.devices.forEach(x=>{ x.tag=(TAG[C.tags[x.id]]||TAG.fresh).w; x.record=C.hw[x.id]||''; const r=(R.devs||{})[x.id]||{};
