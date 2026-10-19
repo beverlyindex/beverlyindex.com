@@ -17,19 +17,19 @@
 @font-face{font-family:'JetBrains Mono';font-weight:400;font-style:normal;font-display:swap;src:url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2')}
 @font-face{font-family:'JetBrains Mono';font-weight:500;font-style:normal;font-display:swap;src:url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2')}
 @font-face{font-family:'JetBrains Mono';font-weight:600;font-style:normal;font-display:swap;src:url('fonts/jetbrains-mono-latin-600-normal.woff2') format('woff2')}
-/* The NOUS and Remiel Sentinel look: near-black navy, a teal glow behind glass spheres, amber serif, monospaced capitals,
-   neon outlines, true-red outlines for Help. Pictures first: a person is their sphere, a task is its icon. */
+/* The Remiel Sentinel way of showing things: one sphere is highlighted at a time, its picture breathes large in the dream
+   circle, and what belongs to that person floats beside it. Real pictures only: faces, and the medicines Home photographs. */
 :root{
   color-scheme:dark;
   --bg:#05080d; --panel:rgba(12,17,29,.94); --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.16);
   --ink:#e8edf7; --mut:#9aa6bd; --dim:#5d6a85;
-  --amber:#e8a24a; --amber2:#f3c27a; --teal:#2fd3e8; --cyan:#4fc3ff; --ring:#1d8fd6; --green:#3ee08a; --purple:#a78bfa; --red:#ff2a2a;
+  --amber:#e8a24a; --amber2:#f3c27a; --cyan:#4fc3ff; --ring:#1d8fd6; --green:#3ee08a; --red:#ff2a2a;
   --serif:'Instrument Serif',Georgia,serif; --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --sans:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
 }
 *{box-sizing:border-box;-webkit-user-select:none;user-select:none}
 input{-webkit-user-select:text;user-select:text}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-tap-highlight-color:transparent;overflow:hidden}
-body{background:radial-gradient(70vmin 60vmin at 60% 48%,rgba(22,96,128,.42),rgba(10,44,64,.16) 50%,transparent 75%),radial-gradient(90vmin 50vmin at 50% 115%,rgba(197,165,90,.08),transparent 70%),var(--bg)}
+body{background:radial-gradient(70vmin 60vmin at 50% 72%,rgba(22,96,128,.40),rgba(10,44,64,.15) 50%,transparent 75%),radial-gradient(60vmin 40vmin at 85% 28%,rgba(124,111,214,.10),transparent 70%),var(--bg)}
 button{font:inherit;color:inherit}
 .hide{display:none!important}
 #stage{position:fixed;inset:0;overflow:hidden}
@@ -37,57 +37,103 @@ button{font:inherit;color:inherit}
 .top .wm{font-family:var(--serif);font-style:italic;font-size:24px;line-height:1}
 .top .wm b{font-family:var(--mono);font-style:normal;font-weight:400;font-size:13px;letter-spacing:.22em;color:var(--mut);margin-right:6px}
 .top .sp{flex:1}
-.ib{width:44px;height:44px;border-radius:50%;border:1px solid var(--line2);background:rgba(16,22,36,.8);display:grid;place-items:center;cursor:pointer}
 .flag{background:none;border:0;padding:6px;cursor:pointer;display:flex;align-items:center;border-radius:4px}.flag svg{display:block;width:30px;height:20px;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
-/* spheres, as in Remiel Sentinel: picture or video inside glass, a bright blue ring and soft outer halos */
-.sph{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;transition:left .6s ease,top .6s ease,opacity .4s;cursor:pointer;touch-action:manipulation}
-.sph .ball{width:var(--d);height:var(--d);border-radius:50%;position:relative;display:grid;place-items:center;
+/* words for actions, in NOUS's neon-outlined capitals */
+.w{appearance:none;display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:10px 16px;border-radius:12px;border:1.5px solid rgba(79,195,255,.6);background:rgba(79,195,255,.07);color:#bfe9ff;
+  font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.w.g{border-color:rgba(62,224,138,.7);background:rgba(62,224,138,.08);color:#9ff5c6}
+.w.a{border-color:rgba(243,194,122,.75);background:rgba(232,162,74,.08);color:var(--amber2)}
+.w.r{border-color:var(--red);background:transparent;color:#ff5a5a}
+.w.gold{border:none;background:linear-gradient(180deg,#f0c67e,#d39a45);color:#1A1A2E;box-shadow:0 8px 26px rgba(232,162,74,.32)}
+.w.big{min-height:60px;font-size:15px;padding:12px 22px;border-radius:16px}
+.w.on{border-color:var(--green);background:rgba(62,224,138,.12);color:#9ff5c6;box-shadow:0 0 16px rgba(62,224,138,.22)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+/* the question region: always here, under the title */
+#ask{position:absolute;left:12px;right:12px;top:calc(max(12px,env(safe-area-inset-top)) + 54px);height:116px;z-index:12;display:flex;align-items:center;gap:12px;opacity:0;pointer-events:none;transition:opacity .8s,transform .8s;transform:translateY(-6px);
+  background:rgba(6,12,22,.84);border:1px solid rgba(79,195,255,.25);border-radius:22px;padding:12px 14px;backdrop-filter:blur(8px);max-width:560px;margin:0 auto}
+#ask.in{opacity:1;pointer-events:auto;transform:none}
+#ask .q{font-family:var(--serif);font-size:26px;line-height:1.05;color:var(--amber2);flex:1;min-width:0}
+#ask .faces{display:flex;gap:10px}
+#ask .faces button{width:62px;height:62px;border-radius:50%;border:2px solid var(--line2);background:rgba(255,255,255,.03);cursor:pointer;display:grid;place-items:center;padding:0}
+#ask .faces svg{width:42px;height:42px}
+#ask .faces .good{border-color:rgba(62,224,138,.7);color:#8ff0bd}#ask .faces .okay{border-color:rgba(243,194,122,.7);color:var(--amber2)}#ask .faces .low{border-color:rgba(255,42,42,.7);color:#ff7b7b}
+/* the dream state, as in Sentinel: faded until highlighted. Upper right, the close-up picture of what matters now;
+   upper left, how urgent it is and where: the place on a map, or the pharmacy when a medicine is due. */
+.dream{position:absolute;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;opacity:.38;transition:opacity .8s;pointer-events:none}
+.dream.hi{opacity:1}
+.dream.urg{opacity:1}
+.dream .circ{width:var(--dd);height:var(--dd);border-radius:50%;position:relative;overflow:hidden;background:radial-gradient(circle,rgba(var(--rgb),.30),rgba(var(--rgb),.05) 70%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.08),0 0 calc(var(--dd)*.2) rgba(var(--rgb),.45),inset 0 0 calc(var(--dd)*.14) rgba(var(--rgb),.55)}
+.dream .circ>img,.dream .circ>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:breathe 8s ease-in-out infinite}
+.dream .circ .ini{position:absolute;inset:0;display:grid;place-items:center;font-weight:600;font-size:calc(var(--dd)*.3);color:rgb(var(--rgb))}
+.dream .circ::after{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,transparent 58%,rgba(5,8,13,.8) 100%);pointer-events:none}
+.dream .tiles2{position:absolute;left:50%;top:50%}
+.dream .tiles2 img{position:absolute;width:256px;height:256px;max-width:none}
+.dream .dot{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:#4fc3ff;box-shadow:0 0 0 4px rgba(79,195,255,.35),0 0 18px #4fc3ff;animation:pulse 1.4s ease-in-out infinite;z-index:2}
+.dream.urg .dot{background:var(--red);box-shadow:0 0 0 5px rgba(255,42,42,.4),0 0 22px var(--red)}
+.dream .h1{font-family:var(--serif);font-size:20px;line-height:1.1;color:#d8f3ff;margin-top:8px;max-width:calc(var(--dd) + 30px)}
+.dream.urg .h1{color:#ffb3b3}
+.dream .h2{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--amber2);margin-top:4px;max-width:calc(var(--dd) + 30px);line-height:1.4;text-transform:uppercase}
+.dream .h3{font-family:var(--mono);font-size:12px;color:#bfe9ff;margin-top:2px;pointer-events:auto}
+.dream .h3 a{color:#9ff5c6;text-decoration:none;border-bottom:1px solid rgba(62,224,138,.5)}
+.sph.m-good .ball{box-shadow:0 0 0 4px var(--green),0 0 0 10px rgba(62,224,138,.22),0 0 0 15px rgba(197,165,90,.35),0 0 calc(var(--d)*.45) rgba(62,224,138,.35)}
+.sph.m-okay .ball{box-shadow:0 0 0 4px var(--amber),0 0 0 10px rgba(232,162,74,.22),0 0 0 15px rgba(197,165,90,.35),0 0 calc(var(--d)*.45) rgba(232,162,74,.35)}
+.sph.m-low .ball{box-shadow:0 0 0 4px var(--red),0 0 0 10px rgba(255,42,42,.22),0 0 0 15px rgba(197,165,90,.35),0 0 calc(var(--d)*.45) rgba(255,42,42,.35)}
+/* one sphere at a time, as in Sentinel: what belongs to that person on its left, how to reach them on its right */
+#strip{position:absolute;left:8px;overscroll-behavior:contain;z-index:4;display:flex;flex-direction:column;gap:8px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding:2px 4px 8px 2px}
+#strip::-webkit-scrollbar{display:none}
+#reach{position:absolute;right:8px;z-index:4;display:flex;flex-direction:column;gap:12px;justify-content:center}
+#reach .w{width:100%;min-height:58px;font-size:12px;letter-spacing:.12em;padding:8px 6px}
+.sec{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;white-space:nowrap;text-transform:uppercase;color:#cfd8ea;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:8px;opacity:0;transition:opacity .7s}
+.sec.in{opacity:1}.sec:first-child{margin-top:0}
+.sec button{appearance:none;background:none;border:1px solid rgba(243,194,122,.6);color:var(--amber2);border-radius:50%;font-family:var(--mono);font-size:16px;width:30px;height:30px;line-height:1;cursor:pointer;flex:none}
+.sec .none{color:var(--dim);font-weight:400;letter-spacing:.08em;text-transform:none;font-family:var(--sans);font-size:12px}
+.fl{display:flex;align-items:center;gap:9px;padding:6px 8px 6px 6px;border-radius:18px;background:rgba(8,14,24,.72);border:1.5px solid rgba(79,195,255,.22);cursor:pointer;
+  opacity:0;transform:translateX(-14px);transition:opacity .7s ease,transform .7s ease,border-color .3s;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.fl.in{opacity:1;transform:none}
+.fl.out{opacity:0;transform:translateX(-20px) scale(.96)}
+.fl .ph{width:46px;height:46px;border-radius:12px;flex:none;overflow:hidden;background:#0b1424;display:grid;place-items:center;position:relative}
+.fl .ph img{width:100%;height:100%;object-fit:cover}
+.fl .ph .nm0{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--mut);text-align:center;padding:4px;line-height:1.2}
+.fl .t{font-size:14px;font-weight:600;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.fl .tm{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--mut);margin-top:3px}
+.fl>div:last-child{min-width:0}
+.fl.late{border-color:var(--red);box-shadow:0 0 18px rgba(255,42,42,.28)}.fl.late .tm{color:#ff8a8a}
+.fl.due{border-color:var(--amber);box-shadow:0 0 18px rgba(232,162,74,.28)}.fl.due .tm{color:var(--amber2)}
+.fl.done{border-color:var(--green)}
+.fl.ev{border-color:var(--red);background:rgba(40,6,10,.75)}.fl.ev .t{font-family:var(--serif);font-weight:400;font-size:18px;color:#ffc9c9}
+.fl.info{cursor:default;flex-direction:column;align-items:flex-start;gap:6px;padding:12px 14px}
+.fl.info .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.fl.info .v{font-size:15px;line-height:1.35}
+.fl.act{cursor:default;background:none;border:none;box-shadow:none;padding:0;flex-wrap:wrap;gap:8px}
+/* spheres, as in Remiel Sentinel */
+.sph{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;transition:left .6s ease,top .6s ease;cursor:pointer;touch-action:manipulation;z-index:2}
+.sph .ball{width:var(--d);height:var(--d);border-radius:50%;position:relative;display:grid;place-items:center;transition:width .4s,height .4s;
   background:radial-gradient(circle at 38% 30%,rgba(255,255,255,.28),rgba(79,195,255,.14) 30%,#0a2236 70%,#050f1a);
   box-shadow:0 0 0 3px var(--ring),0 0 0 calc(var(--d)*.06) rgba(29,143,214,.18),0 0 0 calc(var(--d)*.11) rgba(29,143,214,.08),0 0 calc(var(--d)*.35) rgba(47,211,232,.38)}
 .sph .ball .in{position:absolute;inset:0;border-radius:50%;overflow:hidden;display:grid;place-items:center}
 .sph .ball img,.sph .ball video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.sph .ball .ini{font-weight:600;font-size:calc(var(--d)*.32);letter-spacing:.03em;color:#e6f6ff;text-shadow:0 0 12px rgba(79,195,255,.6)}
-.sph .ball .in::after{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.22),transparent 40%);pointer-events:none}
-.sph.mid .ball{box-shadow:0 0 0 4px var(--ring),0 0 0 9px rgba(29,143,214,.22),0 0 0 15px rgba(197,165,90,.45),0 0 0 17px rgba(197,165,90,.12),0 0 calc(var(--d)*.45) rgba(47,211,232,.42)}
-.sph .nm{margin-top:12px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#8fd8ee;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
-.sph.mid .nm{font-family:var(--sans);font-size:28px;letter-spacing:.01em;text-transform:none;color:#7fd3ea;max-width:80vw;margin-top:18px}
-.sph .tag{position:absolute;top:-18px;font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.14em;color:var(--amber2);white-space:nowrap}
-.sph.ask .ball{box-shadow:0 0 0 3px var(--amber),0 0 0 9px rgba(232,162,74,.22),0 0 28px rgba(232,162,74,.55)}
-.sph.add .ball{background:transparent;box-shadow:none;border:2px dashed rgba(143,216,238,.55)}
-.sph.add .ball svg{width:40%;height:40%;color:#8fd8ee}
+.sph .ball .ini{font-weight:600;font-size:calc(var(--d)*.32);color:#e6f6ff;text-shadow:0 0 12px rgba(79,195,255,.6)}
+.sph .ball .in::after{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.2),transparent 40%);pointer-events:none}
+.sph.home .ball{box-shadow:0 0 0 4px var(--ring),0 0 0 9px rgba(29,143,214,.22),0 0 0 15px rgba(197,165,90,.45),0 0 0 17px rgba(197,165,90,.12),0 0 calc(var(--d)*.45) rgba(47,211,232,.42)}
+.sph.foc .ball .in img,.sph.foc .ball .in video,.sph.foc .ball .in .ini{animation:breathe 8s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.72}50%{opacity:1}}
+.sph.foc .nm{color:#d8f3ff}
+.sph .nm{margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#8fd8ee;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.sph.home .nm{font-family:var(--sans);font-size:24px;letter-spacing:.01em;text-transform:none;color:#7fd3ea;margin-top:16px}
+.sph .tag{position:absolute;top:-17px;font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.14em;color:var(--amber2);white-space:nowrap}
+.sph.ask .ball{box-shadow:0 0 0 3px var(--amber),0 0 0 9px rgba(232,162,74,.22),0 0 28px rgba(232,162,74,.55);animation:pulse 1.6s ease-in-out infinite}
+.sph.alarm .ball{box-shadow:0 0 0 4px var(--red),0 0 0 11px rgba(255,42,42,.25),0 0 40px rgba(255,42,42,.55);animation:pulse 1.2s ease-in-out infinite}
+.sph.warn .ball{box-shadow:0 0 0 4px var(--amber),0 0 0 11px rgba(232,162,74,.25),0 0 36px rgba(232,162,74,.5)}
 .sph.mine .ball{box-shadow:0 0 0 3px #7c6fd6,0 0 22px rgba(124,111,214,.5)}
-.sph .badge{position:absolute;right:-4px;top:-4px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#1b0b0e;border:2px solid var(--red);color:#ff6b6b;z-index:2}
-.sph .badge.warn{border-color:var(--amber);color:var(--amber2);background:#1d1408}
-.sph .badge svg{width:17px;height:17px}
+.sph.add .ball{background:transparent;box-shadow:none;border:2px dashed rgba(143,216,238,.55)}
+.sph.add .ball span{font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:#8fd8ee}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-@keyframes drift{0%,100%{translate:0 0}50%{translate:0 -6px}}
-.sph:not(.mid) .ball{animation:drift 6s ease-in-out infinite}
-.sph.ask .ball{animation:pulse 1.6s ease-in-out infinite}
+@keyframes drift{0%,100%{translate:0 0}50%{translate:0 -5px}}
+.sph:not(.home):not(.ask):not(.alarm) .ball{animation:drift 6s ease-in-out infinite}
 .link{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-/* the quick actions that open round a sphere */
-.qa{position:absolute;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;display:grid;place-items:center;cursor:pointer;z-index:8;
-  background:rgba(10,18,30,.94);border:1.5px solid rgba(79,195,255,.7);color:#bfe9ff;box-shadow:0 0 18px rgba(47,211,232,.35);opacity:0;transform:scale(.4);transition:opacity .25s,transform .25s}
-.qa.on{opacity:1;transform:scale(1)}
-.qa svg{width:26px;height:26px}
-.qa.g{border-color:rgba(62,224,138,.8);color:#9ff5c6;box-shadow:0 0 18px rgba(62,224,138,.35)}
-.qa.a{border-color:rgba(243,194,122,.85);color:var(--amber2);box-shadow:0 0 18px rgba(232,162,74,.35)}
-.qa i{position:absolute;top:62px;font-style:normal;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#9fdcff;white-space:nowrap}
-/* the dream column: what is needed, fading in one by one, fading out once done */
-#dream{position:absolute;left:12px;top:calc(max(12px,env(safe-area-inset-top)) + 196px);width:min(38vw,190px);display:flex;flex-direction:column;gap:10px;z-index:4}
-.dt{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 8px;border-radius:16px;background:rgba(8,14,24,.6);border:1px solid rgba(79,195,255,.18);cursor:pointer;
-  opacity:0;transform:translateX(-14px);transition:opacity .7s ease,transform .7s ease}
-.dt.in{opacity:1;transform:none}
-.dt.out{opacity:0;transform:translateX(-20px) scale(.96)}
-.dt .ic{width:44px;height:44px;border-radius:50%;flex:none;display:grid;place-items:center;border:2px solid rgba(79,195,255,.6);color:#bfe9ff;background:rgba(79,195,255,.08)}
-.dt .ic svg{width:24px;height:24px}
-.dt.late .ic{border-color:var(--red);color:#ff7b7b;background:rgba(255,42,42,.10);box-shadow:0 0 14px rgba(255,42,42,.35)}
-.dt.due .ic{border-color:var(--amber);color:var(--amber2);background:rgba(232,162,74,.10);box-shadow:0 0 14px rgba(232,162,74,.35)}
-.dt.done .ic{border-color:var(--green);color:#9ff5c6}
-.dt .tx{min-width:0}
-.dt .t{font-size:14px;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.dt .w{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--mut);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Help, Remiel Sentinel style: a true-red outline, held to send */
-#help{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(78vw,340px);height:74px;border-radius:999px;border:2.5px solid var(--red);background:transparent;color:var(--red);
+#help{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(78vw,340px);height:68px;border-radius:999px;border:2.5px solid var(--red);background:transparent;color:var(--red);
   font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:.42em;padding-left:.42em;cursor:pointer;overflow:hidden;touch-action:none;z-index:6;box-shadow:0 0 26px rgba(255,42,42,.2)}
 #help .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,42,42,.25);pointer-events:none}
 /* pop-ups */
@@ -95,77 +141,50 @@ button{font:inherit;color:inherit}
 .veil.in{opacity:1}
 .pop{width:min(100%,440px);max-height:calc(100vh - 32px);overflow:auto;background:var(--panel);border:1px solid rgba(232,162,74,.45);border-radius:24px;padding:18px;box-shadow:-3px 0 0 0 var(--amber) inset,0 20px 60px rgba(0,0,0,.6);transform:translateY(12px) scale(.98);transition:transform .3s}
 .veil.in .pop{transform:none}
-.pop .hd{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.pop .hd{display:flex;align-items:center;gap:14px;margin-bottom:14px}
 .pop .hd .who{font-family:var(--serif);font-size:28px;line-height:1.05;color:#9fdcff;flex:1;min-width:0}
-.pop .x{width:44px;height:44px;border-radius:50%;border:1px solid var(--line2);background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--mut);flex:none}
-.pop .x svg{width:18px;height:18px}
+.pop .x{width:44px;height:44px;border-radius:50%;border:1px solid var(--line2);background:transparent;cursor:pointer;color:var(--mut);font-size:24px;line-height:1;flex:none}
 .mini{--d:64px;position:relative;transform:none;left:auto;top:auto}
 .mini .ball{animation:none!important}
+.k{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin:14px 2px 7px}
 .rl{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber2);margin-top:4px}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tg{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px 12px;border-radius:18px;border:1.5px solid var(--line2);background:rgba(255,255,255,.03);cursor:pointer;color:var(--mut);transition:all .2s}
-.tg svg{width:34px;height:34px}
-.tg span{font-size:13px;font-weight:600;text-align:center;line-height:1.15}
-.tg.on{border-color:var(--green);background:rgba(62,224,138,.10);color:#9ff5c6;box-shadow:0 0 18px rgba(62,224,138,.25)}
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{padding:10px 14px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.03);font-size:15px;font-weight:600;cursor:pointer;color:var(--mut)}
-.chip.on{border-color:var(--cyan);color:#bfe9ff;background:rgba(79,195,255,.12)}
-.go{display:flex;gap:16px;justify-content:center;margin-top:20px}
-.round{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:2px solid var(--line2);background:transparent}
-.round svg{width:34px;height:34px}
-.round.yes{border:none;background:linear-gradient(180deg,#f0c67e,#d39a45);color:#1A1A2E;box-shadow:0 0 0 4px rgba(243,194,122,.25),0 10px 30px rgba(232,162,74,.4)}
-.round.no{border-color:var(--red);color:var(--red)}
-.round.call{border:none;background:#16c26a;color:#fff;box-shadow:0 0 0 6px rgba(22,194,106,.25)}
-.round.end{border:none;background:#e0182d;color:#fff;box-shadow:0 0 0 6px rgba(224,24,45,.25)}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.tile{min-height:64px;padding:12px;border-radius:16px;border:1.5px solid var(--line2);background:rgba(255,255,255,.03);cursor:pointer;color:var(--mut);font-size:15px;font-weight:600;text-align:left;line-height:1.2}
+.tile.on{border-color:var(--green);background:rgba(62,224,138,.10);color:#d8fbe9;box-shadow:0 0 18px rgba(62,224,138,.22)}
+.go{display:flex;gap:12px;justify-content:center;margin-top:20px}
 .code{font-family:var(--mono);font-size:52px;font-weight:600;letter-spacing:.16em;text-align:center;color:var(--amber2);text-shadow:0 0 22px rgba(232,162,74,.45);margin:8px 0 10px}
 .timer{height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}.timer i{display:block;height:100%;background:var(--amber);transition:width 1s linear}
 input{width:100%;font:inherit;font-size:18px;color:var(--ink);background:#0a101e;border:1px solid var(--line2);border-radius:14px;padding:14px;min-height:54px}
 input:focus{outline:none;border-color:rgba(167,139,250,.7);box-shadow:0 0 0 3px rgba(167,139,250,.18)}
 .codein{font-family:var(--mono);font-size:40px;letter-spacing:.3em;text-align:center;padding:10px}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
-.pad button{height:62px;border-radius:18px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-family:var(--mono);font-size:24px;cursor:pointer;display:grid;place-items:center}
-.pad svg{width:24px;height:24px}
-.field{display:flex;align-items:center;gap:10px;margin-top:10px}.field>svg{width:22px;height:22px;color:#8fd8ee;flex:none}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.st{border-radius:18px;border:1px solid var(--line);padding:12px 6px;text-align:center;background:rgba(255,255,255,.02);color:inherit;text-decoration:none}
-.st svg{width:28px;height:28px;color:#8fd8ee}.st b{display:block;font-size:15px;margin-top:6px}.st.bad svg,.st.bad b{color:#ff7b7b}.st.warn svg,.st.warn b{color:var(--amber2)}.st.ok svg{color:#9ff5c6}
-.evl{display:flex;flex-direction:column;gap:10px;margin-top:16px}
-.ev{display:flex;align-items:center;gap:12px}.ev svg{width:24px;height:24px;flex:none;color:#8fd8ee}.ev.l3 svg{color:#ff7b7b}.ev.l2 svg{color:var(--amber2)}
-.ev .t{font-family:var(--serif);font-size:19px;line-height:1.1}.ev .w{font-family:var(--mono);font-size:11px;color:var(--mut);letter-spacing:.06em}
-/* the question region: always the same place, under the title, so people learn to look there. A question fades in, and out once answered. */
-#ask{position:absolute;left:12px;right:12px;top:calc(max(12px,env(safe-area-inset-top)) + 56px);height:128px;z-index:12;display:flex;align-items:center;gap:12px;opacity:0;pointer-events:none;transition:opacity .8s,transform .8s;transform:translateY(-6px);
-  background:rgba(6,12,22,.82);border:1px solid rgba(79,195,255,.25);border-radius:22px;padding:12px 14px;backdrop-filter:blur(8px);max-width:560px;margin:0 auto}
-#ask.in{opacity:1;pointer-events:auto;transform:none}
-#ask .q{font-family:var(--serif);font-size:26px;line-height:1.05;color:var(--amber2);flex:1;min-width:0}
-#ask .faces{display:flex;gap:10px}
-#ask .faces button{width:64px;height:64px;border-radius:50%;border:2px solid var(--line2);background:rgba(255,255,255,.03);cursor:pointer;display:grid;place-items:center;padding:0}
-#ask .faces svg{width:42px;height:42px}
-#ask .faces .good{border-color:rgba(62,224,138,.7);color:#8ff0bd}#ask .faces .okay{border-color:rgba(243,194,122,.7);color:var(--amber2)}#ask .faces .low{border-color:rgba(255,42,42,.7);color:#ff7b7b}
+.pad button{height:62px;border-radius:18px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-family:var(--mono);font-size:22px;cursor:pointer}
+.shot{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:4/3;border-radius:18px;border:2px dashed rgba(79,195,255,.45);overflow:hidden;cursor:pointer;background:#0a101e}
+.shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.shot span{font-family:var(--mono);font-size:13px;letter-spacing:.18em;color:#9fdcff;z-index:1;background:rgba(5,8,13,.6);padding:8px 12px;border-radius:10px}
 /* calls */
 #call{position:fixed;inset:0;z-index:40;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center}
 #call video.remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #call video.local{position:absolute;right:14px;top:calc(14px + env(safe-area-inset-top));width:28vw;max-width:140px;aspect-ratio:3/4;object-fit:cover;border-radius:16px;border:2px solid rgba(79,195,255,.6)}
-#call .bar{position:absolute;bottom:calc(30px + env(safe-area-inset-bottom));display:flex;gap:30px}
+#call .bar{position:absolute;bottom:calc(30px + env(safe-area-inset-bottom));display:flex;gap:16px}
 #call .who{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:14px}
 #call .who .mini{--d:150px}
-#call .who .nm3{font-family:var(--serif);font-size:34px;color:#9fdcff}
-#call .ringing .ball{animation:pulse 1.2s ease-in-out infinite!important}
+#call .who .mini .ball{animation:pulse 1.2s ease-in-out infinite!important}
+#call .nm3{font-family:var(--serif);font-size:34px;color:#9fdcff}
 /* urgent: the whole screen until someone answers */
 #urgent{position:fixed;inset:0;z-index:50;background:radial-gradient(700px 500px at 50% 40%,#3a0610,#140207 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;border:4px solid var(--red)}
-#urgent .mini{--d:140px}#urgent .mini .ball{box-shadow:0 0 0 4px var(--red),0 0 40px rgba(255,42,42,.6)}
+#urgent .mini{--d:150px}#urgent .mini .ball{box-shadow:0 0 0 4px var(--red),0 0 40px rgba(255,42,42,.6)}
 #urgent h1{font-family:var(--serif);font-weight:400;font-size:38px;margin:0;color:#ffd0d0}
-#urgent .big svg{width:44px;height:44px;color:#ffb3b3}
-.toast{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(30px);background:rgba(16,24,40,.95);border:1px solid var(--line2);padding:12px 18px;border-radius:999px;max-width:92vw;opacity:0;transition:all .3s;z-index:60;display:flex;align-items:center;gap:10px;pointer-events:none}
-.toast.show{opacity:1;transform:translateX(-50%)}.toast svg{width:22px;height:22px;color:#9ff5c6}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(30px);background:rgba(16,24,40,.95);border:1px solid var(--line2);padding:12px 20px;border-radius:999px;max-width:92vw;opacity:0;transition:all .3s;z-index:60;pointer-events:none;font-family:var(--mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+.toast.show{opacity:1;transform:translateX(-50%)}
 /* first run */
-#start{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;background:radial-gradient(70vmin 60vmin at 50% 40%,rgba(22,96,128,.42),transparent 75%),var(--bg)}
+#start{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px;background:radial-gradient(70vmin 60vmin at 50% 40%,rgba(22,96,128,.42),transparent 75%),var(--bg)}
 #start .wm{font-family:var(--serif);font-style:italic;font-size:48px}#start .wm b{font-family:var(--mono);font-style:normal;font-weight:400;font-size:16px;letter-spacing:.24em;color:var(--mut);display:block;text-align:center}
 .pick{display:flex;gap:22px;justify-content:center;flex-wrap:wrap}
-.pick button{display:flex;flex-direction:column;align-items:center;gap:14px;background:none;border:0;cursor:pointer}
-.pick .ball{width:130px;height:130px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 38% 30%,rgba(255,255,255,.28),rgba(79,195,255,.14) 30%,#0a2236 70%,#050f1a);box-shadow:0 0 0 3px var(--ring),0 0 0 14px rgba(29,143,214,.15),0 0 50px rgba(47,211,232,.35)}
-.pick .ball svg{width:62px;height:62px;color:#bfe9ff}
+.pick button{background:none;border:0;cursor:pointer;padding:0}
+.pick .ball{width:140px;height:140px;border-radius:50%;display:grid;place-items:center;padding:16px;text-align:center;font-family:var(--mono);font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#d8f3ff;line-height:1.4;
+  background:radial-gradient(circle at 38% 30%,rgba(255,255,255,.22),rgba(79,195,255,.14) 30%,#0a2236 70%,#050f1a);box-shadow:0 0 0 3px var(--ring),0 0 0 14px rgba(29,143,214,.15),0 0 50px rgba(47,211,232,.35)}
 .pick .home .ball{box-shadow:0 0 0 3px var(--ring),0 0 0 9px rgba(29,143,214,.2),0 0 0 15px rgba(197,165,90,.45),0 0 50px rgba(47,211,232,.35)}
-.pick span{font-size:17px;font-weight:600;max-width:150px;text-align:center}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -173,10 +192,13 @@ input:focus{outline:none;border-color:rgba(167,139,250,.7);box-shadow:0 0 0 3px 
 <div id="stage">
   <svg class="link" id="links"></svg>
   <div class="top"><div class="wm"><b>REMIEL</b>Covara</div><div class="sp"></div><button class="flag" data-act="lang" id="lngBtn" aria-label="Language: English / Italiano"></button></div>
-  <div id="dream" aria-live="polite"></div>
+  <div id="ask" role="dialog" aria-modal="false"></div>
+  <div class="dream" id="dreamL"></div>
+  <div class="dream" id="dreamR"></div>
+  <div id="strip" aria-live="polite"></div>
+  <div id="reach"></div>
   <div id="orbit"></div>
   <button id="help" class="hide" aria-label="Help: hold for 2 seconds"><span class="fill"></span>HELP</button>
-  <div id="ask" role="dialog" aria-modal="false"></div>
 </div>
 <div id="start" class="hide"></div>
 <div id="pop"></div>
@@ -185,62 +207,38 @@ input:focus{outline:none;border-color:rgba(167,139,250,.7);box-shadow:0 0 0 3px 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 'use strict';
-/* Remiel: Covara. The person looked after (Home) is the sphere in the middle, on every phone: on Home's own phone, and on each
-   caregiver's (Away) phone. Around Home orbit the people in Home's circle. What Home needs to do fades in on the left and
-   fades out once done. Pictures carry the meaning: a sphere is a person, an icon is a task, a face is an answer. */
-const BUILD='2026-10-19.03';
+/* Remiel: Covara, in the way Remiel Sentinel shows things. One sphere is highlighted at a time: it grows, its picture breathes
+   large in the dream circle, and what belongs to that person floats beside it. Home is highlighted unless someone else is
+   tapped, and Home comes back after half a minute. Home (the person looked after) is the sphere in the middle on every phone. */
+const BUILD='2026-10-19.05';
 const API=(window.COVARA_API||'https://remiel-sentinel-api.vercel.app').replace(/\/$/,'');
 const $=s=>document.querySelector(s), esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k,d){ try{ const v=localStorage.getItem('cv:'+k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem('cv:'+k, JSON.stringify(v)); }catch(e){} }};
 
-/* ---------- icons ---------- */
-const P='fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
-const ICON={
- video:'<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h9A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 3 16.5z"/><path d="m15 10 6-3.5v11L15 14"/>',
- phone:'<path d="M5 3.5h3l1.6 4.2-2 1.4a12 12 0 0 0 7.3 7.3l1.4-2 4.2 1.6v3A1.5 1.5 0 0 1 19 20.5 16.5 16.5 0 0 1 3.5 5 1.5 1.5 0 0 1 5 3.5z"/>',
- mail:'<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m4 7 8 6 8-6"/>',
- eye:'<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
- info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.1"/>',
- plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>', check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
- pill:'<rect x="2.8" y="8.2" width="18.4" height="7.6" rx="3.8" transform="rotate(-40 12 12)"/><path d="m9.2 9.1 5.7 5.8"/>',
- cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
- pin:'<path d="M12 21s-6.5-6.2-6.5-11A6.5 6.5 0 0 1 18.5 10c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
- door:'<path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h11A1.5 1.5 0 0 1 19 4.5V21M3 21h18"/><circle cx="15" cy="12.5" r=".9" fill="currentColor"/>',
- fall:'<circle cx="16.5" cy="5" r="2"/><path d="M14.5 8.5 9 11l-3 4.5M9 11l4 3 1 5.5M13 14l5-1.5M3 21h18"/>',
- smile:'<circle cx="12" cy="12" r="9"/><path d="M8.5 14.2a4.2 4.2 0 0 0 7 0M9 9.5v.1M15 9.5v.1"/>',
- meh:'<circle cx="12" cy="12" r="9"/><path d="M8.5 15h7M9 9.5v.1M15 9.5v.1"/>',
- sad:'<circle cx="12" cy="12" r="9"/><path d="M8.5 16a4.2 4.2 0 0 1 7 0M9 9.5v.1M15 9.5v.1"/>',
- battery:'<rect x="2.5" y="7.5" width="17" height="9" rx="2"/><path d="M21.5 10.5v3"/>',
- alert:'<path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4.5M12 17.4v.1"/>',
- user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
- home:'<path d="m3 11 9-7.5 9 7.5"/><path d="M5.5 9.5V20.5h13V9.5"/>',
- heart:'<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z"/>',
- camera:'<path d="M4 7.5h3.5L9 5h6l1.5 2.5H20A1.5 1.5 0 0 1 21.5 9v9.5A1.5 1.5 0 0 1 20 20H4a1.5 1.5 0 0 1-1.5-1.5V9A1.5 1.5 0 0 1 4 7.5z"/><circle cx="12" cy="13.5" r="3.6"/>',
- still:'<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M10 9.5h4M10 12.5h4"/>',
- hand:'<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7h-.5A6.5 6.5 0 0 1 4 16l-1-3a1.5 1.5 0 0 1 2.7-1.2L8 15"/>',
- back:'<path d="M15 5 8 12l7 7"/>', key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3"/>',
- swap:'<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
-};
-// The language button is the flag of the language in use, as in DREAM CODE.
+/* The language button is the flag of the language in use, as in DREAM CODE. The faces are the answers to How are you? */
 const flag=l=>l==='it'?'<svg viewBox="0 0 3 2" aria-hidden="true"><rect width="1" height="2" fill="#009246"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#CE2B37"/></svg>'
   :'<svg viewBox="0 0 19 10" aria-hidden="true"><rect width="19" height="10" fill="#B22234"/><path d="M0 1.15h19M0 2.7h19M0 4.23h19M0 5.77h19M0 7.3h19M0 8.85h19" stroke="#fff" stroke-width=".77"/><rect width="7.6" height="5.38" fill="#3C3B6E"/><g fill="#fff">'+
    [0.6,1.9,3.2,4.5,5.8,7.0].map((x,i)=>[0.55,1.6,2.65,3.7,4.75].map((y,j)=>((i+j)%2===0?'<circle cx="'+x+'" cy="'+y+'" r=".22"/>':'')).join('')).join('')+'</g></svg>';
-const ic=(k,st)=>'<svg viewBox="0 0 24 24" '+P+(st?' style="'+st+'"':'')+' aria-hidden="true">'+(ICON[k]||'')+'</svg>';
+const FACE={good:'<path d="M8.5 14.2a4.2 4.2 0 0 0 7 0"/>', okay:'<path d="M8.5 15h7"/>', low:'<path d="M8.5 16a4.2 4.2 0 0 1 7 0"/>'};
+const face=k=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/>'+FACE[k]+'<path d="M9 9.5v.1M15 9.5v.1"/></svg>';
 
-/* ---------- a few words, English and Italian ---------- */
-const IT={'How are you?':'Come stai?','Taken':'Fatto','Now':'Ora','Late':'In ritardo','Video':'Video','Call':'Chiama','Email':'Email','Sees':'Vede','Open':'Apri',
- 'Where':'Dove','Room':'Stanza','Fall':'Caduta','Medicine':'Medicine','Mood':'Umore','Still phone':'Telefono fermo','Son':'Figlio','Daughter':'Figlia','Partner':'Partner','Friend':'Amico','Nurse':'Infermiere','Doctor':'Medico','Neighbour':'Vicino','Family':'Famiglia',
- 'Help sent':'Aiuto inviato','Not connected':'Non connesso','Added':'Aggiunto','Saved':'Salvato','Me':'Io','is calling':'ti chiama','Calling':'Chiamata','No answer':'Nessuna risposta',
- 'I look after someone':'Mi prendo cura di qualcuno','I am looked after':'Sono assistito','Your first name':'Il tuo nome','Phone':'Telefono','What I do':'Cosa faccio','ASKS TO HELP':'CHIEDE DI AIUTARE','WAITING':'IN ATTESA','ME':'IO',
- 'just now':'ora','min':'min','h':'h','d':'g','No email yet':'Nessuna email'};
+/* ---------- words, English and Italian ---------- */
+const IT={'How are you?':'Come stai?','Taken':'Fatto','Video':'Video','Call':'Chiama','Email':'Email','What they see':'Cosa vede','Open':'Apri','Add':'Aggiungi',
+ 'Where I am':'Dove sono','Which room I am in':'In quale stanza sono','If I fall':'Se cado','My medicines':'Le mie medicine','How I feel':'Come mi sento','If my phone stays still':'Se il telefono resta fermo',
+ 'Son':'Figlio','Daughter':'Figlia','Partner':'Partner','Friend':'Amico','Nurse':'Infermiere','Doctor':'Medico','Neighbour':'Vicino','Family':'Famiglia',
+ 'Help sent':'Aiuto inviato','Not connected':'Non connesso','Added':'Aggiunto','Saved':'Salvato','is calling':'ti chiama','Calling':'Chiamata','No answer':'Nessuna risposta','Answer':'Rispondi','End':'Chiudi',
+ 'I look after someone':'Mi prendo cura di qualcuno','I am looked after':'Sono assistito','Your first name':'Il tuo nome','Phone':'Telefono','What I do':'Cosa faccio','Asks to help':'Chiede di aiutare','Waiting':'In attesa','Me':'Io',
+ 'Yes':'Sì','No':'No','Save':'Salva','Remove':'Rimuovi','Delete':'Canc','OK':'OK','Medicine':'Medicina','Photo of the medicine':'Foto della medicina','Name of the medicine':'Nome della medicina','When':'Quando',
+ 'Morning':'Mattina','Midday':'Mezzogiorno','Evening':'Sera','Night':'Notte','Other time':'Altro orario','Change photo':'Cambia foto','Sees':'Vede','Nothing yet':'Ancora niente',
+ 'I have seen it':'Ho visto','Last moved':'Ultimo movimento','Battery':'Batteria','Place':'Luogo','Room':'Stanza','Mood':'Umore','Not good':'Non bene','Good':'Bene','Okay':'Così così',
+ 'Pharmacy':'Farmacia','Choose your pharmacy':'Scegli la tua farmacia','Appointments':'Appuntamenti','Medications':'Medicine','Subscriptions':'Abbonamenti','Photo':'Foto','Name':'Nome','Next renewal':'Prossimo rinnovo','just now':'ora','min ago':'min fa','h ago':'h fa','d ago':'g fa','Today':'Oggi','No email yet':'Nessuna email','Continue':'Continua'};
 let LANG=store.get('lang', /^it/i.test(navigator.language||'')?'it':'en');
 const T=s=>LANG==='it'&&IT[s]?IT[s]:s;
-const EV_W={en:{help:'§ is asking for help',fall:'§ may have fallen',fall_ok:'§ is all right',left_home:'§ has left home',room_long:'§ in one room a long time',inactive:'§\'s phone has not moved',mood_low:'§ is not feeling good',overdue:'§ missed an item',battery:'§\'s battery is low'},
-  it:{help:'§ chiede aiuto',fall:'§ potrebbe essere caduto',fall_ok:'§ sta bene',left_home:'§ è uscito di casa',room_long:'§ da molto in una stanza',inactive:'Il telefono di § è fermo',mood_low:'§ non si sente bene',overdue:'§ ha saltato una voce',battery:'Batteria scarica per §'}};
-const EV_I={help:'hand',fall:'fall',fall_ok:'check',left_home:'pin',room_long:'door',inactive:'still',mood_low:'sad',overdue:'pill',battery:'battery'};
+const EV_W={en:{help:'§ is asking for help',fall:'§ may have fallen',fall_ok:'§ is all right',left_home:'§ has left home',room_long:'§ in one room a long time',inactive:'§\'s phone has not moved',mood_low:'§ is not feeling good',overdue:'§ missed a medicine',battery:'§\'s battery is low'},
+  it:{help:'§ chiede aiuto',fall:'§ potrebbe essere caduto',fall_ok:'§ sta bene',left_home:'§ è uscito di casa',room_long:'§ da molto in una stanza',inactive:'Il telefono di § è fermo',mood_low:'§ non si sente bene',overdue:'§ ha saltato una medicina',battery:'Batteria scarica per §'}};
 const first=n=>String(n||'').trim().split(/\s+/)[0]||'';
 const evTitle=(kind,name,fb)=>{ const w=(EV_W[LANG]||EV_W.en)[String(kind).replace(/^care-/,'')]; return w?w.replace('§',first(name)):fb; };
-const ago=t=>{ if(!t) return '…'; const m=Math.round((Date.now()-t)/60000); return m<2?T('just now'):m<90?m+' '+T('min'):m<48*60?Math.round(m/60)+' '+T('h'):Math.round(m/1440)+' '+T('d'); };
+const ago=t=>{ if(!t) return '…'; const m=Math.round((Date.now()-t)/60000); return m<2?T('just now'):m<90?m+' '+T('min ago'):m<48*60?Math.round(m/60)+' '+T('h ago'):Math.round(m/1440)+' '+T('d ago'); };
 const hhmm=t=>new Date(t).toLocaleTimeString(LANG==='it'?'it-IT':'en-US',{hour:'2-digit',minute:'2-digit'});
 const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 
@@ -260,150 +258,232 @@ async function api(method, path, body, raw){ if(!ACC.at && !(await identity())) 
   const go=()=>fetch(API+path,{method, headers:Object.assign({'Authorization':'Bearer '+ACC.at}, body&&!raw?{'Content-Type':'application/json'}:{}), body:body?(raw?body:JSON.stringify(body)):undefined});
   let r=await go(); if(r.status===401 && ((await refresh()) || (await identity()))) r=await go();
   let j=null; try{ j=await r.json(); }catch(e){} return {s:r.status, j:j||{}}; }
+async function upload(blob, type, name){ const fd=new FormData(); fd.append('blob_type',type); fd.append('file', blob, name); return api('POST','/storage/upload', fd, true).catch(()=>null); }
 
-let toastT; function toast(m, icon){ const t=$('#toast'); t.innerHTML=(icon?ic(icon):'')+'<span>'+esc(m)+'</span>'; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 2600); }
+let toastT; function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 2600); }
 
 /* ---------- who is where ---------- */
-const S={role:store.get('role',null), links:{as_home:[],as_away:[]}, today:null, me:{}, sums:{}, cur:store.get('cur',null), open:null, pop:null};
+const S={role:store.get('role',null), links:{as_home:[],as_away:[]}, today:null, items:{}, me:{}, sums:{}, cur:store.get('cur',null), focus:null, pop:null};
 const meP=()=>({name:store.get('name',''), sphere:S.me.sphere||'', vid:S.me.vid, local:S.localSphere||''});
 const aways=()=>S.links.as_home.map(l=>({id:l.away.id, p:l.away, l, pending:l.status==='pending'}));
 const homes=()=>S.links.as_away.map(l=>({id:l.home.id, p:l.home, l, pending:l.status==='pending'}));
 // The sphere in the middle is always Home: me on Home's phone, the person I look after on a caregiver's phone.
-function centre(){ if(S.role==='home') return {id:'me', p:meP(), me:true};
-  const hs=homes().filter(h=>!h.pending); const c=hs.find(h=>h.id===S.cur)||hs[0]; if(c){ S.cur=c.id; store.set('cur',c.id); return c; } return {id:'me', p:meP(), me:true}; }
-// Round Home: the caregivers on Home's phone; on a caregiver's phone, me and anyone else I look after.
+function centre(){ if(S.role==='home') return {id:'me', p:meP(), me:true, home:true};
+  const hs=homes().filter(h=>!h.pending); const c=hs.find(h=>h.id===S.cur)||hs[0]; if(c){ S.cur=c.id; store.set('cur',c.id); return Object.assign({home:true}, c); } return {id:'me', p:meP(), me:true}; }
 function orbiters(){ if(S.role==='home') return aways(); const c=centre(); const me={id:'me', p:meP(), me:true};
   return c.me ? homes() : [me, ...homes().filter(h=>h.id!==c.id)]; }
-const findP=id=>{ if(id==='me') return {id:'me', p:meP(), me:true}; return [...aways(), ...homes()].find(o=>o.id===id); };
+const findP=id=>{ const c=centre(); if(id===c.id) return c; if(id==='me') return {id:'me', p:meP(), me:true}; const o=[...aways(), ...homes()].find(o=>o.id===id); return o; };
+const focused=()=>findP(S.focus)||centre();
 
 /* ---------- spheres ---------- */
 function media(p){ const u=(p && p.local) || (p && p.sphere ? API+p.sphere : '');
   let inner; if(u && p.vid) inner='<video src="'+esc(u)+'" autoplay muted loop playsinline></video>'; else if(u) inner='<img src="'+esc(u)+'" alt="">'; else inner='<span class="ini">'+esc(initials(p && p.name))+'</span>';
   return '<div class="in">'+inner+'</div>'; }
-function sphereHTML(id, d, x, y, cls, inner, tag, badge, nm){ return '<div class="sph '+(cls||'')+'" style="--d:'+d+'px;left:'+x+'px;top:'+y+'px" data-act="sph" data-k="'+esc(id||'')+'">'+
-  (tag?'<div class="tag">'+esc(tag)+'</div>':'')+'<div class="ball">'+inner+(badge||'')+'</div>'+(nm!=null?'<div class="nm">'+esc(nm)+'</div>':'')+'</div>'; }
-let LAY={at:{}};
-// Home in the middle, a little low so what needs doing has room above on the left; the people round Home
-// on the sides first, then below, then above, never over Home's sphere or its name.
-const ANG=[-28,28,152,208,90,-90,-62,242];
-function layout(n){ const W=innerWidth, H=innerHeight, narrow=W<700;
-  const dMe=Math.min(W*0.36,H*0.2,190), dO=Math.min(W*0.2,H*0.1,112), cx=W*(narrow?0.5:0.55), cy=H*(narrow?0.6:0.55);
-  const R=Math.max(dMe/2+dO/2+46, Math.min(W,H)*0.26);
-  const pos=[]; for(let i=0;i<n;i++){ const a=ANG[i%ANG.length]*Math.PI/180, rr=R*(i>=ANG.length?1.5:1); let x=cx+rr*Math.cos(a)*(narrow?1:1.15), y=cy+rr*Math.sin(a)*(Math.abs(Math.sin(a))>0.9?1.05:1);
-    x=Math.max(dO/2+8, Math.min(W-dO/2-8, x)); pos.push([x,y]); }
-  return {cx,cy,dMe,dO,pos,at:{}}; }
-// What a caregiver needs to know at a glance, as one badge on Home's sphere.
-function badgeFor(id){ if(S.role!=='away') return ''; const s=S.sums[id]; if(!s) return '';
-  const recent=(s.events||[]).find(e=>e.level>=3 && Date.now()-e.at<6*3600000); if(recent) return '<div class="badge">'+ic(EV_I[recent.kind]||'alert')+'</div>';
-  if(s.today && s.today.items.some(x=>x.state==='late')) return '<div class="badge warn">'+ic('pill')+'</div>';
-  if(s.mood && s.mood.mood==='low' && Date.now()-s.mood.at<12*3600000) return '<div class="badge warn">'+ic('sad')+'</div>';
-  if(s.activity && s.activity.battery!=null && s.activity.battery<15 && !s.activity.charging) return '<div class="badge warn">'+ic('battery')+'</div>';
+function sphereHTML(id, d, x, y, cls, inner, tag, nm){ return '<div class="sph '+(cls||'')+'" style="--d:'+d+'px;left:'+x+'px;top:'+y+'px" data-act="sph" data-k="'+esc(id||'')+'">'+
+  (tag?'<div class="tag">'+esc(tag)+'</div>':'')+'<div class="ball">'+inner+'</div>'+(nm!=null?'<div class="nm">'+esc(nm)+'</div>':'')+'</div>'; }
+// Whether a Home needs a caregiver's eyes: red for help or a fall in the last six hours, amber for a late medicine or a low mood.
+function alertOf(id){ if(S.role!=='away') return ''; const s=S.sums[id]; if(!s) return ''; const seen=store.get('seenAt',0);
+  if((s.events||[]).some(e=>e.level>=3 && e.at>seen && Date.now()-e.at<6*3600000)) return 'alarm';
+  if(s.today && s.today.items.some(x=>x.state==='late')) return 'warn';
+  if(s.mood && s.mood.mood==='low' && Date.now()-s.mood.at<12*3600000) return 'warn';
   return ''; }
-function renderStage(){ const c=centre(), os=orbiters(), L=layout(os.length+1); LAY=L; let h='';
-  h+=sphereHTML(c.id, L.dMe, L.cx, L.cy, 'mid', media(c.p), '', c.me?'':badgeFor(c.id), c.me?c.p.name:c.p.name); L.at[c.id]=[L.cx,L.cy,L.dMe];
-  os.forEach((o,i)=>{ const [x,y]=L.pos[i]; L.at[o.id]=[x,y,L.dO];
-    const tag=o.pending?(S.role==='home'?T('ASKS TO HELP'):T('WAITING')):o.me?T('ME'):(o.l&&o.l.relation?T(o.l.relation).toUpperCase():'');
-    h+=sphereHTML(o.id, L.dO, x, y, (o.pending?'ask ':'')+(o.me?'mine':''), media(o.p), tag, o.me?'':badgeFor(o.id), first(o.p.name)); });
-  const [ax,ay]=L.pos[os.length]; h+=sphereHTML('add', L.dO*0.78, ax, ay, 'add', ic('plus'), '', '', '');
+let LAY={at:{}};
+// The highlighted person is the large sphere in the middle; everyone else waits in a row above and below.
+// Their things are on the sphere's left, the ways to reach them on its right.
+function layout(n){ const W=innerWidth, H=innerHeight, top=S.qTop||178, bottom=H-(S.role==='home'?96:20);
+  const dO=Math.min(W*0.15,H*0.075,88), rowB=bottom-dO/2-30;
+  const dd=Math.min((W-48)/2, H*0.2, 230), band={top:top+4, dd};
+  // Ways to reach on the right are short words; the left gets the rest of the width for names and photos.
+  const zTop=top+dd+64, zBot=rowB-dO/2-24, rw=Math.min(150, Math.max(92, W*0.23)), dMe=Math.max(90, Math.min(W*0.31, zBot-zTop, 220, W-rw-150-40));
+  const lw=Math.min(W-rw-dMe-40, Math.max(150, W*0.36)), cx=8+lw+12+(W-rw-16-(8+lw+12))/2, cy=(zTop+zBot)/2;
+  const pos=[]; for(let i=0;i<n;i++) pos.push([W*(i+1)/(n+1), rowB]);
+  return {cx,cy,dMe,dO,pos,at:{}, band, rw, side:{w:lw, top:zTop-8, bottom:rowB-dO/2-30}}; }
+function renderStage(){ const c=centre(), f=focused(), all=[c, ...orbiters()].filter(o=>o.id!==f.id), L=layout(all.length+1); LAY=L; let h='';
+  h+=sphereHTML(f.id, L.dMe, L.cx, L.cy, 'foc '+(f.home?'home ':'')+(f.me&&!f.home?'mine ':'')+(f.home?moodRing(f):'')+(f.me?'':alertOf(f.id)), media(f.p), f.home||f.me?'':(f.l&&f.l.relation?T(f.l.relation).toUpperCase():''), f.p.name); L.at[f.id]=[L.cx,L.cy];
+  all.forEach((o,i)=>{ const [x,y]=L.pos[i]; L.at[o.id]=[x,y];
+    const tag=o.pending?(S.role==='home'?T('Asks to help'):T('Waiting')):o.home?'':o.me?T('Me'):(o.l&&o.l.relation?T(o.l.relation):'');
+    h+=sphereHTML(o.id, L.dO, x, y, (o.pending?'ask ':'')+(o.home?'home '+moodRing(o):'')+(o.me&&!o.home?'mine ':'')+(o.me?'':alertOf(o.id)), media(o.p), tag.toUpperCase(), first(o.p.name)); });
+  const [ax,ay]=L.pos[all.length]; h+=sphereHTML('add', L.dO*0.8, ax, ay, 'add', '<span>'+esc(T('Add').toUpperCase())+'</span>', '', null);
   $('#orbit').innerHTML=h;
-  $('#links').innerHTML=os.map((o,i)=>'<line x1="'+L.cx+'" y1="'+L.cy+'" x2="'+L.pos[i][0]+'" y2="'+L.pos[i][1]+'" stroke="'+(o.pending?'rgba(232,162,74,.4)':'rgba(79,195,255,.25)')+'" stroke-width="1.2"/>').join('');
+  $('#links').innerHTML=all.map((o,i)=>'<line x1="'+L.cx+'" y1="'+L.cy+'" x2="'+L.pos[i][0]+'" y2="'+L.pos[i][1]+'" stroke="'+(o.pending?'rgba(232,162,74,.35)':'rgba(79,195,255,.18)')+'" stroke-width="1"/>').join('');
   $('#help').classList.toggle('hide', S.role!=='home');
   $('#lngBtn').innerHTML=flag(LANG);
-  if(S.open && L.at[S.open]) openActions(S.open, true); }
+  renderStrip(); renderReach(); renderDreams(); }
 
-/* the quick actions round a sphere: video, call, email, and what they see (Home) or the day (caregiver) */
-function openActions(id, keep){ closeActions(); const o=findP(id), at=LAY.at[id]; if(!o || !at) return;
-  if(o.me) return profilePop();
-  if(o.pending){ if(S.role==='home') return consentPop(o.l); return toast(T('WAITING'),'key'); }
-  if(S.role==='away' && id!==centre().id){ S.cur=id; store.set('cur',id); S.open=null; renderStage(); renderDream(); return; }
-  S.open=id; const [x,y,d]=at, mid=id===centre().id, r=d*0.5+(mid?62:52);
-  const acts=[['video','Video',''],['phone','Call','g'],['mail','Email','']]; acts.push(S.role==='home'?['eye','Sees','a']:['info','Open','a']);
-  const base=mid?Math.PI/2:Math.atan2(y-LAY.cy, x-LAY.cx), spread=mid?Math.PI*1.1:Math.PI*0.95;
-  const html=acts.map((a,k)=>{ const ang=base-spread/2+spread*k/(acts.length-1), qx=Math.max(34,Math.min(innerWidth-34,x+r*Math.cos(ang))), qy=Math.max(90,Math.min(innerHeight-60,y+r*Math.sin(ang)));
-    return '<button class="qa '+a[2]+'" style="left:'+qx+'px;top:'+qy+'px" data-act="qa" data-q="'+a[0]+'" data-k="'+esc(id)+'" aria-label="'+T(a[1])+'">'+ic(a[0])+'<i>'+T(a[1])+'</i></button>'; }).join('');
-  const box=document.createElement('div'); box.id='qas'; box.innerHTML=html; $('#stage').appendChild(box);
-  requestAnimationFrame(()=>box.querySelectorAll('.qa').forEach((q,k)=>setTimeout(()=>q.classList.add('on'), keep?0:k*45))); }
-function closeActions(){ const b=$('#qas'); if(b) b.remove(); }
+// The status ring tells how Home is feeling, from Home's own answer today.
+function moodOf(o){ if(!o||!o.home) return null; if(S.role==='home'){ const m=store.get('mood',''); const [k,d]=String(m).split('|'); return d===new Date().toDateString()?k:null; }
+  const s=S.sums[o.id]; if(!s||!s.mood) return null; return new Date(s.mood.at).toDateString()===new Date().toDateString()?s.mood.mood:null; }
+const moodRing=o=>{ const m=moodOf(o); return m?'m-'+m+' ':''; };
 
-/* ---------- the dream column: what Home needs to do, fading in one by one, fading out once done ---------- */
-function dreamItems(){ const out=[], c=centre(); const day=S.role==='home'?S.today:(S.sums[c.id]||{}).today;
-  if(S.role==='away' && !c.me){ const s=S.sums[c.id]||{}; const seen=store.get('seenAt',0); (s.events||[]).filter(e=>e.level>=2 && e.at>seen && Date.now()-e.at<6*3600000).slice(0,2).forEach(e=>out.push({key:'e'+e.id, icon:EV_I[e.kind]||'alert', t:evTitle(e.kind,c.p.name,e.title), w:hhmm(e.at), cls:e.level>=3?'late':'due', ev:true, open:c.id})); }
-  if(day){ const open=day.items.filter(x=>x.state!=='done'); const shown=open.filter(x=>x.state!=='later').concat(open.filter(x=>x.state==='later').slice(0,1)).slice(0,5);
-    shown.forEach(x=>out.push({key:x.item.id+'|'+x.slot, icon:x.item.kind==='med'?'pill':x.item.kind==='appt'?'cal':'check', t:x.item.title, w:x.slot==='appt'?hhmm(x.at):x.slot, cls:x.state==='late'?'late':x.state==='due'?'due':'',
-      mark:S.role==='home'?{id:x.item.id, slot:x.slot}:null, open:S.role==='away'?c.id:null})); }
-  return out.slice(0,6); }
-function renderDream(){ const box=$('#dream'), want=dreamItems(), keys=new Set(want.map(x=>x.key));
+/* ---------- the dream state ---------- */
+// A small map in a circle: OpenStreetMap tiles drawn by CARTO, as Sentinel's WHEREIS uses, with the place pulsing in the middle.
+function mapCircle(lat, lon, dd){ const z=16, n=2**z, x=(lon+180)/360*n, r=lat*Math.PI/180, y=(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n, tx=Math.floor(x), ty=Math.floor(y), ox=(x-tx)*256, oy=(y-ty)*256; let h='<div class="tiles2">';
+  for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) h+='<img alt="" src="https://'+'abc'[(tx+dx+ty+dy+3)%3]+'.basemaps.cartocdn.com/dark_all/'+z+'/'+(tx+dx)+'/'+(ty+dy)+'.png" style="left:'+(dx*256-ox)+'px;top:'+(dy*256-oy)+'px" onerror="this.remove()">';
+  return h+'</div><div class="dot"></div>'; }
+const picOf=p=>{ const u=(p&&p.local)||(p&&p.sphere?API+p.sphere:''); return u?(p.vid?'<video src="'+esc(u)+'" autoplay muted loop playsinline></video>':'<img src="'+esc(u)+'" alt="">'):'<div class="ini">'+esc(initials(p&&p.name))+'</div>'; };
+function urgentOf(f){ if(!f.home) return null; if(S.role==='home') return S.helpAt&&Date.now()-S.helpAt<15*60000?{kind:'help', at:S.helpAt}:null;
+  const s=S.sums[f.id]; const seen=store.get('seenAt',0); return s?(s.events||[]).find(e=>e.level>=3 && e.at>seen && Date.now()-e.at<6*3600000)||null:null; }
+function dueMedOf(f){ if(!f.home) return null; const day=S.role==='home'?S.today:(S.sums[f.id]||{}).today; if(!day) return null;
+  return day.items.filter(x=>x.item.kind==='med' && (x.state==='late'||x.state==='due')).sort((a,b)=>(a.state==='late'?0:1)-(b.state==='late'?0:1))[0]||null; }
+function placeOf(f){ if(S.role==='home') return f.home&&S.here?{lat:S.here.lat, lon:S.here.lon, at:S.here.at}:null; const s=S.sums[f.id]; return s&&s.location?{lat:s.location.lat, lon:s.location.lon, at:s.location.at, label:s.place}:null; }
+function pharmacyOf(f){ return S.role==='home'?(S.me.pharmacy||null):((S.sums[f.id]||{}).pharmacy||null); }
+function renderDreams(){ const f=focused(), B=LAY.band, W=innerWidth, urg=urgentOf(f), med=urg?null:dueMedOf(f), hi=!!S.hiUntil && Date.now()<S.hiUntil;
+  const R=$('#dreamR'), Lf=$('#dreamL'); const place=placeOf(f);
+  let rgb=f.home?(moodOf(f)==='low'?'255,42,42':moodOf(f)==='okay'?'232,162,74':moodOf(f)==='good'?'62,224,138':'197,165,90'):f.me?'124,111,214':'79,195,255';
+  let right, left;
+  if(urg){ rgb='255,42,42'; right={inner:picOf(f.p), h1:f.p.name, h2:hhmm(urg.at)};
+    left={inner:place?mapCircle(place.lat,place.lon,B.dd):'<div class="ini">!</div>', h1:evTitle(urg.kind,f.p.name,urg.title||''), h2:place?(place.label||place.lat.toFixed(5)+', '+place.lon.toFixed(5)):''}; }
+  else if(med){ const ph=pharmacyOf(f); right={inner:med.item.photo?'<img src="'+esc(API+med.item.photo)+'" alt="">':'<div class="ini" style="font-size:18px;padding:12px">'+esc(med.item.title)+'</div>', h1:med.item.title, h2:med.slot};
+    left=ph?{inner:mapCircle(ph.lat,ph.lon,B.dd), h1:ph.name, h2:ph.address||'', h3:ph.phone?'<a href="tel:'+esc(ph.phone.replace(/[^\d+]/g,''))+'">'+esc(ph.phone)+'</a>':''}
+      :{inner:'<div class="ini" style="font-size:14px;letter-spacing:.14em;padding:18px;font-family:var(--mono)">'+esc(T('Pharmacy').toUpperCase())+'</div>', h1:T('Pharmacy'), h2:S.role==='home'||pharmacyEditable(f)?T('Choose your pharmacy'):''}; }
+  else { right={inner:picOf(f.p), h1:'', h2:''};
+    left=place&&f.home?{inner:mapCircle(place.lat,place.lon,B.dd), h1:f.p.name, h2:(place.label?place.label+' · ':'')+ago(place.at)}:null; }
+  const put=(el,x,cls,d)=>{ if(!d){ el.innerHTML=''; el._k=''; return; } const key=d.inner+d.h1+d.h2+(d.h3||'')+B.dd+rgb;
+    el.style.left=x+'px'; el.style.top=B.top+'px'; el.className='dream '+cls+(urg?' urg':'')+(hi||urg||med?' hi':'');
+    if(el._k===key) return; el._k=key; el.innerHTML='<div class="circ" style="--dd:'+B.dd+'px;--rgb:'+rgb+'">'+d.inner+'</div>'+(d.h1?'<div class="h1" style="--dd:'+B.dd+'px">'+esc(d.h1)+'</div>':'')+(d.h2?'<div class="h2" style="--dd:'+B.dd+'px">'+esc(d.h2)+'</div>':'')+(d.h3?'<div class="h3">'+d.h3+'</div>':''); };
+  put(R, W-B.dd-16, 'r', right); put(Lf, 16, 'l', left);
+  if(med && !pharmacyOf(f) && (S.role==='home'||pharmacyEditable(f))){ Lf.style.pointerEvents='auto'; Lf.dataset.act='pharmacy'; } else { Lf.style.pointerEvents='none'; delete Lf.dataset.act; } }
+const pharmacyEditable=f=>S.role==='away' && !!(S.sums[f.id]||{}).today;
+
+/* ---------- how to reach the highlighted person: on the sphere's right ---------- */
+function renderReach(){ const f=focused(), L=LAY, box=$('#reach'); box.style.width=L.rw+'px';
+  const midTop=L.cy-110; box.style.top=Math.max(L.side.top, midTop)+'px'; box.style.height='220px';
+  let h;
+  if(f.me && !f.home) h='<button class="w" data-act="profile">'+esc(T('Change photo'))+'</button>';
+  else h='<button class="w g" data-act="video" data-k="'+esc(f.id)+'">'+esc(T('Video'))+'</button><button class="w g" data-act="call" data-k="'+esc(f.id)+'">'+esc(T('Phone'))+'</button><button class="w" data-act="mail" data-k="'+esc(f.id)+'">'+esc(T('Email'))+'</button>';
+  if(box._h!==h){ box._h=h; box.innerHTML=h; } }
+
+/* ---------- what belongs to the highlighted person: on the sphere's left ---------- */
+const SHARES=[['location','Where I am'],['rooms','Which room I am in'],['falls','If I fall'],['care','My medicines'],['mood','How I feel'],['activity','If my phone stays still']];
+const dayFmt=t=>new Date(t).toLocaleDateString(LANG==='it'?'it-IT':'en-US',{weekday:'short', day:'numeric', month:'short'});
+function stripItems(){ const f=focused(), out=[];
+  if(f.home){ const hid=S.role==='home'?'me':f.id, day=S.role==='home'?S.today:(S.sums[f.id]||{}).today, items=S.items[hid]||[], sum=S.sums[f.id]||{}, seen=store.get('seenAt',0), canAdd=S.role==='home'||!!day;
+    if(S.role==='away') (sum.events||[]).filter(e=>e.level>=2 && e.at>seen && Date.now()-e.at<6*3600000).slice(0,2).forEach(e=>out.push({key:'e'+e.id, kind:'ev', t:evTitle(e.kind,f.p.name,e.title), tm:hhmm(e.at), open:f.id}));
+    const sec=(key,word,kind,list)=>{ out.push({key:'s-'+key, kind:'sec', word, add:canAdd?kind:null, none:!list.length}); list.forEach(x=>out.push(x)); };
+    const now=Date.now();
+    sec('appt','Appointments','appt', items.filter(i=>i.kind==='appt' && i.at>now-3600000).sort((a,b)=>a.at-b.at).slice(0,3).map(i=>({key:'a'+i.id, kind:'item', t:i.title, tm:(new Date(i.at).toDateString()===new Date().toDateString()?'':dayFmt(i.at)+' ')+hhmm(i.at), photo:i.photo, cls:i.at-now<3600000&&i.at>now-3600000?'due':''})));
+    const meds=day?day.items.filter(x=>x.item.kind!=='appt' && x.state!=='done'):[];
+    sec('med','Medications','med', meds.filter(x=>x.state!=='later').concat(meds.filter(x=>x.state==='later').slice(0,2)).slice(0,5).map(x=>({key:x.item.id+'|'+x.slot, kind:'item', t:x.item.title, tm:x.slot, photo:x.item.photo, cls:x.state==='late'?'late':x.state==='due'?'due':'', mark:{id:x.item.id, slot:x.slot}})));
+    sec('sub','Subscriptions','sub', items.filter(i=>i.kind==='sub').sort((a,b)=>a.at-b.at).slice(0,3).map(i=>({key:'u'+i.id, kind:'item', t:i.title, tm:dayFmt(i.at), photo:i.photo, cls:i.at-now<2*86400000?'due':''})));
+    return out; }
+  if(f.me){ return out; }
+  if(f.p.role || (f.l&&f.l.relation)) out.push({key:'who'+f.id, kind:'info', k:T('What I do'), v:[f.l&&f.l.relation?T(f.l.relation):'', f.p.role].filter(Boolean).join(' · ')});
+  if(f.l && !f.pending){ const on=SHARES.filter(([k])=>f.l.share[k]).map(([k,w])=>T(w)); out.push({key:'sees'+f.id+on.join(), kind:'info', k:T('Sees'), v:on.length?on.join(' · '):T('Nothing yet')}); }
+  if(S.role==='home' && f.l) out.push({key:'eye'+f.id, kind:'act', html:'<button class="w a" data-act="eye" data-k="'+esc(f.id)+'">'+esc(T('What they see'))+'</button>'});
+  return out; }
+function itemHTML(x){
+  if(x.kind==='act') return x.html;
+  if(x.kind==='sec') return '<span>'+esc(T(x.word))+(x.none?' <span class="none">·</span>':'')+'</span>'+(x.add?'<button data-act="item-new" data-k="'+x.add+'" aria-label="'+esc(T('Add'))+'">+</button>':'');
+  if(x.kind==='info') return '<div class="k" style="margin:0">'+esc(x.k)+'</div><div class="v">'+esc(x.v)+'</div>';
+  if(x.kind==='ev') return '<div><div class="t">'+esc(x.t)+'</div><div class="tm">'+esc(x.tm)+'</div></div>';
+  return (x.photo?'<div class="ph"><img src="'+esc(API+x.photo)+'" alt=""></div>':'')+'<div><div class="t">'+esc(x.t)+'</div><div class="tm">'+esc(x.tm)+'</div></div>'; }
+function renderStrip(){ const box=$('#strip'), L=LAY.side, want=stripItems(), keys=new Set(want.map(x=>x.key));
+  box.style.top=L.top+'px'; box.style.width=L.w+'px'; box.style.maxHeight=(L.bottom-L.top)+'px';
   [...box.children].forEach(el=>{ if(!keys.has(el.dataset.key) && !el.classList.contains('out')){ el.classList.add('out'); el.classList.remove('in'); setTimeout(()=>el.remove(), 700); } });
+  let prev=null;
   want.forEach((x,i)=>{ let el=[...box.children].find(c=>c.dataset.key===x.key && !c.classList.contains('out'));
-    const html='<div class="ic">'+ic(x.icon)+'</div><div class="tx"><div class="t">'+esc(x.t)+'</div><div class="w">'+esc(x.w)+'</div></div>';
-    if(!el){ el=document.createElement('div'); el.dataset.key=x.key; el.dataset.act='dream'; box.appendChild(el); el.className='dt '+(x.cls||''); setTimeout(()=>el.classList.add('in'), 150+i*280); }
-    else el.className='dt '+(x.cls||'')+' in';
-    el.innerHTML=html; el._x=x; }); }
+    const cls=x.kind==='sec'?'sec':'fl '+(x.kind==='item'?'':x.kind)+' '+(x.cls||'');
+    if(!el){ el=document.createElement('div'); el.dataset.key=x.key; if(x.kind==='item'||x.kind==='ev') el.dataset.act='float'; el.className=cls; setTimeout(()=>el.classList.add('in'), 120+i*160); }
+    else el.className=cls+' in';
+    if(prev){ if(prev.nextSibling!==el) prev.after(el); } else if(box.firstChild!==el) box.prepend(el);
+    prev=el; el.innerHTML=itemHTML(x); el._x=x; }); }
 
-/* ---------- the daily question ---------- */
+/* ---------- the question region ---------- */
 function maybeAsk(){ if(S.role!=='home' || S.pop) return; const day=new Date().toDateString(); if(store.get('asked','')===day) return; const a=$('#ask'); if(a.classList.contains('in')) return;
-  a.innerHTML='<div class="q">'+T('How are you?')+'</div><div class="faces"><button class="good" data-act="mood" data-k="good" aria-label="Good">'+ic('smile')+'</button><button class="okay" data-act="mood" data-k="okay" aria-label="Okay">'+ic('meh')+'</button><button class="low" data-act="mood" data-k="low" aria-label="Not good">'+ic('sad')+'</button></div>';
+  a.innerHTML='<div class="q">'+T('How are you?')+'</div><div class="faces"><button class="good" data-act="mood" data-k="good" aria-label="'+T('Good')+'">'+face('good')+'</button><button class="okay" data-act="mood" data-k="okay" aria-label="'+T('Okay')+'">'+face('okay')+'</button><button class="low" data-act="mood" data-k="low" aria-label="'+T('Not good')+'">'+face('low')+'</button></div>';
   setTimeout(()=>a.classList.add('in'), 900); }
 
-/* ---------- pop-ups ---------- */
-function pop(html){ closeActions(); const v=$('#pop'); v.innerHTML='<div class="veil" data-act="veil"><div class="pop" role="dialog" aria-modal="true">'+html+'</div></div>'; S.pop=true; requestAnimationFrame(()=>v.firstChild && v.firstChild.classList.add('in')); }
-function unpop(){ const v=$('#pop'); const f=v.firstChild; S.pop=null; if(!f) return; f.classList.remove('in'); setTimeout(()=>{ if(!S.pop) v.innerHTML=''; }, 300); }
-const xBtn='<button class="x" data-act="unpop" aria-label="Close">'+ic('x')+'</button>';
-const mini=(p, extra)=>'<div class="sph mini '+(extra||'')+'"><div class="ball">'+media(p)+'</div></div>';
+/* ---------- highlighting, as in Sentinel: a tap highlights; half a minute idle brings Home back ---------- */
+let idleT=0; function touchIdle(){ clearTimeout(idleT); idleT=setTimeout(()=>{ if(!S.pop && S.focus && S.focus!==centre().id){ S.focus=null; renderStage(); } }, 30000); }
+function highlight(id){ const o=findP(id); if(!o) return;
+  if(o.pending){ if(S.role==='home') return consentPop(o.l); return toast(T('Waiting')); }
+  if(S.role==='away' && !o.me && !o.home && homes().some(h=>h.id===id)){ S.cur=id; store.set('cur',id); S.focus=null; loadItems(); return renderStage(); }
+  S.focus=(id===centre().id)?null:id; S.hiUntil=Date.now()+30000; renderStage(); touchIdle(); setTimeout(renderDreams, 30100); }
 
-const SHARES=[['location','pin','Where'],['rooms','door','Room'],['falls','fall','Fall'],['care','pill','Medicine'],['mood','smile','Mood'],['activity','still','Still phone']];
+/* ---------- pop-ups ---------- */
+function pop(html){ const v=$('#pop'); v.innerHTML='<div class="veil" data-act="veil"><div class="pop" role="dialog" aria-modal="true">'+html+'</div></div>'; S.pop=true; requestAnimationFrame(()=>v.firstChild && v.firstChild.classList.add('in')); }
+function unpop(){ const v=$('#pop'); const f=v.firstChild; S.pop=null; if(!f) return; f.classList.remove('in'); setTimeout(()=>{ if(!S.pop) v.innerHTML=''; }, 300); }
+const xBtn='<button class="x" data-act="unpop" aria-label="Close">&times;</button>';
+const mini=p=>'<div class="sph mini"><div class="ball">'+media(p)+'</div></div>';
 const RELS=['Son','Daughter','Partner','Family','Friend','Nurse','Doctor','Neighbour'];
-// Home taps a caregiver's sphere: who they are, what they may see, and how they are related. Confirming links the two.
+// Home taps a caregiver who asks: what they may see, and how they are related. Yes links the two.
 function consentPop(l){ S.ask={l, share:Object.assign({}, l.status==='pending'?{falls:1, care:1, activity:1}:l.share), rel:l.relation||''};
   const a=l.away; let h='<div class="hd">'+mini(a)+'<div class="who">'+esc(a.name)+(a.role?'<div class="rl">'+esc(a.role)+'</div>':'')+'</div>'+xBtn+'</div>';
-  h+='<div class="grid">'+SHARES.map(([k,i,w])=>'<button class="tg'+(S.ask.share[k]?' on':'')+'" data-act="share" data-k="'+k+'" aria-pressed="'+(S.ask.share[k]?'true':'false')+'">'+ic(i)+'<span>'+T(w)+'</span></button>').join('')+'</div>';
-  h+='<div class="chips" style="margin-top:14px" id="rel">'+RELS.map(r=>'<button class="chip'+(S.ask.rel===r?' on':'')+'" data-act="rel" data-k="'+r+'">'+T(r)+'</button>').join('')+'</div>';
-  h+='<div class="go">'+'<button class="round no" data-act="link-end" data-k="'+esc(l.id)+'" aria-label="'+(l.status==='pending'?'No':'Remove')+'">'+ic('x')+'</button><button class="round yes" data-act="consent-save" aria-label="Yes">'+ic('check')+'</button></div>';
+  h+='<div class="tiles">'+SHARES.map(([k,w])=>'<button class="tile'+(S.ask.share[k]?' on':'')+'" data-act="share" data-k="'+k+'" aria-pressed="'+(S.ask.share[k]?'true':'false')+'">'+esc(T(w))+'</button>').join('')+'</div>';
+  h+='<div class="row" style="margin-top:14px" id="rel">'+RELS.map(r=>'<button class="w'+(S.ask.rel===r?' on':'')+'" data-act="rel" data-k="'+r+'">'+esc(T(r))+'</button>').join('')+'</div>';
+  h+='<div class="go"><button class="w r big" data-act="link-end" data-k="'+esc(l.id)+'">'+esc(T(l.status==='pending'?'No':'Remove'))+'</button><button class="w gold big" data-act="consent-save">'+esc(T('Yes'))+'</button></div>';
   pop(h); }
-
 // My own sphere: my picture or short video, how I am reached, and what I do.
 function profilePop(){ const me=S.me||{};
-  let h='<div class="hd"><label style="cursor:pointer;position:relative">'+mini(meP())+'<span style="position:absolute;right:-6px;bottom:-6px;width:30px;height:30px;border-radius:50%;background:#0b1424;border:1.5px solid rgba(79,195,255,.7);display:grid;place-items:center;color:#bfe9ff">'+ic('camera','width:16px;height:16px')+'</span><input type="file" accept="image/*,video/*" id="pick" class="hide"></label><div class="who">'+esc(store.get('name',''))+'</div>'+xBtn+'</div>';
-  h+='<div class="field">'+ic('phone')+'<input id="mePh" inputmode="tel" placeholder="'+T('Phone')+'" value="'+esc(me.phone||'')+'"></div>';
-  h+='<div class="field">'+ic('mail')+'<input id="meEm" inputmode="email" placeholder="'+T('Email')+'" value="'+esc(me.email||'')+'"></div>';
-  if(S.role==='away') h+='<div class="field">'+ic('heart')+'<input id="meRo" placeholder="'+T('What I do')+'" value="'+esc(me.role||'')+'"></div>';
-  h+='<div class="go"><button class="round yes" data-act="me-save" aria-label="Save">'+ic('check')+'</button></div>';
-  h+='<div style="display:flex;justify-content:center;margin-top:18px"><button class="chip" data-act="role-reset">'+ic('swap','width:16px;height:16px;vertical-align:-3px;margin-right:6px')+(S.role==='home'?T('I look after someone'):T('I am looked after'))+'</button></div>';
+  let h='<div class="hd"><label style="cursor:pointer">'+mini(meP())+'<input type="file" accept="image/*,video/*" id="pick" class="hide"></label><div class="who">'+esc(store.get('name',''))+'<div style="margin-top:8px"><label for="pick" class="w">'+esc(T('Change photo'))+'</label></div></div>'+xBtn+'</div>';
+  h+='<div class="k">'+esc(T('Phone'))+'</div><input id="mePh" inputmode="tel" value="'+esc(me.phone||'')+'">';
+  h+='<div class="k">'+esc(T('Email'))+'</div><input id="meEm" inputmode="email" value="'+esc(me.email||'')+'">';
+  if(S.role==='away') h+='<div class="k">'+esc(T('What I do'))+'</div><input id="meRo" value="'+esc(me.role||'')+'">';
+  if(S.role==='home') h+='<div class="k">'+esc(T('Pharmacy'))+'</div><button class="w" data-act="pharmacy" style="width:100%;justify-content:flex-start;text-transform:none;letter-spacing:.02em;font-family:var(--sans);font-size:15px">'+esc(me.pharmacy?me.pharmacy.name+(me.pharmacy.address?' · '+me.pharmacy.address:''):T('Choose your pharmacy'))+'</button>';
+  h+='<div class="go"><button class="w gold big" data-act="me-save">'+esc(T('Save'))+'</button></div>';
+  h+='<div style="display:flex;justify-content:center;margin-top:16px"><button class="w" data-act="role-reset">'+esc(S.role==='home'?T('I look after someone'):T('I am looked after'))+'</button></div>';
   h+='<div style="text-align:center;margin-top:12px;font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.08em">Beverly Index LLC · Remiel: Covara · '+BUILD+'</div>';
   pop(h); const pk=$('#pick'); if(pk) pk.addEventListener('change',()=>{ const f=pk.files&&pk.files[0]; if(f) setSphere(f); }); }
-
 // Adding someone: Home shows a six-digit code, large, counting down; a caregiver types it on a big pad.
-async function addPop(){ if(S.role==='home'){ const r=await api('POST','/care/code').catch(()=>null); if(!r||r.s!==201) return toast(T('Not connected'),'alert');
-    const exp=r.j.expires_at; pop('<div class="hd"><div class="who" style="color:var(--amber2)">'+ic('key','width:30px;height:30px')+'</div>'+xBtn+'</div><div class="code">'+esc(r.j.code.replace(/(\d{3})(\d{3})/,'$1 $2'))+'</div><div class="timer"><i id="tmr" style="width:100%"></i></div>');
+async function addPop(){ if(S.role==='home'){ const r=await api('POST','/care/code').catch(()=>null); if(!r||r.s!==201) return toast(T('Not connected'));
+    const exp=r.j.expires_at; pop('<div class="hd"><div class="who">'+esc(T('Add'))+'</div>'+xBtn+'</div><div class="code">'+esc(r.j.code.replace(/(\d{3})(\d{3})/,'$1 $2'))+'</div><div class="timer"><i id="tmr" style="width:100%"></i></div>');
     const tick=()=>{ const t=$('#tmr'); if(!t) return; t.style.width=Math.max(0,(exp-Date.now())/(15*60000)*100)+'%'; setTimeout(tick,1000); }; tick(); return; }
-  pop('<div class="hd"><div class="who" style="color:var(--amber2)">'+ic('key','width:30px;height:30px')+'</div>'+xBtn+'</div><input id="cd" class="codein" inputmode="numeric" maxlength="6" readonly placeholder="······"><div class="pad">'+
-    [1,2,3,4,5,6,7,8,9,'x',0,'ok'].map(k=>'<button data-act="pad" data-k="'+k+'"'+(k==='ok'?' style="background:linear-gradient(180deg,#f0c67e,#d39a45);color:#1A1A2E;border:none"':'')+'>'+(k==='x'?ic('back'):k==='ok'?ic('check'):k)+'</button>').join('')+'</div>'); }
-
-// A caregiver opens Home: the day in pictures.
-function personPop(id){ const o=findP(id); const s=S.sums[id]; if(!o) return;
-  let h='<div class="hd">'+mini(o.p)+'<div class="who">'+esc(o.p.name)+'<div class="rl" style="color:var(--mut)">'+(s&&s.seen_at?ago(s.seen_at):'')+'</div></div>'+xBtn+'</div>';
-  if(s){ const tiles=[];
-    if(s.activity){ const m=s.activity.moved_at; tiles.push(['still', ago(m), m&&Date.now()-m>3*3600000?'warn':'ok']); const b=s.activity.battery; tiles.push(['battery', b==null?'…':b+'%'+(s.activity.charging?' ⚡':''), b!=null&&b<15?'bad':'ok']); }
-    if(s.mood!==undefined){ const md=s.mood&&s.mood.mood; tiles.push([md==='low'?'sad':md==='okay'?'meh':'smile', md?ago(s.mood.at):'…', md==='low'?'bad':md==='okay'?'warn':'ok']); }
-    if(s.room!==undefined) tiles.push(['door', s.room?s.room.room:'…', 'ok']);
-    if(s.location!==undefined) tiles.push(['pin', s.location?(s.place||ago(s.location.at)):'…', 'ok', s.location]);
-    if(s.today){ const late=s.today.items.filter(x=>x.state==='late').length, done=s.today.items.filter(x=>x.state==='done').length; tiles.push(['pill', done+'/'+s.today.items.length, late?'bad':'ok']); }
-    h+='<div class="stats">'+tiles.map(t=>t[3]?'<a class="st '+t[2]+'" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat='+t[3].lat+'&mlon='+t[3].lon+'#map=17/'+t[3].lat+'/'+t[3].lon+'">'+ic(t[0])+'<b>'+esc(t[1])+'</b></a>':'<div class="st '+t[2]+'">'+ic(t[0])+'<b>'+esc(t[1])+'</b></div>').join('')+'</div>';
-    if((s.events||[]).length) h+='<div class="evl">'+s.events.slice(0,6).map(e=>'<div class="ev l'+e.level+'">'+ic(EV_I[e.kind]||'alert')+'<div><div class="t">'+esc(evTitle(e.kind,o.p.name,e.title))+'</div><div class="w">'+esc(hhmm(e.at))+' · '+esc(ago(e.at))+'</div></div></div>').join('')+'</div>';
-    if(s.today){ h+='<div class="evl">'+s.today.items.map(x=>'<div class="ev '+(x.state==='late'?'l3':x.state==='due'?'l2':'')+'">'+ic(x.state==='done'?'check':x.item.kind==='med'?'pill':'cal')+'<div><div class="t">'+esc(x.item.title)+'</div><div class="w">'+esc(x.slot==='appt'?hhmm(x.at):x.slot)+'</div></div></div>').join('')+'</div>';
-      h+='<div class="field" style="margin-top:16px">'+ic('pill')+'<input id="itT" placeholder="'+T('Medicine')+'"></div><div class="field">'+ic('cal')+'<input id="itH" placeholder="08:00, 20:00" inputmode="numeric"></div><div class="go"><button class="round yes" data-act="item-add" data-k="'+esc(id)+'" aria-label="Add">'+ic('plus')+'</button></div>'; } }
+  pop('<div class="hd"><div class="who">'+esc(T('Add'))+'</div>'+xBtn+'</div><input id="cd" class="codein" inputmode="numeric" maxlength="6" readonly placeholder="······"><div class="pad">'+
+    [1,2,3,4,5,6,7,8,9,'del',0,'ok'].map(k=>'<button data-act="pad" data-k="'+k+'"'+(k==='ok'?' style="background:linear-gradient(180deg,#f0c67e,#d39a45);color:#1A1A2E;border:none;font-size:16px;letter-spacing:.14em"':k==='del'?' style="font-size:13px;letter-spacing:.14em"':'')+'>'+(k==='del'?T('Delete').toUpperCase():k==='ok'?T('OK'):k)+'</button>').join('')+'</div>'); }
+// A new medicine: Home photographs it, writes its name, and picks when it is taken.
+const SLOTS=[['Morning','08:00'],['Midday','13:00'],['Evening','18:00'],['Night','21:00']];
+function medPop(homeId){ S.med={home:homeId, blob:null, times:new Set(['08:00'])};
+  let h='<div class="hd"><div class="who">'+esc(T('Medicine'))+'</div>'+xBtn+'</div>';
+  h+='<label class="shot" id="shot"><span>'+esc(T('Photo of the medicine').toUpperCase())+'</span><input type="file" accept="image/*" capture="environment" id="medPick" class="hide"></label>';
+  h+='<div class="k">'+esc(T('Name of the medicine'))+'</div><input id="medName" maxlength="120" autocapitalize="words">';
+  h+='<div class="k">'+esc(T('When'))+'</div><div class="row" id="slots">'+SLOTS.map(([w,t])=>'<button class="w'+(t==='08:00'?' on':'')+'" data-act="slot" data-k="'+t+'">'+esc(T(w))+' '+t+'</button>').join('')+'</div>';
+  h+='<div class="k">'+esc(T('Other time'))+'</div><input id="medOther" type="time">';
+  h+='<div class="go"><button class="w gold big" data-act="med-save">'+esc(T('Save'))+'</button></div>';
+  pop(h); $('#medPick').addEventListener('change',async()=>{ const f=$('#medPick').files[0]; if(!f) return; S.med.blob=await shrink(f, 900); const sh=$('#shot'); const im=sh.querySelector('img')||document.createElement('img'); im.src=URL.createObjectURL(S.med.blob); sh.prepend(im); }); }
+// An appointment or a subscription: a name, a photo if wanted, and its date and time.
+function datedPop(kind, homeId){ S.med={home:homeId, blob:null, kind};
+  let h='<div class="hd"><div class="who">'+esc(T(kind==='sub'?'Subscriptions':'Appointments'))+'</div>'+xBtn+'</div>';
+  h+='<label class="shot" id="shot" style="aspect-ratio:16/7"><span>'+esc(T('Photo').toUpperCase())+'</span><input type="file" accept="image/*" capture="environment" id="medPick" class="hide"></label>';
+  h+='<div class="k">'+esc(T('Name'))+'</div><input id="medName" maxlength="120" autocapitalize="words">';
+  h+='<div class="k">'+esc(T(kind==='sub'?'Next renewal':'When'))+'</div><input id="dtWhen" type="datetime-local">';
+  h+='<div class="go"><button class="w gold big" data-act="dated-save">'+esc(T('Save'))+'</button></div>';
+  pop(h); const d=new Date(Date.now()+86400000); d.setMinutes(0); $('#dtWhen').value=new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  $('#medPick').addEventListener('change',async()=>{ const f=$('#medPick').files[0]; if(!f) return; S.med.blob=await shrink(f, 900); const sh=$('#shot'); const im=sh.querySelector('img')||document.createElement('img'); im.src=URL.createObjectURL(S.med.blob); sh.prepend(im); }); }
+// A caregiver opens Home: the day, in words and the photos Home took.
+function personPop(id){ const o=findP(id); const s=S.sums[id]; if(!o||!s) return;
+  let h='<div class="hd">'+mini(o.p)+'<div class="who">'+esc(o.p.name)+'<div class="rl" style="color:var(--mut)">'+(s.seen_at?ago(s.seen_at):'')+'</div></div>'+xBtn+'</div>';
+  const kv=[]; if(s.activity){ kv.push([T('Last moved'), ago(s.activity.moved_at)]); if(s.activity.battery!=null) kv.push([T('Battery'), s.activity.battery+'%']); }
+  if(s.mood!==undefined) kv.push([T('Mood'), s.mood?T(s.mood.mood==='low'?'Not good':s.mood.mood==='okay'?'Okay':'Good')+' · '+ago(s.mood.at):'…']);
+  if(s.room!==undefined) kv.push([T('Room'), s.room?s.room.room:'…']);
+  if(s.location!==undefined) kv.push([T('Place'), s.location?'<a style="color:var(--amber2)" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat='+s.location.lat+'&mlon='+s.location.lon+'#map=17/'+s.location.lat+'/'+s.location.lon+'">'+esc(s.place||ago(s.location.at))+'</a>':'…', true]);
+  h+=kv.map(([k,v,raw])=>'<div class="k">'+esc(k)+'</div><div style="font-size:17px">'+(raw?v:esc(v))+'</div>').join('');
+  if((s.events||[]).length) h+='<div class="k">'+esc(T('Today'))+'</div>'+s.events.slice(0,6).map(e=>'<div style="font-family:var(--serif);font-size:19px;color:'+(e.level>=3?'#ff9a9a':e.level>=2?'var(--amber2)':'#cfe7ff')+'">'+esc(evTitle(e.kind,o.p.name,e.title))+' <span style="font-family:var(--mono);font-size:12px;color:var(--mut)">'+esc(hhmm(e.at))+'</span></div>').join('');
+  if(s.today) h+='<div class="k">'+esc(T('My medicines'))+'</div>'+s.today.items.map(x=>'<div class="fl in '+(x.state==='late'?'late':x.state==='due'?'due':x.state==='done'?'done':'')+'" style="margin-bottom:8px">'+itemHTML({kind:'med', t:x.item.title, tm:(x.slot==='appt'?hhmm(x.at):x.slot)+(x.state==='done'?' · '+T('Taken'):''), photo:x.item.photo})+'</div>').join('');
   pop(h); }
 
-/* ---------- my sphere picture or video ---------- */
-async function setSphere(f){ const isV=/^video\//.test(f.type); let blob=f;
-  if(!isV) blob=await shrink(f, 640);
-  if(blob.size>3.9*1024*1024) return toast('4 MB','alert');
+function doReach(how, o){ if(how==='video') return startCall(o);
+  if(how==='call'){ if(o.p.phone) location.href='tel:'+o.p.phone.replace(/[^\d+]/g,''); else startCall(o); return; }
+  if(o.p.email) location.href='mailto:'+o.p.email; else toast(T('No email yet')); }
+function choosePop(how, list){ pop('<div class="hd"><div class="who">'+esc(T(how==='video'?'Video':how==='call'?'Phone':'Email'))+'</div>'+xBtn+'</div><div class="row" style="justify-content:center;gap:18px">'+
+  list.map(o=>'<button style="background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px" data-act="pick-reach" data-how="'+how+'" data-k="'+esc(o.id)+'">'+mini(o.p)+'<span style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:#8fd8ee;text-transform:uppercase">'+esc(first(o.p.name))+'</span></button>').join('')+'</div>'); }
+
+// Choosing Home's pharmacy: the pharmacies near Home, nearest first, each with its address and phone.
+async function pharmacyPop(){ const f=focused(); const hid=S.role==='home'?null:f.id; let at=S.role==='home'?(S.here||await herePos()):placeOf(f);
+  if(!at) return toast(T('Where I am')+' ?');
+  pop('<div class="hd"><div class="who">'+esc(T('Pharmacy'))+'</div>'+xBtn+'</div><div id="phl" class="k">…</div>');
+  const r=await api('GET','/care/pharmacies?lat='+at.lat.toFixed(4)+'&lon='+at.lon.toFixed(4)).catch(()=>null); const box=$('#phl'); if(!box) return;
+  if(!r||r.s!==200||!(r.j.pharmacies||[]).length){ box.textContent=T('Not connected'); return; }
+  S.phs=r.j.pharmacies; box.outerHTML='<div style="display:flex;flex-direction:column;gap:10px">'+S.phs.map((p,i)=>'<button class="fl in" style="text-align:left;color:inherit;font:inherit" data-act="ph-pick" data-k="'+i+'"><div><div class="t">'+esc(p.name)+'</div><div class="tm">'+esc([p.address, p.phone, (p.m>=1000?(p.m/1000).toFixed(1)+' km':p.m+' m')].filter(Boolean).join(' · '))+'</div></div></button>').join('')+'</div>';
+  S.phHome=hid; }
+
+/* ---------- pictures ---------- */
+async function setSphere(f){ const isV=/^video\//.test(f.type); let blob=isV?f:await shrink(f, 640);
+  if(blob.size>3.9*1024*1024) return toast('4 MB');
   S.localSphere=URL.createObjectURL(blob); S.me.vid=isV; store.set('meVid',isV); renderStage(); profilePop();
-  const fd=new FormData(); fd.append('blob_type','avatar'); fd.append('file', blob, isV?'sphere.mp4':'sphere.jpg');
-  const r=await api('POST','/storage/upload', fd, true).catch(()=>null);
-  if(r && r.s===201){ const m=await api('PUT','/care/me',{sphere:r.j.id}); if(m.s===200){ S.me.sphere=m.j.sphere; toast(T('Saved'),'check'); } } else toast(T('Not connected'),'alert'); }
+  const r=await upload(blob, 'avatar', isV?'sphere.mp4':'sphere.jpg');
+  if(r && r.s===201){ const m=await api('PUT','/care/me',{sphere:r.j.id}); if(m.s===200){ S.me.sphere=m.j.sphere; toast(T('Saved')); } } else toast(T('Not connected')); }
 function shrink(f, max){ return new Promise(res=>{ const img=new Image(); img.onload=()=>{ const s=Math.min(1,max/Math.max(img.width,img.height)), c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
-  c.getContext('2d').drawImage(img,0,0,c.width,c.height); c.toBlob(b=>res(b||f),'image/jpeg',0.85); }; img.onerror=()=>res(f); img.src=URL.createObjectURL(f); }); }
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height); c.toBlob(b=>res(b||f),'image/jpeg',0.86); }; img.onerror=()=>res(f); img.src=URL.createObjectURL(f); }); }
 
 /* ---------- Help: hold two seconds, so it is never sent by accident ---------- */
 function bindHelp(){ const b=$('#help'), f=b.querySelector('.fill'); let t0=0, raf=0;
@@ -412,8 +492,8 @@ function bindHelp(){ const b=$('#help'), f=b.querySelector('.fill'); let t0=0, r
   b.addEventListener('pointerdown',e=>{ e.preventDefault(); t0=performance.now(); try{ navigator.vibrate&&navigator.vibrate(30); }catch(x){} raf=requestAnimationFrame(step); });
   ['pointerup','pointerleave','pointercancel'].forEach(k=>b.addEventListener(k,stop)); }
 async function sendHelp(){ try{ navigator.vibrate&&navigator.vibrate([200,100,200]); }catch(e){}
-  const r=await api('POST','/care/events',{kind:'help', client_ref:'help-'+Date.now()}).catch(()=>null);
-  toast(r && r.s<300 ? T('Help sent') : T('Not connected'), r && r.s<300 ? 'check' : 'alert');
+  S.helpAt=Date.now(); renderDreams(); const r=await api('POST','/care/events',{kind:'help', client_ref:'help-'+Date.now()}).catch(()=>null);
+  toast(r && r.s<300 ? T('Help sent') : T('Not connected'));
   if(S.links.as_home.some(l=>l.status==='active' && l.share.location)){ const p=await herePos(); if(p) api('POST','/location',{latitude:p.lat, longitude:p.lon, accuracy:p.acc}).catch(()=>null); } }
 
 /* ---------- Home's phone reports: movement, battery, place ---------- */
@@ -421,13 +501,13 @@ const MOVE={last:0};
 function watchMotion(){ let prev=null;
   window.addEventListener('devicemotion',e=>{ const a=e.accelerationIncludingGravity; if(!a||a.x==null) return; const v=[a.x,a.y,a.z];
     if(prev){ const d=Math.abs(v[0]-prev[0])+Math.abs(v[1]-prev[1])+Math.abs(v[2]-prev[2]); if(d>1.2) MOVE.last=Date.now(); } prev=v; });
-  ['pointerdown','keydown','touchstart'].forEach(k=>window.addEventListener(k,()=>{ MOVE.last=Date.now(); },{passive:true})); }
+  ['pointerdown','keydown','touchstart'].forEach(k=>window.addEventListener(k,()=>{ MOVE.last=Date.now(); touchIdle(); },{passive:true})); }
 function herePos(){ return new Promise(res=>{ if(!navigator.geolocation) return res(null); navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude, lon:p.coords.longitude, acc:p.coords.accuracy}), ()=>res(null), {enableHighAccuracy:true, timeout:8000, maximumAge:60000}); }); }
 async function report(){ if(S.role!=='home' || !store.get('name','')) return; const b={tz:Intl.DateTimeFormat().resolvedOptions().timeZone};
   if(MOVE.last) b.moved_at=MOVE.last;
   try{ if(navigator.getBattery){ const bt=await navigator.getBattery(); b.battery=Math.round(bt.level*100); b.charging=bt.charging; } }catch(e){}
   await api('POST','/care/state',b).catch(()=>null);
-  if(S.links.as_home.some(l=>l.status==='active' && l.share.location)){ const p=await herePos(); if(p) await api('POST','/location',{latitude:p.lat, longitude:p.lon, accuracy:p.acc, continuous:true}).catch(()=>null); } }
+  if(S.links.as_home.some(l=>l.status==='active' && l.share.location)){ const p=await herePos(); if(p){ S.here={lat:p.lat, lon:p.lon, at:Date.now()}; renderDreams(); await api('POST','/location',{latitude:p.lat, longitude:p.lon, accuracy:p.acc, continuous:true}).catch(()=>null); } } }
 
 /* ---------- data ---------- */
 async function load(){ if(!S.role || !store.get('name','')) return; try{
@@ -435,16 +515,20 @@ async function load(){ if(!S.role || !store.get('name','')) return; try{
   const m=await api('GET','/care/me'); if(m.s===200) S.me=Object.assign({vid:store.get('meVid',false)}, m.j);
   if(S.role==='home'){ const t=await api('GET','/care/today'); if(t.s===200) S.today=t.j; }
   if(S.role==='away') for(const o of homes().filter(o=>!o.pending)){ const s=await api('GET','/care/summary?home='+encodeURIComponent(o.id)); if(s.s===200) S.sums[o.id]=s.j; }
-  await alarmsPoll(); }catch(e){}
-  renderStage(); renderDream(); maybeAsk(); peerStart(); }
+  await loadItems(); await alarmsPoll(); }catch(e){}
+  renderStage(); maybeAsk(); peerStart(); }
+
+// Appointments and subscriptions of the Home in the middle (the day's medicines come with the day).
+async function loadItems(){ const c=centre(); if(!c.home) return; const hid=S.role==='home'?'me':c.id; if(S.role==='away' && !(S.sums[c.id]||{}).today) return;
+  const r=await api('GET','/care/items'+(S.role==='away'?'?home='+encodeURIComponent(c.id):'')).catch(()=>null); if(r && r.s===200) S.items[hid]=r.j.items||[]; }
 
 /* ---------- alarms: an urgent one takes the whole screen until someone answers ---------- */
 async function alarmsPoll(){ if(S.role!=='away') return; const r=await api('GET','/alarms?state=open').catch(()=>null); if(!r||r.s!==200) return;
   const a=(r.j.alarms||[]).filter(x=>/^care-/.test(x.kind) && x.owner_id===ACC.uid).sort((x,y)=>y.level-x.level)[0];
   const box=$('#urgent'); if(!a || a.level<3){ box.classList.add('hide'); box.innerHTML=''; return; }
   const o=findP(a.member_ref); const p=o?o.p:{name:a.member_name||a.raised_by_name};
-  box.innerHTML=mini(p)+'<div class="big">'+ic(EV_I[String(a.kind).replace('care-','')]||'alert')+'</div><h1>'+esc(evTitle(a.kind, p.name, a.title))+'</h1><div style="font-family:var(--mono);color:#ffb3b3;letter-spacing:.1em">'+esc(hhmm(a.created_at))+'</div>'+
-    '<div class="go"><button class="round call" data-act="qa" data-q="video" data-k="'+esc(a.member_ref||'')+'" aria-label="Video">'+ic('video')+'</button><button class="round call" data-act="qa" data-q="phone" data-k="'+esc(a.member_ref||'')+'" aria-label="Call">'+ic('phone')+'</button><button class="round yes" data-act="ack" data-k="'+a.id+'" aria-label="Seen">'+ic('check')+'</button></div>';
+  box.innerHTML=mini(p)+'<h1>'+esc(evTitle(a.kind, p.name, a.title))+'</h1><div style="font-family:var(--mono);color:#ffb3b3;letter-spacing:.1em">'+esc(hhmm(a.created_at))+'</div>'+
+    '<div class="go" style="flex-wrap:wrap"><button class="w g big" data-act="video" data-k="'+esc(a.member_ref||'')+'">'+esc(T('Video'))+'</button><button class="w g big" data-act="call" data-k="'+esc(a.member_ref||'')+'">'+esc(T('Call'))+'</button></div><button class="w gold big" data-act="ack" data-k="'+a.id+'">'+esc(T('I have seen it'))+'</button>';
   box.classList.remove('hide'); try{ navigator.vibrate&&navigator.vibrate([400,200,400,200,400]); }catch(e){} }
 
 /* ---------- video calls: Sentinel Call's servers and Sentinel IDs ---------- */
@@ -456,15 +540,15 @@ async function peerStart(){ if(CALL.peer || CALL.starting || !store.get('name','
     const p=new Peer(mySid(), o); p.on('call', incoming); p.on('error',()=>{}); p.on('disconnected',()=>{ try{ p.reconnect(); }catch(e){} }); CALL.peer=p; }catch(e){} CALL.starting=false; }
 function cam(){ return navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:true}); }
 function callScreen(p, state){ const c=$('#call'); c.classList.remove('hide');
-  c.innerHTML='<video class="remote" autoplay playsinline></video><video class="local" autoplay playsinline muted></video><div class="who">'+mini(p, state!=='in'?'ringing':'ringing')+'<div class="nm3">'+esc(p.name||'')+'</div><div style="font-family:var(--mono);letter-spacing:.2em;color:var(--mut);font-size:12px">'+(state==='in'?T('is calling').toUpperCase():T('Calling').toUpperCase())+'</div></div>'+
-    '<div class="bar">'+(state==='in'?'<button class="round end" data-act="hang" aria-label="Decline">'+ic('x')+'</button><button class="round call" data-act="answer" aria-label="Answer">'+ic('video')+'</button>':'<button class="round end" data-act="hang" aria-label="End">'+ic('phone')+'</button>')+'</div>';
+  c.innerHTML='<video class="remote" autoplay playsinline></video><video class="local" autoplay playsinline muted></video><div class="who">'+mini(p)+'<div class="nm3">'+esc(p.name||'')+'</div><div style="font-family:var(--mono);letter-spacing:.2em;color:var(--mut);font-size:12px">'+esc((state==='in'?T('is calling'):T('Calling')).toUpperCase())+'</div></div>'+
+    '<div class="bar">'+(state==='in'?'<button class="w r big" data-act="hang">'+esc(T('End'))+'</button><button class="w g big" data-act="answer">'+esc(T('Answer'))+'</button>':'<button class="w r big" data-act="hang">'+esc(T('End'))+'</button>')+'</div>';
   if(CALL.stream) c.querySelector('video.local').srcObject=CALL.stream; }
 function attach(call){ CALL.cur=call; call.on('stream',st=>{ clearInterval(CALL.timer); const c=$('#call'); const v=c.querySelector('video.remote'); if(v) v.srcObject=st; const w=c.querySelector('.who'); if(w) w.classList.add('hide'); });
   call.on('close',hangUp); call.on('error',()=>{}); }
-async function startCall(o){ if(!o.p.sentinel_id) return toast(T('No answer'),'alert'); await peerStart(); if(!CALL.peer) return toast(T('Not connected'),'alert');
-  try{ CALL.stream=await cam(); }catch(e){ return toast(T('Not connected'),'alert'); }
+async function startCall(o){ if(!o.p.sentinel_id) return toast(T('No answer')); await peerStart(); if(!CALL.peer) return toast(T('Not connected'));
+  try{ CALL.stream=await cam(); }catch(e){ return toast(T('Not connected')); }
   callScreen(o.p,'out'); api('POST','/call/ring',{to_sentinel_id:o.p.sentinel_id, app:'covara'}).catch(()=>{});
-  CALL.tries=0; const dial=()=>{ if(CALL.cur && CALL.cur.open) return; CALL.tries++; if(CALL.tries>12){ api('POST','/call/ring',{to_sentinel_id:o.p.sentinel_id, state:'missed', app:'covara'}).catch(()=>{}); toast(T('No answer'),'phone'); return hangUp(); }
+  CALL.tries=0; const dial=()=>{ if(CALL.cur && CALL.cur.open) return; CALL.tries++; if(CALL.tries>12){ api('POST','/call/ring',{to_sentinel_id:o.p.sentinel_id, state:'missed', app:'covara'}).catch(()=>{}); toast(T('No answer')); return hangUp(); }
     try{ const c=CALL.peer.call(o.p.sentinel_id, CALL.stream, {metadata:{name:store.get('name',''), app:'covara'}}); if(c) attach(c); }catch(e){} };
   dial(); CALL.timer=setInterval(dial, 4000); }
 function incoming(call){ if(CALL.cur && CALL.cur.open){ try{ call.close(); }catch(e){} return; } CALL.pending=call; const o=[...aways(),...homes()].find(x=>x.p.sentinel_id===call.peer); const p=o?o.p:{name:(call.metadata&&call.metadata.name)||''};
@@ -481,38 +565,51 @@ async function pushOn(){ try{ if(!('Notification' in window) || Notification.per
   const sub=(await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64(k.j.publicKey)}); const j=sub.toJSON();
   await api('POST','/push/subscribe',{endpoint:j.endpoint, keys:j.keys}); }catch(e){} }
 
-/* ---------- first run: a name, then a picture of who I am here ---------- */
+/* ---------- first run ---------- */
 function startScreen(){ const s=$('#start'); if(store.get('name','') && S.role){ s.classList.add('hide'); return; } s.classList.remove('hide');
-  if(!store.get('name','')) s.innerHTML='<div class="wm"><b>REMIEL</b>Covara</div><div style="width:min(86vw,360px)" class="field">'+ic('user')+'<input id="nm" autocomplete="given-name" maxlength="40" placeholder="'+T('Your first name')+'"></div><button class="round yes" data-act="name" aria-label="Continue">'+ic('check')+'</button>';
-  else s.innerHTML='<div class="wm"><b>REMIEL</b>Covara</div><div class="pick"><button class="home" data-act="role" data-k="home"><div class="ball">'+ic('home')+'</div><span>'+T('I am looked after')+'</span></button><button data-act="role" data-k="away"><div class="ball">'+ic('heart')+'</div><span>'+T('I look after someone')+'</span></button></div>'; }
+  if(!store.get('name','')) s.innerHTML='<div class="wm"><b>REMIEL</b>Covara</div><div style="width:min(86vw,360px)"><div class="k">'+esc(T('Your first name'))+'</div><input id="nm" autocomplete="given-name" maxlength="40"></div><button class="w gold big" data-act="name">'+esc(T('Continue'))+'</button>';
+  else s.innerHTML='<div class="wm"><b>REMIEL</b>Covara</div><div class="pick"><button class="home" data-act="role" data-k="home"><div class="ball">'+esc(T('I am looked after'))+'</div></button><button data-act="role" data-k="away"><div class="ball">'+esc(T('I look after someone'))+'</div></button></div>'; }
 
 /* ---------- taps ---------- */
-document.addEventListener('click', async e=>{ const el=e.target.closest('[data-act]'); if(!el){ S.open=null; closeActions(); return; } const k=el.dataset.k;
+document.addEventListener('click', async e=>{ const el=e.target.closest('[data-act]'); if(!el) return; const k=el.dataset.k;
+  const reach=id=>findP(id);
   switch(el.dataset.act){
-    case 'lang': { LANG=LANG==='en'?'it':'en'; store.set('lang',LANG); document.documentElement.lang=LANG; const a=$('#ask'); if(a.classList.contains('in')) a.querySelector('.q').textContent=T('How are you?'); renderStage(); renderDream(); break; }
+    case 'lang': { LANG=LANG==='en'?'it':'en'; store.set('lang',LANG); document.documentElement.lang=LANG; const a=$('#ask'); if(a.classList.contains('in')) a.querySelector('.q').textContent=T('How are you?'); $('#strip').innerHTML=''; renderStage(); break; }
     case 'name': { const v=($('#nm').value||'').trim(); if(!v) return $('#nm').focus(); store.set('name',v); identity(); startScreen(); break; }
     case 'role': S.role=k; store.set('role',k); startScreen(); load(); pushOn(); break;
-    case 'role-reset': S.role=S.role==='home'?'away':'home'; store.set('role',S.role); unpop(); S.sums={}; load(); break;
-    case 'sph': if(k==='add') return addPop(); if(S.open===k){ S.open=null; closeActions(); } else openActions(k); break;
-    case 'qa': { const o=findP(k); if(!o) return; const q=el.dataset.q; S.open=null; closeActions();
-      if(q==='video') return startCall(o);
-      if(q==='phone'){ if(o.p.phone) location.href='tel:'+o.p.phone.replace(/[^\d+]/g,''); else startCall(o); return; }
-      if(q==='mail'){ if(o.p.email) location.href='mailto:'+o.p.email; else toast(T('No email yet'),'mail'); return; }
-      if(q==='eye') return consentPop(o.l);
-      if(q==='info') return personPop(o.id); break; }
+    case 'role-reset': S.role=S.role==='home'?'away':'home'; store.set('role',S.role); S.focus=null; unpop(); S.sums={}; load(); break;
+    case 'sph': if(k==='add') return addPop(); if(k==='me' && S.focus==='me') return profilePop(); highlight(k); break;
+    case 'profile': profilePop(); break;
+    case 'video': case 'call': case 'mail': { let o=reach(k); if(!o) return;
+      // Home reaching out from their own sphere: straight to the one caregiver, or a choice of them
+      if(o.me){ const as=aways().filter(a=>!a.pending); if(!as.length) return addPop(); if(as.length>1) return choosePop(el.dataset.act, as); o=as[0]; }
+      doReach(el.dataset.act, o); break; }
+    case 'pick-reach': { const o=reach(k); if(o){ unpop(); doReach(el.dataset.how, o); } break; }
+    case 'eye': { const o=reach(k); if(o&&o.l) consentPop(o.l); break; }
+    case 'open': personPop(k); break;
     case 'veil': if(e.target===el) unpop(); break;
     case 'unpop': unpop(); break;
     case 'share': { S.ask.share[k]=S.ask.share[k]?0:1; el.classList.toggle('on', !!S.ask.share[k]); el.setAttribute('aria-pressed', S.ask.share[k]?'true':'false'); break; }
-    case 'rel': S.ask.rel=S.ask.rel===k?'':k; document.querySelectorAll('#rel .chip').forEach(c=>c.classList.toggle('on', c.dataset.k===S.ask.rel)); break;
-    case 'consent-save': { const r=await api('PUT','/care/links/'+S.ask.l.id,{approve:true, share:S.ask.share, relation:S.ask.rel}); if(r.s===200){ unpop(); toast(T('Saved'),'check'); load(); } break; }
-    case 'link-end': await api('DELETE','/care/links/'+k); unpop(); load(); break;
-    case 'me-save': { const b={phone:($('#mePh')||{}).value||'', email:($('#meEm')||{}).value||''}; if($('#meRo')) b.role=$('#meRo').value; const r=await api('PUT','/care/me',b); if(r.s===200){ S.me=Object.assign(S.me,r.j); unpop(); toast(T('Saved'),'check'); } break; }
-    case 'pad': { const i=$('#cd'); if(k==='x') i.value=i.value.slice(0,-1); else if(k==='ok'){ if(i.value.length!==6) return; const r=await api('POST','/care/claim',{code:i.value}); if(r.s<300){ unpop(); toast(T('Added'),'check'); load(); } else { i.value=''; toast(r.j.detail||T('Not connected'),'alert'); } } else if(i.value.length<6) i.value+=k; break; }
-    case 'mood': { await api('POST','/care/state',{mood:k}).catch(()=>null); store.set('asked', new Date().toDateString()); $('#ask').classList.remove('in'); toast(T('Saved'), k==='low'?'heart':'check'); break; }
-    case 'dream': { const x=el._x; if(!x) return; if(x.mark){ const r=await api('POST','/care/items/'+x.mark.id+'/mark',{slot:x.mark.slot}); if(r.s===200){ el.classList.add('done'); S.today=r.j; setTimeout(renderDream, 500); toast(T('Taken'),'check'); } } else if(x.open) personPop(x.open); break; }
-    case 'item-add': { const t=($('#itT').value||'').trim(), times=($('#itH').value||'').split(/[ ,;]+/).map(x=>x.trim()).filter(Boolean).map(x=>/^\d:\d\d$/.test(x)?'0'+x:x); if(!t) return $('#itT').focus();
-      const r=await api('POST','/care/items',{home:k, kind:'med', title:t, times}); if(r.s===201){ toast(T('Added'),'check'); await load(); personPop(k); } else toast(r.j.detail||'','alert'); break; }
+    case 'rel': S.ask.rel=S.ask.rel===k?'':k; document.querySelectorAll('#rel .w').forEach(c=>c.classList.toggle('on', c.dataset.k===S.ask.rel)); break;
+    case 'consent-save': { const r=await api('PUT','/care/links/'+S.ask.l.id,{approve:true, share:S.ask.share, relation:S.ask.rel}); if(r.s===200){ unpop(); toast(T('Saved')); S.focus=S.ask.l.away.id; load(); } break; }
+    case 'link-end': await api('DELETE','/care/links/'+k); unpop(); S.focus=null; load(); break;
+    case 'me-save': { const b={phone:($('#mePh')||{}).value||'', email:($('#meEm')||{}).value||''}; if($('#meRo')) b.role=$('#meRo').value; const r=await api('PUT','/care/me',b); if(r.s===200){ S.me=Object.assign(S.me,r.j); unpop(); toast(T('Saved')); renderStage(); } break; }
+    case 'pad': { const i=$('#cd'); if(k==='del') i.value=i.value.slice(0,-1); else if(k==='ok'){ if(i.value.length!==6) return; const r=await api('POST','/care/claim',{code:i.value}); if(r.s<300){ unpop(); toast(T('Added')); load(); } else { i.value=''; toast(r.j.detail||T('Not connected')); } } else if(i.value.length<6) i.value+=k; break; }
+    case 'mood': { await api('POST','/care/state',{mood:k}).catch(()=>null); store.set('asked', new Date().toDateString()); store.set('mood', k+'|'+new Date().toDateString()); renderStage(); $('#ask').classList.remove('in'); toast(T('Saved')); break; }
+    case 'float': { const x=el._x; if(!x) return; if(x.mark && S.role==='home'){ const r=await api('POST','/care/items/'+x.mark.id+'/mark',{slot:x.mark.slot}); if(r.s===200){ el.classList.add('done'); toast(T('Taken')); S.today=r.j; setTimeout(renderStrip, 600); } } else if(S.role==='away') personPop(focused().id); break; }
+    case 'item-new': { const c=centre(); const hid=S.role==='home'?ACC.uid:c.id; if(k==='med') medPop(hid); else datedPop(k, hid); break; }
+    case 'slot': { const t=k; if(S.med.times.has(t)) S.med.times.delete(t); else S.med.times.add(t); el.classList.toggle('on', S.med.times.has(t)); break; }
+    case 'med-save': { const name=($('#medName').value||'').trim(); if(!name) return $('#medName').focus(); const other=$('#medOther').value; if(other) S.med.times.add(other); if(!S.med.times.size) return;
+      let photo=null; if(S.med.blob){ const u=await upload(S.med.blob,'photo','medicine.jpg'); if(u && u.s===201) photo=u.j.id; }
+      const body={kind:'med', title:name, times:[...S.med.times], photo}; if(S.med.home && S.med.home!==ACC.uid) body.home=S.med.home;
+      const r=await api('POST','/care/items', body); if(r.s===201){ unpop(); toast(T('Added')); load(); } else toast(r.j.detail||T('Not connected')); break; }
+    case 'dated-save': { const name=($('#medName').value||'').trim(); if(!name) return $('#medName').focus(); const at=new Date($('#dtWhen').value).getTime(); if(!at) return $('#dtWhen').focus();
+      let photo=null; if(S.med.blob){ const u=await upload(S.med.blob,'photo','item.jpg'); if(u && u.s===201) photo=u.j.id; }
+      const body={kind:S.med.kind, title:name, at, photo}; if(S.med.home && S.med.home!==ACC.uid) body.home=S.med.home;
+      const r=await api('POST','/care/items', body); if(r.s===201){ unpop(); toast(T('Added')); load(); } else toast(r.j.detail||T('Not connected')); break; }
     case 'ack': store.set('seenAt', Date.now()); await api('POST','/alarms/'+k+'/ack'); $('#urgent').classList.add('hide'); load(); break;
+    case 'pharmacy': pharmacyPop(); break;
+    case 'ph-pick': { const p=S.phs[Number(k)]; const body={pharmacy:p}; if(S.phHome) body.home=S.phHome; const r=await api('PUT','/care/pharmacy', body); if(r.s===200){ if(!S.phHome) S.me.pharmacy=r.j.pharmacy; else if(S.sums[S.phHome]) S.sums[S.phHome].pharmacy=r.j.pharmacy; unpop(); toast(T('Saved')); renderDreams(); } break; }
     case 'answer': answer(); break;
     case 'hang': hangUp(); break;
   } });
@@ -523,7 +620,7 @@ document.documentElement.lang=LANG;
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 navigator.serviceWorker && navigator.serviceWorker.addEventListener('message',e=>{ if(e.data && (e.data.type==='PUSH_RECEIVED'||e.data.type==='NOTIFICATION_CLICK')) load(); });
 watchMotion(); bindHelp(); startScreen(); renderStage(); load();
-setInterval(load, 30000); setInterval(report, 120000); setTimeout(report, 4000);
+setInterval(load, 30000); setInterval(report, 120000); setTimeout(report, 4000); setInterval(()=>{ if(S.hiUntil && Date.now()>S.hiUntil){ S.hiUntil=0; renderDreams(); } }, 5000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ MOVE.last=Date.now(); load(); report(); } });
 if(/#call=/.test(location.hash)) peerStart();
 </script>
