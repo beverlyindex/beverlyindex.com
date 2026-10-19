@@ -17902,6 +17902,8 @@ function _enterRestMode() {
   if (_restModeActive) return;
   if (_reducedMotionNow()) return; /* rest mode auto-cycles focus: off under reduced motion */
   if (blufOpen || appState !== 'network') return;
+  /* Covara: on AWAY's phone HOME stays in view; nothing drifts to another sphere */
+  try { if (localStorage.getItem('rc:role') === 'away') return; } catch (e) {}
   _restModeActive = true;
   if (typeof SentinelGuide !== 'undefined') SentinelGuide.onRestMode();
   _cycleDreamContact();
@@ -17921,7 +17923,7 @@ function _cycleDreamContact() {
     var vf = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
     if (vf) pool = pool.filter(function(c) { return vf.has(c.id) || vf.has(String(c.id)); });
   } catch (e) {}
-  if (pool.length === 0) { _exitRestMode(); return; }
+  if (pool.length === 0) { _restModeActive = false; if (_restCycleTimer) { clearInterval(_restCycleTimer); _restCycleTimer = null; } return; }
   /* Avoid showing the same contact twice in a row */
   var pick;
   var attempts = 0;
@@ -19091,6 +19093,8 @@ const SentinelHeadlines = (() => {
   };
 
   async function computeHeadline(contact) {
+    /* Covara: a sphere waiting on a link says so above it */
+    try { if (contact && contact.care && contact.care.state === 'pending' && window.CovaraCare) return { headline: window.CovaraCare.waitLabel(contact), priority: 1000 }; } catch (_) {}
     if (!contact) return { headline: '', priority: 0 };
     const cid = contact.id;
     const now = Date.now();
@@ -29394,7 +29398,9 @@ function drawNetworkView(t) {
 
   /* ── Interaction Memory — dreamy faded image of focused contact ── */
   if (focusedContactId) {
-    const _memPhoto = contactPhotos.get(focusedContactId);
+    /* Covara: when HOME's medicine is due, its photo is the dream picture */
+    let _cvDream = null; try { if (window.CovaraDream) _cvDream = window.CovaraDream(focusedContactId); } catch (e) {}
+    const _memPhoto = _cvDream || contactPhotos.get(focusedContactId);
     const _focNode = NODES.find(n => n.contact.id === focusedContactId);
     const _focCat = _focNode ? (CATS[_focNode.contact.cat] || CATS.other) : CATS.other;
     ctx.save();
@@ -29410,6 +29416,7 @@ function drawNetworkView(t) {
     ctx.clip();
     /* Breathing: a clear pulse from dark to light (about 8 s); inside a Unit, bright to full */
     var _dreamAlpha = _drIso ? 0.9 : (_drBoost ? 0.75 + 0.15 * Math.sin(t * 0.0008) : 0.34 + 0.24 * Math.sin(t * 0.0008));
+    if (_cvDream) _dreamAlpha = 0.82 + 0.14 * Math.sin(t * 0.0016);
     if (_memPhoto && _memPhoto.img) {
       const _memImg = _memPhoto.img;
       const _mw = _memPhoto.isVideo ? _memImg.videoWidth : (_memImg.naturalWidth || _memImg.width);
@@ -45438,5 +45445,7 @@ try { _resolveAppScriptReady(); } catch (e) {}
 
   <!-- Hidden host for GIF images so browser keeps animating them for canvas -->
   <div id="gifAnimationHost"></div>
+  <script src="covara-care.js" defer></script>
+  <script src="covara-today.js" defer></script>
 </body>
 </html>
