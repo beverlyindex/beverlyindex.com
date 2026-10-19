@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b16">
+<title>Remiel: Covara</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="../halo/icon-192.png">
+<style>
+/* Fonts are served with the app (SIL Open Font License), so nothing is fetched from a third party. */
+@font-face{font-family:'DM Sans';font-weight:400;font-style:normal;font-display:swap;src:url('fonts/dm-sans-latin-400-normal.woff2') format('woff2')}
+@font-face{font-family:'DM Sans';font-weight:500;font-style:normal;font-display:swap;src:url('fonts/dm-sans-latin-500-normal.woff2') format('woff2')}
+@font-face{font-family:'DM Sans';font-weight:600;font-style:normal;font-display:swap;src:url('fonts/dm-sans-latin-600-normal.woff2') format('woff2')}
+@font-face{font-family:'Instrument Serif';font-weight:400;font-style:normal;font-display:swap;src:url('fonts/instrument-serif-latin-400-normal.woff2') format('woff2')}
+@font-face{font-family:'Instrument Serif';font-weight:400;font-style:italic;font-display:swap;src:url('fonts/instrument-serif-latin-400-italic.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:400;font-style:normal;font-display:swap;src:url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:500;font-style:normal;font-display:swap;src:url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:600;font-style:normal;font-display:swap;src:url('fonts/jetbrains-mono-latin-600-normal.woff2') format('woff2')}
+/* The NOUS and Remiel Sentinel look: near-black navy, a teal glow behind glass spheres, serif headlines in amber,
+   monospaced capitals for labels, neon-outlined tags, and true-red outlines for Help. */
+:root{
+  color-scheme:dark;
+  --bg:#06090f; --panel:rgba(14,19,32,.86); --panel2:#111827; --well:#0b1020;
+  --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.16);
+  --ink:#e8edf7; --mut:#9aa6bd; --dim:#5d6a85;
+  --amber:#e8a24a; --amber2:#f3c27a; --gold:#C5A55A; --navy:#1A1A2E;
+  --teal:#2fd3e8; --cyan:#4fc3ff; --green:#3ee08a; --purple:#a78bfa; --red:#ff2a2a;
+  --serif:'Instrument Serif',Georgia,serif; --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --sans:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;background:radial-gradient(900px 640px at 50% 34%,rgba(24,92,120,.32),rgba(10,40,60,.12) 45%,transparent 72%),radial-gradient(700px 500px at 50% 120%,rgba(197,165,90,.07),transparent 70%),var(--bg)}
+#app{max-width:560px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+/* header, NOUS-style: glass emblem, italic serif wordmark, monospaced strapline */
+.brand{display:flex;align-items:center;gap:12px;margin:6px 0 4px}
+.brand .orb{width:44px;height:44px;border-radius:12px;background:radial-gradient(circle at 50% 38%,#bff4ff,#2fb9e0 38%,#0b3550 72%,#08131f);box-shadow:0 0 0 1px rgba(79,195,255,.35),0 0 22px rgba(47,211,232,.45);position:relative}
+.brand .orb::after{content:"";position:absolute;inset:9px;border-radius:50%;border:1.5px solid rgba(255,255,255,.55);box-shadow:0 0 10px rgba(255,255,255,.4) inset}
+.brand .wm{font-family:var(--serif);font-style:italic;font-size:30px;line-height:1;letter-spacing:.01em}
+.brand .wm b{font-weight:400;color:var(--mut);font-size:20px;font-style:normal;font-family:var(--mono);letter-spacing:.12em;margin-right:6px}
+.brand .sp{flex:1}
+.strap{font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:#7c6fd6;text-transform:uppercase;margin:0 0 18px 56px}
+h1{font-family:var(--serif);font-weight:400;font-size:34px;line-height:1.12;margin:8px 0 12px;color:var(--amber2)}
+h2{font-family:var(--mono);font-size:11.5px;font-weight:500;color:#cfd8ea;letter-spacing:.24em;text-transform:uppercase;margin:24px 4px 10px}
+p{color:var(--mut);line-height:1.55;margin:6px 0 12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 12px;backdrop-filter:blur(10px)}
+.card.gold{border-color:rgba(232,162,74,.45);box-shadow:-3px 0 0 0 var(--amber) inset,0 0 0 1px rgba(232,162,74,.12),0 10px 40px rgba(232,162,74,.08)}
+.row{display:flex;align-items:center;gap:12px}.row .grow{flex:1;min-width:0}
+/* buttons: Sentinel's round pills, NOUS's neon-outlined actions, a gold primary */
+.btn{appearance:none;border:1px solid var(--line2);background:rgba(20,28,46,.82);color:var(--ink);border-radius:999px;padding:13px 20px;font:inherit;font-weight:600;font-size:16px;cursor:pointer;min-height:52px;touch-action:manipulation;box-shadow:0 0 0 1px rgba(79,195,255,.06),0 6px 18px rgba(0,0,0,.35)}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:linear-gradient(180deg,#f0c67e,#d39a45);color:#1A1A2E;border-color:transparent;box-shadow:0 0 0 1px rgba(255,214,150,.4),0 8px 26px rgba(232,162,74,.32)}
+.btn.next{outline:2px solid var(--amber2);outline-offset:3px}
+.btn.neon{background:rgba(62,224,138,.08);border-color:rgba(62,224,138,.55);color:#8ff0bd;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;border-radius:10px}
+.btn.cyan{background:rgba(79,195,255,.08);border-color:rgba(79,195,255,.55);color:#9fdcff;font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;border-radius:10px}
+.btn.red{background:transparent;border:1.5px solid var(--red);color:var(--red);font-family:var(--mono);font-size:13px;letter-spacing:.14em;text-transform:uppercase;box-shadow:none}
+.btn.wide{width:100%}.btn.sm{min-height:40px;padding:8px 14px;font-size:14px}
+.btn.on{background:rgba(62,224,138,.12);border-color:var(--green);color:#bff6d6}
+.x{appearance:none;background:none;border:0;color:var(--mut);font-size:26px;line-height:1;width:44px;height:44px;cursor:pointer}
+.big{font-size:19px;min-height:74px;border-radius:22px}
+.help{display:block;width:100%;min-height:150px;border-radius:28px;border:2.5px solid var(--red);background:transparent;color:var(--red);font-family:var(--mono);font-size:36px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;cursor:pointer;position:relative;overflow:hidden;touch-action:none;box-shadow:0 0 30px rgba(255,42,42,.18),0 0 0 1px rgba(255,42,42,.15) inset}
+.help small{display:block;font-family:var(--sans);font-size:15px;font-weight:500;color:#ff8b8b;margin-top:8px;letter-spacing:0;text-transform:none}
+.help .fill{position:absolute;left:0;bottom:0;height:100%;width:0;background:rgba(255,42,42,.22);pointer-events:none}
+.choice{display:grid;grid-template-columns:1fr;gap:12px}
+.moods{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.moods .btn{min-height:88px;font-size:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:18px}
+.moods i{font-style:normal;font-size:26px}
+.item{display:flex;align-items:center;gap:12px;padding:13px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item .t{font-weight:600}.item .s.plain{font-family:var(--sans);letter-spacing:0}.item .s{color:var(--mut);font-size:13px;margin-top:3px;font-family:var(--mono);letter-spacing:.04em}
+/* tags, NOUS-style: monospaced capitals in a neon outline */
+.pill{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px;border-radius:5px;border:1px solid var(--line2);color:var(--mut);background:rgba(255,255,255,.03)}
+.pill.done{color:var(--green);border-color:rgba(62,224,138,.55);background:rgba(62,224,138,.08)}
+.pill.due{color:var(--amber);border-color:rgba(232,162,74,.6);background:rgba(232,162,74,.08)}
+.pill.late{color:#ff6b6b;border-color:rgba(255,42,42,.6);background:rgba(255,42,42,.08)}
+.pill.cy{color:var(--cyan);border-color:rgba(79,195,255,.5);background:rgba(79,195,255,.08)}
+.pill.pu{color:var(--purple);border-color:rgba(167,139,250,.5);background:rgba(167,139,250,.08)}
+.code{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:.2em;text-align:center;color:var(--amber2);margin:10px 0;text-shadow:0 0 18px rgba(232,162,74,.35)}
+input,select{width:100%;font:inherit;font-size:17px;color:var(--ink);background:var(--well);border:1px solid var(--line2);border-radius:12px;padding:13px 14px;min-height:50px}
+input:focus,select:focus{outline:none;border-color:rgba(167,139,250,.7);box-shadow:0 0 0 3px rgba(167,139,250,.18)}
+label{display:block;font-family:var(--mono);color:var(--dim);font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin:14px 2px 7px}
+.toggle{display:flex;align-items:center;gap:12px;padding:13px 0;border-top:1px solid var(--line);cursor:pointer}
+.toggle:first-of-type{border-top:0}.toggle .grow{flex:1}
+.toggle .sw{width:52px;height:30px;border-radius:999px;background:rgba(255,255,255,.08);position:relative;flex:none;border:1px solid var(--line2)}
+.toggle .sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#cfd8ea;transition:left .15s}
+.toggle.on .sw{background:rgba(62,224,138,.32);border-color:var(--green)}.toggle.on .sw::after{left:25px;background:#3ee08a;box-shadow:0 0 10px rgba(62,224,138,.7)}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat .card{margin:0;padding:12px 14px}.stat b{display:block;font-size:17px;margin-top:6px}.stat span{font-family:var(--mono);color:var(--dim);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase}
+.ev{padding:11px 0;border-top:1px solid var(--line)}.ev:first-child{border-top:0}
+.ev .t{font-family:var(--serif);font-size:20px}.ev.l3 .t{color:#ff6b6b}.ev.l2 .t{color:var(--amber2)}.ev .s{color:var(--mut);font-size:13px;margin-top:3px;font-family:var(--mono);letter-spacing:.03em}
+/* spheres, Sentinel-style: glass with a glowing cyan ring, the person looked after ringed in gold */
+.sphere{width:68px;height:68px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:600;font-size:22px;color:#eaf6ff;letter-spacing:.04em;
+  background:radial-gradient(circle at 38% 30%,rgba(255,255,255,.35),rgba(79,195,255,.18) 30%,#0b2238 70%,#06111d);
+  box-shadow:0 0 0 3px #1d8fd6,0 0 0 6px rgba(29,143,214,.25),0 0 0 11px rgba(197,165,90,.35),0 0 28px rgba(47,211,232,.45)}
+.sphere.away{box-shadow:0 0 0 3px #1d8fd6,0 0 0 6px rgba(29,143,214,.25),0 0 22px rgba(47,211,232,.4)}
+.who{font-family:var(--serif);font-size:24px;line-height:1.1;color:#9fdcff}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(160%);background:var(--panel2);border:1px solid var(--line2);padding:12px 18px;border-radius:999px;max-width:92vw;transition:transform .25s;z-index:50}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.urgent{position:fixed;inset:0;z-index:60;background:radial-gradient(700px 500px at 50% 40%,#3a0610,#140207 70%);display:flex;flex-direction:column;justify-content:center;padding:24px;text-align:center;border:3px solid var(--red)}
+.urgent h1{font-size:40px;color:#ffd0d0}.urgent p{color:#ffb3b3;font-size:18px}
+.lang{display:flex;gap:6px}.lang .btn{min-height:34px;padding:5px 11px;font-size:12px;font-family:var(--mono);letter-spacing:.1em}
+.foot{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--dim);text-align:center;margin-top:22px}
+.hide{display:none!important}
+.mut{color:var(--mut)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="urgent"></div>
+<script>
+'use strict';
+/* Remiel: Covara. Two roles on one link: Home, the person looked after, and Away, the caregivers.
+   Built on the Remiel Sentinel account server: device accounts, the care module, alarms and push. */
+const BUILD='2026-10-19.01';
+const API=(window.COVARA_API||'https://remiel-sentinel-api.vercel.app').replace(/\/$/,'');
+const $=s=>document.querySelector(s), esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store={get(k,d){ try{ const v=localStorage.getItem('cv:'+k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem('cv:'+k, JSON.stringify(v)); }catch(e){} }};
+
+/* ---------- words, English and Italian ---------- */
+const IT={
+ 'Medicine':'Medicina','Check-in':'Controllo','Care platform':'Piattaforma di assistenza','Looking after each other, simply.':'Prendersi cura a vicenda, semplicemente.',
+ 'What is your first name?':'Come ti chiami?','Continue':'Continua',
+ 'Who is using this phone?':'Chi usa questo telefono?',
+ 'I am the person being looked after':'Sono la persona assistita','I look after someone':'Mi prendo cura di qualcuno',
+ 'Home':'Casa','Away':'Lontano','Help':'Aiuto','Hold for 2 seconds':'Tieni premuto per 2 secondi',
+ 'Help is on its way to':'L\'aiuto sta arrivando a','Your helpers have been told.':'Le persone che ti aiutano sono state avvisate.',
+ 'How are you today?':'Come stai oggi?','Good':'Bene','Okay':'Così così','Not good':'Non bene','Thank you.':'Grazie.',
+ 'Today':'Oggi','Taken':'Fatto','Done':'Fatto','Due now':'Adesso','Late':'In ritardo','Later':'Più tardi','Nothing for today.':'Niente per oggi.',
+ 'Your helpers':'Chi ti aiuta','Add a helper':'Aggiungi una persona','No helpers yet.':'Ancora nessuno.',
+ 'Show this code to your helper':'Mostra questo codice a chi ti aiuta','They type it on their phone in Covara. It works for 15 minutes.':'Lo scrive sul suo telefono in Covara. Vale 15 minuti.',
+ 'asks to look after you':'chiede di prendersi cura di te','Choose what they can see':'Scegli cosa può vedere',
+ 'Where I am':'Dove sono','Which room I am in':'In quale stanza sono','If I fall':'Se cado','My medicines and check-ins':'Le mie medicine e i controlli','How I feel':'Come mi sento','If my phone stays still too long':'Se il telefono resta fermo troppo a lungo',
+ 'Allow':'Consenti','Save':'Salva','Not now':'Non ora','Stop sharing':'Smetti di condividere','Cancel':'Annulla',
+ 'People you look after':'Persone di cui ti prendi cura','Add a person':'Aggiungi una persona','Type the 6-digit code shown on their phone':'Scrivi il codice di 6 cifre che vedi sul suo telefono',
+ 'Waiting for them to say yes on their phone.':'In attesa che dica di sì sul suo telefono.',
+ 'Last moved':'Ultimo movimento','Battery':'Batteria','Room':'Stanza','Place':'Luogo','Mood':'Umore','Not shared':'Non condiviso','Unknown':'Sconosciuto',
+ 'What happened':'Cosa è successo','Nothing yet.':'Ancora niente.','Add a medicine':'Aggiungi una medicina','Add a check-in':'Aggiungi un controllo',
+ 'Name':'Nome','Times (for example 08:00, 20:00)':'Orari (per esempio 08:00, 20:00)','Add':'Aggiungi','Back':'Indietro',
+ 'Waking hours':'Ore di veglia','From':'Dalle','To':'Alle','Alert if the phone stays still for':'Avvisa se il telefono resta fermo per','hours':'ore',
+ 'I have seen it':'Ho visto','Open':'Apri','just now':'proprio ora','minutes ago':'minuti fa','hours ago':'ore fa','days ago':'giorni fa',
+ 'Allow notifications so alerts reach you':'Consenti le notifiche così gli avvisi ti raggiungono','Turn on':'Attiva',
+ 'Sharing where I am':'Condivido dove sono','This phone is not connected. Check the internet.':'Questo telefono non è connesso. Controlla internet.',
+ 'Settings':'Impostazioni','Language':'Lingua','Change role':'Cambia ruolo','End this link':'Termina questo collegamento',
+ 'Help sent. Your helpers are being alerted now.':'Aiuto inviato. Chi ti aiuta viene avvisato ora.',
+ 'They can see':'Può vedere','nothing yet':'ancora niente','waiting for your answer':'in attesa della tua risposta',
+};
+let LANG=store.get('lang', /^it/i.test(navigator.language||'')?'it':'en');
+const T=s=>LANG==='it'&&IT[s]?IT[s]:s;
+
+/* ---------- account: a device account on the Sentinel server, healed on 401 ---------- */
+const ACC={at:store.get('at',null), rt:store.get('rt',null), uid:store.get('uid',null)};
+function rnd(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function identity(){ const name=store.get('name',''); if(!name) return false;
+  let did=store.get('did',null), sec=store.get('sec',null); if(!did){ did='cv-'+rnd(12); store.set('did',did); } if(!sec){ sec=rnd(32); store.set('sec',sec); }
+  const r=await fetch(API+'/auth/device',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device_id:did, device_secret:sec, display_name:name})});
+  if(!r.ok) return false; const j=await r.json(); ACC.at=j.access_token; ACC.rt=j.refresh_token; ACC.uid=j.user_id; store.set('at',ACC.at); store.set('rt',ACC.rt); store.set('uid',ACC.uid); return true; }
+async function refresh(){ if(!ACC.rt) return false; try{ const r=await fetch(API+'/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:ACC.rt})});
+  if(!r.ok) return false; const j=await r.json(); ACC.at=j.access_token; if(j.refresh_token) ACC.rt=j.refresh_token; store.set('at',ACC.at); store.set('rt',ACC.rt); return true; }catch(e){ return false; } }
+async function api(method, path, body){ if(!ACC.at && !(await identity())) throw new Error('offline');
+  const go=()=>fetch(API+path,{method, headers:Object.assign({'Authorization':'Bearer '+ACC.at}, body?{'Content-Type':'application/json'}:{}), body:body?JSON.stringify(body):undefined});
+  let r=await go(); if(r.status===401 && ((await refresh()) || (await identity()))) r=await go();
+  let j=null; try{ j=await r.json(); }catch(e){} return {s:r.status, j:j||{}}; }
+
+/* ---------- small helpers ---------- */
+let toastT; function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 3200); }
+const ago=t=>{ if(!t) return T('Unknown'); const m=Math.round((Date.now()-t)/60000); return m<2?T('just now'):m<90?m+' '+T('minutes ago'):m<48*60?Math.round(m/60)+' '+T('hours ago'):Math.round(m/1440)+' '+T('days ago'); };
+const hhmm=t=>new Date(t).toLocaleTimeString(LANG==='it'?'it-IT':'en-US',{hour:'2-digit',minute:'2-digit'});
+const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
+const S={view:store.get('view',null), role:store.get('role',null), links:{as_home:[],as_away:[]}, today:null, sel:null, sum:null, code:null, ask:null};
+function go(v, sel){ S.view=v; if(sel!==undefined) S.sel=sel; store.set('view',v); render(); window.scrollTo(0,0); }
+
+/* ---------- screens ---------- */
+function head(){ return '<div class="brand"><div class="orb" aria-hidden="true"></div><div class="wm"><b>REMIEL</b>Covara</div><div class="sp"></div>'+
+  '<div class="lang"><button class="btn sm'+(LANG==='en'?' on':'')+'" data-act="lang" data-k="en">EN</button><button class="btn sm'+(LANG==='it'?' on':'')+'" data-act="lang" data-k="it">IT</button></div></div><div class="strap">'+T('Care platform')+'</div>'; }
+function render(){ const a=$('#app'); let h=head();
+  if(!store.get('name','')) h+='<h1>'+T('Looking after each other, simply.')+'</h1><div class="card gold"><label for="nm">'+T('What is your first name?')+'</label><input id="nm" autocomplete="given-name" maxlength="40"><div style="height:12px"></div><button class="btn primary wide next" data-act="name">'+T('Continue')+'</button></div>';
+  else if(!S.role) h+='<h1>'+T('Who is using this phone?')+'</h1><div class="choice"><button class="btn big primary" data-act="role" data-k="home">'+T('I am the person being looked after')+'</button><button class="btn big" data-act="role" data-k="away">'+T('I look after someone')+'</button></div>';
+  else if(S.role==='home') h+=homeHTML();
+  else h+=awayHTML();
+  a.innerHTML=h; const nm=$('#nm'); if(nm) nm.focus(); bindHelp(); }
+
+function pushCard(){ if(!('Notification' in window) || Notification.permission==='granted' || store.get('pushNo',false)) return '';
+  return '<div class="card gold"><div class="row"><div class="grow"><b>'+T('Allow notifications so alerts reach you')+'</b></div><button class="x" data-act="push-no" aria-label="Close">&times;</button></div><button class="btn primary wide next" data-act="push-on">'+T('Turn on')+'</button></div>'; }
+
+const SHARE_ROWS=[['location','Where I am'],['rooms','Which room I am in'],['falls','If I fall'],['care','My medicines and check-ins'],['mood','How I feel'],['activity','If my phone stays still too long']];
+function homeHTML(){
+  if(S.view==='code') return '<div class="card gold"><div class="row"><div class="grow"><b>'+T('Show this code to your helper')+'</b></div><button class="x" data-act="home" aria-label="Close">&times;</button></div>'+
+    '<div class="code">'+esc(S.code?S.code.code.replace(/(\d{3})(\d{3})/,'$1 $2'):'......')+'</div><p>'+T('They type it on their phone in Covara. It works for 15 minutes.')+'</p><button class="btn wide" data-act="home">'+T('Done')+'</button></div>';
+  const pend=S.links.as_home.filter(l=>l.status==='pending');
+  if(S.view==='consent' && S.ask){ const l=S.ask, sh=S.askShare||{};
+    return '<div class="card gold"><div class="row"><div class="sphere away">'+esc(initials(l.away.name))+'</div><div class="grow"><div class="who">'+esc(l.away.name)+'</div><div class="mut">'+(l.status==='pending'?T('asks to look after you'):T('They can see'))+'</div></div><button class="x" data-act="home" aria-label="Close">&times;</button></div>'+
+      '<h2>'+T('Choose what they can see')+'</h2>'+SHARE_ROWS.map(([k,w])=>'<div class="toggle'+(sh[k]?' on':'')+'" data-act="share" data-k="'+k+'" role="switch" aria-checked="'+(sh[k]?'true':'false')+'" tabindex="0"><div class="grow">'+T(w)+'</div><div class="sw"></div></div>').join('')+
+      '<div style="height:14px"></div><button class="btn primary wide next" data-act="consent-save">'+(l.status==='pending'?T('Allow'):T('Save'))+'</button><div style="height:10px"></div>'+
+      '<button class="btn red wide" data-act="link-end" data-k="'+esc(l.id)+'">'+(l.status==='pending'?T('Not now'):T('Stop sharing'))+'</button></div>'; }
+  let h=pushCard();
+  pend.forEach(l=>{ h+='<div class="card gold"><div class="row"><div class="sphere away">'+esc(initials(l.away.name))+'</div><div class="grow"><b>'+esc(l.away.name)+'</b><div class="mut">'+T('asks to look after you')+'</div></div></div><div style="height:10px"></div><button class="btn primary wide next" data-act="consent" data-k="'+esc(l.id)+'">'+T('Choose what they can see')+'</button></div>'; });
+  h+='<button class="help" id="helpBtn" aria-label="'+T('Help')+'"><span class="fill"></span>'+T('Help')+'<small>'+T('Hold for 2 seconds')+'</small></button>';
+  h+='<h2>'+T('How are you today?')+'</h2><div class="moods">'+[['good','Good','☀'],['okay','Okay','⛅'],['low','Not good','☁']].map(([k,w,i])=>'<button class="btn'+(store.get('mood','')===k+':'+new Date().toDateString()?' on':'')+'" data-act="mood" data-k="'+k+'"><i aria-hidden="true">'+i+'</i>'+T(w)+'</button>').join('')+'</div>';
+  h+='<h2>'+T('Today')+'</h2><div class="card">'+todayHTML(S.today, true)+'</div>';
+  const act=S.links.as_home.filter(l=>l.status==='active');
+  h+='<h2>'+T('Your helpers')+'</h2><div class="card">'+(act.length?act.map(l=>{ const on=SHARE_ROWS.filter(([k])=>l.share[k]).map(([k,w])=>T(w)); return '<div class="item"><div class="sphere away" style="width:46px;height:46px;font-size:17px">'+esc(initials(l.away.name))+'</div><div class="grow"><div class="t">'+esc(l.away.name)+'</div><div class="s plain">'+T('They can see')+': '+esc(on.length?on.join(' · '):T('nothing yet'))+'</div></div><button class="btn sm cyan" data-act="consent" data-k="'+esc(l.id)+'">'+T('Settings')+'</button></div>'; }).join(''):'<p>'+T('No helpers yet.')+'</p>')+
+    '<div style="height:10px"></div><button class="btn wide'+(act.length?'':' primary next')+'" data-act="code">'+T('Add a helper')+'</button></div>';
+  h+='<div style="height:8px"></div><button class="btn sm" data-act="role-reset">'+T('Change role')+'</button><div class="foot">Beverly Index LLC · Remiel: Covara · '+BUILD+'</div>';
+  return h; }
+
+function todayHTML(d, mine){ if(!d) return '<p>…</p>'; if(!d.items.length) return '<p>'+T('Nothing for today.')+'</p>';
+  return d.items.map(x=>{ const st=x.state==='done'?['done','Done']:x.state==='late'?['late','Late']:x.state==='due'?['due','Due now']:['','Later'];
+    const when=x.slot==='appt'?hhmm(x.at):x.slot;
+    return '<div class="item"><div class="grow"><div class="t">'+esc(x.item.title)+'</div><div class="s">'+esc(when)+(x.item.detail?' · '+esc(x.item.detail):'')+'</div></div><span class="pill '+st[0]+'">'+T(st[1])+'</span>'+
+      (x.state!=='done'?'<button class="btn sm'+(mine&&(x.state==='due'||x.state==='late')?' primary':'')+'" data-act="mark" data-k="'+esc(x.item.id)+'" data-s="'+esc(x.slot)+'">'+T(x.item.kind==='med'?'Taken':'Done')+'</button>':'')+'</div>'; }).join(''); }
+
+function awayHTML(){
+  if(S.view==='person' && S.sel) return personHTML();
+  let h=pushCard();
+  h+='<h1>'+T('People you look after')+'</h1>';
+  const L=S.links.as_away;
+  L.forEach(l=>{ const p=l.status==='pending';
+    h+='<div class="card'+(p?'':' gold')+'"><div class="row"><div class="sphere">'+esc(initials(l.home.name))+'</div><div class="grow"><div class="who">'+esc(l.home.name)+'</div><div class="mut">'+(p?T('Waiting for them to say yes on their phone.'):'')+'</div></div>'+(p?'':'<button class="btn primary" data-act="person" data-k="'+esc(l.home.id)+'">'+T('Open')+'</button>')+'</div></div>'; });
+  h+='<div class="card'+(L.length?'':' gold')+'"><label for="cd">'+T('Type the 6-digit code shown on their phone')+'</label><input id="cd" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="123 456"><div style="height:12px"></div><button class="btn wide'+(L.length?'':' primary next')+'" data-act="claim">'+T('Add a person')+'</button></div>';
+  h+='<button class="btn sm" data-act="role-reset">'+T('Change role')+'</button><div class="foot">Beverly Index LLC · Remiel: Covara · '+BUILD+'</div>';
+  return h; }
+
+const MOOD_W={good:'Good',okay:'Okay',low:'Not good'};
+// What happened, said in the reader's language from the kind of event (the server's English title is the fallback).
+const EV_W={en:{help:'§ is asking for help',fall:'§ may have fallen',fall_ok:'§ is all right after the fall check',left_home:'§ has left home',room_long:'§ has been in one room a long time',inactive:'§\'s phone has not moved for a while',mood_low:'§ is not feeling good today',overdue:'§ has not marked an item as done',battery:'§\'s phone battery is low'},
+  it:{help:'§ chiede aiuto',fall:'§ potrebbe essere caduto',fall_ok:'§ sta bene dopo il controllo della caduta',left_home:'§ è uscito di casa',room_long:'§ è da molto tempo nella stessa stanza',inactive:'Il telefono di § è fermo da un po\'',mood_low:'§ oggi non si sente bene',overdue:'§ non ha segnato una voce come fatta',battery:'La batteria del telefono di § è scarica'}};
+const evTitle=(kind, name, fallback)=>{ const w=(EV_W[LANG]||EV_W.en)[String(kind).replace(/^care-/,'')]; return w ? w.replace('§', String(name||'').split(/\s+/)[0]) : fallback; };
+function personHTML(){ const s=S.sum, l=S.links.as_away.find(x=>x.home.id===S.sel);
+  let h='<div class="row" style="margin-bottom:8px"><button class="btn sm" data-act="away">'+T('Back')+'</button><div class="grow"></div></div>';
+  if(!s) return h+'<p>…</p>';
+  h+='<div class="card gold"><div class="row"><div class="sphere">'+esc(initials(s.home.name))+'</div><div class="grow"><div class="who" style="font-size:30px">'+esc(s.home.name)+'</div><div class="mut">'+(s.seen_at?ago(s.seen_at):T('Unknown'))+'</div></div></div></div>';
+  const ns='<b class="mut">'+T('Not shared')+'</b>';
+  h+='<div class="stat">'+
+    '<div class="card"><span>'+T('Last moved')+'</span>'+(s.activity?'<b>'+esc(ago(s.activity.moved_at))+'</b>':ns)+'</div>'+
+    '<div class="card"><span>'+T('Battery')+'</span>'+(s.activity?'<b>'+(s.activity.battery==null?T('Unknown'):s.activity.battery+'%'+(s.activity.charging?' ⚡':''))+'</b>':ns)+'</div>'+
+    '<div class="card"><span>'+T('Room')+'</span>'+(s.room!==undefined?'<b>'+esc(s.room?s.room.room:T('Unknown'))+'</b>':ns)+'</div>'+
+    '<div class="card"><span>'+T('Mood')+'</span>'+(s.mood!==undefined?'<b>'+esc(s.mood?T(MOOD_W[s.mood.mood]):T('Unknown'))+'</b>':ns)+'</div></div>';
+  if(s.location!==undefined) h+='<div class="stat" style="grid-template-columns:1fr;margin-bottom:12px"><div class="card"><span>'+T('Place')+'</span><b>'+(s.location?'<a style="color:var(--gold2)" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat='+s.location.lat+'&mlon='+s.location.lon+'#map=17/'+s.location.lat+'/'+s.location.lon+'">'+esc(s.place||(s.location.lat.toFixed(4)+', '+s.location.lon.toFixed(4)))+'</a> · '+esc(ago(s.location.at)):T('Unknown'))+'</b></div></div>';
+  h+='<h2>'+T('What happened')+'</h2><div class="card">'+(s.events.length?s.events.map(e=>'<div class="ev l'+e.level+'"><div class="t">'+esc(evTitle(e.kind, s.home.name, e.title))+'</div><div class="s">'+esc(hhmm(e.at))+' · '+esc(ago(e.at))+(e.body?' · '+esc(e.body):'')+(e.room||e.place?' · '+esc([e.room,e.place].filter(Boolean).join(', ')):'')+'</div></div>').join(''):'<p>'+T('Nothing yet.')+'</p>')+'</div>';
+  if(s.today){ h+='<h2>'+T('Today')+'</h2><div class="card">'+todayHTML(s.today, false)+'</div>';
+    h+='<div class="card"><b>'+T('Add a medicine')+' / '+T('Add a check-in')+'</b><label for="itT">'+T('Name')+'</label><input id="itT" maxlength="120"><label for="itH">'+T('Times (for example 08:00, 20:00)')+'</label><input id="itH" placeholder="08:00, 20:00"><div style="height:12px"></div>'+
+      '<div class="row"><button class="btn neon grow" data-act="item-add" data-k="med">+ '+T('Medicine')+'</button><button class="btn cyan grow" data-act="item-add" data-k="check">+ '+T('Check-in')+'</button></div></div>'; }
+  if(s.activity){ const ws=S.set||{}; h+='<div class="card"><b>'+T('Waking hours')+'</b><div class="row"><div class="grow"><label for="wS">'+T('From')+'</label><input id="wS" type="time" value="'+esc(ws.ws||'08:00')+'"></div><div class="grow"><label for="wE">'+T('To')+'</label><input id="wE" type="time" value="'+esc(ws.we||'21:00')+'"></div></div>'+
+    '<label for="wL">'+T('Alert if the phone stays still for')+'</label><select id="wL">'+[2,3,4,6].map(n=>'<option value="'+n*60+'"'+((ws.lim||180)===n*60?' selected':'')+'>'+n+' '+T('hours')+'</option>').join('')+'</select><div style="height:12px"></div><button class="btn wide" data-act="wake-save">'+T('Save')+'</button></div>'; }
+  if(l) h+='<button class="btn red wide" data-act="link-end" data-k="'+esc(l.id)+'">'+T('End this link')+'</button>';
+  return h; }
+
+/* ---------- Help: hold two seconds, so it is never sent by accident ---------- */
+function bindHelp(){ const b=$('#helpBtn'); if(!b) return; const f=b.querySelector('.fill'); let t0=0, raf=0;
+  const stop=()=>{ cancelAnimationFrame(raf); t0=0; f.style.width='0'; };
+  const step=()=>{ const p=Math.min(1,(performance.now()-t0)/2000); f.style.width=(p*100)+'%'; if(p>=1){ stop(); sendHelp(); return; } raf=requestAnimationFrame(step); };
+  b.addEventListener('pointerdown',e=>{ e.preventDefault(); t0=performance.now(); try{ navigator.vibrate&&navigator.vibrate(30); }catch(x){} raf=requestAnimationFrame(step); });
+  ['pointerup','pointerleave','pointercancel'].forEach(k=>b.addEventListener(k,stop)); }
+async function sendHelp(){ try{ navigator.vibrate&&navigator.vibrate([200,100,200]); }catch(e){}
+  // Help goes at once; where Home is follows when the phone has a position, never holding Help back.
+  const r=await api('POST','/care/events',{kind:'help', client_ref:'help-'+Date.now()}).catch(()=>null);
+  toast(r && r.s<300 ? T('Help sent. Your helpers are being alerted now.') : T('This phone is not connected. Check the internet.'));
+  if(S.links.as_home.some(l=>l.status==='active' && l.share.location)){ const p=await herePos(); if(p) api('POST','/location',{latitude:p.lat, longitude:p.lon, accuracy:p.acc}).catch(()=>null); } }
+
+/* ---------- Home's phone reports: movement, battery, mood, place ---------- */
+const MOVE={last:0, sent:0};
+function watchMotion(){ let prev=null;
+  window.addEventListener('devicemotion',e=>{ const a=e.accelerationIncludingGravity; if(!a||a.x==null) return; const v=[a.x,a.y,a.z];
+    if(prev){ const d=Math.abs(v[0]-prev[0])+Math.abs(v[1]-prev[1])+Math.abs(v[2]-prev[2]); if(d>1.2) MOVE.last=Date.now(); } prev=v; });
+  ['pointerdown','keydown','touchstart'].forEach(k=>window.addEventListener(k,()=>{ MOVE.last=Date.now(); },{passive:true})); }
+function herePos(){ return new Promise(res=>{ if(!navigator.geolocation) return res(null); navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude, lon:p.coords.longitude, acc:p.coords.accuracy}), ()=>res(null), {enableHighAccuracy:true, timeout:8000, maximumAge:60000}); }); }
+async function report(){ if(S.role!=='home' || !store.get('name','')) return; const b={tz:Intl.DateTimeFormat().resolvedOptions().timeZone};
+  if(MOVE.last) b.moved_at=MOVE.last;
+  try{ if(navigator.getBattery){ const bt=await navigator.getBattery(); b.battery=Math.round(bt.level*100); b.charging=bt.charging; } }catch(e){}
+  await api('POST','/care/state',b).catch(()=>null);
+  if(S.links.as_home.some(l=>l.status==='active' && l.share.location)){ const p=await herePos(); if(p) await api('POST','/location',{latitude:p.lat, longitude:p.lon, accuracy:p.acc, continuous:true}).catch(()=>null); } }
+
+/* ---------- data ---------- */
+async function load(){ try{
+  const r=await api('GET','/care/links'); if(r.s===200) S.links=r.j;
+  if(S.role==='home'){ const t=await api('GET','/care/today'); if(t.s===200) S.today=t.j; }
+  if(S.role==='away' && S.view==='person' && S.sel){ const s=await api('GET','/care/summary?home='+encodeURIComponent(S.sel)); if(s.s===200) S.sum=s.j; else if(s.s===404){ S.sum=null; S.view='list'; } }
+  await alarmsPoll();
+  }catch(e){} render(); }
+
+/* ---------- alarms: an urgent one takes the whole screen until someone answers ---------- */
+async function alarmsPoll(){ if(S.role!=='away') return; const r=await api('GET','/alarms?state=open').catch(()=>null); if(!r||r.s!==200) return;
+  const a=(r.j.alarms||[]).filter(x=>/^care-/.test(x.kind) && x.owner_id===ACC.uid).sort((x,y)=>y.level-x.level)[0];
+  const box=$('#urgent'); if(!a || a.level<3){ box.innerHTML=''; return; }
+  box.innerHTML='<div class="urgent" role="alertdialog" aria-live="assertive"><h1>'+esc(evTitle(a.kind, a.member_name||a.raised_by_name, a.title))+'</h1><p>'+esc(a.body||'')+'</p><p>'+esc(hhmm(a.created_at))+'</p><div style="height:18px"></div>'+
+    '<button class="btn primary big wide" data-act="ack" data-k="'+a.id+'">'+T('I have seen it')+'</button><div style="height:10px"></div>'+(a.member_ref?'<button class="btn big wide" data-act="person" data-k="'+esc(a.member_ref)+'">'+T('Open')+'</button>':'')+'</div>';
+  try{ navigator.vibrate&&navigator.vibrate([400,200,400,200,400]); }catch(e){} }
+
+/* ---------- push ---------- */
+const b64=s=>{ const p='='.repeat((4-s.length%4)%4), b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from([...b].map(c=>c.charCodeAt(0))); };
+async function pushOn(){ try{ const perm=await Notification.requestPermission(); if(perm!=='granted') return render();
+  const reg=await navigator.serviceWorker.ready; const k=await api('GET','/push/vapid-key'); if(k.s!==200) return render();
+  const sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64(k.j.publicKey)}); const j=sub.toJSON();
+  await api('POST','/push/subscribe',{endpoint:j.endpoint, keys:j.keys}); }catch(e){} render(); }
+
+/* ---------- taps ---------- */
+document.addEventListener('click', async e=>{ const el=e.target.closest('[data-act]'); if(!el) return; const k=el.dataset.k;
+  switch(el.dataset.act){
+    case 'lang': LANG=k; store.set('lang',k); document.documentElement.lang=k; render(); break;
+    case 'name': { const v=($('#nm').value||'').trim(); if(!v) return $('#nm').focus(); store.set('name',v); identity(); render(); break; }
+    case 'role': S.role=k; store.set('role',k); S.view=k==='home'?'home':'list'; store.set('view',S.view); render(); load(); break;
+    case 'role-reset': S.role=null; store.set('role',null); render(); break;
+    case 'home': go('home'); load(); break;
+    case 'away': S.sum=null; go('list'); load(); break;
+    case 'code': { const r=await api('POST','/care/code').catch(()=>null); if(!r||r.s!==201) return toast(T('This phone is not connected. Check the internet.')); S.code=r.j; go('code'); break; }
+    case 'consent': { const l=S.links.as_home.find(x=>x.id===k); if(!l) return; S.ask=l; S.askShare=Object.assign({}, l.status==='pending'?{falls:1, care:1, activity:1}:l.share); go('consent'); break; }
+    case 'share': S.askShare[k]=S.askShare[k]?0:1; render(); break;
+    case 'consent-save': { const l=S.ask; const r=await api('PUT','/care/links/'+l.id,{approve:true, share:S.askShare}); if(r.s===200){ go('home'); load(); } break; }
+    case 'link-end': await api('DELETE','/care/links/'+k); S.sum=null; go(S.role==='home'?'home':'list'); load(); break;
+    case 'mood': { await api('POST','/care/state',{mood:k}); store.set('mood',k+':'+new Date().toDateString()); toast(T('Thank you.')); render(); break; }
+    case 'mark': { const r=await api('POST','/care/items/'+k+'/mark',{slot:el.dataset.s}); if(r.s===200){ if(S.role==='home') S.today=r.j; else if(S.sum) S.sum.today=r.j; render(); } break; }
+    case 'claim': { const v=($('#cd').value||'').replace(/\D/g,''); if(v.length!==6) return $('#cd').focus(); const r=await api('POST','/care/claim',{code:v}); if(r.s<300){ load(); } else toast(r.j.detail||T('This phone is not connected. Check the internet.')); break; }
+    case 'person': $('#urgent').innerHTML=''; S.sum=null; go('person', k); load(); break;
+    case 'item-add': { const t=($('#itT').value||'').trim(), times=($('#itH').value||'').split(/[ ,;]+/).map(x=>x.trim()).filter(Boolean).map(x=>/^\d:\d\d$/.test(x)?'0'+x:x);
+      if(!t) return $('#itT').focus(); const r=await api('POST','/care/items',{home:S.sel, kind:k, title:t, times}); if(r.s===201) load(); else toast(r.j.detail||''); break; }
+    case 'wake-save': { const m=v=>{ const [h,mi]=String(v).split(':').map(Number); return h*60+mi; }; const ws=$('#wS').value, we=$('#wE').value, lim=Number($('#wL').value);
+      const r=await api('PUT','/care/settings',{home:S.sel, wake_start:m(ws), wake_end:m(we), still_limit:lim}); if(r.s===200){ S.set={ws, we, lim}; toast(T('Save')+' ✓'); } break; }
+    case 'ack': await api('POST','/alarms/'+k+'/ack'); $('#urgent').innerHTML=''; load(); break;
+    case 'push-on': pushOn(); break;
+    case 'push-no': store.set('pushNo',true); render(); break;
+  } });
+document.addEventListener('keydown',e=>{ const t=e.target.closest&&e.target.closest('.toggle'); if(t && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); t.click(); } });
+
+/* ---------- start ---------- */
+document.documentElement.lang=LANG;
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+navigator.serviceWorker && navigator.serviceWorker.addEventListener('message',e=>{ if(e.data && (e.data.type==='PUSH_RECEIVED'||e.data.type==='NOTIFICATION_CLICK')) load(); });
+watchMotion(); render(); load();
+setInterval(load, 30000); setInterval(report, 120000); setTimeout(report, 4000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ MOVE.last=Date.now(); load(); report(); } });
+</script>
+</body>
+</html>
