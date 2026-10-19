@@ -16423,6 +16423,7 @@ function rebuildNodeTargets() {
 /* The name under a sphere: the surname, which tells teammates apart; the
    first name when there is no surname. */
 function sphereLabel(c) {
+  if (c && c.cvItem) return c.cvTitle || ''; /* Covara: a medicine or a visit is named in full */
   var l = c && c.last ? String(c.last).trim() : '';
   return l || (c && c.first ? String(c.first).trim() : '');
 }
@@ -16441,6 +16442,8 @@ function buildNodes(fresh) {
   /* ── SentinelViews filter: only show contacts in active view ── */
   var _viewFilter = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
   var _source = _viewFilter ? DEMO_CONTACTS.filter(function(c) { return _viewFilter.has(c.id) || _viewFilter.has(String(c.id)); }) : DEMO_CONTACTS;
+  /* Covara: HOME's things to do orbit as spheres; on AWAY's phone HOME is the centre */
+  try { if (window.CovaraView) _source = window.CovaraView.source(_source); } catch (e) {}
 
   const N = _source.length;
   const smaller = Math.min(CV.width / DPR, CV.height / DPR);
@@ -16770,6 +16773,7 @@ function enterNetwork() {
 }
 
 function enterDetail(contact, sphereScreenY) {
+  try { if (contact && contact.cvItem && window.CovaraView && window.CovaraView.openNode(contact)) return; } catch (e) {}
   selectedContact = contact;
   /* Stay in network mode — BLUF opens as overlay on galaxy */
   openBluf(sphereScreenY);
@@ -22253,7 +22257,7 @@ const Comm = (() => {
     let show = false;
     try {
       show = !!(focusedContactId && appState === 'network' && window._dreamRect &&
-                !(blufOpen && window.innerWidth < 700));
+                !(blufOpen && window.innerWidth < 700)) && !/^cvi:/.test(String(focusedContactId));
     } catch (e) { show = false; }
     if (!show) {
       if (!el.hidden) { el.hidden = true; }
@@ -26592,11 +26596,13 @@ var RosterImport = (function() {
 })();
 
 function getContactHeadline(contact) {
+  if (contact && contact.cvItem) return contact.cvHeadline || '';
   return SentinelHeadlines.get(contact);
 }
 
 /* ── Quick-action icon drawing for focused spheres ── */
 function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
+  if (contact && contact.cvItem) return; /* Covara: a medicine or a visit has no Video or Phone */
   /* Modern action labels — vertically stacked beside the focused sphere */
   var labelFs = Math.max(10, Math.round(12 * s));
   var lineH = Math.max(22, Math.round(26 * s));
@@ -27823,11 +27829,16 @@ function onPressEnd(e) {
     /* Whole-press travel, not just the final displacement */
     const _totalDist = _pressMaxDist;
 
+    /* Covara: the pills beside HOME's centre sphere */
+    if (pressStarted && !netDragging && _totalDist < NET_DRAG_THRESHOLD && window.CovaraView) {
+      let _cvHit = false; try { _cvHit = window.CovaraView.hitCentre(clientX, clientY); } catch (e) {}
+      if (_cvHit) { pressStarted = false; netDragging = false; stage.classList.remove('pressing'); return; }
+    }
     /* ── Quick-action icon tap: only for a real tap (total drag < 8px) ── */
     if (pressStarted && !netDragging && focusedContactId && _totalDist < NET_DRAG_THRESHOLD) {
       if (focusedContactId) {
         const _qaNode = NODES.find(n => n.contact.id === focusedContactId);
-        if (_qaNode) {
+        if (_qaNode && !_qaNode.contact.cvItem) {
           const _qaP = projectNode(_qaNode);
           const _qaS = _qaP.scale;
           const _qaMul = FOCUS_SCALE;
@@ -27895,8 +27906,8 @@ function onPressEnd(e) {
           sphereTapTimer = null;
           sphereTapTarget = null;
           if (hit.isCenter) {
-            selectedContact = null;
-            openBluf(sphereBottomY);
+            let _cvD = false; try { _cvD = !!(window.CovaraView && window.CovaraView.centreDouble()); } catch (e) {}
+            if (!_cvD) { selectedContact = null; openBluf(sphereBottomY); }
           } else {
             enterDetail(hit.node.contact, sphereBottomY);
           }
@@ -27916,8 +27927,9 @@ function onPressEnd(e) {
             var _tapWasCenter = sphereTapTarget && sphereTapTarget.isCenter;
             sphereTapTarget = null;
             if (_tapWasCenter) {
-              /* Center sphere tap → open Circle Views panel */
-              SentinelViews.openPanel();
+              /* Center sphere tap → open Circle Views panel (Covara: HOME at the centre of AWAY's phone stays put) */
+              let _cvS = false; try { _cvS = !!(window.CovaraView && window.CovaraView.centreSingle()); } catch (e) {}
+              if (!_cvS) SentinelViews.openPanel();
             } else {
               /* Contact sphere stays focused/enlarged */
               /* Resume gentle spin after focus */
@@ -29466,7 +29478,7 @@ function drawNetworkView(t) {
     /* COMMUNICATION | WHEREIS: the small toggle line under the member's picture */
     var _dreamWhere = false;
     try {
-      if (typeof WhereIs !== 'undefined') {
+      if (typeof WhereIs !== 'undefined' && !(_focNode && _focNode.contact.cvItem)) {
         /* The focused sphere's action pills (Video, Phone, Message, Email) must stay clear of the line */
         var _tgAvoid = null;
         try {
@@ -29941,7 +29953,7 @@ function drawNetworkView(t) {
     }
 
     /* Urgency label for sev 0 or 1 */
-    if (isUrgent && s > 0.38 && node._lblName !== 0.28) {
+    if (isUrgent && s > 0.38 && node._lblName !== 0.28 && !node.contact.cvItem) {
       ctx.globalAlpha = (0.55 + 0.35 * pulseA) * (alphaOverride || 1);
       ctx.font = `600 ${Math.round(9 * s)}px "Hanken Grotesk", system-ui, sans-serif`;
       ctx.fillText(sevLabel(node.contact.sev).toLowerCase(), sx, _roleTxt ? _roleY + 12 : sy + r + 24 * s);
@@ -30020,6 +30032,18 @@ function drawNetworkView(t) {
 
   ctx.globalCompositeOperation = 'source-over';
 
+  /* Covara: on AWAY's phone HOME is the centre sphere: HOME's name and picture */
+  let _cvc = null; try { if (window.CovaraView) _cvc = window.CovaraView.centre(); } catch (e) {}
+  if (_cvc && _cvc.frame && _cvc.w > 0 && _cvc.h > 0) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, cr * 0.82, 0, Math.PI * 2); ctx.clip();
+    ctx.globalAlpha = 1.0;
+    PhotoFit.draw(ctx, _cvc.frame, _cvc.w, _cvc.h, cx, cy, cr * 0.82, null);
+    const _cvVig = ctx.createRadialGradient(cx, cy, cr * 0.35, cx, cy, cr * 0.84);
+    _cvVig.addColorStop(0, 'rgba(0,0,0,0)'); _cvVig.addColorStop(0.72, 'rgba(4,2,10,0.25)'); _cvVig.addColorStop(0.88, 'rgba(4,2,10,0.65)'); _cvVig.addColorStop(1, 'rgba(4,2,10,0.95)');
+    ctx.fillStyle = _cvVig; ctx.fillRect(cx - cr, cy - cr, cr * 2, cr * 2);
+    ctx.restore();
+  } else if (!_cvc) {
   /* Media (photo/video) clipped inside the center sphere — always draw from mediaFrame */
   /* Fallback: if media loaded but mediaFrame was never captured, build it now */
   if (!mediaFrame && media) {
@@ -30064,8 +30088,9 @@ function drawNetworkView(t) {
     ctx.restore();
   }
 
+  } /* end own media (Covara) */
   /* Glass-orb lighting on my own sphere */
-  try { drawOrbLight(ctx, cx, cy, cr, uc, 1, !!mediaFrame); } catch (e) {}
+  try { drawOrbLight(ctx, cx, cy, cr, uc, 1, _cvc ? !!_cvc.frame : !!mediaFrame); } catch (e) {}
 
   /* Inner energy ring (category), enhanced by BioMotion. Ring state comes from
      Biometrics.getRingState: heart rate works even when motion is off. */
@@ -30134,8 +30159,8 @@ function drawNetworkView(t) {
   }
 
   /* User initials (only if no media loaded) */
-  if (!mediaFrame) {
-    const userInit = (userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0,2) || 'ME';
+  if (_cvc ? !_cvc.frame : !mediaFrame) {
+    const userInit = ((_cvc && _cvc.name) || userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0,2) || 'ME';
     ctx.fillStyle = `rgba(10,8,20,0.88)`;
     ctx.font = `bold ${Math.round(cr * 0.5)}px "Hanken Grotesk", system-ui, sans-serif`;
     ctx.textAlign = 'center';
@@ -30150,7 +30175,9 @@ function drawNetworkView(t) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   const _nameY = cy + centerR * 1.1 + 6; /* fixed position based on unbreathed centerR */
-  ctx.fillText(userSphereName || 'You', cx, _nameY);
+  ctx.fillText((_cvc && _cvc.name) || userSphereName || 'You', cx, _nameY);
+  /* Covara: Appointments, Medications, Subscriptions (and Video, Phone, Message, Email on AWAY's phone) */
+  try { if (window.CovaraView) window.CovaraView.drawCentre(ctx, cx, cy, centerR, t); } catch (e) {}
   ctx.textBaseline = 'alphabetic';
 
   /* ── Circle Aggregate HUD — only on center sphere (command center) ── */
@@ -45446,6 +45473,6 @@ try { _resolveAppScriptReady(); } catch (e) {}
   <!-- Hidden host for GIF images so browser keeps animating them for canvas -->
   <div id="gifAnimationHost"></div>
   <script src="covara-care.js" defer></script>
-  <script src="covara-today.js" defer></script>
+  <script src="covara-view.js" defer></script>
 </body>
 </html>

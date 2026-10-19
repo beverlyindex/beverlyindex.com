@@ -1,15 +1,20 @@
-/* Remiel: Covara, module 2: Appointments, Medications, Subscriptions.
-   A floating list on the left of HOME's sphere. On HOME's phone it is
-   always there; on AWAY's phone it appears while HOME's sphere is in focus
-   and HOME shares their care. Every medicine is shown by its own name and
-   the photo HOME took of it. A row fades in when it is due and fades out
-   once it is done.
+/* Remiel: Covara, the care galaxy.
+   HOME's appointments, medicines and subscriptions are spheres in the
+   Sentinel galaxy, drawn by Sentinel's own sphere code and joined to HOME.
+   On HOME's phone HOME is the centre sphere; on AWAY's phone HOME takes the
+   centre and AWAY looks at HOME and what needs to be done. Beside HOME's
+   sphere: Appointments, Medications, Subscriptions on the left; on AWAY's
+   phone Video, Phone, Message, Email on the right, in Sentinel's pills.
+   A medicine sphere carries the photo HOME took of it. It comes forward
+   when it is due, its photo fills the dream picture, and once it is taken
+   it leaves the circle.
    Beverly Index LLC */
 (function () {
   'use strict';
   var STR = {
     en: {
-      appts: 'Appointments', meds: 'Medications', subs: 'Subscriptions',
+      appts: 'Appointments', meds: 'Medications', subs: 'Subscriptions', video: 'Video', phone: 'Phone', message: 'Message', email: 'Email',
+      takeNow: 'TAKE NOW', lateAt: 'LATE', atT: 'AT', renewsU: 'RENEWS', takenU: 'TAKEN', doneU: 'DONE',
       add: 'Add', addMed: 'Add a medicine', addAppt: 'Add an appointment', addSub: 'Add a subscription',
       now: 'Now', late: 'Late', later: 'Later', taken: 'Taken', done: 'Done', today: 'Today', tomorrow: 'Tomorrow',
       renews: 'Renews', nothing: 'Nothing for today yet',
@@ -23,7 +28,8 @@
       failed: 'Could not save. Check the internet and try again.', saving: 'Saving'
     },
     it: {
-      appts: 'Appuntamenti', meds: 'Medicine', subs: 'Abbonamenti',
+      appts: 'Appuntamenti', meds: 'Medicine', subs: 'Abbonamenti', video: 'Video', phone: 'Telefono', message: 'Messaggio', email: 'Email',
+      takeNow: 'DA PRENDERE ORA', lateAt: 'IN RITARDO', atT: 'ALLE', renewsU: 'RINNOVO', takenU: 'PRESA', doneU: 'FATTO',
       add: 'Aggiungi', addMed: 'Aggiungi una medicina', addAppt: 'Aggiungi un appuntamento', addSub: 'Aggiungi un abbonamento',
       now: 'Ora', late: 'In ritardo', later: 'Dopo', taken: 'Presa', done: 'Fatto', today: 'Oggi', tomorrow: 'Domani',
       renews: 'Rinnovo', nothing: 'Ancora niente per oggi',
@@ -65,40 +71,7 @@
     return 'radial-gradient(circle at 34% 28%,#fff 0,hsl(' + h + ',90%,82%) 10%,hsl(' + h + ',80%,55%) 45%,hsl(' + h + ',75%,26%) 100%)';
   }
 
-  var css = '' +
-    '#cvToday{position:fixed;left:24px;top:310px;width:300px;max-height:max(220px,calc(100vh - 500px));-webkit-mask-image:linear-gradient(#000 88%,transparent);mask-image:linear-gradient(#000 88%,transparent);padding-bottom:18px;overflow:hidden auto;z-index:60;pointer-events:none;font-family:"Hanken Grotesk",system-ui,sans-serif;color:#e8eef8;opacity:0;transform:translateX(-12px);transition:opacity .5s ease,transform .5s ease;scrollbar-width:none}' +
-    '#cvToday::-webkit-scrollbar{display:none}' +
-    '#cvToday.show{opacity:1;transform:none}#cvToday.show>*{pointer-events:auto}' +
-    'body.rs-overlay-open #cvToday,body.cv-asking #cvToday{opacity:0 !important;pointer-events:none}' +
-    '.cvt-sec{margin:0 0 14px}' +
-    '.cvt-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 6px;padding-left:4px}' +
-    '.cvt-hd b{font:600 11px "JetBrains Mono",monospace;letter-spacing:.18em;color:#5fd0ff;text-transform:uppercase}' +
-    '.cvt-add{background:none;border:0;color:#8ea3bf;font:600 12px "Hanken Grotesk",sans-serif;cursor:pointer;padding:4px 6px;border-radius:8px}' +
-    '.cvt-add:hover{color:#eaf9ff}.cvt-add:focus-visible{outline:2px solid #C5A55A}' +
-    '.cvt-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:linear-gradient(90deg,rgba(14,22,36,.88),rgba(14,22,36,.55));border:1px solid rgba(255,255,255,.07);border-radius:28px;padding:5px 14px 5px 5px;margin:0 0 6px;color:inherit;font:inherit;cursor:pointer;' +
-      'animation:cvtIn .6s ease both;transition:opacity .9s ease,max-height .9s ease,margin .9s ease,padding .9s ease;max-height:80px;overflow:hidden}' +
-    '@keyframes cvtIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}' +
-    '.cvt-row.gone{opacity:0;max-height:0;margin:0;padding-top:0;padding-bottom:0;border-width:0}' +
-    '.cvt-row:focus-visible{outline:2px solid #C5A55A}' +
-    '.cvt-ph{flex:0 0 auto;width:42px;height:42px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(120,200,255,.25),inset 0 -6px 12px rgba(0,0,0,.35)}' +
-    '.cvt-tx{min-width:0;flex:1}' +
-    '.cvt-nm{display:block;font-weight:700;font-size:15px;color:#f3f8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '.cvt-sb{display:block;font-size:12px;color:#8ea3bf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '.cvt-st{flex:0 0 auto;font:600 10px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:#8ea3bf}' +
-    '.cvt-row.due{border-color:rgba(255,200,90,.6);box-shadow:0 0 22px rgba(255,190,60,.22)}.cvt-row.due .cvt-st{color:#ffd27a}' +
-    '.cvt-row.due .cvt-ph{box-shadow:0 0 0 2px #ffcc66,0 0 16px rgba(255,190,60,.6)}' +
-    '.cvt-row.late{border-color:rgba(248,113,113,.65);box-shadow:0 0 22px rgba(248,113,113,.22)}.cvt-row.late .cvt-st{color:#fca5a5}' +
-    '.cvt-row.late .cvt-ph{box-shadow:0 0 0 2px #f87171,0 0 16px rgba(248,113,113,.6)}' +
-    '.cvt-row.done{opacity:.55}.cvt-row.done .cvt-st{color:#86efac}' +
-    '.cvt-empty{font-size:13px;color:#8ea3bf;padding:4px}' +
-    '.cvt-addtile{display:none}' +
-    /* phones: one row of pictures above the bottom buttons, swiped sideways */
-    '@media (max-width:700px){#cvToday{left:0;right:0;top:auto;bottom:178px;width:auto;max-height:none;display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:4px 12px 6px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 24px),transparent);scroll-snap-type:x proximity}' +
-      '.cvt-sec{display:contents}.cvt-hd{display:none}' +
-      '.cvt-row{flex:0 0 80px;flex-direction:column;gap:4px;text-align:center;padding:6px 3px 6px;border-radius:20px;max-height:none;margin:0;scroll-snap-align:start;background:rgba(10,16,28,.82)}' +
-      '.cvt-ph{width:48px;height:48px}.cvt-tx{width:100%}.cvt-nm{font-size:12px}.cvt-sb{font-size:10.5px}.cvt-st{font-size:9px}' +
-      '.cvt-row.gone{flex-basis:0;padding:0;opacity:0}' +
-      '.cvt-addtile{display:flex;flex:0 0 80px;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:20px;border:1px dashed rgba(95,208,255,.45);background:rgba(10,16,28,.6);color:#5fd0ff;font:600 12.5px "Hanken Grotesk",sans-serif;cursor:pointer}}' +
+  var css = ''+
     /* the add and detail sheets */
     '.cvt-f{display:flex;flex-direction:column;gap:12px;text-align:left;margin-top:16px}' +
     '.cvt-f label{font:600 11px "JetBrains Mono",monospace;letter-spacing:.14em;color:#5fd0ff;text-transform:uppercase}' +
@@ -115,78 +88,194 @@
     '.cvt-big{width:min(220px,60vw);aspect-ratio:1;border-radius:50%;margin:6px auto 4px;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(120,200,255,.35),0 0 60px rgba(56,189,248,.35)}';
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
-  var box = document.createElement('div'); box.id = 'cvToday'; box.setAttribute('aria-live', 'polite');
-  document.body.appendChild(box);
 
-  /* Whose care is on screen: HOME's own on HOME's phone; the focused HOME on AWAY's phone. */
+  /* ── whose care: HOME's own on HOME's phone, the linked HOME on AWAY's ── */
+  function homeContact() {
+    if (role() !== 'away' || typeof DEMO_CONTACTS === 'undefined') return null;
+    return DEMO_CONTACTS.filter(function (c) { return c.care && c.care.side === 'home' && c.care.state === 'active'; })[0] || null;
+  }
   function subject() {
-    if (role() === 'home') return { home: null, edit: true, name: '' };
-    var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
-    if (f == null || typeof DEMO_CONTACTS === 'undefined') return null;
-    var c = DEMO_CONTACTS.filter(function (x) { return x.id === f; })[0];
-    if (!c || !c.care || c.care.side !== 'home' || c.care.state !== 'active' || !(c.care.share && c.care.share.care)) return null;
-    return { home: c.care.userId, edit: true, name: c.first };
+    if (role() === 'home') return { home: null, edit: true };
+    var h = homeContact();
+    if (!h) return null;
+    return { home: h.care.userId, edit: !!(h.care.share && h.care.share.care), contact: h };
   }
   function q(s) { return s && s.home ? '?home=' + encodeURIComponent(s.home) : ''; }
 
-  var _data = null, _key = '', _busy = false, _gone = {};
-  async function load(force) {
+  var _data = null, _busy = false, _filter = '', _nodes = [], _sig = '';
+  async function load() {
     var s = subject();
-    var key = s ? (s.home || 'me') : '';
-    if (!s || !authed()) { _data = null; _key = ''; paint(); return; }
+    if (!s || !authed()) { if (_data) { _data = null; rebuild(); } return; }
+    if (!s.edit && s.home) { _data = { s: s, today: { items: [] }, items: [] }; rebuild(); return; }
     if (_busy) return; _busy = true;
     try {
       var a = await api('/care/today' + q(s)), b = await api('/care/items' + q(s));
-      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [] }; _key = key; }
+      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [] }; rebuild(); }
     } catch (e) {} finally { _busy = false; }
-    paint();
   }
 
-  function row(o) {
-    var ph = o.photo ? 'background-image:url("' + photoUrl(o.photo).replace(/["\\]/g, '') + '")' : 'background:' + orbOf(o.title);
-    return '<button class="cvt-row ' + o.cls + '" data-id="' + esc(o.id) + '" data-slot="' + esc(o.slot || '') + '">' +
-      '<span class="cvt-ph" style="' + esc(ph) + '"></span>' +
-      '<span class="cvt-tx"><span class="cvt-nm">' + esc(o.title) + '</span><span class="cvt-sb">' + esc(o.sub) + '</span></span>' +
-      '<span class="cvt-st">' + esc(o.state) + '</span></button>';
+  /* ── photos go into Sentinel's own photo map, so its sphere code draws them ── */
+  var _img = {};
+  function photoFor(id, url) {
+    if (!url || typeof contactPhotos === 'undefined') return;
+    var o = _img[url];
+    if (o && o.ok) { contactPhotos.set(id, o.ph); return; }
+    if (o) { o.ids[id] = 1; return; }
+    o = _img[url] = { ok: false, ids: {} }; o.ids[id] = 1;
+    var im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = function () { o.ok = true; o.ph = { img: im, w: im.naturalWidth, h: im.naturalHeight }; Object.keys(o.ids).forEach(function (k) { contactPhotos.set(k, o.ph); }); };
+    im.src = url;
   }
-  function section(key, rows, kind) {
-    var add = _data && _data.s.edit ? '<button class="cvt-add" data-add="' + kind + '">' + esc(t('add')) + '</button>' : '';
-    return '<div class="cvt-sec"><div class="cvt-hd"><b>' + esc(t(key)) + '</b>' + add + '</div>' + (rows.join('') || '') + '</div>';
+
+  /* ── one sphere per thing to do ── */
+  var CAT = { med: 'friend', check: 'friend', appt: 'professional', sub: 'other', add: 'family' };
+  function upper(x) { return String(x || '').toUpperCase(); }
+  function whenLabel(ms) { return upper(dayLabel(ms)) + ' ' + hhmm(ms); }
+  function nodesFor(d) {
+    var out = [], now = Date.now(), f = _filter;
+    var stIn = {}; (d.today.items || []).forEach(function (x) { if (x.slot === 'appt') stIn[x.item.id] = x.state; });
+    (d.today.items || []).forEach(function (x) {
+      var k = x.item.kind; if (k !== 'med' && k !== 'check') return;
+      if (f && f !== 'med') return;
+      if (!f && x.state === 'done') return;            /* met: it leaves the circle */
+      var hl = x.state === 'late' ? t('lateAt') + ' ' + x.slot : x.state === 'due' ? t('takeNow') : x.state === 'done' ? t('takenU') : t('atT') + ' ' + x.slot;
+      out.push({ id: 'cvi:' + x.item.id + '|' + x.slot, kind: k, item: x.item, slot: x.slot, state: x.state,
+        sev: x.state === 'late' ? 0 : x.state === 'due' ? 1 : x.state === 'done' ? 4 : 3, hl: hl, role: x.item.detail || '' });
+    });
+    d.items.forEach(function (i) {
+      if (i.kind === 'appt') {
+        if (f && f !== 'appt') return;
+        if (!i.at || i.at < now - 3 * 3600e3) return;
+        if (!f && i.at > now + 7 * 864e5) return;
+        var st = stIn[i.id] || 'later'; if (!f && st === 'done') return;
+        out.push({ id: 'cvi:' + i.id + '|appt', kind: 'appt', item: i, slot: 'appt', state: st,
+          sev: st === 'due' ? 1 : i.at - now < 864e5 ? 2 : 4, hl: st === 'done' ? t('doneU') : whenLabel(i.at), role: i.detail || '' });
+      } else if (i.kind === 'sub') {
+        if (f && f !== 'sub') return;
+        if (!f && (!i.at || i.at > now + 7 * 864e5)) return;
+        out.push({ id: 'cvi:' + i.id + '|sub', kind: 'sub', item: i, slot: 'sub', state: 'later',
+          sev: i.at && i.at - now < 3 * 864e5 ? 2 : 4, hl: t('renewsU') + ' ' + upper(dayLabel(i.at)), role: i.detail || '' });
+      }
+    });
+    if (f && d.s.edit) out.push({ id: 'cvi:add|' + f, kind: 'add', add: f, sev: 4, hl: '', role: '' });
+    return out.map(function (n) {
+      var title = n.kind === 'add' ? t(n.add === 'med' ? 'addMed' : n.add === 'appt' ? 'addAppt' : 'addSub') : n.item.title;
+      var w = n.kind === 'add' ? ['\u200b', '\u200b'] : String(title).replace(/[^\p{L}\p{N}\s]/gu, '').trim().split(/\s+/);
+      var c = { id: n.id, first: w[0] || '', last: w[1] || '\u200b', cvTitle: title, cat: CAT[n.kind], sev: n.sev, phone: '', email: '', cvItem: n, cvHeadline: n.hl,
+        details: n.role ? { role: n.role } : undefined };
+      if (n.item && n.item.photo) photoFor(n.id, photoUrl(n.item.photo));
+      return c;
+    });
   }
-  function paint() {
-    var show = !!_data && (role() === 'home' ? true : !!subject());
-    try { if (show && document.getElementById('onboarding') && !document.getElementById('onboarding').hidden && getComputedStyle(document.getElementById('onboarding')).display !== 'none') show = false; } catch (e) {}
-    if (!show) { box.classList.remove('show'); return; }
-    var now = Date.now(), d = _data;
-    var stLabel = { due: t('now'), late: t('late'), later: t('later'), done: t('taken') };
-    /* appointments: the coming two weeks, today's state from /today */
-    var todayAppt = {}; (d.today.items || []).forEach(function (x) { if (x.slot === 'appt') todayAppt[x.item.id] = x.state; });
-    var appts = d.items.filter(function (i) { return i.kind === 'appt' && i.at && i.at > now - 3 * 3600e3 && i.at < now + 14 * 864e5; })
-      .sort(function (a, b) { return a.at - b.at; }).slice(0, 4).map(function (i) {
-        var s = todayAppt[i.id] || 'later'; if (s === 'done' && _gone['a' + i.id]) return '';
-        return row({ id: i.id, slot: 'appt', title: i.title, photo: i.photo, cls: s === 'due' ? 'due' : s === 'done' ? 'done' : '', sub: dayLabel(i.at) + ', ' + hhmm(i.at) + (i.detail ? ' · ' + i.detail : ''), state: s === 'done' ? t('done') : s === 'due' ? t('now') : '' });
-      });
-    var meds = (d.today.items || []).filter(function (x) { return x.item.kind === 'med' || x.item.kind === 'check'; }).map(function (x) {
-      if (x.state === 'done' && _gone[x.item.id + '|' + x.slot]) return '';
-      return row({ id: x.item.id, slot: x.slot, title: x.item.title, photo: x.item.photo, cls: x.state, sub: x.slot + (x.item.detail ? ' · ' + x.item.detail : ''), state: stLabel[x.state] || '' });
-    });
-    var subs = d.items.filter(function (i) { return i.kind === 'sub'; }).sort(function (a, b) { return (a.at || 0) - (b.at || 0); }).slice(0, 4).map(function (i) {
-      var soon = i.at && i.at - now < 3 * 864e5;
-      return row({ id: i.id, slot: 'sub', title: i.title, photo: i.photo, cls: soon ? 'due' : '', sub: t('renews') + ' ' + dayLabel(i.at) + (i.detail ? ' · ' + i.detail : ''), state: '' });
-    });
-    var html = '';
-    html += section('appts', appts, 'appt') + section('meds', meds, 'med') + section('subs', subs, 'sub');
-    if (d.s.edit) html += '<button class="cvt-addtile" data-add="med">' + esc(t('add')) + '</button>';
-    box.innerHTML = html;
-    box.querySelectorAll('[data-add]').forEach(function (b) { b.onclick = function () { openAdd(b.getAttribute('data-add')); }; });
-    box.querySelectorAll('.cvt-row').forEach(function (b) { b.onclick = function () { openItem(b.getAttribute('data-id'), b.getAttribute('data-slot')); }; });
-    /* rows already done fade out a moment after they appear */
-    box.querySelectorAll('.cvt-row.done').forEach(function (r) {
-      var k = r.getAttribute('data-slot') === 'appt' ? 'a' + r.getAttribute('data-id') : r.getAttribute('data-id') + '|' + r.getAttribute('data-slot');
-      setTimeout(function () { r.classList.add('gone'); _gone[k] = 1; }, 2500);
-    });
-    box.classList.add('show');
+  function rebuild() {
+    _nodes = _data ? nodesFor(_data) : [];
+    var sig = _nodes.map(function (c) { return c.id + ':' + c.sev + ':' + c.cvHeadline; }).join(',') + '|' + _filter + '|' + role();
+    if (sig === _sig) return;
+    _sig = sig;
+    var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
+    if (f && /^cvi:/.test(String(f)) && !_nodes.some(function (c) { return c.id === f; })) { try { focusedContactId = null; } catch (e) {} }
+    try { if (typeof buildNodes === 'function') buildNodes(false); } catch (e) {}
   }
+
+  /* What the galaxy orbits. HOME's phone: the family and HOME's things to do.
+     AWAY's phone: HOME is the centre, so HOME's things to do and any other HOME. */
+  function source(list) {
+    if (!role()) return list;
+    var h = homeContact();
+    var people = (list || []).filter(function (c) { return !(h && c.id === h.id); });
+    if (_filter) people = [];
+    return people.concat(_nodes);
+  }
+
+  /* ── HOME at the centre of AWAY's phone ── */
+  var _centrePh = { url: '', frame: null };
+  function centre() {
+    var h = homeContact(); if (!h) return null;
+    var ph = (typeof contactPhotos !== 'undefined') && contactPhotos.get(h.id);
+    return { name: ((h.first || '') + ' ' + (h.last || '')).trim(), frame: ph && ph.img ? ph.img : null, w: ph ? (ph.w || (ph.img && ph.img.naturalWidth)) : 0, h: ph ? (ph.h || (ph.img && ph.img.naturalHeight)) : 0, contact: h };
+  }
+
+  /* ── Sentinel's pills, beside HOME's sphere ── */
+  var _pillHits = [];
+  function pills(ctx, labels, keys, side, cx, cy, cr, active, t0) {
+    var W = ctx.canvas.width / (window.devicePixelRatio || 1);
+    var fs = W < 500 ? 11 : 12, lineH = W < 500 ? 24 : 26, gap = 16, px = 12, py = 5, crn = 6;
+    ctx.save();
+    ctx.font = '500 ' + fs + 'px -apple-system, system-ui, "Segoe UI", sans-serif';
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    var maxW = 0; labels.forEach(function (l) { maxW = Math.max(maxW, ctx.measureText(l).width); });
+    var pw = maxW + px * 2, ph = fs + py * 2;
+    var x = side < 0 ? cx - cr * 1.12 - gap - pw : cx + cr * 1.12 + gap;
+    if (x < 6) x = 6; if (x + pw > W - 6) x = W - 6 - pw;
+    var y0 = cy - (labels.length * lineH) / 2 + lineH / 2;
+    var fade = Math.min(1, 0.75 + 0.25 * Math.sin(t0 * 0.004));
+    for (var i = 0; i < labels.length; i++) {
+      var ly = y0 + i * lineH, on = active === keys[i];
+      ctx.globalAlpha = (on ? 0.95 : 0.72) * fade;
+      ctx.fillStyle = on ? 'rgba(20,40,64,0.95)' : 'rgba(12,14,24,0.88)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, ly - ph / 2, pw, ph, crn); else ctx.rect(x, ly - ph / 2, pw, ph);
+      ctx.fill();
+      ctx.globalAlpha = (on ? 0.9 : 0.45) * fade;
+      ctx.strokeStyle = on ? 'rgba(120,200,255,0.85)' : 'rgba(100,180,255,0.3)';
+      ctx.lineWidth = 1; ctx.stroke();
+      ctx.globalAlpha = 0.95 * fade;
+      ctx.fillStyle = on ? '#ffffff' : '#d8e8ff';
+      ctx.fillText(labels[i], x + pw / 2, ly);
+      _pillHits.push({ x: x, y: ly - lineH / 2, w: pw, h: lineH, key: keys[i] });
+    }
+    ctx.restore();
+  }
+  function drawCentre(ctx, cx, cy, cr, t0) {
+    _pillHits = [];
+    if (!role() || !subject()) return;
+    if (typeof IsoView !== 'undefined' && IsoView.active && IsoView.active()) return;
+    var s = subject();
+    if (s.edit) pills(ctx, [t('appts'), t('meds'), t('subs')], ['appt', 'med', 'sub'], -1, cx, cy, cr, _filter, t0);
+    if (role() === 'away') pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], 1, cx, cy, cr, '', t0);
+  }
+  function hitCentre(clientX, clientY) {
+    if (!_pillHits.length || typeof CV === 'undefined') return false;
+    var r = CV.getBoundingClientRect(), x = clientX - r.left, y = clientY - r.top;
+    var h = _pillHits.filter(function (p) { return x >= p.x - 4 && x <= p.x + p.w + 4 && y >= p.y && y <= p.y + p.h; })[0];
+    if (!h) return false;
+    if (h.key === 'appt' || h.key === 'med' || h.key === 'sub') {
+      _filter = _filter === h.key ? '' : h.key;
+      try { focusedContactId = null; } catch (e) {}
+      rebuild();
+    } else {
+      var c = centre(); if (c && typeof runContactQuickAction === 'function') runContactQuickAction(h.key, c.contact);
+    }
+    return true;
+  }
+  function centreSingle() { return role() === 'away' && !!homeContact(); }
+  function centreDouble() {
+    var h = homeContact(); if (role() !== 'away' || !h) return false;
+    try { enterDetail(h); } catch (e) {}
+    return true;
+  }
+
+  /* A tap twice on a care sphere opens it: its photo large, and Taken or Done. */
+  function openNode(contact) {
+    var n = contact && contact.cvItem; if (!n) return false;
+    if (n.kind === 'add') openAdd(n.add); else openItem(n.item.id, n.slot);
+    return true;
+  }
+
+  /* When a medicine is due and nothing else is in focus, it comes forward,
+     so its photo fills the dream picture. */
+  var _lastTouch = 0;
+  function bringDueForward() {
+    try {
+      if (!_nodes.length || document.querySelector('.cv-ov.open')) return;
+      if (typeof focusedContactId === 'undefined' || focusedContactId != null || typeof appState === 'undefined' || appState !== 'network') return;
+      if (Date.now() - _lastTouch < 6000) return;
+      var due = _nodes.filter(function (c) { return c.cvItem.state === 'late' || c.cvItem.state === 'due'; })
+        .sort(function (a, b) { return a.sev - b.sev; })[0];
+      if (due) focusedContactId = due.id;
+    } catch (e) {}
+  }
+
 
   /* ── sheets ── */
   function sheet(id) {
@@ -218,17 +307,17 @@
     var mk = el.querySelector('[data-a=mark]'); if (mk) mk.onclick = async function () {
       var r = await api('/care/items/' + encodeURIComponent(id) + '/mark', { method: 'POST', body: { slot: slot } }).catch(function () { return { ok: false }; });
       if (!r.ok) { msg.textContent = t('failed'); return; }
-      close(el); _data.today = r.data; paint();
+      close(el); _data.today = r.data; rebuild();
     };
     var un = el.querySelector('[data-a=undo]'); if (un) un.onclick = async function () {
       var r = await api('/care/items/' + encodeURIComponent(id) + '/mark', { method: 'POST', body: { slot: slot, done: false } }).catch(function () { return { ok: false }; });
       if (!r.ok) { msg.textContent = t('failed'); return; }
-      delete _gone[id + '|' + slot]; delete _gone['a' + id]; close(el); _data.today = r.data; paint();
+      close(el); _data.today = r.data; rebuild();
     };
     var rm = el.querySelector('[data-a=rm]'); if (rm) rm.onclick = async function () {
       var r = await api('/care/items/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () { return { ok: false }; });
       if (!r.ok) { msg.textContent = t('failed'); return; }
-      close(el); load(true);
+      close(el); load();
     };
     open(el);
   }
@@ -294,43 +383,30 @@
         }
         var r = await api('/care/items', { method: 'POST', body: body });
         if (!r.ok) throw new Error(r.status);
-        close(el); load(true);
+        close(el); load();
       } catch (e) { msg.textContent = t('failed'); btn.disabled = false; btn.textContent = t('save'); }
     }
     render(); open(el);
   }
 
-  /* ── keep it current ── */
-  var _lastSubject = '';
+
+
+  var _subj = '';
   function tick() {
-    var s = subject(); var k = s ? (s.home || 'me') : '';
-    if (k !== _lastSubject) { _lastSubject = k; _data = null; paint(); if (k) load(true); }
+    var s = subject(); var k = s ? (s.home || 'me') + ':' + s.edit : '';
+    if (k !== _subj) { _subj = k; _filter = ''; _data = null; _sig = ''; if (k) load(); else rebuild(); }
+    bringDueForward();
   }
   function boot() {
     if (!window.CovaraCare || !authed()) { setTimeout(boot, 1000); return; }
-    /* HOME's phone tells the server its time zone so "today" is HOME's today */
     if (role() === 'home') { try { api('/care/state', { method: 'POST', body: { tz: Intl.DateTimeFormat().resolvedOptions().timeZone } }); } catch (e) {} }
-    setInterval(tick, 700);
-    setInterval(function () { if (_lastSubject) load(true); }, 60000);
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && _lastSubject) load(true); });
-    window.addEventListener('localeChanged', paint);
+    var stg = document.getElementById('stage'); if (stg) stg.addEventListener('pointerdown', function () { _lastTouch = Date.now(); });
+    setInterval(tick, 800);
+    setInterval(function () { if (_subj) load(); }, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && _subj) load(); });
+    window.addEventListener('localeChanged', function () { _sig = ''; rebuild(); });
   }
-  /* The dream picture on AWAY's phone: the photo of HOME's medicine that is due or late */
-  var _imgs = {};
-  function dreamImg(url) {
-    if (!url) return null;
-    var o = _imgs[url];
-    if (!o) { o = _imgs[url] = { img: new Image(), isVideo: false, ok: false }; o.img.onload = function () { o.ok = true; }; o.img.src = url; }
-    return o.ok ? o : null;
-  }
-  window.CovaraDream = function (contactId) {
-    if (role() !== 'away' || !_data || !_data.s.home) return null;
-    var c = (typeof DEMO_CONTACTS !== 'undefined') && DEMO_CONTACTS.filter(function (x) { return x.id === contactId; })[0];
-    if (!c || !c.care || c.care.userId !== _data.s.home) return null;
-    var due = (_data.today.items || []).filter(function (x) { return (x.state === 'late' || x.state === 'due') && x.item.photo && (x.item.kind === 'med' || x.item.kind === 'check'); })
-      .sort(function (a, b) { return (a.state === 'late' ? 0 : 1) - (b.state === 'late' ? 0 : 1); })[0];
-    return due ? dreamImg(photoUrl(due.item.photo)) : null;
-  };
-  window.CovaraToday = { load: load, openAdd: openAdd, openItem: openItem, data: function () { return _data; } };
+  window.CovaraView = { source: source, centre: centre, drawCentre: drawCentre, hitCentre: hitCentre, centreSingle: centreSingle, centreDouble: centreDouble,
+    openNode: openNode, load: load, openAdd: openAdd, openItem: openItem, filter: function (f) { _filter = f || ''; rebuild(); }, nodes: function () { return _nodes; }, data: function () { return _data; } };
   setTimeout(boot, 1500);
 })();

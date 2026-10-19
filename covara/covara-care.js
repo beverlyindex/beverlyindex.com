@@ -14,7 +14,7 @@
       roleTitle: 'Who is this phone for?',
       roleHome: 'For me', roleHomeSub: 'My family looks after me',
       roleAway: 'For someone I look after', roleAwaySub: 'A parent, a partner, a friend',
-      linkHome: 'Add family', linkAway: 'Enter code',
+      linkHome: 'Show a code for my family', linkAway: 'Type a code',
       codeTitle: 'Show this to your family',
       codeSub: 'They type it on their phone. It works for 15 minutes.',
       codeWait: 'Waiting for them',
@@ -31,6 +31,7 @@
       joined: '{name} is now in your circle.',
       asks: '{name} asks to look after you. Tap their sphere.',
       offline: 'Covara needs the internet for this. Try again in a moment.',
+      famTitle: 'My family in Covara', lookTitle: 'Who I look after', famEmpty: 'Nobody yet. Show your code to your family.', lookEmpty: 'Nobody yet. Type the code from their phone.', sees: 'Sees:', seesNothing: 'nothing yet',
       sh: { location: 'Where I am', rooms: 'Which room', falls: 'If I fall', care: 'Medicines and visits', mood: 'How I feel', activity: 'If I stop moving' },
       rel: { child: 'Son or daughter', partner: 'Partner', sibling: 'Brother or sister', friend: 'Friend', carer: 'Carer', doctor: 'Doctor' }
     },
@@ -38,7 +39,7 @@
       roleTitle: 'Per chi è questo telefono?',
       roleHome: 'Per me', roleHomeSub: 'La mia famiglia si prende cura di me',
       roleAway: 'Per una persona di cui mi prendo cura', roleAwaySub: 'Un genitore, un partner, un amico',
-      linkHome: 'Aggiungi famiglia', linkAway: 'Inserisci codice',
+      linkHome: 'Mostra un codice per la famiglia', linkAway: 'Scrivi un codice',
       codeTitle: 'Mostra questo alla tua famiglia',
       codeSub: 'Lo scrivono sul loro telefono. Vale 15 minuti.',
       codeWait: 'In attesa',
@@ -55,6 +56,7 @@
       joined: '{name} ora è nella tua cerchia.',
       asks: '{name} chiede di prendersi cura di te. Tocca la sua sfera.',
       offline: 'Covara ha bisogno di internet. Riprova tra poco.',
+      famTitle: 'La mia famiglia in Covara', lookTitle: 'Di chi mi prendo cura', famEmpty: 'Ancora nessuno. Mostra il codice alla tua famiglia.', lookEmpty: 'Ancora nessuno. Scrivi il codice del suo telefono.', sees: 'Vede:', seesNothing: 'ancora niente',
       sh: { location: 'Dove sono', rooms: 'In quale stanza', falls: 'Se cado', care: 'Medicine e visite', mood: 'Come sto', activity: 'Se non mi muovo' },
       rel: { child: 'Figlio o figlia', partner: 'Partner', sibling: 'Fratello o sorella', friend: 'Amico', carer: 'Badante', doctor: 'Medico' }
     }
@@ -119,10 +121,10 @@
     '.cv-rels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px}' +
     '.cv-rel{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid rgba(255,255,255,.16);background:transparent;color:#b9c6d8;font:600 13px "Hanken Grotesk",sans-serif;cursor:pointer}' +
     '.cv-rel[aria-pressed="true"]{border-color:#38bdf8;color:#04121a;background:#38bdf8}' +
-    '.cv-fab{position:fixed;left:20px;bottom:20px;z-index:8000;height:48px;padding:0 18px;border-radius:24px;border:1px solid rgba(56,189,248,.55);background:rgba(12,14,22,.92);color:#5fd0ff;font:700 13px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.04em;cursor:pointer;display:none}' +
-    'body[data-cv-role] .cv-fab{display:block}body.network-active .cv-fab{left:112px}body.cv-asking .cv-fab{display:none}body.rs-overlay-open .cv-fab{display:none !important}' +
-    '.cv-fab:focus-visible{outline:2px solid #C5A55A;outline-offset:2px}' +
-    '@media (max-width:420px){.cv-shares{grid-template-columns:repeat(2,1fr)}.cv-fab{padding:0 14px}body.network-active .cv-fab{left:104px}}';
+    '@media (max-width:420px){.cv-shares{grid-template-columns:repeat(2,1fr)}}' +
+    '.cv-fam-row{display:flex;align-items:center;gap:12px;width:100%;padding:10px 4px;background:none;border:0;border-bottom:1px solid rgba(255,255,255,.06);color:inherit;font:inherit;text-align:left;cursor:pointer}' +
+    '.cv-fam-row:last-child{border-bottom:0}.cv-fam-row i{flex:0 0 auto;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 14px "Hanken Grotesk",sans-serif;font-style:normal;color:#06223a;background:radial-gradient(circle at 34% 28%,#fff 0,#c8f2ff 8%,#59d2ff 30%,#1597d8 62%,#08436f 100%)}' +
+    '.cv-fam-row b{display:block;font-size:14px;color:var(--text-primary,#e8eef8)}.cv-fam-row small{display:block;font-size:12px;color:var(--text-dim,#8ea3bf)}';
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
   function overlay(id) {
@@ -143,7 +145,11 @@
       '<button class="cv-orbpick" data-r="away"><span class="cv-orb"></span><span class="cv-orbname">' + esc(t('roleAway')) + '</span><span class="cv-orbsub">' + esc(t('roleAwaySub')) + '</span></button>' +
       '</div></div>';
     el.querySelectorAll('[data-r]').forEach(function (b) {
-      b.onclick = function () { setRole(b.getAttribute('data-r')); hide(el); document.body.classList.remove('cv-asking'); paintFab(); sync(); };
+      b.onclick = async function () {
+        setRole(b.getAttribute('data-r')); hide(el); document.body.classList.remove('cv-asking'); renderFamily();
+        await sync();
+        if (!careContacts().length) { if (role() === 'home') openCode(); else openPad(); }
+      };
     });
     document.body.classList.add('cv-asking');
     /* HOME's own picture or clip goes inside HOME's sphere when there is one */
@@ -211,7 +217,7 @@
         if (!r.ok) { msg.textContent = r.status === 400 ? t('padOwn') : t('padWrong'); val = ''; paint(); return; }
         msg.className = 'cv-msg ok'; msg.textContent = t('padSent');
         await sync();
-        setTimeout(function () { hide(el); var c = byLink(r.data.link && r.data.link.id); if (c) focusOn(c.id); }, 1400);
+        setTimeout(function () { hide(el); openCircle(); }, 1400);
       } catch (e) { msg.textContent = t('offline'); }
     }
     function press(k) {
@@ -310,29 +316,13 @@
       try { if (typeof buildNodes === 'function') buildNodes(false); } catch (e) {}
       refreshLabels();
     }
+    renderFamily();
     if (added) openCircle();
     if (newAsks.length && !_codeTimer) toast(t('asks', { name: newAsks[0].first }));
-  }
-  /* On AWAY's phone HOME is the one in view: whenever nothing is in focus
-     and the phone has been left alone a few seconds, HOME comes forward. */
-  function keepHomeInView() {
-    try {
-      if (role() !== 'away' || document.querySelector('.cv-ov.open')) return;
-      if (typeof focusedContactId === 'undefined' || focusedContactId != null) return;
-      if (Date.now() - _lastTouch < 5000) return;
-      var h = careContacts().filter(function (c) { return c.care.side === 'home' && c.care.state === 'active'; })[0];
-      if (h) focusOn(h.id);
-    } catch (e) {}
   }
   function openCircle() {
     try { if (typeof appState !== 'undefined' && appState !== 'network' && typeof enterNetwork === 'function') enterNetwork(); } catch (e) {}
   }
-  function focusOn(id) {
-    openCircle();
-    try { if (typeof NODES !== 'undefined' && !NODES.length && typeof buildNodes === 'function') buildNodes(false); } catch (e) {}
-    setTimeout(function () { try { focusedContactId = id; } catch (e) {} }, 300);
-  }
-
   /* HOME taps a sphere that is waiting: the choice opens. Only a real tap
      counts, never the slow drift between spheres when the phone is resting. */
   var _down = null;
@@ -354,13 +344,35 @@
   function waitLabel(c) { return c.care.side === 'away' ? t('waitHome') : t('waitAway'); }
   function refreshLabels() { try { if (typeof SentinelHeadlines !== 'undefined' && SentinelHeadlines.refreshAll) SentinelHeadlines.refreshAll(); } catch (e) {} }
 
-  /* ── the button beside Team ── */
-  var fab = document.createElement('button');
-  fab.className = 'cv-fab'; fab.type = 'button';
-  fab.onclick = function () { if (role() === 'home') openCode(); else if (role() === 'away') openPad(); else askRole(); };
-  document.body.appendChild(fab);
-  function paintFab() { fab.textContent = role() === 'away' ? t('linkAway') : t('linkHome'); }
-  window.addEventListener('localeChanged', paintFab);
+  /* ── Settings, People and Circle: the family, what each one sees, and the code ── */
+  function sharesText(sh) {
+    var on = SHARES.filter(function (k) { return sh && sh[k]; }).map(function (k) { return L().sh[k]; });
+    return on.length ? on.join(', ') : t('seesNothing');
+  }
+  function renderFamily() {
+    var anchor = document.getElementById('circleSection');
+    if (!anchor || !role()) return;
+    var sec = document.getElementById('cvFamilySection');
+    if (!sec) {
+      sec = document.createElement('div'); sec.id = 'cvFamilySection'; sec.className = 'settings-section'; sec.setAttribute('data-cat', 'circle');
+      anchor.parentNode.insertBefore(sec, anchor);
+      try { if (anchor.classList.contains('is-cat')) sec.classList.add('is-cat'); } catch (e) {}
+    }
+    var home = role() === 'home';
+    var rows = careContacts().map(function (c) {
+      var cv = c.care, rel = cv.relation && L().rel[cv.relation] ? L().rel[cv.relation] : '';
+      var sub = cv.state === 'pending' ? (home ? t('waitHome') : t('waitAway')) : home ? t('sees') + ' ' + sharesText(cv.share) : rel;
+      return '<button type="button" class="cv-fam-row" data-id="' + c.id + '"><i>' + esc(initials(c.first + ' ' + c.last)) + '</i><span><b>' + esc((c.first + ' ' + c.last).trim()) + (home && rel ? ' · ' + esc(rel) : '') + '</b><small>' + esc(sub) + '</small></span></button>';
+    }).join('');
+    sec.innerHTML = '<div class="settings-section-title">' + esc(home ? t('famTitle') : t('lookTitle')) + '</div>' +
+      '<div class="settings-card">' + (rows || '<p class="settings-help" style="margin:0 0 10px">' + esc(home ? t('famEmpty') : t('lookEmpty')) + '</p>') +
+      '<div style="margin-top:12px"><button type="button" class="circle-invite-btn" data-a="link">' + esc(home ? t('linkHome') : t('linkAway')) + '</button></div></div>';
+    sec.querySelector('[data-a=link]').onclick = function () { try { if (typeof _closeSettings === 'function') _closeSettings(); } catch (e) {} if (home) openCode(); else openPad(); };
+    sec.querySelectorAll('.cv-fam-row').forEach(function (b) {
+      b.onclick = function () { var c = careContacts().filter(function (x) { return String(x.id) === b.getAttribute('data-id'); })[0]; if (c && home) openConsent(c); };
+    });
+  }
+  window.addEventListener('localeChanged', renderFamily);
 
   /* Start once the gate and onboarding are behind us and the account exists. */
   function ready() {
@@ -377,8 +389,7 @@
     if (!ready()) { setTimeout(boot, 700); return; }
     _started = true;
     if (role()) document.body.setAttribute('data-cv-role', role());
-    paintFab();
-    setInterval(keepHomeInView, 1000);
+    renderFamily();
     var stg = document.getElementById('stage'); if (stg) { stg.addEventListener('pointerdown', onDown); stg.addEventListener('pointerup', onUp); }
     if (!role()) askRole();
     (function wait() { if (authed()) { sync(); setInterval(sync, 20000); } else setTimeout(wait, 1000); })();
