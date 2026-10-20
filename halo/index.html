@@ -1119,7 +1119,7 @@ button.loc-row:active{transform:translateY(2px);box-shadow:inset 0 2px 7px rgba(
                 <div id="fixBar"></div>
                 <div class="radline" id="radLine"></div>
                 <div class="loc" id="locBox"></div><div id="routeBox"></div><div id="markBox"></div><div id="tripBox"></div><div id="subjBox"></div><div id="elogBox"></div>
-                <div class="formrow map-only" style="align-items:center;margin:14px 0 10px"><button class="btn sm primary" data-act="wview" data-v="list">&#8249; List</button><span class="limit" style="margin:0">Map: Micro, Macro and Identification. Tap a sphere to bring it forward.</span></div>
+                <div class="formrow map-only" style="align-items:center;margin:14px 0 10px"><button class="btn sm primary" data-act="wview" data-v="list">&#8249; List</button><button class="btn sm" data-act="wview" data-v="one">Base view</button><span class="limit" style="margin:0">Map: Micro, Macro and Identification. Tap a sphere to bring it forward.</span></div>
                 <div class="mapkey" id="mapKey"></div>
                 <div class="onemap" id="oneMap"><div class="om-pre" id="omPre"></div><div class="om-legend layers" id="omLegend"></div><div class="om-body"><div class="om-host" id="omHost"></div><div class="om-list" id="omList"></div></div></div>
                 <div class="stage" id="stage" data-big="micro">
@@ -1290,7 +1290,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-20.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-20.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2653,7 +2653,7 @@ function locVerdict(L){ const w=L.wy.filter(d=>d.withYou), m=L.wy.filter(d=>d.ma
 function ptsParts(){ const pr=ptsR(MILE), out=[], cs=poiCount('alpr'); if(cs) out.push(cs+' plate '+(cs===1?'camera':'cameras'));
   [['cctv','camera','cameras'],['speed','speed camera','speed cameras'],['site','tower site','tower sites']].forEach(x=>{ const k=ptsOf(x[0],pr).length; if(k) out.push(k+' '+(k===1?x[1]:x[2])); }); return out; }
 function locPoints(){ if(!gz() || !ptsReady()) return ''; const parts=ptsParts(); if(!parts.length) return ''; const cn=layerOn('cam')?camsNear()[0]:null;
-  return '<div class="loc-cams"><span><b>Within '+esc(miText(ptsR(MILE)))+':</b> '+esc(parts.join(', '))+'.'+(cn?' The nearest plate camera is '+esc(miText(cn.d))+' '+compass(cn.brg)+'.':'')+'</span><button class="btn sm" data-act="wview" data-v="spheres" data-big="macro">Show on the map</button></div>'; }
+  return '<div class="loc-cams"><span><b>Within '+esc(miText(ptsR(MILE)))+':</b> '+esc(parts.join(', '))+'.'+(cn?' The nearest plate camera is '+esc(miText(cn.d))+' '+compass(cn.brg)+'.':'')+'</span><button class="btn sm" data-act="wview" data-v="one" data-fit="mile">Show on the map</button></div>'; }
 /* ---------- The encounter log. One encounter is one stretch of time a device stayed in earshot of the phone you carry: when it began and ended,
    how near it came, and where you were at that moment. Encounters are written to a database on this phone and kept across trips, so each device
    carries its own history: how many times, on how many days, at how many places. The log records; it raises no alert. ---------- */
@@ -2887,7 +2887,7 @@ function locRender(){ const box=el('locBox'); if(!box || !locMode()) return; con
   h+=tripStrip()+(M.live?nowContacts():'');
   if(M.live && M.rest.length) h+=nowList('rest','Nearest','new, local and yours, by distance',M.rest,5);
   if(M.live) h+=TAG_KEY+MOVE_KEY;
-  h+=locPoints()+'<div class="loc-bar"><button class="btn" data-act="wview" data-v="spheres" style="flex:1">Map</button><button class="btn'+(S.elog?' on':'')+'" data-act="elog-open" style="flex:1.4">Artifacts'+(ELOG.ready&&ELOG.n.dev?' · '+ELOG.n.dev:'')+'</button></div>'; }
+  h+=locPoints()+'<div class="loc-bar"><button class="btn" data-act="wview" data-v="one" style="flex:1">Map</button><button class="btn'+(S.elog?' on':'')+'" data-act="elog-open" style="flex:1.4">Artifacts'+(ELOG.ready&&ELOG.n.dev?' · '+ELOG.n.dev:'')+'</button></div>'; }
   h+=
     ((P.units==='mi'||P.units==='km') ? '<div class="limit unitsw2" style="text-align:center;margin-top:10px">Distances '+['mi','km'].map(u=>'<button class="chipbtn '+(unitNow()===u?'on':'')+'" data-act="units" data-u="'+u+'">'+(u==='mi'?'Feet and miles':'Meters and kilometers')+'</button>').join(' ')+'</div>' : '');
   if(box._h!==h){ box.innerHTML=h; box._h=h; } }
@@ -4378,7 +4378,7 @@ function routeAttach(map){ if(!map || map._rt) return; try{ map.addSource('rt',{
     map.addLayer({id:'rt-pt',type:'circle',source:'rt',filter:['==',['get','kind'],'pt'],paint:{'circle-radius':['case',['>',['get','end'],0],7,4.5],'circle-color':['case',['==',['get','end'],2],'#e9f0ff','#0b1224'],'circle-stroke-width':2.5,'circle-stroke-color':'#e9f0ff'}});
     map._rt=true; }catch(e){} }
 function routeShow(){ const d=routeData(); [MAP,MACRO,FULL].forEach(m=>{ if(!m) return; try{ if(!m._rt) routeAttach(m); const s=m.getSource('rt'); if(s) s.setData(d); }catch(e){} }); }
-function routeOnMap(){ const L=routeLineNow(); mapFullOpen().then(()=>{ routeShow(); if(!FULL || !L) return; MF.follow=false; el('mfFollow').classList.remove('on');
+function routeOnMap(){ const L=routeLineNow(); mapFullOpen().then(()=>{ routeShow(); if(!FULL || !L) return; MF.follow=false; el('mfFollow').classList.remove('on'); mfTouched(true);
   try{ let w=180,e2=-180,s=90,n=-90; L.forEach(c=>{ w=Math.min(w,c[0]); e2=Math.max(e2,c[0]); s=Math.min(s,c[1]); n=Math.max(n,c[1]); }); FULL.fitBounds([[w,s],[e2,n]],{padding:{top:120,bottom:160,left:40,right:70},duration:0,maxZoom:17}); }catch(e){} }); }
 document.addEventListener('keydown', ev=>{ if(ev.key==='Enter' && ev.target && (ev.target.id==='planTo' || ev.target.id==='planFrom')){ ev.preventDefault(); planGo(); } });
 const buzz = p => { try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} };
@@ -5967,7 +5967,7 @@ async function tripOnMap(R){ S.tripView=R; S.tvSel=null; S.tvFuse={}; MF.sel=nul
   try{ const fx=Object.values(R.devs||{}).filter(r=>r.v==='fixed' && r.sig && !r.mine && !r.sim).slice(0,250); const out=await Promise.all(fx.map(r=>fixedFuse(r.sig))); fx.forEach((r,i)=>{ if(out[i]) S.tvFuse[r.id]=out[i]; }); }catch(e){}
   await mapFullOpen(); let tries=0; const go=()=>{ if(S.tripView!==R) return; if(!FULL || !FULL.getSource('mf')){ if(++tries<60) setTimeout(go,150); return; } tripViewDraw(true); }; go(); }
 function tripViewEnd(redraw){ if(!S.tripView) return; S.tripView=null; S.tvSel=null; S.tvFuse={}; if(FULL) tvLive(true); try{ const s=FULL&&FULL.getSource('tv'); if(s) s.setData({type:'FeatureCollection',features:[]}); }catch(e){}
-  if(redraw){ MF.follow=true; const f=el('mfFollow'); if(f) f.classList.add('on'); mapFullTick(true); } }
+  if(redraw){ MF.follow=true; const f=el('mfFollow'); if(f) f.classList.add('on'); mfTouched(false); baseFrame(); mapFullTick(true); } }          // the live map again, as the Base view
 function tripViewTick(){ const R=S.tripView; if(!R) return; const L=tripLocated(R), st=withTrip(R, walkStats), n=k=>L.filter(x=>x.c===k).length;
   const A=tripAps(R), nA=Object.keys(R.aps||{}).length;
   setHTML(el('mfSum'), '<b>'+esc(tripName(R))+'</b> · '+esc(walkDur((R.t1||Date.now())-R.t0))+' · '+esc(du(st.distance_m||0))+' · '+st.heard+' heard · '+L.length+' located'+(nA?' · '+nA+' Wi-Fi '+(nA===1?'network':'networks'):'')+' <button class="mf-fit" data-act="tv-close">Back to now</button>');
@@ -8704,8 +8704,9 @@ document.addEventListener('click', e=>{
     case 'om-r': omFit(+a.dataset.r, true); oneRender(); break;
     case 'om-f': { const f=a.dataset.f||''; S.omF=(S.omF||'')===f?'':f; MF.sel=null; mapFullTick(false); oneRender(); break; }
     case 'tl-close': { MF.tl=null; if(S.tripView) tripViewTick(); else mapFullTick(false); break; }
-    case 'om-pt': { const it=ptsNear().find(i=>String(i.id)===a.dataset.id); if(!it) break; MF.sel=null; MF.pt=it; if(FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); try{ FULL.easeTo({center:[it.lon,it.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
-    case 'wview': { const to=a.dataset.v || (locMode()?'spheres':'list'); S.wview=to; if(S.mapFull) mapFullClose(false);
+    case 'om-pt': { const it=ptsNear().find(i=>String(i.id)===a.dataset.id); if(!it) break; MF.sel=null; MF.pt=it; if(FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); mfTouched(true); try{ FULL.easeTo({center:[it.lon,it.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
+    case 'wview': { const to=a.dataset.v || (locMode()?'one':'list'); S.wview=to; if(S.mapFull) mapFullClose(false);
+      if(to==='one'){ if(a.dataset.fit==='mile'){ S.omR=MILE; mfTouched(true); } else if(!MF.touched) S.omR=BASE_FT/3.281; }          // the map always comes back as the Base view: tilted, 200 ft round you, unless you moved it, and then Reset is showing
       if(a.dataset.big && el('stage')){ el('stage').dataset.big=a.dataset.big; S.big=a.dataset.big; _fitR=0; _fitM=0; }
       if(to!=='one' && S.oneMap){ S.oneMap=false; const mf=el('mapFull'); document.body.appendChild(mf); mf.classList.remove('inline'); mf.classList.add('hidden'); fullInline(false); }
       renderVicinity(); setTimeout(()=>{ try{ if(MAP){ MAP.resize(); fitRadius(true); } if(MACRO) MACRO.resize(); if(FULL) FULL.resize(); }catch(e){} renderVicinity(); if(to!=='list'){ const c=el('vicCard'); if(c) c.scrollIntoView({block:'start'}); } },80); break; }
@@ -8809,11 +8810,11 @@ document.addEventListener('click', e=>{
     case 'near-off': { const d=renDev(a.dataset.id); if(!d) break; P.nearOff=P.nearOff||{}; if(P.nearOff[d.sig]) delete P.nearOff[d.sig]; else P.nearOff[d.sig]=1; save(); S._rsig=''; renderRoster(); toast(P.nearOff[d.sig]?'Remiel will not alert you when this device is near.':'Remiel will alert you when this device is near.'); break; }
     case 'mf-follow': { MF.follow=!MF.follow; a.classList.toggle('on',MF.follow); mapFullTick(false); break; }
     case 'mf-north': { MF.headUp=!MF.headUp; a.classList.toggle('on',MF.headUp); a.innerHTML='<small>'+(MF.headUp?'FACE UP':'N UP')+'</small>'; if(!MF.headUp && FULL){ try{ FULL.rotateTo(0,{duration:400}); }catch(e){} } headAsk(); mapFullTick(false); break; }
-    case 'mf-fit': { const g=gz(); if(!FULL || !g) break; MF.follow=false; el('mfFollow').classList.remove('on'); fitTo(FULL, g, MILE, true); toast('The map now shows '+miText(MILE)+' around you. The round button brings it back to you.'); break; }
+    case 'mf-fit': { const g=gz(); if(!FULL || !g) break; MF.follow=false; el('mfFollow').classList.remove('on'); fitTo(FULL, g, MILE, true); mfTouched(true); toast('The map now shows '+miText(MILE)+' around you. The round button brings it back to you.'); break; }
     case 'mf-zin': if(FULL) FULL.zoomIn(); break;
     case 'mf-reset': mfReset(); break;
     case 'mf-zout': if(FULL) FULL.zoomOut(); break;
-    case 'mf-dev': { MF.pt=null; MF.sel=a.dataset.id||null; const d=MF.sel&&findDevice(MF.sel); if(d && d.fix && FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); try{ FULL.easeTo({center:[d.fix.lon,d.fix.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
+    case 'mf-dev': { MF.pt=null; MF.sel=a.dataset.id||null; const d=MF.sel&&findDevice(MF.sel); if(d && d.fix && FULL){ MF.follow=false; el('mfFollow').classList.remove('on'); mfTouched(true); try{ FULL.easeTo({center:[d.fix.lon,d.fix.lat],duration:500}); }catch(e){} } mapFullTick(false); break; }
     case 'mf-ident': { const id=a.dataset.id; mapFullClose(false); setTimeout(()=>{ if(S.view!=='watchers') setView('watchers'); selectDevice(id); const c=el('identPanel'); if(c) c.scrollIntoView({block:'center'}); },120); break; }
     case 'report': reportOpen(false); break;
     case 'report-new': if(S.reportOpen && S.reportKind==='police' && S.repSubj){ subjReport(S.repSubj); toast('Report made again from the record, '+new Date().toLocaleTimeString()+'.'); } else if(S.reportOpen && S.reportKind==='trip2'){ tripPrint(); toast('Trip page made again from the record, '+new Date().toLocaleTimeString()+'.'); } else if(S.reportOpen && S.reportKind==='trip'){ tripDocShow(); toast('Trip report made again from the record, '+new Date().toLocaleTimeString()+'.'); } else reportOpen(true); break;
