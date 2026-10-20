@@ -215,6 +215,36 @@
       var rg = x.createLinearGradient(cx - R, cy - R, cx + R, cy + R); rg.addColorStop(0, 'rgba(120,220,255,.85)'); rg.addColorStop(1, 'rgba(60,140,220,.45)');
       x.strokeStyle = rg; x.lineWidth = 1.4; x.shadowColor = 'rgba(80,200,255,.8)'; x.shadowBlur = 10; x.stroke(); x.shadowBlur = 0;
     }
+    /* A band of colour from blue to red, the sound scrolling from right to left: left edge x0, centre line cy,
+       width w, tallest wave maxA, levels src (0 to 1, oldest first) */
+    function band(x, x0, cy, w, maxA, src, ts) {
+      var n = src.length, g = x.createLinearGradient(x0, 0, x0 + w, 0);
+      [[0, '#2f6bff'], [0.18, '#2fd0ff'], [0.36, '#3cffb4'], [0.52, '#f6ff6a'], [0.68, '#ffb03a'], [0.84, '#ff4a3a'], [1, '#ff3f9b']].forEach(function (c) { g.addColorStop(c[0], c[1]); });
+      x.save(); x.globalCompositeOperation = 'lighter';
+      var P = 150;
+      function lvl(f) { return src[Math.min(n - 1, Math.max(0, Math.floor(f * (n - 1))))]; }
+      for (var s2 = 0; s2 < 6; s2++) {
+        var fr = 9 + s2 * 3.3, ph = ts * (0.004 + s2 * 0.0011) + s2 * 1.3;
+        x.beginPath();
+        for (var j = 0; j <= P; j++) {
+          var f = j / P, a = maxA * (0.06 + lvl(f) * 0.94) * Math.exp(-Math.pow((f - 0.5) * 2, 2) * 0.9);
+          var py = cy + Math.sin(f * fr + ph) * a;
+          if (j) x.lineTo(x0 + f * w, py); else x.moveTo(x0, py);
+        }
+        for (var j2 = P; j2 >= 0; j2--) {
+          var f2 = j2 / P, a2 = maxA * (0.06 + lvl(f2) * 0.94) * Math.exp(-Math.pow((f2 - 0.5) * 2, 2) * 0.9);
+          x.lineTo(x0 + f2 * w, cy - Math.sin(f2 * fr + ph) * a2);
+        }
+        x.closePath();
+        x.globalAlpha = 0.09; x.fillStyle = g; x.fill();
+        x.globalAlpha = 0.55; x.strokeStyle = g; x.lineWidth = 1.2; x.stroke();
+      }
+      x.globalAlpha = 1;
+      var cl = x.createLinearGradient(x0, 0, x0 + w, 0); cl.addColorStop(0, 'rgba(255,255,255,0)'); cl.addColorStop(0.5, 'rgba(255,255,255,.95)'); cl.addColorStop(1, 'rgba(255,255,255,0)');
+      x.strokeStyle = cl; x.lineWidth = 1.6; x.shadowColor = '#fff'; x.shadowBlur = 12;
+      x.beginPath(); x.moveTo(x0, cy); x.lineTo(x0 + w, cy); x.stroke();
+      x.restore();
+    }
     /* The dream circle while someone speaks: a band of colour from blue to red across the picture,
        the sound itself scrolling from right to left, laid over whatever image is there */
     function drawDreamRing(ts, you) {
@@ -228,34 +258,10 @@
       var src = state === 'listening' ? hist : ahist;
       x.save(); x.beginPath(); x.arc(cx, cy, R - 1, 0, Math.PI * 2); x.clip();
       x.fillStyle = 'rgba(2,6,18,.38)'; x.fillRect(0, 0, S, S);
-      var g = x.createLinearGradient(0, 0, S, 0);
-      [[0, '#2f6bff'], [0.18, '#2fd0ff'], [0.36, '#3cffb4'], [0.52, '#f6ff6a'], [0.68, '#ffb03a'], [0.84, '#ff4a3a'], [1, '#ff3f9b']].forEach(function (c) { g.addColorStop(c[0], c[1]); });
-      x.globalCompositeOperation = 'lighter';
-      var maxA = R * 0.62, P = 150;
-      function lvl(f) { var idx = Math.min(N - 1, Math.max(0, Math.floor(f * (N - 1)))); return src[idx]; }
-      for (var s2 = 0; s2 < 6; s2++) {
-        var fr = 9 + s2 * 3.3, ph = ts * (0.004 + s2 * 0.0011) + s2 * 1.3;
-        x.beginPath();
-        for (var j = 0; j <= P; j++) {
-          var f = j / P, a = maxA * (0.06 + lvl(f) * 0.94) * Math.exp(-Math.pow((f - 0.5) * 2, 2) * 0.9);
-          var py = cy + Math.sin(f * fr + ph) * a;
-          if (j) x.lineTo(f * S, py); else x.moveTo(0, py);
-        }
-        for (var j2 = P; j2 >= 0; j2--) {
-          var f2 = j2 / P, a2 = maxA * (0.06 + lvl(f2) * 0.94) * Math.exp(-Math.pow((f2 - 0.5) * 2, 2) * 0.9);
-          x.lineTo(f2 * S, cy - Math.sin(f2 * fr + ph) * a2);
-        }
-        x.closePath();
-        x.globalAlpha = 0.09; x.fillStyle = g; x.fill();
-        x.globalAlpha = 0.55; x.strokeStyle = g; x.lineWidth = 1.2; x.stroke();
-      }
-      x.globalAlpha = 1;
-      var cl = x.createLinearGradient(0, 0, S, 0); cl.addColorStop(0, 'rgba(255,255,255,0)'); cl.addColorStop(0.5, 'rgba(255,255,255,.95)'); cl.addColorStop(1, 'rgba(255,255,255,0)');
-      x.strokeStyle = cl; x.lineWidth = 1.6; x.shadowColor = '#fff'; x.shadowBlur = 12;
-      x.beginPath(); x.moveTo(0, cy); x.lineTo(S, cy); x.stroke();
+      band(x, 0, cy, S, R * 0.62, src, ts);
       x.restore();
     }
-    return { listen: listen, heard: heard, rms: rms, doneListening: doneListening, speakStart: speakStart, word: word, speakEnd: speakEnd, stop: stopAll };
+    return { listen: listen, heard: heard, rms: rms, doneListening: doneListening, speakStart: speakStart, word: word, speakEnd: speakEnd, stop: stopAll, band: band, ribbon: ribbon };
   })();
   window.CovaraVoiceVisual = VV;
   var rec = null, busy = false, _orb = null, _cap = null, bubble = null;
