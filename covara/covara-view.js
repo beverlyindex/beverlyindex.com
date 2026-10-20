@@ -143,6 +143,7 @@
     '.cvx-add{display:block;width:100%;padding:9px 6px;background:none;border:0;color:rgba(95,208,255,0.9);font:600 12px var(--nous-font,"Hanken Grotesk",sans-serif);text-align:left;cursor:pointer;border-radius:10px}' +
     '.cvx-add:hover{background:rgba(255,255,255,0.03)}' +
     '.cvx-empty{padding:8px 6px;font-size:12px;color:rgba(200,214,232,0.6)}' +
+    '.cv-pbrief{position:fixed;z-index:30}.cv-pbrief .db-issue{-webkit-line-clamp:3}' +
     '.cvx-ini{display:flex;align-items:center;justify-content:center;font:700 12px var(--nous-font,"Hanken Grotesk",sans-serif);color:#0c0e14}' +
     '@media (max-width:700px){#cvTabs{top:78px;left:10px;width:min(240px,58vw)}#cvTabs.is-open{width:calc(100vw - 20px)}.cvx-list{max-height:52vh}.cvx-tab b{letter-spacing:1.2px}}' +
     /* the add, change and photo sheets */
@@ -332,7 +333,7 @@
     if (document.querySelector('.cv-ov.open')) return false;
     /* a family member in focus shows Sentinel's Communication panel here instead */
     var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
-    if (f != null && !/^cvp:/.test(String(f))) return false;
+    if (f != null) return false;
     return true;
   }
   var _ls = null, _html = '';
@@ -397,7 +398,7 @@
     return due ? due.it : null;
   }
   window.CovaraDream = function (focusId) {
-    if (focusId != null && !/^cvp:/.test(String(focusId))) return null;
+    if (focusId != null) return null;
     var it = dreamItem(); return it ? img(photoUrl(it.photo)) : null;
   };
   window.CovaraDreamWanted = function () { return !!dreamItem(); };
@@ -444,31 +445,57 @@
   /* A double tap on one of HOME's people: who they are, what they can help with, and how to reach them. */
   function openNode(contact) {
     var n = contact && contact.cvItem; if (!n) return false;
-    if (n.kind === 'person') { openPerson(n); try { focusedContactId = null; } catch (err) {} }
+    try { focusedContactId = contact.id; } catch (err) {}
     return true;
   }
-  function openPerson(n) {
-    var el = sheet('cvPerson'), rows = [];
-    function kv(k, v) { if (v) rows.push('<dt>' + esc(t(k)) + '</dt><dd>' + esc(v) + '</dd>'); }
-    kv('dGroup', t('g' + (n.group || 'other').charAt(0).toUpperCase() + (n.group || 'other').slice(1)));
-    kv('dRel', n.relation); kv('dProf', n.profession); kv('dOrg', n.org); kv('dHelps', n.helps);
-    kv('dRecords', n.records ? t('yes') : n.group === 'family' && !n.records ? t('no') : n.records === false ? t('no') : '');
+
+  /* ── the left dream state window for one of HOME's people, as Sentinel shows
+     its Communication summary: the group and name, what they can help with,
+     then who they are. Video, Phone, Message and Email sit around the sphere. ── */
+  var ACC = { family: '#38bdf8', doctor: '#f59e0b', legal: '#c878dc', care: '#14b8a6', other: '#c878dc' };
+  var pbox = document.createElement('div'); pbox.className = 'dream-brief cv-pbrief'; pbox.hidden = true; pbox.setAttribute('aria-live', 'polite'); pbox.style.position = 'fixed'; pbox.style.zIndex = '6500';
+  document.body.appendChild(pbox);
+  var _pFor = '';
+  function personFor(id) { return _people.filter(function (p) { return p.id === id; })[0]; }
+  function personHtml(n) {
+    var g = t('g' + (n.group || 'other').charAt(0).toUpperCase() + (n.group || 'other').slice(1));
+    var rows = [];
+    function kv(k, v) { if (v) rows.push('<div class="db-t">' + esc(t(k)) + '</div><div class="db-issue">' + esc(v) + '</div>'); }
+    kv('dRel', n.relation); kv('dProf', n.profession); kv('dOrg', n.org);
+    if (n.records != null && n.group !== 'family') kv('dRecords', n.records ? t('yes') : t('no'));
     if (n.prescribes) kv('dPrescribes', (_ls ? _ls.med : []).filter(function (x) { return ((x.it.meta || {}).prescriber || '').trim().toLowerCase().replace(/^(dr|dott(?:ssa)?)\.?\s+/i, '') === n.name.trim().toLowerCase().replace(/^(dr|dott(?:ssa)?)\.?\s+/i, ''); }).map(function (x) { return x.it.title; }).join(', '));
     if (isFinite(n.next)) kv('dNextVisit', when(n.next));
     kv('dPhone', n.phone); kv('dEmail', n.email);
-    var acts = '';
-    if (n.phone) acts += '<a class="cv-btn" style="display:inline-flex;align-items:center;text-decoration:none" href="tel:' + esc(String(n.phone).replace(/[^\d+]/g, '')) + '">' + esc(t('callTo', { name: n.name })) + '</a>';
-    if (n.email) acts += '<a class="cv-btn" style="display:inline-flex;align-items:center;text-decoration:none" href="mailto:' + esc(n.email) + '">' + esc(t('dEmail')) + '</a>';
-    el.innerHTML = '<div class="cv-box"><div class="cv-mono">' + esc(t('g' + (n.group || 'other').charAt(0).toUpperCase() + (n.group || 'other').slice(1))) + '</div>' +
-      '<div class="cvt-big" style="' + esc('background:' + orbOf(n.name)) + ';width:min(140px,40vw);display:flex;align-items:center;justify-content:center;font:700 40px var(--nous-font,\'Hanken Grotesk\',sans-serif);color:#0c0e14">' + esc(initials2(n.name)) + '</div>' +
-      '<h2 class="cv-h">' + esc(n.name) + '</h2>' +
-      '<dl class="cvx-kv" style="text-align:left;max-width:420px;margin:12px auto">' + rows.join('') + '</dl>' +
-      '<div class="cv-row">' + acts + (n.itemId && role() === 'home' ? '<button class="cv-btn" data-a="edit">' + esc(t('change')) + '</button>' : '') + '<button class="cv-btn pri" data-a="close">' + esc(t('cancel')) + '</button></div></div>';
-    el.querySelector('[data-a=close]').onclick = function () { close(el); };
-    var ed = el.querySelector('[data-a=edit]'); if (ed) ed.onclick = function () { close(el); var it = _data.items.filter(function (i) { return i.id === n.itemId; })[0]; if (it) openEdit('rec', it); };
-    el.onclick = function (e) { if (e.target === el) close(el); };
-    open(el);
+    return '<div class="db-top"><span class="db-label">' + esc(g) + '</span><span class="db-name">' + esc(n.name) + '</span></div>' +
+      (n.helps ? '<div class="db-head">' + esc(n.helps) + '</div>' : '') + rows.join('');
   }
+  function personFrame() {
+    var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
+    var p = f && /^cvp:/.test(String(f)) ? personFor(f) : null;
+    var r = window._dreamRect;
+    if (!p || !r || typeof appState === 'undefined' || appState !== 'network' || document.querySelector('.cv-ov.open') || document.body.classList.contains('rs-overlay-open')) { if (!pbox.hidden) pbox.hidden = true; _pFor = ''; return; }
+    if (_pFor !== p.id + p.cvHeadline) { _pFor = p.id + p.cvHeadline; pbox.innerHTML = personHtml(p.cvItem); pbox.style.setProperty('--db-acc', ACC[p.cvItem.group] || '#38bdf8'); }
+    var vw = window.innerWidth, phone = vw <= 480, cv = document.getElementById('sphere'), off = cv ? cv.getBoundingClientRect() : { left: 0, top: 0 };
+    var left, width, top;
+    if (phone) { left = 12; width = Math.min(Math.round(vw * 0.62), 260); top = Math.round(Math.max(84, off.top + r.cy - r.r + 30)); }
+    else { left = Math.max(16, Math.round(vw * 0.03)); width = Math.round(Math.min(380, Math.max(240, r.cx - r.r - left - 24))); top = Math.round(Math.max(70, off.top + r.cy - r.r * 0.62)); }
+    /* keep clear of Video, Phone, Message, Email around the focused sphere */
+    var q = window._qaRect;
+    if (q && Date.now() - q.t < 500) {
+      var qx0 = off.left + q.x0, qx1 = off.left + q.x1, qy0 = off.top + q.y0, qy1 = off.top + q.y1, h = pbox.offsetHeight || 220;
+      var hits = function () { return left < qx1 + 8 && left + width > qx0 - 8 && top < qy1 + 8 && top + h > qy0 - 8; };
+      if (hits()) {
+        if (qx0 - 10 - left >= 170) width = Math.round(qx0 - 10 - left);
+        else {
+          var below = Math.round(Math.max(qy1, off.top + q.sy + q.r) + 12), above = Math.round(Math.min(qy0, off.top + q.sy - q.r) - 12 - h);
+          top = below + h <= window.innerHeight - 90 ? below : Math.max(70, above);
+        }
+      }
+    }
+    pbox.style.left = left + 'px'; pbox.style.top = top + 'px'; pbox.style.width = width + 'px';
+    if (pbox.hidden) pbox.hidden = false;
+  }
+  (function loop() { try { personFrame(); } catch (e) {} requestAnimationFrame(loop); })();
 
   /* ── HOME at the centre of AWAY's phone, with Video, Phone, Message, Email ── */
   function centre() {
@@ -501,6 +528,7 @@
   function drawCentre(ctx, cx, cy, cr, t0) {
     _pillHits = [];
     if (role() !== 'away' || !homeContact()) return;
+    if (typeof focusedContactId !== 'undefined' && focusedContactId != null) return; /* one sphere at a time carries the calling pills */
     if (typeof IsoView !== 'undefined' && IsoView.active && IsoView.active()) return;
     pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, cy, cr, t0);
   }

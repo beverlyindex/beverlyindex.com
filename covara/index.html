@@ -26599,7 +26599,7 @@ function getContactHeadline(contact) {
 
 /* ── Quick-action icon drawing for focused spheres ── */
 function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
-  if (contact && contact.cvItem) return; /* Covara: a medicine or a visit has no Video or Phone */
+  if (contact && contact.cvItem && contact.cvItem.kind !== 'person') return; /* Covara: only people have Video, Phone, Message, Email */
   /* Modern action labels — vertically stacked beside the focused sphere */
   var labelFs = Math.max(10, Math.round(12 * s));
   var lineH = Math.max(22, Math.round(26 * s));
@@ -26629,6 +26629,8 @@ function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
   var pillW = maxW + px * 2;
   var pillH = labelFs + py * 2;
   var cr = 6;
+  /* Covara: where the pills sit, so the left dream window never covers them */
+  window._qaRect = { x0: flipLeft ? startX - pillW : startX, x1: flipLeft ? startX : startX + pillW, y0: startY - lineH / 2, y1: startY + totalH - lineH / 2, sx: sx, sy: sy, r: r, t: Date.now() };
 
   for (var i = 0; i < labels.length; i++) {
     var ly = startY + i * lineH;
@@ -27696,6 +27698,11 @@ async function startVideoWith(c) {
 
 function runContactQuickAction(type, c) {
   if (!c) return;
+  /* Covara: one of HOME's people without a Covara account is messaged by text */
+  if (c.cvItem && c.cvItem.kind === 'person' && type === 'sms') {
+    if (c.phone) window.location.href = 'sms:' + normalizePhone(c.phone); else showToast(I18n.t('qa.noPhone'));
+    return;
+  }
   if (type === 'video') {
     startVideoWith(c);
   } else if (type === 'phone' && c.phone) {
@@ -27835,7 +27842,7 @@ function onPressEnd(e) {
     if (pressStarted && !netDragging && focusedContactId && _totalDist < NET_DRAG_THRESHOLD) {
       if (focusedContactId) {
         const _qaNode = NODES.find(n => n.contact.id === focusedContactId);
-        if (_qaNode && !_qaNode.contact.cvItem) {
+        if (_qaNode && !(_qaNode.contact.cvItem && _qaNode.contact.cvItem.kind !== 'person')) {
           const _qaP = projectNode(_qaNode);
           const _qaS = _qaP.scale;
           const _qaMul = FOCUS_SCALE;
