@@ -1,5 +1,6 @@
 /* Remiel: Covara, HOME's care inside the Sentinel galaxy.
-   Upper left: pull tabs for Medications, Appointments and Subscriptions.
+   HOME's care: five pills on the left of HOME's sphere (Medicines, Visits,
+   Health, Safety, Papers); each opens its panel in the upper left.
    A tab opens a drop-down list ordered by what is needed soonest; each
    entry opens to its details, with the photo HOME took, and the question
    "Is it working?". People (HOME, the family, the doctors) are spheres;
@@ -10,7 +11,54 @@
   'use strict';
   var STR = {
     en: {
-      meds: 'Medications', appts: 'Appointments', subs: 'Subscriptions',
+      sec_med: 'Medicines', sec_visit: 'Visits', sec_health: 'Health', sec_safety: 'Safety', sec_papers: 'Papers', me: 'me',
+      dFilled: 'Prescription', filled: 'Filled', filledOn: 'Filled {d}', notFilled: 'Not filled',
+      dayOf: 'The day of {name}', dayHint: 'Tap what you saw. Anyone looking after them sees it, and a sudden change warns everyone.', lastDays: 'Last days', warnTail: 'Sudden changes like these can mean an infection, dehydration or pain. Consider calling the doctor.',
+      lg_water: 'Drinking', lg_meal: 'Meals', lg_sleep: 'Sleep', lg_toilet: 'Toilet', lg_pain: 'Pain', lg_mood: 'Mood', lg_behaviour: 'Behaviour',
+      lv_none: 'None', lv_little: 'A little', lv_enough: 'Enough', lv_some: 'Some', lv_all: 'All', lv_bad: 'Bad', lv_broken: 'Broken', lv_good: 'Good', lv_normal: 'Normal', lv_accident: 'Accident', lv_pain: 'Pain',
+      lv_calm: 'Calm', lv_confused: 'Confused', lv_upset: 'Upset', lv_wandering: 'Wandering', lv_agitated: 'Agitated', lv_repeating: 'Repeating', lv_refusing: 'Refusing', lv_hallucinating: 'Seeing things', lv_other: 'Other',
+      forEr: 'For the emergency room', erShort: 'Diagnosis, allergies, medicines, wishes', erEmpty: 'Fill this in now, while it is calm: tap Change. The medicines and doctors already come from Covara.', showNurse: 'Show the nurse',
+      ifMissing: 'If {name} goes missing', missShort: 'A description for the police', missEmpty: 'Describe them now, while it is calm: tap Change. The last position comes from WHEREIS.', showPolice: 'Show the police', lastSeen: 'Last position',
+      fallsRooms: 'Falls and rooms', fallsShort: 'Room sensors', fallsBody: 'A room sensor sees a fall and which room they are in. To add one: Settings, Room sensors.',
+      whoDecides: 'Who decides for {name}', pxNobody: 'No one named yet', pxNamedShort: '{name}, when needed', pxNow: '{name} decides now',
+      pxWhy: 'Name the person who will make these choices for you if one day you cannot: what each person sees, and who joins. Choose now, while you can. Tap a name.',
+      pxNamed: '{name} will decide for you if a doctor says you no longer can. Tap another name to change, or the same name to remove.', pxNoFamily: 'Add family first: Settings, Family.',
+      pxActiveHome: '{name} is making these choices for you now. You can take them back at any time.', pxDecideAgain: 'I decide again',
+      pxNone: '{name} has not named anyone to decide for them.', pxNamedOther: '{name} named {proxy} to decide when needed.',
+      pxYouNamed: '{name} named you to make their choices if a doctor says they can no longer decide.', pxCannot: '{name} can no longer decide', pxActiveOther: '{proxy} decides for {name} now.',
+      pxYouDecide: 'You decide for {name} now: who joins, and what each person sees.', pxEnd: '{name} decides again', pxAsks: 'asks to join', pxApprove: 'Let them join',
+      pxOnWhy: 'Do this only when a doctor has said {name} can no longer make these choices. Everyone looking after them is told, and {name} can take it back at any time.',
+      pxDoctor: 'The doctor who said so', pxDate: 'When', pxNote: 'Note (optional)', pxConfirm: 'A doctor has said {name} can no longer decide', pxTake: 'Decide for them now', pxNeedDoc: 'Write the doctor\u2019s name.', pxNeedOk: 'Tap the confirmation first.', decides: 'Decides for them',
+      sk_location: 'Where', sk_rooms: 'Room', sk_falls: 'Falls', sk_care: 'Medicines', sk_mood: 'Mood', sk_activity: 'Moving',
+      aboutTitle: 'About {name}', aboutShort: 'Who they are, what calms them', aboutEmpty: 'Tell anyone new who {name} is: tap Change.', noCare: '{name} has not chosen to share medicines and visits with you.',
+      sh_diagnosis: 'Diagnosis', sh_stage: 'Stage', sh_allergies: 'Allergies', sh_conditions: 'Other conditions', sh_blood: 'Blood type', sh_dnr: 'If the heart stops', sh_directive: 'Advance directive', sh_insurance: 'Insurance', sh_hospital: 'Preferred hospital', sh_talk: 'How to talk to them',
+      sh_height: 'Height', sh_weight: 'Weight', sh_hair: 'Hair', sh_eyes: 'Eyes', sh_marks: 'Marks, glasses, walking', sh_clothes: 'Usually wears', sh_aids: 'Wears or carries', sh_language: 'Language', sh_places: 'Places they may go',
+      sh_nickname: 'Likes to be called', sh_work: 'Their work', sh_story: 'Their story', sh_likes: 'Loves', sh_calms: 'What calms them', sh_upsets: 'What upsets them',
+      dnr_full: 'Resuscitate', dnr_dnr: 'Do not resuscitate (DNR)', dnr_polst: 'See POLST form', dnr_unknown: 'Not decided',
+      ph_diagnosis: 'For example Alzheimer\u2019s disease', ph_stage: 'Early, middle or late', ph_allergies: 'Medicines and foods', ph_conditions: 'For example diabetes, heart', ph_blood: 'For example A+', ph_directive: 'Where the papers are', ph_insurance: 'Plan and member number', ph_hospital: 'Name and address', ph_talk: 'For example speak slowly, one question at a time',
+      ph_height: 'For example 5 ft 9', ph_weight: 'For example 160 lb', ph_hair: 'Colour and length', ph_eyes: 'Colour', ph_marks: 'Scars, glasses, a cane', ph_clothes: 'For example blue cardigan', ph_aids: 'Hearing aid, ID bracelet', ph_language: 'For example English', ph_places: 'Old home, old work, church',
+      ph_nickname: 'For example Nonno', ph_work: 'For example teacher', ph_story: 'Where they grew up, family, proud moments', ph_likes: 'Music, food, places', ph_calms: 'For example a walk, old songs', ph_upsets: 'For example being rushed, noise',
+      to: 'to', shiftNone: 'No one is on the rota yet.', addShift: 'Add a shift', onDuty: 'Who is on duty', onNow: '{name} is on duty now', nextShift: 'Next: {name}, {when}', shiftShort: 'The rota of family and carers',
+      hoPh: 'What the next person should know: sleep, meals, mood, anything new', hoSave: 'Leave the note', handover: 'Handover notes', hoShort: 'What the next person should know',
+      checkIn: 'I am here', checkWhy: 'Tap when you arrive at {name}’s home and when you leave. Your phone checks it is at the address, so the family can trust the visits.', imHere: 'I have arrived', imLeaving: 'I am leaving',
+      vi_arrived: 'arrived', vi_left: 'left', loc_here: 'at {name}’s address', loc_away: 'not at the address', loc_unknown: 'position not known', youAreHere: 'You arrived at {when}', checkShort: 'Arriving and leaving, checked',
+      forYou: 'For you', forYouShort: 'How you are holding up, and help', holding: 'How are you holding up today?', me_good: 'Good', me_tired: 'Tired', me_overwhelmed: 'Overwhelmed',
+      meHelpTired: 'Ask someone in the family to take the next shift: Visits, Who is on duty. Short breaks keep you going.', meHelpBad: 'You do not have to carry this alone. Call the Alzheimer’s Association Helpline now, any hour, and ask the family to cover the next days.',
+      helpline: 'Call the 24/7 Helpline 800-272-3900', whoDid: 'Who did what this week', entries: '{n} entries', entry1: '1 entry',
+      comfortTitle: 'Comfort', comfortShort: 'Music, photos and stories that calm', comfortEmpty: 'Add the songs, photos and stories that calm {name}. Music from their youth often helps most.', addComfort: 'Add something that comforts',
+      ct_music: 'Music', ct_photo: 'Photo', ct_video: 'Video', ct_story: 'Story', play: 'Play', nItems: '{n} saved', ctTitle: 'Name (for example Moon River)', ctUrl: 'Link (optional)', ctPhoto: 'Add a photo', needHttps: 'The link must start with https://',
+      leaving: 'When {name} leaves home', leaveWhy: 'The family is told the moment {name}’s phone leaves home, with the way walked on WHEREIS. Choose when:', lv2_night: 'At night', lv2_always: 'Any time', lv2_off: 'Never',
+      leaveDoor: 'If {name} may leave without the phone, add a room sensor on the front door named Front door (Settings, Room sensors). It warns when the door opens at night.',
+      moneyTitle: 'Money and scams', moneyShort: 'Report a scam call or unusual spending', worryWhy: 'People with memory loss are often targeted. Report anything worrying and the family is told at once.', worryPh: 'What happened (optional)',
+      wo_scam_call: 'Scam call', wo_spending: 'Unusual spending', wo_stranger: 'New person asking for money', wo_other: 'Other worry',
+      worryTips: 'Never give card or bank numbers on the phone. Medicare and banks do not call asking for them. Ask the bank for alerts on large payments, and add a trusted contact to the accounts.',
+      docsTitle: 'Legal documents', docsEmpty: 'Keep the legal papers here so they are ready when needed. Take a photo or add the PDF.', docsMissing: 'Missing: {list}', addDoc: 'Add a document', openDoc: 'Open',
+      dt_poa_health: 'Health care power of attorney', dt_poa_money: 'Financial power of attorney', dt_directive: 'Advance directive', dt_will: 'Will', dt_hipaa: 'HIPAA authorization', dt_insurance: 'Insurance', dt_id: 'ID and cards', dt_other: 'Other',
+      docTitle: 'Name', docKept: 'Where the original is kept', docOn: 'Signed on', docFile: 'Add the PDF or a photo',
+      shiftWho: 'Who', shiftStart: 'From', shiftEnd: 'To', noAppts: 'No appointments coming up.',
+      doubleWarn: '{med} was marked taken again {min} min after the last dose. Check before any more is taken. If a second dose was taken, call the doctor or pharmacist.',
+      dVoice: 'Voice', voiceBy: 'A message from {name}', playVoice: 'Play the message', voiceLabel: 'A family voice for when it is due', voiceRec: 'Record a message', voiceAgain: 'Record again', voiceStop: 'Stop', voiceNoMic: 'The microphone is not available. Allow it in the browser and try again.',
+      meds: 'Medicines', appts: 'Appointments', subs: 'Subscriptions',
       video: 'Video', phone: 'Phone', message: 'Message', email: 'Email',
       now: 'NOW', late: 'LATE', today: 'Today', tomorrow: 'Tomorrow', next: 'NEXT', none: 'Nothing recorded',
       addMed: 'Add a medicine', addAppt: 'Add an appointment', addSub: 'Add a subscription',
@@ -39,6 +87,53 @@
       forms: { tablet: 'tablet', pill: 'pill', capsule: 'capsule', drop: 'drop', ml: 'ml', puff: 'puff', injection: 'injection', patch: 'patch', spoon: 'spoon', sachet: 'sachet' }
     },
     it: {
+      sec_med: 'Medicine', sec_visit: 'Visite', sec_health: 'Salute', sec_safety: 'Sicurezza', sec_papers: 'Documenti', me: 'me',
+      dFilled: 'Ricetta', filled: 'Ritirata', filledOn: 'Ritirata il {d}', notFilled: 'Da ritirare',
+      dayOf: 'La giornata di {name}', dayHint: 'Tocca ciò che hai visto. Chi lo assiste lo vede, e un cambiamento improvviso avvisa tutti.', lastDays: 'Ultimi giorni', warnTail: 'Cambiamenti improvvisi come questi possono indicare un\u2019infezione, disidratazione o dolore. Valuta di chiamare il medico.',
+      lg_water: 'Bere', lg_meal: 'Pasti', lg_sleep: 'Sonno', lg_toilet: 'Bagno', lg_pain: 'Dolore', lg_mood: 'Umore', lg_behaviour: 'Comportamento',
+      lv_none: 'Niente', lv_little: 'Poco', lv_enough: 'Abbastanza', lv_some: 'Un po\u2019', lv_all: 'Tutto', lv_bad: 'Male', lv_broken: 'Interrotto', lv_good: 'Bene', lv_normal: 'Normale', lv_accident: 'Incidente', lv_pain: 'Dolore',
+      lv_calm: 'Calmo', lv_confused: 'Confuso', lv_upset: 'Agitato', lv_wandering: 'Vaga', lv_agitated: 'Agitazione', lv_repeating: 'Ripete', lv_refusing: 'Rifiuta', lv_hallucinating: 'Vede cose', lv_other: 'Altro',
+      forEr: 'Per il pronto soccorso', erShort: 'Diagnosi, allergie, medicine, volontà', erEmpty: 'Compilalo ora, con calma: tocca Modifica. Medicine e medici arrivano già da Covara.', showNurse: 'Mostra all\u2019infermiere',
+      ifMissing: 'Se {name} si perde', missShort: 'Una descrizione per la polizia', missEmpty: 'Descrivilo ora, con calma: tocca Modifica. L\u2019ultima posizione arriva da WHEREIS.', showPolice: 'Mostra alla polizia', lastSeen: 'Ultima posizione',
+      fallsRooms: 'Cadute e stanze', fallsShort: 'Sensori nelle stanze', fallsBody: 'Un sensore nella stanza vede una caduta e in quale stanza si trova. Per aggiungerne uno: Impostazioni, Sensori delle stanze.',
+      whoDecides: 'Chi decide per {name}', pxNobody: 'Nessuno ancora', pxNamedShort: '{name}, se serve', pxNow: 'Ora decide {name}',
+      pxWhy: 'Indica chi farà queste scelte per te se un giorno non potrai: cosa vede ciascuno, e chi entra. Scegli ora, finché puoi. Tocca un nome.',
+      pxNamed: '{name} deciderà per te se un medico dirà che non puoi più. Tocca un altro nome per cambiare, o lo stesso per togliere.', pxNoFamily: 'Aggiungi prima la famiglia: Impostazioni, Famiglia.',
+      pxActiveHome: '{name} fa ora queste scelte per te. Puoi riprenderle quando vuoi.', pxDecideAgain: 'Decido di nuovo io',
+      pxNone: '{name} non ha indicato nessuno che decida per lui.', pxNamedOther: '{name} ha indicato {proxy} per decidere se serve.',
+      pxYouNamed: '{name} ha indicato te per fare le sue scelte se un medico dirà che non può più decidere.', pxCannot: '{name} non può più decidere', pxActiveOther: 'Ora {proxy} decide per {name}.',
+      pxYouDecide: 'Ora decidi tu per {name}: chi entra, e cosa vede ciascuno.', pxEnd: '{name} decide di nuovo', pxAsks: 'chiede di entrare', pxApprove: 'Fallo entrare',
+      pxOnWhy: 'Fallo solo quando un medico ha detto che {name} non può più fare queste scelte. Tutti quelli che lo assistono vengono avvisati, e {name} può riprenderle quando vuole.',
+      pxDoctor: 'Il medico che lo ha detto', pxDate: 'Quando', pxNote: 'Nota (facoltativa)', pxConfirm: 'Un medico ha detto che {name} non può più decidere', pxTake: 'Decidi per lui ora', pxNeedDoc: 'Scrivi il nome del medico.', pxNeedOk: 'Tocca prima la conferma.', decides: 'Decide per lui',
+      sk_location: 'Dove', sk_rooms: 'Stanza', sk_falls: 'Cadute', sk_care: 'Medicine', sk_mood: 'Umore', sk_activity: 'Movimento',
+      aboutTitle: 'Chi è {name}', aboutShort: 'Chi è, cosa lo calma', aboutEmpty: 'Racconta a chi arriva chi è {name}: tocca Modifica.', noCare: '{name} non ha scelto di condividere medicine e visite con te.',
+      sh_diagnosis: 'Diagnosi', sh_stage: 'Fase', sh_allergies: 'Allergie', sh_conditions: 'Altre malattie', sh_blood: 'Gruppo sanguigno', sh_dnr: 'Se il cuore si ferma', sh_directive: 'Disposizioni anticipate', sh_insurance: 'Assicurazione', sh_hospital: 'Ospedale preferito', sh_talk: 'Come parlargli',
+      sh_height: 'Altezza', sh_weight: 'Peso', sh_hair: 'Capelli', sh_eyes: 'Occhi', sh_marks: 'Segni, occhiali, andatura', sh_clothes: 'Di solito indossa', sh_aids: 'Porta con sé', sh_language: 'Lingua', sh_places: 'Posti dove può andare',
+      sh_nickname: 'Come ama essere chiamato', sh_work: 'Il suo lavoro', sh_story: 'La sua storia', sh_likes: 'Ama', sh_calms: 'Cosa lo calma', sh_upsets: 'Cosa lo agita',
+      dnr_full: 'Rianimare', dnr_dnr: 'Non rianimare (DNR)', dnr_polst: 'Vedi modulo POLST', dnr_unknown: 'Non deciso',
+      ph_diagnosis: 'Per esempio Alzheimer', ph_stage: 'Iniziale, intermedia o avanzata', ph_allergies: 'Medicine e cibi', ph_conditions: 'Per esempio diabete, cuore', ph_blood: 'Per esempio A+', ph_directive: 'Dove sono i documenti', ph_insurance: 'Piano e numero', ph_hospital: 'Nome e indirizzo', ph_talk: 'Per esempio parla piano, una domanda alla volta',
+      ph_height: 'Per esempio 175 cm', ph_weight: 'Per esempio 72 kg', ph_hair: 'Colore e lunghezza', ph_eyes: 'Colore', ph_marks: 'Cicatrici, occhiali, bastone', ph_clothes: 'Per esempio cardigan blu', ph_aids: 'Apparecchio acustico, braccialetto', ph_language: 'Per esempio italiano', ph_places: 'Vecchia casa, vecchio lavoro, chiesa',
+      ph_nickname: 'Per esempio Nonno', ph_work: 'Per esempio insegnante', ph_story: 'Dove è cresciuto, famiglia, momenti di orgoglio', ph_likes: 'Musica, cibo, luoghi', ph_calms: 'Per esempio una passeggiata, vecchie canzoni', ph_upsets: 'Per esempio la fretta, il rumore',
+      to: 'alle', shiftNone: 'Nessuno ancora nei turni.', addShift: 'Aggiungi un turno', onDuty: 'Chi è di turno', onNow: 'Ora è di turno {name}', nextShift: 'Prossimo: {name}, {when}', shiftShort: 'I turni di famiglia e assistenti',
+      hoPh: 'Cosa deve sapere chi arriva: sonno, pasti, umore, novità', hoSave: 'Lascia la nota', handover: 'Note per il cambio', hoShort: 'Cosa deve sapere chi arriva',
+      checkIn: 'Sono qui', checkWhy: 'Tocca quando arrivi a casa di {name} e quando vai via. Il telefono controlla che sia all’indirizzo, così la famiglia può fidarsi delle visite.', imHere: 'Sono arrivato', imLeaving: 'Vado via',
+      vi_arrived: 'arrivato', vi_left: 'andato via', loc_here: 'all’indirizzo di {name}', loc_away: 'non all’indirizzo', loc_unknown: 'posizione non nota', youAreHere: 'Sei arrivato alle {when}', checkShort: 'Arrivi e partenze, verificati',
+      forYou: 'Per te', forYouShort: 'Come stai, e un aiuto', holding: 'Come stai oggi?', me_good: 'Bene', me_tired: 'Stanco', me_overwhelmed: 'Sopraffatto',
+      meHelpTired: 'Chiedi a qualcuno della famiglia il prossimo turno: Visite, Chi è di turno. Brevi pause ti aiutano a continuare.', meHelpBad: 'Non devi portarlo da solo. Chiama ora una linea di aiuto per l’Alzheimer e chiedi alla famiglia di coprire i prossimi giorni.',
+      helpline: 'Chiama la linea 24/7 (USA) 800-272-3900', whoDid: 'Chi ha fatto cosa questa settimana', entries: '{n} registrazioni', entry1: '1 registrazione',
+      comfortTitle: 'Conforto', comfortShort: 'Musica, foto e storie che calmano', comfortEmpty: 'Aggiungi le canzoni, le foto e le storie che calmano {name}. La musica della giovinezza spesso aiuta di più.', addComfort: 'Aggiungi qualcosa che conforta',
+      ct_music: 'Musica', ct_photo: 'Foto', ct_video: 'Video', ct_story: 'Storia', play: 'Ascolta', nItems: '{n} salvati', ctTitle: 'Nome (per esempio Volare)', ctUrl: 'Link (facoltativo)', ctPhoto: 'Aggiungi una foto', needHttps: 'Il link deve iniziare con https://',
+      leaving: 'Quando {name} esce di casa', leaveWhy: 'La famiglia viene avvisata appena il telefono di {name} esce di casa, con il percorso su WHEREIS. Scegli quando:', lv2_night: 'Di notte', lv2_always: 'Sempre', lv2_off: 'Mai',
+      leaveDoor: 'Se {name} può uscire senza telefono, aggiungi un sensore sulla porta d’ingresso chiamato Porta (Impostazioni, Sensori delle stanze). Avvisa quando la porta si apre di notte.',
+      moneyTitle: 'Soldi e truffe', moneyShort: 'Segnala una chiamata truffa o spese insolite', worryWhy: 'Le persone con perdita di memoria sono spesso prese di mira. Segnala ciò che ti preoccupa e la famiglia viene avvisata subito.', worryPh: 'Cosa è successo (facoltativo)',
+      wo_scam_call: 'Chiamata truffa', wo_spending: 'Spese insolite', wo_stranger: 'Persona nuova che chiede soldi', wo_other: 'Altra preoccupazione',
+      worryTips: 'Mai dare numeri di carte o conti al telefono. Banche ed enti non li chiedono. Chiedi alla banca avvisi sui pagamenti grandi e aggiungi una persona di fiducia ai conti.',
+      docsTitle: 'Documenti legali', docsEmpty: 'Tieni qui i documenti legali, pronti quando servono. Fai una foto o aggiungi il PDF.', docsMissing: 'Mancano: {list}', addDoc: 'Aggiungi un documento', openDoc: 'Apri',
+      dt_poa_health: 'Procura sanitaria', dt_poa_money: 'Procura finanziaria', dt_directive: 'Disposizioni anticipate', dt_will: 'Testamento', dt_hipaa: 'Autorizzazione privacy', dt_insurance: 'Assicurazione', dt_id: 'Documenti e tessere', dt_other: 'Altro',
+      docTitle: 'Nome', docKept: 'Dove si trova l’originale', docOn: 'Firmato il', docFile: 'Aggiungi il PDF o una foto',
+      shiftWho: 'Chi', shiftStart: 'Dalle', shiftEnd: 'Alle', noAppts: 'Nessun appuntamento in arrivo.',
+      doubleWarn: '{med} è stata segnata di nuovo {min} min dopo l’ultima dose. Controlla prima di darne altra. Se è stata presa una seconda dose, chiama il medico o il farmacista.',
+      dVoice: 'Voce', voiceBy: 'Un messaggio di {name}', playVoice: 'Ascolta il messaggio', voiceLabel: 'Una voce di famiglia per quando è ora', voiceRec: 'Registra un messaggio', voiceAgain: 'Registra di nuovo', voiceStop: 'Ferma', voiceNoMic: 'Il microfono non è disponibile. Consentilo nel browser e riprova.',
       meds: 'Medicine', appts: 'Appuntamenti', subs: 'Abbonamenti',
       video: 'Video', phone: 'Telefono', message: 'Messaggio', email: 'Email',
       now: 'ORA', late: 'IN RITARDO', today: 'Oggi', tomorrow: 'Domani', next: 'PROSSIMA', none: 'Niente registrato',
@@ -143,9 +238,28 @@
     '.cvx-add{display:block;width:100%;padding:9px 6px;background:none;border:0;color:rgba(95,208,255,0.9);font:600 12px var(--nous-font,"Hanken Grotesk",sans-serif);text-align:left;cursor:pointer;border-radius:10px}' +
     '.cvx-add:hover{background:rgba(255,255,255,0.03)}' +
     '.cvx-empty{padding:8px 6px;font-size:12px;color:rgba(200,214,232,0.6)}' +
+    '.cvx-head{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;margin:0 0 6px;border-radius:12px;background:rgba(14,22,36,0.86);border:1px solid rgba(56,189,248,0.5);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}' +
+    '.cvx-head b{font-family:var(--nous-mono,"JetBrains Mono",monospace);font-size:10.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#fff}.cvx-head span{flex:1;font-size:12px;color:rgba(200,214,232,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cvx-x{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:transparent;color:#d8e8ff;font-size:18px;line-height:1;cursor:pointer}' +
+    '.cvx-bar{flex:0 0 auto;width:4px;align-self:stretch;min-height:30px;border-radius:2px;background:#38bdf8}.cvx-bar.red{background:#ef4444}.cvx-bar.gold{background:#C5A55A}.cvx-bar.blue{background:#38bdf8}' +
+    '.cvx-row .cvx-chev{font-size:13px;color:rgba(159,216,255,0.7);transition:transform .25s ease}.cvx-item.open .cvx-chev{transform:rotate(90deg)}' +
+    '.cvx-sub{font-size:12px;line-height:1.45;color:rgba(214,226,244,.85);margin:4px 6px 8px}' +
+    '.cvx-warn{font-size:12px;line-height:1.45;color:#fecaca;background:rgba(239,68,68,.14);border:1px solid rgba(239,68,68,.4);border-radius:10px;padding:8px 10px;margin:4px 6px 8px}' +
+    '.cvx-nm small.warn{color:#ffd24d}' +
+    '.cvh{padding:0 6px}.cvh-k{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}.cvh-l{font:700 10px var(--nous-mono,"JetBrains Mono",monospace);letter-spacing:1.4px;text-transform:uppercase;color:rgba(159,216,255,.85);margin:0 0 6px}' +
+    '.cvh-l i{font-style:normal;letter-spacing:.5px;text-transform:none;font-weight:600;margin-left:6px}' +
+    '.good{color:#86efac}.mid{color:#ffd24d}.bad{color:#fca5a5}' +
+    '.cvt-chip.sm{min-height:32px;padding:0 11px;font-size:12px}.cvt-chip.sm.good{border-color:rgba(134,239,172,.35)}.cvt-chip.sm.mid{border-color:rgba(255,210,77,.35)}.cvt-chip.sm.bad{border-color:rgba(252,165,165,.4)}' +
+    '.cvh-w{list-style:none;margin:0 6px 6px;padding:0;font-size:12px}.cvh-w li{padding:3px 0}.cvh-w small{color:rgba(200,214,232,.65)}' +
+    '.cvp-l{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}.cvp-l b{font-size:13px}.cvp-l small{color:rgba(200,214,232,.7)}.cvp-l .cvt-chips{margin-top:6px;gap:6px}' +
+    '.cvt-f textarea{width:100%;box-sizing:border-box;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(10,14,22,.9);color:#f1f6ff;font:500 15px "Hanken Grotesk",sans-serif;padding:10px 14px;resize:vertical}' +
+    '.cvx-card .cvx-kv{font-size:16px;text-align:left;gap:8px 14px}.cvx-card .cvx-kv dt{font-size:11px}' +
+    '.cvx-btn.warn{border-color:rgba(255,210,77,.6);color:#ffe9a8}' +
+    '.cvc{display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.05)}.cvc .cvx-btn{flex:0 0 auto;display:inline-flex;align-items:center;text-decoration:none}' +
+    '.cvx-lnk{background:none;border:0;color:rgba(252,165,165,.85);font:600 11px var(--nous-font,"Hanken Grotesk",sans-serif);cursor:pointer;padding:4px}' +
     '.cv-pbrief{position:fixed;z-index:30}.cv-pbrief .db-issue{-webkit-line-clamp:3}' +
     '.cvx-ini{display:flex;align-items:center;justify-content:center;font:700 12px var(--nous-font,"Hanken Grotesk",sans-serif);color:#0c0e14}' +
-    '@media (max-width:700px){#cvTabs{top:78px;left:10px;width:min(240px,58vw)}#cvTabs.is-open{width:calc(100vw - 20px)}.cvx-list{max-height:52vh}.cvx-tab b{letter-spacing:1.2px}}' +
+    '@media (max-width:700px){#cvTabs{top:78px;left:10px;width:calc(100vw - 20px)}.cvx-list{max-height:52vh}.cvx-tab b{letter-spacing:1.2px}}' +
     /* the add, change and photo sheets */
     '.cvt-f{display:flex;flex-direction:column;gap:10px;text-align:left;margin-top:14px}' +
     '.cvt-f label{font:600 10.5px "JetBrains Mono",monospace;letter-spacing:.14em;color:#5fd0ff;text-transform:uppercase}' +
@@ -180,11 +294,14 @@
   async function load() {
     var s = subject();
     if (!s || !authed()) { _data = null; render(); syncSpheres(); return; }
-    if (!s.edit) { _data = { s: s, today: { items: [] }, items: [] }; render(); syncSpheres(); return; }
     if (_busy) return; _busy = true;
     try {
+      var px = await api('/care/proxy' + q(s)).catch(function () { return { ok: false }; });
+      if (!s.edit) { _data = { s: s, today: { items: [] }, items: [], proxy: px.ok ? px.data : null, warn: _data && _data.warn }; render(); syncSpheres(); return; }
       var a = await api('/care/today' + q(s)), b = await api('/care/items' + q(s)), c = role() === 'away' ? await api('/care/circle' + q(s)) : { ok: false };
-      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [] }; render(); syncSpheres(); }
+      try { if (window.CovaraWhere) CovaraWhere.load(true); } catch (e) {}
+      var lg = await api('/care/log' + (q(s) ? q(s) + '&' : '?') + 'days=7').catch(function () { return { ok: false }; }), sh = await api('/care/sheet' + q(s)).catch(function () { return { ok: false }; });
+      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
     } catch (e) {} finally { _busy = false; }
   }
 
@@ -231,11 +348,15 @@
     return { med: meds, appt: appts, sub: subs, rec: recs };
   }
 
-  /* ── the pull tabs ── */
+  /* ── HOME's care: five pills on the left of HOME's sphere, mirroring Video, Phone, Message, Email.
+     Medicines (with whether each prescription is filled), Visits, Health (HOME's day), Safety
+     (for the emergency room, and if HOME goes missing) and Papers (who decides for HOME, who sees
+     HOME's medical records, and who HOME is). A pill opens its panel in the upper left. ── */
   var box = document.createElement('div'); box.id = 'cvTabs'; box.setAttribute('aria-label', 'Care');
   document.body.appendChild(box);
   var _open = '', _openItem = '';
-  var TABS = [['med', 'meds', 'addMed'], ['appt', 'appts', 'addAppt'], ['sub', 'subs', 'addSub'], ['rec', 'recs', 'addRec']];
+  var SECTIONS = ['med', 'visit', 'health', 'safety', 'papers'];
+  var SEC_ADD = { med: 'addMed', visit: 'addAppt' };
 
   function ph(it) {
     return it.photo ? 'background-image:url("' + photoUrl(it.photo).replace(/["\\]/g, '') + '")' : 'background:' + orbOf(it.title);
@@ -253,6 +374,15 @@
     var perDay = per * ((it.times || []).length || 0);
     var out = perDay ? Date.now() + (left / perDay) * 864e5 : null;
     return { left: left, out: out };
+  }
+  /* The prescription: filled (picked up) or not filled (running out, or never picked up) */
+  function filled(it) {
+    var m = it.meta || {}, sp = supply(it);
+    var low = sp && (sp.left <= 0 || (sp.out && sp.out - Date.now() < 7 * 864e5));
+    if (low) return { ok: false, text: t('notFilled') + (sp.out ? ' · ' + t('runsOut') + ' ' + dayLabel(sp.out) : '') };
+    if (m.refilled_on) return { ok: true, text: t('filledOn', { d: dateOnly(m.refilled_on) }) };
+    if (m.dispensed) return { ok: true, text: t('filled') };
+    return null;
   }
   function who(id) { if (id === myId()) return t('you'); if (_data.s.contact && id === _data.s.home) return _data.s.contact.first; return ''; }
   function feedbackHtml(it) {
@@ -277,25 +407,27 @@
       kv('dWatch', m.watch_for);
       kv('dBy', [m.prescriber, m.prescribed_on ? dateOnly(m.prescribed_on) : '', m.prescriber_phone].filter(Boolean).join(' · '));
       kv('dRx', m.rx_number);
+      var fl = filled(it); kv('dFilled', fl ? fl.text : '');
+      kv('dVoice', m.voice_url ? t('voiceBy', { name: m.voice_by || '' }) : '');
       kv('dFrom', [m.source ? t(m.source) : '', m.source_name, m.source_phone, m.source_address].filter(Boolean).join(' · '));
       kv('dStart', m.start_on ? dateOnly(m.start_on) + (m.end_on ? '' : ' · ' + t('ongoing')) : '');
       kv('dEnds', m.end_on ? dateOnly(m.end_on) : '');
       var sp = supply(it);
       kv('dSupply', [sp ? sp.left + ' ' + t('left') + (sp.out ? ', ' + t('runsOut') + ' ' + dayLabel(sp.out) : '') : '', m.refills != null ? m.refills + ' ' + t('refills') : ''].filter(Boolean).join(' · '));
-    } else if (kind === 'appt') {
+    } else {
       kv('dWhen', when(it.at)); kv('dWith', m.with); kv('dWhere', m.place || it.detail); kv('dNotes', m.notes);
       kv('dLastDone', it.last_done ? when(it.last_done) : '');
-    } else {
-      kv('dRenews', it.at ? dayLabel(it.at) : ''); kv('dProvider', m.provider || it.detail); kv('dEvery', m.every); kv('dCost', m.cost); kv('dNotes', m.notes);
     }
-    var canMark = (kind === 'med' && e.n.slot && e.n.state !== 'off') || (kind === 'appt' && e.n.state !== 'done' && dayLabel(it.at) === t('today'));
+    var canMark = (kind === 'med' && e.n.slot && e.n.state !== 'off') || (kind === 'visit' && e.n.state !== 'done' && dayLabel(it.at) === t('today'));
     var acts = '<div class="cvx-acts">' +
       (canMark && _data.s.edit ? '<button type="button" class="cvx-btn pri" data-a="mark">' + esc(kind === 'med' ? t('taken') : t('done')) + '</button>' : '') +
       (_data.s.edit ? '<button type="button" class="cvx-btn" data-a="edit">' + esc(t('change')) + '</button>' : '') +
-      (_data.s.edit && kind === 'med' ? '<button type="button" class="cvx-btn" data-a="refill">' + esc(t('refill')) + '</button>' : '') + '</div>';
+      (_data.s.edit && kind === 'med' ? '<button type="button" class="cvx-btn" data-a="refill">' + esc(t('refill')) + '</button>' : '') +
+      (kind === 'med' && m.voice_url ? '<button type="button" class="cvx-btn" data-a="voice" data-src="' + esc(photoUrl(m.voice_url)) + '">' + esc(t('playVoice')) + '</button>' : '') + '</div>';
     return '<button type="button" class="cvx-big" style="' + esc(ph(it)) + '" data-a="photo" aria-label="' + esc(it.title) + '"></button>' +
       '<dl class="cvx-kv">' + rows.join('') + '</dl>' + acts + (_data.s.edit ? feedbackHtml(it) : '');
   }
+  function initials2(n) { var w = String(n || '').replace(/^(dr|dott)\.?\s+/i, '').trim().split(/\s+/); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
   function recRow(e) {
     var it = e.it, m = it.meta || {}, key = it.id;
     var sub = [m.relation, m.profession].filter(Boolean).join(' · ');
@@ -305,76 +437,362 @@
     if (it.kind === 'family') kv('whatSee', t('seesCovara'));
     var canEdit = role() === 'home';
     var acts = canEdit ? '<div class="cvx-acts">' + (it.kind === 'family' ? '<button type="button" class="cvx-btn" data-a="consent">' + esc(t('whatSee')) + '</button>' : '<button type="button" class="cvx-btn" data-a="edit">' + esc(t('change')) + '</button>') + '</div>' : '';
-    var pic = it.contact && typeof contactPhotos !== 'undefined' && contactPhotos.get(it.contact.id) ? '' : '';
     return '<div class="cvx-item' + (_openItem === key ? ' open' : '') + '" data-id="' + esc(key) + '" data-kind="rec">' +
       '<button type="button" class="cvx-row" aria-expanded="' + (_openItem === key) + '"><span class="cvx-ph cvx-ini" style="' + esc('background:' + orbOf(it.title)) + '">' + esc(initials2(it.title)) + '</span>' +
-      '<span class="cvx-nm"><span>' + esc(it.title) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' +
-      '<span class="cvx-when">' + esc(m.org ? '' : '') + pic + '</span></button>' +
+      '<span class="cvx-nm"><span>' + esc(it.title) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span></button>' +
       '<div class="cvx-det" style="padding-left:50px">' + (_openItem === key ? '<dl class="cvx-kv">' + rows.join('') + '</dl>' + acts : '') + '</div></div>';
   }
-  function initials2(n) { var w = String(n || '').replace(/^(dr|dott)\.?\s+/i, '').trim().split(/\s+/); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
   function rowHtml(kind, e) {
     if (kind === 'rec') return recRow(e);
     var it = e.it, m = it.meta || {};
-    var sub = kind === 'med' ? (doseText(m) || it.detail || '') : kind === 'appt' ? [m.with, m.place || it.detail].filter(Boolean).join(' · ') : (m.provider || it.detail || '');
-    var w = kind === 'med' ? nextLabel(e.n) : kind === 'appt' ? (e.n.state === 'done' ? t('done').toUpperCase() : dayLabel(it.at).toUpperCase() + ' ' + hhmm(it.at)) : (it.at ? dayLabel(it.at).toUpperCase() : '');
+    var sub = kind === 'med' ? (doseText(m) || it.detail || '') : [m.with, m.place || it.detail].filter(Boolean).join(' · ');
+    var fl = kind === 'med' ? filled(it) : null;
+    if (fl && !fl.ok) sub = t('notFilled') + (sub ? ' · ' + sub : '');
+    var w = kind === 'med' ? nextLabel(e.n) : (e.n.state === 'done' ? t('done').toUpperCase() : dayLabel(it.at).toUpperCase() + ' ' + hhmm(it.at));
     var cls = e.n.state === 'late' ? 'late' : e.n.state === 'due' ? 'due' : e.n.state === 'done' ? 'done' : '';
     var key = it.id;
     return '<div class="cvx-item' + (_openItem === key ? ' open' : '') + '" data-id="' + esc(key) + '" data-kind="' + kind + '">' +
       '<button type="button" class="cvx-row" aria-expanded="' + (_openItem === key) + '"><span class="cvx-ph" style="' + esc(ph(it)) + '"></span>' +
-      '<span class="cvx-nm"><span>' + esc(it.title) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' +
+      '<span class="cvx-nm"><span>' + esc(it.title) + '</span>' + (sub ? '<small' + (fl && !fl.ok ? ' class="warn"' : '') + '>' + esc(sub) + '</small>' : '') + '</span>' +
       '<span class="cvx-when ' + cls + '">' + esc(w) + '</span></button>' +
       '<div class="cvx-det">' + (_openItem === key ? detailsHtml(kind, e) : '') + '</div></div>';
   }
+  /* a row in Health, Safety or Papers: a title, a line under it, and what opens */
+  function block(key, title, sub, body, cls) {
+    return '<div class="cvx-item' + (_openItem === key ? ' open' : '') + '" data-id="' + esc(key) + '" data-kind="block">' +
+      '<button type="button" class="cvx-row" aria-expanded="' + (_openItem === key) + '"><span class="cvx-bar ' + (cls || '') + '"></span>' +
+      '<span class="cvx-nm"><span>' + esc(title) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span><span class="cvx-chev" aria-hidden="true">›</span></button>' +
+      '<div class="cvx-det" style="padding-left:16px">' + (_openItem === key ? body : '') + '</div></div>';
+  }
+  function name1() { if (_data.s.home) return _data.s.name || ''; var n = ''; try { n = String(userSphereName || '').trim().split(/\s+/)[0]; } catch (e) {} return n || t('me'); }
+
+  /* ── Health: HOME's day, recorded by anyone looking after HOME in a tap ── */
+  var LOGK = ['water', 'meal', 'sleep', 'toilet', 'pain', 'mood', 'behaviour'];
+  var LOGV = { water: ['none', 'little', 'enough'], meal: ['none', 'some', 'all'], sleep: ['bad', 'broken', 'good'], toilet: ['normal', 'accident', 'pain', 'none'], pain: ['none', 'some', 'bad'], mood: ['calm', 'confused', 'upset'], behaviour: ['wandering', 'agitated', 'repeating', 'refusing', 'hallucinating', 'other'] };
+  var GOOD = { enough: 1, all: 1, good: 1, normal: 1, calm: 1 }, BAD = { none: 1, bad: 1, accident: 1, pain: 1, upset: 1, agitated: 1, hallucinating: 1, wandering: 1 };
+  function tone(k, v) { if (k === 'pain') return v === 'none' ? 'good' : v === 'bad' ? 'bad' : 'mid'; if (k === 'toilet' && v === 'none') return 'mid'; return GOOD[v] ? 'good' : BAD[v] ? 'bad' : 'mid'; }
+  function healthHtml() {
+    var log = _data.log || [], since = new Date(); since.setHours(0, 0, 0, 0);
+    var today = log.filter(function (x) { return x.at >= since.getTime(); });
+    var rows = LOGK.map(function (k) {
+      var last = today.filter(function (x) { return x.kind === k; })[0];
+      return '<div class="cvh-k"><div class="cvh-l">' + esc(t('lg_' + k)) + (last ? ' <i class="' + tone(k, last.value) + '">' + esc(t('lv_' + last.value)) + ' · ' + esc(hhmm(last.at)) + '</i>' : '') + '</div>' +
+        '<div class="cvt-chips cvh-c">' + LOGV[k].map(function (v) { return '<button type="button" class="cvt-chip sm ' + tone(k, v) + '" data-log="' + k + ':' + v + '">' + esc(t('lv_' + v)) + '</button>'; }).join('') + '</div></div>';
+    }).join('');
+    var week = log.filter(function (x) { return LOGV[x.kind]; }).slice(0, 14).map(function (x) { return '<li><b class="' + tone(x.kind, x.value) + '">' + esc(t('lg_' + x.kind) + ': ' + t('lv_' + x.value)) + '</b> <small>' + esc(when(x.at)) + (x.note ? ' · ' + x.note : '') + '</small></li>'; }).join('');
+    return '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 2px">' + esc(t('dayOf', { name: name1() })) + '</div>' +
+      '<div class="cvx-sub">' + esc(t('dayHint')) + '</div>' + (_data.warn ? '<div class="cvx-warn">' + esc(_data.warn) + '</div>' : '') +
+      '<div class="cvh">' + rows + '</div>' +
+      (week ? '<div class="cvx-q" style="margin:12px 6px 4px;color:rgba(159,216,255,.8)">' + esc(t('lastDays')) + '</div><ul class="cvh-w">' + week + '</ul>' : '') + comfortBlock();
+  }
+
+  /* ── Safety: the emergency room, and if HOME goes missing ── */
+  function sheetRows(keys) {
+    var d = (_data.sheet && _data.sheet.data) || {}, rows = [];
+    keys.forEach(function (k) { var v = d[k]; if (k === 'dnr' && v) v = t('dnr_' + v); if (v) rows.push('<dt>' + esc(t('sh_' + k)) + '</dt><dd>' + esc(v) + '</dd>'); });
+    return rows;
+  }
+  var ER_KEYS = ['diagnosis', 'stage', 'allergies', 'conditions', 'blood', 'dnr', 'directive', 'insurance', 'hospital', 'talk'];
+  var MISS_KEYS = ['height', 'weight', 'hair', 'eyes', 'marks', 'clothes', 'aids', 'language', 'places'];
+  var ABOUT_KEYS = ['nickname', 'work', 'story', 'likes', 'calms', 'upsets'];
+  function medsLine() { return (_ls ? _ls.med : []).map(function (x) { return x.it.title + (doseText(x.it.meta || {}) ? ' ' + doseText(x.it.meta || {}) : '') + ((x.it.times || []).length ? ' (' + x.it.times.join(', ') + ')' : ''); }).join('; '); }
+  function doctorsLine() { return (_data.items || []).filter(function (i) { return i.kind === 'access' && (i.meta || {}).group === 'doctor'; }).map(function (i) { return i.title + ((i.meta || {}).phone ? ' ' + i.meta.phone : ''); }).join('; '); }
+  function erHtml(full) {
+    var rows = sheetRows(ER_KEYS);
+    if (medsLine()) rows.splice(Math.min(rows.length, 4), 0, '<dt>' + esc(t('meds')) + '</dt><dd>' + esc(medsLine()) + '</dd>');
+    if (doctorsLine()) rows.push('<dt>' + esc(t('gDoctor')) + '</dt><dd>' + esc(doctorsLine()) + '</dd>');
+    if (_data.proxy && _data.proxy.proxy) rows.push('<dt>' + esc(t('decides')) + '</dt><dd>' + esc(_data.proxy.proxy.name) + '</dd>');
+    var empty = !sheetRows(ER_KEYS).length;
+    return (empty ? '<div class="cvx-sub">' + esc(t('erEmpty')) + '</div>' : '') + '<dl class="cvx-kv">' + rows.join('') + '</dl>' +
+      (full ? '' : '<div class="cvx-acts"><button type="button" class="cvx-btn pri" data-a="show-er">' + esc(t('showNurse')) + '</button>' + (_data.s.edit ? '<button type="button" class="cvx-btn" data-a="sheet-er">' + esc(t('change')) + '</button>' : '') + '</div>');
+  }
+  function missingHtml(full) {
+    var rows = sheetRows(MISS_KEYS), w = window.CovaraWhere && CovaraWhere.data(), loc2 = w && w.location;
+    if (loc2) rows.unshift('<dt>' + esc(t('lastSeen')) + '</dt><dd>' + esc(when(loc2.at) + ' · ' + loc2.lat.toFixed(5) + ', ' + loc2.lon.toFixed(5)) + '</dd>');
+    var empty = !sheetRows(MISS_KEYS).length;
+    return (empty ? '<div class="cvx-sub">' + esc(t('missEmpty')) + '</div>' : '') + '<dl class="cvx-kv">' + rows.join('') + '</dl>' +
+      (full ? '' : '<div class="cvx-acts"><button type="button" class="cvx-btn pri" data-a="show-miss">' + esc(t('showPolice')) + '</button>' + (_data.s.edit ? '<button type="button" class="cvx-btn" data-a="sheet-miss">' + esc(t('change')) + '</button>' : '') + '</div>');
+  }
+  function safetyHtml() {
+    var d = (_data.sheet && _data.sheet.data) || {};
+    return leaveBlock() + block('er', t('forEr'), d.diagnosis ? d.diagnosis + (d.allergies ? ' · ' + t('sh_allergies') + ': ' + d.allergies : '') : t('erShort'), erHtml(false), 'red') +
+      block('miss', t('ifMissing', { name: name1() }), t('missShort'), missingHtml(false), 'gold') +
+      block('rooms', t('fallsRooms'), t('fallsShort'), '<div class="cvx-sub">' + esc(t('fallsBody')) + '</div>', 'blue') + worryBlock();
+  }
+
+  /* ── Papers: who decides for HOME, who sees HOME's medical records, and who HOME is ── */
+  var SHARE_K = ['location', 'rooms', 'falls', 'care', 'mood', 'activity'];
+  function proxyHtml() {
+    var P = _data.proxy || {}, p = P.proxy, me = myId(), out = '';
+    if (role() === 'home') {
+      if (p && p.active) out = '<div class="cvx-sub">' + esc(t('pxActiveHome', { name: p.name })) + '</div><div class="cvx-acts"><button type="button" class="cvx-btn pri" data-a="px-end">' + esc(t('pxDecideAgain')) + '</button></div>';
+      else {
+        var fam = (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).filter(function (c) { return c.care && c.care.side === 'away' && c.care.state === 'active'; });
+        out = '<div class="cvx-sub">' + esc(p ? t('pxNamed', { name: p.name }) : t('pxWhy')) + '</div>' +
+          (fam.length ? '<div class="cvt-chips" style="margin:6px 0 10px">' + fam.map(function (c) { var on = p && c.care.userId === p.user_id; return '<button type="button" class="cvt-chip sm" data-px="' + esc(c.care.userId) + '" aria-pressed="' + !!on + '">' + esc(((c.first || '') + ' ' + (c.last || '')).trim()) + '</button>'; }).join('') + '</div>' : '<div class="cvx-sub">' + esc(t('pxNoFamily')) + '</div>');
+      }
+    } else {
+      if (!p) out = '<div class="cvx-sub">' + esc(t('pxNone', { name: name1() })) + '</div>';
+      else if (p.active && P.you_decide) {
+        out = '<div class="cvx-sub">' + esc(t('pxYouDecide', { name: name1() })) + '</div>' + (P.links || []).map(function (l) {
+          return '<div class="cvp-l"><b>' + esc(l.away.name || '') + '</b> <small>' + esc(l.relation && window.CovaraCare ? CovaraCare.relLabel(l.relation) : '') + (l.status === 'pending' ? ' · ' + t('pxAsks') : '') + '</small><div class="cvt-chips">' +
+            (l.status === 'pending' ? '<button type="button" class="cvt-chip sm" data-lk="' + esc(l.id) + ':approve">' + esc(t('pxApprove')) + '</button>' : '') +
+            SHARE_K.map(function (k) { return '<button type="button" class="cvt-chip sm" data-lk="' + esc(l.id) + ':' + k + '" aria-pressed="' + !!(l.share && l.share[k]) + '">' + esc(t('sk_' + k)) + '</button>'; }).join('') + '</div></div>';
+        }).join('') + '<div class="cvx-acts" style="margin-top:10px"><button type="button" class="cvx-btn" data-a="px-end">' + esc(t('pxEnd', { name: name1() })) + '</button></div>';
+      } else if (p.active) out = '<div class="cvx-sub">' + esc(t('pxActiveOther', { proxy: p.name, name: name1() })) + '</div>';
+      else if (p.user_id === me) out = '<div class="cvx-sub">' + esc(t('pxYouNamed', { name: name1() })) + '</div><div class="cvx-acts"><button type="button" class="cvx-btn warn" data-a="px-on">' + esc(t('pxCannot', { name: name1() })) + '</button></div>';
+      else out = '<div class="cvx-sub">' + esc(t('pxNamedOther', { proxy: p.name, name: name1() })) + '</div>';
+    }
+    return out;
+  }
+  function papersHtml() {
+    var P = _data.proxy || {}, p = P.proxy;
+    var recs = (_ls ? _ls.rec : []);
+    var d = (_data.sheet && _data.sheet.data) || {};
+    var aboutBody = (sheetRows(ABOUT_KEYS).length ? '<dl class="cvx-kv">' + sheetRows(ABOUT_KEYS).join('') + '</dl>' : '<div class="cvx-sub">' + esc(t('aboutEmpty', { name: name1() })) + '</div>') +
+      (_data.s.edit ? '<div class="cvx-acts"><button type="button" class="cvx-btn" data-a="sheet-about">' + esc(t('change')) + '</button></div>' : '');
+    var recBody = recs.map(function (e) { return recRow(e); }).join('') || '<div class="cvx-empty">' + esc(t('none')) + '</div>';
+    if (role() === 'home') recBody += '<button type="button" class="cvx-add" data-add="rec">' + esc(t('addRec')) + '</button>';
+    return block('proxy', t('whoDecides', { name: name1() }), p ? (p.active ? t('pxNow', { name: p.name }) : t('pxNamedShort', { name: p.name })) : t('pxNobody'), proxyHtml(), p && p.active ? 'gold' : p ? 'blue' : 'red') +
+      (_data.s.edit ? docsBlock() : '') +
+      block('records', role() === 'home' ? t('recsHeadMe') : t('recsHeadOf', { name: _data.s.name || '' }), recs.length + ' ' + t('people'), recBody, 'blue') +
+      block('about', t('aboutTitle', { name: name1() }), d.nickname || d.work || t('aboutShort'), aboutBody, 'blue');
+  }
+
+  /* ── more in each pill: the care team, comfort, leaving home, money worries, documents ── */
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function itemsOf(kind) { return (_data.items || []).filter(function (i) { return i.kind === kind; }); }
+  function whoName(id) {
+    if (id === myId()) return t('you');
+    if (_data.s.contact && id === _data.s.home) return _data.s.contact.first;
+    var f = (_data.family || []).filter(function (x) { return x.id === id; })[0]; if (f) return String(f.name || '').split(/\s+/)[0];
+    var c = (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).filter(function (x) { return x.care && x.care.userId === id; })[0];
+    return c ? c.first : '';
+  }
+  var _medWarn = null;
+  function visitsExtra() {
+    var out = '', now = Date.now();
+    var shifts = itemsOf('shift').filter(function (s) { return ((s.meta || {}).end || s.at + 8 * 3600e3) > now; }).sort(function (a, b) { return a.at - b.at; });
+    var on = shifts.filter(function (s) { return s.at <= now; })[0];
+    var shBody = (shifts.length ? '<ul class="cvh-w">' + shifts.slice(0, 8).map(function (s) { var m = s.meta || {}; return '<li><b>' + esc(m.who || s.title) + '</b> <small>' + esc(when(s.at) + (m.end ? ' ' + t('to') + ' ' + hhmm(m.end) : '')) + '</small>' + (_data.s.edit ? ' <button type="button" class="cvx-lnk" data-rm-item="' + esc(s.id) + '">' + esc(t('remove')) + '</button>' : '') + '</li>'; }).join('') + '</ul>' : '<div class="cvx-sub">' + esc(t('shiftNone')) + '</div>') +
+      (_data.s.edit ? '<button type="button" class="cvx-add" data-form="shift">' + esc(t('addShift')) + '</button>' : '');
+    out += block('shifts', t('onDuty'), on ? t('onNow', { name: (on.meta || {}).who || on.title }) : shifts[0] ? t('nextShift', { name: (shifts[0].meta || {}).who || shifts[0].title, when: when(shifts[0].at) }) : t('shiftShort'), shBody, on ? 'gold' : 'blue');
+    var notes = (_data.log || []).filter(function (x) { return x.kind === 'handover'; });
+    var hoBody = '<div class="cvt-f" style="margin:4px 0 8px"><textarea id="cvHo" rows="3" placeholder="' + esc(t('hoPh')) + '"></textarea></div><div class="cvx-acts"><button type="button" class="cvx-btn pri" data-a="ho-save">' + esc(t('hoSave')) + '</button></div>' +
+      (notes.length ? '<ul class="cvh-w">' + notes.slice(0, 6).map(function (x) { return '<li>' + esc(x.note) + '<br><small>' + esc((whoName(x.by) || '') + ' · ' + when(x.at)) + '</small></li>'; }).join('') + '</ul>' : '');
+    out += block('handover', t('handover'), notes[0] ? (whoName(notes[0].by) + ' · ' + when(notes[0].at)) : t('hoShort'), hoBody, 'blue');
+    if (role() === 'away') {
+      var vis = (_data.log || []).filter(function (x) { return x.kind === 'visit'; });
+      var mine = vis.filter(function (x) { return x.by === myId(); })[0], here = mine && mine.value === 'arrived';
+      var viBody = '<div class="cvx-sub">' + esc(t('checkWhy', { name: name1() })) + '</div><div class="cvx-acts"><button type="button" class="cvx-btn pri" data-visit="' + (here ? 'left' : 'arrived') + '">' + esc(here ? t('imLeaving') : t('imHere')) + '</button></div>' +
+        (vis.length ? '<ul class="cvh-w">' + vis.slice(0, 8).map(function (x) { var l = String(x.note || '').replace('loc:', '') || 'unknown'; return '<li><b class="' + (l === 'here' ? 'good' : l === 'away' ? 'bad' : 'mid') + '">' + esc((whoName(x.by) || '') + ' ' + t('vi_' + x.value)) + '</b> <small>' + esc(when(x.at) + ' · ' + t('loc_' + l, { name: name1() })) + '</small></li>'; }).join('') + '</ul>' : '');
+      out += block('checkin', t('checkIn'), here ? t('youAreHere', { when: hhmm(mine.at) }) : t('checkShort'), viBody, here ? 'gold' : 'blue');
+      var me = (_data.log || []).filter(function (x) { return x.kind === 'me'; })[0], recent = me && Date.now() - me.at < 864e5;
+      var tally = {}; (_data.log || []).forEach(function (x) { if (x.kind === 'me') return; var n = whoName(x.by) || '?'; tally[n] = (tally[n] || 0) + 1; });
+      var fyBody = '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin-top:4px">' + esc(t('holding')) + '</div><div class="cvt-chips">' + ['good', 'tired', 'overwhelmed'].map(function (v) { return '<button type="button" class="cvt-chip sm ' + (v === 'good' ? 'good' : v === 'tired' ? 'mid' : 'bad') + '" data-me="' + v + '" aria-pressed="' + !!(recent && me.value === v) + '">' + esc(t('me_' + v)) + '</button>'; }).join('') + '</div>' +
+        (recent && me.value !== 'good' ? '<div class="cvx-sub" style="margin-top:8px">' + esc(t(me.value === 'overwhelmed' ? 'meHelpBad' : 'meHelpTired')) + '</div>' : '') +
+        '<div class="cvx-acts" style="margin-top:8px"><a class="cvx-btn pri" style="display:inline-flex;align-items:center;text-decoration:none" href="tel:+18002723900">' + esc(t('helpline')) + '</a></div>' +
+        (Object.keys(tally).length ? '<div class="cvx-q" style="margin-top:10px;color:rgba(159,216,255,.8)">' + esc(t('whoDid')) + '</div><ul class="cvh-w">' + Object.keys(tally).sort(function (a, b) { return tally[b] - tally[a]; }).map(function (n) { return '<li><b>' + esc(n) + '</b> <small>' + esc(t(tally[n] === 1 ? 'entry1' : 'entries', { n: tally[n] })) + '</small></li>'; }).join('') + '</ul>' : '');
+      out += block('foryou', t('forYou'), t('forYouShort'), fyBody, recent && me.value === 'overwhelmed' ? 'red' : 'blue');
+    }
+    return out;
+  }
+  function comfortBlock() {
+    var cs = itemsOf('comfort');
+    var body = (cs.length ? cs.map(function (c) { var m = c.meta || {};
+      return '<div class="cvc">' + (c.photo ? '<button type="button" class="cvx-ph" style="' + esc(ph(c)) + ';border:0;cursor:zoom-in" data-cphoto="' + esc(c.id) + '"></button>' : '<span class="cvx-ph cvx-ini" style="' + esc('background:' + orbOf(c.title)) + '">' + esc(initials2(c.title)) + '</span>') +
+        '<span class="cvx-nm"><span>' + esc(c.title) + '</span><small>' + esc(t('ct_' + (m.type || 'music'))) + '</small></span>' +
+        (m.url ? '<a class="cvx-btn" href="' + esc(m.url) + '" target="_blank" rel="noopener">' + esc(t('play')) + '</a>' : '') +
+        (_data.s.edit ? '<button type="button" class="cvx-lnk" data-rm-item="' + esc(c.id) + '">' + esc(t('remove')) + '</button>' : '') + '</div>'; }).join('') : '<div class="cvx-sub">' + esc(t('comfortEmpty', { name: name1() })) + '</div>') +
+      (_data.s.edit ? '<button type="button" class="cvx-add" data-form="comfort">' + esc(t('addComfort')) + '</button>' : '');
+    return block('comfort', t('comfortTitle'), cs.length ? t('nItems', { n: cs.length }) : t('comfortShort'), body, 'gold');
+  }
+  function leaveBlock() {
+    var w = window.CovaraWhere && CovaraWhere.data(), mode = _data.leave || (w && w.leave_alert) || 'night';
+    var body = '<div class="cvx-sub">' + esc(t('leaveWhy', { name: name1() })) + '</div><div class="cvt-chips">' + ['night', 'always', 'off'].map(function (m) { return '<button type="button" class="cvt-chip sm" data-leave="' + m + '" aria-pressed="' + (mode === m) + '">' + esc(t('lv2_' + m)) + '</button>'; }).join('') + '</div>' +
+      '<div class="cvx-sub" style="margin-top:8px">' + esc(t('leaveDoor', { name: name1() })) + '</div>';
+    return block('leave', t('leaving', { name: name1() }), t('lv2_' + mode), body, mode === 'off' ? 'red' : 'gold');
+  }
+  function worryBlock() {
+    var ws = (_data.log || []).filter(function (x) { return x.kind === 'worry'; });
+    var body = '<div class="cvx-sub">' + esc(t('worryWhy', { name: name1() })) + '</div><div class="cvt-f" style="margin:4px 0 8px"><input type="text" id="cvWorryNote" maxlength="300" placeholder="' + esc(t('worryPh')) + '"></div><div class="cvt-chips">' +
+      ['scam_call', 'spending', 'stranger', 'other'].map(function (v) { return '<button type="button" class="cvt-chip sm bad" data-worry="' + v + '">' + esc(t('wo_' + v)) + '</button>'; }).join('') + '</div>' +
+      (ws.length ? '<ul class="cvh-w" style="margin-top:8px">' + ws.slice(0, 6).map(function (x) { return '<li><b class="bad">' + esc(t('wo_' + x.value)) + '</b> <small>' + esc(when(x.at) + (x.note ? ' · ' + x.note : '')) + '</small></li>'; }).join('') + '</ul>' : '') +
+      '<div class="cvx-sub" style="margin-top:8px">' + esc(t('worryTips')) + '</div>';
+    return block('money', t('moneyTitle'), ws[0] ? t('wo_' + ws[0].value) + ' · ' + dayLabel(ws[0].at) : t('moneyShort'), body, ws.length ? 'red' : 'blue');
+  }
+  var DOC_T = ['poa_health', 'poa_money', 'directive', 'will', 'hipaa', 'insurance', 'id', 'other'];
+  function docsBlock() {
+    var ds = itemsOf('doc');
+    var body = (ds.length ? ds.map(function (d) { var m = d.meta || {};
+      return '<div class="cvc"><span class="cvx-ph cvx-ini" style="background:linear-gradient(135deg,#e7cf8f,#8a6a24);font-size:10px">' + esc(m.file_kind === 'pdf' ? 'PDF' : m.file ? 'IMG' : initials2(d.title)) + '</span><span class="cvx-nm"><span>' + esc(d.title) + '</span><small>' + esc([t('dt_' + (m.type || 'other')), m.kept, m.on ? dateOnly(m.on) : ''].filter(Boolean).join(' · ')) + '</small></span>' +
+        (m.file_url ? '<a class="cvx-btn" href="' + esc(photoUrl(m.file_url)) + '" target="_blank" rel="noopener">' + esc(t('openDoc')) + '</a>' : '') +
+        (_data.s.edit ? '<button type="button" class="cvx-lnk" data-rm-item="' + esc(d.id) + '">' + esc(t('remove')) + '</button>' : '') + '</div>'; }).join('') : '<div class="cvx-sub">' + esc(t('docsEmpty')) + '</div>') +
+      (_data.s.edit ? '<button type="button" class="cvx-add" data-form="doc">' + esc(t('addDoc')) + '</button>' : '');
+    var have = {}; ds.forEach(function (d) { have[(d.meta || {}).type] = 1; });
+    var miss = ['poa_health', 'poa_money', 'directive'].filter(function (k) { return !have[k]; });
+    return block('docs', t('docsTitle'), miss.length ? t('docsMissing', { list: miss.map(function (k) { return t('dt_' + k); }).join(', ') }) : t('nItems', { n: ds.length }), body, miss.length ? 'red' : 'gold');
+  }
+  /* The care team's forms: a shift, something that brings comfort, a document */
+  function openForm(kind) {
+    var el = sheet('cvForm2'), d0 = new Date(Date.now() + 3600e3), ds = d0.getFullYear() + '-' + pad(d0.getMonth() + 1) + '-' + pad(d0.getDate());
+    function inp2(id, label, val, type, extra) { return '<div><label for="' + id + '">' + esc(t(label)) + '</label><input type="' + (type || 'text') + '" id="' + id + '" value="' + esc(val || '') + '" autocomplete="off" ' + (extra || '') + '></div>'; }
+    var pick = kind === 'comfort' ? 'music' : kind === 'doc' ? 'poa_health' : '', file = null, f = '', title = kind === 'shift' ? 'addShift' : kind === 'comfort' ? 'addComfort' : 'addDoc';
+    if (kind === 'shift') f = inp2('fWho', 'shiftWho', '', 'text', 'maxlength="80"') + inp2('fDate', 'date', ds, 'date') + '<div class="cvt-two">' + inp2('fStart', 'shiftStart', '09:00', 'time') + inp2('fEnd', 'shiftEnd', '17:00', 'time') + '</div>';
+    else if (kind === 'comfort') f = '<div class="cvt-chips">' + ['music', 'photo', 'video', 'story'].map(function (k) { return '<button type="button" class="cvt-chip" data-pick="' + k + '" aria-pressed="' + (pick === k) + '">' + esc(t('ct_' + k)) + '</button>'; }).join('') + '</div>' +
+      inp2('fTitle', 'ctTitle', '', 'text', 'maxlength="120"') + inp2('fUrl', 'ctUrl', '', 'url', 'maxlength="400" placeholder="https://"') +
+      '<button type="button" class="cvt-shot" data-shot style="width:110px;height:110px">' + esc(t('ctPhoto')) + '</button><input type="file" accept="image/*" hidden data-file>';
+    else f = '<div class="cvt-chips">' + DOC_T.map(function (k) { return '<button type="button" class="cvt-chip sm" data-pick="' + k + '" aria-pressed="' + (pick === k) + '">' + esc(t('dt_' + k)) + '</button>'; }).join('') + '</div>' +
+      inp2('fTitle', 'docTitle', '', 'text', 'maxlength="120"') + inp2('fKept', 'docKept', '', 'text', 'maxlength="160"') + inp2('fOn', 'docOn', '', 'date') +
+      '<button type="button" class="cvt-shot" data-shot style="width:110px;height:110px">' + esc(t('docFile')) + '</button><input type="file" accept="application/pdf,image/*" hidden data-file>';
+    el.innerHTML = '<div class="cv-box"><div class="cv-mono">' + esc(t(title)) + '</div><div class="cvt-f">' + f + '</div><div class="cv-msg"></div>' +
+      '<div class="cv-row"><button class="cv-btn pri" data-a="save">' + esc(t('save')) + '</button><button class="cv-btn" data-a="close">' + esc(t('cancel')) + '</button></div></div>';
+    el.querySelectorAll('[data-pick]').forEach(function (b) { b.onclick = function () { pick = b.getAttribute('data-pick'); el.querySelectorAll('[data-pick]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); var ti = el.querySelector('#fTitle'); if (kind === 'doc' && ti && !ti.value) ti.value = t('dt_' + pick); }; });
+    var shot = el.querySelector('[data-shot]'), fi = el.querySelector('[data-file]');
+    if (shot) { shot.onclick = function () { fi.click(); }; fi.onchange = function () { file = fi.files && fi.files[0]; if (!file) return; if (/^image\//.test(file.type)) { shot.classList.add('has'); shot.style.backgroundImage = 'url(' + URL.createObjectURL(file) + ')'; } else shot.textContent = file.name; }; }
+    if (kind === 'doc') { var ti0 = el.querySelector('#fTitle'); if (ti0) ti0.value = t('dt_' + pick); }
+    el.querySelector('[data-a=close]').onclick = function () { close(el); };
+    function v(id) { var x = el.querySelector('#' + id); return x ? String(x.value || '').trim() : ''; }
+    el.querySelector('[data-a=save]').onclick = async function () {
+      var msg = el.querySelector('.cv-msg'), body = { kind: kind, meta: {} };
+      if (_data.s.home) body.home = _data.s.home;
+      if (kind === 'shift') {
+        if (!v('fWho')) { msg.textContent = t('needName'); return; }
+        var st0 = new Date(v('fDate') + 'T' + v('fStart')).getTime(), en = new Date(v('fDate') + 'T' + v('fEnd')).getTime(); if (en <= st0) en += 864e5;
+        if (!isFinite(st0)) { msg.textContent = t('needWhen'); return; }
+        body.title = v('fWho'); body.at = st0; body.meta = { who: v('fWho'), end: en };
+      } else {
+        if (!v('fTitle')) { msg.textContent = t('needName'); return; }
+        body.title = v('fTitle'); body.meta = { type: pick };
+        if (kind === 'comfort' && v('fUrl')) { if (!/^https:\/\//.test(v('fUrl'))) { msg.textContent = t('needHttps'); return; } body.meta.url = v('fUrl'); }
+        if (kind === 'doc') { if (v('fKept')) body.meta.kept = v('fKept'); if (v('fOn')) body.meta.on = v('fOn'); }
+      }
+      var sb = el.querySelector('[data-a=save]'); sb.disabled = true; sb.textContent = t('saving');
+      try {
+        if (file) {
+          var fd = new FormData(); fd.append('file', file, file.name || ('care-' + Date.now())); fd.append('blob_type', kind === 'doc' ? 'document' : 'photo');
+          var up = await api('/storage/upload', { method: 'POST', body: fd });
+          if (!up.ok) throw new Error(up.status);
+          if (kind === 'doc') { body.meta.file = up.data.id; body.meta.file_kind = /pdf/.test(file.type) ? 'pdf' : 'image'; } else body.photo = up.data.id;
+        }
+        var r = await api('/care/items', { method: 'POST', body: body });
+        if (!r.ok) throw new Error(r.status);
+        close(el); load();
+      } catch (e) { msg.textContent = t('failed'); sb.disabled = false; sb.textContent = t('save'); }
+    };
+    open(el);
+  }
+  /* On HOME's phone: when a medicine is due, the family voice recorded for it plays once */
+  var _played = {};
+  function playDueVoices() {
+    if (role() !== 'home' || !_ls) return;
+    var day = new Date().toDateString();
+    _ls.med.forEach(function (x) {
+      var m = x.it.meta || {}; if (!m.voice_url || x.n.state !== 'due') return;
+      var k = 'cvv:' + x.it.id + ':' + x.n.slot + ':' + day; if (_played[k]) return;
+      try { if (localStorage.getItem(k)) { _played[k] = 1; return; } } catch (e) {}
+      _played[k] = 1;
+      try { new Audio(photoUrl(m.voice_url)).play().then(function () { try { localStorage.setItem(k, '1'); } catch (e) {} }).catch(function () { _played[k] = 0; }); } catch (e) {}
+    });
+  }
+
+  /* ── the panel the pill opens ── */
   function visible() {
-    if (!_data || !role()) return false;
+    if (!_data || !role() || !_open) return false;
     var ob = document.getElementById('onboarding'); if (ob && !ob.hidden && getComputedStyle(ob).display !== 'none') return false;
     var gate = document.getElementById('gateScreen'); if (gate && gate.offsetParent !== null && getComputedStyle(gate).display !== 'none') return false;
     if (document.querySelector('.cv-ov.open')) return false;
-    /* a family member in focus shows Sentinel's Communication panel here instead */
     var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
     if (f != null) return false;
-    /* WHEREIS holds the upper left while it is shown */
     if (window.CovaraWhere && window.CovaraWhere.shown()) return false;
     return true;
+  }
+  /* What each pill says at a glance: its colour (late, due, a warning) */
+  function pillState(k) {
+    if (!_ls) return '';
+    if (k === 'med') { var top = _ls.med[0]; if (top && top.n.state === 'late') return 'late'; if (_ls.med.some(function (x) { var f = filled(x.it); return f && !f.ok; })) return 'due'; return top && top.n.state === 'due' ? 'due' : ''; }
+    if (k === 'visit') { var a = _ls.appt[0]; var me3 = (_data.log || []).filter(function (x) { return x.kind === 'me'; })[0]; if (me3 && me3.value === 'overwhelmed' && Date.now() - me3.at < 864e5) return 'late'; return a && a.it.at - Date.now() < 864e5 && a.n.state !== 'done' ? 'due' : ''; }
+    if (k === 'health') return _data.warn ? 'late' : '';
+    if (k === 'safety') { var d = (_data.sheet && _data.sheet.data) || {}; var wq = (_data.log || []).filter(function (x) { return x.kind === 'worry' && Date.now() - x.at < 864e5; }).length; var wh = window.CovaraWhere && CovaraWhere.data(); if (wq || (wh && wh.at_home === false && wh.left_at)) return 'late'; return d.diagnosis ? '' : 'due'; }
+    if (k === 'papers') { var P = _data.proxy || {}; var hasPoa = itemsOf('doc').some(function (x) { return (x.meta || {}).type === 'poa_health'; }); return P.proxy && hasPoa ? '' : 'due'; }
+    return '';
   }
   var _ls = null, _html = '';
   function render() {
     if (!_data) { box.classList.remove('show'); box.innerHTML = ''; _html = ''; return; }
     _ls = lists();
-    var html = TABS.map(function (T) {
-      var k = T[0], arr = _ls[k], top = arr[0], hint = '', hc = '';
-      if (k === 'med' && top) { var lateN = arr.filter(function (e) { return e.n.state === 'late'; }).length; hc = top.n.state === 'late' ? 'late' : top.n.state === 'due' ? 'due' : ''; hint = lateN > 1 ? lateN + ' ' + t('late') : (top.n.state === 'off' || top.n.state === 'done') && !isFinite(top.n.at) ? '' : (hc ? '' : t('next') + ' ') + nextLabel(top.n); }
-      else if (k === 'rec') { hint = arr.length ? arr.length + ' ' + t('people').toUpperCase() : ''; }
-      else if (top) { hc = top.n.state === 'due' ? 'due' : ''; hint = k === 'appt' ? dayLabel(top.it.at).toUpperCase() + ' ' + hhmm(top.it.at) : dayLabel(top.it.at).toUpperCase(); }
-      var head = '<button type="button" class="cvx-tab" data-tab="' + k + '" aria-expanded="' + (_open === k) + '"><span class="cvx-dot ' + hc + '"></span><b>' + esc(t(T[1])) + '</b>' +
-        '<span class="cvx-hint ' + hc + '">' + esc(arr.length ? hint : '') + '</span><span class="cvx-chev" aria-hidden="true">›</span></button>';
-      if (_open !== k) return head;
-      var body = arr.map(function (e) { return rowHtml(k, e); }).join('') || '<div class="cvx-empty">' + esc(t('none')) + '</div>';
-      if (k === 'rec') body = '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 4px">' + esc(role() === 'home' ? t('recsHeadMe') : t('recsHeadOf', { name: _data.s.name || '' })) + '</div>' + body;
-      if (k === 'rec' ? role() === 'home' : _data.s.edit) body += '<button type="button" class="cvx-add" data-add="' + k + '">' + esc(t(T[2])) + '</button>';
-      return head + '<div class="cvx-list" role="list">' + body + '</div>';
-    }).join('');
+    var k = _open, html = '';
+    if (k) {
+      var body = '';
+      if (k === 'med' || k === 'visit') {
+        var arr = k === 'med' ? _ls.med : _ls.appt; body = arr.map(function (e) { return rowHtml(k, e); }).join('') || '<div class="cvx-empty">' + esc(t(k === 'visit' ? 'noAppts' : 'none')) + '</div>';
+        if (_data.s.edit) body += '<button type="button" class="cvx-add" data-add="' + k + '">' + esc(t(SEC_ADD[k])) + '</button>';
+        if (k === 'med' && _medWarn && Date.now() - _medWarn.at < 15 * 60000) body = '<div class="cvx-warn">' + esc(_medWarn.text) + '</div>' + body;
+        if (k === 'visit' && _data.s.edit) body += visitsExtra();
+      }
+      else if (k === 'health') body = _data.s.edit ? healthHtml() : '<div class="cvx-sub">' + esc(t('noCare', { name: name1() })) + '</div>';
+      else if (k === 'safety') body = _data.s.edit ? safetyHtml() : '<div class="cvx-sub">' + esc(t('noCare', { name: name1() })) + '</div>';
+      else body = papersHtml();
+      html = '<div class="cvx-head"><b>' + esc(t('sec_' + k)) + '</b><span>' + esc(_data.s.home ? _data.s.name || '' : '') + '</span><button type="button" class="cvx-x" data-a="close" aria-label="' + esc(t('cancel')) + '">×</button></div>' +
+        '<div class="cvx-list" role="list">' + body + '</div>';
+    }
     if (html !== _html) { var sc = box.querySelector('.cvx-list'); var top0 = sc ? sc.scrollTop : 0; box.innerHTML = html; _html = html; bind(); var sc2 = box.querySelector('.cvx-list'); if (sc2) sc2.scrollTop = top0; }
     box.classList.toggle('show', visible());
     box.classList.toggle('is-open', !!_open);
   }
-  function entry(id) { var all = _ls ? _ls.med.concat(_ls.appt, _ls.sub, _ls.rec) : []; return all.filter(function (e) { return e.it.id === id; })[0]; }
+  function entry(id) { var all = _ls ? _ls.med.concat(_ls.appt, _ls.rec) : []; return all.filter(function (e) { return e.it.id === id; })[0]; }
+  function toggleSection(k) { _open = _open === k ? '' : k; _openItem = ''; _html = ''; render(); }
   function bind() {
-    box.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-tab'); _open = _open === k ? '' : k; _openItem = ''; render(); }; });
-    box.querySelectorAll('[data-add]').forEach(function (b) { b.onclick = function () { openEdit(b.getAttribute('data-add')); }; });
+    var cl = box.querySelector('[data-a=close]'); if (cl) cl.onclick = function () { _open = ''; _openItem = ''; render(); };
+    box.querySelectorAll('[data-add]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-add'); openEdit(k === 'visit' ? 'appt' : k); }; });
+    box.querySelectorAll('[data-a=show-er]').forEach(function (b) { b.onclick = function () { openCard('er'); }; });
+    box.querySelectorAll('[data-a=show-miss]').forEach(function (b) { b.onclick = function () { openCard('miss'); }; });
+    box.querySelectorAll('[data-a=sheet-er]').forEach(function (b) { b.onclick = function () { openSheet('er'); }; });
+    box.querySelectorAll('[data-a=sheet-miss]').forEach(function (b) { b.onclick = function () { openSheet('miss'); }; });
+    box.querySelectorAll('[data-a=sheet-about]').forEach(function (b) { b.onclick = function () { openSheet('about'); }; });
+    box.querySelectorAll('[data-form]').forEach(function (b) { b.onclick = function () { openForm(b.getAttribute('data-form')); }; });
+    box.querySelectorAll('[data-rm-item]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var r = await api('/care/items/' + encodeURIComponent(b.getAttribute('data-rm-item')), { method: 'DELETE' }).catch(function () { return { ok: false }; }); if (r.ok) load(); else b.disabled = false; }; });
+    box.querySelectorAll('[data-cphoto]').forEach(function (b) { b.onclick = function () { var it = itemsOf('comfort').filter(function (x) { return x.id === b.getAttribute('data-cphoto'); })[0]; if (it) openPhoto(it); }; });
+    function logPost(body) { return api('/care/log', { method: 'POST', body: Object.assign(body, _data.s.home ? { home: _data.s.home } : {}) }).catch(function () { return { ok: false }; }); }
+    var hs = box.querySelector('[data-a=ho-save]'); if (hs) hs.onclick = async function () { var n = box.querySelector('#cvHo'); if (!n || !n.value.trim()) return; hs.disabled = true; var r = await logPost({ kind: 'handover', value: 'note', note: n.value.trim() }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } else hs.disabled = false; };
+    box.querySelectorAll('[data-visit]').forEach(function (b) { b.onclick = async function () {
+      b.disabled = true;
+      /* the phone's own position first, so the visit can be checked against HOME's address */
+      await new Promise(function (res) { if (!navigator.geolocation) return res(); navigator.geolocation.getCurrentPosition(function (p) { api('/location', { method: 'POST', body: { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy } }).then(res, res); }, function () { res(); }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }); });
+      var r = await logPost({ kind: 'visit', value: b.getAttribute('data-visit') }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } else b.disabled = false;
+    }; });
+    box.querySelectorAll('[data-me]').forEach(function (b) { b.onclick = async function () { var r = await logPost({ kind: 'me', value: b.getAttribute('data-me') }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } }; });
+    box.querySelectorAll('[data-worry]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var n = box.querySelector('#cvWorryNote'); var r = await logPost({ kind: 'worry', value: b.getAttribute('data-worry'), note: n ? n.value.trim() : '' }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } else b.disabled = false; }; });
+    box.querySelectorAll('[data-leave]').forEach(function (b) { b.onclick = async function () { var m = b.getAttribute('data-leave'); var r = await api('/care/leave', { method: 'PUT', body: Object.assign({ mode: m }, _data.s.home ? { home: _data.s.home } : {}) }).catch(function () { return { ok: false }; }); if (r.ok) { _data.leave = m; _html = ''; render(); } }; });
+    box.querySelectorAll('[data-a=voice]').forEach(function (b) { b.onclick = function () { try { new Audio(b.getAttribute('data-src')).play(); } catch (e) {} }; });
+    box.querySelectorAll('[data-a=px-on]').forEach(function (b) { b.onclick = function () { openProxyOn(); }; });
+    box.querySelectorAll('[data-a=px-end]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var r = await api('/care/proxy/end', { method: 'POST', body: _data.s.home ? { home: _data.s.home } : {} }).catch(function () { return { ok: false }; }); if (r.ok) load(); else b.disabled = false; }; });
+    box.querySelectorAll('[data-px]').forEach(function (b) { b.onclick = async function () {
+      var cur = _data.proxy && _data.proxy.proxy, id = b.getAttribute('data-px'), next = cur && cur.user_id === id ? null : id;
+      var r = await api('/care/proxy', { method: 'PUT', body: { user_id: next } }).catch(function () { return { ok: false }; }); if (r.ok) load();
+    }; });
+    box.querySelectorAll('[data-lk]').forEach(function (b) { b.onclick = async function () {
+      var p = b.getAttribute('data-lk').split(':'), body = p[1] === 'approve' ? { approve: true } : { share: {} };
+      if (p[1] !== 'approve') body.share[p[1]] = b.getAttribute('aria-pressed') === 'true' ? 0 : 1;
+      b.disabled = true; var r = await api('/care/links/' + encodeURIComponent(p[0]), { method: 'PUT', body: body }).catch(function () { return { ok: false }; }); if (r.ok) load(); else b.disabled = false;
+    }; });
+    box.querySelectorAll('[data-log]').forEach(function (b) { b.onclick = async function () {
+      var p = b.getAttribute('data-log').split(':'); b.disabled = true;
+      var r = await api('/care/log', { method: 'POST', body: Object.assign({ kind: p[0], value: p[1] }, _data.s.home ? { home: _data.s.home } : {}) }).catch(function () { return { ok: false }; });
+      if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); if (r.data.warn) _data.warn = name1() + ' ' + r.data.warn.signs.join(', ') + '. ' + t('warnTail'); _html = ''; render(); } else b.disabled = false;
+    }; });
     box.querySelectorAll('.cvx-item').forEach(function (el) {
       var id = el.getAttribute('data-id'), kind = el.getAttribute('data-kind');
       el.querySelector('.cvx-row').onclick = function () { _openItem = _openItem === id ? '' : id; render(); };
       var e = entry(id); if (!e) return;
       var p = el.querySelector('[data-a=photo]'); if (p) p.onclick = function () { openPhoto(e.it); };
-      var ed = el.querySelector('[data-a=edit]'); if (ed) ed.onclick = function () { openEdit(kind, e.it); };
+      var ed = el.querySelector('[data-a=edit]'); if (ed) ed.onclick = function () { openEdit(kind === 'visit' ? 'appt' : kind, e.it); };
       var rf = el.querySelector('[data-a=refill]'); if (rf) rf.onclick = function () { openRefill(e.it); };
       var cs = el.querySelector('[data-a=consent]'); if (cs) cs.onclick = function () { if (window.CovaraCare && e.it.contact) CovaraCare.openConsent(e.it.contact); };
       var mk = el.querySelector('[data-a=mark]'); if (mk) mk.onclick = async function () {
         mk.disabled = true;
-        var r = await api('/care/items/' + encodeURIComponent(id) + '/mark', { method: 'POST', body: Object.assign({ slot: kind === 'appt' ? 'appt' : e.n.slot }, _data.s.home ? { home: _data.s.home } : {}) }).catch(function () { return { ok: false }; });
-        if (r.ok) load(); else mk.disabled = false;
+        var r = await api('/care/items/' + encodeURIComponent(id) + '/mark', { method: 'POST', body: Object.assign({ slot: kind === 'visit' ? 'appt' : e.n.slot }, _data.s.home ? { home: _data.s.home } : {}) }).catch(function () { return { ok: false }; });
+        if (r.ok) { if (r.data && r.data.warn && r.data.warn.double) { _medWarn = { at: Date.now(), text: t('doubleWarn', { med: e.it.title, min: Math.max(1, Math.round((Date.now() - r.data.warn.last_at) / 60000)) }) }; _html = ''; render(); var sl = box.querySelector('.cvx-list'); if (sl) sl.scrollTop = 0; } load(); } else mk.disabled = false;
       };
       el.querySelectorAll('[data-fb]').forEach(function (b) {
         b.onclick = async function () {
@@ -383,6 +801,57 @@
         };
       });
     });
+  }
+
+  /* ── the sheets: full screen for a nurse or the police; fields to fill; the proxy's confirmation ── */
+  function openCard(kind) {
+    var el = sheet('cvCard'), nm = _data.s.home ? ((_data.s.contact.first || '') + ' ' + (_data.s.contact.last || '')).trim() : (function () { try { return userSphereName || ''; } catch (e) { return ''; } })();
+    var pic = role() === 'away' && _data.s.contact && typeof contactPhotos !== 'undefined' && contactPhotos.get(_data.s.contact.id);
+    el.innerHTML = '<div class="cv-box cvx-card"><div class="cv-mono">' + esc(kind === 'er' ? t('forEr') : t('ifMissing', { name: nm })) + '</div>' +
+      (kind === 'miss' && pic && pic.img && pic.img.src ? '<div class="cvt-big" style="background-image:url(\'' + esc(pic.img.src) + '\')"></div>' : '') +
+      '<h2 class="cv-h">' + esc(nm) + '</h2>' + (kind === 'er' ? erHtml(true) : missingHtml(true)) +
+      '<div class="cv-row"><button class="cv-btn pri" data-a="close">' + esc(t('done')) + '</button></div></div>';
+    el.querySelector('[data-a=close]').onclick = function () { close(el); };
+    open(el);
+  }
+  var SHEET_F = { er: ER_KEYS, miss: MISS_KEYS, about: ABOUT_KEYS };
+  var LONG = { story: 1, talk: 1, calms: 1, upsets: 1, likes: 1, places: 1, conditions: 1, allergies: 1, marks: 1, clothes: 1 };
+  function openSheet(group) {
+    var el = sheet('cvSheet'), d = (_data.sheet && _data.sheet.data) || {};
+    var f = SHEET_F[group].map(function (k) {
+      if (k === 'dnr') return '<label>' + esc(t('sh_dnr')) + '</label><div class="cvt-chips">' + ['full', 'dnr', 'polst', 'unknown'].map(function (v) { return '<button type="button" class="cvt-chip" data-dnr="' + v + '" aria-pressed="' + (d.dnr === v) + '">' + esc(t('dnr_' + v)) + '</button>'; }).join('') + '</div>';
+      return '<div><label for="cvs_' + k + '">' + esc(t('sh_' + k)) + '</label>' + (LONG[k] ? '<textarea id="cvs_' + k + '" rows="3" placeholder="' + esc(t('ph_' + k)) + '">' + esc(d[k] || '') + '</textarea>' : '<input type="text" id="cvs_' + k + '" value="' + esc(d[k] || '') + '" placeholder="' + esc(t('ph_' + k)) + '">') + '</div>';
+    }).join('');
+    el.innerHTML = '<div class="cv-box"><div class="cv-mono">' + esc(group === 'er' ? t('forEr') : group === 'miss' ? t('ifMissing', { name: name1() }) : t('aboutTitle', { name: name1() })) + '</div>' +
+      '<div class="cvt-f">' + f + '</div><div class="cv-msg"></div><div class="cv-row"><button class="cv-btn pri" data-a="save">' + esc(t('save')) + '</button><button class="cv-btn" data-a="close">' + esc(t('cancel')) + '</button></div></div>';
+    var dnr = d.dnr || null;
+    el.querySelectorAll('[data-dnr]').forEach(function (b) { b.onclick = function () { dnr = b.getAttribute('data-dnr'); el.querySelectorAll('[data-dnr]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); }; });
+    el.querySelector('[data-a=close]').onclick = function () { close(el); };
+    el.querySelector('[data-a=save]').onclick = async function () {
+      var body = _data.s.home ? { home: _data.s.home } : {};
+      SHEET_F[group].forEach(function (k) { if (k === 'dnr') { if (dnr) body.dnr = dnr; return; } var i = el.querySelector('#cvs_' + k); if (i) body[k] = i.value; });
+      var r = await api('/care/sheet', { method: 'PUT', body: body }).catch(function () { return { ok: false }; });
+      if (r.ok) { _data.sheet = r.data; close(el); _html = ''; render(); } else el.querySelector('.cv-msg').textContent = t('failed');
+    };
+    open(el);
+  }
+  function openProxyOn() {
+    var el = sheet('cvProxy'), d = new Date(), today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    el.innerHTML = '<div class="cv-box"><div class="cv-mono">' + esc(t('pxCannot', { name: name1() })) + '</div><p class="cv-sub">' + esc(t('pxOnWhy', { name: name1() })) + '</p>' +
+      '<div class="cvt-f"><div><label for="cvPxDoc">' + esc(t('pxDoctor')) + '</label><input type="text" id="cvPxDoc" maxlength="120"></div>' +
+      '<div><label for="cvPxOn">' + esc(t('pxDate')) + '</label><input type="date" id="cvPxOn" value="' + today + '"></div>' +
+      '<div><label for="cvPxNote">' + esc(t('pxNote')) + '</label><input type="text" id="cvPxNote" maxlength="300"></div>' +
+      '<div class="cvt-chips"><button type="button" class="cvt-chip" data-ok aria-pressed="false">' + esc(t('pxConfirm', { name: name1() })) + '</button></div></div>' +
+      '<div class="cv-msg"></div><div class="cv-row"><button class="cv-btn pri" data-a="save">' + esc(t('pxTake')) + '</button><button class="cv-btn" data-a="close">' + esc(t('cancel')) + '</button></div></div>';
+    var ok = false, okb = el.querySelector('[data-ok]'); okb.onclick = function () { ok = !ok; okb.setAttribute('aria-pressed', ok ? 'true' : 'false'); };
+    el.querySelector('[data-a=close]').onclick = function () { close(el); };
+    el.querySelector('[data-a=save]').onclick = async function () {
+      var msg = el.querySelector('.cv-msg'), doc = el.querySelector('#cvPxDoc').value.trim();
+      if (!doc) { msg.textContent = t('pxNeedDoc'); return; } if (!ok) { msg.textContent = t('pxNeedOk'); return; }
+      var r = await api('/care/proxy/activate', { method: 'POST', body: { home: _data.s.home, confirm: true, doctor: doc, on: el.querySelector('#cvPxOn').value, note: el.querySelector('#cvPxNote').value } }).catch(function () { return { ok: false }; });
+      if (r.ok) { close(el); load(); } else msg.textContent = (r.data && r.data.detail) || t('failed');
+    };
+    open(el);
   }
 
   /* ── the dream picture: what is highlighted, or the medicine that is due ── */
@@ -509,7 +978,8 @@
     return { name: ((h.first || '') + ' ' + (h.last || '')).trim(), frame: p && p.img ? p.img : null, w: p ? (p.w || (p.img && p.img.naturalWidth)) : 0, h: p ? (p.h || (p.img && p.img.naturalHeight)) : 0, contact: h };
   }
   var _pillHits = [];
-  function pills(ctx, labels, keys, cx, cy, cr, t0) {
+  var DOT = { late: '#ef4444', due: '#ffd24d' };
+  function pills(ctx, labels, keys, cx, cy, cr, t0, left, states, onKey) {
     var W = ctx.canvas.width / (window.devicePixelRatio || 1);
     var fs = W < 500 ? 11 : 12, lineH = W < 500 ? 24 : 26, gap = 16, px = 12, py = 5;
     ctx.save();
@@ -517,35 +987,46 @@
     ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
     var maxW = 0; labels.forEach(function (l) { maxW = Math.max(maxW, ctx.measureText(l).width); });
     var pw = maxW + px * 2, phh = fs + py * 2;
-    var x = cx + cr * 1.12 + gap; if (x + pw > W - 6) x = W - 6 - pw;
+    if (states) pw += 14;
+    var x = left ? cx - cr * 1.12 - gap - pw : cx + cr * 1.12 + gap; if (x + pw > W - 6) x = W - 6 - pw; if (x < 6) x = 6;
     var y0 = cy - (labels.length * lineH) / 2 + lineH / 2;
     var fade = Math.min(1, 0.75 + 0.25 * Math.sin(t0 * 0.004));
     for (var i = 0; i < labels.length; i++) {
       var ly = y0 + i * lineH;
-      ctx.globalAlpha = 0.72 * fade; ctx.fillStyle = 'rgba(12,14,24,0.88)';
+      var on = onKey && keys[i] === onKey;
+      ctx.globalAlpha = (on ? 0.95 : 0.72) * fade; ctx.fillStyle = on ? 'rgba(56,189,248,0.32)' : 'rgba(12,14,24,0.88)';
       ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, ly - phh / 2, pw, phh, 6); else ctx.rect(x, ly - phh / 2, pw, phh); ctx.fill();
-      ctx.globalAlpha = 0.45 * fade; ctx.strokeStyle = 'rgba(100,180,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.globalAlpha = 0.95 * fade; ctx.fillStyle = '#d8e8ff'; ctx.fillText(labels[i], x + pw / 2, ly);
+      ctx.globalAlpha = (on ? 0.9 : 0.45) * fade; ctx.strokeStyle = on ? '#38bdf8' : 'rgba(100,180,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+      var tx = x + pw / 2;
+      if (states) {
+        tx = x + 7 + (pw - 7) / 2;
+        var st0 = states[i]; ctx.globalAlpha = fade; ctx.beginPath(); ctx.arc(x + 10, ly, 3, 0, Math.PI * 2); ctx.fillStyle = DOT[st0] || 'rgba(96,165,250,.6)'; ctx.fill();
+      }
+      ctx.globalAlpha = 0.95 * fade; ctx.fillStyle = on ? '#ffffff' : '#d8e8ff'; ctx.fillText(labels[i], tx, ly);
       _pillHits.push({ x: x, y: ly - lineH / 2, w: pw, h: lineH, key: keys[i] });
     }
     ctx.restore();
   }
   function drawCentre(ctx, cx, cy, cr, t0) {
     _pillHits = [];
-    if (role() !== 'away' || !homeContact()) return;
-    if (typeof focusedContactId !== 'undefined' && focusedContactId != null) return; /* one sphere at a time carries the calling pills */
+    if (!role() || (role() === 'away' && !homeContact())) return;
+    if (typeof focusedContactId !== 'undefined' && focusedContactId != null) return; /* one sphere at a time carries the pills */
     if (typeof IsoView !== 'undefined' && IsoView.active && IsoView.active()) return;
-    pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, cy, cr, t0);
+    /* left: HOME's care; right (AWAY's phone): calling HOME */
+    if (_data) pills(ctx, SECTIONS.map(function (k) { return t('sec_' + k); }), SECTIONS.map(function (k) { return 'sec:' + k; }), cx, cy, cr, t0, true, SECTIONS.map(pillState), _open ? 'sec:' + _open : '');
+    if (role() === 'away') pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, cy, cr, t0);
   }
   function hitCentre(clientX, clientY) {
     if (!_pillHits.length || typeof CV === 'undefined') return false;
     var r = CV.getBoundingClientRect(), x = clientX - r.left, y = clientY - r.top;
     var h = _pillHits.filter(function (p) { return x >= p.x - 4 && x <= p.x + p.w + 4 && y >= p.y && y <= p.y + p.h; })[0];
     if (!h) return false;
+    if (/^sec:/.test(h.key)) { toggleSection(h.key.slice(4)); return true; }
     var c = centre(); if (c && typeof runContactQuickAction === 'function') runContactQuickAction(h.key, c.contact);
     return true;
   }
   function centreSingle() { return role() === 'away' && !!homeContact(); }
+  function sectionOpen() { return _open; }
   function centreDouble() { var h = homeContact(); if (role() !== 'away' || !h) return false; try { enterDetail(h); } catch (e) {} return true; }
 
   /* ── sheets ── */
@@ -614,7 +1095,8 @@
         inp('cvWatch', 'watch', m.watch_for, 'text', 'maxlength="200"') +
         '<div class="cvt-two">' + inp('cvRx', 'rx', m.rx_number, 'text', 'maxlength="40"') + inp('cvPrescriberPhone', 'prescriberPhone', m.prescriber_phone, 'tel', 'maxlength="30"') + '</div>' +
         '<div class="cvt-two">' + inp('cvStart', 'startOn', m.start_on, 'date') + inp('cvEnd', 'endOn', m.end_on, 'date') + '</div>' +
-        '<div class="cvt-two">' + inp('cvDispensed', 'dispensed', m.dispensed, 'number', 'inputmode="numeric" min="0"') + inp('cvRefills', 'refillsLeft', m.refills, 'number', 'inputmode="numeric" min="0" max="99"') + '</div>';
+        '<div class="cvt-two">' + inp('cvDispensed', 'dispensed', m.dispensed, 'number', 'inputmode="numeric" min="0"') + inp('cvRefills', 'refillsLeft', m.refills, 'number', 'inputmode="numeric" min="0" max="99"') + '</div>' +
+        '<label>' + esc(t('voiceLabel')) + '</label><div class="cvt-chips"><button type="button" class="cvt-chip" data-rec aria-pressed="false">' + esc(m.voice ? t('voiceAgain') : t('voiceRec')) + '</button></div><audio controls hidden data-recplay></audio>';
     } else if (kind === 'rec') {
       f = '<label>' + esc(t('dGroup')) + '</label><div class="cvt-chips">' + ['family', 'doctor', 'legal', 'care', 'other'].map(function (g) { return '<button type="button" class="cvt-chip" data-grp="' + g + '" aria-pressed="' + ((m.group || 'doctor') === g) + '">' + esc(t('g' + g.charAt(0).toUpperCase() + g.slice(1))) + '</button>'; }).join('') + '</div>' +
         inp('cvName', 'recName', it && it.title, 'text', 'maxlength="120"') + inp('cvRel', 'recRel', m.relation, 'text', 'maxlength="60"') +
@@ -643,6 +1125,17 @@
     var rb = el.querySelector('[data-recs]'); if (rb) rb.onclick = function () { recsOn = !recsOn; rb.setAttribute('aria-pressed', recsOn ? 'true' : 'false'); };
     var prnB = el.querySelector('[data-prn]'); if (prnB) prnB.onclick = function () { prn = !prn; prnB.setAttribute('aria-pressed', prn ? 'true' : 'false'); };
     el.querySelectorAll('[data-src]').forEach(function (b) { b.onclick = function () { src = src === b.getAttribute('data-src') ? '' : b.getAttribute('data-src'); el.querySelectorAll('[data-src]').forEach(function (x) { x.setAttribute('aria-pressed', x.getAttribute('data-src') === src ? 'true' : 'false'); }); }; });
+    /* A family voice for when it is due: up to 20 seconds, recorded here */
+    var voiceBlob = null, recB = el.querySelector('[data-rec]'), recP = el.querySelector('[data-recplay]'), rec = null;
+    if (recB) recB.onclick = async function () {
+      if (rec && rec.state === 'recording') { rec.stop(); return; }
+      try {
+        var stream = await navigator.mediaDevices.getUserMedia({ audio: true }), parts = [];
+        rec = new MediaRecorder(stream); rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) parts.push(ev.data); };
+        rec.onstop = function () { stream.getTracks().forEach(function (x) { x.stop(); }); voiceBlob = new Blob(parts, { type: rec.mimeType || 'audio/webm' }); recP.src = URL.createObjectURL(voiceBlob); recP.hidden = false; recB.setAttribute('aria-pressed', 'false'); recB.textContent = t('voiceAgain'); };
+        rec.start(); recB.setAttribute('aria-pressed', 'true'); recB.textContent = t('voiceStop'); setTimeout(function () { if (rec && rec.state === 'recording') rec.stop(); }, 20000);
+      } catch (e) { el.querySelector('.cv-msg').textContent = t('voiceNoMic'); }
+    };
     var shotB = el.querySelector('[data-shot]'), file = el.querySelector('[data-file]');
     if (shotB) shotB.onclick = function () { file.click(); };
     var read = {};
@@ -691,7 +1184,7 @@
           instructions: v('cvInstr') || undefined, looks_like: v('cvLooks') || undefined, watch_for: v('cvWatch') || undefined,
           rx_number: v('cvRx') || undefined, prescriber_phone: v('cvPrescriberPhone') || undefined, start_on: v('cvStart') || undefined, end_on: v('cvEnd') || undefined,
           dispensed: v('cvDispensed') || undefined, refills: v('cvRefills') !== '' ? Number(v('cvRefills')) : undefined,
-          refilled_on: m.refilled_on || undefined, as_needed: prn || undefined };
+          refilled_on: m.refilled_on || undefined, as_needed: prn || undefined, voice: m.voice || undefined, voice_by: m.voice_by || undefined };
       } else if (kind === 'rec') {
         body.kind = 'access';
         body.meta = { group: grp, records: recsOn, helps: v('cvHelps') || undefined, relation: v('cvRel') || undefined, profession: v('cvProf') || undefined, org: v('cvOrg') || undefined, phone: v('cvPhone') || undefined, email: v('cvEmail') || undefined, since: v('cvSince') || undefined };
@@ -709,9 +1202,14 @@
           var up = await api('/storage/upload', { method: 'POST', body: fd });
           if (up.ok && up.data.id && up.data.file_size > 0) body.photo = up.data.id;
         }
+        if (voiceBlob && kind === 'med') {
+          var vfd = new FormData(); vfd.append('file', voiceBlob, 'voice-' + Date.now() + (/ogg/.test(voiceBlob.type) ? '.ogg' : /mp4/.test(voiceBlob.type) ? '.m4a' : '.webm')); vfd.append('blob_type', 'voice');
+          var vu = await api('/storage/upload', { method: 'POST', body: vfd });
+          if (vu.ok && vu.data.id) { body.meta.voice = vu.data.id; var me2 = ''; try { me2 = String(userSphereName || '').trim().split(/\s+/)[0]; } catch (e) {} body.meta.voice_by = me2 || undefined; }
+        }
         var r = await api('/care/items' + (it ? '/' + encodeURIComponent(it.id) : ''), { method: it ? 'PUT' : 'POST', body: body });
         if (!r.ok) throw new Error(r.status);
-        close(el); _open = kind; _openItem = r.data.item ? r.data.item.id : _openItem; load();
+        close(el); _open = kind === 'appt' ? 'visit' : kind === 'rec' ? 'papers' : kind; _openItem = r.data.item ? r.data.item.id : _openItem; load();
       } catch (e) { msg.textContent = t('failed'); sb.disabled = false; sb.textContent = t('save'); }
     };
     open(el);
@@ -722,7 +1220,7 @@
   function tick() {
     var s = subject(); var k = s ? (s.home || 'me') + ':' + s.edit : '';
     if (k !== _subj) { _subj = k; _open = ''; _openItem = ''; _data = null; if (k) load(); else { render(); syncSpheres(); } }
-    if (_data) { box.classList.toggle('show', visible()); }
+    if (_data) { box.classList.toggle('show', visible()); try { playDueVoices(); } catch (e) {} }
   }
   function boot() {
     if (!window.CovaraCare || !authed()) { setTimeout(boot, 1000); return; }
@@ -733,6 +1231,6 @@
     window.addEventListener('localeChanged', function () { _html = ''; render(); syncSpheres(); });
   }
   window.CovaraView = { source: source, centre: centre, drawCentre: drawCentre, hitCentre: hitCentre, centreSingle: centreSingle, centreDouble: centreDouble,
-    openNode: openNode, load: load, openEdit: openEdit, open: function (k, id) { _open = k || ''; _openItem = id || ''; render(); }, data: function () { return _data; }, lists: function () { return _ls; } };
+    openNode: openNode, load: load, openEdit: openEdit, open: function (k, id) { _open = { appt: 'visit', sub: 'med', rec: 'papers' }[k] || k || ''; _openItem = id || ''; _html = ''; render(); }, section: sectionOpen, data: function () { return _data; }, lists: function () { return _ls; } };
   setTimeout(boot, 1500);
 })();
