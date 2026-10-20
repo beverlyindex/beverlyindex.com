@@ -122,6 +122,148 @@
   }
 
   /* ── listening and speaking ── */
+
+  /* ── what Covara hears and says, seen: the TALK orb turns translucent and grows, the person's voice
+     shows as gold bars around it and Covara's voice as a blue wave inside it; while the person speaks the
+     same gold voice ring also plays around the dream circle. The microphone level is real (the phone's own
+     level in the Android app, the microphone itself on a computer); words heard light it up as they arrive. ── */
+  var VV = (function () {
+    var state = 'idle', ac = null, an = null, ms = null, tbuf = null, level = 0, kick = 0, ai = 0, aiKick = 0, aiOn = false, aiEndAt = 0;
+    var N = 72, hist = [], ahist = [], raf = 0, orbEl = null;
+    for (var i = 0; i < N; i++) { hist.push(0); ahist.push(0); }
+    var cvs = document.createElement('canvas'); cvs.id = 'cvTalkWave'; cvs.style.cssText = 'position:fixed;pointer-events:none;z-index:7150;opacity:0;transition:opacity .35s';
+    var dcv = document.createElement('canvas'); dcv.id = 'cvTalkDream'; dcv.style.cssText = 'position:fixed;pointer-events:none;z-index:6400;opacity:0;transition:opacity .35s';
+    function attach() { if (!cvs.parentNode && document.body) { document.body.appendChild(cvs); document.body.appendChild(dcv); } }
+    var touchy = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    async function micOn() {
+      if (touchy || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+      try {
+        ms = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        if (state !== 'listening') { micOff(); return; }
+        ac = new (window.AudioContext || window.webkitAudioContext)(); an = ac.createAnalyser(); an.fftSize = 1024; tbuf = new Float32Array(an.fftSize);
+        ac.createMediaStreamSource(ms).connect(an);
+      } catch (e) { micOff(); }
+    }
+    function micOff() { try { if (ms) ms.getTracks().forEach(function (x) { x.stop(); }); } catch (e) {} try { if (ac) ac.close(); } catch (e) {} ms = null; ac = null; an = null; }
+    function listen(orb) { orbEl = orb || orbEl; state = 'listening'; attach(); micOn(); if (orbEl) orbEl.classList.add('live'); run(); }
+    function heard() { kick = Math.min(1, kick + 0.55); }
+    function rms(db) { var v = Math.max(0, Math.min(1, (Number(db) + 2) / 11)); level = Math.max(level * 0.6, v); }
+    function settle() { clearTimeout(settle._t); settle._t = setTimeout(function () { if (state === 'fading') { state = 'idle'; if (orbEl) orbEl.classList.remove('live'); cvs.style.opacity = '0'; dcv.style.opacity = '0'; } }, 1800); }
+    function doneListening() { micOff(); if (state === 'listening') { state = aiOn ? 'speaking' : 'fading'; settle(); } }
+    function speakStart(est) { aiOn = true; aiEndAt = est ? Date.now() + est : 0; state = 'speaking'; attach(); if (orbEl) orbEl.classList.add('live'); run(); }
+    function word() { aiKick = Math.min(1, aiKick + 0.7); }
+    function speakEnd() { aiOn = false; aiEndAt = 0; if (state === 'speaking') { state = 'fading'; settle(); } }
+    function stopAll() { micOff(); aiOn = false; state = 'fading'; settle(); }
+    function run() { if (!raf) raf = requestAnimationFrame(frame); }
+    function size(c, w, h) { var dpr = window.devicePixelRatio || 1; if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); } c.style.width = w + 'px'; c.style.height = h + 'px'; var x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); return x; }
+    function frame(ts) {
+      raf = 0;
+      var now = Date.now();
+      if (aiOn && aiEndAt && now > aiEndAt) speakEnd();
+      /* the person's voice */
+      var mic = 0;
+      if (an && state === 'listening') { an.getFloatTimeDomainData(tbuf); var sum = 0; for (var i = 0; i < tbuf.length; i++) sum += tbuf[i] * tbuf[i]; mic = Math.min(1, Math.sqrt(sum / tbuf.length) * 7); }
+      kick *= 0.9; level *= 0.88;
+      var you = state === 'listening' ? Math.max(mic, level, kick * (0.55 + 0.45 * Math.random())) : 0;
+      /* Covara's voice: the device voices give no sound to measure, so the wave follows each word as it is said */
+      aiKick *= 0.9;
+      var aiv = aiOn ? Math.min(1, 0.22 + aiKick * 0.6 + 0.18 * Math.abs(Math.sin(ts * 0.011)) * (0.6 + 0.4 * Math.sin(ts * 0.0031))) : 0;
+      hist.push(you); hist.shift(); ahist.push(aiv); ahist.shift();
+      var any = state !== 'idle' && (state !== 'fading' || hist.some(function (v) { return v > 0.01; }) || ahist.some(function (v) { return v > 0.01; }));
+      if (state === 'fading' && !any) { state = 'idle'; if (orbEl) orbEl.classList.remove('live'); cvs.style.opacity = '0'; dcv.style.opacity = '0'; return; }
+      drawOrb(ts); drawDreamRing(ts, you);
+      raf = requestAnimationFrame(frame);
+    }
+    /* TALK: a glass sphere with a ribbon of fine light running through it, warm on the left (the person speaking)
+       and cool on the right (Covara speaking). The ribbon lifts and twists with each voice; at rest it lies almost flat. */
+    function ribbon(x, cx, cy, half, amp, ts, strands, phase, twist) {
+      for (var k = 0; k < strands; k++) {
+        var u = k / (strands - 1) - 0.5;
+        x.beginPath();
+        for (var j = 0; j <= 140; j++) {
+          var f = j / 140, px = cx - half + f * half * 2;
+          var env = Math.exp(-Math.pow((f - 0.5) * 2.1, 2) * 1.6);
+          var w1 = Math.sin(f * Math.PI * 2.2 + ts * 0.0021 + phase + u * twist);
+          var w2 = Math.sin(f * Math.PI * 4.6 - ts * 0.0016 + phase * 1.7) * 0.35;
+          var py = cy + (w1 + w2) * amp * env + u * amp * 0.55 * Math.cos(f * Math.PI * 2.2 + ts * 0.0021 + phase);
+          if (j) x.lineTo(px, py); else x.moveTo(px, py);
+        }
+        x.stroke();
+      }
+    }
+    function drawOrb(ts) {
+      if (!orbEl) return;
+      var r = orbEl.getBoundingClientRect(); if (!r.width) return;
+      var R = r.width / 2, Wd = Math.round(R * 2 + 28), Ht = Wd, cx = Wd / 2, cy = Ht / 2;
+      cvs.style.left = Math.round(r.left + r.width / 2 - Wd / 2) + 'px'; cvs.style.top = Math.round(r.top + r.height / 2 - Ht / 2) + 'px';
+      var x = size(cvs, Wd, Ht); x.clearRect(0, 0, Wd, Ht); cvs.style.opacity = '1';
+      var you = 0, me = 0; for (var i = N - 12; i < N; i++) { you = Math.max(you, hist[i]); me = Math.max(me, ahist[i]); }
+      var amp = R * (0.06 + Math.max(you, me) * 0.5), half = R;
+      var g = x.createLinearGradient(cx - half, 0, cx + half, 0);
+      var warm = 0.35 + you * 0.65, cool = 0.35 + me * 0.65;
+      g.addColorStop(0, 'rgba(255,70,40,.25)'); g.addColorStop(0.18, 'rgba(255,90,50,' + 0.55 * warm + ')'); g.addColorStop(0.36, 'rgba(255,170,90,' + 0.75 * warm + ')');
+      g.addColorStop(0.5, 'rgba(255,240,215,0.85)');
+      g.addColorStop(0.64, 'rgba(170,240,235,' + 0.75 * cool + ')'); g.addColorStop(0.82, 'rgba(90,210,230,' + 0.55 * cool + ')'); g.addColorStop(1, 'rgba(60,190,230,.25)');
+      /* the waves stay inside the glass sphere */
+      x.save(); x.beginPath(); x.arc(cx, cy, R - 1.5, 0, Math.PI * 2); x.clip();
+      x.globalCompositeOperation = 'lighter'; x.strokeStyle = g; x.lineWidth = 0.7;
+      ribbon(x, cx, cy, half, amp, ts, 22, 0, 2.6);
+      x.lineWidth = 0.55; ribbon(x, cx, cy, half, amp * 0.8, ts, 18, 2.1, -3.2);
+      x.restore();
+      /* the glass sphere's rim */
+      x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2);
+      var rg = x.createLinearGradient(cx - R, cy - R, cx + R, cy + R); rg.addColorStop(0, 'rgba(120,220,255,.85)'); rg.addColorStop(1, 'rgba(60,140,220,.45)');
+      x.strokeStyle = rg; x.lineWidth = 1.4; x.shadowColor = 'rgba(80,200,255,.8)'; x.shadowBlur = 10; x.stroke(); x.shadowBlur = 0;
+    }
+    /* A band of colour from blue to red, the sound scrolling from right to left: left edge x0, centre line cy,
+       width w, tallest wave maxA, levels src (0 to 1, oldest first) */
+    function band(x, x0, cy, w, maxA, src, ts) {
+      var n = src.length, g = x.createLinearGradient(x0, 0, x0 + w, 0);
+      [[0, '#2f6bff'], [0.18, '#2fd0ff'], [0.36, '#3cffb4'], [0.52, '#f6ff6a'], [0.68, '#ffb03a'], [0.84, '#ff4a3a'], [1, '#ff3f9b']].forEach(function (c) { g.addColorStop(c[0], c[1]); });
+      x.save(); x.globalCompositeOperation = 'lighter';
+      var P = 150;
+      function lvl(f) { return src[Math.min(n - 1, Math.max(0, Math.floor(f * (n - 1))))]; }
+      for (var s2 = 0; s2 < 6; s2++) {
+        var fr = 9 + s2 * 3.3, ph = ts * (0.004 + s2 * 0.0011) + s2 * 1.3;
+        x.beginPath();
+        for (var j = 0; j <= P; j++) {
+          var f = j / P, a = maxA * (0.06 + lvl(f) * 0.94) * Math.exp(-Math.pow((f - 0.5) * 2, 2) * 0.9);
+          var py = cy + Math.sin(f * fr + ph) * a;
+          if (j) x.lineTo(x0 + f * w, py); else x.moveTo(x0, py);
+        }
+        for (var j2 = P; j2 >= 0; j2--) {
+          var f2 = j2 / P, a2 = maxA * (0.06 + lvl(f2) * 0.94) * Math.exp(-Math.pow((f2 - 0.5) * 2, 2) * 0.9);
+          x.lineTo(x0 + f2 * w, cy - Math.sin(f2 * fr + ph) * a2);
+        }
+        x.closePath();
+        x.globalAlpha = 0.09; x.fillStyle = g; x.fill();
+        x.globalAlpha = 0.55; x.strokeStyle = g; x.lineWidth = 1.2; x.stroke();
+      }
+      x.globalAlpha = 1;
+      var cl = x.createLinearGradient(x0, 0, x0 + w, 0); cl.addColorStop(0, 'rgba(255,255,255,0)'); cl.addColorStop(0.5, 'rgba(255,255,255,.95)'); cl.addColorStop(1, 'rgba(255,255,255,0)');
+      x.strokeStyle = cl; x.lineWidth = 1.6; x.shadowColor = '#fff'; x.shadowBlur = 12;
+      x.beginPath(); x.moveTo(x0, cy); x.lineTo(x0 + w, cy); x.stroke();
+      x.restore();
+    }
+    /* The dream circle while someone speaks: a band of colour from blue to red across the picture,
+       the sound itself scrolling from right to left, laid over whatever image is there */
+    function drawDreamRing(ts, you) {
+      var d = window._dreamRect, sp = document.getElementById('sphere');
+      var live = state === 'listening' || aiOn;
+      if (!d || !sp || !live) { dcv.style.opacity = '0'; return; }
+      var b = sp.getBoundingClientRect(), k = b.width / (sp.width / (window.devicePixelRatio || 1) || b.width);
+      var R = d.r * k, S = Math.round(R * 2), cx = S / 2, cy = S / 2;
+      dcv.style.left = Math.round(b.left + d.cx * k - R) + 'px'; dcv.style.top = Math.round(b.top + d.cy * k - R) + 'px';
+      var x = size(dcv, S, S); x.clearRect(0, 0, S, S); dcv.style.opacity = '1';
+      var src = state === 'listening' ? hist : ahist;
+      x.save(); x.beginPath(); x.arc(cx, cy, R - 1, 0, Math.PI * 2); x.clip();
+      x.fillStyle = 'rgba(2,6,18,.38)'; x.fillRect(0, 0, S, S);
+      band(x, 0, cy, S, R * 0.62, src, ts);
+      x.restore();
+    }
+    return { listen: listen, heard: heard, rms: rms, doneListening: doneListening, speakStart: speakStart, word: word, speakEnd: speakEnd, stop: stopAll, band: band, ribbon: ribbon };
+  })();
+  window.CovaraVoiceVisual = VV;
   var rec = null, busy = false, _orb = null, _cap = null, bubble = null;
   /* The most natural voice the device has. Phones and computers carry a few voices recorded from real people
      (Apple's Premium and Enhanced voices, Google's network voices, Microsoft's Natural voices); the default is often
@@ -144,15 +286,18 @@
   }
   function speak(text) {
     /* in the installed Android app: the phone's own voice engine, which carries Google's natural voices */
-    if (window.CovaraNative && typeof CovaraNative.speak === 'function') { if (!String(text || '').trim()) return; try { CovaraNative.speak(forEar(text), IT() ? 'it-IT' : 'en-US', window.CovaraCalm ? 0.86 : 0.95); return; } catch (e) {} }
+    if (window.CovaraNative && typeof CovaraNative.speak === 'function') { if (!String(text || '').trim()) return; try { VV.speakStart(forEar(text).split(/\s+/).length * 420 + 1500); CovaraNative.speak(forEar(text), IT() ? 'it-IT' : 'en-US', window.CovaraCalm ? 0.86 : 0.95); return; } catch (e) {} }
     try {
       if (!window.speechSynthesis || !text) return;
       speechSynthesis.cancel(); if (!_voice) _voice = pickVoice();
       /* a sentence at a time, with a breath between, so it sounds like someone talking, not a list being read */
       var parts = forEar(text).match(/[^.!?]+[.!?]*/g) || [text];
+      VV.speakStart(forEar(text).split(/\s+/).length * 420 + 1500);
       parts.forEach(function (part, i) {
         var u = new SpeechSynthesisUtterance(part.trim()); if (_voice) u.voice = _voice; u.lang = _voice ? _voice.lang : (IT() ? 'it-IT' : 'en-US');
         u.rate = window.CovaraCalm ? 0.86 : 0.94; u.pitch = 1.02 - (i % 2) * 0.03; u.volume = 1;
+        u.onboundary = function () { VV.word(); };
+        if (i === parts.length - 1) { u.onend = function () { VV.speakEnd(); }; u.onerror = function () { VV.speakEnd(); }; }
         speechSynthesis.speak(u);
       });
     } catch (e) {}
@@ -176,22 +321,31 @@
   /* the installed Android app hears with the phone's own speech recognition */
   if (!window.CovaraNativeEvent) window.CovaraNativeEvent = function (j) { try { window.dispatchEvent(new CustomEvent('covara-native', { detail: JSON.parse(j) })); } catch (e) {} };
   window.addEventListener('covara-native', function (e) {
-    var d = e.detail || {}; if (d.kind !== 'speech' || !busy) return;
+    var d = e.detail || {};
+    if (d.kind === 'tts') { if (d.type === 'start') VV.speakStart(0); else if (d.type === 'word') VV.word(); else if (d.type === 'end') VV.speakEnd(); return; }
+    if (d.kind !== 'speech' || !busy) return;
+    if (d.type === 'rms') { VV.rms(d.value); return; }
+    if (d.type === 'partial') { VV.heard(); if (bubble && d.value) { bubble.textContent = '\u201c' + d.value + '\u2026\u201d'; bubble.hidden = false; } return; }
     if (d.type === 'result') { stop(); var a = answer(d.value); say('\u201c' + d.value + '\u201d: ' + a, a); }
     else if (d.type === 'error') { stop(); if (d.value === 'not-allowed') typed(); else say(t('notHeard')); }
   });
-  function nativeListen(orb) { busy = true; orb.classList.add('listening'); say(t('listening'), ' '); try { CovaraNative.listen(IT() ? 'it-IT' : 'en-US'); } catch (e) { stop(); typed(); } }
-  function stop() { busy = false; if (_orb) _orb.classList.remove('listening'); try { if (rec) rec.abort(); } catch (e) {} try { if (window.CovaraNative && CovaraNative.stopListening) CovaraNative.stopListening(); } catch (e) {} }
+  function nativeListen(orb) { busy = true; orb.classList.add('listening'); VV.listen(orb); say(t('listening'), ' '); try { CovaraNative.listen(IT() ? 'it-IT' : 'en-US'); } catch (e) { stop(); typed(); } }
+  function stop() { busy = false; VV.doneListening(); if (_orb) _orb.classList.remove('listening'); try { if (rec) rec.abort(); } catch (e) {} try { if (window.CovaraNative && CovaraNative.stopListening) CovaraNative.stopListening(); } catch (e) {} }
   function toggle(orb, cap) {
     _orb = orb; _cap = cap;
     if (busy) { stop(); return; }
+    try { if (window.speechSynthesis) speechSynthesis.cancel(); if (window.CovaraNative && CovaraNative.hush) CovaraNative.hush(); } catch (e) {} VV.speakEnd();
     if (window.CovaraNative && typeof CovaraNative.listen === 'function' && CovaraNative.canHear()) { nativeListen(orb); return; }
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { typed(); return; }
-    rec = new SR(); rec.lang = IT() ? 'it-IT' : 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
-    busy = true; orb.classList.add('listening'); say(t('listening'), ' ');
+    rec = new SR(); rec.lang = IT() ? 'it-IT' : 'en-US'; rec.interimResults = true; rec.maxAlternatives = 1;
+    busy = true; orb.classList.add('listening'); VV.listen(orb); say(t('listening'), ' ');
     var heard = false;
-    rec.onresult = function (e) { heard = true; var q = e.results[0][0].transcript; stop(); var a = answer(q); say('“' + q + '”: ' + a, a); };
+    rec.onresult = function (e) {
+      var r0 = e.results[e.results.length - 1], q = r0[0].transcript; VV.heard();
+      if (!r0.isFinal) { if (bubble) { bubble.textContent = '\u201c' + q + '\u2026\u201d'; bubble.hidden = false; } return; }
+      heard = true; stop(); var a = answer(q); say('\u201c' + q + '\u201d: ' + a, a);
+    };
     rec.onerror = function (e) { stop(); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) typed(); else say(t('notHeard')); };
     rec.onend = function () { if (busy && !heard) { stop(); say(t('notHeard')); } };
     try { rec.start(); } catch (e) { stop(); typed(); }
