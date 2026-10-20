@@ -26,8 +26,24 @@
       calling: 'Chiamo {who}.', messaging: 'Apro un messaggio a {who}.', whoCall: 'Non ho trovato {who} nella cerchia.',
       opening: 'Apro {what}.', camera: 'Apro la fotocamera.', home: 'Torno a {name}.', now: 'Ecco tutto ora.' }
   };
+  /* When HOME asks about himself, Covara answers to him, not about him: "Where am I?" "You are at home." */
+  var ME = {
+    en: { help: 'You can ask me: did I take my medicines, where am I, who is with me, what is next, how am I today, call someone by name, or open the camera.',
+      allTaken: 'You have taken everything due so far today. Well done.', noMeds: 'You have no medicines today.',
+      atHome: 'You are at home{room}.', out: 'You are out, {d} from home{near}.', inside: 'You are inside {place}.', noPos: 'I do not know where you are yet. Keep the phone with you and I will find you.',
+      withNone: 'No one from your circle is with you right now.', withSome: '{list} {verb} with you.', closest: ' The closest is {who}, {d} away.',
+      moodNone: 'You have not told me how you feel today. Tap the camera and take your photo for today, and I will ask.', mood_good: 'You told me today is a good day.', mood_okay: 'You told me today is an okay day.', mood_low: 'You told me today is not a good day. Would you like to call someone? Say: call, and their name.',
+      home: 'Back home.' },
+    it: { help: 'Puoi chiedermi: ho preso le medicine, dove sono, chi \u00e8 con me, cosa c\u2019\u00e8 dopo, come sto oggi, chiama qualcuno per nome, o apri la fotocamera.',
+      allTaken: 'Hai preso tutto quello previsto finora oggi. Bravo.', noMeds: 'Oggi non hai medicine.',
+      atHome: 'Sei a casa{room}.', out: 'Sei fuori, a {d} da casa{near}.', inside: 'Sei dentro {place}.', noPos: 'Non so ancora dove sei. Tieni il telefono con te e ti trover\u00f2.',
+      withNone: 'Nessuno della tua cerchia \u00e8 con te ora.', withSome: '{list} {verb} con te.', closest: ' Il pi\u00f9 vicino \u00e8 {who}, a {d}.',
+      moodNone: 'Non mi hai ancora detto come stai oggi.', mood_good: 'Mi hai detto che oggi \u00e8 una buona giornata.', mood_okay: 'Mi hai detto che oggi va cos\u00ec cos\u00ec.', mood_low: 'Mi hai detto che oggi non \u00e8 una buona giornata. Vuoi chiamare qualcuno? Di\u2019: chiama, e il nome.',
+      home: 'Torno a casa.' }
+  };
+  function self() { return role() !== 'away'; }
   function IT() { try { return String(I18n.locale || 'en').slice(0, 2) === 'it'; } catch (e) { return false; } }
-  function t(k, p) { var s = (IT() ? S.it : S.en)[k] || S.en[k] || k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
+  function t(k, p) { var s = (self() && (IT() ? ME.it : ME.en)[k]) || (IT() ? S.it : S.en)[k] || S.en[k] || k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
   function role() { try { return localStorage.getItem('rc:role') || ''; } catch (e) { return ''; } }
   function homeContact() { if (typeof DEMO_CONTACTS === 'undefined') return null; return DEMO_CONTACTS.filter(function (c) { return c.care && c.care.side === 'home' && c.care.state === 'active'; })[0] || null; }
   function first() { if (role() === 'away') { var h = homeContact(); return h ? h.first : ''; } return IT() ? 'tu' : 'you'; }
@@ -58,7 +74,7 @@
     try { if (typeof WhereIs !== 'undefined') WhereIs.setMode('whereis'); } catch (e) {}
     if (!w || !w.location) return t('noPos', { name: first() });
     var s = w.inside ? t('inside', { name: first(), place: w.inside.name }) : w.at_home === false ? t('out', { name: first(), d: dist(w.from_home_m), near: w.health && w.health[0] && w.health[0].m < 300 ? t('near', { place: w.health[0].name }) : '' }) : t('atHome', { name: first(), room: w.rooms && w.rooms.now ? t('inRoom', { room: w.rooms.now }) : '' });
-    return s + t('ago', { t: agoT(w.location.at) });
+    return s + (self() && Date.now() - w.location.at < 15 * 60000 ? '' : t('ago', { t: agoT(w.location.at) }));
   }
   function withWho() {
     var w = window.CovaraWhere && CovaraWhere.data(); if (!w || !w.location) return t('noPos', { name: first() });
@@ -97,7 +113,7 @@
     if (/\b(who is with|with (him|her|dad|mom)|chi [eè] con|is anyone with)\b/.test(s)) return withWho();
     if (/\b(where|dove)\b/.test(s)) return where();
     if (/\b(next|coming up|appointment|prossim|appuntament)\b/.test(s)) return next();
-    if (/\b(how is|how's|feel|feeling|mood|come sta|umore)\b/.test(s)) return mood();
+    if (/\b(how is|how's|how am i|feel|feeling|mood|come sta|come sto|umore)\b/.test(s)) return mood();
     if (/\b(camera|photo|picture|what is this|what's this|fotocamera|foto|cos[' ]?[eè] questo)\b/.test(s)) { setTimeout(function () { try { CovaraCamera.open(); } catch (e) {} }, 600); return t('camera'); }
     if (/\b(everything|all of it|tutto)\b/.test(s)) { setTimeout(function () { try { CovaraNav.now(); } catch (e) {} }, 400); return t('now'); }
     if (/\b(home|back|casa|indietro)\b/.test(s) && s.split(/\s+/).length <= 3) { try { CovaraNav.home(); } catch (e) {} return t('home', { name: first() }); }
@@ -107,11 +123,43 @@
 
   /* ── listening and speaking ── */
   var rec = null, busy = false, _orb = null, _cap = null, bubble = null;
-  function say(text) {
+  /* The most natural voice the device has. Phones and computers carry a few voices recorded from real people
+     (Apple's Premium and Enhanced voices, Google's network voices, Microsoft's Natural voices); the default is often
+     the flattest one, so Covara picks the best by name. */
+  var _voice = null;
+  var GOOD = [/premium/i, /enhanced/i, /natural/i, /neural/i, /siri/i, /google (us|uk) english/i, /google italiano/i, /x-.*-network/i, /^(ava|zoe|evan|nathan|joelle|noelle|samantha|alice|federica|luca|emma)\b/i];
+  function pickVoice() {
+    if (!window.speechSynthesis) return null;
+    var lang = IT() ? 'it' : 'en', vs = speechSynthesis.getVoices().filter(function (v) { return String(v.lang).toLowerCase().indexOf(lang) === 0; });
+    if (!vs.length) return null;
+    function score(v) { var n = v.name + ' ' + v.voiceURI, sc = 0; GOOD.forEach(function (r, i) { if (r.test(n)) sc += 40 - i * 3; }); if (/en-US|it-IT/i.test(v.lang)) sc += 5; if (/compact|eloquence|espeak|fred|albert|zarvox|bells|bad news|boing|bubbles|cellos|jester|organ|trinoids|whisper|wobble|superstar|grandma|grandpa|rocko|shelley|sandy|reed|flo|eddy/i.test(n)) sc -= 100; return sc; }
+    vs.sort(function (a, b) { return score(b) - score(a); });
+    return vs[0];
+  }
+  try { if (window.speechSynthesis) { _voice = pickVoice(); speechSynthesis.onvoiceschanged = function () { _voice = pickVoice(); }; } } catch (e) {}
+  function forEar(text) {
+    return String(text)
+      .replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g, function (m, h, mi) { h = +h; mi = +mi; if (IT()) return h + (mi ? ' e ' + mi : ''); var ap = h < 12 ? 'A M' : 'P M', h12 = h % 12 || 12; return h12 + (mi ? ' ' + (mi < 10 ? 'oh ' + mi : mi) : '') + ' ' + ap; })
+      .replace(/\bmg\b/g, IT() ? 'milligrammi' : 'milligrams').replace(/\bDr\./g, IT() ? 'Dottor' : 'Doctor');
+  }
+  function speak(text) {
+    try {
+      if (!window.speechSynthesis || !text) return;
+      speechSynthesis.cancel(); if (!_voice) _voice = pickVoice();
+      /* a sentence at a time, with a breath between, so it sounds like someone talking, not a list being read */
+      var parts = forEar(text).match(/[^.!?]+[.!?]*/g) || [text];
+      parts.forEach(function (part, i) {
+        var u = new SpeechSynthesisUtterance(part.trim()); if (_voice) u.voice = _voice; u.lang = _voice ? _voice.lang : (IT() ? 'it-IT' : 'en-US');
+        u.rate = window.CovaraCalm ? 0.86 : 0.94; u.pitch = 1.02 - (i % 2) * 0.03; u.volume = 1;
+        speechSynthesis.speak(u);
+      });
+    } catch (e) {}
+  }
+  function say(text, spoken) {
     if (!bubble) { bubble = document.createElement('div'); bubble.id = 'cvTalkBubble'; bubble.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:190px;z-index:7300;max-width:min(560px,calc(100vw - 32px));padding:12px 16px;border-radius:16px;border:1px solid rgba(197,165,90,.6);background:rgba(10,14,24,.94);color:#f0eef5;font:500 15px/1.45 var(--nous-font,"Hanken Grotesk",sans-serif);box-shadow:0 14px 34px rgba(0,0,0,.6)'; document.body.appendChild(bubble); bubble.addEventListener('click', function () { bubble.hidden = true; }); }
     bubble.textContent = text; bubble.hidden = false;
     clearTimeout(bubble._t); bubble._t = setTimeout(function () { bubble.hidden = true; }, Math.max(6000, text.length * 90));
-    try { if (window.speechSynthesis) { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text); u.lang = IT() ? 'it-IT' : 'en-US'; u.rate = window.CovaraCalm ? 0.85 : 0.98; speechSynthesis.speak(u); } } catch (e) {}
+    speak(spoken || text);
   }
   function typed() {
     if (!bubble) say('');
@@ -130,9 +178,9 @@
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { typed(); return; }
     rec = new SR(); rec.lang = IT() ? 'it-IT' : 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
-    busy = true; orb.classList.add('listening'); say(t('listening'));
+    busy = true; orb.classList.add('listening'); say(t('listening'), ' ');
     var heard = false;
-    rec.onresult = function (e) { heard = true; var q = e.results[0][0].transcript; stop(); say('“' + q + '”: ' + answer(q)); };
+    rec.onresult = function (e) { heard = true; var q = e.results[0][0].transcript; stop(); var a = answer(q); say('“' + q + '”: ' + a, a); };
     rec.onerror = function (e) { stop(); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) typed(); else say(t('notHeard')); };
     rec.onend = function () { if (busy && !heard) { stop(); say(t('notHeard')); } };
     try { rec.start(); } catch (e) { stop(); typed(); }

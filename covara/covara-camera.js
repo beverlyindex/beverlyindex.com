@@ -19,7 +19,7 @@
     it: { title: 'FOTOCAMERA COVARA', medicine: 'MEDICINA', meal: 'PASTO', letter: 'LETTERA', room: 'STANZA', face: 'VOLTO', close: 'Chiudi', again: 'Un’altra', done: 'Fatto',
       h_medicine: 'Inquadra l’etichetta del flacone o della scatola.', h_meal: 'Fotografa il piatto dopo il pasto.', h_letter: 'Fotografa la lettera o la bolletta, piatta e con buona luce.', h_room: 'Dalla porta, fotografa la stanza.', h_face: 'Una foto di {name} per oggi.', h_face_me: 'Una tua foto per oggi.', moodMe: 'Come stai oggi?',
       sending: 'Invio…', reading: 'Lettura dell’etichetta…', medFilled: '{name}: segnata Ritirata', medNew: '{name}: una nuova medicina. Apri Medicine, Foto in attesa, per aggiungerla con un tocco.', medUnread: 'Non è stato possibile leggere l’etichetta. Aspetta in Medicine, Foto in attesa.',
-      mealQ: 'Quanto ha mangiato?', m_all: 'Tutto', m_some: 'Un po’', m_none: 'Niente', mealOk: 'Salvato nella giornata di {name}.',
+      mealQ: 'Quanto ha mangiato?', m_all: 'Tutto', m_some: 'Un po’', m_none: 'Niente', mealOk: 'Salvato nella giornata di {name}.', mealOkMe: 'Salvato nella tua giornata.', faceOkMe: 'La tua foto di oggi \u00e8 salvata.',
       letterOk: 'Niente in questa lettera sembra una truffa.', letterBad: 'Questa lettera mostra segni di truffa: {why}. La famiglia è stata avvisata. Non pagarla e non chiamare il numero indicato.', letterNone: 'Non è stato possibile leggere le parole. Riprova più vicino, piatta, con buona luce.',
       roomQ: 'Che stanza è?', r_kitchen: 'Cucina', r_bedroom: 'Camera', r_bathroom: 'Bagno', r_living: 'Soggiorno', r_door: 'Porta d’ingresso', r_hall: 'Corridoio', roomOk: '{room} salvata per il radar delle stanze.',
       faceOk: 'La foto di oggi di {name} è salvata.', moodQ: 'Come sta {name} oggi?', g: 'Bene', o: 'Così così', l: 'Giù',
@@ -159,7 +159,7 @@
         var id = await upload(blob); if (!id) return card(t('failed'), 'bad');
         var r = await api('/care/log', { method: 'POST', body: Object.assign({ kind: 'meal', value: o.v, photo: id }, homeBody()) });
         if (!r.ok) return card(t('failed'), 'bad');
-        card(t('mealOk', { name: first() }), o.v === 'none' ? 'warn' : 'good'); frame(o.v === 'none' ? 'warn' : 'good', t('meal') + ' · ' + o.label.toUpperCase());
+        card(t(role() === 'away' ? 'mealOk' : 'mealOkMe', { name: first() }), o.v === 'none' ? 'warn' : 'good'); frame(o.v === 'none' ? 'warn' : 'good', t('meal') + ' · ' + o.label.toUpperCase());
         ask(' ', again(), after);
       });
     },
@@ -188,7 +188,7 @@
       var id = await upload(blob); if (!id) throw new Error('up');
       var r = await api('/care/log', { method: 'POST', body: Object.assign({ kind: 'face', value: 'checkin', photo: id }, homeBody()) });
       if (!r.ok) throw new Error('log');
-      card(t('faceOk', { name: first() }), 'good'); frame('good', first().toUpperCase() + ' · ' + new Date().toLocaleDateString(IT() ? 'it' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase());
+      card(t(role() === 'away' ? 'faceOk' : 'faceOkMe', { name: first() }), 'good'); frame('good', first().toUpperCase() + ' · ' + new Date().toLocaleDateString(IT() ? 'it' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase());
       if (role() === 'home') ask(t('moodMe'), [{ label: t('g'), m: 'good', pri: true }, { label: t('o'), m: 'okay' }, { label: t('l'), m: 'low' }], async function (o) { await api('/care/state', { method: 'POST', body: { mood: o.m } }).catch(function () {}); ask(' ', again(), after); });
       else ask(' ', again(), after);
     }
