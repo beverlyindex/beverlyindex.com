@@ -23079,11 +23079,12 @@ const WhereIs = (() => {
         return x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
       };
       const which = e => {
-        if (typeof focusedContactId === 'undefined' || !focusedContactId) return null;
+        const _cvW = !!(window.CovaraWhere && window.CovaraWhere.on());
+        if ((typeof focusedContactId === 'undefined' || !focusedContactId) && !_cvW) return null;
         /* A sphere under the finger always wins over the drawn regions */
         try { if (typeof hitTestNetwork === 'function' && hitTestNetwork(e.clientX, e.clientY)) return null; } catch (err) {}
         if (hit(e, window._dreamToggleHit)) return 'toggle';
-        if (_mode === 'whereis' && (hit(e, window._dreamWhereHit) || hit(e, window._dreamMicroHit))) return 'map';
+        if (_mode === 'whereis' && !_cvW && (hit(e, window._dreamWhereHit) || hit(e, window._dreamMicroHit))) return 'map';
         return null;
       };
       let _down = null;
@@ -23836,7 +23837,7 @@ const WhereIs = (() => {
     }));
   }
 
-  return { init, mode, setMode, drawToggle, drawDream, hideAnchor, openPanel, closePanel, arrivalItemsFor, pulseLine, placeChipHtml, matchContact, entryFor,
+  return { init, bind: _bind, mode, setMode, drawToggle, drawDream, hideAnchor, openPanel, closePanel, arrivalItemsFor, pulseLine, placeChipHtml, matchContact, entryFor,
            circle, circleFor, stateFor, stateText, ask, shareWith, checkAsks, approxFor, approxText, forgetApprox, renderCircleShare, fillCard,
            updateVisibility, renderPlaces, addPlace, editPlace, closeEditor, savePlace, deletePlace, printQr, setOpenShare, renderCheckin, checkIn, onSettingsOpen,
            sharedLocations, myPlaces, sharedPlaces, nowFor, arrivalsFor, trail, tile, drawTiles, ageText, invalidate,
@@ -29484,7 +29485,9 @@ function drawNetworkView(t) {
     /* COMMUNICATION | WHEREIS: the small toggle line under the member's picture */
     var _dreamWhere = false;
     try {
-      if (typeof WhereIs !== 'undefined' && _focNode && !_focNode.contact.cvItem) {
+      /* Covara: WHEREIS is always about HOME, so it is there on AWAY's main screen too */
+      var _cvWhereOn = false; try { _cvWhereOn = !!(window.CovaraWhere && window.CovaraWhere.on()); } catch (e) {}
+      if (typeof WhereIs !== 'undefined' && (_cvWhereOn || (_focNode && !_focNode.contact.cvItem))) {
         /* The focused sphere's action pills (Video, Phone, Message, Email) must stay clear of the line */
         var _tgAvoid = null;
         try {
@@ -29497,10 +29500,11 @@ function drawNetworkView(t) {
           } else window._focusOrb = null;
         } catch (e) { _tgAvoid = null; window._focusOrb = null; }
         window._dreamPillAvoid = _tgAvoid;
-        WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId, _tgAvoid);
+        WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId || (_cvWhereOn ? 'covara-home' : null), _tgAvoid);
         _dreamWhere = WhereIs.mode() === 'whereis';
-        if (_dreamWhere) WhereIs.drawDream(ctx, W, H, focusedContactId, t, window._dreamRect, _focNode, _focCat);
-        else { window._dreamWhereHit = null; window._dreamMicroHit = null; }
+        if (_dreamWhere && _cvWhereOn) { try { WhereIs.bind(); } catch (e) {} window.CovaraWhere.draw(ctx, W, H, t, window._dreamRect); }
+        else if (_dreamWhere) WhereIs.drawDream(ctx, W, H, focusedContactId, t, window._dreamRect, _focNode, _focCat);
+        else { window._dreamWhereHit = null; window._dreamMicroHit = null; try { if (window.CovaraWhere) window.CovaraWhere.hide(); } catch (e) {} }
       }
     } catch (e) { window._dreamWhereHit = null; window._dreamMicroHit = null; }
     /* The communication summary beside the picture is HTML (#dreamBrief), placed by Comm.frame,
@@ -45481,5 +45485,6 @@ try { _resolveAppScriptReady(); } catch (e) {}
   <script src="covara-care.js" defer></script>
   <script src="covara-label.js" defer></script>
   <script src="covara-view.js" defer></script>
+  <script src="covara-where.js" defer></script>
 </body>
 </html>
