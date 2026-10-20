@@ -9,8 +9,9 @@
   for (var i = 0; i < N; i++) { them.push(0); me.push(0); }
   var ac = null, anThem = null, anMe = null, buf = null, srcThem = null, srcMe = null, raf = 0;
   var cv = document.createElement('canvas'); cv.id = 'cvCallWave';
-  cv.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;z-index:100003';
-  function attach() { if (!cv.parentNode && document.body) document.body.appendChild(cv); }
+  cv.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:100002';
+  /* inside the call screen, above the pictures and beneath the call buttons */
+  function attach() { var ov = document.getElementById('scOverlay'); if (ov && cv.parentNode !== ov) ov.appendChild(cv); }
 
   function analyser(stream) {
     if (!stream || !stream.getAudioTracks || !stream.getAudioTracks().length) return null;
@@ -69,15 +70,18 @@
     var x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
     var rt = tile(document.getElementById('scRemoteVideo')), lt = tile(document.getElementById('scLocalVideo'));
     /* the other person: a band of colour across the lower part of their picture, clear of the face */
-    if (rt) {
+    /* only once the call is through (the "calling" screen gone) and their sound has arrived; kept to the very bottom of the frame */
+    var st = document.getElementById('scStatus'), through = !st || getComputedStyle(st).display === 'none';
+    if (rt && anThem && through) {
+      var ma = Math.min(rt.height * 0.07, 46);
       x.save(); x.beginPath(); x.rect(rt.left, rt.top, rt.width, rt.height); x.clip();
-      V.band(x, rt.left, rt.top + rt.height * 0.7, rt.width, Math.min(rt.height * 0.13, 90), them, ts);
+      V.band(x, rt.left, rt.top + rt.height - ma - 6, rt.width, ma, them, ts);
       x.restore();
     }
     /* you: a warm ribbon of light along the bottom of your picture */
-    if (lt) {
+    if (lt && anMe) {
       var you = 0; for (var i = N - 10; i < N; i++) you = Math.max(you, me[i]);
-      var cy = lt.top + lt.height * 0.62, half = lt.width * 0.42, amp = Math.min(lt.height * 0.12, 60) * (0.08 + you * 0.92);
+      var am = Math.min(lt.height * 0.08, 34), cy = lt.top + lt.height - am - 5, half = lt.width * 0.42, amp = am * (0.08 + you * 0.92);
       var g = x.createLinearGradient(lt.left + lt.width / 2 - half, 0, lt.left + lt.width / 2 + half, 0);
       g.addColorStop(0, 'rgba(255,70,40,0)'); g.addColorStop(0.25, 'rgba(255,100,55,' + (0.4 + you * 0.5) + ')'); g.addColorStop(0.5, 'rgba(255,236,205,.9)'); g.addColorStop(0.75, 'rgba(255,160,80,' + (0.4 + you * 0.5) + ')'); g.addColorStop(1, 'rgba(255,90,50,0)');
       x.save(); x.beginPath(); x.rect(lt.left, lt.top, lt.width, lt.height); x.clip();
@@ -87,6 +91,16 @@
     }
     raf = requestAnimationFrame(frame);
   }
+  /* Android's built-in browser draws a large grey play button on a video that has no picture yet (the call
+     screen's video before the other person answers). A clear poster image removes it. */
+  var CLEAR = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  function clearPosters(root) { try { (root || document).querySelectorAll('video:not([poster])').forEach(function (v) { v.setAttribute('poster', CLEAR); }); } catch (e) {} }
+  function bindPosters() {
+    clearPosters();
+    var ov = document.getElementById('scOverlay');
+    if (ov && window.MutationObserver) new MutationObserver(function () { clearPosters(ov); }).observe(ov, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindPosters); else bindPosters();
   setInterval(watch, 500);
   window.CovaraCallWave = { watch: watch, stop: stop, levels: function () { return { them: them[N - 1], me: me[N - 1] }; } };
 })();
