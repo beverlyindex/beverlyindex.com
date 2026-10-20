@@ -156,7 +156,13 @@
   function spanM() {
     var d = _data;
     if (!d || !d.location) return 150;
-    if (d.at_home === false && d.health && d.health.length) { var f = d.health.slice(0, 3).map(function (x) { return x.m; }); return Math.max(250, Math.min(4000, Math.max.apply(null, f) * 1.18)); }
+    if (d.at_home === false) {
+      var far = 250, L0 = d.location;
+      (d.health || []).slice(0, 3).forEach(function (x) { far = Math.max(far, x.m * 1.18); });
+      (d.trail || []).forEach(function (p) { far = Math.max(far, 1.15 * Math.hypot((p[0] - L0.lat) * 111320, (p[1] - L0.lon) * 111320 * Math.cos(L0.lat * Math.PI / 180))); });
+      if (d.from_home_m) far = Math.max(far, d.from_home_m * 1.1);
+      return Math.min(4000, far);
+    }
     return Math.max(120, Math.min(400, (d.location.accuracy || 0) * 2.5));
   }
   var _R = 100;
@@ -274,6 +280,18 @@
         }
       }
     });
+    /* the way HOME walked since leaving home: older is fainter */
+    var tr = d.at_home === false && d.trail ? d.trail : [];
+    if (tr.length > 1) {
+      x.save(); x.lineCap = 'round'; x.lineJoin = 'round';
+      for (var j = 1; j < tr.length; j++) {
+        var p0 = at(tr[j - 1][0], tr[j - 1][1]), p1 = at(tr[j][0], tr[j][1]);
+        x.beginPath(); x.moveTo(p0.x, p0.y); x.lineTo(p1.x, p1.y);
+        x.strokeStyle = '#ffd24d'; x.globalAlpha = 0.25 + 0.7 * (j / (tr.length - 1)); x.lineWidth = 2.2; x.stroke();
+      }
+      var s0 = at(tr[0][0], tr[0][1]); x.globalAlpha = 0.9; x.beginPath(); x.arc(s0.x, s0.y, 3, 0, Math.PI * 2); x.fillStyle = '#ffd24d'; x.fill();
+      x.restore();
+    }
     /* HOME at the centre, and who is with HOME beside them */
     var hr2 = Math.max(9, Math.round(R * 0.12));
     var withL = d.with || [];
