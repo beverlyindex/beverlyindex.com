@@ -131,7 +131,7 @@
     var state = 'idle', ac = null, an = null, ms = null, tbuf = null, level = 0, kick = 0, ai = 0, aiKick = 0, aiOn = false, aiEndAt = 0;
     var N = 72, hist = [], ahist = [], raf = 0, orbEl = null;
     for (var i = 0; i < N; i++) { hist.push(0); ahist.push(0); }
-    var cvs = document.createElement('canvas'); cvs.id = 'cvTalkWave'; cvs.style.cssText = 'position:fixed;pointer-events:none;z-index:7090;opacity:0;transition:opacity .35s';
+    var cvs = document.createElement('canvas'); cvs.id = 'cvTalkWave'; cvs.style.cssText = 'position:fixed;pointer-events:none;z-index:7150;opacity:0;transition:opacity .35s';
     var dcv = document.createElement('canvas'); dcv.id = 'cvTalkDream'; dcv.style.cssText = 'position:fixed;pointer-events:none;z-index:6400;opacity:0;transition:opacity .35s';
     function attach() { if (!cvs.parentNode && document.body) { document.body.appendChild(cvs); document.body.appendChild(dcv); } }
     var touchy = /Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -174,52 +174,83 @@
       drawOrb(ts); drawDreamRing(ts, you);
       raf = requestAnimationFrame(frame);
     }
+    /* TALK: a glass sphere with a ribbon of fine light running through it, warm on the left (the person speaking)
+       and cool on the right (Covara speaking). The ribbon lifts and twists with each voice; at rest it lies almost flat. */
+    function ribbon(x, cx, cy, half, amp, ts, strands, phase, twist) {
+      for (var k = 0; k < strands; k++) {
+        var u = k / (strands - 1) - 0.5;
+        x.beginPath();
+        for (var j = 0; j <= 140; j++) {
+          var f = j / 140, px = cx - half + f * half * 2;
+          var env = Math.exp(-Math.pow((f - 0.5) * 2.1, 2) * 1.6);
+          var w1 = Math.sin(f * Math.PI * 2.2 + ts * 0.0021 + phase + u * twist);
+          var w2 = Math.sin(f * Math.PI * 4.6 - ts * 0.0016 + phase * 1.7) * 0.35;
+          var py = cy + (w1 + w2) * amp * env + u * amp * 0.55 * Math.cos(f * Math.PI * 2.2 + ts * 0.0021 + phase);
+          if (j) x.lineTo(px, py); else x.moveTo(px, py);
+        }
+        x.stroke();
+      }
+    }
     function drawOrb(ts) {
       if (!orbEl) return;
       var r = orbEl.getBoundingClientRect(); if (!r.width) return;
-      var R = r.width / 2 * 1.14, S = Math.round(R * 4.2), cx = S / 2, cy = S / 2;
-      cvs.style.left = Math.round(r.left + r.width / 2 - S / 2) + 'px'; cvs.style.top = Math.round(r.top + r.height / 2 - S / 2) + 'px';
-      var x = size(cvs, S, S); x.clearRect(0, 0, S, S); cvs.style.opacity = '1';
-      /* the person: gold bars standing out from the orb's edge */
-      for (var i = 0; i < N; i++) {
-        var v = hist[(i * 7) % N], a = -Math.PI / 2 + i / N * Math.PI * 2, L = 3 + v * R * 1.05;
-        x.strokeStyle = 'rgba(255,214,120,' + (0.25 + v * 0.75) + ')'; x.lineWidth = 2.4; x.lineCap = 'round';
-        x.beginPath(); x.moveTo(cx + Math.cos(a) * (R + 4), cy + Math.sin(a) * (R + 4)); x.lineTo(cx + Math.cos(a) * (R + 4 + L), cy + Math.sin(a) * (R + 4 + L)); x.stroke();
-      }
-      /* Covara: a blue wave around the inside of the orb */
-      var amp = ahist[N - 1];
-      if (amp > 0.01) {
-        for (var k = 0; k < 2; k++) {
-          x.beginPath();
-          for (var j = 0; j <= 96; j++) {
-            var b = j / 96 * Math.PI * 2, w = Math.sin(b * (5 + k * 2) + ts * (0.006 + k * 0.004)) * 0.5 + Math.sin(b * 3 - ts * 0.004) * 0.5;
-            var rr = R * (0.62 + k * 0.12) + w * amp * R * 0.26;
-            var px = cx + Math.cos(b) * rr, py = cy + Math.sin(b) * rr; if (j) x.lineTo(px, py); else x.moveTo(px, py);
-          }
-          x.closePath(); x.strokeStyle = k ? 'rgba(159,231,255,' + (0.35 + amp * 0.5) + ')' : 'rgba(56,189,248,' + (0.55 + amp * 0.45) + ')'; x.lineWidth = k ? 1.4 : 2.2; x.shadowColor = '#38bdf8'; x.shadowBlur = 10; x.stroke(); x.shadowBlur = 0;
-        }
-      }
+      var R = r.width / 2 * 1.14, Wd = Math.round(R * 6.2), Ht = Math.round(R * 3), cx = Wd / 2, cy = Ht / 2;
+      cvs.style.left = Math.round(r.left + r.width / 2 - Wd / 2) + 'px'; cvs.style.top = Math.round(r.top + r.height / 2 - Ht / 2) + 'px';
+      var x = size(cvs, Wd, Ht); x.clearRect(0, 0, Wd, Ht); cvs.style.opacity = '1';
+      var you = 0, me = 0; for (var i = N - 12; i < N; i++) { you = Math.max(you, hist[i]); me = Math.max(me, ahist[i]); }
+      var amp = R * (0.12 + Math.max(you, me) * 0.85), half = Wd / 2 - 4;
+      var g = x.createLinearGradient(cx - half, 0, cx + half, 0);
+      var warm = 0.35 + you * 0.65, cool = 0.35 + me * 0.65;
+      g.addColorStop(0, 'rgba(255,70,40,0)'); g.addColorStop(0.18, 'rgba(255,90,50,' + 0.55 * warm + ')'); g.addColorStop(0.36, 'rgba(255,170,90,' + 0.75 * warm + ')');
+      g.addColorStop(0.5, 'rgba(255,240,215,0.85)');
+      g.addColorStop(0.64, 'rgba(170,240,235,' + 0.75 * cool + ')'); g.addColorStop(0.82, 'rgba(90,210,230,' + 0.55 * cool + ')'); g.addColorStop(1, 'rgba(60,190,230,0)');
+      x.save(); x.globalCompositeOperation = 'lighter'; x.strokeStyle = g; x.lineWidth = 0.7;
+      ribbon(x, cx, cy, half, amp, ts, 22, 0, 2.6);
+      x.lineWidth = 0.55; ribbon(x, cx, cy, half, amp * 0.8, ts, 18, 2.1, -3.2);
+      x.restore();
+      /* the glass sphere's rim */
+      x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2);
+      var rg = x.createLinearGradient(cx - R, cy - R, cx + R, cy + R); rg.addColorStop(0, 'rgba(120,220,255,.85)'); rg.addColorStop(1, 'rgba(60,140,220,.45)');
+      x.strokeStyle = rg; x.lineWidth = 1.4; x.shadowColor = 'rgba(80,200,255,.8)'; x.shadowBlur = 10; x.stroke(); x.shadowBlur = 0;
     }
+    /* The dream circle while someone speaks: a band of colour from blue to red across the picture,
+       the sound itself scrolling from right to left, laid over whatever image is there */
     function drawDreamRing(ts, you) {
       var d = window._dreamRect, sp = document.getElementById('sphere');
-      if (!d || !sp || state !== 'listening') { dcv.style.opacity = '0'; return; }
+      var live = state === 'listening' || aiOn;
+      if (!d || !sp || !live) { dcv.style.opacity = '0'; return; }
       var b = sp.getBoundingClientRect(), k = b.width / (sp.width / (window.devicePixelRatio || 1) || b.width);
-      var R = d.r * k, S = Math.round(R * 2 + 120), cx = S / 2, cy = S / 2;
-      dcv.style.left = Math.round(b.left + d.cx * k - S / 2) + 'px'; dcv.style.top = Math.round(b.top + d.cy * k - S / 2) + 'px';
+      var R = d.r * k, S = Math.round(R * 2), cx = S / 2, cy = S / 2;
+      dcv.style.left = Math.round(b.left + d.cx * k - R) + 'px'; dcv.style.top = Math.round(b.top + d.cy * k - R) + 'px';
       var x = size(dcv, S, S); x.clearRect(0, 0, S, S); dcv.style.opacity = '1';
-      /* gold voice bars around the dream circle, and the voice line across it */
-      for (var i = 0; i < N * 2; i++) {
-        var v = hist[(i * 5) % N], a = -Math.PI / 2 + i / (N * 2) * Math.PI * 2, L = 2 + v * 46;
-        x.strokeStyle = 'rgba(255,214,120,' + (0.18 + v * 0.7) + ')'; x.lineWidth = 2; x.lineCap = 'round';
-        x.beginPath(); x.moveTo(cx + Math.cos(a) * (R + 6), cy + Math.sin(a) * (R + 6)); x.lineTo(cx + Math.cos(a) * (R + 6 + L), cy + Math.sin(a) * (R + 6 + L)); x.stroke();
+      var src = state === 'listening' ? hist : ahist;
+      x.save(); x.beginPath(); x.arc(cx, cy, R - 1, 0, Math.PI * 2); x.clip();
+      x.fillStyle = 'rgba(2,6,18,.38)'; x.fillRect(0, 0, S, S);
+      var g = x.createLinearGradient(0, 0, S, 0);
+      [[0, '#2f6bff'], [0.18, '#2fd0ff'], [0.36, '#3cffb4'], [0.52, '#f6ff6a'], [0.68, '#ffb03a'], [0.84, '#ff4a3a'], [1, '#ff3f9b']].forEach(function (c) { g.addColorStop(c[0], c[1]); });
+      x.globalCompositeOperation = 'lighter';
+      var maxA = R * 0.62, P = 150;
+      function lvl(f) { var idx = Math.min(N - 1, Math.max(0, Math.floor(f * (N - 1)))); return src[idx]; }
+      for (var s2 = 0; s2 < 6; s2++) {
+        var fr = 9 + s2 * 3.3, ph = ts * (0.004 + s2 * 0.0011) + s2 * 1.3;
+        x.beginPath();
+        for (var j = 0; j <= P; j++) {
+          var f = j / P, a = maxA * (0.06 + lvl(f) * 0.94) * Math.exp(-Math.pow((f - 0.5) * 2, 2) * 0.9);
+          var py = cy + Math.sin(f * fr + ph) * a;
+          if (j) x.lineTo(f * S, py); else x.moveTo(0, py);
+        }
+        for (var j2 = P; j2 >= 0; j2--) {
+          var f2 = j2 / P, a2 = maxA * (0.06 + lvl(f2) * 0.94) * Math.exp(-Math.pow((f2 - 0.5) * 2, 2) * 0.9);
+          x.lineTo(f2 * S, cy - Math.sin(f2 * fr + ph) * a2);
+        }
+        x.closePath();
+        x.globalAlpha = 0.09; x.fillStyle = g; x.fill();
+        x.globalAlpha = 0.55; x.strokeStyle = g; x.lineWidth = 1.2; x.stroke();
       }
-      x.save(); x.beginPath(); x.arc(cx, cy, R - 2, 0, Math.PI * 2); x.clip();
-      x.beginPath();
-      for (var j = 0; j <= 120; j++) {
-        var px = cx - R + j / 120 * R * 2, h = hist[Math.floor(j / 120 * (N - 1))], py = cy + R * 0.55 + Math.sin(j * 0.55 + ts * 0.02) * h * R * 0.22;
-        if (j) x.lineTo(px, py); else x.moveTo(px, py);
-      }
-      x.strokeStyle = 'rgba(255,214,120,' + (0.35 + you * 0.6) + ')'; x.lineWidth = 2.5; x.shadowColor = '#ffd678'; x.shadowBlur = 12; x.stroke();
+      x.globalAlpha = 1;
+      var cl = x.createLinearGradient(0, 0, S, 0); cl.addColorStop(0, 'rgba(255,255,255,0)'); cl.addColorStop(0.5, 'rgba(255,255,255,.95)'); cl.addColorStop(1, 'rgba(255,255,255,0)');
+      x.strokeStyle = cl; x.lineWidth = 1.6; x.shadowColor = '#fff'; x.shadowBlur = 12;
+      x.beginPath(); x.moveTo(0, cy); x.lineTo(S, cy); x.stroke();
       x.restore();
     }
     return { listen: listen, heard: heard, rms: rms, doneListening: doneListening, speakStart: speakStart, word: word, speakEnd: speakEnd, stop: stopAll };
