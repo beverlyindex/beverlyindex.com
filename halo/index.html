@@ -1290,7 +1290,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-20.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-20.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3104,10 +3104,13 @@ const PLAIN_RE=/^(an AirTag|a Samsung SmartTag|a Tile tracker|a car tracker|a tr
 // Where you were at a moment of the trip, from its own route.
 function tripPosAt(R, t){ const rt=R.route||[]; if(!rt.length) return null; let i=rt.length-1; while(i>0 && rt[i].t>t) i--; const a=rt[i], b=rt[i+1];
   if(t<=a.t || !b) return a; const f=(t-a.t)/Math.max(1,b.t-a.t); return {lat:a.lat+(b.lat-a.lat)*f, lon:a.lon+(b.lon-a.lon)*f, t}; }
-// The places you stopped: each waypoint, and each stretch of a minute or more in which your route moved less than 25 m.
+// The places you stopped: each waypoint, and each stretch of a minute or more in which your route moved less than 25 m. A waypoint set
+// as you stopped takes in the whole time you then stood there, so leaving it is when you really walked on.
 function tripStops(R){ const rt=R.route||[], out=(R.wps||[]).filter(w=>w.pos).map(w=>({t:w.t, end:w.t, pos:w.pos, n:w.n, label:'waypoint '+w.n}));
   (R.sgs||[]).forEach(g=>{ if(!out.some(o=>Math.abs(o.t-g.t)<90000)) out.push({t:g.t, end:g.end, pos:g.pos, label:'the '+STOP_KIND[g.kind]}); });
-  for(let i=0;i+1<rt.length;i++){ const a=rt[i], b=rt[i+1]; if(b.t-a.t>=60000 && distLL(a.lat,a.lon,b.lat,b.lon)<25 && !out.some(o=>Math.abs(o.t-a.t)<90000)) out.push({t:a.t, end:b.t, pos:{lat:a.lat,lon:a.lon}, label:'where you stopped for '+walkDur(b.t-a.t)}); }
+  for(let i=0;i+1<rt.length;i++){ const a=rt[i], b=rt[i+1]; if(!(b.t-a.t>=60000 && distLL(a.lat,a.lon,b.lat,b.lon)<25)) continue;
+    const o=out.find(o=>(Math.abs(o.t-a.t)<90000 || (a.t>=o.t && a.t<=o.end+30000)) && o.pos && distLL(o.pos.lat,o.pos.lon,a.lat,a.lon)<30); if(o){ if(b.t>o.end) o.end=b.t; continue; }          // the same spot: one stop
+    out.push({t:a.t, end:b.t, pos:{lat:a.lat,lon:a.lon}, label:'where you stopped for '+walkDur(b.t-a.t)}); }
   return out.sort((a,b)=>a.t-b.t); }
 /* Went your way when you left. A device within 20 m of you at a stop, heard without a break from the moment you left it, that kept a steady distance
    from you while you moved on at least 46 m (150 ft). Something left behind at the stop would fall away as you went, and soon out of earshot;
@@ -3124,6 +3127,7 @@ function tripWent(R, r, stops){ const L=r.dl||[]; if(L.length<3) return null;
     const use=win.slice(0, k+1).filter(x=>U(x)>=WENT.leave), far=use.filter(x=>U(x)>=WENT.move), last=win[k], uEnd=U(last); if(use.length<3 || far.length<2) continue;
     const ms=use.map(x=>x[1]), keep=ms.reduce((a,b)=>a+b,0)/ms.length, fk=far.reduce((a,x)=>a+x[1],0)/far.length, fu=far.reduce((a,x)=>a+U(x),0)/far.length;
     if(uEnd<WENT.move || Math.max(...ms)-Math.min(...ms)>WENT.spread || fk>WENT.ratio*fu) continue;
+    if(tripAhead(R, r, A, stops)) continue;
     return {t0:Math.min(near[0][0], A.t), t1:last[0], near:mA, keep:Math.round(keep), walked:uEnd, at:A}; }
   return null; }
 function tripFindings(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, ds=Object.values(R.devs||{}).filter(r=>!r.sim && !r.mine && tags[r.id]!=='yours' && !r.pr), F=[], stops=tripStops(R);
