@@ -291,7 +291,7 @@
       seen[l.id] = true;
       var nm = String(o.name || '').trim().split(/\s+/);
       var c = byLink(l.id);
-      var care = { linkId: l.id, side: x.side, userId: o.id, state: l.status, share: l.share, relation: l.relation || '' };
+      var care = { linkId: l.id, side: x.side, userId: o.id, state: l.status, share: l.share, relation: l.relation || '', role: o.role || '' };
       if (!c) {
         c = { id: Date.now() + i, first: nm[0] || '?', last: nm.slice(1).join(' '), cat: 'family', sev: 4, phone: o.phone || '', email: o.email || '', sentinelId: o.sentinel_id || '', care: care };
         try { await RemielDB.putContact(c); } catch (e) {}
@@ -397,6 +397,6 @@
     var m = /#link=([\w-]+)/.exec(location.hash || '');
     if (m) setTimeout(function () { var c = byLink(m[1]); if (c && role() === 'home') openConsent(c); }, 2500);
   }
-  window.CovaraCare = { sync: sync, openCode: openCode, openPad: openPad, openConsent: openConsent, askRole: askRole, role: role, waitLabel: waitLabel, careContacts: careContacts };
+  window.CovaraCare = { relLabel: function (k) { return (L().rel || {})[k] || k; }, sync: sync, openCode: openCode, openPad: openPad, openConsent: openConsent, askRole: askRole, role: role, waitLabel: waitLabel, careContacts: careContacts };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 800); }); else setTimeout(boot, 800);
 })();

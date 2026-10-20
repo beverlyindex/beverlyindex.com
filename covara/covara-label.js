@@ -51,7 +51,7 @@
       if (d <= 0.25 && (!best || d < best.d || (d === best.d && n.length > best.n.length))) best = { name: name, d: d, n: n };
     });
     if (best) return best.name;
-    var m = new RegExp('([A-Za-z][A-Za-z\\-]{3,}(?:\\s+[A-Za-z][A-Za-z\\-]{3,})?)(?:\\s+(?:hcl|hydrochloride|sodium|potassium|calcium|er|xr|sr|xl|dr|cr))?\\s+\\d+(?:[.,]\\d+)?\\s*' + UNIT + '\\b', 'i').exec(text);
+    var m = new RegExp('([A-Za-z][A-Za-z\\-]{3,}(?:[ \\t]+[A-Za-z][A-Za-z\\-]{3,})?)(?:[ \\t]+(?:hcl|hydrochloride|sodium|potassium|calcium|er|xr|sr|xl|dr|cr))?\\s+\\d+(?:[.,]\\d+)?\\s*' + UNIT + '\\b', 'i').exec(text);
     if (m && !/\b(take|prendere|qty|quantity|refills?|rx|tablet|capsule)\b/i.test(m[1])) return title(m[1]);
     return '';
   }
@@ -155,6 +155,9 @@
     var dt = findDate(L, dayFirst); if (dt) out.prescribed_on = dt;
     var c = findCount(flat); if (c.dispensed) out.dispensed = c.dispensed; if (c.refills != null) out.refills = c.refills;
     var pu = findPurpose(flat); if (pu) out.purpose = pu;
+    var rx = /\brx\s*(?:#|no\.?|number|n\.?)?\s*[:\-]?\s*([A-Z0-9\-]{5,14})/i.exec(flat); if (rx) out.rx_number = rx[1];
+    var ins = /\b(with (?:food|meals|water|milk)|on an empty stomach|before (?:meals|breakfast|bed)|after (?:meals|food)|do not crush|swallow whole|a stomaco pieno|a stomaco vuoto|prima dei pasti|dopo i pasti|con acqua)\b/i.exec(flat);
+    if (ins) out.instructions = ins[1].charAt(0).toUpperCase() + ins[1].slice(1).toLowerCase();
     return out;
   }
 

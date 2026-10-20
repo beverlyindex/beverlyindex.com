@@ -28,6 +28,12 @@
       failed: 'Could not save. Check the internet and try again.',
       reading: 'Reading the label on this phone…', readOk: 'Read from the label. Check each gold line before you save.', readNone: 'The label could not be read. Try again closer, in good light, or fill it in.',
       dSupply: 'Supply', refills: 'refills', dispensedN: 'in the bottle',
+      recs: 'Medical Records', recsHeadMe: 'Access to my medical records', recsHeadOf: 'Access to {name}\u2019s medical records', addRec: 'Add a person', people: 'people',
+      dRel: 'Relationship', dProf: 'Profession', dOrg: 'Organisation', dPhone: 'Phone', dEmail: 'Email', dSince: 'Since', seesCovara: 'Sees medicines and visits in Covara', whatSee: 'What they see',
+      recName: 'Name', recRel: 'Relationship to HOME (for example daughter, cardiologist)', recProf: 'Profession', recOrg: 'Hospital, practice or company (optional)', recPhone: 'Phone (optional)', recEmail: 'Email (optional)', recSince: 'Allowed since (optional)',
+      refill: 'Re-Fill', refillTitle: 'Re-Fill', callTo: 'Call {name}', pickedUp: 'I picked up the refill', howMany: 'How many in the new bottle', left: 'left', runsOut: 'runs out about', noRefills: 'No refills left: ask the doctor for a new prescription.',
+      dInstr: 'How to take it', dLooks: 'Looks like', dWatch: 'Watch for', dRx: 'Rx number', dStart: 'Started', dEnds: 'Ends', asNeeded: 'Only when needed', ongoing: 'Ongoing',
+      instr: 'How to take it (for example with food)', looks: 'What it looks like (for example small white round)', watch: 'Side effects to watch for (optional)', rx: 'Rx number (optional)', prescriberPhone: 'Prescriber phone (optional)', startOn: 'Started on', endOn: 'Ends on (empty if ongoing)', dispensed: 'How many in the bottle', refillsLeft: 'Refills left',
       forms: { tablet: 'tablet', pill: 'pill', capsule: 'capsule', drop: 'drop', ml: 'ml', puff: 'puff', injection: 'injection', patch: 'patch', spoon: 'spoon', sachet: 'sachet' }
     },
     it: {
@@ -49,6 +55,12 @@
       failed: 'Non salvato. Controlla internet e riprova.',
       reading: 'Lettura dell\u2019etichetta su questo telefono…', readOk: 'Letto dall\u2019etichetta. Controlla ogni riga dorata prima di salvare.', readNone: 'Non è stato possibile leggere l\u2019etichetta. Riprova più vicino, con buona luce, o compila a mano.',
       dSupply: 'Scorta', refills: 'rinnovi', dispensedN: 'nella confezione',
+      recs: 'Cartella clinica', recsHeadMe: 'Chi può vedere la mia cartella clinica', recsHeadOf: 'Chi può vedere la cartella clinica di {name}', addRec: 'Aggiungi una persona', people: 'persone',
+      dRel: 'Relazione', dProf: 'Professione', dOrg: 'Struttura', dPhone: 'Telefono', dEmail: 'Email', dSince: 'Dal', seesCovara: 'Vede medicine e visite in Covara', whatSee: 'Cosa vede',
+      recName: 'Nome', recRel: 'Relazione con HOME (per esempio figlia, cardiologo)', recProf: 'Professione', recOrg: 'Ospedale, studio o azienda (facoltativo)', recPhone: 'Telefono (facoltativo)', recEmail: 'Email (facoltativo)', recSince: 'Autorizzato dal (facoltativo)',
+      refill: 'Ricarica', refillTitle: 'Nuova confezione', callTo: 'Chiama {name}', pickedUp: 'Ho ritirato la nuova confezione', howMany: 'Quante nella nuova confezione', left: 'rimaste', runsOut: 'finiscono circa', noRefills: 'Nessun rinnovo rimasto: chiedi al medico una nuova ricetta.',
+      dInstr: 'Come prenderla', dLooks: 'Aspetto', dWatch: 'Attenzione a', dRx: 'Numero ricetta', dStart: 'Iniziata', dEnds: 'Termina', asNeeded: 'Solo al bisogno', ongoing: 'Continua',
+      instr: 'Come prenderla (per esempio a stomaco pieno)', looks: 'Com\u2019è fatta (per esempio piccola bianca rotonda)', watch: 'Effetti da tenere d\u2019occhio (facoltativo)', rx: 'Numero ricetta (facoltativo)', prescriberPhone: 'Telefono del medico (facoltativo)', startOn: 'Iniziata il', endOn: 'Termina il (vuoto se continua)', dispensed: 'Quante nella confezione', refillsLeft: 'Rinnovi rimasti',
       forms: { tablet: 'compressa', pill: 'pillola', capsule: 'capsula', drop: 'goccia', ml: 'ml', puff: 'spruzzo', injection: 'iniezione', patch: 'cerotto', spoon: 'cucchiaio', sachet: 'bustina' }
     }
   };
@@ -56,7 +68,7 @@
   var FORMS = ['tablet', 'pill', 'capsule', 'drop', 'ml', 'puff', 'injection', 'patch', 'spoon', 'sachet'];
   var UNITS = ['mg', 'mcg', 'g', 'ml', 'IU', '%', 'mg/ml'];
   function L() { var l = (window.I18n && I18n.locale) || 'en'; return STR[String(l).slice(0, 2)] || STR.en; }
-  function t(k) { return L()[k] || STR.en[k] || k; }
+  function t(k, p) { var v = L()[k] || STR.en[k] || k; Object.keys(p || {}).forEach(function (n) { v = v.split('{' + n + '}').join(p[n]); }); return v; }
   function loc() { return (window.I18n && I18n.locale) || 'en'; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function authed() { try { return typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated(); } catch (e) { return false; } }
@@ -127,11 +139,12 @@
     '.cvx-add{display:block;width:100%;padding:9px 6px;background:none;border:0;color:rgba(95,208,255,0.9);font:600 12px var(--nous-font,"Hanken Grotesk",sans-serif);text-align:left;cursor:pointer;border-radius:10px}' +
     '.cvx-add:hover{background:rgba(255,255,255,0.03)}' +
     '.cvx-empty{padding:8px 6px;font-size:12px;color:rgba(200,214,232,0.6)}' +
+    '.cvx-ini{display:flex;align-items:center;justify-content:center;font:700 12px var(--nous-font,"Hanken Grotesk",sans-serif);color:#0c0e14}' +
     '@media (max-width:700px){#cvTabs{top:78px;left:10px;width:min(240px,58vw)}#cvTabs.is-open{width:calc(100vw - 20px)}.cvx-list{max-height:52vh}.cvx-tab b{letter-spacing:1.2px}}' +
     /* the add, change and photo sheets */
     '.cvt-f{display:flex;flex-direction:column;gap:10px;text-align:left;margin-top:14px}' +
     '.cvt-f label{font:600 10.5px "JetBrains Mono",monospace;letter-spacing:.14em;color:#5fd0ff;text-transform:uppercase}' +
-    '.cvt-f input[type=text],.cvt-f input[type=tel],.cvt-f input[type=number],.cvt-f input[type=date],.cvt-f input[type=time],.cvt-f select{width:100%;box-sizing:border-box;min-height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(10,14,22,.9);color:#f1f6ff;font:500 16px "Hanken Grotesk",sans-serif;padding:0 14px;color-scheme:dark}' +
+    '.cvt-f input[type=text],.cvt-f input[type=email],.cvt-f input[type=tel],.cvt-f input[type=number],.cvt-f input[type=date],.cvt-f input[type=time],.cvt-f select{width:100%;box-sizing:border-box;min-height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(10,14,22,.9);color:#f1f6ff;font:500 16px "Hanken Grotesk",sans-serif;padding:0 14px;color-scheme:dark}' +
     '.cvt-f input:focus,.cvt-f select:focus{outline:2px solid #38bdf8;outline-offset:1px}' +
     '.cvt-two{display:flex;gap:10px}.cvt-two>*{flex:1;min-width:0}.cvt-two>div{display:flex;flex-direction:column;gap:6px}' +
     '.cvt-shot{align-self:center;position:relative;width:140px;height:140px;border-radius:50%;border:0;cursor:pointer;background:radial-gradient(circle at 34% 28%,#3a4558 0,#1b2230 55%,#0c1018 100%);box-shadow:0 0 0 2px rgba(120,200,255,.35),0 0 40px rgba(56,189,248,.25);color:#cfe7ff;font:600 13px "Hanken Grotesk",sans-serif;padding:0 18px;background-size:cover;background-position:center}' +
@@ -201,14 +214,22 @@
     var subs = d.items.filter(function (i) { return i.kind === 'sub'; })
       .sort(function (a, b) { return (a.at || 0) - (b.at || 0); })
       .map(function (i) { return { it: i, n: { state: i.at && i.at - now < 3 * 864e5 ? 'due' : 'later', at: i.at } }; });
-    return { med: meds, appt: appts, sub: subs };
+    /* who may see HOME's medical records: the people HOME names, and the family HOME lets see medicines in Covara */
+    var recs = d.items.filter(function (i) { return i.kind === 'access'; }).sort(function (a, b) { return a.title.localeCompare(b.title); })
+      .map(function (i) { return { it: i, n: { state: 'later', at: Infinity } }; });
+    if (role() === 'home' && typeof DEMO_CONTACTS !== 'undefined') DEMO_CONTACTS.forEach(function (c) {
+      var cv = c.care; if (!cv || cv.side !== 'away' || cv.state !== 'active' || !(cv.share && cv.share.care)) return;
+      var rel = cv.relation && window.CovaraCare && CovaraCare.relLabel ? CovaraCare.relLabel(cv.relation) : '';
+      recs.push({ it: { id: 'fam:' + c.id, kind: 'family', title: ((c.first || '') + ' ' + (c.last || '')).trim(), meta: { relation: rel, profession: cv.role || '', email: c.email, phone: c.phone }, contact: c }, n: { state: 'later', at: Infinity } });
+    });
+    return { med: meds, appt: appts, sub: subs, rec: recs };
   }
 
   /* ── the pull tabs ── */
   var box = document.createElement('div'); box.id = 'cvTabs'; box.setAttribute('aria-label', 'Care');
   document.body.appendChild(box);
   var _open = '', _openItem = '';
-  var TABS = [['med', 'meds', 'addMed'], ['appt', 'appts', 'addAppt'], ['sub', 'subs', 'addSub']];
+  var TABS = [['med', 'meds', 'addMed'], ['appt', 'appts', 'addAppt'], ['sub', 'subs', 'addSub'], ['rec', 'recs', 'addRec']];
 
   function ph(it) {
     return it.photo ? 'background-image:url("' + photoUrl(it.photo).replace(/["\\]/g, '') + '")' : 'background:' + orbOf(it.title);
@@ -218,6 +239,14 @@
     var a = m.qty ? m.qty + (f ? ' ' + f + (m.qty > 1 && f && !/s$/.test(f) && loc().slice(0, 2) === 'en' ? 's' : '') : '') : '';
     var b = m.strength ? m.strength + ' ' + (m.unit || '') : '';
     return [a, b].filter(Boolean).join(' · ');
+  }
+  /* How many are left and when they run out, from the bottle size and the doses marked since the refill. */
+  function supply(it) {
+    var m = it.meta || {}; if (!m.dispensed) return null;
+    var per = (m.qty || 1), used = (it.doses_since_refill || 0) * per, left = Math.max(0, m.dispensed - used);
+    var perDay = per * ((it.times || []).length || 0);
+    var out = perDay ? Date.now() + (left / perDay) * 864e5 : null;
+    return { left: left, out: out };
   }
   function who(id) { if (id === myId()) return t('you'); if (_data.s.contact && id === _data.s.home) return _data.s.contact.first; return ''; }
   function feedbackHtml(it) {
@@ -233,13 +262,20 @@
     function kv(k, v) { if (v) rows.push('<dt>' + esc(t(k)) + '</dt><dd>' + esc(v) + '</dd>'); }
     if (kind === 'med') {
       kv('dNext', isFinite(e.n.at) ? (e.n.state === 'late' ? t('late') + ', ' : e.n.state === 'due' ? t('now') + ', ' : '') + when(e.n.at) : '');
-      kv('dSchedule', (it.times || []).join(' · '));
-      kv('dDose', doseText(m) || it.detail);
-      kv('dBy', [m.prescriber, m.prescribed_on ? dateOnly(m.prescribed_on) : ''].filter(Boolean).join(', '));
-      kv('dFrom', [m.source ? t(m.source) : '', m.source_name, m.source_phone].filter(Boolean).join(' · '));
+      kv('dSchedule', m.as_needed && !(it.times || []).length ? t('asNeeded') : (it.times || []).join(' · '));
       kv('dFor', m.purpose);
-      kv('dSupply', [m.dispensed ? m.dispensed + ' ' + t('dispensedN') : '', m.refills != null ? m.refills + ' ' + t('refills') : ''].filter(Boolean).join(' · '));
       kv('dLast', it.last_done ? when(it.last_done) : t('never'));
+      kv('dDose', doseText(m) || it.detail);
+      kv('dInstr', m.instructions);
+      kv('dLooks', m.looks_like);
+      kv('dWatch', m.watch_for);
+      kv('dBy', [m.prescriber, m.prescribed_on ? dateOnly(m.prescribed_on) : '', m.prescriber_phone].filter(Boolean).join(' · '));
+      kv('dRx', m.rx_number);
+      kv('dFrom', [m.source ? t(m.source) : '', m.source_name, m.source_phone, m.source_address].filter(Boolean).join(' · '));
+      kv('dStart', m.start_on ? dateOnly(m.start_on) + (m.end_on ? '' : ' · ' + t('ongoing')) : '');
+      kv('dEnds', m.end_on ? dateOnly(m.end_on) : '');
+      var sp = supply(it);
+      kv('dSupply', [sp ? sp.left + ' ' + t('left') + (sp.out ? ', ' + t('runsOut') + ' ' + dayLabel(sp.out) : '') : '', m.refills != null ? m.refills + ' ' + t('refills') : ''].filter(Boolean).join(' · '));
     } else if (kind === 'appt') {
       kv('dWhen', when(it.at)); kv('dWith', m.with); kv('dWhere', m.place || it.detail); kv('dNotes', m.notes);
       kv('dLastDone', it.last_done ? when(it.last_done) : '');
@@ -249,11 +285,30 @@
     var canMark = (kind === 'med' && e.n.slot && e.n.state !== 'off') || (kind === 'appt' && e.n.state !== 'done' && dayLabel(it.at) === t('today'));
     var acts = '<div class="cvx-acts">' +
       (canMark && _data.s.edit ? '<button type="button" class="cvx-btn pri" data-a="mark">' + esc(kind === 'med' ? t('taken') : t('done')) + '</button>' : '') +
-      (_data.s.edit ? '<button type="button" class="cvx-btn" data-a="edit">' + esc(t('change')) + '</button>' : '') + '</div>';
+      (_data.s.edit ? '<button type="button" class="cvx-btn" data-a="edit">' + esc(t('change')) + '</button>' : '') +
+      (_data.s.edit && kind === 'med' ? '<button type="button" class="cvx-btn" data-a="refill">' + esc(t('refill')) + '</button>' : '') + '</div>';
     return '<button type="button" class="cvx-big" style="' + esc(ph(it)) + '" data-a="photo" aria-label="' + esc(it.title) + '"></button>' +
       '<dl class="cvx-kv">' + rows.join('') + '</dl>' + acts + (_data.s.edit ? feedbackHtml(it) : '');
   }
+  function recRow(e) {
+    var it = e.it, m = it.meta || {}, key = it.id;
+    var sub = [m.relation, m.profession].filter(Boolean).join(' · ');
+    var rows = [];
+    function kv(k, v) { if (v) rows.push('<dt>' + esc(t(k)) + '</dt><dd>' + esc(v) + '</dd>'); }
+    kv('dRel', m.relation); kv('dProf', m.profession); kv('dOrg', m.org); kv('dPhone', m.phone); kv('dEmail', m.email); kv('dSince', m.since ? dateOnly(m.since) : '');
+    if (it.kind === 'family') kv('whatSee', t('seesCovara'));
+    var canEdit = role() === 'home';
+    var acts = canEdit ? '<div class="cvx-acts">' + (it.kind === 'family' ? '<button type="button" class="cvx-btn" data-a="consent">' + esc(t('whatSee')) + '</button>' : '<button type="button" class="cvx-btn" data-a="edit">' + esc(t('change')) + '</button>') + '</div>' : '';
+    var pic = it.contact && typeof contactPhotos !== 'undefined' && contactPhotos.get(it.contact.id) ? '' : '';
+    return '<div class="cvx-item' + (_openItem === key ? ' open' : '') + '" data-id="' + esc(key) + '" data-kind="rec">' +
+      '<button type="button" class="cvx-row" aria-expanded="' + (_openItem === key) + '"><span class="cvx-ph cvx-ini" style="' + esc('background:' + orbOf(it.title)) + '">' + esc(initials2(it.title)) + '</span>' +
+      '<span class="cvx-nm"><span>' + esc(it.title) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' +
+      '<span class="cvx-when">' + esc(m.org ? '' : '') + pic + '</span></button>' +
+      '<div class="cvx-det" style="padding-left:50px">' + (_openItem === key ? '<dl class="cvx-kv">' + rows.join('') + '</dl>' + acts : '') + '</div></div>';
+  }
+  function initials2(n) { var w = String(n || '').replace(/^(dr|dott)\.?\s+/i, '').trim().split(/\s+/); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
   function rowHtml(kind, e) {
+    if (kind === 'rec') return recRow(e);
     var it = e.it, m = it.meta || {};
     var sub = kind === 'med' ? (doseText(m) || it.detail || '') : kind === 'appt' ? [m.with, m.place || it.detail].filter(Boolean).join(' · ') : (m.provider || it.detail || '');
     var w = kind === 'med' ? nextLabel(e.n) : kind === 'appt' ? (e.n.state === 'done' ? t('done').toUpperCase() : dayLabel(it.at).toUpperCase() + ' ' + hhmm(it.at)) : (it.at ? dayLabel(it.at).toUpperCase() : '');
@@ -282,19 +337,21 @@
     var html = TABS.map(function (T) {
       var k = T[0], arr = _ls[k], top = arr[0], hint = '', hc = '';
       if (k === 'med' && top) { var lateN = arr.filter(function (e) { return e.n.state === 'late'; }).length; hc = top.n.state === 'late' ? 'late' : top.n.state === 'due' ? 'due' : ''; hint = lateN > 1 ? lateN + ' ' + t('late') : (top.n.state === 'off' || top.n.state === 'done') && !isFinite(top.n.at) ? '' : (hc ? '' : t('next') + ' ') + nextLabel(top.n); }
+      else if (k === 'rec') { hint = arr.length ? arr.length + ' ' + t('people').toUpperCase() : ''; }
       else if (top) { hc = top.n.state === 'due' ? 'due' : ''; hint = k === 'appt' ? dayLabel(top.it.at).toUpperCase() + ' ' + hhmm(top.it.at) : dayLabel(top.it.at).toUpperCase(); }
       var head = '<button type="button" class="cvx-tab" data-tab="' + k + '" aria-expanded="' + (_open === k) + '"><span class="cvx-dot ' + hc + '"></span><b>' + esc(t(T[1])) + '</b>' +
         '<span class="cvx-hint ' + hc + '">' + esc(arr.length ? hint : '') + '</span><span class="cvx-chev" aria-hidden="true">›</span></button>';
       if (_open !== k) return head;
       var body = arr.map(function (e) { return rowHtml(k, e); }).join('') || '<div class="cvx-empty">' + esc(t('none')) + '</div>';
-      if (_data.s.edit) body += '<button type="button" class="cvx-add" data-add="' + k + '">' + esc(t(T[2])) + '</button>';
+      if (k === 'rec') body = '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 4px">' + esc(role() === 'home' ? t('recsHeadMe') : t('recsHeadOf', { name: _data.s.name || '' })) + '</div>' + body;
+      if (k === 'rec' ? role() === 'home' : _data.s.edit) body += '<button type="button" class="cvx-add" data-add="' + k + '">' + esc(t(T[2])) + '</button>';
       return head + '<div class="cvx-list" role="list">' + body + '</div>';
     }).join('');
     if (html !== _html) { var sc = box.querySelector('.cvx-list'); var top0 = sc ? sc.scrollTop : 0; box.innerHTML = html; _html = html; bind(); var sc2 = box.querySelector('.cvx-list'); if (sc2) sc2.scrollTop = top0; }
     box.classList.toggle('show', visible());
     box.classList.toggle('is-open', !!_open);
   }
-  function entry(id) { var all = _ls ? _ls.med.concat(_ls.appt, _ls.sub) : []; return all.filter(function (e) { return e.it.id === id; })[0]; }
+  function entry(id) { var all = _ls ? _ls.med.concat(_ls.appt, _ls.sub, _ls.rec) : []; return all.filter(function (e) { return e.it.id === id; })[0]; }
   function bind() {
     box.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-tab'); _open = _open === k ? '' : k; _openItem = ''; render(); }; });
     box.querySelectorAll('[data-add]').forEach(function (b) { b.onclick = function () { openEdit(b.getAttribute('data-add')); }; });
@@ -304,6 +361,8 @@
       var e = entry(id); if (!e) return;
       var p = el.querySelector('[data-a=photo]'); if (p) p.onclick = function () { openPhoto(e.it); };
       var ed = el.querySelector('[data-a=edit]'); if (ed) ed.onclick = function () { openEdit(kind, e.it); };
+      var rf = el.querySelector('[data-a=refill]'); if (rf) rf.onclick = function () { openRefill(e.it); };
+      var cs = el.querySelector('[data-a=consent]'); if (cs) cs.onclick = function () { if (window.CovaraCare && e.it.contact) CovaraCare.openConsent(e.it.contact); };
       var mk = el.querySelector('[data-a=mark]'); if (mk) mk.onclick = async function () {
         mk.disabled = true;
         var r = await api('/care/items/' + encodeURIComponent(id) + '/mark', { method: 'POST', body: Object.assign({ slot: kind === 'appt' ? 'appt' : e.n.slot }, _data.s.home ? { home: _data.s.home } : {}) }).catch(function () { return { ok: false }; });
@@ -440,6 +499,26 @@
     el.onclick = function (e) { if (e.target === el) close(el); };
     open(el);
   }
+  function openRefill(it) {
+    var el = sheet('cvRefill'), m = it.meta || {}, sp = supply(it);
+    var call = m.source_phone ? '<a class="cv-btn" style="display:inline-flex;align-items:center;text-decoration:none" href="tel:' + esc(String(m.source_phone).replace(/[^\d+]/g, '')) + '">' + esc(t('callTo', { name: m.source_name || t(m.source || 'pharmacy') })) + '</a>' : '';
+    el.innerHTML = '<div class="cv-box"><div class="cv-mono">' + esc(t('refillTitle')) + '</div><div class="cvt-big" style="' + esc(ph(it)) + ';width:min(180px,50vw)"></div>' +
+      '<h2 class="cv-h">' + esc(it.title) + '</h2><p class="cv-sub">' + esc([sp ? sp.left + ' ' + t('left') : '', m.refills != null ? m.refills + ' ' + t('refills') : ''].filter(Boolean).join(' · ')) + '</p>' +
+      (m.refills === 0 ? '<p class="cv-sub" style="color:#ffd24d">' + esc(t('noRefills')) + '</p>' : '') +
+      '<div class="cv-row">' + call + '</div>' +
+      '<div class="cvt-f"><div><label for="cvNewQty">' + esc(t('howMany')) + '</label><input type="number" id="cvNewQty" inputmode="numeric" min="1" value="' + esc(m.dispensed || '') + '"></div></div>' +
+      '<div class="cv-msg"></div><div class="cv-row"><button class="cv-btn pri" data-a="ok">' + esc(t('pickedUp')) + '</button><button class="cv-btn" data-a="close">' + esc(t('cancel')) + '</button></div></div>';
+    el.querySelector('[data-a=close]').onclick = function () { close(el); };
+    el.querySelector('[data-a=ok]').onclick = async function () {
+      var d = new Date(), today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      var nm = Object.assign({}, m, { refilled_on: today });
+      var q2 = Number(el.querySelector('#cvNewQty').value); if (q2 > 0) nm.dispensed = q2;
+      if (typeof nm.refills === 'number' && nm.refills > 0) nm.refills -= 1;
+      var r = await api('/care/items/' + encodeURIComponent(it.id), { method: 'PUT', body: { meta: nm } }).catch(function () { return { ok: false }; });
+      if (r.ok) { close(el); load(); } else el.querySelector('.cv-msg').textContent = t('failed');
+    };
+    open(el);
+  }
   function openEdit(kind, it) {
     var el = sheet('cvAdd'); var photo = null; var m = (it && it.meta) || {};
     var times = {}; ((it && it.times) || []).forEach(function (x) { times[x] = true; });
@@ -458,12 +537,24 @@
         '<div><label for="cvUnit">' + esc(t('unit')) + '</label><select id="cvUnit">' + UNITS.map(function (u) { return '<option' + ((m.unit || 'mg') === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') + '</select></div></div>' +
         '<div class="cvt-two">' + inp('cvQty', 'qty', m.qty || 1, 'number', 'inputmode="decimal" min="0" step="any"') +
         '<div><label for="cvForm">' + esc(t('form')) + '</label><select id="cvForm">' + FORMS.map(function (x) { return '<option value="' + x + '"' + ((m.form || 'tablet') === x ? ' selected' : '') + '>' + esc(L().forms[x]) + '</option>'; }).join('') + '</select></div></div>' +
-        '<label>' + esc(t('when')) + '</label><div class="cvt-chips">' + SLOTS.map(function (s) { return '<button type="button" class="cvt-chip" data-t="' + s[1] + '" aria-pressed="' + !!times[s[1]] + '">' + esc(t(s[0])) + '<small>' + s[1] + '</small></button>'; }).join('') + '</div>' +
+        '<label>' + esc(t('when')) + '</label><div class="cvt-chips">' + SLOTS.map(function (s) { return '<button type="button" class="cvt-chip" data-t="' + s[1] + '" aria-pressed="' + !!times[s[1]] + '">' + esc(t(s[0])) + '<small>' + s[1] + '</small></button>'; }).join('') +
+        '<button type="button" class="cvt-chip" data-prn aria-pressed="' + !!m.as_needed + '">' + esc(t('asNeeded')) + '</button></div>' +
         inp('cvOther', 'other', other, 'time') +
         '<div class="cvt-two">' + inp('cvPrescriber', 'prescriber', m.prescriber, 'text', 'maxlength="80"') + inp('cvPrescribedOn', 'prescribedOn', m.prescribed_on, 'date') + '</div>' +
         '<label>' + esc(t('source')) + '</label><div class="cvt-chips">' + ['pharmacy', 'doctor'].map(function (x) { return '<button type="button" class="cvt-chip" data-src="' + x + '" aria-pressed="' + (src === x) + '">' + esc(t(x)) + '</button>'; }).join('') + '</div>' +
         '<div class="cvt-two">' + inp('cvSourceName', 'sourceName', m.source_name, 'text', 'maxlength="120"') + inp('cvSourcePhone', 'sourcePhone', m.source_phone, 'tel', 'maxlength="30"') + '</div>' +
-        inp('cvPurpose', 'purpose', m.purpose, 'text', 'maxlength="120"');
+        inp('cvPurpose', 'purpose', m.purpose, 'text', 'maxlength="120"') +
+        inp('cvInstr', 'instr', m.instructions, 'text', 'maxlength="200"') +
+        inp('cvLooks', 'looks', m.looks_like, 'text', 'maxlength="120"') +
+        inp('cvWatch', 'watch', m.watch_for, 'text', 'maxlength="200"') +
+        '<div class="cvt-two">' + inp('cvRx', 'rx', m.rx_number, 'text', 'maxlength="40"') + inp('cvPrescriberPhone', 'prescriberPhone', m.prescriber_phone, 'tel', 'maxlength="30"') + '</div>' +
+        '<div class="cvt-two">' + inp('cvStart', 'startOn', m.start_on, 'date') + inp('cvEnd', 'endOn', m.end_on, 'date') + '</div>' +
+        '<div class="cvt-two">' + inp('cvDispensed', 'dispensed', m.dispensed, 'number', 'inputmode="numeric" min="0"') + inp('cvRefills', 'refillsLeft', m.refills, 'number', 'inputmode="numeric" min="0" max="99"') + '</div>';
+    } else if (kind === 'rec') {
+      f = inp('cvName', 'recName', it && it.title, 'text', 'maxlength="120"') + inp('cvRel', 'recRel', m.relation, 'text', 'maxlength="60"') +
+        inp('cvProf', 'recProf', m.profession, 'text', 'maxlength="80"') + inp('cvOrg', 'recOrg', m.org, 'text', 'maxlength="120"') +
+        '<div class="cvt-two">' + inp('cvPhone', 'recPhone', m.phone, 'tel', 'maxlength="30"') + inp('cvEmail', 'recEmail', m.email, 'email', 'maxlength="120"') + '</div>' +
+        inp('cvSince', 'recSince', m.since, 'date');
     } else if (kind === 'appt') {
       f = shot + inp('cvName', 'apptTitle', it && it.title, 'text', 'maxlength="120"') + inp('cvWith', 'apptWith', m.with, 'text', 'maxlength="80"') +
         '<div class="cvt-two">' + inp('cvDate', 'date', ds, 'date') + inp('cvTime', 'time', tv, 'time') + '</div>' +
@@ -473,17 +564,19 @@
         '<div class="cvt-two">' + inp('cvDate', 'renews', ds, 'date') + inp('cvEvery', 'every', m.every, 'text', 'maxlength="30"') + '</div>' +
         inp('cvCost', 'cost', m.cost, 'text', 'maxlength="30"');
     }
-    var title = kind === 'med' ? 'addMed' : kind === 'appt' ? 'addAppt' : 'addSub';
+    var title = kind === 'med' ? 'addMed' : kind === 'appt' ? 'addAppt' : kind === 'rec' ? 'addRec' : 'addSub';
     el.innerHTML = '<div class="cv-box"><div class="cv-mono">' + esc(it ? t('change') : t(title)) + '</div>' +
       '<div class="cvt-f">' + f + '</div><div class="cv-msg"></div>' +
       '<div class="cv-row"><button class="cv-btn pri" data-a="save">' + esc(t('save')) + '</button><button class="cv-btn" data-a="close">' + esc(t('cancel')) + '</button></div>' +
       (it ? '<div class="cv-row"><button class="cv-btn warn" data-a="rm">' + esc(t('remove')) + '</button></div>' : '') + '</div>';
     el.querySelectorAll('[data-t]').forEach(function (b) { b.onclick = function () { var v = b.getAttribute('data-t'); times[v] = !times[v]; b.setAttribute('aria-pressed', times[v] ? 'true' : 'false'); }; });
+    var prn = !!m.as_needed;
+    var prnB = el.querySelector('[data-prn]'); if (prnB) prnB.onclick = function () { prn = !prn; prnB.setAttribute('aria-pressed', prn ? 'true' : 'false'); };
     el.querySelectorAll('[data-src]').forEach(function (b) { b.onclick = function () { src = src === b.getAttribute('data-src') ? '' : b.getAttribute('data-src'); el.querySelectorAll('[data-src]').forEach(function (x) { x.setAttribute('aria-pressed', x.getAttribute('data-src') === src ? 'true' : 'false'); }); }; });
     var shotB = el.querySelector('[data-shot]'), file = el.querySelector('[data-file]');
-    shotB.onclick = function () { file.click(); };
+    if (shotB) shotB.onclick = function () { file.click(); };
     var read = {};
-    file.onchange = function () {
+    if (file) file.onchange = function () {
       var x = file.files && file.files[0]; if (!x) return; photo = x; shotB.classList.add('has'); shotB.style.backgroundImage = 'url(' + URL.createObjectURL(x) + ')';
       if (kind === 'med' && window.CovaraLabel) readLabel(x);
     };
@@ -495,7 +588,7 @@
       function put(id, val) { var i = el.querySelector('#' + id); if (!i || val == null || val === '' || String(i.value || '').trim()) return; i.value = val; i.classList.add('cvt-read'); }
       function sel(id, val) { var i = el.querySelector('#' + id); if (!i || !val) return; if ([].some.call(i.options, function (o) { return o.value === String(val); })) { i.value = String(val); i.classList.add('cvt-read'); } }
       put('cvName', f.title); put('cvStrength', f.strength); sel('cvUnit', f.unit); if (f.qty) { var q = el.querySelector('#cvQty'); if (q) { q.value = f.qty; q.classList.add('cvt-read'); } } sel('cvForm', f.form);
-      put('cvPrescriber', f.prescriber); put('cvPrescribedOn', f.prescribed_on); put('cvSourceName', f.source_name); put('cvSourcePhone', f.source_phone); put('cvPurpose', f.purpose);
+      put('cvPrescriber', f.prescriber); put('cvPrescribedOn', f.prescribed_on); put('cvSourceName', f.source_name); put('cvSourcePhone', f.source_phone); put('cvPurpose', f.purpose); put('cvInstr', f.instructions); put('cvRx', f.rx_number); put('cvDispensed', f.dispensed); put('cvRefills', f.refills); put('cvStart', f.prescribed_on);
       if (f.source && !src) { src = f.source; el.querySelectorAll('[data-src]').forEach(function (b) { var on = b.getAttribute('data-src') === src; b.setAttribute('aria-pressed', on ? 'true' : 'false'); if (on) b.classList.add('cvt-read'); }); }
       if (f.times && f.times.length && !Object.keys(times).some(function (k) { return times[k]; })) {
         f.times.forEach(function (hm) {
@@ -520,12 +613,18 @@
       if (_data && _data.s.home) body.home = _data.s.home;
       if (kind === 'med') {
         var ts = Object.keys(times).filter(function (k) { return times[k]; }); if (v('cvOther') && ts.indexOf(v('cvOther')) < 0) ts.push(v('cvOther'));
-        if (!ts.length) { msg.textContent = t('needTime'); return; }
+        if (!ts.length && !prn) { msg.textContent = t('needTime'); return; }
         body.times = ts;
         body.meta = { strength: v('cvStrength') || undefined, unit: v('cvUnit') || undefined, qty: v('cvQty') || undefined, form: v('cvForm') || undefined,
           prescriber: v('cvPrescriber') || undefined, prescribed_on: v('cvPrescribedOn') || undefined, source: src || undefined,
           source_name: v('cvSourceName') || undefined, source_phone: v('cvSourcePhone') || undefined, purpose: v('cvPurpose') || undefined,
-          dispensed: read.dispensed || m.dispensed || undefined, refills: read.refills != null ? read.refills : m.refills };
+          instructions: v('cvInstr') || undefined, looks_like: v('cvLooks') || undefined, watch_for: v('cvWatch') || undefined,
+          rx_number: v('cvRx') || undefined, prescriber_phone: v('cvPrescriberPhone') || undefined, start_on: v('cvStart') || undefined, end_on: v('cvEnd') || undefined,
+          dispensed: v('cvDispensed') || undefined, refills: v('cvRefills') !== '' ? Number(v('cvRefills')) : undefined,
+          refilled_on: m.refilled_on || undefined, as_needed: prn || undefined };
+      } else if (kind === 'rec') {
+        body.kind = 'access';
+        body.meta = { relation: v('cvRel') || undefined, profession: v('cvProf') || undefined, org: v('cvOrg') || undefined, phone: v('cvPhone') || undefined, email: v('cvEmail') || undefined, since: v('cvSince') || undefined };
       } else {
         var d = v('cvDate'), tm = kind === 'appt' ? v('cvTime') : '09:00';
         if (!d || !tm) { msg.textContent = t('needWhen'); return; }
