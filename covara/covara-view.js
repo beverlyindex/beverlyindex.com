@@ -58,6 +58,8 @@
       shiftWho: 'Who', shiftStart: 'From', shiftEnd: 'To', noAppts: 'No appointments coming up.',
       doubleWarn: '{med} was marked taken again {min} min after the last dose. Check before any more is taken. If a second dose was taken, call the doctor or pharmacist.',
       dVoice: 'Voice', voiceBy: 'A message from {name}', playVoice: 'Play the message', voiceLabel: 'A family voice for when it is due', voiceRec: 'Record a message', voiceAgain: 'Record again', voiceStop: 'Stop', voiceNoMic: 'The microphone is not available. Allow it in the browser and try again.',
+      inTitle: 'Photos waiting', inShort: 'Bottles from the pharmacy, labels', inWaiting: '{n} to look at', inWhy: 'At the pharmacy, take a photo of each bottle. Then, in the phone’s Photos, select them, tap Share and choose Covara. Covara reads each label: a refill is marked Filled with the new count, and a new medicine waits here for one tap.',
+      inAddPhotos: 'Add photos of the new bottles', inSending: 'Sending {n} photos…', inReading: 'Reading the label…', inQueued: 'Waiting to be read', inFilled: 'Filled: {name}', inAdded: 'Added: {name}', inNew: '{name}: a new medicine?', inAddIt: 'Add it', inNotMed: 'Not a medicine', inUnread: 'The label could not be read', inByHand: 'Fill in by hand', inShared: 'Shared from the phone', inAdded2: 'Added in Covara',
       meds: 'Medicines', appts: 'Appointments', subs: 'Subscriptions',
       video: 'Video', phone: 'Phone', message: 'Message', email: 'Email',
       now: 'NOW', late: 'LATE', today: 'Today', tomorrow: 'Tomorrow', next: 'NEXT', none: 'Nothing recorded',
@@ -134,6 +136,8 @@
       shiftWho: 'Chi', shiftStart: 'Dalle', shiftEnd: 'Alle', noAppts: 'Nessun appuntamento in arrivo.',
       doubleWarn: '{med} è stata segnata di nuovo {min} min dopo l’ultima dose. Controlla prima di darne altra. Se è stata presa una seconda dose, chiama il medico o il farmacista.',
       dVoice: 'Voce', voiceBy: 'Un messaggio di {name}', playVoice: 'Ascolta il messaggio', voiceLabel: 'Una voce di famiglia per quando è ora', voiceRec: 'Registra un messaggio', voiceAgain: 'Registra di nuovo', voiceStop: 'Ferma', voiceNoMic: 'Il microfono non è disponibile. Consentilo nel browser e riprova.',
+      inTitle: 'Foto in attesa', inShort: 'Confezioni dalla farmacia, etichette', inWaiting: '{n} da guardare', inWhy: 'In farmacia, fai una foto a ogni confezione. Poi, nelle Foto del telefono, selezionale, tocca Condividi e scegli Covara. Covara legge ogni etichetta: una ricarica viene segnata Ritirata con il nuovo numero, e una nuova medicina aspetta qui un tocco.',
+      inAddPhotos: 'Aggiungi le foto delle nuove confezioni', inSending: 'Invio di {n} foto…', inReading: 'Lettura dell’etichetta…', inQueued: 'In attesa di lettura', inFilled: 'Ritirata: {name}', inAdded: 'Aggiunta: {name}', inNew: '{name}: una nuova medicina?', inAddIt: 'Aggiungila', inNotMed: 'Non è una medicina', inUnread: 'Non è stato possibile leggere l’etichetta', inByHand: 'Compila a mano', inShared: 'Condivisa dal telefono', inAdded2: 'Aggiunta in Covara',
       meds: 'Medicine', appts: 'Appuntamenti', subs: 'Abbonamenti',
       video: 'Video', phone: 'Telefono', message: 'Messaggio', email: 'Email',
       now: 'ORA', late: 'IN RITARDO', today: 'Oggi', tomorrow: 'Domani', next: 'PROSSIMA', none: 'Niente registrato',
@@ -256,6 +260,7 @@
     '.cvx-card .cvx-kv{font-size:16px;text-align:left;gap:8px 14px}.cvx-card .cvx-kv dt{font-size:11px}' +
     '.cvx-btn.warn{border-color:rgba(255,210,77,.6);color:#ffe9a8}' +
     '.cvc{display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.05)}.cvc .cvx-btn{flex:0 0 auto;display:inline-flex;align-items:center;text-decoration:none}' +
+    '.cvc{flex-wrap:wrap}.cvc-a{flex-basis:100%;display:flex;align-items:center;gap:8px;padding-left:44px}' +
     '.cvx-lnk{background:none;border:0;color:rgba(252,165,165,.85);font:600 11px var(--nous-font,"Hanken Grotesk",sans-serif);cursor:pointer;padding:4px}' +
     '.cv-pbrief{position:fixed;z-index:30}.cv-pbrief .db-issue{-webkit-line-clamp:3}' +
     '.cvx-ini{display:flex;align-items:center;justify-content:center;font:700 12px var(--nous-font,"Hanken Grotesk",sans-serif);color:#0c0e14}' +
@@ -300,8 +305,9 @@
       if (!s.edit) { _data = { s: s, today: { items: [] }, items: [], proxy: px.ok ? px.data : null, warn: _data && _data.warn }; render(); syncSpheres(); return; }
       var a = await api('/care/today' + q(s)), b = await api('/care/items' + q(s)), c = role() === 'away' ? await api('/care/circle' + q(s)) : { ok: false };
       try { if (window.CovaraWhere) CovaraWhere.load(true); } catch (e) {}
+      var ib = await api('/care/inbox' + q(s)).catch(function () { return { ok: false }; });
       var lg = await api('/care/log' + (q(s) ? q(s) + '&' : '?') + 'days=7').catch(function () { return { ok: false }; }), sh = await api('/care/sheet' + q(s)).catch(function () { return { ok: false }; });
-      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
+      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
     } catch (e) {} finally { _busy = false; }
   }
 
@@ -696,6 +702,96 @@
     });
   }
 
+  /* ── Photos waiting: bottles from the pharmacy (or any label), shared from the phone's gallery
+     or added here. Any phone that sees HOME's medicines reads them and files each one: a refill
+     of a medicine already in Covara is marked Filled with the new count; a new one waits for a tap. ── */
+  function todayIso() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function matchMed(f) {
+    var meds = (_data.items || []).filter(function (i) { return i.kind === 'med' || i.kind === 'check'; });
+    var rx = String(f.rx_number || '').replace(/\D/g, '');
+    if (rx.length >= 5) { var byRx = meds.filter(function (i) { return String((i.meta || {}).rx_number || '').replace(/\D/g, '') === rx; })[0]; if (byRx) return byRx; }
+    var w = norm(f.title).split(' ')[0]; if (!w || w.length < 4) return null;
+    return meds.filter(function (i) { return norm(i.title).split(' ')[0] === w; })[0] || null;
+  }
+  async function sendToInbox(blob, name, source) {
+    var fd = new FormData(); fd.append('file', blob, name || ('bottle-' + Date.now() + '.jpg')); fd.append('blob_type', 'photo');
+    var up = await api('/storage/upload', { method: 'POST', body: fd });
+    if (!up.ok || !up.data.id) return false;
+    var r = await api('/care/inbox', { method: 'POST', body: Object.assign({ photo: up.data.id, source: source || 'app' }, _data && _data.s.home ? { home: _data.s.home } : {}) });
+    return r.ok;
+  }
+  /* Photos shared into Covara from the phone's share sheet wait in this phone until Covara sends them */
+  var _importing = false;
+  async function importShared() {
+    if (_importing || !/[?&]shared=/.test(location.search) || !_data || !_data.s.edit) return;
+    _importing = true;
+    try {
+      var cache = await caches.open('covara-share'), keys = await cache.keys(), n = 0;
+      for (var i = 0; i < keys.length; i++) {
+        var res = await cache.match(keys[i]); if (!res) continue;
+        var b = await res.blob(), nm = decodeURIComponent(res.headers.get('x-name') || 'photo.jpg');
+        if (await sendToInbox(b, nm, 'share')) { await cache.delete(keys[i]); n++; }
+      }
+      try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
+      if (n) { _open = 'med'; _openItem = 'inbox'; _html = ''; await load(); }
+    } catch (e) {} finally { _importing = false; }
+  }
+  function addPhotos() {
+    var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+    inp.onchange = async function () {
+      var fs = [].slice.call(inp.files || []).slice(0, 30); if (!fs.length) return;
+      _data.inboxNote = t('inSending', { n: fs.length }); _html = ''; render();
+      for (var i = 0; i < fs.length; i++) await sendToInbox(fs[i], fs[i].name, 'app');
+      _data.inboxNote = ''; _openItem = 'inbox'; load();
+    };
+    inp.click();
+  }
+  /* Reads the photos waiting, one at a time, on this phone */
+  var _reading = false;
+  async function processInbox() {
+    if (_reading || !_data || !_data.s.edit || !window.CovaraLabel) return;
+    var next = (_data.inbox || []).filter(function (x) { return x.status === 'new'; })[0];
+    if (!next) return;
+    _reading = true; _data.inboxReading = next.id; _html = ''; render();
+    try {
+      var blob = await (await fetch(photoUrl(next.photo))).blob();
+      var file = new File([blob], 'label.jpg', { type: blob.type || 'image/jpeg' });
+      var r = null; try { r = await window.CovaraLabel.read(file); } catch (e) { r = null; }
+      var f = (r && r.fields) || {}, m = Object.keys(f).length ? matchMed(f) : null, upd = null;
+      if (m) {
+        var meta = Object.assign({}, m.meta || {}); delete meta.voice_url; delete meta.file_url;
+        meta.refilled_on = todayIso();
+        if (f.dispensed) meta.dispensed = f.dispensed;
+        if (f.refills != null && f.refills !== '') meta.refills = Number(f.refills); else if (typeof meta.refills === 'number' && meta.refills > 0) meta.refills -= 1;
+        ['rx_number', 'source_name', 'source_phone', 'prescriber', 'instructions', 'strength', 'unit', 'form', 'qty'].forEach(function (k) { if ((meta[k] == null || meta[k] === '') && f[k] != null && f[k] !== '') meta[k] = f[k]; });
+        if (!meta.source && f.source) meta.source = f.source;
+        var body = Object.assign({ meta: meta }, m.photo ? {} : { photo: next.blob }, _data.s.home ? { home: _data.s.home } : {});
+        var pr = await api('/care/items/' + encodeURIComponent(m.id), { method: 'PUT', body: body });
+        upd = pr.ok ? { status: 'done', item_id: m.id, result: { action: 'refill', title: m.title, dispensed: meta.dispensed || null } } : { status: 'review', result: { fields: f } };
+      } else upd = { status: 'review', result: { fields: f } };
+      await api('/care/inbox/' + encodeURIComponent(next.id), { method: 'PUT', body: upd });
+    } catch (e) {
+      try { await api('/care/inbox/' + encodeURIComponent(next.id), { method: 'PUT', body: { status: 'review', result: { fields: {} } } }); } catch (e2) {}
+    } finally { _reading = false; _data.inboxReading = ''; }
+    load();
+  }
+  function inboxBlock() {
+    var all = (_data.inbox || []).filter(function (x) { return x.status === 'new' || x.status === 'review' || (x.status === 'done' && Date.now() - (x.done_at || x.at) < 36e5 * 24); });
+    var waiting = all.filter(function (x) { return x.status !== 'done'; }).length;
+    var rows = all.map(function (x) {
+      var res = x.result || {}, f = res.fields || {}, line = '', acts = '', cls = '';
+      if (x.status === 'new') { line = _data.inboxReading === x.id ? t('inReading') : t('inQueued'); cls = 'mid'; }
+      else if (x.status === 'done') { line = res.action === 'refill' ? t('inFilled', { name: res.title || '' }) + (res.dispensed ? ' · ' + res.dispensed + ' ' + t('dispensedN') : '') : t('inAdded', { name: res.title || '' }); cls = 'good'; }
+      else if (f.title) { line = t('inNew', { name: f.title }); cls = 'mid'; acts = '<button type="button" class="cvx-btn pri" data-in-add="' + esc(x.id) + '">' + esc(t('inAddIt')) + '</button><button type="button" class="cvx-lnk" data-in-skip="' + esc(x.id) + '">' + esc(t('inNotMed')) + '</button>'; }
+      else { line = t('inUnread'); cls = 'bad'; acts = '<button type="button" class="cvx-btn" data-in-add="' + esc(x.id) + '">' + esc(t('inByHand')) + '</button><button type="button" class="cvx-lnk" data-in-skip="' + esc(x.id) + '">' + esc(t('remove')) + '</button>'; }
+      return '<div class="cvc"><span class="cvx-ph" style="background-image:url(&quot;' + esc(photoUrl(x.photo)) + '&quot;)"></span><span class="cvx-nm"><span class="' + cls + '">' + esc(line) + '</span><small>' + esc((x.source === 'share' ? t('inShared') : t('inAdded2')) + ' · ' + when(x.at)) + '</small></span>' + (acts ? '<div class="cvc-a">' + acts + '</div>' : '') + '</div>';
+    }).join('');
+    var body = '<div class="cvx-sub">' + esc(t('inWhy', { name: name1() })) + '</div>' + (_data.inboxNote ? '<div class="cvx-sub mid">' + esc(_data.inboxNote) + '</div>' : '') + rows +
+      '<button type="button" class="cvx-add" data-a="inbox-add">' + esc(t('inAddPhotos')) + '</button>';
+    return block('inbox', t('inTitle'), waiting ? t('inWaiting', { n: waiting }) : t('inShort'), body, waiting ? 'gold' : 'blue');
+  }
+
   /* ── the panel the pill opens ── */
   function visible() {
     if (!_data || !role() || !_open) return false;
@@ -710,7 +806,7 @@
   /* What each pill says at a glance: its colour (late, due, a warning) */
   function pillState(k) {
     if (!_ls) return '';
-    if (k === 'med') { var top = _ls.med[0]; if (top && top.n.state === 'late') return 'late'; if (_ls.med.some(function (x) { var f = filled(x.it); return f && !f.ok; })) return 'due'; return top && top.n.state === 'due' ? 'due' : ''; }
+    if (k === 'med') { if ((_data.inbox || []).some(function (x) { return x.status === 'review'; })) return 'due'; var top = _ls.med[0]; if (top && top.n.state === 'late') return 'late'; if (_ls.med.some(function (x) { var f = filled(x.it); return f && !f.ok; })) return 'due'; return top && top.n.state === 'due' ? 'due' : ''; }
     if (k === 'visit') { var a = _ls.appt[0]; var me3 = (_data.log || []).filter(function (x) { return x.kind === 'me'; })[0]; if (me3 && me3.value === 'overwhelmed' && Date.now() - me3.at < 864e5) return 'late'; return a && a.it.at - Date.now() < 864e5 && a.n.state !== 'done' ? 'due' : ''; }
     if (k === 'health') return _data.warn ? 'late' : '';
     if (k === 'safety') { var d = (_data.sheet && _data.sheet.data) || {}; var wq = (_data.log || []).filter(function (x) { return x.kind === 'worry' && Date.now() - x.at < 864e5; }).length; var wh = window.CovaraWhere && CovaraWhere.data(); if (wq || (wh && wh.at_home === false && wh.left_at)) return 'late'; return d.diagnosis ? '' : 'due'; }
@@ -729,6 +825,7 @@
         if (_data.s.edit) body += '<button type="button" class="cvx-add" data-add="' + k + '">' + esc(t(SEC_ADD[k])) + '</button>';
         if (k === 'med' && _medWarn && Date.now() - _medWarn.at < 15 * 60000) body = '<div class="cvx-warn">' + esc(_medWarn.text) + '</div>' + body;
         if (k === 'visit' && _data.s.edit) body += visitsExtra();
+        if (k === 'med' && _data.s.edit) body = inboxBlock() + body;
       }
       else if (k === 'health') body = _data.s.edit ? healthHtml() : '<div class="cvx-sub">' + esc(t('noCare', { name: name1() })) + '</div>';
       else if (k === 'safety') body = _data.s.edit ? safetyHtml() : '<div class="cvx-sub">' + esc(t('noCare', { name: name1() })) + '</div>';
@@ -750,6 +847,9 @@
     box.querySelectorAll('[data-a=sheet-er]').forEach(function (b) { b.onclick = function () { openSheet('er'); }; });
     box.querySelectorAll('[data-a=sheet-miss]').forEach(function (b) { b.onclick = function () { openSheet('miss'); }; });
     box.querySelectorAll('[data-a=sheet-about]').forEach(function (b) { b.onclick = function () { openSheet('about'); }; });
+    var ia = box.querySelector('[data-a=inbox-add]'); if (ia) ia.onclick = addPhotos;
+    box.querySelectorAll('[data-in-skip]').forEach(function (b) { b.onclick = async function () { b.disabled = true; await api('/care/inbox/' + encodeURIComponent(b.getAttribute('data-in-skip')), { method: 'PUT', body: { status: 'dismissed' } }).catch(function () {}); load(); }; });
+    box.querySelectorAll('[data-in-add]').forEach(function (b) { b.onclick = function () { var x = (_data.inbox || []).filter(function (y) { return y.id === b.getAttribute('data-in-add'); })[0]; if (x) openEdit('med', null, { fields: (x.result && x.result.fields) || {}, blob: x.blob, photo: x.photo, inboxId: x.id }); }; });
     box.querySelectorAll('[data-form]').forEach(function (b) { b.onclick = function () { openForm(b.getAttribute('data-form')); }; });
     box.querySelectorAll('[data-rm-item]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var r = await api('/care/items/' + encodeURIComponent(b.getAttribute('data-rm-item')), { method: 'DELETE' }).catch(function () { return { ok: false }; }); if (r.ok) load(); else b.disabled = false; }; });
     box.querySelectorAll('[data-cphoto]').forEach(function (b) { b.onclick = function () { var it = itemsOf('comfort').filter(function (x) { return x.id === b.getAttribute('data-cphoto'); })[0]; if (it) openPhoto(it); }; });
@@ -1065,7 +1165,7 @@
     };
     open(el);
   }
-  function openEdit(kind, it) {
+  function openEdit(kind, it, preset) {
     var el = sheet('cvAdd'); var photo = null; var m = (it && it.meta) || {};
     var times = {}; ((it && it.times) || []).forEach(function (x) { times[x] = true; });
     var other = ((it && it.times) || []).filter(function (x) { return !SLOTS.some(function (s) { return s[1] === x; }); })[0] || '';
@@ -1148,6 +1248,11 @@
       var msg = el.querySelector('.cv-msg'); msg.className = 'cv-msg info'; msg.textContent = t('reading');
       var r = null; try { r = await window.CovaraLabel.read(x); } catch (e) { r = null; }
       var f = r && r.fields || {}; read = f;
+      applyFields(f);
+      var got = Object.keys(f).length;
+      msg.className = 'cv-msg' + (got ? ' info' : ''); msg.textContent = got ? t('readOk') : t('readNone');
+    }
+    function applyFields(f) {
       function put(id, val) { var i = el.querySelector('#' + id); if (!i || val == null || val === '' || String(i.value || '').trim()) return; i.value = val; i.classList.add('cvt-read'); }
       function sel(id, val) { var i = el.querySelector('#' + id); if (!i || !val) return; if ([].some.call(i.options, function (o) { return o.value === String(val); })) { i.value = String(val); i.classList.add('cvt-read'); } }
       put('cvName', f.title); put('cvStrength', f.strength); sel('cvUnit', f.unit); if (f.qty) { var q = el.querySelector('#cvQty'); if (q) { q.value = f.qty; q.classList.add('cvt-read'); } } sel('cvForm', f.form);
@@ -1160,8 +1265,11 @@
           else { var o = el.querySelector('#cvOther'); if (o && !o.value) { o.value = hm; o.classList.add('cvt-read'); } }
         });
       }
-      var got = Object.keys(f).length;
-      msg.className = 'cv-msg' + (got ? ' info' : ''); msg.textContent = got ? t('readOk') : t('readNone');
+    }
+    /* A photo from the photos waiting: its label already read, its picture already there */
+    if (preset) {
+      if (preset.photo && shotB) { shotB.classList.add('has'); shotB.style.backgroundImage = 'url("' + photoUrl(preset.photo).replace(/["\\]/g, '') + '")'; }
+      if (preset.fields && Object.keys(preset.fields).length) { applyFields(preset.fields); var pm = el.querySelector('.cv-msg'); pm.className = 'cv-msg info'; pm.textContent = t('readOk'); }
     }
     el.querySelector('[data-a=close]').onclick = function () { close(el); };
     var rm = el.querySelector('[data-a=rm]'); if (rm) rm.onclick = async function () {
@@ -1207,8 +1315,10 @@
           var vu = await api('/storage/upload', { method: 'POST', body: vfd });
           if (vu.ok && vu.data.id) { body.meta.voice = vu.data.id; var me2 = ''; try { me2 = String(userSphereName || '').trim().split(/\s+/)[0]; } catch (e) {} body.meta.voice_by = me2 || undefined; }
         }
+        if (!photo && preset && preset.blob) body.photo = preset.blob;
         var r = await api('/care/items' + (it ? '/' + encodeURIComponent(it.id) : ''), { method: it ? 'PUT' : 'POST', body: body });
         if (!r.ok) throw new Error(r.status);
+        if (preset && preset.inboxId) await api('/care/inbox/' + encodeURIComponent(preset.inboxId), { method: 'PUT', body: { status: 'done', item_id: r.data.item ? r.data.item.id : null, result: { action: 'new', title: body.title } } }).catch(function () {});
         close(el); _open = kind === 'appt' ? 'visit' : kind === 'rec' ? 'papers' : kind; _openItem = r.data.item ? r.data.item.id : _openItem; load();
       } catch (e) { msg.textContent = t('failed'); sb.disabled = false; sb.textContent = t('save'); }
     };
@@ -1220,7 +1330,7 @@
   function tick() {
     var s = subject(); var k = s ? (s.home || 'me') + ':' + s.edit : '';
     if (k !== _subj) { _subj = k; _open = ''; _openItem = ''; _data = null; if (k) load(); else { render(); syncSpheres(); } }
-    if (_data) { box.classList.toggle('show', visible()); try { playDueVoices(); } catch (e) {} }
+    if (_data) { box.classList.toggle('show', visible()); try { playDueVoices(); } catch (e) {} try { importShared(); processInbox(); } catch (e) {} }
   }
   function boot() {
     if (!window.CovaraCare || !authed()) { setTimeout(boot, 1000); return; }
