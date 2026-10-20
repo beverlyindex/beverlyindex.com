@@ -194,17 +194,19 @@
     function drawOrb(ts) {
       if (!orbEl) return;
       var r = orbEl.getBoundingClientRect(); if (!r.width) return;
-      var R = r.width / 2 * 1.14, Wd = Math.round(R * 6.2), Ht = Math.round(R * 3), cx = Wd / 2, cy = Ht / 2;
+      var R = r.width / 2, Wd = Math.round(R * 2 + 28), Ht = Wd, cx = Wd / 2, cy = Ht / 2;
       cvs.style.left = Math.round(r.left + r.width / 2 - Wd / 2) + 'px'; cvs.style.top = Math.round(r.top + r.height / 2 - Ht / 2) + 'px';
       var x = size(cvs, Wd, Ht); x.clearRect(0, 0, Wd, Ht); cvs.style.opacity = '1';
       var you = 0, me = 0; for (var i = N - 12; i < N; i++) { you = Math.max(you, hist[i]); me = Math.max(me, ahist[i]); }
-      var amp = R * (0.12 + Math.max(you, me) * 0.85), half = Wd / 2 - 4;
+      var amp = R * (0.06 + Math.max(you, me) * 0.5), half = R;
       var g = x.createLinearGradient(cx - half, 0, cx + half, 0);
       var warm = 0.35 + you * 0.65, cool = 0.35 + me * 0.65;
-      g.addColorStop(0, 'rgba(255,70,40,0)'); g.addColorStop(0.18, 'rgba(255,90,50,' + 0.55 * warm + ')'); g.addColorStop(0.36, 'rgba(255,170,90,' + 0.75 * warm + ')');
+      g.addColorStop(0, 'rgba(255,70,40,.25)'); g.addColorStop(0.18, 'rgba(255,90,50,' + 0.55 * warm + ')'); g.addColorStop(0.36, 'rgba(255,170,90,' + 0.75 * warm + ')');
       g.addColorStop(0.5, 'rgba(255,240,215,0.85)');
-      g.addColorStop(0.64, 'rgba(170,240,235,' + 0.75 * cool + ')'); g.addColorStop(0.82, 'rgba(90,210,230,' + 0.55 * cool + ')'); g.addColorStop(1, 'rgba(60,190,230,0)');
-      x.save(); x.globalCompositeOperation = 'lighter'; x.strokeStyle = g; x.lineWidth = 0.7;
+      g.addColorStop(0.64, 'rgba(170,240,235,' + 0.75 * cool + ')'); g.addColorStop(0.82, 'rgba(90,210,230,' + 0.55 * cool + ')'); g.addColorStop(1, 'rgba(60,190,230,.25)');
+      /* the waves stay inside the glass sphere */
+      x.save(); x.beginPath(); x.arc(cx, cy, R - 1.5, 0, Math.PI * 2); x.clip();
+      x.globalCompositeOperation = 'lighter'; x.strokeStyle = g; x.lineWidth = 0.7;
       ribbon(x, cx, cy, half, amp, ts, 22, 0, 2.6);
       x.lineWidth = 0.55; ribbon(x, cx, cy, half, amp * 0.8, ts, 18, 2.1, -3.2);
       x.restore();
