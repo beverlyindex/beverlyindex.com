@@ -1112,9 +1112,13 @@
     if (!role() || (role() === 'away' && !homeContact())) return;
     if (typeof focusedContactId !== 'undefined' && focusedContactId != null) return; /* one sphere at a time carries the pills */
     if (typeof IsoView !== 'undefined' && IsoView.active && IsoView.active()) return;
-    /* left: HOME's care; right (AWAY's phone): calling HOME */
-    if (_data) pills(ctx, SECTIONS.map(function (k) { return t('sec_' + k); }), SECTIONS.map(function (k) { return 'sec:' + k; }), cx, cy, cr, t0, true, SECTIONS.map(pillState), _open ? 'sec:' + _open : '');
-    if (role() === 'away') pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, cy, cr, t0);
+    /* all on the right of HOME's sphere: HOME's care on top, calling HOME (AWAY's phone) beneath it,
+       so the lower left stays clear for the day's schedule */
+    var W0 = ctx.canvas.width / (window.devicePixelRatio || 1), lh = (W0 < 500 ? 24 : 26) + (window.CovaraCalm ? 8 : 0);
+    var comm = role() === 'away', nCare = _data ? SECTIONS.length : 0, nComm = comm ? 4 : 0, gapG = nCare && nComm ? lh * 0.7 : 0;
+    var total = (nCare + nComm) * lh + gapG, top = cy - total / 2;
+    if (_data) pills(ctx, SECTIONS.map(function (k) { return t('sec_' + k); }), SECTIONS.map(function (k) { return 'sec:' + k; }), cx, top + nCare * lh / 2, cr, t0, false, SECTIONS.map(pillState), _open ? 'sec:' + _open : '');
+    if (comm) pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, top + nCare * lh + gapG + nComm * lh / 2, cr, t0);
   }
   function hitCentre(clientX, clientY) {
     if (!_pillHits.length || typeof CV === 'undefined') return false;
