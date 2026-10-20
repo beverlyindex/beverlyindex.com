@@ -13111,6 +13111,13 @@ const I18n = (function () {
     "wx.checked": "Checked {n} min ago.",
     "wx.noneNow": "No official warnings there now.",
     "wx.close": "Close",
+    "wx.keep": "Keep watching",
+    "wx.remove": "Remove",
+    "wx.removed": "Removed. It will not show again unless it gets worse.",
+    "wx.hiddenN": "{n} removed on this device.",
+    "wx.showAgain": "Show them again",
+    "wx.areasMore": "and {n} more areas",
+    "wx.sameN": "{n} official notices say the same thing; shown once.",
     "ledger.reviewDictation": "Review, then tap Log",
     "medimg.title": "Scan a medication label",
     "medimg.hint": "Point the camera at the medication label or upload a photo",
@@ -13478,6 +13485,13 @@ const I18n = (function () {
     "wx.checked": "Controllato {n} min fa.",
     "wx.noneNow": "Nessun avviso ufficiale l\u00EC ora.",
     "wx.close": "Chiudi",
+    "wx.keep": "Continua a seguire",
+    "wx.remove": "Rimuovi",
+    "wx.removed": "Rimosso. Non riapparir\u00e0 a meno che non peggiori.",
+    "wx.hiddenN": "{n} rimossi su questo dispositivo.",
+    "wx.showAgain": "Mostrali di nuovo",
+    "wx.areasMore": "e altre {n} zone",
+    "wx.sameN": "{n} avvisi ufficiali dicono la stessa cosa; mostrati una volta.",
     "ledger.reviewDictation": "Controlla, poi tocca Registra",
     "medimg.title": "Leggi l’etichetta di un farmaco",
     "medimg.hint": "Inquadra l’etichetta del farmaco o carica una foto",
@@ -23872,11 +23886,36 @@ var Warnings = (function () {
   function _levelLabel(l) { return l >= 4 ? _t('wx.level4', 'Extreme') : l === 3 ? _t('wx.level3', 'Severe') : _t('wx.level2', 'Moderate'); }
   function _when(t) { try { return new Date(t).toLocaleString(I18n.locale === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
 
-  /* Shown warnings for a sphere: Moderate and above, still running */
+  /* The same warning is often issued many times (one notice per county or zone, plus each update). They are
+     shown once, as one kind of warning: the same event, at the same level, from the same office. */
+  function _gk(w) { return [String(w.event || w.headline || '').toLowerCase().trim(), w.level, String(w.sender || '').toLowerCase().trim()].join('|'); }
+  /* Removed on this device: hidden until it ends, unless it is raised to a higher level (a new kind, so it shows). */
+  var DKEY = 'wx:removed', _dis = null;
+  function _disLoad() {
+    if (_dis) return _dis;
+    try { _dis = JSON.parse(localStorage.getItem(DKEY) || '{}') || {}; } catch (e) { _dis = {}; }
+    var now = Date.now(), ch = false; Object.keys(_dis).forEach(function (k) { if (!_dis[k] || _dis[k] < now) { delete _dis[k]; ch = true; } });
+    if (ch) _disSave(); return _dis;
+  }
+  function _disSave() { try { localStorage.setItem(DKEY, JSON.stringify(_dis || {})); } catch (e) {} }
+  function _hidden(w) { var d = _disLoad()[_gk(w)]; return !!(d && d > Date.now()); }
+  function remove(gk, until) { _disLoad()[gk] = Math.max(until || 0, Date.now() + 6 * 3600e3); _disSave(); _sig++; _paintChip(true); }
+  function restoreAll() { _dis = {}; _disSave(); _sig++; _paintChip(true); }
+  function _hiddenCount() { var n = 0; _by.forEach(function (v) { (v.list || []).forEach(function (w) { if (w.level >= 2 && _hidden(w)) n++; }); }); var g = {}; _by.forEach(function (v) { (v.list || []).forEach(function (w) { if (w.level >= 2 && _hidden(w)) g[_gk(w)] = 1; }); }); return Object.keys(g).length; }
+  /* Read: the mark stops pulsing once the warning has been opened */
+  var _read = {};
+  /* Shown warnings for a sphere: Moderate and above, still running, not removed, one per kind */
   function listFor(id) {
     var e = _by.get(String(id)); if (!e) return [];
-    var now = Date.now();
-    return e.list.filter(function (w) { return w.level >= 2 && !(w.expires && w.expires < now); });
+    var now = Date.now(), seen = {}, out = [];
+    e.list.forEach(function (w) {
+      if (w.level < 2 || (w.expires && w.expires < now) || _hidden(w)) return;
+      var k = _gk(w);
+      if (seen[k]) { seen[k]._n = (seen[k]._n || 1) + 1; if (w.area && seen[k]._areas.indexOf(w.area) < 0) seen[k]._areas.push(w.area); if (w.expires > (seen[k]._until || 0)) seen[k]._until = w.expires; return; }
+      var c = Object.assign({}, w, { _gk: k, _n: 1, _areas: w.area ? [w.area] : [], _until: w.expires || 0 });
+      seen[k] = c; out.push(c);
+    });
+    return out.sort(function (a, b) { return b.level - a.level; });
   }
   function levelFor(id) { var l = listFor(id); return l.length ? l[0].level : 0; }
 
@@ -23934,10 +23973,14 @@ var Warnings = (function () {
     } finally { _busy = false; }
   }
 
+  function _allRead() { var all = true; _by.forEach(function (v, k) { listFor(k).forEach(function (w) { if (!_read[w._gk]) all = false; }); }); return all; }
   /* ── The mark on a sphere: a small triangle in the level's colour ── */
-  function drawMark(ctx, x, y, size, level, alpha, t) {
+  /* Where each mark was drawn this frame, so a tap on the triangle opens that person's warnings */
+  var _marks = [], _markFrame = 0;
+  function drawMark(ctx, x, y, size, level, alpha, t, key) {
     var col = COLORS[level]; if (!col) return;
-    var pulse = (level >= 4 && !(typeof _reducedMotionNow === 'function' && _reducedMotionNow())) ? 0.75 + 0.25 * Math.sin((t || 0) * 0.006) : 1;
+    if (key != null) { var nowF = Math.floor(performance.now() / 50); if (nowF !== _markFrame) { _markFrame = nowF; _marks = _marks.filter(function (m) { return nowF - m.f < 3; }); } _marks = _marks.filter(function (m) { return m.key !== String(key); }); _marks.push({ x: x, y: y, r: Math.max(18, size * 1.6), key: String(key), f: nowF }); }
+    var pulse = (level >= 4 && !_allRead() && !(typeof _reducedMotionNow === 'function' && _reducedMotionNow())) ? 0.75 + 0.25 * Math.sin((t || 0) * 0.006) : 1;
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = Math.max(0.35, Math.min(1, (alpha || 1))) * pulse;
@@ -24014,6 +24057,8 @@ var Warnings = (function () {
       '.wx-card .wx-txt{white-space:pre-line;line-height:1.45;font-size:13.5px}' +
       '.wx-card a{display:inline-block;margin-top:10px;color:#38d4ff;font-weight:700;text-decoration:none}' +
       '.wx-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}' +
+      '.wx-act{display:flex;gap:8px;margin-top:12px}.wx-act button{min-height:40px;padding:0 16px;border-radius:20px;font:700 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}.wx-keep{border:1px solid #38bdf8;background:rgba(56,189,248,.16);color:#e0f2fe}.wx-rm{border:1px solid #ff3b3b;background:transparent;color:#ff6b6b}.wx-done{color:#86efac;font-size:12.5px;margin-top:8px}' +
+      '.wx-hidden{color:#9ca3af;font-size:12.5px;margin:4px 0 0}.wx-hidden button{background:none;border:0;color:#38d4ff;font:700 12.5px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;padding:0 4px}' +
       '.wx-names button{font:600 13px "Hanken Grotesk",system-ui,sans-serif;padding:6px 10px;border-radius:14px;border:1px solid rgba(56,212,255,.5);background:transparent;color:#e5e7eb;cursor:pointer}' +
       '.dream-brief .db-wx{border:1.5px solid #ff8c1a;border-radius:10px;padding:7px 9px;margin:0 0 9px;background:rgba(10,12,18,.72)}' +
       '.dream-brief .db-wx-t{font:800 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#fde68a;margin-bottom:4px}' +
@@ -24029,13 +24074,16 @@ var Warnings = (function () {
     var h = '<div class="wx-card" style="border-left-color:' + col + '">' +
       '<div><span class="wx-lv" style="background:' + col + '">' + _esc(_levelLabel(w.level)) + '</span><span class="wx-ev">' + _esc(w.event || w.headline) + '</span></div>' +
       (w.headline && w.headline !== w.event ? '<div class="wx-hl">' + _esc(w.headline) + '</div>' : '') +
-      (w.area ? '<div class="wx-meta">' + _esc(w.area) + (w.km != null ? ' · ' + _esc(_t('wx.km', '{n} km away', { n: w.km })) : '') + '</div>' : '') +
+      (w._areas && w._areas.length ? '<div class="wx-meta">' + _esc(w._areas.slice(0, 3).join('; ')) + (w._areas.length > 3 ? ' ' + _esc(_t('wx.areasMore', 'and {n} more areas', { n: w._areas.length - 3 })) : '') + (w.km != null && w._areas.length === 1 ? ' · ' + _esc(_t('wx.km', '{n} km away', { n: w.km })) : '') + '</div>' : (w.area ? '<div class="wx-meta">' + _esc(w.area) + '</div>' : '')) +
+      (w._n > 1 ? '<div class="wx-meta">' + _esc(_t('wx.sameN', '{n} official notices say the same thing; shown once.', { n: w._n })) + '</div>' : '') +
       (times ? '<div class="wx-meta">' + _esc(times) + '</div>' : '') +
       '<div class="wx-meta">' + _esc([w.sender ? _t('wx.issued', 'Issued by {sender}', { sender: w.sender }) : '', _t('wx.source', 'Source: {source}', { source: w.source })].filter(Boolean).join(' · ')) + '</div>' +
       (w.instruction ? '<div class="wx-sec">' + _esc(_t('wx.whatToDo', 'What to do')) + '</div><div class="wx-txt">' + _esc(w.instruction) + '</div>' : '') +
       (w.description ? '<div class="wx-sec">' + _esc(_t('wx.details', 'Details')) + '</div><div class="wx-txt">' + _esc(w.description) + '</div>' : '') +
       (names ? '<div class="wx-names">' + names + '</div>' : '') +
       (w.url ? '<a href="' + _esc(w.url) + '" target="_blank" rel="noopener">' + _esc(_t('wx.open', 'Open the official warning')) + ' ›</a>' : '') +
+      '<div class="wx-act"><button type="button" class="wx-keep" data-keep="' + _esc(w._gk) + '">' + _esc(_t('wx.keep', 'Keep watching')) + '</button>' +
+      '<button type="button" class="wx-rm" data-rm="' + _esc(w._gk) + '" data-until="' + (w._until || w.expires || 0) + '">' + _esc(_t('wx.remove', 'Remove')) + '</button></div>' +
       '</div>';
     return h;
   }
@@ -24050,8 +24098,10 @@ var Warnings = (function () {
       var groups = new Map();
       _by.forEach(function (v, k) {
         listFor(k).forEach(function (w) {
-          if (!groups.has(w.id)) groups.set(w.id, { w: w, keys: [] });
-          groups.get(w.id).keys.push(k);
+          var g0 = groups.get(w._gk);
+          if (!g0) { g0 = { w: Object.assign({}, w, { _areas: (w._areas || []).slice() }), keys: [] }; groups.set(w._gk, g0); }
+          else { g0.w._n += w._n; (w._areas || []).forEach(function (a) { if (g0.w._areas.indexOf(a) < 0) g0.w._areas.push(a); }); if (w._until > g0.w._until) g0.w._until = w._until; }
+          if (g0.keys.indexOf(k) < 0) g0.keys.push(k);
         });
       });
       var list = Array.from(groups.values()).sort(function (a, b) { return (b.w.level - a.w.level) || (b.keys.length - a.keys.length); });
@@ -24071,6 +24121,10 @@ var Warnings = (function () {
       note = [how, checked].filter(Boolean).join(' ');
       html = listFor(forKey).map(function (w) { return _card(w, ''); }).join('') || '<p class="wx-note">' + _esc(_t('wx.noneNow', 'No official warnings there now.')) + '</p>';
     }
+    var hc = _hiddenCount();
+    if (hc) html += '<p class="wx-hidden">' + _esc(_t('wx.hiddenN', '{n} removed on this device.', { n: hc })) + '<button type="button" data-restore="1">' + _esc(_t('wx.showAgain', 'Show them again')) + '</button></p>';
+    if (!html) html = '<p class="wx-note">' + _esc(_t('wx.noneNow', 'No official warnings there now.')) + '</p>';
+    _by.forEach(function (v, k) { if (forKey === 'circle' || String(k) === String(forKey)) listFor(k).forEach(function (w) { _read[w._gk] = 1; }); });
     _closeSheet();
     var wrap = document.createElement('div'); wrap.className = 'wx-wrap'; wrap.id = 'wxSheetWrap';
     wrap.innerHTML = '<div class="wx-sheet" role="dialog" aria-modal="true" aria-labelledby="wxTitle"><button type="button" class="wx-x" aria-label="' + _esc(_t('wx.close', 'Close')) + '">×</button>' +
@@ -24078,6 +24132,16 @@ var Warnings = (function () {
     wrap._for = forKey;
     wrap.addEventListener('click', function (ev) {
       if (ev.target === wrap || ev.target.closest('.wx-x')) { _closeSheet(); return; }
+      var kb = ev.target.closest('[data-keep]');
+      if (kb) { _read[kb.getAttribute('data-keep')] = 1; _closeSheet(); return; }
+      var rb = ev.target.closest('[data-rm]');
+      if (rb) {
+        remove(rb.getAttribute('data-rm'), Number(rb.getAttribute('data-until')) || 0);
+        var card = rb.closest('.wx-card'); if (card) { card.innerHTML = '<div class="wx-done">' + _esc(_t('wx.removed', 'Removed. It will not show again unless it gets worse.')) + '</div>'; card.style.borderLeftColor = '#334155'; }
+        setTimeout(function () { if (_sheet && !_sheet.querySelector('.wx-card .wx-act')) _closeSheet(); }, 1400);
+        return;
+      }
+      if (ev.target.closest('[data-restore]')) { restoreAll(); _openSheet(forKey); return; }
       var b = ev.target.closest('.wx-names button'); if (!b) return;
       _closeSheet();
       try {
@@ -24100,6 +24164,22 @@ var Warnings = (function () {
     var st = document.getElementById('stage'), cv = document.getElementById('sphere');
     if (!st || !cv) return;
     var down = false;
+    var markAt = function (e) {
+      var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      for (var i = _marks.length - 1; i >= 0; i--) { var m = _marks[i]; if (Math.hypot(x - m.x, y - m.y) <= m.r) return m.key; }
+      return null;
+    };
+    var markDown = null;
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(function (evt) {
+      st.addEventListener(evt, function (e) { var p = (e.touches && e.touches[0]) || e; var k = markAt(p); if (k) { markDown = k; e.stopImmediatePropagation(); } }, true);
+    });
+    ['pointerup', 'mouseup', 'touchend', 'click'].forEach(function (evt) {
+      st.addEventListener(evt, function (e) {
+        if (!markDown) return;
+        e.stopImmediatePropagation(); e.preventDefault();
+        if (evt === 'pointerup' || evt === 'touchend') { var k = markDown; markDown = null; _openSheet(k); }
+      }, true);
+    });
     var inHit = function (e) {
       var h = window._dreamWarnHit; if (!h) return false;
       var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -24139,7 +24219,7 @@ var Warnings = (function () {
     window.addEventListener('localeChanged', function () { _sig++; _paintChip(true); });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else setTimeout(init, 0);
-  return { refresh: refresh, listFor: listFor, levelFor: levelFor, drawMark: drawMark, briefHtml: briefHtml, frame: frame, open: _openSheet,
+  return { refresh: refresh, listFor: listFor, levelFor: levelFor, drawMark: drawMark, briefHtml: briefHtml, frame: frame, open: _openSheet, remove: remove, restoreAll: restoreAll,
     _setForTest: function (map) { _by = new Map(Object.keys(map).map(function (k) { return [k, map[k]]; })); _at = Date.now(); _sig++; _paintChip(true); },
     get sig() { return _sig; } };
 })();
@@ -29982,7 +30062,7 @@ function drawNetworkView(t) {
     /* ── Official warning where this person is ── */
     try {
       const _wl = Warnings.levelFor(node.contact.id);
-      if (_wl >= 2) Warnings.drawMark(ctx, sx + r * 0.78, sy - r * 0.78, Math.max(6, Math.min(16, r * 0.36)), _wl, alphaOverride || 1, t);
+      if (_wl >= 2) Warnings.drawMark(ctx, sx + r * 0.78, sy - r * 0.78, Math.max(6, Math.min(16, r * 0.36)), _wl, alphaOverride || 1, t, node.contact.id);
     } catch (e) {}
 
     /* ── Quick-action icons beneath focused/enlarged sphere ── */
@@ -30217,7 +30297,7 @@ function drawNetworkView(t) {
   }
 
   /* Official warning where I am */
-  try { const _swl = Warnings.levelFor('self'); if (_swl >= 2) Warnings.drawMark(ctx, cx + centerR * 0.74, cy - centerR * 0.74, Math.max(9, centerR * 0.16), _swl, 1, t); } catch (e) {}
+  try { const _swl = Warnings.levelFor('self'); if (_swl >= 2) Warnings.drawMark(ctx, cx + centerR * 0.74, cy - centerR * 0.74, Math.max(9, centerR * 0.16), _swl, 1, t, 'self'); } catch (e) {}
   } /* end centre sphere (not drawn in ISO VIEW) */
 
   /* ── PASS 2: Draw contact spheres IN FRONT of center (with transparency) ── */
