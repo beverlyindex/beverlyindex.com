@@ -334,6 +334,8 @@
     /* a family member in focus shows Sentinel's Communication panel here instead */
     var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
     if (f != null) return false;
+    /* WHEREIS holds the upper left while it is shown */
+    if (window.CovaraWhere && window.CovaraWhere.shown()) return false;
     return true;
   }
   var _ls = null, _html = '';
@@ -399,9 +401,12 @@
   }
   window.CovaraDream = function (focusId) {
     if (focusId != null) return null;
-    var it = dreamItem(); return it ? img(photoUrl(it.photo)) : null;
+    var it = dreamItem(); if (it) return img(photoUrl(it.photo));
+    /* On AWAY's phone, with nothing due, the dream picture is HOME, so COMMUNICATION | WHEREIS is always there */
+    var h = homeContact(); if (h) { try { var p = contactPhotos.get(h.id); if (p && p.img) return p; } catch (e) {} }
+    return null;
   };
-  window.CovaraDreamWanted = function () { return !!dreamItem(); };
+  window.CovaraDreamWanted = function () { return !!dreamItem() || !!homeContact(); };
 
   /* ── the doctors and the people HOME sees are spheres joined to HOME ── */
   var _people = [], _psig = '';
@@ -473,7 +478,7 @@
     var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
     var p = f && /^cvp:/.test(String(f)) ? personFor(f) : null;
     var r = window._dreamRect;
-    if (!p || !r || typeof appState === 'undefined' || appState !== 'network' || document.querySelector('.cv-ov.open') || document.body.classList.contains('rs-overlay-open')) { if (!pbox.hidden) pbox.hidden = true; _pFor = ''; return; }
+    if (!p || !r || typeof appState === 'undefined' || appState !== 'network' || (window.CovaraWhere && window.CovaraWhere.shown()) || document.querySelector('.cv-ov.open') || document.body.classList.contains('rs-overlay-open')) { if (!pbox.hidden) pbox.hidden = true; _pFor = ''; return; }
     if (_pFor !== p.id + p.cvHeadline) { _pFor = p.id + p.cvHeadline; pbox.innerHTML = personHtml(p.cvItem); pbox.style.setProperty('--db-acc', ACC[p.cvItem.group] || '#38bdf8'); }
     var vw = window.innerWidth, phone = vw <= 480, cv = document.getElementById('sphere'), off = cv ? cv.getBoundingClientRect() : { left: 0, top: 0 };
     var left, width, top;
