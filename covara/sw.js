@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-covara-v116';
+const CACHE_NAME = 'remiel-covara-v117';
 
 const PRECACHE_URLS = [
   './',
@@ -17,6 +17,10 @@ const PRECACHE_URLS = [
   './covara-label.js',
   './covara-view.js',
   './covara-where.js',
+  './covara-camera.js',
+  './covara-talk.js',
+  './covara-nav.js',
+  './share.html',
   './badge-96.png',
   './icon-192.png',
   './icon-512.png',

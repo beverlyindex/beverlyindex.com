@@ -1081,7 +1081,7 @@
   var DOT = { late: '#ef4444', due: '#ffd24d' };
   function pills(ctx, labels, keys, cx, cy, cr, t0, left, states, onKey) {
     var W = ctx.canvas.width / (window.devicePixelRatio || 1);
-    var fs = W < 500 ? 11 : 12, lineH = W < 500 ? 24 : 26, gap = 16, px = 12, py = 5;
+    var fs = (W < 500 ? 11 : 12) + (window.CovaraCalm ? 3 : 0), lineH = (W < 500 ? 24 : 26) + (window.CovaraCalm ? 8 : 0), gap = 16, px = 12, py = 5;
     ctx.save();
     ctx.font = '500 ' + fs + 'px -apple-system, system-ui, "Segoe UI", sans-serif';
     ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
