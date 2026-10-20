@@ -143,6 +143,8 @@
       .replace(/\bmg\b/g, IT() ? 'milligrammi' : 'milligrams').replace(/\bDr\./g, IT() ? 'Dottor' : 'Doctor');
   }
   function speak(text) {
+    /* in the installed Android app: the phone's own voice engine, which carries Google's natural voices */
+    if (window.CovaraNative && typeof CovaraNative.speak === 'function') { if (!String(text || '').trim()) return; try { CovaraNative.speak(forEar(text), IT() ? 'it-IT' : 'en-US', window.CovaraCalm ? 0.86 : 0.95); return; } catch (e) {} }
     try {
       if (!window.speechSynthesis || !text) return;
       speechSynthesis.cancel(); if (!_voice) _voice = pickVoice();
@@ -171,10 +173,19 @@
     f.onsubmit = function (e) { e.preventDefault(); say(answer(i.value)); };
     setTimeout(function () { i.focus(); }, 50);
   }
-  function stop() { busy = false; if (_orb) _orb.classList.remove('listening'); try { if (rec) rec.abort(); } catch (e) {} }
+  /* the installed Android app hears with the phone's own speech recognition */
+  if (!window.CovaraNativeEvent) window.CovaraNativeEvent = function (j) { try { window.dispatchEvent(new CustomEvent('covara-native', { detail: JSON.parse(j) })); } catch (e) {} };
+  window.addEventListener('covara-native', function (e) {
+    var d = e.detail || {}; if (d.kind !== 'speech' || !busy) return;
+    if (d.type === 'result') { stop(); var a = answer(d.value); say('\u201c' + d.value + '\u201d: ' + a, a); }
+    else if (d.type === 'error') { stop(); if (d.value === 'not-allowed') typed(); else say(t('notHeard')); }
+  });
+  function nativeListen(orb) { busy = true; orb.classList.add('listening'); say(t('listening'), ' '); try { CovaraNative.listen(IT() ? 'it-IT' : 'en-US'); } catch (e) { stop(); typed(); } }
+  function stop() { busy = false; if (_orb) _orb.classList.remove('listening'); try { if (rec) rec.abort(); } catch (e) {} try { if (window.CovaraNative && CovaraNative.stopListening) CovaraNative.stopListening(); } catch (e) {} }
   function toggle(orb, cap) {
     _orb = orb; _cap = cap;
     if (busy) { stop(); return; }
+    if (window.CovaraNative && typeof CovaraNative.listen === 'function' && CovaraNative.canHear()) { nativeListen(orb); return; }
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { typed(); return; }
     rec = new SR(); rec.lang = IT() ? 'it-IT' : 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;

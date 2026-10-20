@@ -57,15 +57,49 @@
     if (r === 'away') return homeContact() ? POST_AWAY_MS : 0;
     return 0;
   }
+  /* ── the installed Android app: HOME's phone keeps sending while locked ──
+     The app holds a location-only key (it can send this phone's position and nothing else). Covara asks for one
+     while HOME shares location with someone in the circle, and drops it the moment HOME stops sharing or signs out. */
+  if (!window.CovaraNativeEvent) window.CovaraNativeEvent = function (j) { try { window.dispatchEvent(new CustomEvent('covara-native', { detail: JSON.parse(j) })); } catch (e) {} };
+  var NATIVE = !!(window.CovaraNative && typeof CovaraNative.locStart === 'function'), _nBusy = false, _nTried = 0;
+  function nStatus() { try { return JSON.parse(CovaraNative.locStatus() || '{}'); } catch (e) { return {}; } }
+  function nativeLive() { if (!NATIVE) return false; var s = nStatus(); return !!(s.on && s.running && s.hasKey); }
+  async function nativeSync(force) {
+    if (!NATIVE || _nBusy) return;
+    var st = nStatus();
+    var want = authed() && role() === 'home' && links('away').some(function (c) { return c.care.share && c.care.share.location; });
+    if (!want) {
+      if (st.on || st.hasKey) {
+        try { CovaraNative.locStop(true); } catch (e) {}
+        if (authed() && st.device) { try { SyncEngine.apiFetch('/location/device/' + encodeURIComponent(st.device), { method: 'DELETE' }).catch(function () {}); } catch (e) {} }
+      }
+      return;
+    }
+    if (st.on && st.running && st.hasKey) return;
+    /* one try every 10 minutes, so a refused permission is not asked again and again */
+    if (!force && Date.now() - _nTried < 600000) return;
+    _nTried = Date.now(); _nBusy = true;
+    try {
+      var r = await SyncEngine.apiFetch('/location/device', { method: 'POST', body: JSON.stringify({ name: 'Android phone', replaces: st.device || undefined }) });
+      var j = await r.json().catch(function () { return {}; });
+      if (r.ok && j.token) CovaraNative.locStart(SyncEngine.getApiBase(), j.token, j.id);
+    } catch (e) {}
+    _nBusy = false;
+  }
+  window.addEventListener('covara-native', function (e) { if (e.detail && e.detail.kind === 'resume') nativeSync(true); });
+  window.CovaraWhereNative = { sync: nativeSync, status: function () { return NATIVE ? nStatus() : null; } };
+
   function moved(a, b) { if (!a || !b) return Infinity; return Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos(a.lat * Math.PI / 180)); }
   function post(force) {
     var every = wantSend(); if (!every || !_fix) return;
+    if (role() === 'home' && nativeLive()) return;
     var now = Date.now();
     if (!force && now - _lastPost < every && moved(_fix, _lastPostAt) < 25) return;
     _lastPost = now; _lastPostAt = { lat: _fix.lat, lon: _fix.lon };
     try { SyncEngine.apiFetch('/location', { method: 'POST', body: JSON.stringify({ latitude: _fix.lat, longitude: _fix.lon, accuracy: _fix.acc, continuous: true }) }).catch(function () {}); } catch (e) {}
   }
   function watch() {
+    nativeSync(false);
     var want = !!wantSend();
     if (want && _watch == null && navigator.geolocation) {
       try {
