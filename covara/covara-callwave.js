@@ -91,6 +91,16 @@
     }
     raf = requestAnimationFrame(frame);
   }
+  /* Android's built-in browser draws a large grey play button on a video that has no picture yet (the call
+     screen's video before the other person answers). A clear poster image removes it. */
+  var CLEAR = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  function clearPosters(root) { try { (root || document).querySelectorAll('video:not([poster])').forEach(function (v) { v.setAttribute('poster', CLEAR); }); } catch (e) {} }
+  function bindPosters() {
+    clearPosters();
+    var ov = document.getElementById('scOverlay');
+    if (ov && window.MutationObserver) new MutationObserver(function () { clearPosters(ov); }).observe(ov, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindPosters); else bindPosters();
   setInterval(watch, 500);
   window.CovaraCallWave = { watch: watch, stop: stop, levels: function () { return { them: them[N - 1], me: me[N - 1] }; } };
 })();

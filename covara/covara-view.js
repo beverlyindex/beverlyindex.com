@@ -1085,10 +1085,18 @@
     ctx.save();
     ctx.font = '500 ' + fs + 'px -apple-system, system-ui, "Segoe UI", sans-serif';
     ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    var maxW = 0; labels.forEach(function (l) { maxW = Math.max(maxW, ctx.measureText(l).width); });
-    var pw = maxW + px * 2, phh = fs + py * 2;
-    if (states) pw += 14;
-    var x = left ? cx - cr * 1.12 - gap - pw : cx + cr * 1.12 + gap; if (x + pw > W - 6) x = W - 6 - pw; if (x < 6) x = 6;
+    if (W < 500) gap = 8;
+    /* keep clear of the sphere and its ring: on a narrow phone the pills get smaller until they fit beside it */
+    var room = left ? (cx - cr * 1.18 - gap - 6) : (W - 6 - (cx + cr * 1.18 + gap)), maxW = 0, pw = 0, dotW = states ? 14 : 0;
+    for (var tries = 0; tries < 6; tries++) {
+      ctx.font = '500 ' + fs + 'px -apple-system, system-ui, "Segoe UI", sans-serif';
+      maxW = 0; labels.forEach(function (l) { maxW = Math.max(maxW, ctx.measureText(l).width); });
+      pw = maxW + px * 2 + dotW;
+      if (pw <= room || fs <= 9) break;
+      fs -= 1; px = Math.max(6, px - 2); dotW = states ? 12 : 0;
+    }
+    var phh = fs + py * 2;
+    var x = left ? cx - cr * 1.18 - gap - pw : cx + cr * 1.18 + gap; if (x + pw > W - 4) x = W - 4 - pw; if (x < 4) x = 4;
     var y0 = cy - (labels.length * lineH) / 2 + lineH / 2;
     var fade = Math.min(1, 0.75 + 0.25 * Math.sin(t0 * 0.004));
     for (var i = 0; i < labels.length; i++) {
@@ -1099,8 +1107,8 @@
       ctx.globalAlpha = (on ? 0.9 : 0.45) * fade; ctx.strokeStyle = on ? '#38bdf8' : 'rgba(100,180,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
       var tx = x + pw / 2;
       if (states) {
-        tx = x + 7 + (pw - 7) / 2;
-        var st0 = states[i]; ctx.globalAlpha = fade; ctx.beginPath(); ctx.arc(x + 10, ly, 3, 0, Math.PI * 2); ctx.fillStyle = DOT[st0] || 'rgba(96,165,250,.6)'; ctx.fill();
+        tx = x + dotW / 2 + (pw - dotW / 2) / 2;
+        var st0 = states[i]; ctx.globalAlpha = fade; ctx.beginPath(); ctx.arc(x + dotW * 0.7, ly, 3, 0, Math.PI * 2); ctx.fillStyle = DOT[st0] || 'rgba(96,165,250,.6)'; ctx.fill();
       }
       ctx.globalAlpha = 0.95 * fade; ctx.fillStyle = on ? '#ffffff' : '#d8e8ff'; ctx.fillText(labels[i], tx, ly);
       _pillHits.push({ x: x, y: ly - lineH / 2, w: pw, h: lineH, key: keys[i] });
