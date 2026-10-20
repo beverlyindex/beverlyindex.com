@@ -402,7 +402,7 @@
       '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><input class="circle-invite-input" id="cvSnName" maxlength="60" placeholder="' + esc(t('snNamePh')) + '"><button type="button" class="circle-invite-btn" data-a="add">' + esc(t('snAdd')) + '</button></div>' +
       '<div id="cvSnKey" style="display:none;margin-top:12px;font:12px/1.5 monospace;word-break:break-all;color:#ffd24d"></div></div>';
     sec.querySelector('[data-a=add]').onclick = async function () {
-      var nm = (sec.querySelector('#cvSnName').value || '').trim() || t('snNamePh');
+      var nm = (sec.querySelector('#cvSnName').value || '').trim(); if (!nm) { sec.querySelector('#cvSnName').focus(); return; }
       var r = await api('/sensors', { method: 'POST', body: Object.assign({ name: nm }, sh.body || {}) }).catch(function () { return { ok: false }; });
       var out = sec.querySelector('#cvSnKey'); out.style.display = 'block';
       if (!r.ok) { out.textContent = t('offline'); return; }

@@ -34,7 +34,7 @@
   function links(side) { if (typeof DEMO_CONTACTS === 'undefined') return []; return DEMO_CONTACTS.filter(function (c) { return c.care && c.care.side === side && c.care.state === 'active'; }); }
   function on() { var r = role(); return r === 'home' || (r === 'away' && !!homeContact()); }
   function homeUser() { var h = homeContact(); return role() === 'away' && h ? h.care.userId : ''; }
-  function first(name) { return String(name || '').trim().split(/\s+/)[0] || (IT() ? 'Casa' : 'Home'); }
+  function first(name) { var w = String(name || '').trim().split(/\s+/)[0]; if (!w) return IT() ? 'Casa' : 'Home'; return w === w.toUpperCase() && w.length > 1 ? w[0] + w.slice(1).toLowerCase() : w; }
   function imperial() { return !IT(); }
   function dist(m) {
     if (m == null || !isFinite(m)) return '';
@@ -57,15 +57,49 @@
     if (r === 'away') return homeContact() ? POST_AWAY_MS : 0;
     return 0;
   }
+  /* ── the installed Android app: HOME's phone keeps sending while locked ──
+     The app holds a location-only key (it can send this phone's position and nothing else). Covara asks for one
+     while HOME shares location with someone in the circle, and drops it the moment HOME stops sharing or signs out. */
+  if (!window.CovaraNativeEvent) window.CovaraNativeEvent = function (j) { try { window.dispatchEvent(new CustomEvent('covara-native', { detail: JSON.parse(j) })); } catch (e) {} };
+  var NATIVE = !!(window.CovaraNative && typeof CovaraNative.locStart === 'function'), _nBusy = false, _nTried = 0;
+  function nStatus() { try { return JSON.parse(CovaraNative.locStatus() || '{}'); } catch (e) { return {}; } }
+  function nativeLive() { if (!NATIVE) return false; var s = nStatus(); return !!(s.on && s.running && s.hasKey); }
+  async function nativeSync(force) {
+    if (!NATIVE || _nBusy) return;
+    var st = nStatus();
+    var want = authed() && role() === 'home' && links('away').some(function (c) { return c.care.share && c.care.share.location; });
+    if (!want) {
+      if (st.on || st.hasKey) {
+        try { CovaraNative.locStop(true); } catch (e) {}
+        if (authed() && st.device) { try { SyncEngine.apiFetch('/location/device/' + encodeURIComponent(st.device), { method: 'DELETE' }).catch(function () {}); } catch (e) {} }
+      }
+      return;
+    }
+    if (st.on && st.running && st.hasKey) return;
+    /* one try every 10 minutes, so a refused permission is not asked again and again */
+    if (!force && Date.now() - _nTried < 600000) return;
+    _nTried = Date.now(); _nBusy = true;
+    try {
+      var r = await SyncEngine.apiFetch('/location/device', { method: 'POST', body: JSON.stringify({ name: 'Android phone', replaces: st.device || undefined }) });
+      var j = await r.json().catch(function () { return {}; });
+      if (r.ok && j.token) CovaraNative.locStart(SyncEngine.getApiBase(), j.token, j.id);
+    } catch (e) {}
+    _nBusy = false;
+  }
+  window.addEventListener('covara-native', function (e) { if (e.detail && e.detail.kind === 'resume') nativeSync(true); });
+  window.CovaraWhereNative = { sync: nativeSync, status: function () { return NATIVE ? nStatus() : null; } };
+
   function moved(a, b) { if (!a || !b) return Infinity; return Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos(a.lat * Math.PI / 180)); }
   function post(force) {
     var every = wantSend(); if (!every || !_fix) return;
+    if (role() === 'home' && nativeLive()) return;
     var now = Date.now();
     if (!force && now - _lastPost < every && moved(_fix, _lastPostAt) < 25) return;
     _lastPost = now; _lastPostAt = { lat: _fix.lat, lon: _fix.lon };
     try { SyncEngine.apiFetch('/location', { method: 'POST', body: JSON.stringify({ latitude: _fix.lat, longitude: _fix.lon, accuracy: _fix.acc, continuous: true }) }).catch(function () {}); } catch (e) {}
   }
   function watch() {
+    nativeSync(false);
     var want = !!wantSend();
     if (want && _watch == null && navigator.geolocation) {
       try {
@@ -339,12 +373,13 @@
         x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, r, a0 + 0.03, a0 + step - 0.03); x.closePath();
         x.fillStyle = rm.fall ? 'rgba(255,61,90,' + (0.28 + 0.25 * lit) + ')' : here ? 'rgba(211,181,119,' + (0.22 + 0.22 * lit) + ')' : 'rgba(79,141,240,' + (0.05 + 0.1 * lit) + ')'; x.fill();
         x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + r * Math.cos(a0), cy + r * Math.sin(a0)); x.strokeStyle = 'rgba(143,180,255,.28)'; x.lineWidth = 1; x.stroke();
-        var lx = cx + r * 0.66 * Math.cos(mid), ly = cy + r * 0.66 * Math.sin(mid);
-        var nm = rm.name.length > 11 ? rm.name.slice(0, 10) + '…' : rm.name;
+        var lk = n === 1 ? 0 : 0.7, lx = cx + r * lk * Math.cos(mid), ly = cy + r * lk * Math.sin(mid) + (n === 1 ? r * 0.42 : 0);
+        /* the label fits inside its slice and inside the circle */
+        var nm = fit(x, rm.name, (here || rm.fall ? '800 ' : '600 ') + fs + 'px ' + SANS, n === 1 ? r * 1.1 : Math.min(r * 0.58, 2 * r * 0.7 * Math.sin(Math.min(step, Math.PI) / 2) - 6));
         text(x, nm, lx, ly, (here || rm.fall ? '800 ' : '600 ') + fs + 'px ' + SANS, rm.fall ? '#ffd0d8' : here ? '#ffe9b8' : (rm.online === false ? 'rgba(200,214,232,.45)' : '#c7d2e2'));
         if (rm.fall) text(x, t('fall'), lx, ly + fs + 2, '800 ' + Math.max(7, fs - 2) + 'px ' + MONO, '#ff3d5a');
         else if (here && d.rooms.since) text(x, ago(d.rooms.since), lx, ly + fs + 2, '600 ' + Math.max(7, fs - 2) + 'px ' + MONO, '#d3b577');
-        if (here) homeDot(x, cx + r * 0.36 * Math.cos(mid), cy + r * 0.36 * Math.sin(mid), Math.max(6, r * 0.12), reduce ? 0 : now, name);
+        if (here) homeDot(x, cx + r * (n === 1 ? 0 : 0.3) * Math.cos(mid), cy + r * (n === 1 ? 0 : 0.3) * Math.sin(mid), Math.max(6, r * 0.11), reduce ? 0 : now, name);
       });
       if (!reduce) sweep(x, cx, cy, r - 2, now, false);
     } else {
