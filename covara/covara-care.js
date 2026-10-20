@@ -31,6 +31,7 @@
       joined: '{name} is now in your circle.',
       asks: '{name} asks to look after you. Tap their sphere.',
       offline: 'Covara needs the internet for this. Try again in a moment.',
+      snTitle: 'Room sensors (fall detection)', snHelp: 'A 60 GHz fall sensor on the ceiling of a room sees a fall without a camera and rings everyone who sees falls at once, even when the phone is in another room.', snNone: 'No room sensor yet.', snAdd: 'Add a room sensor', snNamePh: 'Room name, for example Bathroom', snRemove: 'Remove', snKeyOnce: 'Put this line in the sensor now. It is shown only once:', snCopy: 'Copy', snOn: 'Watching', snQuiet: 'Not heard from in a while', snNever: 'Waiting for its first report', snFall: 'Saw a fall in the last hour',
       famTitle: 'My family in Covara', lookTitle: 'Who I look after', famEmpty: 'Nobody yet. Show your code to your family.', lookEmpty: 'Nobody yet. Type the code from their phone.', sees: 'Sees:', seesNothing: 'nothing yet',
       sh: { location: 'Where I am', rooms: 'Which room', falls: 'If I fall', care: 'Medicines and visits', mood: 'How I feel', activity: 'If I stop moving' },
       rel: { child: 'Son or daughter', partner: 'Partner', sibling: 'Brother or sister', friend: 'Friend', carer: 'Carer', doctor: 'Doctor' }
@@ -56,6 +57,7 @@
       joined: '{name} ora è nella tua cerchia.',
       asks: '{name} chiede di prendersi cura di te. Tocca la sua sfera.',
       offline: 'Covara ha bisogno di internet. Riprova tra poco.',
+      snTitle: 'Sensori nelle stanze (cadute)', snHelp: 'Un sensore di cadute a 60 GHz sul soffitto vede una caduta senza telecamera e avvisa subito chi vede le cadute, anche se il telefono è in un\u2019altra stanza.', snNone: 'Ancora nessun sensore.', snAdd: 'Aggiungi un sensore', snNamePh: 'Nome della stanza, per esempio Bagno', snRemove: 'Rimuovi', snKeyOnce: 'Inserisci ora questa riga nel sensore. Viene mostrata una sola volta:', snCopy: 'Copia', snOn: 'Attivo', snQuiet: 'Nessun segnale da un po\u2019', snNever: 'In attesa del primo segnale', snFall: 'Ha visto una caduta nell\u2019ultima ora',
       famTitle: 'La mia famiglia in Covara', lookTitle: 'Di chi mi prendo cura', famEmpty: 'Ancora nessuno. Mostra il codice alla tua famiglia.', lookEmpty: 'Ancora nessuno. Scrivi il codice del suo telefono.', sees: 'Vede:', seesNothing: 'ancora niente',
       sh: { location: 'Dove sono', rooms: 'In quale stanza', falls: 'Se cado', care: 'Medicine e visite', mood: 'Come sto', activity: 'Se non mi muovo' },
       rel: { child: 'Figlio o figlia', partner: 'Partner', sibling: 'Fratello o sorella', friend: 'Amico', carer: 'Badante', doctor: 'Medico' }
@@ -371,8 +373,45 @@
     sec.querySelectorAll('.cv-fam-row').forEach(function (b) {
       b.onclick = function () { var c = careContacts().filter(function (x) { return String(x.id) === b.getAttribute('data-id'); })[0]; if (c && home) openConsent(c); };
     });
+    scheduleSensors();
   }
   window.addEventListener('localeChanged', renderFamily);
+
+  /* ── Room sensors: a fall radar in a room reports a fall straight to Covara ── */
+  function sensorHome() {
+    if (role() === 'home') return { q: '', name: '' };
+    var h = careContacts().filter(function (c) { return c.care.side === 'home' && c.care.state === 'active' && c.care.share && c.care.share.falls; })[0];
+    return h ? { q: '?home=' + encodeURIComponent(h.care.userId), body: { home: h.care.userId }, name: h.first } : null;
+  }
+  var _snT = null;
+  function scheduleSensors() { clearTimeout(_snT); _snT = setTimeout(renderSensors, 800); }
+  async function renderSensors() {
+    var anchor = document.getElementById('cvFamilySection'); if (!anchor || !role() || !authed()) return;
+    var sec = document.getElementById('cvSensorSection');
+    if (!sec) { sec = document.createElement('div'); sec.id = 'cvSensorSection'; sec.className = 'settings-section'; sec.setAttribute('data-cat', 'circle'); anchor.parentNode.insertBefore(sec, anchor.nextSibling); try { if (anchor.classList.contains('is-cat')) sec.classList.add('is-cat'); } catch (e) {} }
+    var sh = sensorHome();
+    if (!sh) { sec.innerHTML = ''; return; }
+    var list = [];
+    try { var r = await api('/sensors' + sh.q); if (r.ok) list = r.data.sensors || []; } catch (e) {}
+    var rows = list.map(function (x) {
+      var st = x.last_event === 'fall' && Date.now() - x.last_event_at < 3600e3 ? t('snFall') : x.last_seen && Date.now() - x.last_seen < 15 * 60e3 ? t('snOn') : x.last_seen ? t('snQuiet') : t('snNever');
+      return '<div class="cv-fam-row" style="cursor:default"><i>' + esc(initials(x.name)) + '</i><span><b>' + esc(x.name) + '</b><small>' + esc(st) + '</small></span><button type="button" class="circle-invite-btn" style="margin-left:auto" data-rm="' + esc(x.id) + '">' + esc(t('snRemove')) + '</button></div>';
+    }).join('');
+    sec.innerHTML = '<div class="settings-section-title">' + esc(t('snTitle')) + '</div><p class="settings-help">' + esc(t('snHelp')) + '</p>' +
+      '<div class="settings-card">' + (rows || '<p class="settings-help" style="margin:0 0 10px">' + esc(t('snNone')) + '</p>') +
+      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><input class="circle-invite-input" id="cvSnName" maxlength="60" placeholder="' + esc(t('snNamePh')) + '"><button type="button" class="circle-invite-btn" data-a="add">' + esc(t('snAdd')) + '</button></div>' +
+      '<div id="cvSnKey" style="display:none;margin-top:12px;font:12px/1.5 monospace;word-break:break-all;color:#ffd24d"></div></div>';
+    sec.querySelector('[data-a=add]').onclick = async function () {
+      var nm = (sec.querySelector('#cvSnName').value || '').trim() || t('snNamePh');
+      var r = await api('/sensors', { method: 'POST', body: Object.assign({ name: nm }, sh.body || {}) }).catch(function () { return { ok: false }; });
+      var out = sec.querySelector('#cvSnKey'); out.style.display = 'block';
+      if (!r.ok) { out.textContent = t('offline'); return; }
+      var line = 'Bearer ' + r.data.sensor.id + '.' + r.data.key;
+      out.innerHTML = esc(t('snKeyOnce')) + '<br><br>' + esc(line) + '<br><br><button type="button" class="circle-invite-btn" data-a="copy">' + esc(t('snCopy')) + '</button>';
+      out.querySelector('[data-a=copy]').onclick = function () { try { navigator.clipboard.writeText(line); } catch (e) {} };
+    };
+    sec.querySelectorAll('[data-rm]').forEach(function (b) { b.onclick = async function () { await api('/sensors/' + encodeURIComponent(b.getAttribute('data-rm')) + sh.q, { method: 'DELETE' }).catch(function () {}); renderSensors(); }; });
+  }
 
   /* Start once the gate and onboarding are behind us and the account exists. */
   function ready() {

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="robots" content="noindex, nofollow">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -9030,31 +9031,27 @@ async function sha256(str) {
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/* Stored access-code hashes — the carecircle: salt prefix is
-   retained for backward compatibility with existing codes.
-   Note: index.html uppercases input before hashing; we do the same.
-   To add a code: sha256('carecircle:' + CODE_UPPERCASED) and add the hex here. */
-/* Access codes, stored as SHA-256 of 'carecircle:' + code. A code with an
-   expiry stops working at that moment (epoch ms, UTC). Issued 28 Sep 2026. */
+/* Remiel: Covara access codes, its own: stored as SHA-256 of 'covara:' + the code
+   in capitals. Remiel Sentinel codes do not open Covara. Issued 20 Oct 2026. */
+async function _gateHash(code) { return sha256('covara:' + String(code).toUpperCase()); }
 const VALID_HASHES = new Set([
-  '02c9549ac193f3287f532293c5df0264965ccba60e79bd712919e7bd12bba5f9',  /* primary */
-  'a3fe4af273bc66ef078dd5b61f6a39d4e8d61ad5642c36136131d5d972c2a17b',  /* RS 1 */
-  '1217d2bbb98144178898c681aeb42c444fc1c76a0b56534ae477a6e6198ef2fd',  /* RS 2 */
-  'b943f277d7aeb73f9da98d6a3cc78fcbef17aa12feba4f99abaa57190d067c96',  /* RS 3 */
-  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd',  /* RS 4, 24 h */
-  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483',  /* RS 5, 24 h */
-  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1'   /* RS 6, 24 h */
+  '4d28010ea0fd1c438d3e8396e4c5be4168c2bf25d131129f58ed729f530d8716'  /* permanent 1 */,
+  '54c8ce69cb3858da9423263c0c1f605f4feed7fe4cd20a55c4886c2a5f39a8d1'  /* permanent 2 */,
+  '77be368b9eb482834994ec846096ce827bb8e2fa0d8894869e40f3dcbbd985ad'  /* permanent 3 */,
+  'b39cb573f2f7eb3013b5acacc08438534d36326d0f6bd35f48de6c8903e0718a'  /* permanent 4 */,
+  '5469ac511c0f3cece93cec3ef0bb6bc71a54ad648d1cf3551b5f1fd7b54ba20d'  /* 24 h 1 */,
+  'd863cfea76c97c98df3837e1b03b9db931eccde25edd11d9a60119539f45aab1'  /* 24 h 2 */,
+  '5b9a9aefd3ee2f7862450dd98fd805a0dfcdcacdb9041f165bd30858a2419239'  /* 24 h 3 */
 ]);
 /* Codes that stop working a fixed time after their FIRST use, anywhere. The
    first use is recorded by the API (POST /gate/use) so a code passed between
-   devices shares one clock; when the API cannot be reached, this device's own
-   record of the first use is used instead. */
+   devices shares one clock. */
 const CODE_TTL_MS = {
-  'b7c45d5f9f9f78ea2d8db327dad90bf42ccdb9cae38afbde0e684e2461c5bdcd': 24 * 3600 * 1000,
-  '3bb9248e9acc6c71d50eac5130425b7d8eda0e20893d28ebec69c19e71506483': 24 * 3600 * 1000,
-  'c064090e162444cdf80d4a8bb850b509ae7841e6fc5fabeed83b37a5b520edc1': 24 * 3600 * 1000
+  '5469ac511c0f3cece93cec3ef0bb6bc71a54ad648d1cf3551b5f1fd7b54ba20d': 24 * 3600 * 1000,
+  'd863cfea76c97c98df3837e1b03b9db931eccde25edd11d9a60119539f45aab1': 24 * 3600 * 1000,
+  '5b9a9aefd3ee2f7862450dd98fd805a0dfcdcacdb9041f165bd30858a2419239': 24 * 3600 * 1000
 };
-const GATE_API = 'https://remiel-sentinel-api.vercel.app';
+const GATE_API = 'https://remiel-covara-api.vercel.app';
 async function _firstUse(hash) {
   const key = 'rc:firstUse:' + hash.slice(0, 16);
   let local = 0;
@@ -9280,7 +9277,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
     var stored = '';
     try { stored = localStorage.getItem('rc:access') || ''; } catch (e) {}
     if (!stored || stored === 'open') { showGate(); return; }
-    sha256('carecircle:' + stored.toUpperCase()).then(function (h) { return codeState(h); }).then(function (st) {
+    _gateHash(stored).then(function (h) { return codeState(h); }).then(function (st) {
       if (st === 'ok') beginVideoIntro(); else { try { localStorage.removeItem('rc:access'); } catch (e) {} showGate(); }
     }).catch(function () { showGate(); });
   } catch (e) { showGate(); }
@@ -9301,7 +9298,7 @@ async function submitGateCode() {
   const code = input.value.trim().toUpperCase();
   if (!code) { flashGateError(I18n.t('gate.error.empty'), input); return; }
 
-  const hash = await sha256('carecircle:' + code);
+  const hash = await _gateHash(code);
   const state = await codeState(hash);
   if (state === 'ok') {
     errEl.innerHTML = '&nbsp;';
@@ -30712,7 +30709,7 @@ const SettingsPanel = (function () {
     try {
       // Configure API base if not set
       if (!SyncEngine.getStatus().apiBase) {
-        await SyncEngine.configure('https://remiel-sentinel-api.vercel.app');
+        await SyncEngine.configure('https://remiel-covara-api.vercel.app');
       }
 
       if (_syncMode === 'signup') {
@@ -34472,7 +34469,7 @@ const MedicationTracker = (() => {
 const SyncEngine = (() => {
   'use strict';
 
-  const DEFAULT_API_BASE = 'https://remiel-sentinel-api.vercel.app';
+  const DEFAULT_API_BASE = 'https://remiel-covara-api.vercel.app';
   const API_BASE_KEY = '_sync_api_base';
   const TOKEN_KEY = '_sync_access_token';
   const REFRESH_KEY = '_sync_refresh_token';
@@ -38562,7 +38559,7 @@ const SyncPrompt = (function() {
 
     try {
       if (!SyncEngine.getStatus().apiBase) {
-        await SyncEngine.configure('https://remiel-sentinel-api.vercel.app');
+        await SyncEngine.configure('https://remiel-covara-api.vercel.app');
       }
 
       if (_mode === 'signup') {
@@ -38895,7 +38892,7 @@ const SentinelCall = (function() {
         else if (typeof SyncEngine.getStatus === 'function') b = (SyncEngine.getStatus() || {}).apiBase || null;
       }
     } catch (e) {}
-    return b || 'https://remiel-sentinel-api.vercel.app';
+    return b || 'https://remiel-covara-api.vercel.app';
   }
 
   /* ── Fetch TURN/STUN ICE servers for NAT traversal ── */
