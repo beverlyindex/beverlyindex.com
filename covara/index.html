@@ -11156,6 +11156,8 @@ const I18n = (function () {
     'bg.inLedger': "a Ledger note",
     'guest.title': "Video Call",
     'guest.callingYou': "{name} is calling you",
+    'cv.familyCodeLbl': "Family code: calls, messages and your circle",
+    'cv.familyCodeBtn': "Show my family code",
     'guest.circleTitle': "Video call {name}",
     'guest.circleSub': "You are a guest in {name}'s circle. Call any time from this same link.",
     'guest.callNow': "Call {name}",
@@ -12036,6 +12038,8 @@ const I18n = (function () {
     'bg.inLedger': "una nota del Registro",
     'guest.title': "Videochiamata",
     'guest.callingYou': "{name} ti sta chiamando",
+    'cv.familyCodeLbl': "Codice di famiglia: chiamate, messaggi e la tua cerchia",
+    'cv.familyCodeBtn': "Mostra il mio codice di famiglia",
     'guest.circleTitle': "Videochiama {name}",
     'guest.circleSub': "Sei ospite nella cerchia di {name}. Chiama quando vuoi da questo stesso link.",
     'guest.callNow': "Chiama {name}",
@@ -17854,12 +17858,13 @@ async function updateBlufContent() {
     if (!_qaBar.querySelector('.qa-self-note')) {
       const _selfNote = document.createElement('div');
       _selfNote.className = 'qa-self-note';
-      const _myScId = SentinelCall.getMyId ? SentinelCall.getMyId() : '...';
-      _selfNote.innerHTML = '<div style="text-align:center;padding:4px 0;">'
-        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.5;margin-bottom:4px;">Your Sentinel ID</div>'
-        + '<div style="font-family:monospace;font-size:18px;letter-spacing:3px;font-weight:700;">' + (_myScId || '...') + '</div>'
-        + '<button onclick="SentinelCall.shareCallLink()" style="margin-top:8px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:rgb(56,189,248);border-radius:8px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;">Share Call Link</button>'
-        + '</div>';
+      /* Covara: one bridge for everyone, the family code. Whoever uses it joins at once and can video call;
+         no separate ID or call link to pass around. */
+      const _isHome = (function () { try { return localStorage.getItem('rc:role') !== 'away'; } catch (e) { return true; } })();
+      _selfNote.innerHTML = _isHome ? '<div style="text-align:center;padding:4px 0;">'
+        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.6;margin-bottom:6px;">' + _t('cv.familyCodeLbl', 'Family code: calls, messages and your circle') + '</div>'
+        + '<button onclick="try{closeBluf()}catch(e){};setTimeout(function(){CovaraCare.openCode()},250)" style="background:#38bdf8;border:0;color:#04121f;border-radius:22px;padding:10px 20px;font-size:14px;font-weight:800;cursor:pointer;">' + _t('cv.familyCodeBtn', 'Show my family code') + '</button>'
+        + '</div>' : '';
       _qaBar.appendChild(_selfNote);
     }
     if (_editBtn) _editBtn.style.display = 'none';

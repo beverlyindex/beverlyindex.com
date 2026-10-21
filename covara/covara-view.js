@@ -12,6 +12,7 @@
   var STR = {
     en: {
       sec_med: 'Medicines', sec_visit: 'Visits', sec_health: 'Health', sec_safety: 'Safety', sec_papers: 'Papers', me: 'me',
+      pv_med: 'Doses, photos of each bottle, refills', pv_visit: 'Appointments, carers, the day log', pv_health: 'Sleep, breathing, how the day went', pv_safety: 'Emergency card, wandering, worries', pv_papers: 'Who decides, documents, records access', pv_late: 'needs attention', pv_due: 'due now',
       dFilled: 'Prescription', filled: 'Filled', filledOn: 'Filled {d}', notFilled: 'Not filled',
       dayOf: 'The day of {name}', dayHint: 'Tap what you saw. Anyone looking after them sees it, and a sudden change warns everyone.', lastDays: 'Last days', warnTail: 'Sudden changes like these can mean an infection, dehydration or pain. Consider calling the doctor.',
       lg_water: 'Drinking', lg_meal: 'Meals', lg_sleep: 'Sleep', lg_toilet: 'Toilet', lg_pain: 'Pain', lg_mood: 'Mood', lg_behaviour: 'Behaviour',
@@ -90,6 +91,7 @@
     },
     it: {
       sec_med: 'Medicine', sec_visit: 'Visite', sec_health: 'Salute', sec_safety: 'Sicurezza', sec_papers: 'Documenti', me: 'me',
+      pv_med: 'Dosi, foto di ogni flacone, ricariche', pv_visit: 'Appuntamenti, assistenti, il diario', pv_health: 'Sonno, respiro, com\u2019\u00e8 andata la giornata', pv_safety: 'Scheda di emergenza, allontanamento, preoccupazioni', pv_papers: 'Chi decide, documenti, accesso alle cartelle', pv_late: 'richiede attenzione', pv_due: 'da fare ora',
       dFilled: 'Ricetta', filled: 'Ritirata', filledOn: 'Ritirata il {d}', notFilled: 'Da ritirare',
       dayOf: 'La giornata di {name}', dayHint: 'Tocca ciò che hai visto. Chi lo assiste lo vede, e un cambiamento improvviso avvisa tutti.', lastDays: 'Ultimi giorni', warnTail: 'Cambiamenti improvvisi come questi possono indicare un\u2019infezione, disidratazione o dolore. Valuta di chiamare il medico.',
       lg_water: 'Bere', lg_meal: 'Pasti', lg_sleep: 'Sonno', lg_toilet: 'Bagno', lg_pain: 'Dolore', lg_mood: 'Umore', lg_behaviour: 'Comportamento',
@@ -205,6 +207,8 @@
   var css = '' +
     '#cvTabs{position:fixed;left:16px;top:84px;width:min(340px,calc(100vw - 32px));z-index:7000;font-family:var(--nous-font,"Hanken Grotesk",system-ui,sans-serif);color:#e8ecf4;opacity:0;transform:translateY(-6px);transition:opacity .45s ease,transform .45s ease;pointer-events:none}' +
     '#cvTabs.show{opacity:1;transform:none;pointer-events:auto}' +
+    '#cvTabs.in-card{position:static;width:auto;opacity:1;transform:none;pointer-events:auto;margin:4px 0 2px}#cvTabs.in-card .cvx-head{display:none}#cvTabs.in-card .cvx-list{max-height:none;overflow:visible}' +
+    '.cv-pull.cvp-late .bluf-pull-preview{color:#ff8a8a}.cv-pull.cvp-due .bluf-pull-preview{color:#fde68a}.cv-pull.cvp-late .bluf-section-label:after,.cv-pull.cvp-due .bluf-section-label:after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:8px;vertical-align:1px;background:#fbbf24;box-shadow:0 0 8px #fbbf24}.cv-pull.cvp-late .bluf-section-label:after{background:#ff4d6a;box-shadow:0 0 8px #ff4d6a}' +
     'body.rs-overlay-open #cvTabs,body.cv-asking #cvTabs{opacity:0 !important;pointer-events:none !important}' +
     '.cvx-tab{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px 12px;border-radius:12px;background:rgba(10,12,20,0.72);border:1px solid rgba(56,189,248,0.22);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:inherit;font:inherit;cursor:pointer;text-align:left}' +
     '.cvx-tab:focus-visible,.cvx-row:focus-visible{outline:2px solid #C5A55A;outline-offset:1px}' +
@@ -815,6 +819,7 @@
   /* ── the panel the pill opens ── */
   function visible() {
     if (!_data || !role() || !_open) return false;
+    if (_inCard) return true;
     var ob = document.getElementById('onboarding'); if (ob && !ob.hidden && getComputedStyle(ob).display !== 'none') return false;
     var gate = document.getElementById('gateScreen'); if (gate && gate.offsetParent !== null && getComputedStyle(gate).display !== 'none') return false;
     if (document.querySelector('.cv-ov.open')) return false;
@@ -1145,9 +1150,9 @@
     /* all on the right of HOME's sphere: HOME's care on top, calling HOME (AWAY's phone) beneath it,
        so the lower left stays clear for the day's schedule */
     var W0 = cssW(ctx), lh = (W0 < 500 ? 24 : 26) + (window.CovaraCalm ? 8 : 0);
-    var comm = role() === 'away', nCare = _data ? SECTIONS.length : 0, nComm = comm ? 4 : 0, gapG = nCare && nComm ? lh * 0.7 : 0;
+    var comm = role() === 'away', nCare = 0, nComm = comm ? 4 : 0, gapG = nCare && nComm ? lh * 0.7 : 0;
     var total = (nCare + nComm) * lh + gapG, top = cy - total / 2;
-    if (_data) pills(ctx, SECTIONS.map(function (k) { return t('sec_' + k); }), SECTIONS.map(function (k) { return 'sec:' + k; }), cx, top + nCare * lh / 2, cr, t0, false, SECTIONS.map(pillState), _open ? 'sec:' + _open : '');
+    /* Medicines, Visits, Health, Safety and Papers now live in the pulls of the card a double tap opens */
     if (comm) pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, top + nCare * lh + gapG + nComm * lh / 2, cr, t0);
   }
   function hitCentre(clientX, clientY) {
@@ -1390,6 +1395,72 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden && _subj) load(); });
     window.addEventListener('localeChanged', function () { _html = ''; render(); syncSpheres(); });
   }
+  /* ── the care pulls in the card a double tap opens on HOME's sphere ──
+     Medicines, Visits, Health, Safety and Papers open inside the card, as its first pulls, with everything they
+     hold (photos of each bottle, refills, the day log, the emergency card, who decides). Medicines takes the place
+     of the card's own Treatment & Medications pull. */
+  var _inCard = false, _cardPulls = null;
+  function cardIsHome() {
+    var ov = document.getElementById('blufOverlay'); if (!ov || !ov.classList.contains('open') || !_data) return false;
+    var sc = (typeof selectedContact !== 'undefined') ? selectedContact : null;
+    if (role() === 'home') return !sc;
+    var h = homeContact(); return !!(h && sc && sc.id === h.id);
+  }
+  function cardPulls() {
+    var anchor = document.getElementById('pull_videonote'); if (!anchor) return null;
+    if (_cardPulls && _cardPulls.parentNode) return _cardPulls;
+    var wrap = document.createElement('div'); wrap.id = 'cvCarePulls';
+    wrap.innerHTML = SECTIONS.map(function (k) {
+      return '<div class="bluf-pull cv-pull" data-cvp="' + k + '"><div class="bluf-pull-header" role="button" tabindex="0"><div class="bluf-section-label">' + esc(t('sec_' + k)) + '</div>' +
+        '<span class="bluf-pull-preview" data-pv></span><span class="bluf-pull-chevron">&#9660;</span></div><div class="bluf-pull-body"><div class="bluf-pull-content" data-slot></div></div></div>';
+    }).join('');
+    anchor.parentNode.insertBefore(wrap, anchor);
+    wrap.querySelectorAll('[data-cvp]').forEach(function (p) {
+      var hd = p.querySelector('.bluf-pull-header');
+      function go(e) { if (e) e.stopPropagation(); openCardPull(p.getAttribute('data-cvp')); }
+      hd.addEventListener('click', go); hd.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } });
+    });
+    /* opening one of the card's own pulls folds ours */
+    anchor.parentNode.addEventListener('click', function (e) { var hd = e.target.closest && e.target.closest('.bluf-pull-header'); if (hd && !hd.closest('.cv-pull') && _inCard) foldCard(); }, true);
+    _cardPulls = wrap; return wrap;
+  }
+  function openCardPull(k) {
+    var wrap = cardPulls(); if (!wrap) return;
+    if (_inCard && _open === k) { foldCard(); return; }
+    document.querySelectorAll('#blufCard .bluf-pull.open').forEach(function (x) { if (!x.classList.contains('cv-pull')) x.classList.remove('open'); });
+    wrap.querySelectorAll('.cv-pull').forEach(function (x) { x.classList.toggle('open', x.getAttribute('data-cvp') === k); });
+    var slot = wrap.querySelector('[data-cvp="' + k + '"] [data-slot]');
+    _inCard = true; box.classList.add('in-card'); slot.appendChild(box);
+    _open = k; _openItem = ''; _html = ''; render();
+  }
+  function foldCard() {
+    if (_cardPulls) _cardPulls.querySelectorAll('.cv-pull').forEach(function (x) { x.classList.remove('open'); });
+    _open = ''; _openItem = ''; _html = ''; render();
+  }
+  function leaveCard() {
+    if (!_inCard) return;
+    _inCard = false; box.classList.remove('in-card'); document.body.appendChild(box);
+    _open = ''; _openItem = ''; _html = ''; render();
+  }
+  function cardTick() {
+    var med = document.getElementById('pull_medication');
+    if (cardIsHome()) {
+      var wrap = cardPulls(); if (!wrap) return;
+      wrap.hidden = false; if (med) med.style.display = 'none';
+      wrap.querySelectorAll('.cv-pull').forEach(function (p) {
+        var k = p.getAttribute('data-cvp'), st = ''; try { _ls = _ls || lists(); st = pillState(k); } catch (e) {}
+        var pv = p.querySelector('[data-pv]'), txt = st === 'late' ? t('pv_late') : st === 'due' ? t('pv_due') : t('pv_' + k);
+        if (pv.textContent !== txt) pv.textContent = txt;
+        p.classList.toggle('cvp-late', st === 'late'); p.classList.toggle('cvp-due', st === 'due');
+      });
+    } else {
+      if (_cardPulls) _cardPulls.hidden = true;
+      if (med) med.style.display = '';
+      leaveCard();
+    }
+  }
+  setInterval(cardTick, 400);
+
   window.CovaraView = { _hits: function () { return _pillHits; }, source: source, centre: centre, drawCentre: drawCentre, hitCentre: hitCentre, centreSingle: centreSingle, centreDouble: centreDouble,
     openNode: openNode, load: load, openEdit: openEdit, open: function (k, id) { _open = { appt: 'visit', sub: 'med', rec: 'papers' }[k] || k || ''; _openItem = id || ''; _html = ''; render(); }, section: sectionOpen, data: function () { return _data; }, fresh: function () { return { syncedAt: _syncedAt, checkedAt: _stampOkAt }; }, lists: function () { return _ls; } };
   setTimeout(boot, 1500);
