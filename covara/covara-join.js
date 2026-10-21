@@ -49,7 +49,12 @@
 
   var home = null;
   fetch(base() + '/care-join/' + encodeURIComponent(code), { cache: 'no-store' }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (j) {
-    if (!j || !j.valid) { h.textContent = t('titleNo'); p.textContent = t('bad'); return; }
+    if (!j || !j.valid) {
+      /* the code has ended, but someone who already joined as a guest can still call from the same link */
+      var g0 = null; try { g0 = JSON.parse(localStorage.getItem('rc:guestJoin') || 'null'); } catch (e) {}
+      if (g0 && g0.sid) { h.textContent = t('again', { name: g0.first || '' }); setTimeout(function () { toCall(g0.sid, g0.first, g0.me); }, 600); return; }
+      h.textContent = t('titleNo'); p.textContent = t('bad'); return;
+    }
     home = j.home || {};
     var who = home.first || (IT() ? 'questa persona' : 'them');
     /* someone who already joined as a guest goes straight to the call */
