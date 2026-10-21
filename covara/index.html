@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>body.cv-guest-call .sentinel-guide{display:none !important}</style>
 </head>
 <body>
 <title>Remiel: Covara</title>
@@ -9297,6 +9298,9 @@ let appRevealed = false;
 })();
 let _guestCallMode = false;
 try { _guestCallMode = !!new URLSearchParams(window.location.search).get('call'); } catch (e) {}
+/* A family code's join link (#join=123456): kept for this visit, so it can be used once Covara is open */
+let _joinCode = null;
+try { var _jm = /[#&?]join=(\d{6})/.exec((window.location.hash || '') + '&' + (window.location.search || '')); if (_jm) { _joinCode = _jm[1]; sessionStorage.setItem('rc:join', _joinCode); } } catch (e) {}
 /* B1: revealApp needs RemielDB, I18n and the modules declared further down
    this script. _appScriptReady resolves at the very end of the script block,
    so a reveal requested early (reduced motion, fast skip) waits instead of
@@ -9322,6 +9326,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
     if (_guestCallMode) { beginVideoIntro(); return; }
     var stored = '';
     try { stored = localStorage.getItem('rc:access') || ''; } catch (e) {}
+    /* Someone without Covara opening a family code's link: the join card shows instead of the gate (covara-join.js) */
+    if (_joinCode && (!stored || stored === 'open')) { window.CovaraJoinGuest = _joinCode; var _gj = document.getElementById('gateScreen'); if (_gj) _gj.style.display = 'none'; return; }
     if (!stored || stored === 'open') { showGate(); return; }
     _gateHash(stored).then(function (h) { return codeState(h); }).then(function (st) {
       if (st === 'ok') beginVideoIntro(); else { try { localStorage.removeItem('rc:access'); } catch (e) {} showGate(); }
@@ -11150,6 +11156,11 @@ const I18n = (function () {
     'bg.inLedger': "a Ledger note",
     'guest.title': "Video Call",
     'guest.callingYou': "{name} is calling you",
+    'cv.familyCodeLbl': "Family code: calls, messages and your circle",
+    'cv.familyCodeBtn': "Show my family code",
+    'guest.circleTitle': "Video call {name}",
+    'guest.circleSub': "You are a guest in {name}'s circle. Call any time from this same link.",
+    'guest.callNow': "Call {name}",
     'guest.sub': "Enter your name to join the call",
     'guest.namePh': "Your name",
     'guest.join': "Join Call",
@@ -12027,6 +12038,11 @@ const I18n = (function () {
     'bg.inLedger': "una nota del Registro",
     'guest.title': "Videochiamata",
     'guest.callingYou': "{name} ti sta chiamando",
+    'cv.familyCodeLbl': "Codice di famiglia: chiamate, messaggi e la tua cerchia",
+    'cv.familyCodeBtn': "Mostra il mio codice di famiglia",
+    'guest.circleTitle': "Videochiama {name}",
+    'guest.circleSub': "Sei ospite nella cerchia di {name}. Chiama quando vuoi da questo stesso link.",
+    'guest.callNow': "Chiama {name}",
     'guest.sub': "Scrivi il tuo nome per entrare nella chiamata",
     'guest.namePh': "Il tuo nome",
     'guest.join': "Entra nella chiamata",
@@ -13165,6 +13181,15 @@ const I18n = (function () {
     "wx.showAgain": "Show them again",
     "wx.areasMore": "and {n} more areas",
     "wx.sameN": "{n} official notices say the same thing; shown once.",
+    "wx.stLive": "In force now",
+    "wx.stSoon": "Starts {time}",
+    "wx.stEnded": "Ended {time}",
+    "wx.issuedAt": "Issued {time}",
+    "wx.fromAt": "From {time}",
+    "wx.untilAt": "until {time}",
+    "wx.keptAt": "You chose Keep watching {time}",
+    "wx.seenAt": "First shown on this phone {time}",
+    "wx.newHere": "New on this phone",
     "ledger.reviewDictation": "Review, then tap Log",
     "medimg.title": "Scan a medication label",
     "medimg.hint": "Point the camera at the medication label or upload a photo",
@@ -13540,6 +13565,15 @@ const I18n = (function () {
     "wx.showAgain": "Mostrali di nuovo",
     "wx.areasMore": "e altre {n} zone",
     "wx.sameN": "{n} avvisi ufficiali dicono la stessa cosa; mostrati una volta.",
+    "wx.stLive": "In vigore ora",
+    "wx.stSoon": "Inizia {time}",
+    "wx.stEnded": "Terminato {time}",
+    "wx.issuedAt": "Emesso {time}",
+    "wx.fromAt": "Dal {time}",
+    "wx.untilAt": "fino al {time}",
+    "wx.keptAt": "Hai scelto Continua a seguire {time}",
+    "wx.seenAt": "Mostrato per la prima volta su questo telefono {time}",
+    "wx.newHere": "Nuovo su questo telefono",
     "ledger.reviewDictation": "Controlla, poi tocca Registra",
     "medimg.title": "Leggi l’etichetta di un farmaco",
     "medimg.hint": "Inquadra l’etichetta del farmaco o carica una foto",
@@ -17824,12 +17858,13 @@ async function updateBlufContent() {
     if (!_qaBar.querySelector('.qa-self-note')) {
       const _selfNote = document.createElement('div');
       _selfNote.className = 'qa-self-note';
-      const _myScId = SentinelCall.getMyId ? SentinelCall.getMyId() : '...';
-      _selfNote.innerHTML = '<div style="text-align:center;padding:4px 0;">'
-        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.5;margin-bottom:4px;">Your Sentinel ID</div>'
-        + '<div style="font-family:monospace;font-size:18px;letter-spacing:3px;font-weight:700;">' + (_myScId || '...') + '</div>'
-        + '<button onclick="SentinelCall.shareCallLink()" style="margin-top:8px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:rgb(56,189,248);border-radius:8px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;">Share Call Link</button>'
-        + '</div>';
+      /* Covara: one bridge for everyone, the family code. Whoever uses it joins at once and can video call;
+         no separate ID or call link to pass around. */
+      const _isHome = (function () { try { return localStorage.getItem('rc:role') !== 'away'; } catch (e) { return true; } })();
+      _selfNote.innerHTML = _isHome ? '<div style="text-align:center;padding:4px 0;">'
+        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.6;margin-bottom:6px;">' + _t('cv.familyCodeLbl', 'Family code: calls, messages and your circle') + '</div>'
+        + '<button onclick="try{closeBluf()}catch(e){};setTimeout(function(){CovaraCare.openCode()},250)" style="background:#38bdf8;border:0;color:#04121f;border-radius:22px;padding:10px 20px;font-size:14px;font-weight:800;cursor:pointer;">' + _t('cv.familyCodeBtn', 'Show my family code') + '</button>'
+        + '</div>' : '';
       _qaBar.appendChild(_selfNote);
     }
     if (_editBtn) _editBtn.style.display = 'none';
@@ -19651,6 +19686,21 @@ const SentinelMessaging = (() => {
     if (canDeliver) await _deliver(contactId, msg.id);
   }
 
+  /* Send a message to one person without the message screen open (Talk uses it). The message lands
+     in that person's thread, as if typed there. Returns true once it is on its way. */
+  async function sendTo(contactId, text) {
+    text = String(text || '').trim(); if (!text) return false;
+    const contact = _findContact(contactId); if (!contact) return false;
+    const canDeliver = _authed() && _isValidSid(contact.sentinelId);
+    const msg = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), from: 'center', text: text, ts: Date.now(), state: canDeliver ? 'pending' : 'local' };
+    const thread = await _loadThread(contactId);
+    thread.push(msg);
+    await _saveThread(contactId, thread);
+    if (_activeContactId === contactId) { try { await _renderThread(contactId); } catch (e) {} }
+    if (canDeliver) await _deliver(contactId, msg.id);
+    return canDeliver;
+  }
+
   /* Deliver every message that waited for a link request to be accepted */
   async function flushAwaiting(contactId) {
     const thread = await _loadThread(contactId);
@@ -19803,7 +19853,11 @@ const SentinelMessaging = (() => {
           const isNew = !(serverId && before.some(x => x.serverId === serverId));
           await _noteUnknown(key, _unknownNames[key], isNew);
         }
+        let _isNewMsg = true;
+        try { const _th = await _loadThread(key); _isNewMsg = !(serverId && _th.some(x => x.serverId === serverId)); } catch (_) {}
         await receiveResponse(key, m.text, { serverId: serverId, ts: m.ts });
+        /* Covara: a new message reaches the headline (Talk messages) and, after a Talk message, opens the thread */
+        if (_isNewMsg) { try { window.dispatchEvent(new CustomEvent('covara-message', { detail: { contactId: key, text: m.text, ts: m.ts || Date.now(), name: contact ? ((contact.first || '') + ' ' + (contact.last || '')).trim() : (_unknownNames[key] || '') } })); } catch (_) {} }
       }
 
       if (data.cursor != null) {
@@ -19970,7 +20024,7 @@ const SentinelMessaging = (() => {
   }
 
   return {
-    openFor, close, send, retry, receiveResponse, poll, addUnknownSender, flushAwaiting, adoptUnknown,
+    openFor, close, send, sendTo, retry, receiveResponse, poll, addUnknownSender, flushAwaiting, adoptUnknown,
     getTickerData, getLatestMessageText,
     loadBlufSection,
     get activeContactId() { return _activeContactId; },
@@ -23939,7 +23993,11 @@ var Warnings = (function () {
   function _contact(id) { try { return DEMO_CONTACTS.find(function (c) { return String(c.id) === String(id); }) || null; } catch (e) { return null; } }
   function _first(c) { return c ? (c.first || ((c.last || '') + '')).trim() : ''; }
   function _levelLabel(l) { return l >= 4 ? _t('wx.level4', 'Extreme') : l === 3 ? _t('wx.level3', 'Severe') : _t('wx.level2', 'Moderate'); }
-  function _when(t) { try { return new Date(t).toLocaleString(I18n.locale === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+  function _when(t) { try { return new Date(t).toLocaleString(I18n.locale === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
+  /* When this phone first showed each warning, and when it was kept: so a warning read before can be told from a new one */
+  var _seenAt = {}, _keptAt = {};
+  try { _seenAt = JSON.parse(localStorage.getItem('wx:seenAt') || '{}') || {}; _keptAt = JSON.parse(localStorage.getItem('wx:keptAt') || '{}') || {}; } catch (e) {}
+  function _saveTimes() { try { var cut = Date.now() - 14 * 864e5; [_seenAt, _keptAt].forEach(function (o) { Object.keys(o).forEach(function (k) { if (o[k] < cut) delete o[k]; }); }); localStorage.setItem('wx:seenAt', JSON.stringify(_seenAt)); localStorage.setItem('wx:keptAt', JSON.stringify(_keptAt)); } catch (e) {} }
 
   /* The same warning is often issued many times (one notice per county or zone, plus each update). They are
      shown once, as one kind of warning: the same event, at the same level, from the same office. */
@@ -24108,6 +24166,9 @@ var Warnings = (function () {
       '.wx-card .wx-lv{display:inline-block;font:800 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#0b0d14;border-radius:6px;padding:2px 7px;margin-right:6px;vertical-align:1px}' +
       '.wx-card .wx-ev{font-size:16px;font-weight:800}.wx-card .wx-hl{margin:6px 0 4px;font-weight:600}' +
       '.wx-card .wx-meta{color:#9ca3af;font-size:12.5px;margin:2px 0}' +
+      '.wx-card .wx-st{display:inline-block;font:800 10.5px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;border:1px solid;border-radius:999px;padding:3px 9px;margin:0 0 7px}' +
+      '.wx-card .wx-dates{font:700 12.5px "Hanken Grotesk",system-ui,sans-serif;color:#e0f2fe;margin:6px 0 2px}' +
+      '.wx-card .wx-mine{font-size:12px;color:#9fb4e2;margin:2px 0 4px}.wx-card .wx-mine.new{color:#fde68a;font-weight:700}' +
       '.wx-card .wx-sec{font:700 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9fd8ff;margin:10px 0 3px}' +
       '.wx-card .wx-txt{white-space:pre-line;line-height:1.45;font-size:13.5px}' +
       '.wx-card a{display:inline-block;margin-top:10px;color:#38d4ff;font-weight:700;text-decoration:none}' +
@@ -24125,9 +24186,23 @@ var Warnings = (function () {
   }
   function _card(w, names) {
     var col = COLORS[w.level] || '#ff8c1a';
-    var times = [w.onset && w.onset > Date.now() ? _t('wx.from', 'From {time}', { time: _when(w.onset) }) : '', w.expires ? _t('wx.until', 'Until {time}', { time: _when(w.expires) }) : ''].filter(Boolean).join(' · ');
+    var now = Date.now(), seenNew = false;
+    if (w._gk && !_seenAt[w._gk]) { _seenAt[w._gk] = now; seenNew = true; _saveTimes(); }
+    /* the plain state: in force now, starting later, or over */
+    var st = w.expires && w.expires < now ? { k: 'ended', c: '#9ca3af', t: _t('wx.stEnded', 'Ended {time}', { time: _when(w.expires) }) }
+      : w.onset && w.onset > now ? { k: 'soon', c: '#fbbf24', t: _t('wx.stSoon', 'Starts {time}', { time: _when(w.onset) }) }
+      : { k: 'live', c: '#22d3a6', t: _t('wx.stLive', 'In force now') };
+    var dates = [w.issued ? _t('wx.issuedAt', 'Issued {time}', { time: _when(w.issued) }) : '',
+      w.onset ? _t('wx.fromAt', 'From {time}', { time: _when(w.onset) }) : '',
+      w.expires ? _t('wx.untilAt', 'until {time}', { time: _when(w.expires) }) : ''].filter(Boolean).join(' · ');
+    var mine = w._gk && _keptAt[w._gk] ? _t('wx.keptAt', 'You chose Keep watching {time}', { time: _when(_keptAt[w._gk]) })
+      : w._gk && _seenAt[w._gk] && !seenNew ? _t('wx.seenAt', 'First shown on this phone {time}', { time: _when(_seenAt[w._gk]) }) : _t('wx.newHere', 'New on this phone');
+    var times = '';
     var h = '<div class="wx-card" style="border-left-color:' + col + '">' +
+      '<div class="wx-st wx-st-' + st.k + '" style="color:' + st.c + ';border-color:' + st.c + '">' + (st.k === 'live' ? '● ' : '') + _esc(st.t) + '</div>' +
       '<div><span class="wx-lv" style="background:' + col + '">' + _esc(_levelLabel(w.level)) + '</span><span class="wx-ev">' + _esc(w.event || w.headline) + '</span></div>' +
+      (dates ? '<div class="wx-dates">' + _esc(dates) + '</div>' : '') +
+      '<div class="wx-mine' + (seenNew || !_seenAt[w._gk] ? ' new' : '') + '">' + _esc(mine) + '</div>' +
       (w.headline && w.headline !== w.event ? '<div class="wx-hl">' + _esc(w.headline) + '</div>' : '') +
       (w._areas && w._areas.length ? '<div class="wx-meta">' + _esc(w._areas.slice(0, 3).join('; ')) + (w._areas.length > 3 ? ' ' + _esc(_t('wx.areasMore', 'and {n} more areas', { n: w._areas.length - 3 })) : '') + (w.km != null && w._areas.length === 1 ? ' · ' + _esc(_t('wx.km', '{n} km away', { n: w.km })) : '') + '</div>' : (w.area ? '<div class="wx-meta">' + _esc(w.area) + '</div>' : '')) +
       (w._n > 1 ? '<div class="wx-meta">' + _esc(_t('wx.sameN', '{n} official notices say the same thing; shown once.', { n: w._n })) + '</div>' : '') +
@@ -24188,7 +24263,7 @@ var Warnings = (function () {
     wrap.addEventListener('click', function (ev) {
       if (ev.target === wrap || ev.target.closest('.wx-x')) { _closeSheet(); return; }
       var kb = ev.target.closest('[data-keep]');
-      if (kb) { _read[kb.getAttribute('data-keep')] = 1; _closeSheet(); return; }
+      if (kb) { _read[kb.getAttribute('data-keep')] = 1; _keptAt[kb.getAttribute('data-keep')] = Date.now(); _saveTimes(); _closeSheet(); return; }
       var rb = ev.target.closest('[data-rm]');
       if (rb) {
         remove(rb.getAttribute('data-rm'), Number(rb.getAttribute('data-until')) || 0);
@@ -41311,6 +41386,7 @@ const SentinelCall = (function() {
   let _guestConnected = false; /* this guest call reached picture and sound */
   let _guestShared = null;   /* null not sent, else 'pending' | 'accepted' | 'failed' */
   let _guestRelabel = null;  /* re-applies the guest card's wording */
+  let _guestCircle = false;  /* a guest of the circle calling in (family code) */
 
   function checkCallInvite() {
     const params = new URLSearchParams(window.location.search);
@@ -41320,6 +41396,9 @@ const SentinelCall = (function() {
     const hn = (params.get('n') || '').replace(/[<>"]/g, '').trim().slice(0, 30);
     _guestHostName = hn;
     const gn = (params.get('g') || '').replace(/[<>"]/g, '').trim().slice(0, 30);
+    /* gj=1: a guest of this circle (joined with the family code) calling in, not someone being called */
+    _guestCircle = params.get('gj') === '1';
+    try { document.body.classList.add('cv-guest-call'); } catch (e) {}
     const room = params.get('room');
     _guestRoom = (room && /^[A-Za-z0-9-]{4,40}$/.test(room)) ? room : null;
     const m = params.get('m');
@@ -41340,10 +41419,11 @@ const SentinelCall = (function() {
       /* After a call that connected, the card says so instead of "is calling you" */
       const ended = _guestConnected && !_currentCall && !_group;
       if (_gt) _gt.textContent = ended ? _t('guest.endedTitle', 'Call ended')
+        : _guestCircle ? _tp('guest.circleTitle', 'Video call {name}', { name: _guestHostName || '' })
         : (_guestHostName ? _tp('guest.callingYou', '{name} is calling you', { name: _guestHostName }) : _t('guest.title', 'Video Call'));
-      if (_gs) _gs.textContent = ended ? '' : _t('guest.sub', 'Enter your name to join the call');
+      if (_gs) _gs.textContent = ended ? '' : _guestCircle ? _tp('guest.circleSub', 'You are a guest in {name}\'s circle. Call any time from this same link.', { name: _guestHostName || '' }) : _t('guest.sub', 'Enter your name to join the call');
       if (_gi) _gi.placeholder = _t('guest.namePh', 'Your name');
-      if (_gb && !_gb.dataset.joining) _gb.textContent = ended ? _tp('guest.callAgain', 'Call {name} again', { name: _guestHostLabel() }) : _t('guest.join', 'Join Call');
+      if (_gb && !_gb.dataset.joining) _gb.textContent = ended ? _tp('guest.callAgain', 'Call {name} again', { name: _guestHostLabel() }) : _guestCircle ? _tp('guest.callNow', 'Call {name}', { name: _guestHostLabel() }) : _t('guest.join', 'Join Call');
     };
     _guestRelabel = _guestLabels;
     _guestLabels();
@@ -45627,5 +45707,6 @@ try { _resolveAppScriptReady(); } catch (e) {}
   <script src="covara-callwave.js" defer></script>
   <script src="covara-sleep.js" defer></script>
   <script src="covara-glass.js" defer></script>
+  <script src="covara-join.js" defer></script>
 </body>
 </html>

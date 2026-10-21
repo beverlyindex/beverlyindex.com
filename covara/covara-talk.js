@@ -15,7 +15,9 @@
       nextAppt: 'Next: {title}{with}, {when}.', nextNone: 'Nothing is planned for the coming days.', withWho: ' with {who}',
       moodNone: 'I have not heard how {name} feels today.', mood_good: '{name} said today is a good day.', mood_okay: '{name} said today is okay.', mood_low: '{name} said today is not a good day. You may want to call.',
       calling: 'Calling {who}.', messaging: 'Opening a message to {who}.', whoCall: 'I could not find {who} in the circle.',
-      opening: 'Opening {what}.', camera: 'Opening the camera.', home: 'Back to {name}.', now: 'Here is everything now.' },
+      opening: 'Opening {what}.', camera: 'Opening the camera.', home: 'Back to {name}.', now: 'Here is everything now.',
+      talkTo: 'Message for {who}. Speak now…', sentTalk: 'To {who}: \u201c{text}\u201d. Sent.', talkFail: 'Not sent to {who}. Check the internet and tap TALK again.', hlTalk: 'TALK', hlReply: 'Reply', hlTalkBack: 'Talk back', hlGot: 'Got it', hlFrom: 'Message from {who}: {text}',
+      offer: 'Who should get this message?', everyone: 'Everyone', notNow: 'Not now', sentTo: 'Sent to {who}.', sentAll: 'Sent to everyone in the circle.', notSent: 'I could not send it. Check the internet and try again.', noOne: 'There is no one in the circle to send it to yet.', tryAsk: 'You can also ask: ' },
     it: { listening: 'Ascolto…', notHeard: 'Non ho capito. Tocca e chiedi di nuovo.', noMic: 'La voce non è disponibile in questo browser. Scrivi la domanda:', ask: 'Chiedi',
       help: 'Puoi chiedere: {name} ha preso le medicine, dov’è {name}, chi è con {name}, cosa c’è dopo, come sta {name} oggi, chiama qualcuno, o apri la fotocamera.',
       allTaken: '{name} ha preso tutto quello previsto finora oggi.', taken: 'Prese: {list}.', late: 'In ritardo: {list}.', due: 'Da prendere ora: {list}.', laterMed: 'Prossime: {list}.', noMeds: 'Non ci sono medicine per oggi.',
@@ -24,7 +26,9 @@
       nextAppt: 'Prossimo: {title}{with}, {when}.', nextNone: 'Niente in programma nei prossimi giorni.', withWho: ' con {who}',
       moodNone: 'Non so ancora come sta {name} oggi.', mood_good: '{name} ha detto che oggi è una buona giornata.', mood_okay: '{name} ha detto che oggi va così così.', mood_low: '{name} ha detto che oggi non è una buona giornata. Forse è il caso di chiamare.',
       calling: 'Chiamo {who}.', messaging: 'Apro un messaggio a {who}.', whoCall: 'Non ho trovato {who} nella cerchia.',
-      opening: 'Apro {what}.', camera: 'Apro la fotocamera.', home: 'Torno a {name}.', now: 'Ecco tutto ora.' }
+      opening: 'Apro {what}.', camera: 'Apro la fotocamera.', home: 'Torno a {name}.', now: 'Ecco tutto ora.',
+      talkTo: 'Messaggio per {who}. Parla ora…', sentTalk: 'A {who}: \u201c{text}\u201d. Mandato.', talkFail: 'Non mandato a {who}. Controlla internet e tocca di nuovo TALK.', hlTalk: 'TALK', hlReply: 'Rispondi', hlTalkBack: 'Rispondi a voce', hlGot: 'Ho visto', hlFrom: 'Messaggio da {who}: {text}',
+      offer: 'A chi mando questo messaggio?', everyone: 'A tutti', notNow: 'Non ora', sentTo: 'Mandato a {who}.', sentAll: 'Mandato a tutta la cerchia.', notSent: 'Non sono riuscito a mandarlo. Controlla internet e riprova.', noOne: 'Non c\u2019\u00e8 ancora nessuno nella cerchia a cui mandarlo.', tryAsk: 'Puoi anche chiedere: ' }
   };
   /* When HOME asks about himself, Covara answers to him, not about him: "Where am I?" "You are at home." */
   var ME = {
@@ -102,13 +106,49 @@
     return t(kind === 'sms' ? 'messaging' : 'calling', { who: who });
   }
   var SECT = [[/medicin|pill|tablet|medicine|farmac|pastigl/, 'med'], [/visit|appointment|appuntament|shift|turn/, 'visit'], [/health|salute|drink|ate|eat|sleep|bere|mangi|dorm/, 'health'], [/safety|sicurezza|emergency|emergenz|missing|scam|truff/, 'safety'], [/paper|document|power of attorney|procura|legal|legale/, 'papers']];
+  /* ── free words: anything Talk cannot answer becomes a message, to the person named or to the circle ── */
+  var _offer = null;
+  function circle() {
+    var seen = {}, out = [];
+    (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).forEach(function (c) {
+      if (!c || !c.care || c.care.state !== 'active' || !c.sentinelId || seen[c.id]) return; seen[c.id] = 1; out.push(c);
+    });
+    return out;
+  }
+  function nameOf(c) { return c.cvTitle || ((c.first || '') + ' ' + (c.last || '')).trim(); }
+  async function sendMsg(people, text) {
+    var ok = 0;
+    for (var i = 0; i < people.length; i++) { try { if (await SentinelMessaging.sendTo(people[i].id, text)) ok++; } catch (e) {} }
+    return ok;
+  }
+  function tell(name, text) {
+    var c = findPerson(name);
+    if (!c || !c.sentinelId) return t('whoCall', { who: name });
+    sendMsg([c], text).then(function (n) { say(n ? t('sentTo', { who: nameOf(c) }) : t('notSent')); });
+    return t('sentTo', { who: nameOf(c) });
+  }
   function answer(q) {
     var s = String(q || '').toLowerCase().trim();
     if (!s) return t('notHeard');
     var m;
+    _offer = null;
+    /* "tell Vincent I am fine", "ask Ann to call me", "di' a Vincent che sto bene" */
+    if ((m = String(q).trim().match(/^(?:tell|ask|send|let)\s+(\S+)\s+(.{2,})$/i))) {
+      /* the name is one word, or two when the second is that person's surname ("tell Vincent Rossi ...") */
+      var w = m[2].split(/\s+/), c0 = null, rest = m[2];
+      if (w.length > 1 && w[0].length > 2) { var c2 = findPerson(m[1] + ' ' + w[0]); if (c2 && String(c2.last || '').toLowerCase() === w[0].toLowerCase()) { c0 = c2; rest = w.slice(1).join(' '); } }
+      if (!c0) c0 = findPerson(m[1]);
+      rest = rest.replace(/^(?:that|to|know(?:\s+that)?)\s+/i, '');
+      if (c0 && rest.length > 1) return tell(nameOf(c0), rest.replace(/^\w/, function (x) { return x.toUpperCase(); }));
+    }
+    if ((m = String(q).trim().match(/^(?:di['\u2019]?|dici)\s+a\s+(\S+)\s+(?:che\s+)?(.{2,})$/i))) { var c1 = findPerson(m[1]); if (c1) return tell(nameOf(c1), m[2]); }
     if ((m = s.match(/^(?:call|phone|ring|chiama|telefona a)\s+(.+)$/))) return call(m[1], 'phone');
     if ((m = s.match(/^(?:video(?: call)?|videochiama)\s+(.+)$/))) return call(m[1], 'video');
     if ((m = s.match(/^(?:message|text|write to|scrivi a|messaggio a)\s+(.+)$/))) return call(m[1], 'sms');
+    /* words that are not a question ("I feel dizzy", "The doctor moved my visit to Friday") are for someone: offer to send them */
+    var isQ = /\?\s*$/.test(s) || /^(did|does|do|has|have|had|where|who|whom|what|when|which|why|how|is|are|was|were|can|could|will|would|should|show|open|read|chi|dove|cosa|come|quando|quale|perch[eé]|ha|hanno|ho|sono|mostra|apri)\b/.test(s);
+    var cmd = /\b(camera|photo|picture|fotocamera|foto|everything|tutto)\b/.test(s) || (/\b(home|back|casa|indietro)\b/.test(s) && s.split(/\s+/).length <= 3);
+    if (!isQ && !cmd && s.split(/\s+/).length >= 3) { _offer = { text: String(q).trim() }; return t('offer'); }
     if (/\b(take|took|taken|pill|pills|medicine|medicines|medication|dose|presa|preso|prese|medicin|pastigl)\b/.test(s) && /\b(did|has|have|ha|hanno|took|taken|preso|prese|today|oggi)\b/.test(s)) return meds();
     if (/\b(who is with|with (him|her|dad|mom)|chi [eè] con|is anyone with)\b/.test(s)) return withWho();
     if (/\b(where|dove)\b/.test(s)) return where();
@@ -118,7 +158,31 @@
     if (/\b(everything|all of it|tutto)\b/.test(s)) { setTimeout(function () { try { CovaraNav.now(); } catch (e) {} }, 400); return t('now'); }
     if (/\b(home|back|casa|indietro)\b/.test(s) && s.split(/\s+/).length <= 3) { try { CovaraNav.home(); } catch (e) {} return t('home', { name: first() }); }
     for (var i = 0; i < SECT.length; i++) if (SECT[i][0].test(s)) { try { CovaraView.open(SECT[i][1]); } catch (e) {} return t('opening', { what: q }); }
+    /* nothing above: these are words for someone, so offer to send them */
+    if (s.split(/\s+/).length >= 2) { _offer = { text: String(q).trim() }; return t('offer'); }
     return t('help', { name: first() });
+  }
+  /* the choice of who gets the message, as buttons in the reply */
+  function offerButtons() {
+    if (!_offer || !bubble) return;
+    var o = _offer; _offer = null;
+    var ppl = circle();
+    if (!ppl.length) { say(t('noOne')); return; }
+    clearTimeout(bubble._t); bubble._t = setTimeout(function () { bubble.hidden = true; bubble.style.width = ''; }, 30000);
+    bubble.style.width = 'min(560px, calc(100vw - 32px))'; bubble.style.boxSizing = 'border-box';
+    var row = document.createElement('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
+    function btn(label, pri, fn) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = label;
+      b.style.cssText = 'min-height:40px;padding:0 14px;border-radius:20px;cursor:pointer;font:700 14px var(--nous-font,"Hanken Grotesk",sans-serif);' + (pri ? 'border:0;background:#38bdf8;color:#04121a' : 'border:1px solid rgba(150,200,255,.5);background:rgba(40,90,190,.25);color:#e8f2ff');
+      b.onclick = function (e) { e.stopPropagation(); fn(); }; row.appendChild(b);
+    }
+    ppl.slice(0, 6).forEach(function (c) { btn(nameOf(c), false, function () { sendMsg([c], o.text).then(function (n) { say(n ? t('sentTo', { who: nameOf(c) }) : t('notSent')); }); }); });
+    if (ppl.length > 1) btn(t('everyone'), true, function () { sendMsg(ppl, o.text).then(function (n) { say(n ? (n === ppl.length ? t('sentAll') : t('sentTo', { who: n })) : t('notSent')); }); });
+    btn(t('notNow'), false, function () { bubble.hidden = true; });
+    bubble.appendChild(row);
+    var hint = document.createElement('div'); hint.style.cssText = 'margin-top:8px;font-size:12.5px;color:#9fb4e2';
+    hint.textContent = t('tryAsk') + t('help', { name: first() }).replace(/^[^:]*:\s*/, '');
+    bubble.appendChild(hint);
   }
 
   /* ── listening and speaking ── */
@@ -304,7 +368,7 @@
   }
   function say(text, spoken) {
     if (!bubble) { bubble = document.createElement('div'); bubble.id = 'cvTalkBubble'; bubble.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:190px;z-index:7300;max-width:min(560px,calc(100vw - 32px));padding:12px 16px;border-radius:16px;border:1px solid rgba(197,165,90,.6);background:rgba(10,14,24,.94);color:#f0eef5;font:500 15px/1.45 var(--nous-font,"Hanken Grotesk",sans-serif);box-shadow:0 14px 34px rgba(0,0,0,.6)'; document.body.appendChild(bubble); bubble.addEventListener('click', function () { bubble.hidden = true; }); }
-    bubble.textContent = text; bubble.hidden = false;
+    bubble.textContent = text; bubble.hidden = false; bubble.style.width = '';
     clearTimeout(bubble._t); bubble._t = setTimeout(function () { bubble.hidden = true; }, Math.max(6000, text.length * 90));
     speak(spoken || text);
   }
@@ -315,7 +379,7 @@
     var i = document.createElement('input'); i.type = 'text'; i.style.cssText = 'flex:1;min-height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:#0a0e16;color:#fff;padding:0 12px;font:500 15px var(--nous-font,sans-serif)';
     var b = document.createElement('button'); b.type = 'submit'; b.textContent = t('ask'); b.style.cssText = 'min-height:40px;padding:0 16px;border-radius:12px;border:0;background:#38bdf8;color:#04121a;font-weight:800';
     f.appendChild(i); f.appendChild(b); bubble.appendChild(f); bubble.hidden = false; clearTimeout(bubble._t);
-    f.onsubmit = function (e) { e.preventDefault(); say(answer(i.value)); };
+    f.onsubmit = function (e) { e.preventDefault(); heardWords(i.value); };
     setTimeout(function () { i.focus(); }, 50);
   }
   /* the installed Android app hears with the phone's own speech recognition */
@@ -326,29 +390,108 @@
     if (d.kind !== 'speech' || !busy) return;
     if (d.type === 'rms') { VV.rms(d.value); return; }
     if (d.type === 'partial') { VV.heard(); if (bubble && d.value) { bubble.textContent = '\u201c' + d.value + '\u2026\u201d'; bubble.hidden = false; } return; }
-    if (d.type === 'result') { stop(); var a = answer(d.value); say('\u201c' + d.value + '\u201d: ' + a, a); }
+    if (d.type === 'result') { stop(); heardWords(d.value); }
     else if (d.type === 'error') { stop(); if (d.value === 'not-allowed') typed(); else say(t('notHeard')); }
   });
-  function nativeListen(orb) { busy = true; orb.classList.add('listening'); VV.listen(orb); say(t('listening'), ' '); try { CovaraNative.listen(IT() ? 'it-IT' : 'en-US'); } catch (e) { stop(); typed(); } }
+  function nativeListen(orb) { busy = true; orb.classList.add('listening'); VV.listen(orb); say(_to ? t('talkTo', { who: nameOf(_to) }) : t('listening'), ' '); try { CovaraNative.listen(IT() ? 'it-IT' : 'en-US'); } catch (e) { stop(); typed(); } }
   function stop() { busy = false; VV.doneListening(); if (_orb) _orb.classList.remove('listening'); try { if (rec) rec.abort(); } catch (e) {} try { if (window.CovaraNative && CovaraNative.stopListening) CovaraNative.stopListening(); } catch (e) {} }
   function toggle(orb, cap) {
     _orb = orb; _cap = cap;
     if (busy) { stop(); return; }
+    _to = target();
     try { if (window.speechSynthesis) speechSynthesis.cancel(); if (window.CovaraNative && CovaraNative.hush) CovaraNative.hush(); } catch (e) {} VV.speakEnd();
     if (window.CovaraNative && typeof CovaraNative.listen === 'function' && CovaraNative.canHear()) { nativeListen(orb); return; }
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { typed(); return; }
     rec = new SR(); rec.lang = IT() ? 'it-IT' : 'en-US'; rec.interimResults = true; rec.maxAlternatives = 1;
-    busy = true; orb.classList.add('listening'); VV.listen(orb); say(t('listening'), ' ');
+    busy = true; orb.classList.add('listening'); VV.listen(orb); say(_to ? t('talkTo', { who: nameOf(_to) }) : t('listening'), ' ');
     var heard = false;
     rec.onresult = function (e) {
       var r0 = e.results[e.results.length - 1], q = r0[0].transcript; VV.heard();
       if (!r0.isFinal) { if (bubble) { bubble.textContent = '\u201c' + q + '\u2026\u201d'; bubble.hidden = false; } return; }
-      heard = true; stop(); var a = answer(q); say('\u201c' + q + '\u201d: ' + a, a);
+      heard = true; stop(); heardWords(q);
     };
     rec.onerror = function (e) { stop(); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) typed(); else say(t('notHeard')); };
     rec.onend = function () { if (busy && !heard) { stop(); say(t('notHeard')); } };
     try { rec.start(); } catch (e) { stop(); typed(); }
   }
-  window.CovaraTalk = { toggle: toggle, answer: answer, say: say };
+  /* ── TALK as messaging: tap a sphere, tap TALK, speak; the words go to that person as a message ──
+     With no sphere chosen, a family member's TALK goes to HOME; on HOME's phone with no sphere chosen, TALK
+     answers questions as before. A reply to a TALK message opens the conversation in Messages. */
+  var MARK = '🎙 ';               /* a Talk message starts with a microphone, so the other phone shows it as a headline */
+  var _to = null, _awaiting = {};
+  function target() {
+    var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null, c = null;
+    if (f != null && typeof DEMO_CONTACTS !== 'undefined') c = DEMO_CONTACTS.filter(function (x) { return x.id === f; })[0] || null;
+    if (c && c.sentinelId) return c;
+    if (role() === 'away') { var h = homeContact(); if (h && h.sentinelId) return h; }
+    return null;
+  }
+  function sendTalk(c, words) {
+    var text = String(words || '').trim(); if (!text) { say(t('notHeard')); return; }
+    text = text.replace(/^\w/, function (x) { return x.toUpperCase(); });
+    var who = nameOf(c);
+    say(t('sentTalk', { who: who, text: text }), IT() ? 'Mandato a ' + who + '.' : 'Sent to ' + who + '.');
+    _awaiting[c.id] = Date.now();
+    SentinelMessaging.sendTo(c.id, MARK + text).then(function (ok) { if (!ok) say(t('talkFail', { who: who })); }).catch(function () { say(t('talkFail', { who: who })); });
+  }
+  function heardWords(q) {
+    if (_to) { var c = _to; _to = null; sendTalk(c, q); return; }
+    var a = answer(q); say('“' + q + '”: ' + a, a); offerButtons();
+  }
+
+  /* ── the headline: a Talk message, or a reply, at the top of the screen until it is seen ── */
+  var hl = null, hlQueue = [];
+  function headline(m) {
+    if (!hl) {
+      hl = document.createElement('div'); hl.id = 'cvTalkHeadline'; hl.setAttribute('role', 'alert');
+      hl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 74px);z-index:99990;width:min(560px,calc(100vw - 24px));box-sizing:border-box;padding:12px 14px;border-radius:18px;border:1.5px solid rgba(255,210,77,.75);background:linear-gradient(155deg,rgba(70,130,235,.22),rgba(14,30,78,.42));-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);box-shadow:0 0 26px rgba(255,210,77,.35),0 0 22px rgba(70,150,255,.28),inset 0 1px 0 rgba(255,255,255,.14);color:#f4f7ff;font:500 15px/1.4 var(--nous-font,"Hanken Grotesk",sans-serif);text-shadow:0 1px 2px rgba(2,8,24,.55)';
+      document.body.appendChild(hl);
+    }
+    hlQueue = hlQueue.filter(function (x) { return x.contactId !== m.contactId; }); hlQueue.unshift(m);
+    paintHl();
+  }
+  function paintHl() {
+    if (!hl) return;
+    var m = hlQueue[0]; if (!m) { hl.hidden = true; return; }
+    var who = String(m.name || '').trim().split(/\s+/)[0] || '';
+    var txt = String(m.text || '').replace(MARK, '').replace(/^🎙\s*/, '');
+    var when = ''; try { when = new Date(m.ts).toLocaleTimeString(IT() ? 'it' : 'en-US', { hour: 'numeric', minute: '2-digit' }); } catch (e) {}
+    function esc(x) { return String(x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    var b = 'min-height:38px;padding:0 14px;border-radius:19px;cursor:pointer;font:700 13.5px var(--nous-font,"Hanken Grotesk",sans-serif);';
+    hl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;font:800 10.5px var(--nous-mono,\'JetBrains Mono\',monospace);letter-spacing:.14em;color:#ffd24d;text-transform:uppercase"><span>🎙 ' + esc(t('hlTalk')) + ' · ' + esc(who) + '</span><span style="margin-left:auto;color:#9fd8ff;letter-spacing:.06em">' + esc(when) + (hlQueue.length > 1 ? ' · +' + (hlQueue.length - 1) : '') + '</span></div>' +
+      '<div style="margin:6px 0 10px;font-size:17px;font-weight:600">“' + esc(txt) + '”</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" data-h="talk" style="' + b + 'border:0;background:#38bdf8;color:#04121a">🎙 ' + esc(t('hlTalkBack')) + '</button>' +
+      '<button type="button" data-h="reply" style="' + b + 'border:1px solid rgba(150,200,255,.55);background:rgba(40,90,190,.25);color:#e8f2ff">' + esc(t('hlReply')) + '</button>' +
+      '<button type="button" data-h="ok" style="' + b + 'border:1px solid rgba(150,200,255,.35);background:transparent;color:#cfe0ff">' + esc(t('hlGot')) + '</button></div>';
+    hl.hidden = false;
+    hl.querySelector('[data-h=ok]').onclick = function () { hlQueue.shift(); paintHl(); };
+    hl.querySelector('[data-h=reply]').onclick = function () { hlQueue.shift(); paintHl(); try { SentinelMessaging.openFor(m.contactId); } catch (e) {} };
+    hl.querySelector('[data-h=talk]').onclick = function () {
+      hlQueue.shift(); paintHl();
+      try { focusedContactId = m.contactId; } catch (e) {}
+      var orb = _orb || document.querySelector('.cvn-orb') || document.body;
+      setTimeout(function () { toggle(orb, _cap); }, 150);
+    };
+  }
+  window.addEventListener('covara-message', function (e) {
+    var m = e.detail || {}; if (!m.contactId) return;
+    var talk = /^🎙/.test(String(m.text || ''));
+    var replying = _awaiting[m.contactId] && Date.now() - _awaiting[m.contactId] < 30 * 60000;
+    if (replying && !talk) {
+      /* an answer to my Talk message: the conversation continues in Messages */
+      delete _awaiting[m.contactId];
+      try { SentinelMessaging.openFor(m.contactId); } catch (err) {}
+      return;
+    }
+    if (!talk) return;
+    headline(m);
+    /* HOME hears it too */
+    if (role() !== 'away') { try { speak(t('hlFrom', { who: String(m.name || '').split(/\s+/)[0], text: String(m.text).replace(/^🎙\s*/, '') })); } catch (err) {} }
+    if (replying) delete _awaiting[m.contactId];
+  });
+  /* new messages are fetched every 8 seconds while Covara is on screen, so a Talk message lands at once */
+  setInterval(function () { try { if (document.visibilityState === 'visible' && typeof SentinelMessaging !== 'undefined' && SyncEngine.isAuthenticated()) SentinelMessaging.poll(); } catch (e) {} }, 8000);
+
+  window.CovaraTalk = { toggle: toggle, answer: answer, say: say, typed: typed, ask: function (q) { var a = answer(q); say('\u201c' + q + '\u201d: ' + a, a); offerButtons(); }, talkTo: function (c, q) { sendTalk(c, q); }, headline: headline };
 })();

@@ -12,6 +12,7 @@
   var STR = {
     en: {
       sec_med: 'Medicines', sec_visit: 'Visits', sec_health: 'Health', sec_safety: 'Safety', sec_papers: 'Papers', me: 'me',
+      pv_med: 'Doses, photos of each bottle, refills', pv_visit: 'Appointments, carers, the day log', pv_health: 'Sleep, breathing, how the day went', pv_safety: 'Emergency card, wandering, worries', pv_papers: 'Who decides, documents, records access', pv_late: 'needs attention', pv_due: 'due now',
       dFilled: 'Prescription', filled: 'Filled', filledOn: 'Filled {d}', notFilled: 'Not filled',
       dayOf: 'The day of {name}', dayHint: 'Tap what you saw. Anyone looking after them sees it, and a sudden change warns everyone.', lastDays: 'Last days', warnTail: 'Sudden changes like these can mean an infection, dehydration or pain. Consider calling the doctor.',
       lg_water: 'Drinking', lg_meal: 'Meals', lg_sleep: 'Sleep', lg_toilet: 'Toilet', lg_pain: 'Pain', lg_mood: 'Mood', lg_behaviour: 'Behaviour',
@@ -72,7 +73,7 @@
       photo: 'Take a photo of it', name: 'Name, as on the box', strength: 'Strength', unit: 'Unit', qty: 'How many each time', form: 'Form',
       when: 'When', morning: 'Morning', midday: 'Midday', evening: 'Evening', night: 'Night', other: 'Other time',
       prescriber: 'Prescribed by', prescribedOn: 'Prescribed on', source: 'Get it from', sourceName: 'Pharmacy or doctor name', sourcePhone: 'Their phone', purpose: 'What it is for (optional)',
-      apptTitle: 'What it is for', apptWith: 'With whom', date: 'Date', time: 'Time', place: 'Where', notes: 'Notes (optional)',
+      tagWho: 'Tag people from the circle (it shows on their own timeline, and they are told)', apptTitle: 'What it is for', apptWith: 'With whom', date: 'Date', time: 'Time', place: 'Where', notes: 'Notes (optional)',
       subTitle: 'What it is', provider: 'Who provides it', renews: 'Next renewal', every: 'How often (for example monthly)', cost: 'Cost (optional)',
       needName: 'Write its name first.', needTime: 'Choose at least one time.', needWhen: 'Choose the date and time.',
       failed: 'Could not save. Check the internet and try again.',
@@ -90,6 +91,7 @@
     },
     it: {
       sec_med: 'Medicine', sec_visit: 'Visite', sec_health: 'Salute', sec_safety: 'Sicurezza', sec_papers: 'Documenti', me: 'me',
+      pv_med: 'Dosi, foto di ogni flacone, ricariche', pv_visit: 'Appuntamenti, assistenti, il diario', pv_health: 'Sonno, respiro, com\u2019\u00e8 andata la giornata', pv_safety: 'Scheda di emergenza, allontanamento, preoccupazioni', pv_papers: 'Chi decide, documenti, accesso alle cartelle', pv_late: 'richiede attenzione', pv_due: 'da fare ora',
       dFilled: 'Ricetta', filled: 'Ritirata', filledOn: 'Ritirata il {d}', notFilled: 'Da ritirare',
       dayOf: 'La giornata di {name}', dayHint: 'Tocca ciò che hai visto. Chi lo assiste lo vede, e un cambiamento improvviso avvisa tutti.', lastDays: 'Ultimi giorni', warnTail: 'Cambiamenti improvvisi come questi possono indicare un\u2019infezione, disidratazione o dolore. Valuta di chiamare il medico.',
       lg_water: 'Bere', lg_meal: 'Pasti', lg_sleep: 'Sonno', lg_toilet: 'Bagno', lg_pain: 'Dolore', lg_mood: 'Umore', lg_behaviour: 'Comportamento',
@@ -150,7 +152,7 @@
       photo: 'Fai una foto', name: 'Nome, come sulla scatola', strength: 'Dosaggio', unit: 'Unità', qty: 'Quante ogni volta', form: 'Forma',
       when: 'Quando', morning: 'Mattina', midday: 'Mezzogiorno', evening: 'Sera', night: 'Notte', other: 'Altro orario',
       prescriber: 'Prescritta da', prescribedOn: 'Prescritta il', source: 'Dove si ritira', sourceName: 'Nome della farmacia o del medico', sourcePhone: 'Il loro telefono', purpose: 'A cosa serve (facoltativo)',
-      apptTitle: 'Per cosa', apptWith: 'Con chi', date: 'Data', time: 'Ora', place: 'Dove', notes: 'Note (facoltativo)',
+      tagWho: 'Tagga persone della cerchia (appare sulla loro linea del tempo e vengono avvisate)', apptTitle: 'Per cosa', apptWith: 'Con chi', date: 'Data', time: 'Ora', place: 'Dove', notes: 'Note (facoltativo)',
       subTitle: 'Che cos\u2019è', provider: 'Chi lo fornisce', renews: 'Prossimo rinnovo', every: 'Ogni quanto (per esempio mensile)', cost: 'Costo (facoltativo)',
       needName: 'Scrivi prima il nome.', needTime: 'Scegli almeno un orario.', needWhen: 'Scegli data e ora.',
       failed: 'Non salvato. Controlla internet e riprova.',
@@ -205,6 +207,8 @@
   var css = '' +
     '#cvTabs{position:fixed;left:16px;top:84px;width:min(340px,calc(100vw - 32px));z-index:7000;font-family:var(--nous-font,"Hanken Grotesk",system-ui,sans-serif);color:#e8ecf4;opacity:0;transform:translateY(-6px);transition:opacity .45s ease,transform .45s ease;pointer-events:none}' +
     '#cvTabs.show{opacity:1;transform:none;pointer-events:auto}' +
+    '#cvTabs.in-card{position:static;width:auto;opacity:1;transform:none;pointer-events:auto;margin:4px 0 2px}#cvTabs.in-card .cvx-head{display:none}#cvTabs.in-card .cvx-list{max-height:none;overflow:visible}' +
+    '.cv-pull.cvp-late .bluf-pull-preview{color:#ff8a8a}.cv-pull.cvp-due .bluf-pull-preview{color:#fde68a}.cv-pull.cvp-late .bluf-section-label:after,.cv-pull.cvp-due .bluf-section-label:after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:8px;vertical-align:1px;background:#fbbf24;box-shadow:0 0 8px #fbbf24}.cv-pull.cvp-late .bluf-section-label:after{background:#ff4d6a;box-shadow:0 0 8px #ff4d6a}' +
     'body.rs-overlay-open #cvTabs,body.cv-asking #cvTabs{opacity:0 !important;pointer-events:none !important}' +
     '.cvx-tab{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px 12px;border-radius:12px;background:rgba(10,12,20,0.72);border:1px solid rgba(56,189,248,0.22);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:inherit;font:inherit;cursor:pointer;text-align:left}' +
     '.cvx-tab:focus-visible,.cvx-row:focus-visible{outline:2px solid #C5A55A;outline-offset:1px}' +
@@ -301,7 +305,7 @@
      circle shows the same timeline within about 10 seconds of the change. */
   async function stampCheck() {
     var s = subject();
-    if (!s || !s.edit || !authed() || document.hidden || _stampBusy) return;
+    if (!s || !authed() || document.hidden || _stampBusy) return;
     _stampBusy = true;
     try {
       var r = await api('/care/stamp' + q(s));
@@ -815,6 +819,7 @@
   /* ── the panel the pill opens ── */
   function visible() {
     if (!_data || !role() || !_open) return false;
+    if (_inCard) return true;
     var ob = document.getElementById('onboarding'); if (ob && !ob.hidden && getComputedStyle(ob).display !== 'none') return false;
     var gate = document.getElementById('gateScreen'); if (gate && gate.offsetParent !== null && getComputedStyle(gate).display !== 'none') return false;
     if (document.querySelector('.cv-ov.open')) return false;
@@ -1145,9 +1150,9 @@
     /* all on the right of HOME's sphere: HOME's care on top, calling HOME (AWAY's phone) beneath it,
        so the lower left stays clear for the day's schedule */
     var W0 = cssW(ctx), lh = (W0 < 500 ? 24 : 26) + (window.CovaraCalm ? 8 : 0);
-    var comm = role() === 'away', nCare = _data ? SECTIONS.length : 0, nComm = comm ? 4 : 0, gapG = nCare && nComm ? lh * 0.7 : 0;
+    var comm = role() === 'away', nCare = 0, nComm = comm ? 4 : 0, gapG = nCare && nComm ? lh * 0.7 : 0;
     var total = (nCare + nComm) * lh + gapG, top = cy - total / 2;
-    if (_data) pills(ctx, SECTIONS.map(function (k) { return t('sec_' + k); }), SECTIONS.map(function (k) { return 'sec:' + k; }), cx, top + nCare * lh / 2, cr, t0, false, SECTIONS.map(pillState), _open ? 'sec:' + _open : '');
+    /* Medicines, Visits, Health, Safety and Papers now live in the pulls of the card a double tap opens */
     if (comm) pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, top + nCare * lh + gapG + nComm * lh / 2, cr, t0);
   }
   function hitCentre(clientX, clientY) {
@@ -1199,6 +1204,19 @@
     };
     open(el);
   }
+  /* the people who can be tagged: everyone in HOME's circle with an account, HOME included, not me */
+  function tagPeople() {
+    var me = ''; try { me = SyncEngine.getUserId() || ''; } catch (e) {}
+    var out = [], seen = {};
+    function add(id, name) { if (!id || id === me || seen[id] || !name) return; seen[id] = 1; out.push({ id: id, name: String(name).trim().split(/\s+/)[0] }); }
+    (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).forEach(function (c) { if (c.care && c.care.state === 'active' && c.care.userId) add(c.care.userId, c.cvTitle || c.first); });
+    ((_data && _data.family) || []).forEach(function (f) { add(f.id, f.name); });
+    return out;
+  }
+  function tagChips(on) {
+    var ppl = tagPeople(); if (!ppl.length) return '';
+    return '<label>' + esc(t('tagWho')) + '</label><div class="cvt-chips cvt-tags">' + ppl.map(function (p) { return '<button type="button" class="cvt-chip" data-tag="' + esc(p.id) + '" aria-pressed="' + (on.indexOf(p.id) >= 0) + '">' + esc(p.name) + '</button>'; }).join('') + '</div>';
+  }
   function openEdit(kind, it, preset) {
     var el = sheet('cvAdd'); var photo = null; var m = (it && it.meta) || {};
     var times = {}; ((it && it.times) || []).forEach(function (x) { times[x] = true; });
@@ -1242,7 +1260,7 @@
     } else if (kind === 'appt') {
       f = shot + inp('cvName', 'apptTitle', it && it.title, 'text', 'maxlength="120"') + inp('cvWith', 'apptWith', m.with, 'text', 'maxlength="80"') +
         '<div class="cvt-two">' + inp('cvDate', 'date', ds, 'date') + inp('cvTime', 'time', tv, 'time') + '</div>' +
-        inp('cvPlace', 'place', m.place || (it && it.detail), 'text', 'maxlength="160"') + inp('cvNotes', 'notes', m.notes, 'text', 'maxlength="300"');
+        inp('cvPlace', 'place', m.place || (it && it.detail), 'text', 'maxlength="160"') + inp('cvNotes', 'notes', m.notes, 'text', 'maxlength="300"') + tagChips(m.tags || []);
     } else {
       f = shot + inp('cvName', 'subTitle', it && it.title, 'text', 'maxlength="120"') + inp('cvProvider', 'provider', m.provider || (it && it.detail), 'text', 'maxlength="120"') +
         '<div class="cvt-two">' + inp('cvDate', 'renews', ds, 'date') + inp('cvEvery', 'every', m.every, 'text', 'maxlength="30"') + '</div>' +
@@ -1254,6 +1272,7 @@
       '<div class="cv-row"><button class="cv-btn pri" data-a="save">' + esc(t('save')) + '</button><button class="cv-btn" data-a="close">' + esc(t('cancel')) + '</button></div>' +
       (it ? '<div class="cv-row"><button class="cv-btn warn" data-a="rm">' + esc(t('remove')) + '</button></div>' : '') + '</div>';
     el.querySelectorAll('[data-t]').forEach(function (b) { b.onclick = function () { var v = b.getAttribute('data-t'); times[v] = !times[v]; b.setAttribute('aria-pressed', times[v] ? 'true' : 'false'); }; });
+    el.querySelectorAll('[data-tag]').forEach(function (b) { b.onclick = function () { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); }; });
     var prn = !!m.as_needed, grp = m.group || 'doctor', recsOn = m.records !== false;
     el.querySelectorAll('[data-grp]').forEach(function (b) { b.onclick = function () { grp = b.getAttribute('data-grp'); el.querySelectorAll('[data-grp]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); }; });
     var rb = el.querySelector('[data-recs]'); if (rb) rb.onclick = function () { recsOn = !recsOn; rb.setAttribute('aria-pressed', recsOn ? 'true' : 'false'); };
@@ -1334,7 +1353,8 @@
         var d = v('cvDate'), tm = kind === 'appt' ? v('cvTime') : '09:00';
         if (!d || !tm) { msg.textContent = t('needWhen'); return; }
         body.at = new Date(d + 'T' + tm).getTime();
-        body.meta = kind === 'appt' ? { with: v('cvWith') || undefined, place: v('cvPlace') || undefined, notes: v('cvNotes') || undefined }
+        var tags = [].slice.call(el.querySelectorAll('[data-tag][aria-pressed=true]')).map(function (b) { return b.getAttribute('data-tag'); });
+        body.meta = kind === 'appt' ? { with: v('cvWith') || undefined, place: v('cvPlace') || undefined, notes: v('cvNotes') || undefined, tags: tags }
           : { provider: v('cvProvider') || undefined, every: v('cvEvery') || undefined, cost: v('cvCost') || undefined };
       }
       var sb = el.querySelector('[data-a=save]'); sb.disabled = true; sb.textContent = t('saving');
@@ -1375,6 +1395,72 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden && _subj) load(); });
     window.addEventListener('localeChanged', function () { _html = ''; render(); syncSpheres(); });
   }
+  /* ── the care pulls in the card a double tap opens on HOME's sphere ──
+     Medicines, Visits, Health, Safety and Papers open inside the card, as its first pulls, with everything they
+     hold (photos of each bottle, refills, the day log, the emergency card, who decides). Medicines takes the place
+     of the card's own Treatment & Medications pull. */
+  var _inCard = false, _cardPulls = null;
+  function cardIsHome() {
+    var ov = document.getElementById('blufOverlay'); if (!ov || !ov.classList.contains('open') || !_data) return false;
+    var sc = (typeof selectedContact !== 'undefined') ? selectedContact : null;
+    if (role() === 'home') return !sc;
+    var h = homeContact(); return !!(h && sc && sc.id === h.id);
+  }
+  function cardPulls() {
+    var anchor = document.getElementById('pull_videonote'); if (!anchor) return null;
+    if (_cardPulls && _cardPulls.parentNode) return _cardPulls;
+    var wrap = document.createElement('div'); wrap.id = 'cvCarePulls';
+    wrap.innerHTML = SECTIONS.map(function (k) {
+      return '<div class="bluf-pull cv-pull" data-cvp="' + k + '"><div class="bluf-pull-header" role="button" tabindex="0"><div class="bluf-section-label">' + esc(t('sec_' + k)) + '</div>' +
+        '<span class="bluf-pull-preview" data-pv></span><span class="bluf-pull-chevron">&#9660;</span></div><div class="bluf-pull-body"><div class="bluf-pull-content" data-slot></div></div></div>';
+    }).join('');
+    anchor.parentNode.insertBefore(wrap, anchor);
+    wrap.querySelectorAll('[data-cvp]').forEach(function (p) {
+      var hd = p.querySelector('.bluf-pull-header');
+      function go(e) { if (e) e.stopPropagation(); openCardPull(p.getAttribute('data-cvp')); }
+      hd.addEventListener('click', go); hd.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } });
+    });
+    /* opening one of the card's own pulls folds ours */
+    anchor.parentNode.addEventListener('click', function (e) { var hd = e.target.closest && e.target.closest('.bluf-pull-header'); if (hd && !hd.closest('.cv-pull') && _inCard) foldCard(); }, true);
+    _cardPulls = wrap; return wrap;
+  }
+  function openCardPull(k) {
+    var wrap = cardPulls(); if (!wrap) return;
+    if (_inCard && _open === k) { foldCard(); return; }
+    document.querySelectorAll('#blufCard .bluf-pull.open').forEach(function (x) { if (!x.classList.contains('cv-pull')) x.classList.remove('open'); });
+    wrap.querySelectorAll('.cv-pull').forEach(function (x) { x.classList.toggle('open', x.getAttribute('data-cvp') === k); });
+    var slot = wrap.querySelector('[data-cvp="' + k + '"] [data-slot]');
+    _inCard = true; box.classList.add('in-card'); slot.appendChild(box);
+    _open = k; _openItem = ''; _html = ''; render();
+  }
+  function foldCard() {
+    if (_cardPulls) _cardPulls.querySelectorAll('.cv-pull').forEach(function (x) { x.classList.remove('open'); });
+    _open = ''; _openItem = ''; _html = ''; render();
+  }
+  function leaveCard() {
+    if (!_inCard) return;
+    _inCard = false; box.classList.remove('in-card'); document.body.appendChild(box);
+    _open = ''; _openItem = ''; _html = ''; render();
+  }
+  function cardTick() {
+    var med = document.getElementById('pull_medication');
+    if (cardIsHome()) {
+      var wrap = cardPulls(); if (!wrap) return;
+      wrap.hidden = false; if (med) med.style.display = 'none';
+      wrap.querySelectorAll('.cv-pull').forEach(function (p) {
+        var k = p.getAttribute('data-cvp'), st = ''; try { _ls = _ls || lists(); st = pillState(k); } catch (e) {}
+        var pv = p.querySelector('[data-pv]'), txt = st === 'late' ? t('pv_late') : st === 'due' ? t('pv_due') : t('pv_' + k);
+        if (pv.textContent !== txt) pv.textContent = txt;
+        p.classList.toggle('cvp-late', st === 'late'); p.classList.toggle('cvp-due', st === 'due');
+      });
+    } else {
+      if (_cardPulls) _cardPulls.hidden = true;
+      if (med) med.style.display = '';
+      leaveCard();
+    }
+  }
+  setInterval(cardTick, 400);
+
   window.CovaraView = { _hits: function () { return _pillHits; }, source: source, centre: centre, drawCentre: drawCentre, hitCentre: hitCentre, centreSingle: centreSingle, centreDouble: centreDouble,
     openNode: openNode, load: load, openEdit: openEdit, open: function (k, id) { _open = { appt: 'visit', sub: 'med', rec: 'papers' }[k] || k || ''; _openItem = id || ''; _html = ''; render(); }, section: sectionOpen, data: function () { return _data; }, fresh: function () { return { syncedAt: _syncedAt, checkedAt: _stampOkAt }; }, lists: function () { return _ls; } };
   setTimeout(boot, 1500);

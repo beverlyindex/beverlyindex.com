@@ -11,7 +11,7 @@
   var S = {
     en: { home: 'HOME', now: 'EVERYTHING NOW', calm: 'CALM', share: 'SHARE WITH DOCTOR', shareShort: 'SHARE', nowShort: 'NOW',
       camera: 'CAMERA', cameraHint: 'Point at a bottle, a meal, a letter or a door', talk: 'TALK', talkHint: '“Did Dad take his 8 o’clock?”', where: 'WHERE',
-      circle: 'CIRCLE', of: '{i} of {n}', people: '{n} people', atHome: 'at home', out: 'out', since: 'since {t}', mood: 'Mood', live: 'Live', updated: 'Updated {t}', phone: 'Phone', charging: 'charging', moved: 'Last moved', ago: '{t} ago', justNow: 'just now',
+      circle: 'CIRCLE', of: '{i} of {n}', people: '{n} people', atHome: 'at home', out: 'out', since: 'since {t}', mood: 'Mood', live: 'Live', updated: 'Updated {t}', tagYou: 'Tagged you', tagged: 'Tagged', tagPill: 'TAGGED', phone: 'Phone', charging: 'charging', moved: 'Last moved', ago: '{t} ago', justNow: 'just now',
       calm_good: 'good', calm_okay: 'okay', calm_low: 'low', kitchen: 'Kitchen',
       nowTitle: 'Everything now', nowAlerts: 'Alerts, last day', nowWhere: 'Where', nowMeds: 'Medicines', nowNext: 'Coming up', nowHealth: 'Health', nowWith: 'With', nowNone: 'Nothing waiting.', nowBack: 'Back to where I was',
       nowLate: '{n} late', nowDue: '{n} due now', nowAllDone: 'All taken so far today', nowOut: 'Out, {d} from home', nowHome: 'At home', nowNoPos: 'No position yet',
@@ -21,7 +21,7 @@
       ev_taken: 'Taken', ev_late: 'Late', ev_due: 'Due', ev_later: 'Later', ev_visit: 'Visit', ev_log: 'Noted', sched: 'SCHEDULE', ev_shift: 'On duty', ev_appt: 'Appointment', schedNone: 'Nothing scheduled today' },
     it: { home: 'CASA', now: 'TUTTO ORA', calm: 'CALMA', share: 'CONDIVIDI COL MEDICO', shareShort: 'CONDIVIDI', nowShort: 'ORA',
       camera: 'FOTOCAMERA', cameraHint: 'Inquadra un flacone, un pasto, una lettera o una porta', talk: 'PARLA', talkHint: '“Papà ha preso la medicina delle 8?”', where: 'DOVE',
-      circle: 'CERCHIA', of: '{i} di {n}', people: '{n} persone', atHome: 'a casa', out: 'fuori', since: 'dalle {t}', mood: 'Umore', live: 'In diretta', updated: 'Aggiornato alle {t}', phone: 'Telefono', charging: 'in carica', moved: 'Ultimo movimento', ago: '{t} fa', justNow: 'adesso',
+      circle: 'CERCHIA', of: '{i} di {n}', people: '{n} persone', atHome: 'a casa', out: 'fuori', since: 'dalle {t}', mood: 'Umore', live: 'In diretta', updated: 'Aggiornato alle {t}', tagYou: 'Ti hanno taggato', tagged: 'Taggato', tagPill: 'TAGGATO', phone: 'Telefono', charging: 'in carica', moved: 'Ultimo movimento', ago: '{t} fa', justNow: 'adesso',
       calm_good: 'bene', calm_okay: 'così così', calm_low: 'giù', kitchen: 'Cucina',
       nowTitle: 'Tutto ora', nowAlerts: 'Avvisi, ultimo giorno', nowWhere: 'Dove', nowMeds: 'Medicine', nowNext: 'In arrivo', nowHealth: 'Salute', nowWith: 'Con', nowNone: 'Niente in attesa.', nowBack: 'Torna dove ero',
       nowLate: '{n} in ritardo', nowDue: '{n} da prendere ora', nowAllDone: 'Tutte prese finora oggi', nowOut: 'Fuori, a {d} da casa', nowHome: 'A casa', nowNoPos: 'Nessuna posizione',
@@ -96,6 +96,8 @@
     '#cvnDay .bd.deep{background:linear-gradient(180deg,rgba(109,93,252,.95),rgba(109,93,252,.6));box-shadow:0 0 8px rgba(109,93,252,.7)}#cvnDay .bd.light{background:linear-gradient(180deg,rgba(56,189,248,.8),rgba(56,189,248,.45));box-shadow:0 0 6px rgba(56,189,248,.5)}' +
     '#cvnDay .dt{position:absolute;left:47px;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%}' +
     '#cvnDay .dt.g{background:#22d3a6;box-shadow:0 0 9px #22d3a6}#cvnDay .dt.b{background:#38bdf8;box-shadow:0 0 9px #38bdf8}#cvnDay .dt.y{background:#ffd24d;box-shadow:0 0 9px #ffd24d}#cvnDay .dt.r{background:#ef4444;box-shadow:0 0 11px #ef4444}#cvnDay .dt.o{background:#05070d;border:1.5px solid rgba(159,216,255,.7)}' +
+    '#cvnDay .dt.tg{width:16px;height:16px;margin:-8px 0 0 -8px;background:#ffd24d;border:2px solid #fff;box-shadow:0 0 0 3px rgba(255,210,77,.35),0 0 16px #ffd24d;animation:cvTag 1.6s ease-in-out infinite}@keyframes cvTag{50%{box-shadow:0 0 0 7px rgba(255,210,77,.12),0 0 22px #ffd24d}}' +
+    '#cvnDay .tgl{position:absolute;left:62px;transform:translateY(-50%);padding:2px 7px;border-radius:999px;background:#ffd24d;color:#1a1200;font:800 9px var(--nous-mono,"JetBrains Mono",monospace);letter-spacing:.12em;white-space:nowrap;box-shadow:0 0 12px rgba(255,210,77,.6)}' +
     '#cvnDay .nw{position:absolute;left:30px;width:34px;height:2px;margin-top:-1px;background:#fff;box-shadow:0 0 10px #fff}#cvnDay .nw:after{content:"";position:absolute;right:-4px;top:-3px;border:4px solid transparent;border-left-color:#fff}' +
     '#cvnDay .sc{position:absolute;left:24px;width:44px;height:2px;margin-top:-1px;background:#C5A55A;box-shadow:0 0 12px #C5A55A}' +
     '#cvnDay .nn{position:absolute;left:62px;top:50%;transform:translateY(-50%);width:90px;font:500 10.5px var(--nous-font,"Hanken Grotesk",sans-serif);color:#6f86ad}' +
@@ -162,9 +164,13 @@
 
   /* ── what HOME's phone and the server say, every minute ── */
   var _sum = null, _sumAt = 0;
+  var _tagged = [];
+  function myId() { try { return SyncEngine.getUserId() || ''; } catch (e) { return ''; } }
+  function tagsOf(it) { var m = (it && it.meta) || {}; return Array.isArray(m.tags) ? m.tags : (Array.isArray(it && it.tags) ? it.tags : []); }
   async function loadSummary() {
     if (!authed() || !on()) return;
     if (Date.now() - _sumAt < 60000) return; _sumAt = Date.now();
+    try { var tg = await api('/care/tagged' + homeQ()); if (tg.ok) _tagged = (tg.data && tg.data.items) || []; } catch (e) {}
     var r = await api('/care/summary' + homeQ()).catch(function () { return { ok: false }; });
     if (r.ok) _sum = r.data;
   }
@@ -312,6 +318,15 @@
     });
     (d.log || []).forEach(function (x) { if (x.at < s0.getTime() || x.kind === 'me') return; out.push({ at: x.at, c: x.kind === 'worry' || x.value === 'bad' || x.value === 'flagged' ? 'r' : 'b', text: x.kind + ': ' + x.value + (x.note && x.kind !== 'visit' ? ' · ' + x.note : ''), k: 'ev_log' }); });
     ((_sum && _sum.events) || []).forEach(function (e) { if (e.at < s0.getTime()) return; out.push({ at: e.at, c: e.level >= 3 ? 'r' : 'y', text: e.title, k: '' }); });
+    /* tagged: what someone tagged me on is on this timeline too, whatever else I can see, and stands out */
+    var me = myId(), have = {};
+    ((d.items) || []).forEach(function (it) { if (it.kind === 'appt' && it.at && tagsOf(it).indexOf(me) >= 0) have[it.id] = it; });
+    _tagged.forEach(function (x) { if (x.at) have[x.id] = have[x.id] || x; });
+    Object.keys(have).forEach(function (id) {
+      var x = have[id];
+      out = out.filter(function (e) { return !(e.text === x.title && Math.abs(e.at - x.at) < 60000); });
+      out.push({ at: x.at, c: 'tg', text: t('tagYou') + ' · ' + x.title + ((x.meta && x.meta.place) || x.place ? ' · ' + ((x.meta && x.meta.place) || x.place) : ''), k: '', tag: true });
+    });
     return out.sort(function (a, b) { return a.at - b.at; });
   }
   /* ── the schedule: a full 24 hours, top to bottom, for whoever the circle stepper is on ──
@@ -336,6 +351,7 @@
     var d = cv() || {}, ns = namesOf(c), uid = c.care && c.care.userId, ev = [], bands = [];
     (d.items || []).forEach(function (it) {
       var m = it.meta || {};
+      if (uid && it.at && it.at >= B.a && it.at < B.b && tagsOf(it).indexOf(uid) >= 0) { ev.push({ at: it.at, c: 'tg', text: t('tagged') + ' · ' + it.title + (m.place ? ' · ' + m.place : ''), k: '', tag: true }); return; }
       if (it.kind === 'shift' && mentions(m.who || it.title, ns)) {
         var e = m.end || it.at + 8 * 3600e3; if (e < B.a || it.at > B.b) return;
         bands.push({ a: Math.max(it.at, B.a), b: Math.min(e, B.b), text: t('ev_shift') + ' ' + hm(it.at) + ' ' + (IT() ? 'alle' : 'to') + ' ' + hm(e) });
@@ -377,7 +393,7 @@
     day.innerHTML = '<div class="hd"><b>' + esc(S.name) + '</b><span class="dd">' + esc(dstr) + '</span>' + esc(t('sched')) + ' · 24H' +
       (fr ? '<span class="fr ' + fr.c + '">' + esc(fr.text) + '</span>' : '') + '</div><div class="tr"><div class="ln"></div>' + tk +
       S.bands.map(function (b) { return '<span class="bd' + (b.cls ? ' ' + b.cls : '') + '" style="top:' + pos(b.a) + '%;height:' + Math.max(1.2, pos(b.b) - pos(b.a)) + '%"></span>'; }).join('') +
-      ev.map(function (e) { return '<span class="dt ' + e.c + '" style="top:' + pos(e.at) + '%"></span>'; }).join('') +
+      ev.map(function (e) { return '<span class="dt ' + e.c + '" style="top:' + pos(e.at) + '%"></span>' + (e.tag ? '<span class="tgl" style="top:' + pos(e.at) + '%">' + esc(t('tagPill')) + '</span>' : ''); }).join('') +
       (!ev.length && !S.bands.length ? '<span class="nn">' + esc(t('schedNone')) + '</span>' : '') +
       '<span class="nw" style="top:' + pos(Date.now()) + '%"></span>' + (_scrub ? '<span class="sc" style="top:' + pos(_scrub) + '%"></span>' : '') + '</div>';
   }
