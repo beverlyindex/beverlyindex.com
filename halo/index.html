@@ -1291,7 +1291,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-21.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-21.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3813,9 +3813,9 @@ function motionRead(d){ const M=d.ms, n=M.length; if(n<6 || d.band!=='ble' || d.
   const j=n-1, tj=M[j][0], rj=med3(M,j), lo3=k=>Math.min(M[k][1],M[k-1][1],M[k-2][1]), hi3=k=>Math.max(M[k][1],M[k-1][1],M[k-2][1]); let best=null; const vs=[];
   for(let i=j-3;i>=2;i--){ const dt=tj-M[i][0]; if(dt>MOVE.win) break; if(dt<3000) continue; const ri=med3(M,i), db=rj-ri; if(Math.abs(db)<MOVE.db) continue;
     if(db>0 ? lo3(j)-hi3(i)<3 : lo3(i)-hi3(j)<3) continue;          // the two sets of readings must stand clear of one another
-    const pi=msFix(M,i), pj=msFix(M,j); if(!pi || !pj || pi===pj) continue;          // no claim about your own movement without two fixes of your own
+    const pi=msFix(M,i), pj=msFix(M,j); if(!pi || !pj || pi===pj || pj[0]-pi[0]<0.6*dt) continue;          // no claim about your own movement without two fixes of your own that span these seconds
     const U=Math.hypot(pj[2]-pi[2], pj[3]-pi[3]), dn=distOf(Math.max(ri,rj),d.band), df=distOf(Math.min(ri,rj),d.band), gap=df-dn; let v=0, still=false;
-    if(U<MOVE.still && dn<=40){ still=true; v=gap/(dt/1000); }
+    if(U<MOVE.still && dn<=40 && pj[0]-pi[0]>=6000){ still=true; v=gap/(dt/1000); }
     else if(U>=MOVE.still && d.verdict!=='fixed' && gap-U>=MOVE.fast && dn<=MOVE.near && dt<=MOVE.fastWin) v=(gap-U)/(dt/1000);
     else continue;
     const cs=commonShift(d, M[i][0], tj, db); if(cs.opp>=2 || (cs.n<4 ? Math.abs(db)<MOVE.db+3 : Math.abs(db-cs.med)<MOVE.db)) continue;
@@ -3899,7 +3899,8 @@ function grpCand(d, nowS){ if(d.band!=='ble' || !d.present || d.sim || isYours(d
   if(near<=GROUP.stopNear){ if(!d.grpNear) d.grpNear=M[n-1][0]; } else d.grpNear=0;
   return {d, since:d.since||M[0][0], rise:now-f0, falling:top-now>=6, m:near, mv:!!(d.mov && d.mov.v && nowS-d.mov.t<MOVE.keep) ? d.mov.v : 0, app, t:M[n-1][0]}; }
 function groupScan(nowS, live){ if(GRP.last && Math.abs(nowS-GRP.last)<1900) return; GRP.last=nowS; if(onWheels() && !SGS.on) return;
-  const tL=nowS-LIVE.skew, mv=ownMove(tL, 15000), still=!!mv && mv.d<4; if(still){ if(!GRP.stillT) GRP.stillT=nowS; } else GRP.stillT=0;
+  const tL=nowS-LIVE.skew, lf=TRACK.length?TRACK[TRACK.length-1]:null, mv=(lf && tL-(lf.t2||lf.t)<=12000) ? ownMove(tL, 15000) : null, still=!!mv && mv.d<4;          // a position more than 12 seconds old says nothing about now
+  if(still){ if(!GRP.stillT) GRP.stillT=nowS; } else if(mv) GRP.stillT=0;
   let n=0; const C=[]; LIVE.devs.forEach(d=>{ if(d.band==='ble' && d.present) n++; const c=grpCand(d, nowS); if(c) C.push(c); });
   if(window.__GDBG) window.__GDBG.push({t:nowS, n, still, C:C.map(c=>[c.d.sig.slice(-5), Math.round((nowS-c.since)/1000), Math.round(c.rise), c.falling?1:0, Math.round(c.m), +c.mv.toFixed(1), c.d.cls[0]])});
   const crowd=n>GROUP.crowd;
@@ -4122,7 +4123,7 @@ function contactScan(nowS){ if(!nowS && scanQuiet()) return; nowS=nowS||Date.now
     if(pk.t-pk.first>CONTACT.arrive || d.verdict==='fixed') return; const h=ELOG.ready?ELOG.hist.get(d.sig):null; if(h && h.fx>0) return;
     const gone=heard>=pk.last+4000 ? nowS-pk.last : 0, drop=pk.r-pk.lastR, mv=!!(d.mov && d.mov.v) && !stayPut(d), M=d.ms, a=M.find(q=>q[2]!==null), z=[...M].reverse().find(q=>q[2]!==null);
     const fixture=houseDev(d) || !!h || stayPut(d), carried=isWorn(d) || d.cls==='Vehicle' || d.cls==='Tag';          // a device already on record at this place is part of the place
-    cand.push({d, pk, mv, fixture, carried, still:!!a && a!==z && (z[0]-a[0])>=0.5*(M[M.length-1][0]-M[0][0]) && Math.hypot(z[2]-a[2], z[3]-a[3])<6, moved:!!a && a!==z && Math.hypot(z[2]-a[2], z[3]-a[3])>=6, done:nowS-pk.t>=CONTACT.wait && (gone>=CONTACT.wait || drop>=CONTACT.fade), part:gone>=8000 || drop>=CONTACT.mfade,
+    cand.push({d, pk, mv, fixture, carried, still:!!a && a!==z && (z[0]-a[0])>=Math.max(6000, 0.5*(M[M.length-1][0]-M[0][0])) && Math.hypot(z[2]-a[2], z[3]-a[3])<6, moved:!!a && a!==z && Math.hypot(z[2]-a[2], z[3]-a[3])>=6, done:nowS-pk.t>=CONTACT.wait && (gone>=CONTACT.wait || drop>=CONTACT.fade), part:gone>=8000 || drop>=CONTACT.mfade,
       lead:mv || ((isWorn(d) || d.cls==='Vehicle') && !fixture && distOf(pk.r,'ble')<=CONTACT.near)}); });
   cand.filter(c=>c.lead && c.done).sort((a,b)=>b.pk.r-a.pk.r).forEach(L=>{ if(L.d.ct) return;
     const mem=cand.filter(c=>!c.d.ct && (c===L || (c.part && Math.abs(c.pk.t-L.pk.t)<=CONTACT.peak && Math.abs(c.pk.first-L.pk.first)<=20000 && c.pk.r>=L.pk.r-10 && (c.mv || (!c.fixture && (L.still || c.carried)))))), id='C'+Math.round(L.pk.t-LIVE.skew).toString(36)+L.d.id.slice(-2);
@@ -7200,7 +7201,7 @@ function apLearn(la,lo,acc,t,wl){ if(!(acc<=25)) return; const M=apkLoad(); apSt
 const GAP_S=20, JUMP_M=60;
 function posGate(la,lo,acc,t,src,wl,app){
   // The same fix handed over again with a later batch says nothing new: it gets the answer it got the first time, and counts for nothing.
-  if(app && GATE.ft===t && GATE.fla===la && GATE.flo===lo) return 0;
+  if(app && GATE.fla===la && GATE.flo===lo && Math.abs(t-(GATE.ft||0))<700) return 0;          // the app stamps a fix's time afresh with each batch, a few milliseconds apart: the same place, the same moment, is the same fix
   if(src!=='net' && !apCheck(la,lo,t,wl)) return 0;
   const g=posGate0(la,lo,acc,t,src,app); if(app){ GATE.ft=t; GATE.fla=la; GATE.flo=lo; } if(g>0 && src!=='net') apLearn(la,lo,(typeof acc==='number'&&acc>0)?acc:50,t,wl); return g; }
 function posGate0(la,lo,acc,t,src,app){ acc=(typeof acc==='number'&&acc>0)?acc:50; const L=GATE.last, rough=a=>a>=30;
