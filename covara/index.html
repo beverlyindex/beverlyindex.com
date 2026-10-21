@@ -13165,6 +13165,15 @@ const I18n = (function () {
     "wx.showAgain": "Show them again",
     "wx.areasMore": "and {n} more areas",
     "wx.sameN": "{n} official notices say the same thing; shown once.",
+    "wx.stLive": "In force now",
+    "wx.stSoon": "Starts {time}",
+    "wx.stEnded": "Ended {time}",
+    "wx.issuedAt": "Issued {time}",
+    "wx.fromAt": "From {time}",
+    "wx.untilAt": "until {time}",
+    "wx.keptAt": "You chose Keep watching {time}",
+    "wx.seenAt": "First shown on this phone {time}",
+    "wx.newHere": "New on this phone",
     "ledger.reviewDictation": "Review, then tap Log",
     "medimg.title": "Scan a medication label",
     "medimg.hint": "Point the camera at the medication label or upload a photo",
@@ -13540,6 +13549,15 @@ const I18n = (function () {
     "wx.showAgain": "Mostrali di nuovo",
     "wx.areasMore": "e altre {n} zone",
     "wx.sameN": "{n} avvisi ufficiali dicono la stessa cosa; mostrati una volta.",
+    "wx.stLive": "In vigore ora",
+    "wx.stSoon": "Inizia {time}",
+    "wx.stEnded": "Terminato {time}",
+    "wx.issuedAt": "Emesso {time}",
+    "wx.fromAt": "Dal {time}",
+    "wx.untilAt": "fino al {time}",
+    "wx.keptAt": "Hai scelto Continua a seguire {time}",
+    "wx.seenAt": "Mostrato per la prima volta su questo telefono {time}",
+    "wx.newHere": "Nuovo su questo telefono",
     "ledger.reviewDictation": "Controlla, poi tocca Registra",
     "medimg.title": "Leggi l’etichetta di un farmaco",
     "medimg.hint": "Inquadra l’etichetta del farmaco o carica una foto",
@@ -23939,7 +23957,11 @@ var Warnings = (function () {
   function _contact(id) { try { return DEMO_CONTACTS.find(function (c) { return String(c.id) === String(id); }) || null; } catch (e) { return null; } }
   function _first(c) { return c ? (c.first || ((c.last || '') + '')).trim() : ''; }
   function _levelLabel(l) { return l >= 4 ? _t('wx.level4', 'Extreme') : l === 3 ? _t('wx.level3', 'Severe') : _t('wx.level2', 'Moderate'); }
-  function _when(t) { try { return new Date(t).toLocaleString(I18n.locale === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+  function _when(t) { try { return new Date(t).toLocaleString(I18n.locale === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
+  /* When this phone first showed each warning, and when it was kept: so a warning read before can be told from a new one */
+  var _seenAt = {}, _keptAt = {};
+  try { _seenAt = JSON.parse(localStorage.getItem('wx:seenAt') || '{}') || {}; _keptAt = JSON.parse(localStorage.getItem('wx:keptAt') || '{}') || {}; } catch (e) {}
+  function _saveTimes() { try { var cut = Date.now() - 14 * 864e5; [_seenAt, _keptAt].forEach(function (o) { Object.keys(o).forEach(function (k) { if (o[k] < cut) delete o[k]; }); }); localStorage.setItem('wx:seenAt', JSON.stringify(_seenAt)); localStorage.setItem('wx:keptAt', JSON.stringify(_keptAt)); } catch (e) {} }
 
   /* The same warning is often issued many times (one notice per county or zone, plus each update). They are
      shown once, as one kind of warning: the same event, at the same level, from the same office. */
@@ -24108,6 +24130,9 @@ var Warnings = (function () {
       '.wx-card .wx-lv{display:inline-block;font:800 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#0b0d14;border-radius:6px;padding:2px 7px;margin-right:6px;vertical-align:1px}' +
       '.wx-card .wx-ev{font-size:16px;font-weight:800}.wx-card .wx-hl{margin:6px 0 4px;font-weight:600}' +
       '.wx-card .wx-meta{color:#9ca3af;font-size:12.5px;margin:2px 0}' +
+      '.wx-card .wx-st{display:inline-block;font:800 10.5px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;border:1px solid;border-radius:999px;padding:3px 9px;margin:0 0 7px}' +
+      '.wx-card .wx-dates{font:700 12.5px "Hanken Grotesk",system-ui,sans-serif;color:#e0f2fe;margin:6px 0 2px}' +
+      '.wx-card .wx-mine{font-size:12px;color:#9fb4e2;margin:2px 0 4px}.wx-card .wx-mine.new{color:#fde68a;font-weight:700}' +
       '.wx-card .wx-sec{font:700 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9fd8ff;margin:10px 0 3px}' +
       '.wx-card .wx-txt{white-space:pre-line;line-height:1.45;font-size:13.5px}' +
       '.wx-card a{display:inline-block;margin-top:10px;color:#38d4ff;font-weight:700;text-decoration:none}' +
@@ -24125,9 +24150,23 @@ var Warnings = (function () {
   }
   function _card(w, names) {
     var col = COLORS[w.level] || '#ff8c1a';
-    var times = [w.onset && w.onset > Date.now() ? _t('wx.from', 'From {time}', { time: _when(w.onset) }) : '', w.expires ? _t('wx.until', 'Until {time}', { time: _when(w.expires) }) : ''].filter(Boolean).join(' · ');
+    var now = Date.now(), seenNew = false;
+    if (w._gk && !_seenAt[w._gk]) { _seenAt[w._gk] = now; seenNew = true; _saveTimes(); }
+    /* the plain state: in force now, starting later, or over */
+    var st = w.expires && w.expires < now ? { k: 'ended', c: '#9ca3af', t: _t('wx.stEnded', 'Ended {time}', { time: _when(w.expires) }) }
+      : w.onset && w.onset > now ? { k: 'soon', c: '#fbbf24', t: _t('wx.stSoon', 'Starts {time}', { time: _when(w.onset) }) }
+      : { k: 'live', c: '#22d3a6', t: _t('wx.stLive', 'In force now') };
+    var dates = [w.issued ? _t('wx.issuedAt', 'Issued {time}', { time: _when(w.issued) }) : '',
+      w.onset ? _t('wx.fromAt', 'From {time}', { time: _when(w.onset) }) : '',
+      w.expires ? _t('wx.untilAt', 'until {time}', { time: _when(w.expires) }) : ''].filter(Boolean).join(' · ');
+    var mine = w._gk && _keptAt[w._gk] ? _t('wx.keptAt', 'You chose Keep watching {time}', { time: _when(_keptAt[w._gk]) })
+      : w._gk && _seenAt[w._gk] && !seenNew ? _t('wx.seenAt', 'First shown on this phone {time}', { time: _when(_seenAt[w._gk]) }) : _t('wx.newHere', 'New on this phone');
+    var times = '';
     var h = '<div class="wx-card" style="border-left-color:' + col + '">' +
+      '<div class="wx-st wx-st-' + st.k + '" style="color:' + st.c + ';border-color:' + st.c + '">' + (st.k === 'live' ? '● ' : '') + _esc(st.t) + '</div>' +
       '<div><span class="wx-lv" style="background:' + col + '">' + _esc(_levelLabel(w.level)) + '</span><span class="wx-ev">' + _esc(w.event || w.headline) + '</span></div>' +
+      (dates ? '<div class="wx-dates">' + _esc(dates) + '</div>' : '') +
+      '<div class="wx-mine' + (seenNew || !_seenAt[w._gk] ? ' new' : '') + '">' + _esc(mine) + '</div>' +
       (w.headline && w.headline !== w.event ? '<div class="wx-hl">' + _esc(w.headline) + '</div>' : '') +
       (w._areas && w._areas.length ? '<div class="wx-meta">' + _esc(w._areas.slice(0, 3).join('; ')) + (w._areas.length > 3 ? ' ' + _esc(_t('wx.areasMore', 'and {n} more areas', { n: w._areas.length - 3 })) : '') + (w.km != null && w._areas.length === 1 ? ' · ' + _esc(_t('wx.km', '{n} km away', { n: w.km })) : '') + '</div>' : (w.area ? '<div class="wx-meta">' + _esc(w.area) + '</div>' : '')) +
       (w._n > 1 ? '<div class="wx-meta">' + _esc(_t('wx.sameN', '{n} official notices say the same thing; shown once.', { n: w._n })) + '</div>' : '') +
@@ -24188,7 +24227,7 @@ var Warnings = (function () {
     wrap.addEventListener('click', function (ev) {
       if (ev.target === wrap || ev.target.closest('.wx-x')) { _closeSheet(); return; }
       var kb = ev.target.closest('[data-keep]');
-      if (kb) { _read[kb.getAttribute('data-keep')] = 1; _closeSheet(); return; }
+      if (kb) { _read[kb.getAttribute('data-keep')] = 1; _keptAt[kb.getAttribute('data-keep')] = Date.now(); _saveTimes(); _closeSheet(); return; }
       var rb = ev.target.closest('[data-rm]');
       if (rb) {
         remove(rb.getAttribute('data-rm'), Number(rb.getAttribute('data-until')) || 0);
