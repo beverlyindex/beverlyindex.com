@@ -72,7 +72,7 @@
       photo: 'Take a photo of it', name: 'Name, as on the box', strength: 'Strength', unit: 'Unit', qty: 'How many each time', form: 'Form',
       when: 'When', morning: 'Morning', midday: 'Midday', evening: 'Evening', night: 'Night', other: 'Other time',
       prescriber: 'Prescribed by', prescribedOn: 'Prescribed on', source: 'Get it from', sourceName: 'Pharmacy or doctor name', sourcePhone: 'Their phone', purpose: 'What it is for (optional)',
-      apptTitle: 'What it is for', apptWith: 'With whom', date: 'Date', time: 'Time', place: 'Where', notes: 'Notes (optional)',
+      tagWho: 'Tag people from the circle (it shows on their own timeline, and they are told)', apptTitle: 'What it is for', apptWith: 'With whom', date: 'Date', time: 'Time', place: 'Where', notes: 'Notes (optional)',
       subTitle: 'What it is', provider: 'Who provides it', renews: 'Next renewal', every: 'How often (for example monthly)', cost: 'Cost (optional)',
       needName: 'Write its name first.', needTime: 'Choose at least one time.', needWhen: 'Choose the date and time.',
       failed: 'Could not save. Check the internet and try again.',
@@ -150,7 +150,7 @@
       photo: 'Fai una foto', name: 'Nome, come sulla scatola', strength: 'Dosaggio', unit: 'Unità', qty: 'Quante ogni volta', form: 'Forma',
       when: 'Quando', morning: 'Mattina', midday: 'Mezzogiorno', evening: 'Sera', night: 'Notte', other: 'Altro orario',
       prescriber: 'Prescritta da', prescribedOn: 'Prescritta il', source: 'Dove si ritira', sourceName: 'Nome della farmacia o del medico', sourcePhone: 'Il loro telefono', purpose: 'A cosa serve (facoltativo)',
-      apptTitle: 'Per cosa', apptWith: 'Con chi', date: 'Data', time: 'Ora', place: 'Dove', notes: 'Note (facoltativo)',
+      tagWho: 'Tagga persone della cerchia (appare sulla loro linea del tempo e vengono avvisate)', apptTitle: 'Per cosa', apptWith: 'Con chi', date: 'Data', time: 'Ora', place: 'Dove', notes: 'Note (facoltativo)',
       subTitle: 'Che cos\u2019è', provider: 'Chi lo fornisce', renews: 'Prossimo rinnovo', every: 'Ogni quanto (per esempio mensile)', cost: 'Costo (facoltativo)',
       needName: 'Scrivi prima il nome.', needTime: 'Scegli almeno un orario.', needWhen: 'Scegli data e ora.',
       failed: 'Non salvato. Controlla internet e riprova.',
@@ -301,7 +301,7 @@
      circle shows the same timeline within about 10 seconds of the change. */
   async function stampCheck() {
     var s = subject();
-    if (!s || !s.edit || !authed() || document.hidden || _stampBusy) return;
+    if (!s || !authed() || document.hidden || _stampBusy) return;
     _stampBusy = true;
     try {
       var r = await api('/care/stamp' + q(s));
@@ -1199,6 +1199,19 @@
     };
     open(el);
   }
+  /* the people who can be tagged: everyone in HOME's circle with an account, HOME included, not me */
+  function tagPeople() {
+    var me = ''; try { me = SyncEngine.getUserId() || ''; } catch (e) {}
+    var out = [], seen = {};
+    function add(id, name) { if (!id || id === me || seen[id] || !name) return; seen[id] = 1; out.push({ id: id, name: String(name).trim().split(/\s+/)[0] }); }
+    (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).forEach(function (c) { if (c.care && c.care.state === 'active' && c.care.userId) add(c.care.userId, c.cvTitle || c.first); });
+    ((_data && _data.family) || []).forEach(function (f) { add(f.id, f.name); });
+    return out;
+  }
+  function tagChips(on) {
+    var ppl = tagPeople(); if (!ppl.length) return '';
+    return '<label>' + esc(t('tagWho')) + '</label><div class="cvt-chips cvt-tags">' + ppl.map(function (p) { return '<button type="button" class="cvt-chip" data-tag="' + esc(p.id) + '" aria-pressed="' + (on.indexOf(p.id) >= 0) + '">' + esc(p.name) + '</button>'; }).join('') + '</div>';
+  }
   function openEdit(kind, it, preset) {
     var el = sheet('cvAdd'); var photo = null; var m = (it && it.meta) || {};
     var times = {}; ((it && it.times) || []).forEach(function (x) { times[x] = true; });
@@ -1242,7 +1255,7 @@
     } else if (kind === 'appt') {
       f = shot + inp('cvName', 'apptTitle', it && it.title, 'text', 'maxlength="120"') + inp('cvWith', 'apptWith', m.with, 'text', 'maxlength="80"') +
         '<div class="cvt-two">' + inp('cvDate', 'date', ds, 'date') + inp('cvTime', 'time', tv, 'time') + '</div>' +
-        inp('cvPlace', 'place', m.place || (it && it.detail), 'text', 'maxlength="160"') + inp('cvNotes', 'notes', m.notes, 'text', 'maxlength="300"');
+        inp('cvPlace', 'place', m.place || (it && it.detail), 'text', 'maxlength="160"') + inp('cvNotes', 'notes', m.notes, 'text', 'maxlength="300"') + tagChips(m.tags || []);
     } else {
       f = shot + inp('cvName', 'subTitle', it && it.title, 'text', 'maxlength="120"') + inp('cvProvider', 'provider', m.provider || (it && it.detail), 'text', 'maxlength="120"') +
         '<div class="cvt-two">' + inp('cvDate', 'renews', ds, 'date') + inp('cvEvery', 'every', m.every, 'text', 'maxlength="30"') + '</div>' +
@@ -1254,6 +1267,7 @@
       '<div class="cv-row"><button class="cv-btn pri" data-a="save">' + esc(t('save')) + '</button><button class="cv-btn" data-a="close">' + esc(t('cancel')) + '</button></div>' +
       (it ? '<div class="cv-row"><button class="cv-btn warn" data-a="rm">' + esc(t('remove')) + '</button></div>' : '') + '</div>';
     el.querySelectorAll('[data-t]').forEach(function (b) { b.onclick = function () { var v = b.getAttribute('data-t'); times[v] = !times[v]; b.setAttribute('aria-pressed', times[v] ? 'true' : 'false'); }; });
+    el.querySelectorAll('[data-tag]').forEach(function (b) { b.onclick = function () { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); }; });
     var prn = !!m.as_needed, grp = m.group || 'doctor', recsOn = m.records !== false;
     el.querySelectorAll('[data-grp]').forEach(function (b) { b.onclick = function () { grp = b.getAttribute('data-grp'); el.querySelectorAll('[data-grp]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); }; });
     var rb = el.querySelector('[data-recs]'); if (rb) rb.onclick = function () { recsOn = !recsOn; rb.setAttribute('aria-pressed', recsOn ? 'true' : 'false'); };
@@ -1334,7 +1348,8 @@
         var d = v('cvDate'), tm = kind === 'appt' ? v('cvTime') : '09:00';
         if (!d || !tm) { msg.textContent = t('needWhen'); return; }
         body.at = new Date(d + 'T' + tm).getTime();
-        body.meta = kind === 'appt' ? { with: v('cvWith') || undefined, place: v('cvPlace') || undefined, notes: v('cvNotes') || undefined }
+        var tags = [].slice.call(el.querySelectorAll('[data-tag][aria-pressed=true]')).map(function (b) { return b.getAttribute('data-tag'); });
+        body.meta = kind === 'appt' ? { with: v('cvWith') || undefined, place: v('cvPlace') || undefined, notes: v('cvNotes') || undefined, tags: tags }
           : { provider: v('cvProvider') || undefined, every: v('cvEvery') || undefined, cost: v('cvCost') || undefined };
       }
       var sb = el.querySelector('[data-a=save]'); sb.disabled = true; sb.textContent = t('saving');
