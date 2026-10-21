@@ -175,7 +175,7 @@
     _busy = true;
     SyncEngine.apiFetch('/care/whereis' + (h ? '?home=' + encodeURIComponent(h) : ''), { method: 'GET' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { _data = j; _for = h; _at = Date.now(); _busy = false; mapTo(); })
+      .then(function (j) { _data = j; _for = h; _at = Date.now(); if (j && j.rooms && j.rooms.phone) _roomAt = _at; _busy = false; mapTo(); })
       .catch(function () { _busy = false; _at = Date.now(); });
   }
 
@@ -259,10 +259,10 @@
 
   /* ── the radar ── */
   var SWEEP_S = 4;
-  function sweepA(now) { return ((now / 1000) % SWEEP_S) / SWEEP_S * Math.PI * 2 - Math.PI / 2; }
+  function sweepA(now, per) { per = per || SWEEP_S; return ((now / 1000) % per) / per * Math.PI * 2 - Math.PI / 2; }
   function sweepLit(now, a) { var lag = ((sweepA(now) - a) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); return Math.exp(-lag / 1.1); }
-  function sweep(x, cx, cy, R, now, gold) {
-    var a = sweepA(now);
+  function sweep(x, cx, cy, R, now, gold, per) {
+    var a = sweepA(now, per);
     if (x.createConicGradient) {
       var g = x.createConicGradient(a - 1.25, cx, cy);
       g.addColorStop(0, 'rgba(211,181,119,0)'); g.addColorStop(.17, 'rgba(211,181,119,' + (gold ? .18 : .14) + ')'); g.addColorStop(.197, 'rgba(232,206,140,.38)'); g.addColorStop(.199, 'rgba(211,181,119,0)'); g.addColorStop(1, 'rgba(211,181,119,0)');
@@ -402,6 +402,19 @@
     if (mapState === 'ready') text(x, '© OpenStreetMap · OpenFreeMap', c, D - Math.max(10, R * 0.07), '500 7.5px ' + SANS, 'rgba(240,238,245,.75)');
   }
 
+  /* ── the room every 10 seconds: only what HOME's phone hears, merged into the radar's data ── */
+  var ROOM_S = 10, _roomAt = 0, _roomBusy = false;
+  function loadRoom() {
+    if (!authed() || _roomBusy || !_data || !_data.rooms || !shown()) return;
+    var h = homeUser(); if (_for !== h) return;
+    _roomBusy = true;
+    SyncEngine.apiFetch('/care/room' + (h ? '?home=' + encodeURIComponent(h) : ''), { method: 'GET' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { _roomBusy = false; if (j && j.share && _data && _data.rooms && _for === h) { _data.rooms.phone = j.phone; _roomAt = Date.now(); } })
+      .catch(function () { _roomBusy = false; });
+  }
+  setInterval(loadRoom, ROOM_S * 1000);
+
   /* ── HOME's own phone listening to the room: the last two hours around the rim, movement as ripples ── */
   function dur(ms) {
     var m = Math.max(0, Math.round(ms / 60000)); if (m < 1) return IT() ? 'meno di 1 min' : 'under 1 min';
@@ -409,7 +422,8 @@
   }
   function phoneRoom(x, cx, cy, r, now, reduce, name, fs) {
     var d = _data, p = d.rooms.phone, fn = first(name), small = Math.max(7, fs - 1.5);
-    if (!reduce) sweep(x, cx, cy, r - 2, now, false);
+    /* one full sweep every 10 seconds, starting at the top as each new reading of the room arrives */
+    if (!reduce) sweep(x, cx, cy, r - 2, p && p.online && _roomAt ? Date.now() - _roomAt : now, false, ROOM_S);
     if (!p) {
       /* nothing heard yet: say plainly what turns it on, on whose phone */
       var self = role() === 'home';
