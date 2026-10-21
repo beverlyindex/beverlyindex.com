@@ -1291,7 +1291,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-21.08', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-21.09', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -8342,6 +8342,7 @@ function nearScan(){ const subj=subjSigs();
    while you moved 25 m or more within the last minute. A tag standing still grows strong as you near it and fades once you pass, and fails. */
 function tagPace(d){ if(d.cls!=='Tag' || d.band!=='ble' || d.mine || d.retFix || d.verdict==='fixed' || stayPut(d) || houseDev(d) || driving()) return null;
   const lr=d.leg; if(!lr || lr.legs<3 || lr.share<FOLLOW.share || lr.reach<80 || (d.mins||0)<2 || !(d.dist<=25)) return null;
+  if(lr.drift>6 || lr.spread>12) return null;          // grew stronger leg by leg, or swung widely: one you walked up to where it stands (a tag with someone sitting in a doorway), not one that kept pace
   const M=(d.ms||[]).filter(q=>q[2]!==null); if(M.length<2) return null; const z=M[M.length-1];
   if(Date.now()+LIVE.skew-z[0]>10000) return null;          // heard, with a fix of yours, just now
   for(const a of M){ if(z[0]-a[0]>60000) continue; const moved=Math.hypot(z[2]-a[2], z[3]-a[3]); if(moved<25) continue;
