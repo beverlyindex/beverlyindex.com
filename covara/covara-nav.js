@@ -85,7 +85,7 @@
     '.cvn-step{width:40px;height:40px;border-radius:50%;border:1px solid rgba(56,189,248,.4);background:rgba(10,14,24,.84);color:#9fd8ff;font-size:20px;line-height:1;cursor:pointer}' +
     '.cvn-who{min-width:150px;max-width:230px;padding:7px 14px;border-radius:16px;border:1px solid rgba(56,189,248,.35);background:rgba(10,14,24,.84);cursor:pointer;text-align:left;color:inherit;font:inherit}' +
     '.cvn-who small{display:block;font:600 9.5px var(--nous-mono,"JetBrains Mono",monospace);letter-spacing:.14em;color:#9fd8ff}.cvn-who b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '#cvnDay{position:fixed;left:30px;top:150px;bottom:96px;width:78px;z-index:7050;touch-action:none;cursor:ns-resize;transition:opacity .45s ease,filter .45s ease}' +
+    '#cvnDay{position:fixed;left:30px;top:106px;bottom:96px;width:78px;z-index:7050;touch-action:none;cursor:ns-resize;transition:opacity .45s ease,filter .45s ease}' +
     '#cvnDay.back{opacity:.14;filter:blur(.6px);pointer-events:none;z-index:3}' +
     '#cvnDay .hd{position:absolute;left:0;top:0;width:150px;font:700 9.5px var(--nous-mono,"JetBrains Mono",monospace);letter-spacing:.16em;color:#C5A55A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#cvnDay .hd b{display:block;font:700 12px var(--nous-font,"Hanken Grotesk",sans-serif);letter-spacing:.02em;color:#e8ecf4;text-transform:none;margin-bottom:1px}' +
     '#cvnDay .tr{position:absolute;left:0;right:0;top:56px;bottom:0}#cvnDay .hd .dd{display:block;font:700 11px var(--nous-mono,"JetBrains Mono",monospace);letter-spacing:.08em;color:#9fd8ff;margin:1px 0 2px}' +
@@ -118,7 +118,7 @@
       '.cvn-slot{min-width:0;max-width:none;padding:0;border:0;background:none;box-shadow:none;flex-direction:column;gap:3px}.cvn-slot span{display:none}.cvn-slot b{font-size:9px;letter-spacing:.14em;margin:0}' +
       '.cvn-lens,.cvn-pin{width:50px;height:50px}.cvn-orb{width:66px;height:66px}.cvn-talk small{display:none}' +
       '#cvnCircle{left:auto;right:auto;bottom:auto;position:static}#cvnCircle .cvn-who{display:none}.cvn-step{width:38px;height:38px}' +
-      '#cvnDay{left:8px;top:318px;bottom:64px;width:60px}#cvnDay .ln{left:34px}#cvnDay .mk{left:31px}#cvnDay .tk{width:28px;font-size:8px}#cvnDay .bd{left:40px}#cvnDay .dt{left:35px}#cvnDay .nw{left:22px;width:26px}#cvnDay .sc{left:16px;width:36px}#cvnDay .hd{width:170px}#cvnDay .nn{left:46px;width:70px}' +
+      '#cvnDay{left:8px;top:106px;bottom:64px;width:60px}#cvnDay .ln{left:34px}#cvnDay .mk{left:31px}#cvnDay .tk{width:28px;font-size:8px}#cvnDay .bd{left:40px}#cvnDay .dt{left:35px}#cvnDay .nw{left:22px;width:26px}#cvnDay .sc{left:16px;width:36px}#cvnDay .hd{width:170px}#cvnDay .nn{left:46px;width:70px}' +
       '.cvn-hud.r{display:none}.cvn-hud.l{top:76px !important;left:16px !important;font-size:9.5px}' +
       '#cvnBezel{inset:6px;border-radius:20px}body.cvn-on #addPersonFab{bottom:196px !important;right:12px !important;width:44px !important;height:44px !important}' +
     '}';
@@ -395,6 +395,16 @@
   }
   /* In front when nothing else is at its place; behind, faded, when a map, a panel or a summary is shown there */
   function overlaps(a, b) { return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; }
+  /* the schedule starts just below the logo and the sphere size slider with its name */
+  function logoBottom() {
+    var y = 0;
+    document.querySelectorAll('.app-logo, #sphereSize, #sphereSize *, #cvnHudL, #cvnHudL *').forEach(function (e) {
+      var r = e.getBoundingClientRect(); if (!r.height || r.left > 220 || r.top > 220) return;
+      var cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') return;
+      y = Math.max(y, r.bottom);
+    });
+    return Math.round((y || 90) + 16);
+  }
   function dayDepth() {
     /* a person's summary on the left: the schedule moves down beneath it, so both stay readable */
     var below = 0;
@@ -402,9 +412,9 @@
       if (el2.hidden) return; var cs = getComputedStyle(el2); if (cs.display === 'none' || +cs.opacity < 0.2) return;
       var b = el2.getBoundingClientRect(); if (b.left < 160 && b.width) below = Math.max(below, b.bottom + 14);
     });
-    var css = window.innerWidth <= 700 ? 318 : 150, bottomGap = window.innerWidth <= 700 ? 64 : 96;
+    var css = logoBottom(), bottomGap = window.innerWidth <= 700 ? 64 : 96;
     var topPx = below && window.innerHeight - bottomGap - below >= 200 ? Math.max(css, below) : 0;
-    var want = topPx ? topPx + 'px' : '';
+    var want = (topPx || css) + 'px';
     if (day.style.top !== want) { day.style.top = want; _dsig = ''; }
     var r = day.getBoundingClientRect(); if (!r.width) return;
     var back = false;
