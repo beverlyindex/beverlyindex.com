@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>body.cv-guest-call .sentinel-guide{display:none !important}</style>
 </head>
 <body>
 <title>Remiel: Covara</title>
@@ -9297,6 +9298,9 @@ let appRevealed = false;
 })();
 let _guestCallMode = false;
 try { _guestCallMode = !!new URLSearchParams(window.location.search).get('call'); } catch (e) {}
+/* A family code's join link (#join=123456): kept for this visit, so it can be used once Covara is open */
+let _joinCode = null;
+try { var _jm = /[#&?]join=(\d{6})/.exec((window.location.hash || '') + '&' + (window.location.search || '')); if (_jm) { _joinCode = _jm[1]; sessionStorage.setItem('rc:join', _joinCode); } } catch (e) {}
 /* B1: revealApp needs RemielDB, I18n and the modules declared further down
    this script. _appScriptReady resolves at the very end of the script block,
    so a reveal requested early (reduced motion, fast skip) waits instead of
@@ -9322,6 +9326,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
     if (_guestCallMode) { beginVideoIntro(); return; }
     var stored = '';
     try { stored = localStorage.getItem('rc:access') || ''; } catch (e) {}
+    /* Someone without Covara opening a family code's link: the join card shows instead of the gate (covara-join.js) */
+    if (_joinCode && (!stored || stored === 'open')) { window.CovaraJoinGuest = _joinCode; var _gj = document.getElementById('gateScreen'); if (_gj) _gj.style.display = 'none'; return; }
     if (!stored || stored === 'open') { showGate(); return; }
     _gateHash(stored).then(function (h) { return codeState(h); }).then(function (st) {
       if (st === 'ok') beginVideoIntro(); else { try { localStorage.removeItem('rc:access'); } catch (e) {} showGate(); }
@@ -11150,6 +11156,9 @@ const I18n = (function () {
     'bg.inLedger': "a Ledger note",
     'guest.title': "Video Call",
     'guest.callingYou': "{name} is calling you",
+    'guest.circleTitle': "Video call {name}",
+    'guest.circleSub': "You are a guest in {name}'s circle. Call any time from this same link.",
+    'guest.callNow': "Call {name}",
     'guest.sub': "Enter your name to join the call",
     'guest.namePh': "Your name",
     'guest.join': "Join Call",
@@ -12027,6 +12036,9 @@ const I18n = (function () {
     'bg.inLedger': "una nota del Registro",
     'guest.title': "Videochiamata",
     'guest.callingYou': "{name} ti sta chiamando",
+    'guest.circleTitle': "Videochiama {name}",
+    'guest.circleSub': "Sei ospite nella cerchia di {name}. Chiama quando vuoi da questo stesso link.",
+    'guest.callNow': "Chiama {name}",
     'guest.sub': "Scrivi il tuo nome per entrare nella chiamata",
     'guest.namePh': "Il tuo nome",
     'guest.join': "Entra nella chiamata",
@@ -41350,6 +41362,7 @@ const SentinelCall = (function() {
   let _guestConnected = false; /* this guest call reached picture and sound */
   let _guestShared = null;   /* null not sent, else 'pending' | 'accepted' | 'failed' */
   let _guestRelabel = null;  /* re-applies the guest card's wording */
+  let _guestCircle = false;  /* a guest of the circle calling in (family code) */
 
   function checkCallInvite() {
     const params = new URLSearchParams(window.location.search);
@@ -41359,6 +41372,9 @@ const SentinelCall = (function() {
     const hn = (params.get('n') || '').replace(/[<>"]/g, '').trim().slice(0, 30);
     _guestHostName = hn;
     const gn = (params.get('g') || '').replace(/[<>"]/g, '').trim().slice(0, 30);
+    /* gj=1: a guest of this circle (joined with the family code) calling in, not someone being called */
+    _guestCircle = params.get('gj') === '1';
+    try { document.body.classList.add('cv-guest-call'); } catch (e) {}
     const room = params.get('room');
     _guestRoom = (room && /^[A-Za-z0-9-]{4,40}$/.test(room)) ? room : null;
     const m = params.get('m');
@@ -41379,10 +41395,11 @@ const SentinelCall = (function() {
       /* After a call that connected, the card says so instead of "is calling you" */
       const ended = _guestConnected && !_currentCall && !_group;
       if (_gt) _gt.textContent = ended ? _t('guest.endedTitle', 'Call ended')
+        : _guestCircle ? _tp('guest.circleTitle', 'Video call {name}', { name: _guestHostName || '' })
         : (_guestHostName ? _tp('guest.callingYou', '{name} is calling you', { name: _guestHostName }) : _t('guest.title', 'Video Call'));
-      if (_gs) _gs.textContent = ended ? '' : _t('guest.sub', 'Enter your name to join the call');
+      if (_gs) _gs.textContent = ended ? '' : _guestCircle ? _tp('guest.circleSub', 'You are a guest in {name}\'s circle. Call any time from this same link.', { name: _guestHostName || '' }) : _t('guest.sub', 'Enter your name to join the call');
       if (_gi) _gi.placeholder = _t('guest.namePh', 'Your name');
-      if (_gb && !_gb.dataset.joining) _gb.textContent = ended ? _tp('guest.callAgain', 'Call {name} again', { name: _guestHostLabel() }) : _t('guest.join', 'Join Call');
+      if (_gb && !_gb.dataset.joining) _gb.textContent = ended ? _tp('guest.callAgain', 'Call {name} again', { name: _guestHostLabel() }) : _guestCircle ? _tp('guest.callNow', 'Call {name}', { name: _guestHostLabel() }) : _t('guest.join', 'Join Call');
     };
     _guestRelabel = _guestLabels;
     _guestLabels();
@@ -45666,5 +45683,6 @@ try { _resolveAppScriptReady(); } catch (e) {}
   <script src="covara-callwave.js" defer></script>
   <script src="covara-sleep.js" defer></script>
   <script src="covara-glass.js" defer></script>
+  <script src="covara-join.js" defer></script>
 </body>
 </html>

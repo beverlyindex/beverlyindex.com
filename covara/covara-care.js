@@ -16,13 +16,16 @@
       roleAway: 'For someone I look after', roleAwaySub: 'A parent, a partner, a friend',
       linkHome: 'Show a code for my family', linkAway: 'Type a code',
       codeTitle: 'Show this to your family',
-      codeSub: 'They type it on their phone. It works for 15 minutes.',
+      codeSub: 'One code for everyone you give it to. Each person who uses it joins your circle at once, and you can call each other straight away. It works until {date}.',
+      codeShare: 'Send the link', codeCopied: 'Link copied. Paste it in a message.', codeEnd: 'End this code', codeEnded: 'Code ended. Nobody new can join with it.',
+      joinedTitle: 'Joined with your code', joinedNone: 'Nobody yet.', guest: 'GUEST', joinedToast: '{name} joined your circle. Tap their sphere to choose what else they can see.',
+      shareText: 'Join my circle on Remiel: Covara so we can video call: {link} (code {code})',
       codeWait: 'Waiting for them',
       codeNew: 'New code', close: 'Close',
       padTitle: 'Type the code from their phone',
       padWrong: 'That code is not valid. Ask for a new one on the other phone.',
       padOwn: 'This code is from your own phone.',
-      padSent: 'Sent. They choose what you can see.',
+      padSent: 'You are in the circle. You can call each other now.',
       waitHome: 'WAITING FOR YOU', waitAway: 'WAITING FOR THEM',
       consentTitle: 'Choose what {name} can see',
       consentWho: '{name} is my',
@@ -42,13 +45,16 @@
       roleAway: 'Per una persona di cui mi prendo cura', roleAwaySub: 'Un genitore, un partner, un amico',
       linkHome: 'Mostra un codice per la famiglia', linkAway: 'Scrivi un codice',
       codeTitle: 'Mostra questo alla tua famiglia',
-      codeSub: 'Lo scrivono sul loro telefono. Vale 15 minuti.',
+      codeSub: 'Un codice per tutti quelli a cui lo dai. Chi lo usa entra subito nella tua cerchia e potete chiamarvi subito. Vale fino al {date}.',
+      codeShare: 'Invia il link', codeCopied: 'Link copiato. Incollalo in un messaggio.', codeEnd: 'Termina questo codice', codeEnded: 'Codice terminato. Nessun altro può entrare con questo.',
+      joinedTitle: 'Entrati con il tuo codice', joinedNone: 'Ancora nessuno.', guest: 'OSPITE', joinedToast: '{name} è entrato nella tua cerchia. Tocca la sua sfera per scegliere cos\'altro può vedere.',
+      shareText: 'Entra nella mia cerchia su Remiel: Covara così possiamo fare videochiamate: {link} (codice {code})',
       codeWait: 'In attesa',
       codeNew: 'Nuovo codice', close: 'Chiudi',
       padTitle: 'Scrivi il codice del suo telefono',
       padWrong: 'Il codice non è valido. Chiedi un nuovo codice sull’altro telefono.',
       padOwn: 'Questo codice è del tuo telefono.',
-      padSent: 'Inviato. Ora sceglie cosa puoi vedere.',
+      padSent: 'Sei nella cerchia. Potete chiamarvi adesso.',
       waitHome: 'ASPETTA TE', waitAway: 'IN ATTESA',
       consentTitle: 'Scegli cosa può vedere {name}',
       consentWho: '{name} è',
@@ -86,6 +92,7 @@
     '.cv-ov.open{opacity:1;pointer-events:auto}body.cv-asking #reachModal{display:none !important}' +
     '.cv-box{width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;text-align:center;padding:8px 0 20px}' +
     '.cv-h{font:400 clamp(26px,5vw,38px)/1.15 "Instrument Serif",Georgia,serif;margin:0 0 6px;color:#f1f6ff}' +
+    '.cv-joined{margin:6px auto 4px;max-width:420px;text-align:left}.cv-jl{margin-top:8px;display:flex;flex-direction:column;gap:6px}.cv-jr{display:flex;align-items:baseline;gap:8px;padding:8px 12px;border-radius:12px;border:1px solid rgba(150,200,255,.3);background:rgba(40,90,190,.16)}.cv-jr b{font-weight:700}.cv-jr i{margin-left:auto;font-style:normal;font-size:12px;color:#9fb4e2}.cv-gt{font:800 10px "JetBrains Mono",monospace;letter-spacing:.12em;color:#0b0d14;background:#fbbf24;border-radius:6px;padding:2px 6px}' +
     '.cv-sub{font-size:14px;color:#8ea3bf;margin:0 0 22px}' +
     '.cv-mono{font:600 11px "JetBrains Mono",monospace;letter-spacing:.18em;color:#5fd0ff;text-transform:uppercase}' +
     '.cv-orbs{display:flex;gap:clamp(18px,6vw,48px);justify-content:center;flex-wrap:wrap;margin-top:18px}' +
@@ -166,39 +173,69 @@
     show(el);
   }
 
-  /* ── HOME: the code ── */
-  var _codeTimer = null;
+  /* ── HOME: the family code ──
+     One code for everyone HOME gives it to, for 7 days. Each person who uses it joins at once (their sphere appears,
+     calls and messages work both ways); HOME sees exactly who joined, and can end the code at any time. */
+  var _codeTimer = null, _joinSeen = null;
+  function joinLink(code) { return location.origin + location.pathname.replace(/[^/]*$/, '') + '#join=' + code; }
+  function when(ms) { try { return new Date(ms).toLocaleString(L() === STR.it ? 'it-IT' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
   async function openCode() {
-    var el = overlay('cvCode');
+    var el = overlay('cvCode'), cur = null;
     el.innerHTML = '<div class="cv-box"><div class="cv-mono">' + esc(t('linkHome')) + '</div><h2 class="cv-h" style="margin-top:10px">' + esc(t('codeTitle')) + '</h2>' +
       '<div class="cv-code" aria-live="polite"><span></span><span></span><span></span><span></span><span></span><span></span></div>' +
-      '<p class="cv-sub">' + esc(t('codeSub')) + '</p><div class="cv-ring"><b>' + esc(t('codeWait')) + '</b></div>' +
-      '<div class="cv-msg"></div><div class="cv-row"><button class="cv-btn" data-a="new">' + esc(t('codeNew')) + '</button><button class="cv-btn pri" data-a="close">' + esc(t('close')) + '</button></div></div>';
+      '<p class="cv-sub" data-sub></p>' +
+      '<div class="cv-row"><button class="cv-btn pri" data-a="share">' + esc(t('codeShare')) + '</button></div>' +
+      '<div class="cv-joined"><div class="cv-mono">' + esc(t('joinedTitle')) + '</div><div data-j class="cv-jl"></div></div>' +
+      '<div class="cv-msg"></div><div class="cv-row"><button class="cv-btn" data-a="end">' + esc(t('codeEnd')) + '</button><button class="cv-btn" data-a="new">' + esc(t('codeNew')) + '</button><button class="cv-btn" data-a="close">' + esc(t('close')) + '</button></div></div>';
+    var msg = el.querySelector('.cv-msg');
     el.querySelector('[data-a=close]').onclick = closeCode;
-    el.querySelector('[data-a=new]').onclick = fill;
-    show(el);
-    async function fill() {
-      var msg = el.querySelector('.cv-msg'); msg.textContent = '';
+    el.querySelector('[data-a=new]').onclick = function () { fill(true); };
+    el.querySelector('[data-a=end]').onclick = async function () {
+      try { await api('/code', { method: 'DELETE' }); } catch (e) {}
+      cur = null; paint(null); msg.className = 'cv-msg ok'; msg.textContent = t('codeEnded');
+    };
+    el.querySelector('[data-a=share]').onclick = async function () {
+      if (!cur) { await fill(false); if (!cur) return; }
+      var link = joinLink(cur.code), text = t('shareText', { link: link, code: cur.code });
+      try { if (navigator.share) { await navigator.share({ title: 'Remiel: Covara', text: text, url: link }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+      try { await navigator.clipboard.writeText(text); msg.className = 'cv-msg ok'; msg.textContent = t('codeCopied'); } catch (e) { msg.textContent = text; }
+    };
+    function paint(c) {
+      var d = c ? String(c.code || '').split('') : [];
+      el.querySelectorAll('.cv-code span').forEach(function (s, i) { s.textContent = d[i] || ''; });
+      el.querySelector('.cv-code').setAttribute('aria-label', d.join(' '));
+      el.querySelector('[data-sub]').textContent = c ? t('codeSub', { date: when(c.expires_at) }) : '';
+    }
+    function list(j) {
+      var box = el.querySelector('[data-j]');
+      box.innerHTML = !j.length ? '<div class="cv-sub">' + esc(t('joinedNone')) + '</div>' : j.map(function (p) {
+        return '<div class="cv-jr"><b>' + esc(p.name || '?') + '</b>' + (p.guest ? '<span class="cv-gt">' + esc(t('guest')) + '</span>' : '') + '<i>' + esc(when(p.at)) + '</i></div>';
+      }).join('');
+    }
+    async function fill(fresh) {
+      msg.className = 'cv-msg'; msg.textContent = '';
       try {
-        var r = await api('/code', { method: 'POST' });
+        var r = await api('/code', { method: 'POST', body: fresh ? { fresh: true } : {} });
         if (!r.ok) throw new Error(r.status);
-        var d = String(r.data.code || '').split('');
-        el.querySelectorAll('.cv-code span').forEach(function (s, i) { s.textContent = d[i] || ''; });
-        el.querySelector('.cv-code').setAttribute('aria-label', d.join(' '));
+        cur = r.data; paint(cur);
       } catch (e) { msg.textContent = t('offline'); }
     }
-    await fill();
+    async function poll() {
+      try {
+        var r = await api('/code');
+        if (r.ok) {
+          list(r.data.joined || []);
+          var ids = (r.data.joined || []).map(function (p) { return p.id + p.at; }).join();
+          if (_joinSeen !== null && ids !== _joinSeen) await sync();
+          _joinSeen = ids;
+        }
+      } catch (e) {}
+    }
+    show(el);
+    await fill(false);
+    _joinSeen = null; await poll();
     clearInterval(_codeTimer);
-    _codeTimer = setInterval(async function () {
-      var before = pendingIds();
-      await sync();
-      var after = pendingIds().filter(function (id) { return before.indexOf(id) < 0; });
-      if (after.length) {
-        closeCode();
-        var c = byLink(after[0]);
-        if (c) openConsent(c);
-      }
-    }, 3000);
+    _codeTimer = setInterval(poll, 3000);
   }
   function closeCode() { clearInterval(_codeTimer); _codeTimer = null; hide(document.getElementById('cvCode')); }
 
@@ -278,7 +315,7 @@
   function byLink(id) { return careContacts().filter(function (c) { return c.care.linkId === id; })[0] || null; }
   function pendingIds() { return careContacts().filter(function (c) { return c.care.state === 'pending' && c.care.side === 'away'; }).map(function (c) { return c.care.linkId; }); }
 
-  var _syncing = null;
+  var _syncing = null, _synced = false;
   function sync() { if (!_syncing) _syncing = _sync().finally(function () { _syncing = null; }); return _syncing; }
   async function _sync() {
     if (!authed()) return;
@@ -298,7 +335,7 @@
         c = { id: Date.now() + i, first: nm[0] || '?', last: nm.slice(1).join(' '), cat: 'family', sev: 4, phone: o.phone || '', email: o.email || '', sentinelId: o.sentinel_id || '', care: care };
         try { await RemielDB.putContact(c); } catch (e) {}
         DEMO_CONTACTS.push(c); changed = true; added = true;
-        if (x.side === 'away' && l.status === 'pending') newAsks.push(c);
+        if (x.side === 'away') newAsks.push(c);
       } else {
         var was = JSON.stringify(c.care) + c.first + c.last + c.phone + c.email + c.sentinelId;
         c.care = care; c.first = nm[0] || c.first; c.last = nm.slice(1).join(' ');
@@ -320,7 +357,8 @@
     }
     renderFamily();
     if (added) openCircle();
-    if (newAsks.length && !_codeTimer) toast(t('asks', { name: newAsks[0].first }));
+    if (newAsks.length && _synced) toast(newAsks[0].care.state === 'pending' ? t('asks', { name: newAsks[0].first }) : t('joinedToast', { name: newAsks[0].first }));
+    _synced = true;
   }
   function openCircle() {
     try { if (typeof appState !== 'undefined' && appState !== 'network' && typeof enterNetwork === 'function') enterNetwork(); } catch (e) {}
@@ -338,11 +376,12 @@
         if (role() !== 'home' || document.querySelector('.cv-ov.open')) return;
         var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null;
         var c = DEMO_CONTACTS.filter(function (x) { return x.id === f; })[0];
-        if (c && c.care && c.care.side === 'away' && c.care.state === 'pending') openConsent(c);
+        if (c && c.care && c.care.side === 'away' && (c.care.state === 'pending' || noneShared(c))) openConsent(c);
       } catch (err) {}
     }, 160);
   }
 
+  function noneShared(c) { var sh = (c.care && c.care.share) || {}; return !Object.keys(sh).some(function (k) { return sh[k]; }); }
   function waitLabel(c) { return c.care.side === 'away' ? t('waitHome') : t('waitAway'); }
   function refreshLabels() { try { if (typeof SentinelHeadlines !== 'undefined' && SentinelHeadlines.refreshAll) SentinelHeadlines.refreshAll(); } catch (e) {} }
 
@@ -449,7 +488,18 @@
     renderFamily();
     var stg = document.getElementById('stage'); if (stg) { stg.addEventListener('pointerdown', onDown); stg.addEventListener('pointerup', onUp); }
     if (!role()) askRole();
-    (function wait() { if (authed()) { sync(); setInterval(sync, 20000); } else setTimeout(wait, 1000); })();
+    /* opened from a family code's link: join that circle at once */
+    (function joinWait() {
+      var jc = ''; try { jc = sessionStorage.getItem('rc:join') || ''; } catch (e) {}
+      if (!/^\d{6}$/.test(jc)) return;
+      if (!authed()) { setTimeout(joinWait, 1000); return; }
+      try { sessionStorage.removeItem('rc:join'); } catch (e) {}
+      try { if (/join=/.test(location.hash)) history.replaceState({}, '', location.pathname); } catch (e) {}
+      api('/claim', { method: 'POST', body: { code: jc } }).then(function (r) {
+        if (r.ok) { toast(t('padSent')); sync(); } else toast(r.status === 400 ? t('padOwn') : t('padWrong'));
+      }).catch(function () {});
+    })();
+    (function wait() { if (authed()) { sync(); setInterval(function () { if (!document.hidden) sync(); }, role() === 'home' ? 8000 : 20000); } else setTimeout(wait, 1000); })();
     document.addEventListener('visibilitychange', function () { if (!document.hidden) sync(); });
     var m = /#link=([\w-]+)/.exec(location.hash || '');
     if (m) setTimeout(function () { var c = byLink(m[1]); if (c && role() === 'home') openConsent(c); }, 2500);
