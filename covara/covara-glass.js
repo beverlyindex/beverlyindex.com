@@ -31,7 +31,7 @@
     '.sv-empty', '.sentinel-msg-panel', '.magnet-prompt', '.ui-confirm-box', '.wx-sheet', '.clv-panel', '.br-sheet',
     '.help-card', '.team-menu', '.team-card', '.wx-chip', '.bev-tile'
   ];
-  var CHIPS = ['.cvn-chip', '.cvn-step', '.cvn-btn', '.cv-btn:not(.pri)', '.cv-pad button', '.cv-code span', '#cvCam .ask button',
+  var CHIPS = ['.cvn-chip', '.cvn-step', '.cvn-btn:not(.pri)', '.cv-btn:not(.pri)', '.cv-pad button', '.cv-code span', '#cvCam .ask button',
     '.iso-btn', '.iso-x', '.lib-pill', '.sv-badge', '.bluf-pull', '.dream-brief .db-wx',
     '.dd-bluf', '.dd-streak', '.dd-alert-item', '.dd-med-item', '.cvs-tiles span'];
   var FIELDS = ['.cvt-f textarea', '.cvt-f input[type=text]', '.cvt-f input[type=email]', '.cvt-f input[type=tel]', '.cvt-f input[type=number]',
