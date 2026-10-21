@@ -15,6 +15,7 @@
       roleHome: 'For me', roleHomeSub: 'My family looks after me',
       roleAway: 'For someone I look after', roleAwaySub: 'A parent, a partner, a friend',
       linkHome: 'Show a code for my family', linkAway: 'Type a code',
+      myLocTitle: 'WHO CAN SEE WHERE YOU ARE', myLocHome: 'Only {name}', myLocCircle: 'The whole circle', myLocNone: 'Nobody', myLocSaved: 'Saved. Only the people you chose can see where you are.',
       codeTitle: 'Show this to your family',
       codeSub: 'One code for everyone you give it to. Each person who uses it joins your circle at once, and you can call each other straight away. It works until {date}.',
       codeShare: 'Send the link', codeCopied: 'Link copied. Paste it in a message.', codeEnd: 'End this code', codeEnded: 'Code ended. Nobody new can join with it.',
@@ -44,6 +45,7 @@
       roleHome: 'Per me', roleHomeSub: 'La mia famiglia si prende cura di me',
       roleAway: 'Per una persona di cui mi prendo cura', roleAwaySub: 'Un genitore, un partner, un amico',
       linkHome: 'Mostra un codice per la famiglia', linkAway: 'Scrivi un codice',
+      myLocTitle: 'CHI PU\u00d2 VEDERE DOVE SEI', myLocHome: 'Solo {name}', myLocCircle: 'Tutta la cerchia', myLocNone: 'Nessuno', myLocSaved: 'Salvato. Solo le persone che hai scelto possono vedere dove sei.',
       codeTitle: 'Mostra questo alla tua famiglia',
       codeSub: 'Un codice per tutti quelli a cui lo dai. Chi lo usa entra subito nella tua cerchia e potete chiamarvi subito. Vale fino al {date}.',
       codeShare: 'Invia il link', codeCopied: 'Link copiato. Incollalo in un messaggio.', codeEnd: 'Termina questo codice', codeEnded: 'Codice terminato. Nessun altro può entrare con questo.',
@@ -92,6 +94,7 @@
     '.cv-ov.open{opacity:1;pointer-events:auto}body.cv-asking #reachModal{display:none !important}' +
     '.cv-box{width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;text-align:center;padding:8px 0 20px}' +
     '.cv-h{font:400 clamp(26px,5vw,38px)/1.15 "Instrument Serif",Georgia,serif;margin:0 0 6px;color:#f1f6ff}' +
+    '.cv-myloc{margin:-2px 0 12px 52px}.cv-myloc small{display:block;font:700 9.5px "JetBrains Mono",monospace;letter-spacing:.14em;color:#9fd8ff;margin-bottom:6px}.cv-myloc div{display:flex;flex-wrap:wrap;gap:6px}.cv-myloc button{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid rgba(150,200,255,.4);background:rgba(40,90,190,.18);color:#e8f2ff;font:600 13px "Hanken Grotesk",sans-serif;cursor:pointer}.cv-myloc button[aria-pressed=true]{background:#38bdf8;color:#04121a;border-color:#38bdf8}' +
     '.cv-joined{margin:6px auto 4px;max-width:420px;text-align:left}.cv-jl{margin-top:8px;display:flex;flex-direction:column;gap:6px}.cv-jr{display:flex;align-items:baseline;gap:8px;padding:8px 12px;border-radius:12px;border:1px solid rgba(150,200,255,.3);background:rgba(40,90,190,.16)}.cv-jr b{font-weight:700}.cv-jr i{margin-left:auto;font-style:normal;font-size:12px;color:#9fb4e2}.cv-gt{font:800 10px "JetBrains Mono",monospace;letter-spacing:.12em;color:#0b0d14;background:#fbbf24;border-radius:6px;padding:2px 6px}' +
     '.cv-sub{font-size:14px;color:#8ea3bf;margin:0 0 22px}' +
     '.cv-mono{font:600 11px "JetBrains Mono",monospace;letter-spacing:.18em;color:#5fd0ff;text-transform:uppercase}' +
@@ -330,7 +333,7 @@
       seen[l.id] = true;
       var nm = String(o.name || '').trim().split(/\s+/);
       var c = byLink(l.id);
-      var care = { linkId: l.id, side: x.side, userId: o.id, state: l.status, share: l.share, relation: l.relation || '', role: o.role || '' };
+      var care = { linkId: l.id, side: x.side, userId: o.id, state: l.status, share: l.share, relation: l.relation || '', role: o.role || '', myLoc: l.my_location || 'home' };
       if (!c) {
         c = { id: Date.now() + i, first: nm[0] || '?', last: nm.slice(1).join(' '), cat: 'family', sev: 4, phone: o.phone || '', email: o.email || '', sentinelId: o.sentinel_id || '', care: care };
         try { await RemielDB.putContact(c); } catch (e) {}
@@ -403,12 +406,22 @@
     var rows = careContacts().map(function (c) {
       var cv = c.care, rel = cv.relation && L().rel[cv.relation] ? L().rel[cv.relation] : '';
       var sub = cv.state === 'pending' ? (home ? t('waitHome') : t('waitAway')) : home ? t('sees') + ' ' + sharesText(cv.share) : rel;
-      return '<button type="button" class="cv-fam-row" data-id="' + c.id + '"><i>' + esc(initials(c.first + ' ' + c.last)) + '</i><span><b>' + esc((c.first + ' ' + c.last).trim()) + (home && rel ? ' · ' + esc(rel) : '') + '</b><small>' + esc(sub) + '</small></span></button>';
+      return '<button type="button" class="cv-fam-row" data-id="' + c.id + '"><i>' + esc(initials(c.first + ' ' + c.last)) + '</i><span><b>' + esc((c.first + ' ' + c.last).trim()) + (home && rel ? ' · ' + esc(rel) : '') + '</b><small>' + esc(sub) + '</small></span></button>' +
+        /* a family member chooses, for this circle, who can see where they are */
+        (!home && cv.side === 'home' && cv.state === 'active' ? '<div class="cv-myloc" data-link="' + esc(cv.linkId) + '"><small>' + esc(t('myLocTitle')) + '</small><div>' +
+          [['home', t('myLocHome', { name: c.first || '' })], ['circle', t('myLocCircle')], ['none', t('myLocNone')]].map(function (o) { return '<button type="button" data-m="' + o[0] + '" aria-pressed="' + ((cv.myLoc || 'home') === o[0]) + '">' + esc(o[1]) + '</button>'; }).join('') + '</div></div>' : '');
     }).join('');
     sec.innerHTML = '<div class="settings-section-title">' + esc(home ? t('famTitle') : t('lookTitle')) + '</div>' +
       '<div class="settings-card">' + (rows || '<p class="settings-help" style="margin:0 0 10px">' + esc(home ? t('famEmpty') : t('lookEmpty')) + '</p>') +
       '<div style="margin-top:12px"><button type="button" class="circle-invite-btn" data-a="link">' + esc(home ? t('linkHome') : t('linkAway')) + '</button></div></div>';
     sec.querySelector('[data-a=link]').onclick = function () { try { if (typeof _closeSettings === 'function') _closeSettings(); } catch (e) {} if (home) openCode(); else openPad(); };
+    sec.querySelectorAll('.cv-myloc [data-m]').forEach(function (b) {
+      b.onclick = async function () {
+        var box = b.closest('.cv-myloc'), id = box.getAttribute('data-link'), m = b.getAttribute('data-m');
+        box.querySelectorAll('[data-m]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        try { var r = await api('/links/' + encodeURIComponent(id) + '/my-location', { method: 'PUT', body: { mode: m } }); if (r.ok) { toast(t('myLocSaved')); sync(); } else toast(t('offline')); } catch (e) { toast(t('offline')); }
+      };
+    });
     sec.querySelectorAll('.cv-fam-row').forEach(function (b) {
       b.onclick = function () { var c = careContacts().filter(function (x) { return String(x.id) === b.getAttribute('data-id'); })[0]; if (c && home) openConsent(c); };
     });

@@ -18,6 +18,7 @@
       noPos: '{first}\'s position appears when {first}\'s phone opens Remiel: Covara.', finding: 'Finding {first}...', noMap: 'Map not available',
       addSensor: 'Rooms appear once a room sensor is added: Settings, Room sensors.', outRooms: '{first} is out of the house.', home: 'Home', ago: '{t} ago', now: 'now',
       emergency: 'Emergency', hospital: 'Hospital', clinic: 'Clinic', doctor: 'Doctor', fall: 'FALL', here: 'HERE',
+      atHomeOf: 'At {home}\'s home', fromHomeOf: '{d} from {home}\'s home', withHome: 'With {home}', homeAway: '{home} is {d} away', homeOf: '{home}\'s home', memberNoShare: '{first} has not shared where they are with you.', memberRooms: 'Rooms are watched in {home}\'s home.',
       moving: 'MOVING NOW', still: 'STILL', stillFor: 'STILL · {t}', heardBy: '{first}\'s phone · {t}', lastHeard: '{first}\'s phone last heard the room {t}',
       tapListen: 'Tap here to let this phone listen to the room for movement.', listenStarting: 'Starting to listen to the room...', listenDenied: 'Bluetooth was not allowed. Tap here to ask again.',
       installApp: 'Open Remiel: Covara in the Android app on {first}\'s phone to listen to the room.', notListening: '{first}\'s phone is not listening to the room yet.', learning: 'LISTENING · LEARNING THE ROOM' },
@@ -26,6 +27,7 @@
       noPos: 'La posizione di {first} appare quando il telefono di {first} apre Remiel: Covara.', finding: 'Cerco {first}...', noMap: 'Mappa non disponibile',
       addSensor: 'Le stanze appaiono quando si aggiunge un sensore: Impostazioni, Sensori delle stanze.', outRooms: '{first} è fuori casa.', home: 'Casa', ago: '{t} fa', now: 'adesso',
       emergency: 'Pronto soccorso', hospital: 'Ospedale', clinic: 'Clinica', doctor: 'Medico', fall: 'CADUTA', here: 'QUI',
+      atHomeOf: 'A casa di {home}', fromHomeOf: 'a {d} dalla casa di {home}', withHome: 'Con {home}', homeAway: '{home} \u00e8 a {d}', homeOf: 'Casa di {home}', memberNoShare: '{first} non condivide con te dove si trova.', memberRooms: 'Le stanze sono quelle della casa di {home}.',
       moving: 'IN MOVIMENTO', still: 'FERMO', stillFor: 'FERMO · {t}', heardBy: 'Telefono di {first} · {t}', lastHeard: 'Il telefono di {first} ha sentito la stanza {t}',
       tapListen: 'Tocca qui perché questo telefono ascolti i movimenti nella stanza.', listenStarting: 'Inizio ad ascoltare la stanza...', listenDenied: 'Il Bluetooth non è stato permesso. Tocca qui per chiedere di nuovo.',
       installApp: 'Apri Remiel: Covara nell\'app Android sul telefono di {first} per ascoltare la stanza.', notListening: 'Il telefono di {first} non ascolta ancora la stanza.', learning: 'IN ASCOLTO · IMPARO LA STANZA' }
@@ -168,14 +170,24 @@
 
   /* ── what the server says ── */
   var _data = null, _for = '', _at = 0, _busy = false, _shownAt = 0;
+  /* WHEREIS follows the sphere chosen: a family member, as that member allows; else HOME */
+  function whoUser() {
+    var f = (typeof focusedContactId !== 'undefined') ? focusedContactId : null; if (f == null || typeof DEMO_CONTACTS === 'undefined') return '';
+    var c = DEMO_CONTACTS.filter(function (x) { return x.id === f; })[0], h = homeContact();
+    if (!c || !c.care || !c.care.userId || c.care.state !== 'active') return '';
+    if (h && c.care.userId === h.care.userId) return '';
+    return c.care.userId;
+  }
   function load(force) {
     if (!authed() || _busy) return;
-    var h = homeUser();
+    var hu = homeUser(), w = whoUser(), h = hu + '|' + w;
     if (!force && _for === h && Date.now() - _at < POLL_MS) return;
+    if (_for !== h) { _data = null; _for = h; }
     _busy = true;
-    SyncEngine.apiFetch('/care/whereis' + (h ? '?home=' + encodeURIComponent(h) : ''), { method: 'GET' })
+    var q = []; if (hu) q.push('home=' + encodeURIComponent(hu)); if (w) q.push('who=' + encodeURIComponent(w));
+    SyncEngine.apiFetch('/care/whereis' + (q.length ? '?' + q.join('&') : ''), { method: 'GET' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { _data = j; _for = h; _at = Date.now(); if (j && j.rooms && j.rooms.phone) _roomAt = _at; _busy = false; mapTo(); })
+      .then(function (j) { if (_for !== h) { _busy = false; return; } _data = j; _for = h; _at = Date.now(); if (j && j.rooms && j.rooms.phone) _roomAt = _at; _busy = false; mapTo(); })
       .catch(function () { _busy = false; _at = Date.now(); });
   }
 
@@ -326,7 +338,7 @@
     if (!has) {
       if (!reduce) sweep(x, c, c, R - 3, now, false);
       [0.33, 0.66].forEach(function (k) { x.beginPath(); x.arc(c, c, R * k, 0, Math.PI * 2); x.strokeStyle = 'rgba(143,180,255,.32)'; x.lineWidth = 1; x.stroke(); });
-      var msg = !d ? t('finding', { first: first(name) }) : !d.share.location ? t('noShare', { first: first(name) }) : t('noPos', { first: first(name) });
+      var msg = !d ? t('finding', { first: first(name) }) : !d.share.location ? t(d.member ? 'memberNoShare' : 'noShare', { first: first(name) }) : t('noPos', { first: first(name) });
       var ls = wrap(msg, Math.max(14, Math.round(R * 1.45 / (fs * 0.62))));
       ls.forEach(function (l, i) { text(x, l, c, c + (i - (ls.length - 1) / 2) * (fs + 5), '500 ' + fs + 'px ' + SANS, '#e6edf8'); });
       rim(x, c, c, R);
@@ -343,9 +355,15 @@
     });
     if (!reduce) sweep(x, c, c, R - 3, now, true);
     /* where home is, when HOME is out and it fits on the radar */
+    var hn = d.member ? first(d.member.home_name) : '';
     if (d.home_spot && d.at_home === false) {
       var hp = at(d.home_spot.lat, d.home_spot.lon), hr = Math.hypot(hp.x - c, hp.y - c);
-      if (hr < R * 0.9) { x.beginPath(); x.arc(hp.x, hp.y, 4, 0, Math.PI * 2); x.fillStyle = '#9fd8ff'; x.fill(); text(x, t('home').toUpperCase(), hp.x, hp.y - 10, '700 ' + Math.max(8, fs - 1) + 'px ' + MONO, '#9fd8ff'); }
+      if (hr < R * 0.9) { x.beginPath(); x.arc(hp.x, hp.y, 4, 0, Math.PI * 2); x.fillStyle = '#9fd8ff'; x.fill(); text(x, (d.member ? t('homeOf', { home: hn }) : t('home')).toUpperCase(), hp.x, hp.y - 10, '700 ' + Math.max(8, fs - 1) + 'px ' + MONO, '#9fd8ff'); }
+    }
+    /* a family member's radar also marks HOME, when HOME is on it and apart from them */
+    if (d.member && d.with_home && !d.with_home.with) {
+      var rp = at(d.with_home.lat, d.with_home.lon), rr = Math.hypot(rp.x - c, rp.y - c);
+      if (rr < R * 0.9) { x.beginPath(); x.arc(rp.x, rp.y, Math.max(6, R * 0.06), 0, Math.PI * 2); x.fillStyle = '#d3b577'; x.fill(); x.strokeStyle = '#fff4d6'; x.lineWidth = 1.2; x.stroke(); text(x, initials(d.member.home_name), rp.x, rp.y + 0.5, '800 ' + Math.max(7, Math.round(R * 0.05)) + 'px ' + SANS, '#1a1200'); }
     }
     /* the nearest health facilities, when HOME is out */
     (d.at_home === false ? (d.health || []) : []).slice(0, 5).forEach(function (f, i) {
@@ -387,8 +405,9 @@
     });
     homeDot(x, c, c, hr2, reduce ? 0 : now, name);
     /* words: who and where, at the foot of the circle */
-    var where = d.inside ? t('inside', { place: d.inside.name }) : d.at_home === true ? t('atHome') : d.at_home === false ? (t('out') + (d.from_home_m != null ? ', ' + t('fromHome', { d: dist(d.from_home_m) }) : '')) : '';
-    var line3 = withL.length ? (withL.some(function (m) { return m.you; }) && withL.length === 1 ? t('withYou') : t('with', { name: withL.map(function (m) { return m.you ? (IT() ? 'te' : 'you') : first(m.name); }).join(', ') }))
+    var where = d.inside ? t('inside', { place: d.inside.name }) : d.member ? (d.at_home === true ? t('atHomeOf', { home: hn }) : d.at_home === false && d.from_home_m != null ? t('fromHomeOf', { d: dist(d.from_home_m), home: hn }) : '')
+      : d.at_home === true ? t('atHome') : d.at_home === false ? (t('out') + (d.from_home_m != null ? ', ' + t('fromHome', { d: dist(d.from_home_m) }) : '')) : '';
+    var line3 = d.member ? (d.with_home ? (d.with_home.with ? t('withHome', { home: hn }) : t('homeAway', { home: hn, d: dist(d.with_home.m) })) : '') : withL.length ? (withL.some(function (m) { return m.you; }) && withL.length === 1 ? t('withYou') : t('with', { name: withL.map(function (m) { return m.you ? (IT() ? 'te' : 'you') : first(m.name); }).join(', ') }))
       : d.closest ? (d.closest.you ? t('nearestYou', { d: dist(d.closest.m) }) : t('nearest', { name: first(d.closest.name), d: dist(d.closest.m) })) : '';
     var nf = d.at_home === false && d.health && d.health[0] && !d.inside ? d.health[0] : null;
     var line4 = nf ? nf.name : '';
@@ -406,11 +425,11 @@
   var ROOM_S = 10, _roomAt = 0, _roomBusy = false;
   function loadRoom() {
     if (!authed() || _roomBusy || !_data || !_data.rooms || !shown()) return;
-    var h = homeUser(); if (_for !== h) return;
+    var h = homeUser(); if (_for !== h + '|') return;
     _roomBusy = true;
     SyncEngine.apiFetch('/care/room' + (h ? '?home=' + encodeURIComponent(h) : ''), { method: 'GET' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { _roomBusy = false; if (j && j.share && _data && _data.rooms && _for === h) { _data.rooms.phone = j.phone; _roomAt = Date.now(); } })
+      .then(function (j) { _roomBusy = false; if (j && j.share && _data && _data.rooms && _for === h + '|') { _data.rooms.phone = j.phone; _roomAt = Date.now(); } })
       .catch(function () { _roomBusy = false; });
   }
   setInterval(loadRoom, ROOM_S * 1000);
@@ -511,6 +530,10 @@
         }
       });
       if (!reduce) sweep(x, cx, cy, r - 2, now, false);
+    } else if (d && d.member) {
+      if (!reduce) sweep(x, cx, cy, r - 2, now, false);
+      homeDot(x, cx, cy - r * 0.3, Math.max(6, r * 0.12), reduce ? 0 : now, name);
+      wrap(t('memberRooms', { home: first(d.member.home_name) }), Math.max(12, Math.round(r * 1.5 / (fs * 0.6)))).slice(0, 4).forEach(function (l, i) { text(x, l, cx, cy + r * 0.05 + i * (fs + 4), '500 ' + fs + 'px ' + SANS, '#e6edf8'); });
     } else if (d && !out && !(d.share && !d.share.rooms) && d.rooms) {
       phoneRoom(x, cx, cy, r, now, reduce, name, fs);
     } else {
