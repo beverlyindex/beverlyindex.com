@@ -8526,10 +8526,46 @@ function uiConfirm(message, okLabel) {
 
 /* Downscale a large photo off the tap: createImageBitmap with resize options where
    available (decoded off the main thread), else a canvas pass after the UI updates. */
+/* What to tell the person when a picture cannot be used */
+function mediaErrText(err) {
+  if (err && err.code === 'heic') return (typeof _t === 'function' ? _t('media.heic', '') : '') || 'This photo is in HEIC format, which this phone cannot show here. Choose another photo, or set the camera to save photos as JPEG.';
+  return (typeof _t === 'function' ? _t('self.error', 'That file could not be used. Try another photo or clip.') : 'That file could not be used. Try another photo or clip.');
+}
+/* A JPEG's width and height, read from its header (no decoding): the first frame marker after the start. */
+async function jpegSize(blob) {
+  try {
+    var b = new Uint8Array(await blob.slice(0, Math.min(blob.size, 262144)).arrayBuffer());
+    if (b[0] !== 0xFF || b[1] !== 0xD8) return null;
+    var i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xFF) { i++; continue; }
+      var m = b[i + 1], len = (b[i + 2] << 8) | b[i + 3];
+      if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) return { h: (b[i + 5] << 8) | b[i + 6], w: (b[i + 7] << 8) | b[i + 8] };
+      if (m === 0xD8 || m === 0x01 || (m >= 0xD0 && m <= 0xD7)) { i += 2; continue; }
+      i += 2 + len;
+    }
+  } catch (e) {}
+  return null;
+}
 async function downscalePhoto(blob, maxEdge) {
   maxEdge = maxEdge || 1280;
   try {
     if (!blob || !/^image\//.test(blob.type || '') || /gif|svg/.test(blob.type)) return blob;
+    /* Fast path for camera photos: the size comes from the file header, and the photo is decoded once, off the
+       main thread, then drawn at the reduced size. Before, it was decoded twice on the main thread. */
+    var js = /jpe?g/.test(blob.type) ? await jpegSize(blob) : null;
+    if (js && js.w && js.h && typeof createImageBitmap === 'function') {
+      if (Math.max(js.w, js.h) <= maxEdge && blob.size < 1500000) return blob;
+      try {
+        var bm = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+        var sc0 = Math.min(1, maxEdge / Math.max(bm.width, bm.height)), w0 = Math.round(bm.width * sc0), h0 = Math.round(bm.height * sc0);
+        var c0 = (typeof OffscreenCanvas !== 'undefined') ? new OffscreenCanvas(w0, h0) : Object.assign(document.createElement('canvas'), { width: w0, height: h0 });
+        c0.getContext('2d').drawImage(bm, 0, 0, w0, h0);
+        try { bm.close(); } catch (e) {}
+        var o0 = c0.convertToBlob ? await c0.convertToBlob({ type: 'image/jpeg', quality: 0.86 }) : await new Promise(function (r) { c0.toBlob(r, 'image/jpeg', 0.86); });
+        if (o0 && o0.size) return o0;
+      } catch (e) { /* the slower path below */ }
+    }
     var im = new Image();
     var u = URL.createObjectURL(blob);
     im.src = u;
@@ -8610,6 +8646,9 @@ var SphereMedia = (function () {
     }
     if (_str(head, 4, 8) === 'ftyp') {
       var brand = _str(head, 8, 12);
+      /* HEIC and AVIF photos share the same box as MP4 video; their brand tells them apart */
+      if (/^(heic|heix|heim|heis|hevc|hevx|mif1|msf1)$/.test(brand)) return { kind: 'photo', mime: 'image/heic' };
+      if (/^(avif|avis)$/.test(brand)) return { kind: 'photo', mime: 'image/avif' };
       return { kind: 'video', mime: brand === 'qt  ' ? 'video/quicktime' : (/^video\//.test(mt) ? mt : 'video/mp4') };
     }
     if (head[0] === 0x1A && head[1] === 0x45 && head[2] === 0xDF && head[3] === 0xA3) return { kind: 'video', mime: 'video/webm' };
@@ -8628,6 +8667,13 @@ var SphereMedia = (function () {
     var blob = file;
     if (s.kind === 'photo') {
       if (s.mime === 'image/gif') blob = file.type === 'image/gif' ? file : new Blob([file], { type: 'image/gif' });
+      else if (s.mime === 'image/heic') {
+        /* HEIC: kept as a JPEG when this browser can read it; otherwise say so plainly */
+        var hb = null;
+        try { var bmh = await createImageBitmap(new Blob([file], { type: 'image/heic' })); var ch0 = document.createElement('canvas'); var sch = Math.min(1, 1280 / Math.max(bmh.width, bmh.height)); ch0.width = Math.round(bmh.width * sch); ch0.height = Math.round(bmh.height * sch); ch0.getContext('2d').drawImage(bmh, 0, 0, ch0.width, ch0.height); hb = await new Promise(function (r) { ch0.toBlob(r, 'image/jpeg', 0.86); }); } catch (e) { hb = null; }
+        if (!hb) { var he = new Error('heic'); he.code = 'heic'; throw he; }
+        blob = hb;
+      }
       else blob = await downscalePhoto(file, 1280);
     } else if (String(file.type || '').split(';')[0].toLowerCase() !== s.mime) {
       blob = new Blob([file], { type: s.mime });
@@ -13111,6 +13157,7 @@ const I18n = (function () {
     "wx.checked": "Checked {n} min ago.",
     "wx.noneNow": "No official warnings there now.",
     "wx.close": "Close",
+    "media.heic": "This photo is in HEIC format, which this phone cannot show here. Choose another photo, or set the camera to save photos as JPEG.",
     "wx.keep": "Keep watching",
     "wx.remove": "Remove",
     "wx.removed": "Removed. It will not show again unless it gets worse.",
@@ -13485,6 +13532,7 @@ const I18n = (function () {
     "wx.checked": "Controllato {n} min fa.",
     "wx.noneNow": "Nessun avviso ufficiale l\u00EC ora.",
     "wx.close": "Chiudi",
+    "media.heic": "Questa foto è in formato HEIC, che questo telefono non può mostrare qui. Scegli un'altra foto, oppure imposta la fotocamera per salvare in JPEG.",
     "wx.keep": "Continua a seguire",
     "wx.remove": "Rimuovi",
     "wx.removed": "Rimosso. Non riapparir\u00e0 a meno che non peggiori.",
@@ -15431,7 +15479,7 @@ async function _obSaveAndLaunch() {
         const prep = await SphereMedia.prepare(p.photoBlob);
         await RemielDB.putPhoto(cid, prep.blob, prep.kind);
         await SphereMedia.show(cid, prep.blob, prep.kind);
-      } catch (err) { console.warn('obContactPhoto save error', err); }
+      } catch (err) { console.warn('obContactPhoto save error', err); try { showToast(mediaErrText(err)); } catch (e2) {} }
     }
   }
 
@@ -16554,17 +16602,22 @@ function hitTestNetwork(clientX, clientY) {
   // Center sphere (user) — matches render size (CSS px)
   const W = CV.width / DPR;
   const centerR = netCenterR(W);
-  if (!_iso && Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
-  // Contact nodes — find front-most hit
-  let closest = null;
-  let closestZ = -Infinity;
+  /* The sphere drawn on top wins. A smaller depth is nearer the viewer (projectNode's scale grows as z falls),
+     and the centre sphere sits at depth NET_DIST: a person's sphere passing in front of it takes the tap, so a
+     double tap on that person never opens the centre's own card by mistake. */
+  const centreHit = !_iso && Math.hypot(mx - cx, my - cy) < centerR * 1.2;
+  let closest = null, closestZ = Infinity, inside = false;
   for (const node of NODES) {
     if (_iso && node.contact.id !== focusedContactId) continue;
     const p = projectNode(node);
-    const d = Math.hypot(mx - p.sx, my - p.sy);
-    const hitR = node.r * p.scale * 1.6;
-    if (d < hitR && p.z > closestZ) { closest = node; closestZ = p.z; }
+    const d = Math.hypot(mx - p.sx, my - p.sy), r = node.r * p.scale;
+    if (d >= r * 1.45) continue;
+    /* on the sphere itself beats near its edge; then nearest the viewer */
+    const on = d < r;
+    if ((on && !inside) || (on === inside && p.z < closestZ)) { closest = node; closestZ = p.z; inside = on; }
   }
+  if (closest && (!centreHit || closestZ < NET_DIST)) return { isCenter: false, node: closest };
+  if (centreHit) return { isCenter: true };
   return closest ? { isCenter: false, node: closest } : null;
 }
 
@@ -17508,6 +17561,7 @@ function openBluf(sphereScreenY) {
   }
 
   overlay.classList.add('open');
+  try { if (window.CovaraNav && CovaraNav.refresh) CovaraNav.refresh(); } catch (e) {}
 
   /* Start at the top of the card. scrollIntoView pushed the card up under the
      fixed app header, so the overlay itself is scrolled to 0 instead. */
@@ -17529,6 +17583,7 @@ function closeBluf() {
   const overlay = document.getElementById('blufOverlay');
   overlay.classList.remove('open');
   overlay.style.paddingTop = '';
+  try { if (window.CovaraNav && CovaraNav.refresh) CovaraNav.refresh(); } catch (e) {}
   overlay.style.justifyContent = '';
   if (appState === 'network') {
     setTimeout(() => { netSpin = true; }, 400);
@@ -28194,7 +28249,7 @@ function handleContactPhoto(e) {
     else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
   }).catch(function(err) {
     console.error('RemielDB: photo save FAILED for', contactId, err);
-    showToast(_t('self.error', 'That file could not be used. Try another photo or clip.'));
+    showToast(mediaErrText(err));
   });
 }
 
@@ -28616,7 +28671,7 @@ const SelfSphere = (() => {
     } catch (err) {
       unbusy(b);
       console.warn('[SelfSphere] update failed', err);
-      _status(root, _t('self.error', 'That file could not be used. Try another photo or clip.'), true);
+      _status(root, mediaErrText(err), true);
     }
   }
 
@@ -42891,7 +42946,7 @@ async function saveContactModal() {
           const shown = await SphereMedia.show(_cmEditId, prep.blob, prep.kind);
           if (shown && shown.failed) showToast(SphereMedia.cannotPlayNotice());
           else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
-        } catch (e) { console.error('Modal photo save FAILED', _cmEditId, e); }
+        } catch (e) { console.error('Modal photo save FAILED', _cmEditId, e); showToast(mediaErrText(e)); }
       }
 
       // Rebuild constellation nodes and refresh BLUF
@@ -42928,7 +42983,7 @@ async function saveContactModal() {
         const shown = await SphereMedia.show(newId, prep.blob, prep.kind);
         if (shown && shown.failed) showToast(SphereMedia.cannotPlayNotice());
         else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
-      } catch(e) { console.error('Modal photo save FAILED', newId, e); }
+      } catch(e) { console.error('Modal photo save FAILED', newId, e); showToast(mediaErrText(e)); }
     }
 
     // Rebuild constellation nodes

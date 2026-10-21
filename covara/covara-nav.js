@@ -424,6 +424,7 @@
     if (typeof appState !== 'undefined' && appState !== 'network') return false;
     var ob = document.getElementById('onboarding'); if (ob && !ob.hidden && getComputedStyle(ob).display !== 'none') return false;
     if (document.querySelector('.cv-ov.open') || document.body.classList.contains('rs-overlay-open')) return false;
+    var bo = document.getElementById('blufOverlay'); if (bo && bo.classList.contains('open')) return false; /* a person's card: Covara's own controls step aside so nothing sits on it */
     return true;
   }
   function tick() {
@@ -437,5 +438,5 @@
   }
   setInterval(tick, 500);
   window.addEventListener('localeChanged', function () { if (built) words(); _dsig = ''; });
-  window.CovaraNav = { home: goHome, now: everythingNow, share: shareDoctor, step: step, calm: setCalm, summary: function () { return _sum; }, act: act };
+  window.CovaraNav = { home: goHome, now: everythingNow, share: shareDoctor, step: step, calm: setCalm, refresh: function () { try { tick(); } catch (e) {} }, summary: function () { return _sum; }, act: act };
 })();
