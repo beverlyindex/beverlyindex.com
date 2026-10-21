@@ -1291,7 +1291,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-21.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-21.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2919,7 +2919,11 @@ function tripStart(){ if(W.on) return; const me=ePos(), fresh=me && Date.now()-m
     if(N && st.permission==='granted' && st.locationOn!==false && (!PH.on || PH.lost || st.listening===false)){ try{ N.start(); }catch(e){} PH.native=true; PH.on=true; PH.lost=false; PH.asked=Date.now(); store.set('halo_listen','1'); if(!PH.timer) PH.timer=setInterval(phFlush, 2000); S.tripListen=Date.now(); } }
   LIVE.leg=null; LIVE.devs.forEach(d=>{ d.trk=null; d.withYou=false; d.maybe=false; d.tested=false; d.verdict='near'; });          // "moving with you" on this trip is read from this trip's own legs
   walkStart(Date.now(), fresh?me:null, 0); if(!S.pos) geoAsk().then(()=>renderVicinity());
-  if(S.tripListen && Date.now()-S.tripListen<2000){ wEvent('note','Listening started with the trip.'); setTimeout(()=>{ if(!W.on) return; PH.nstat=nativeStatus(); if(PH.nstat && PH.nstat.listening===false){ PH.lost=true; wEvent('warn','This phone did not start listening. Open Remiel and press Start listening.'); renderVicinity(); } }, 8000); }
+  if(S.tripListen && Date.now()-S.tripListen<2000){ wEvent('note','Listening started with the trip.'); const t0=S.tripListen;          // a phone can take 20 seconds to begin: the warning waits for that, and for the first report
+    const heard=()=>LIVE.seen.mobile-LIVE.skew>=t0, check=(last)=>{ if(!W.on || heard()) return; PH.nstat=nativeStatus(); if(!PH.nstat || PH.nstat.listening!==false) return;
+      if(!last) return void setTimeout(()=>check(true), 12000);
+      PH.lost=true; wEvent('warn','This phone did not start listening. Open Remiel and press Start listening.'); renderVicinity(); };
+    setTimeout(()=>check(false), 8000); }
   toast('Trip started. Remiel is recording your path and every device along it.'); }
 function wpSweep(w){ LIVE.devs.forEach(d=>{ if(!d.present || d.band==='cell' || quietAp(d) || !(d.dist<=WP_M || (d.cls==='Vehicle' && d.dist<=40))) return; const e=w.devs[d.id], m=Math.max(1,Math.round(d.dist));
     if(!e || m<e.m) w.devs[d.id]={id:d.id, sig:d.sig, name:devName(d), kind:kindShort(d), cls:d.cls, m, yours:isYours(d)}; }); }
@@ -7795,6 +7799,7 @@ async function nativeDrain(){
         const bs=String(x.b).toLowerCase(), flock=FLOCK_SSID.test(String(x.s||'')) || bs.indexOf(FLOCK_OUI)===0, drone=!flock && DRONE_SSID.test(String(x.s||''));
         list.push({id:'ap:'+bs, rssi:x.r, band:'wifi', cls:(flock||drone)?'Camera':'Access point', name:String(x.s||'').slice(0,40), hint:flock?'Flock Safety camera, Wi-Fi on':drone?'Drone, by its Wi-Fi name':(open?'Open network':'Secured network')+(x.f>=5925?', 6 GHz':x.f>=4900?', 5 GHz':', 2.4 GHz'), conf:3, flags:open?['open']:[]}); });
       LIVE.seen.mobile=Math.max(LIVE.seen.mobile, b.t+LIVE.skew);      // the phone reported, whether or not anything was in earshot
+      if(PH.lost && PH.asked && b.t>=PH.asked){ PH.lost=false; if(W.on) wEvent('note','This phone is listening.'); }          // it is hearing: whatever said it was not is past
       if(typeof b.sa==='number') LIVE.sa=b.sa;
       if(list.length) ingestReport('this-phone', b.t+LIVE.skew, {t:b.t, pos:used?{lat:q.lat,lon:q.lon,acc:typeof q.acc==='number'?q.acc:25}:undefined, s:list}, LIVE.skew);          // a sighting is placed at this fix only when the fix passed Remiel's checks; otherwise at the last position that did
       if(!live && W.on && list.length) walkTick(b.t, [...new Set(list.map(x=>(LIVE.alias||{})[x.id]||x.id))], used?q:null);
