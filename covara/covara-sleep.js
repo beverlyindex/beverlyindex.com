@@ -14,7 +14,7 @@
       howPhone: 'Or leave the phone on the bed overnight with Night watch on. It estimates sleep from movement only.', howPhoneAway: 'Or turn on Night watch on {name}’s own phone: Health, Sleep and breathing.',
       nightWatch: 'Start Night watch on this phone', nwTitle: 'NIGHT WATCH', nwOn: 'Night watch is on', nwHelp: 'Put the phone on the bed beside the pillow, face down, plugged in. The screen goes dark by itself.',
       nwMic: 'Also listen to the room (only how loud it is is kept, never the sound)', nwStop: 'Stop Night watch', nwSaved: 'Saved through {t}', nwNoMotion: 'This phone does not report movement, so Night watch cannot work here.',
-      nwKeep: 'Keep Covara open. If the screen turns off, Night watch pauses.', nwTap: 'Tap to see', h: 'h', m: 'm' },
+      nwKeep: 'Keep Covara open. If the screen turns off, Night watch pauses.', nwTap: 'Tap to see', h: 'h', m: 'm', subWatch: 'From a watch or ring (Health Connect)', hcUse: 'Use my watch or ring (Health Connect)', hcOn: 'Watch or ring connected through Health Connect. Last sent {t}.', hcNone: 'Health Connect is not on this phone.', hcSync: 'Send it now', hcDenied: 'Covara was not allowed to read sleep. You can allow it in Health Connect at any time.', hcPrivacy: 'How Covara uses this', wiUse: 'Connect a Withings sleep mat or watch', wiOn: 'Withings connected. Last night arrives on its own each morning.', wiOff: 'Disconnect Withings', wiDone: 'Withings is connected. Last night will appear here shortly.', wiFail: 'Withings did not connect. Try again.', wiNotSet: 'Withings is not set up on Covara\u2019s server yet.' },
     it: { title: 'Sonno e respiro', subNone: 'Ancora nessuna lettura del sonno', subRadar: 'Dal sensore accanto al letto', subPhone: 'Dal telefono sul letto (una stima approssimativa)',
       now: 'Ora', inBed: 'A letto', outBed: 'Fuori dal letto', away: 'Non nella stanza', st_deep: 'Sonno profondo', st_light: 'Sonno leggero', st_awake: 'Sveglio', st_out: 'Fuori dal letto', st_none: 'Nessuno',
       breath: 'Respiro', heart: 'Cuore', perMin: '/min', lastNight: 'La notte scorsa', asleep: 'Ha dormito', deep: 'Profondo', woke: 'Sveglio a letto', up: 'Si è alzato', times: '{n} volte', once: 'una volta', never: 'mai',
@@ -24,7 +24,7 @@
       howPhone: 'Oppure lascia il telefono sul letto di notte con Veglia notturna attiva. Stima il sonno solo dal movimento.', howPhoneAway: 'Oppure attiva Veglia notturna sul telefono di {name}: Salute, Sonno e respiro.',
       nightWatch: 'Avvia Veglia notturna su questo telefono', nwTitle: 'VEGLIA NOTTURNA', nwOn: 'Veglia notturna attiva', nwHelp: 'Metti il telefono sul letto accanto al cuscino, a faccia in giù, in carica. Lo schermo si oscura da solo.',
       nwMic: 'Ascolta anche la stanza (si tiene solo il volume, mai il suono)', nwStop: 'Ferma Veglia notturna', nwSaved: 'Salvato fino alle {t}', nwNoMotion: 'Questo telefono non segnala il movimento, quindi Veglia notturna non funziona qui.',
-      nwKeep: 'Tieni Covara aperta. Se lo schermo si spegne, Veglia notturna si ferma.', nwTap: 'Tocca per vedere', h: 'h', m: 'min' }
+      nwKeep: 'Tieni Covara aperta. Se lo schermo si spegne, Veglia notturna si ferma.', nwTap: 'Tocca per vedere', h: 'h', m: 'min', subWatch: 'Da un orologio o anello (Health Connect)', hcUse: 'Usa il mio orologio o anello (Health Connect)', hcOn: 'Orologio o anello collegato tramite Health Connect. Ultimo invio {t}.', hcNone: 'Health Connect non è su questo telefono.', hcSync: 'Invia ora', hcDenied: 'Covara non ha il permesso di leggere il sonno. Puoi darlo in Health Connect quando vuoi.', hcPrivacy: 'Come Covara usa questi dati', wiUse: 'Collega un tappetino o un orologio Withings', wiOn: 'Withings collegato. La notte arriva da sola ogni mattina.', wiOff: 'Scollega Withings', wiDone: 'Withings è collegato. La notte scorsa apparirà qui a breve.', wiFail: 'Withings non si è collegato. Riprova.', wiNotSet: 'Withings non è ancora configurato sul server di Covara.' }
   };
   function IT() { try { return String(I18n.locale || 'en').slice(0, 2) === 'it'; } catch (e) { return false; } }
   function t(k, p) { var s = (IT() ? S.it : S.en)[k] || S.en[k] || k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
@@ -67,7 +67,7 @@
     var h = '';
     if (!v || !v.source) {
       h += '<div class="cvx-sub">' + esc(t('noneHow')) + '</div><ul class="cvh-w"><li>' + esc(t('howRadar')) + '</li><li>' + esc(self ? t('howPhone') : t('howPhoneAway', { name: name })) + '</li></ul>';
-      if (self) h += '<button type="button" class="cvx-add" data-sleep-act="watch">' + esc(t('nightWatch')) + '</button>';
+      if (self) h += hcBlock() + '<button type="button" class="cvx-add" data-sleep-act="watch">' + esc(t('nightWatch')) + '</button>';
       return h;
     }
     var live = (v.sensors || []).filter(function (s) { return s.vitals; })[0];
@@ -89,7 +89,8 @@
         (n.breath ? '<div class="cvs-sp"><small style="color:#22d3a6">' + esc(t('breath')) + '</small>' + spark(v.series, 'breath', '#22d3a6', 6, 34) + '</div>' : '') +
         (n.heart ? '<div class="cvs-sp"><small style="color:#ff6b8a">' + esc(t('heart')) + '</small>' + spark(v.series, 'heart', '#ff6b8a', 40, 120) + '</div>' : '');
     }
-    h += '<div class="cvx-sub" style="margin-top:8px">' + esc(v.source === 'radar' ? t('subRadar') : t('subPhone')) + '. ' + esc(t('trend')) + '</div>';
+    h += '<div class="cvx-sub" style="margin-top:8px">' + esc(v.source === 'radar' ? t('subRadar') : v.source === 'watch' ? t('subWatch') : t('subPhone')) + '. ' + esc(t('trend')) + '</div>';
+    if (self) h += hcBlock();
     if (self && v.source !== 'radar') h += '<button type="button" class="cvx-add" data-sleep-act="watch">' + esc(t('nightWatch')) + '</button>';
     return h;
   }
@@ -101,6 +102,50 @@
     '#cvNight label{display:flex;gap:8px;align-items:center;justify-content:center;font-size:13px;color:#55627e;margin:10px 0}#cvNight button{margin-top:16px;min-height:44px;padding:0 20px;border-radius:22px;border:1px solid #2a3550;background:transparent;color:#7f8fb0;font:600 14px var(--nous-font,sans-serif)}' +
     '#cvNight.dim>*{opacity:.18}#cvNight .sv{font-size:12px;color:#3d4a66}';
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+
+  /* ── a watch or ring, through the phone's health store (the Android app only) ── */
+  function hc() { try { return window.CovaraNative && typeof CovaraNative.healthStatus === 'function' ? CovaraNative.healthStatus() : null; } catch (e) { return null; } }
+  var LASTK = 'cv:hcSync';
+  function lastSync() { try { return +localStorage.getItem(LASTK) || 0; } catch (e) { return 0; } }
+  var _wi = null;
+  function wiLoad() { try { SyncEngine.apiFetch('/care/withings').then(function (r) { return r.json(); }).then(function (j) { _wi = j; }).catch(function () {}); } catch (e) {} }
+  function wiBlock() {
+    if (!_wi || !_wi.configured) return '';
+    if (_wi.connected) return '<div class="cvx-sub" style="margin-top:8px">' + esc(t('wiOn')) + '</div><button type="button" class="cvx-add" data-sleep-act="wioff">' + esc(t('wiOff')) + '</button>';
+    return '<button type="button" class="cvx-add" data-sleep-act="wi">' + esc(t('wiUse')) + '</button>';
+  }
+  setTimeout(wiLoad, 6000);
+  try {
+    var qw = new URLSearchParams(location.search).get('withings');
+    if (qw) { setTimeout(function () { alertBox(t(qw === 'connected' ? 'wiDone' : 'wiFail')); wiLoad(); try { CovaraView.load(); } catch (e) {} }, 4000); history.replaceState(null, '', location.pathname); }
+  } catch (e) {}
+  function hcBlock() {
+    var st = hc(); if (!st) return wiBlock();
+    var priv = ' <a href="health-privacy.html" target="_blank" rel="noopener" style="color:#9fd8ff">' + esc(t('hcPrivacy')) + '</a>';
+    if (st === 'granted') return wiBlock() + '<div class="cvx-sub" style="margin-top:8px">' + esc(t('hcOn', { t: lastSync() ? hm(lastSync()) : '…' })) + priv + '</div><button type="button" class="cvx-add" data-sleep-act="hcsync">' + esc(t('hcSync')) + '</button>';
+    if (st === 'unavailable') return wiBlock();
+    return '<button type="button" class="cvx-add" data-sleep-act="hc">' + esc(t('hcUse')) + '</button><div class="cvx-sub">' + priv + '</div>' + wiBlock();
+  }
+  async function hcSync(force) {
+    if (hc() !== 'granted' || role() !== 'home') return;
+    if (!force && Date.now() - lastSync() < 30 * 60000) return;
+    try {
+      await SyncEngine.apiFetch('/care/me');   /* makes sure the sign in is fresh before the phone uses it */
+      CovaraNative.healthSync(SyncEngine.getApiBase(), SyncEngine.getAccessToken());
+    } catch (e) {}
+  }
+  if (!window.CovaraNativeEvent) window.CovaraNativeEvent = function (j) { try { window.dispatchEvent(new CustomEvent('covara-native', { detail: JSON.parse(j) })); } catch (e) {} };
+  window.addEventListener('covara-native', function (e) {
+    var d = e.detail || {};
+    if (d.kind === 'resume') { hcSync(false); return; }
+    if (d.kind !== 'health') return;
+    if (d.type === 'granted') hcSync(true);
+    else if (d.type === 'denied') alertBox(t('hcDenied'));
+    else if (d.type === 'unavailable') alertBox(t('hcNone'));
+    else if (d.type === 'synced') { try { localStorage.setItem(LASTK, String(Date.now())); } catch (x) {} try { if (window.CovaraView) CovaraView.load(); } catch (x) {} }
+  });
+  setTimeout(function () { hcSync(false); }, 15000);
+  setInterval(function () { hcSync(false); }, 10 * 60000);
 
   /* ── Night watch: HOME's phone on the bed, a reading a minute ── */
   var nw = null;
@@ -169,7 +214,9 @@
     try { if (window.CovaraView) CovaraView.load(); } catch (e) {}
   }
   function alertBox(msg) { try { if (typeof showToast === 'function') showToast(msg); else window.alert(msg); } catch (e) {} }
-  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-sleep-act]'); if (!b) return; e.preventDefault(); e.stopPropagation(); if (b.getAttribute('data-sleep-act') === 'watch') startWatch(); }, true);
+  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-sleep-act]'); if (!b) return; e.preventDefault(); e.stopPropagation(); var act = b.getAttribute('data-sleep-act'); if (act === 'watch') startWatch(); else if (act === 'hc') { try { CovaraNative.healthConnect(); } catch (x) {} } else if (act === 'hcsync') hcSync(true);
+    else if (act === 'wi') { SyncEngine.apiFetch('/care/withings/start', { method: 'POST' }).then(function (r) { return r.json().then(function (j) { if (r.ok && j.url) location.href = j.url; else alertBox(t('wiNotSet')); }); }).catch(function () { alertBox(t('wiFail')); }); }
+    else if (act === 'wioff') { SyncEngine.apiFetch('/care/withings', { method: 'DELETE' }).then(function () { wiLoad(); setTimeout(function () { try { CovaraView.load(); } catch (e) {} }, 500); }).catch(function () {}); } }, true);
 
   /* For the 24 hour schedule bar: HOME's sleep as bands */
   function bands(series) {
