@@ -23,7 +23,7 @@
 
   var CARDS = [
     /* Covara's own */
-    '.dream-comm', '.dream-brief', '#cvnDayTip', '#cvTalkBubble', '.cvn-slot', '.cvn-who', '#cvCam .card',
+    '.dream-comm', '.dream-brief', '#cvnDayTip', '#cvTalkBubble', '#cvCam .card', '.cvn-box', '.daily-digest',
     '.cv-sheet', '.cv-panel', '.cv-pop', '.cv-toast', '.cvs-card', '.cv-card',
     /* the person's card and everything that opens from the galaxy */
     '.bluf-card', '.overlay-panel', '.sentinel-guide', '.st-card', '.intel-box', '.ios-hint', '.contacts-popup',
@@ -32,16 +32,19 @@
     '.help-card', '.team-menu', '.team-card', '.wx-chip', '.bev-tile'
   ];
   var CHIPS = ['.cvn-chip', '.cvn-step', '.cvn-btn', '.cv-btn:not(.pri)', '.cv-pad button', '.cv-code span', '#cvCam .ask button',
-    '.iso-btn', '.iso-x', '.lib-pill', '.sv-badge', '.bluf-pull', '.dream-brief .db-wx'];
+    '.iso-btn', '.iso-x', '.lib-pill', '.sv-badge', '.bluf-pull', '.dream-brief .db-wx',
+    '.dd-bluf', '.dd-streak', '.dd-alert-item', '.dd-med-item', '.cvs-tiles span'];
   var FIELDS = ['.cvt-f textarea', '.cvt-f input[type=text]', '.cvt-f input[type=email]', '.cvt-f input[type=tel]', '.cvt-f input[type=number]',
     '.cvt-f input[type=date]', '.cvt-f input[type=time]', '.cvt-f select', '.intel-box textarea'];
   var DIMS = ['.bluf-overlay', '.overlay', '.contact-modal-overlay', '.sync-prompt-overlay', '.roster-modal-overlay', '.sv-overlay',
-    '.sentinel-msg-overlay', '.ui-confirm-overlay', '.clv-overlay', '.intel-modal'];
+    '.sentinel-msg-overlay', '.ui-confirm-overlay', '.clv-overlay', '.intel-modal', '.cvn-sheet'];
 
   var css = CARDS.join(',') + '{' + GLASS + '}' +
     CHIPS.join(',') + '{' + CHIP + '}' +
     FIELDS.join(',') + '{' + FIELD + '}' +
     DIMS.join(',') + '{' + DIM + '}' +
+    /* the Camera, Where and Circle cards are cards on a wide screen; on a phone they are bare orbs and stay so */
+    '@media (min-width:701px){.cvn-slot,.cvn-who{' + GLASS + '}}' +
     /* the brief's own darkness setting is turned down too, for its layered background */
     '.dream-brief{--db-bg:0.22 !important}' +
     /* the person's card keeps its panels light inside the glass */
