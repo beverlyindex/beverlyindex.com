@@ -19853,7 +19853,11 @@ const SentinelMessaging = (() => {
           const isNew = !(serverId && before.some(x => x.serverId === serverId));
           await _noteUnknown(key, _unknownNames[key], isNew);
         }
+        let _isNewMsg = true;
+        try { const _th = await _loadThread(key); _isNewMsg = !(serverId && _th.some(x => x.serverId === serverId)); } catch (_) {}
         await receiveResponse(key, m.text, { serverId: serverId, ts: m.ts });
+        /* Covara: a new message reaches the headline (Talk messages) and, after a Talk message, opens the thread */
+        if (_isNewMsg) { try { window.dispatchEvent(new CustomEvent('covara-message', { detail: { contactId: key, text: m.text, ts: m.ts || Date.now(), name: contact ? ((contact.first || '') + ' ' + (contact.last || '')).trim() : (_unknownNames[key] || '') } })); } catch (_) {} }
       }
 
       if (data.cursor != null) {
