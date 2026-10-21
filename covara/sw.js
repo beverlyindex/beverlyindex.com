@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-covara-v141';
+const CACHE_NAME = 'remiel-covara-v142';
 
 const PRECACHE_URLS = [
   './',
