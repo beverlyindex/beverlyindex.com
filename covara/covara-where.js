@@ -181,7 +181,8 @@
   function load(force) {
     if (!authed() || _busy) return;
     var hu = homeUser(), w = whoUser(), h = hu + '|' + w;
-    if (!force && _for === h && Date.now() - _at < POLL_MS) return;
+    var urgent = false; try { urgent = !!(window.CovaraHelp && CovaraHelp.list().length); } catch (e) {}
+    if (!force && _for === h && Date.now() - _at < (urgent ? 8000 : POLL_MS)) return;
     if (_for !== h) { _data = null; _for = h; }
     _busy = true;
     var q = []; if (hu) q.push('home=' + encodeURIComponent(hu)); if (w) q.push('who=' + encodeURIComponent(w));
@@ -492,10 +493,35 @@
     }
   }
 
+  function precision(x, cx, cy, r, now, hp, name, reduce, alpha) {
+    var fs = Math.max(8, Math.min(10.5, Math.round(r * 0.1))), acc = Math.max(1, Number(hp.location.accuracy) || 15);
+    x.save(); x.globalAlpha = Math.min(1, 0.8 + alpha * 0.4);
+    x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.clip();
+    var bg = x.createRadialGradient(cx, cy, r * 0.05, cx, cy, r); bg.addColorStop(0, '#3a0b16'); bg.addColorStop(.7, '#1a0610'); bg.addColorStop(1, '#090208'); x.fillStyle = bg; x.fillRect(cx - r, cy - r, 2 * r, 2 * r);
+    /* scale: the outer ring is the larger of 10 ft (3 m) and the phone's own accuracy, so the spot is never drawn tighter than the phone knows */
+    var span = Math.max(3.05, acc * 1.25), px = r * 0.86 / span;
+    [0.33, 0.66, 1].forEach(function (k) { x.beginPath(); x.arc(cx, cy, r * 0.86 * k, 0, Math.PI * 2); x.strokeStyle = 'rgba(255,140,160,' + (k === 1 ? .55 : .3) + ')'; x.lineWidth = 1; x.setLineDash(k === 1 ? [] : [3, 4]); x.stroke(); x.setLineDash([]); });
+    x.strokeStyle = 'rgba(255,170,185,.35)'; x.beginPath(); x.moveTo(cx - r, cy); x.lineTo(cx + r, cy); x.moveTo(cx, cy - r); x.lineTo(cx, cy + r); x.stroke();
+    /* the phone's accuracy as a soft red disc, the caller in the middle, pulsing */
+    var ar = Math.min(r * 0.86, acc * px);
+    x.beginPath(); x.arc(cx, cy, ar, 0, Math.PI * 2); x.fillStyle = 'rgba(255,60,90,.18)'; x.fill(); x.strokeStyle = 'rgba(255,90,115,.8)'; x.lineWidth = 1.4; x.stroke();
+    var k2 = reduce ? 0.5 : (now % 1200) / 1200;
+    x.beginPath(); x.arc(cx, cy, 6 + k2 * r * 0.35, 0, Math.PI * 2); x.strokeStyle = 'rgba(255,90,115,' + (0.8 * (1 - k2)) + ')'; x.lineWidth = 2; x.stroke();
+    homeDot(x, cx, cy, Math.max(6, r * 0.11), reduce ? 0 : now, name);
+    var imp = !IT();
+    text(x, (hp.room ? String(hp.room).toUpperCase() + ' \u00b7 ' : '') + (imp ? Math.round(span * 3.281) + ' FT' : Math.round(span) + ' M'), cx, cy - r * 0.84, '700 ' + Math.max(7, fs - 1) + 'px ' + MONO, '#ffc7d2');
+    text(x, (imp ? '\u00b1' + Math.max(5, Math.round(acc * 3.281)) + ' ft' : '\u00b1' + Math.round(acc) + ' m') + ' \u00b7 ' + ago(hp.location.at), cx, cy + r * 0.62, '700 ' + fs + 'px ' + MONO, '#ffe3e8');
+    x.restore();
+    rim(x, cx, cy, r);
+  }
+
   /* ── the room radar: inside the home or facility where HOME is ── */
   function drawMicro(x, cx, cy, r, now, alpha) {
     var d = _data, reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     var name = (d && d.home && d.home.name) || '';
+    /* someone called for help: the small circle is the precise spot, the room or the tightest circle the phone gives */
+    var hp = null; try { hp = d && d.home && window.CovaraHelp ? CovaraHelp.forPerson(d.home.id) : null; } catch (e) {}
+    if (hp) { precision(x, cx, cy, r, now, hp, name, reduce, alpha); return; }
     x.save();
     x.globalAlpha = Math.min(1, 0.72 + alpha * 0.6);
     x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.clip();
