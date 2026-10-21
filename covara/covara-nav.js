@@ -93,6 +93,7 @@
     '#cvnDay .mk{position:absolute;left:43px;width:8px;height:1px;background:rgba(143,180,255,.35)}' +
     '#cvnDay .tk{position:absolute;left:0;width:38px;text-align:right;transform:translateY(-50%);font:600 9px var(--nous-mono,"JetBrains Mono",monospace);color:#8fa6cc;white-space:nowrap}' +
     '#cvnDay .bd{position:absolute;left:52px;width:6px;border-radius:3px;background:linear-gradient(180deg,rgba(197,165,90,.9),rgba(197,165,90,.55));box-shadow:0 0 8px rgba(197,165,90,.6)}' +
+    '#cvnDay .bd.deep{background:linear-gradient(180deg,rgba(109,93,252,.95),rgba(109,93,252,.6));box-shadow:0 0 8px rgba(109,93,252,.7)}#cvnDay .bd.light{background:linear-gradient(180deg,rgba(56,189,248,.8),rgba(56,189,248,.45));box-shadow:0 0 6px rgba(56,189,248,.5)}' +
     '#cvnDay .dt{position:absolute;left:47px;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%}' +
     '#cvnDay .dt.g{background:#22d3a6;box-shadow:0 0 9px #22d3a6}#cvnDay .dt.b{background:#38bdf8;box-shadow:0 0 9px #38bdf8}#cvnDay .dt.y{background:#ffd24d;box-shadow:0 0 9px #ffd24d}#cvnDay .dt.r{background:#ef4444;box-shadow:0 0 11px #ef4444}#cvnDay .dt.o{background:#05070d;border:1.5px solid rgba(159,216,255,.7)}' +
     '#cvnDay .nw{position:absolute;left:30px;width:34px;height:2px;margin-top:-1px;background:#fff;box-shadow:0 0 10px #fff}#cvnDay .nw:after{content:"";position:absolute;right:-4px;top:-3px;border:4px solid transparent;border-left-color:#fff}' +
@@ -327,7 +328,10 @@
   function mentions(text, ns) { var s0 = String(text || '').toLowerCase(); return ns.some(function (n) { return s0.indexOf(n) >= 0; }); }
   function schedule() {
     var c = who(), B = dayBounds();
-    if (!c) return { name: first(), ev: dayEvents(), bands: [] };
+    if (!c) {
+      var vb = []; try { var vv = (cv() || {}).vitals; if (vv && window.CovaraSleep) vb = CovaraSleep.bands(vv.series).map(function (g) { return { a: g.a, b: g.b, cls: g.s, text: (IT() ? (g.s === 'deep' ? 'Sonno profondo ' : 'Sonno leggero ') : (g.s === 'deep' ? 'Deep sleep ' : 'Light sleep ')) + hm(g.a) + ' ' + (IT() ? 'alle' : 'to') + ' ' + hm(g.b) }; }); } catch (e) {}
+      return { name: first(), ev: dayEvents(), bands: vb };
+    }
     var d = cv() || {}, ns = namesOf(c), uid = c.care && c.care.userId, ev = [], bands = [];
     (d.items || []).forEach(function (it) {
       var m = it.meta || {};
@@ -360,7 +364,7 @@
     }
     var dstr = new Date().toLocaleDateString(loc(), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
     day.innerHTML = '<div class="hd"><b>' + esc(S.name) + '</b><span class="dd">' + esc(dstr) + '</span>' + esc(t('sched')) + ' · 24H</div><div class="tr"><div class="ln"></div>' + tk +
-      S.bands.map(function (b) { return '<span class="bd" style="top:' + pos(b.a) + '%;height:' + Math.max(1.2, pos(b.b) - pos(b.a)) + '%"></span>'; }).join('') +
+      S.bands.map(function (b) { return '<span class="bd' + (b.cls ? ' ' + b.cls : '') + '" style="top:' + pos(b.a) + '%;height:' + Math.max(1.2, pos(b.b) - pos(b.a)) + '%"></span>'; }).join('') +
       ev.map(function (e) { return '<span class="dt ' + e.c + '" style="top:' + pos(e.at) + '%"></span>'; }).join('') +
       (!ev.length && !S.bands.length ? '<span class="nn">' + esc(t('schedNone')) + '</span>' : '') +
       '<span class="nw" style="top:' + pos(Date.now()) + '%"></span>' + (_scrub ? '<span class="sc" style="top:' + pos(_scrub) + '%"></span>' : '') + '</div>';

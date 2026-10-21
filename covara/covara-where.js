@@ -378,8 +378,15 @@
         var nm = fit(x, rm.name, (here || rm.fall ? '800 ' : '600 ') + fs + 'px ' + SANS, n === 1 ? r * 1.1 : Math.min(r * 0.58, 2 * r * 0.7 * Math.sin(Math.min(step, Math.PI) / 2) - 6));
         text(x, nm, lx, ly, (here || rm.fall ? '800 ' : '600 ') + fs + 'px ' + SANS, rm.fall ? '#ffd0d8' : here ? '#ffe9b8' : (rm.online === false ? 'rgba(200,214,232,.45)' : '#c7d2e2'));
         if (rm.fall) text(x, t('fall'), lx, ly + fs + 2, '800 ' + Math.max(7, fs - 2) + 'px ' + MONO, '#ff3d5a');
+        else if (rm.in_bed === 1) text(x, IT() ? 'A LETTO' : 'IN BED', lx, ly + fs + 2, '700 ' + Math.max(7, fs - 2) + 'px ' + MONO, '#c4b5fd');
         else if (here && d.rooms.since) text(x, ago(d.rooms.since), lx, ly + fs + 2, '600 ' + Math.max(7, fs - 2) + 'px ' + MONO, '#d3b577');
-        if (here) homeDot(x, cx + r * (n === 1 ? 0 : 0.3) * Math.cos(mid), cy + r * (n === 1 ? 0 : 0.3) * Math.sin(mid), Math.max(6, r * 0.11), reduce ? 0 : now, name);
+        if (here) {
+          /* a ceiling or bedside sensor that reports where they are: the dot sits at that spot within the room's slice */
+          var pr = n === 1 ? 0 : 0.3, pa = mid;
+          if (rm.pos && n > 1) { pr = 0.22 + Math.max(0, Math.min(1, Number(rm.pos.y) / 5)) * 0.62; pa = mid + Math.max(-1, Math.min(1, Number(rm.pos.x) / 3)) * step * 0.38; }
+          else if (rm.pos && n === 1) { pr = Math.max(0, Math.min(1, Number(rm.pos.y) / 5)) * 0.8; pa = -Math.PI / 2 + Math.max(-1, Math.min(1, Number(rm.pos.x) / 3)) * 1.1; }
+          homeDot(x, cx + r * pr * Math.cos(pa), cy + r * pr * Math.sin(pa), Math.max(6, r * 0.11), reduce ? 0 : now, name);
+        }
       });
       if (!reduce) sweep(x, cx, cy, r - 2, now, false);
     } else {

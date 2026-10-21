@@ -31,7 +31,7 @@
       joined: '{name} is now in your circle.',
       asks: '{name} asks to look after you. Tap their sphere.',
       offline: 'Covara needs the internet for this. Try again in a moment.',
-      snTitle: 'Room sensors (fall detection)', snHelp: 'A 60 GHz fall sensor on the ceiling of a room sees a fall without a camera and rings everyone who sees falls at once, even when the phone is in another room.', snNone: 'No room sensor yet.', snAdd: 'Add a room sensor', snNamePh: 'Room name, for example Bathroom', snRemove: 'Remove', snKeyOnce: 'Put this line in the sensor now. It is shown only once:', snCopy: 'Copy', snOn: 'Watching', snQuiet: 'Not heard from in a while', snNever: 'Waiting for its first report', snFall: 'Saw a fall in the last hour',
+      snTitle: 'Room sensors (falls, sleep, breathing)', snHelp: 'A 60 GHz radar sensor sees without a camera. Beside the bed it follows sleep, breathing and heart rate; on a ceiling it sees a fall and where they are in the room, and rings everyone who sees falls at once. Name the room, choose where it goes, tap Pair, and type the code on the sensor\u2019s setup page.', snNone: 'No room sensor yet.', snAdd: 'Add a room sensor', snNamePh: 'Room name, for example Bathroom', snRemove: 'Remove', snKeyOnce: 'Put this line in the sensor now. It is shown only once:', snCopy: 'Copy', snOn: 'Watching', snQuiet: 'Not heard from in a while', snNever: 'Waiting for its first report', snFall: 'Saw a fall in the last hour', snKind: 'Where it goes', k_bed: 'Bedside: sleep, breathing and heart rate', k_fall: 'Ceiling: falls, and where they are in the room', k_room: 'Other: someone in the room, or a door', snPair: 'Pair a Covara sensor', snKeyAdv: 'Get a key line instead (for your own device)', snCode: 'On the sensor\u2019s setup page, enter this code within 15 minutes:', snNeedName: 'Type the room name first.', kb_bed: 'Bedside', kb_fall: 'Ceiling', kb_room: 'Room',
       famTitle: 'My family in Covara', lookTitle: 'Who I look after', famEmpty: 'Nobody yet. Show your code to your family.', lookEmpty: 'Nobody yet. Type the code from their phone.', sees: 'Sees:', seesNothing: 'nothing yet',
       sh: { location: 'Where I am', rooms: 'Which room', falls: 'If I fall', care: 'Medicines and visits', mood: 'How I feel', activity: 'If I stop moving' },
       rel: { child: 'Son or daughter', partner: 'Partner', sibling: 'Brother or sister', friend: 'Friend', carer: 'Carer', doctor: 'Doctor' }
@@ -57,7 +57,7 @@
       joined: '{name} ora è nella tua cerchia.',
       asks: '{name} chiede di prendersi cura di te. Tocca la sua sfera.',
       offline: 'Covara ha bisogno di internet. Riprova tra poco.',
-      snTitle: 'Sensori nelle stanze (cadute)', snHelp: 'Un sensore di cadute a 60 GHz sul soffitto vede una caduta senza telecamera e avvisa subito chi vede le cadute, anche se il telefono è in un\u2019altra stanza.', snNone: 'Ancora nessun sensore.', snAdd: 'Aggiungi un sensore', snNamePh: 'Nome della stanza, per esempio Bagno', snRemove: 'Rimuovi', snKeyOnce: 'Inserisci ora questa riga nel sensore. Viene mostrata una sola volta:', snCopy: 'Copia', snOn: 'Attivo', snQuiet: 'Nessun segnale da un po\u2019', snNever: 'In attesa del primo segnale', snFall: 'Ha visto una caduta nell\u2019ultima ora',
+      snTitle: 'Sensori nelle stanze (cadute, sonno, respiro)', snHelp: 'Un sensore radar a 60 GHz vede senza telecamera. Accanto al letto segue sonno, respiro e battito; sul soffitto vede una caduta e dove si trova nella stanza, e avvisa subito chi vede le cadute. Dai un nome alla stanza, scegli dove va, tocca Abbina e scrivi il codice nella pagina di configurazione del sensore.', snNone: 'Ancora nessun sensore.', snAdd: 'Aggiungi un sensore', snNamePh: 'Nome della stanza, per esempio Bagno', snRemove: 'Rimuovi', snKeyOnce: 'Inserisci ora questa riga nel sensore. Viene mostrata una sola volta:', snCopy: 'Copia', snOn: 'Attivo', snQuiet: 'Nessun segnale da un po\u2019', snNever: 'In attesa del primo segnale', snFall: 'Ha visto una caduta nell\u2019ultima ora', snKind: 'Dove va', k_bed: 'Accanto al letto: sonno, respiro e battito', k_fall: 'Soffitto: cadute, e dove si trova nella stanza', k_room: 'Altro: qualcuno nella stanza, o una porta', snPair: 'Abbina un sensore Covara', snKeyAdv: 'Ottieni invece una riga chiave (per un tuo dispositivo)', snCode: 'Nella pagina di configurazione del sensore, inserisci questo codice entro 15 minuti:', snNeedName: 'Scrivi prima il nome della stanza.', kb_bed: 'Letto', kb_fall: 'Soffitto', kb_room: 'Stanza',
       famTitle: 'La mia famiglia in Covara', lookTitle: 'Di chi mi prendo cura', famEmpty: 'Ancora nessuno. Mostra il codice alla tua famiglia.', lookEmpty: 'Ancora nessuno. Scrivi il codice del suo telefono.', sees: 'Vede:', seesNothing: 'ancora niente',
       sh: { location: 'Dove sono', rooms: 'In quale stanza', falls: 'Se cado', care: 'Medicine e visite', mood: 'Come sto', activity: 'Se non mi muovo' },
       rel: { child: 'Figlio o figlia', partner: 'Partner', sibling: 'Fratello o sorella', friend: 'Amico', carer: 'Badante', doctor: 'Medico' }
@@ -395,20 +395,38 @@
     try { var r = await api('/sensors' + sh.q); if (r.ok) list = r.data.sensors || []; } catch (e) {}
     var rows = list.map(function (x) {
       var st = x.last_event === 'fall' && Date.now() - x.last_event_at < 3600e3 ? t('snFall') : x.last_seen && Date.now() - x.last_seen < 15 * 60e3 ? t('snOn') : x.last_seen ? t('snQuiet') : t('snNever');
-      return '<div class="cv-fam-row" style="cursor:default"><i>' + esc(initials(x.name)) + '</i><span><b>' + esc(x.name) + '</b><small>' + esc(st) + '</small></span><button type="button" class="circle-invite-btn" style="margin-left:auto" data-rm="' + esc(x.id) + '">' + esc(t('snRemove')) + '</button></div>';
+      return '<div class="cv-fam-row" style="cursor:default"><i>' + esc(initials(x.name)) + '</i><span><b>' + esc(x.name) + '</b><small>' + esc((x.kind && x.kind !== 'room' ? t('kb_' + x.kind) + ' \u00b7 ' : '') + st) + '</small></span><button type="button" class="circle-invite-btn" style="margin-left:auto" data-rm="' + esc(x.id) + '">' + esc(t('snRemove')) + '</button></div>';
     }).join('');
     sec.innerHTML = '<div class="settings-section-title">' + esc(t('snTitle')) + '</div><p class="settings-help">' + esc(t('snHelp')) + '</p>' +
       '<div class="settings-card">' + (rows || '<p class="settings-help" style="margin:0 0 10px">' + esc(t('snNone')) + '</p>') +
-      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><input class="circle-invite-input" id="cvSnName" maxlength="60" placeholder="' + esc(t('snNamePh')) + '"><button type="button" class="circle-invite-btn" data-a="add">' + esc(t('snAdd')) + '</button></div>' +
+      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><input class="circle-invite-input" id="cvSnName" maxlength="60" placeholder="' + esc(t('snNamePh')) + '">' +
+      '<select class="circle-invite-input" id="cvSnKind" aria-label="' + esc(t('snKind')) + '"><option value="bed">' + esc(t('k_bed')) + '</option><option value="fall">' + esc(t('k_fall')) + '</option><option value="room">' + esc(t('k_room')) + '</option></select>' +
+      '<button type="button" class="circle-invite-btn" data-a="pair" style="background:#38bdf8;color:#04121a;border-color:#38bdf8">' + esc(t('snPair')) + '</button><button type="button" class="circle-invite-btn" data-a="add">' + esc(t('snKeyAdv')) + '</button></div>' +
       '<div id="cvSnKey" style="display:none;margin-top:12px;font:12px/1.5 monospace;word-break:break-all;color:#ffd24d"></div></div>';
     sec.querySelector('[data-a=add]').onclick = async function () {
       var nm = (sec.querySelector('#cvSnName').value || '').trim(); if (!nm) { sec.querySelector('#cvSnName').focus(); return; }
-      var r = await api('/sensors', { method: 'POST', body: Object.assign({ name: nm }, sh.body || {}) }).catch(function () { return { ok: false }; });
+      var r = await api('/sensors', { method: 'POST', body: Object.assign({ name: nm, kind: sec.querySelector('#cvSnKind').value }, sh.body || {}) }).catch(function () { return { ok: false }; });
       var out = sec.querySelector('#cvSnKey'); out.style.display = 'block';
       if (!r.ok) { out.textContent = t('offline'); return; }
       var line = 'Bearer ' + r.data.sensor.id + '.' + r.data.key;
       out.innerHTML = esc(t('snKeyOnce')) + '<br><br>' + esc(line) + '<br><br><button type="button" class="circle-invite-btn" data-a="copy">' + esc(t('snCopy')) + '</button>';
       out.querySelector('[data-a=copy]').onclick = function () { try { navigator.clipboard.writeText(line); } catch (e) {} };
+    };
+    sec.querySelector('[data-a=pair]').onclick = async function () {
+      var nm = (sec.querySelector('#cvSnName').value || '').trim(), out = sec.querySelector('#cvSnKey');
+      if (!nm) { out.style.display = 'block'; out.textContent = t('snNeedName'); sec.querySelector('#cvSnName').focus(); return; }
+      var r = await api('/sensors/pair-code', { method: 'POST', body: Object.assign({ name: nm, kind: sec.querySelector('#cvSnKind').value }, sh.body || {}) }).catch(function () { return { ok: false }; });
+      out.style.display = 'block';
+      if (!r.ok) { out.textContent = t('offline'); return; }
+      out.innerHTML = esc(t('snCode')) + '<div style="font:800 34px/1.2 var(--nous-mono,monospace);letter-spacing:.22em;color:#fff;margin:8px 0">' + esc(r.data.code.slice(0, 3) + ' ' + r.data.code.slice(3)) + '</div>';
+      var before = list.length;
+      clearInterval(sec._iv); sec._iv = setInterval(async function () {
+        /* the sensor pairs itself: once it appears in the list, show it; the code is no longer needed */
+        if (!document.body.contains(sec)) { clearInterval(sec._iv); return; }
+        if (Date.now() > r.data.expires_at) { clearInterval(sec._iv); renderSensors(); return; }
+        var r2 = await api('/sensors' + sh.q).catch(function () { return { ok: false }; });
+        if (r2.ok && (r2.data.sensors || []).length > before) { clearInterval(sec._iv); renderSensors(); }
+      }, 5000);
     };
     sec.querySelectorAll('[data-rm]').forEach(function (b) { b.onclick = async function () { await api('/sensors/' + encodeURIComponent(b.getAttribute('data-rm')) + sh.q, { method: 'DELETE' }).catch(function () {}); renderSensors(); }; });
   }

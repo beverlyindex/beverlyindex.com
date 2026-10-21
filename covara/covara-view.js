@@ -307,7 +307,8 @@
       try { if (window.CovaraWhere) CovaraWhere.load(true); } catch (e) {}
       var ib = await api('/care/inbox' + q(s)).catch(function () { return { ok: false }; });
       var lg = await api('/care/log' + (q(s) ? q(s) + '&' : '?') + 'days=7').catch(function () { return { ok: false }; }), sh = await api('/care/sheet' + q(s)).catch(function () { return { ok: false }; });
-      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
+      var vt = await api('/care/vitals' + q(s)).catch(function () { return { ok: false }; });
+      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
     } catch (e) {} finally { _busy = false; }
   }
 
@@ -486,7 +487,8 @@
         '<div class="cvt-chips cvh-c">' + LOGV[k].map(function (v) { return '<button type="button" class="cvt-chip sm ' + tone(k, v) + '" data-log="' + k + ':' + v + '">' + esc(t('lv_' + v)) + '</button>'; }).join('') + '</div></div>';
     }).join('');
     var week = log.filter(function (x) { return LOGV[x.kind]; }).slice(0, 14).map(function (x) { return '<li><b class="' + tone(x.kind, x.value) + '">' + esc(t('lg_' + x.kind) + ': ' + t('lv_' + x.value)) + '</b> <small>' + esc(when(x.at)) + (x.note ? ' · ' + x.note : '') + '</small></li>'; }).join('');
-    return '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 2px">' + esc(t('dayOf', { name: name1() })) + '</div>' +
+    var sleepB = window.CovaraSleep ? block('sleep', CovaraSleep.title(), CovaraSleep.sub(_data.vitals), CovaraSleep.body(_data.vitals, name1(), role() === 'home'), 'blue') : '';
+    return sleepB + '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 2px">' + esc(t('dayOf', { name: name1() })) + '</div>' +
       '<div class="cvx-sub">' + esc(t('dayHint')) + '</div>' + (_data.warn ? '<div class="cvx-warn">' + esc(_data.warn) + '</div>' : '') +
       '<div class="cvh">' + rows + '</div>' +
       (week ? '<div class="cvx-q" style="margin:12px 6px 4px;color:rgba(159,216,255,.8)">' + esc(t('lastDays')) + '</div><ul class="cvh-w">' + week + '</ul>' : '') + comfortBlock();
