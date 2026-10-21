@@ -17,12 +17,18 @@
       nearest: 'Closest: {name}, {d}', nearestYou: 'Closest: you, {d}', noShare: '{first} has not chosen to share location with you.', noRooms: '{first} has not chosen to share rooms with you.',
       noPos: '{first}\'s position appears when {first}\'s phone opens Remiel: Covara.', finding: 'Finding {first}...', noMap: 'Map not available',
       addSensor: 'Rooms appear once a room sensor is added: Settings, Room sensors.', outRooms: '{first} is out of the house.', home: 'Home', ago: '{t} ago', now: 'now',
-      emergency: 'Emergency', hospital: 'Hospital', clinic: 'Clinic', doctor: 'Doctor', fall: 'FALL', here: 'HERE' },
+      emergency: 'Emergency', hospital: 'Hospital', clinic: 'Clinic', doctor: 'Doctor', fall: 'FALL', here: 'HERE',
+      moving: 'MOVING NOW', still: 'STILL', stillFor: 'STILL · {t}', heardBy: '{first}\'s phone · {t}', lastHeard: '{first}\'s phone last heard the room {t}',
+      tapListen: 'Tap here to let this phone listen to the room for movement.', listenStarting: 'Starting to listen to the room...', listenDenied: 'Bluetooth was not allowed. Tap here to ask again.',
+      installApp: 'Open Remiel: Covara in the Android app on {first}\'s phone to listen to the room.', notListening: '{first}\'s phone is not listening to the room yet.', learning: 'LISTENING · LEARNING THE ROOM' },
     it: { label: 'WHEREIS', rooms: 'STANZE', atHome: 'A casa', out: 'Fuori', fromHome: 'a {d} da casa', inside: 'Dentro {place}', withYou: 'Con te', with: 'Con {name}',
       nearest: 'Più vicino: {name}, {d}', nearestYou: 'Più vicino: tu, {d}', noShare: '{first} non ha scelto di condividere la posizione con te.', noRooms: '{first} non ha scelto di condividere le stanze con te.',
       noPos: 'La posizione di {first} appare quando il telefono di {first} apre Remiel: Covara.', finding: 'Cerco {first}...', noMap: 'Mappa non disponibile',
       addSensor: 'Le stanze appaiono quando si aggiunge un sensore: Impostazioni, Sensori delle stanze.', outRooms: '{first} è fuori casa.', home: 'Casa', ago: '{t} fa', now: 'adesso',
-      emergency: 'Pronto soccorso', hospital: 'Ospedale', clinic: 'Clinica', doctor: 'Medico', fall: 'CADUTA', here: 'QUI' }
+      emergency: 'Pronto soccorso', hospital: 'Ospedale', clinic: 'Clinica', doctor: 'Medico', fall: 'CADUTA', here: 'QUI',
+      moving: 'IN MOVIMENTO', still: 'FERMO', stillFor: 'FERMO · {t}', heardBy: 'Telefono di {first} · {t}', lastHeard: 'Il telefono di {first} ha sentito la stanza {t}',
+      tapListen: 'Tocca qui perché questo telefono ascolti i movimenti nella stanza.', listenStarting: 'Inizio ad ascoltare la stanza...', listenDenied: 'Il Bluetooth non è stato permesso. Tocca qui per chiedere di nuovo.',
+      installApp: 'Apri Remiel: Covara nell\'app Android sul telefono di {first} per ascoltare la stanza.', notListening: 'Il telefono di {first} non ascolta ancora la stanza.', learning: 'IN ASCOLTO · IMPARO LA STANZA' }
   };
   function t(k, p) { var s = (IT() ? S.it : S.en)[k] || S.en[k] || k; if (p) s = s.replace(/\{(\w+)\}/g, function (m, x) { return p[x] != null ? p[x] : m; }); return s; }
   function role() { try { return localStorage.getItem('rc:role') || ''; } catch (e) { return ''; } }
@@ -87,7 +93,52 @@
     _nBusy = false;
   }
   window.addEventListener('covara-native', function (e) { if (e.detail && e.detail.kind === 'resume') nativeSync(true); });
-  window.CovaraWhereNative = { sync: nativeSync, status: function () { return NATIVE ? nStatus() : null; } };
+  /* ── the same phone listening to HOME's room, while it rests on its charger ──
+     The app holds a room key (it can send the room's movement level and nothing else). Covara asks for one
+     while HOME shares rooms with someone in the circle, and drops it the moment HOME stops sharing or signs out. */
+  var RNATIVE = !!(window.CovaraNative && typeof CovaraNative.roomStart === 'function'), _rBusy = false, _rTried = 0, _rState = '';
+  function rStatus() { try { return JSON.parse(CovaraNative.roomStatus() || '{}'); } catch (e) { return {}; } }
+  function roomWanted() { return authed() && role() === 'home' && links('away').some(function (c) { return c.care.share && c.care.share.rooms; }); }
+  async function roomSync(force) {
+    if (!RNATIVE || _rBusy) return;
+    var st = rStatus();
+    if (!roomWanted()) {
+      if (st.on || st.hasKey) {
+        try { CovaraNative.roomStop(true); } catch (e) {}
+        if (authed() && st.device) { try { SyncEngine.apiFetch('/location/device/' + encodeURIComponent(st.device), { method: 'DELETE' }).catch(function () {}); } catch (e) {} }
+      }
+      return;
+    }
+    if (st.on && st.running && st.hasKey) return;
+    /* asked once by itself; after a refusal, only when HOME taps the room circle */
+    var asked = false; try { asked = localStorage.getItem('rc:roomAsked') === '1'; } catch (e) {}
+    if (!force && (asked || Date.now() - _rTried < 600000)) return;
+    _rTried = Date.now(); _rBusy = true; _rState = 'starting';
+    try { localStorage.setItem('rc:roomAsked', '1'); } catch (e) {}
+    try {
+      var r = await SyncEngine.apiFetch('/location/room-device', { method: 'POST', body: JSON.stringify({ name: 'Room listener', replaces: st.device || undefined }) });
+      var j = await r.json().catch(function () { return {}; });
+      if (r.ok && j.token) CovaraNative.roomStart(SyncEngine.getApiBase(), j.token, j.id); else _rState = '';
+    } catch (e) { _rState = ''; }
+    _rBusy = false;
+  }
+  window.addEventListener('covara-native', function (e) {
+    var d = e.detail || {};
+    if (d.kind === 'resume') roomSync(false);
+    if (d.kind === 'room') { _rState = d.state === 'denied' ? 'denied' : 'started'; setTimeout(function () { load(true); }, 70000); }
+  });
+  /* a tap on the room circle on HOME's own phone starts listening when it is not yet */
+  document.addEventListener('click', function (e) {
+    var m = window._dreamMicroHit; if (!m || !RNATIVE || role() !== 'home' || !shown()) return;
+    var cv = document.getElementById('sphere'); if (!cv) return;
+    var rc = cv.getBoundingClientRect(), dx = e.clientX - rc.left - m.cx, dy = e.clientY - rc.top - m.cy;
+    if (dx * dx + dy * dy > m.r * m.r) return;
+    var st = rStatus(); if (st.on && st.running) return;
+    roomSync(true);
+  }, true);
+  setInterval(function () { if (document.visibilityState === 'visible') roomSync(false); }, 30000);
+  setTimeout(function () { roomSync(false); }, 6000);
+  window.CovaraWhereNative = { sync: nativeSync, status: function () { return NATIVE ? nStatus() : null; }, roomSync: roomSync, roomStatus: function () { return RNATIVE ? rStatus() : null; } };
 
   function moved(a, b) { if (!a || !b) return Infinity; return Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos(a.lat * Math.PI / 180)); }
   function post(force) {
@@ -124,7 +175,7 @@
     _busy = true;
     SyncEngine.apiFetch('/care/whereis' + (h ? '?home=' + encodeURIComponent(h) : ''), { method: 'GET' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { _data = j; _for = h; _at = Date.now(); _busy = false; mapTo(); })
+      .then(function (j) { _data = j; _for = h; _at = Date.now(); if (j && j.rooms && j.rooms.phone) _roomAt = _at; _busy = false; mapTo(); })
       .catch(function () { _busy = false; _at = Date.now(); });
   }
 
@@ -208,10 +259,10 @@
 
   /* ── the radar ── */
   var SWEEP_S = 4;
-  function sweepA(now) { return ((now / 1000) % SWEEP_S) / SWEEP_S * Math.PI * 2 - Math.PI / 2; }
+  function sweepA(now, per) { per = per || SWEEP_S; return ((now / 1000) % per) / per * Math.PI * 2 - Math.PI / 2; }
   function sweepLit(now, a) { var lag = ((sweepA(now) - a) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); return Math.exp(-lag / 1.1); }
-  function sweep(x, cx, cy, R, now, gold) {
-    var a = sweepA(now);
+  function sweep(x, cx, cy, R, now, gold, per) {
+    var a = sweepA(now, per);
     if (x.createConicGradient) {
       var g = x.createConicGradient(a - 1.25, cx, cy);
       g.addColorStop(0, 'rgba(211,181,119,0)'); g.addColorStop(.17, 'rgba(211,181,119,' + (gold ? .18 : .14) + ')'); g.addColorStop(.197, 'rgba(232,206,140,.38)'); g.addColorStop(.199, 'rgba(211,181,119,0)'); g.addColorStop(1, 'rgba(211,181,119,0)');
@@ -351,6 +402,77 @@
     if (mapState === 'ready') text(x, '© OpenStreetMap · OpenFreeMap', c, D - Math.max(10, R * 0.07), '500 7.5px ' + SANS, 'rgba(240,238,245,.75)');
   }
 
+  /* ── the room every 10 seconds: only what HOME's phone hears, merged into the radar's data ── */
+  var ROOM_S = 10, _roomAt = 0, _roomBusy = false;
+  function loadRoom() {
+    if (!authed() || _roomBusy || !_data || !_data.rooms || !shown()) return;
+    var h = homeUser(); if (_for !== h) return;
+    _roomBusy = true;
+    SyncEngine.apiFetch('/care/room' + (h ? '?home=' + encodeURIComponent(h) : ''), { method: 'GET' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { _roomBusy = false; if (j && j.share && _data && _data.rooms && _for === h) { _data.rooms.phone = j.phone; _roomAt = Date.now(); } })
+      .catch(function () { _roomBusy = false; });
+  }
+  setInterval(loadRoom, ROOM_S * 1000);
+
+  /* ── HOME's own phone listening to the room: the last two hours around the rim, movement as ripples ── */
+  function dur(ms) {
+    var m = Math.max(0, Math.round(ms / 60000)); if (m < 1) return IT() ? 'meno di 1 min' : 'under 1 min';
+    if (m < 60) return m + ' min'; var hh = Math.floor(m / 60), mm = m % 60; return hh + ' h' + (mm ? ' ' + mm + ' min' : '');
+  }
+  function phoneRoom(x, cx, cy, r, now, reduce, name, fs) {
+    var d = _data, p = d.rooms.phone, fn = first(name), small = Math.max(7, fs - 1.5);
+    /* one full sweep every 10 seconds, starting at the top as each new reading of the room arrives */
+    if (!reduce) sweep(x, cx, cy, r - 2, p && p.online && _roomAt ? Date.now() - _roomAt : now, false, ROOM_S);
+    if (!p) {
+      /* nothing heard yet: say plainly what turns it on, on whose phone */
+      var self = role() === 'home';
+      var msg = self ? (RNATIVE ? (_rState === 'starting' ? t('listenStarting') : _rState === 'denied' ? t('listenDenied') : t('tapListen')) : t('installApp', { first: fn })) : t('notListening', { first: fn });
+      homeDot(x, cx, cy - r * 0.3, Math.max(6, r * 0.12), reduce ? 0 : now, name);
+      wrap(msg, Math.max(12, Math.round(r * 1.5 / (fs * 0.6)))).slice(0, 5).forEach(function (l, i) { text(x, l, cx, cy + r * 0.05 + i * (fs + 4), '500 ' + fs + 'px ' + SANS, '#e6edf8'); });
+      return;
+    }
+    var T = 2 * 3600000, tr = p.trace || [], tNow = Date.now();
+    /* the last two hours as a ring, like a clock face run backwards from the top: gold where the room moved */
+    var rr = r * 0.7, lw = Math.max(3, r * 0.065);
+    x.beginPath(); x.arc(cx, cy, rr, 0, Math.PI * 2); x.strokeStyle = 'rgba(143,180,255,.12)'; x.lineWidth = lw; x.stroke();
+    tr.forEach(function (pt) {
+      var age = tNow - pt[0]; if (age < 0 || age > T) return;
+      var a1 = -Math.PI / 2 - (age / T) * Math.PI * 2, a0 = a1 - (60000 / T) * Math.PI * 2 - 0.004;
+      x.beginPath(); x.arc(cx, cy, rr, a0, a1);
+      x.strokeStyle = pt[1] >= 2 ? 'rgba(255,210,77,.95)' : pt[1] === 1 ? 'rgba(211,181,119,.7)' : 'rgba(79,141,240,.42)';
+      x.lineWidth = lw; x.stroke();
+    });
+    /* now: a bright tick at the top */
+    x.beginPath(); x.moveTo(cx, cy - rr - lw); x.lineTo(cx, cy - rr + lw); x.strokeStyle = '#ffffff'; x.lineWidth = 2; x.stroke();
+    /* movement now: ripples from HOME, faster and warmer the more the room moves */
+    var lvl = p.online ? ['none', 'minimal', 'moderate', 'high'].indexOf(p.level) : -1;
+    var hy = cy - r * 0.12, hr = Math.max(6, r * 0.13);
+    if (lvl >= 1 && !reduce) {
+      var per = [0, 2400, 1600, 1000][lvl], nR = lvl + 1;
+      for (var i = 0; i < nR; i++) {
+        var k = ((now + i * per / nR) % per) / per, rad = hr + k * r * 0.5;
+        x.beginPath(); x.arc(cx, hy, rad, 0, Math.PI * 2); x.strokeStyle = 'rgba(255,210,77,' + (0.75 * (1 - k)) + ')'; x.lineWidth = 2; x.stroke();
+      }
+    } else if (lvl === 0 && !reduce) {
+      var k2 = (now % 4200) / 4200;
+      x.beginPath(); x.arc(cx, hy, hr + k2 * r * 0.3, 0, Math.PI * 2); x.strokeStyle = 'rgba(143,180,255,' + (0.35 * (1 - k2)) + ')'; x.lineWidth = 1.4; x.stroke();
+    }
+    x.save(); if (!p.online) x.globalAlpha = 0.45; homeDot(x, cx, hy, hr, reduce || !p.online ? 0 : now, name); x.restore();
+    /* words */
+    var l1, c1;
+    if (!p.online) { l1 = t('lastHeard', { first: fn, t: ago(p.at) }); c1 = '#9fb4e2'; }
+    else if (lvl >= 1) { l1 = t('moving'); c1 = '#ffd24d'; }
+    else if (p.started_at && tNow - p.started_at < 3 * 60000 && !p.moved_at) { l1 = t('learning'); c1 = '#9fd8ff'; }
+    else { l1 = p.still_ms > 60000 ? t('stillFor', { t: dur(p.still_ms) }) : t('still'); c1 = '#9fd8ff'; }
+    var y1 = cy + r * 0.3;
+    if (!p.online) wrap(l1, Math.max(12, Math.round(r * 1.4 / (fs * 0.6)))).slice(0, 3).forEach(function (l, i) { text(x, l, cx, y1 + i * (fs + 3), '600 ' + fs + 'px ' + SANS, c1); });
+    else {
+      text(x, fit(x, l1, '800 ' + fs + 'px ' + MONO, chord(r - 6, cy, y1) - 8), cx, y1, '800 ' + fs + 'px ' + MONO, c1);
+      text(x, fit(x, t('heardBy', { first: fn, t: ago(p.at) }), '500 ' + small + 'px ' + SANS, chord(r - 6, cy, y1 + fs + 4) - 10), cx, y1 + fs + 4, '500 ' + small + 'px ' + SANS, 'rgba(230,237,248,.8)');
+    }
+  }
+
   /* ── the room radar: inside the home or facility where HOME is ── */
   function drawMicro(x, cx, cy, r, now, alpha) {
     var d = _data, reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -389,6 +511,8 @@
         }
       });
       if (!reduce) sweep(x, cx, cy, r - 2, now, false);
+    } else if (d && !out && !(d.share && !d.share.rooms) && d.rooms) {
+      phoneRoom(x, cx, cy, r, now, reduce, name, fs);
     } else {
       if (!reduce) sweep(x, cx, cy, r - 2, now, false);
       var msg = !d ? '' : (d.share && !d.share.rooms) ? t('noRooms', { first: first(name) }) : out ? (d.inside ? t('inside', { place: d.inside.name }) : t('outRooms', { first: first(name) })) : t('addSensor');

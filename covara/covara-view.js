@@ -295,7 +295,25 @@
   }
   function q(s) { return s && s.home ? '?home=' + encodeURIComponent(s.home) : ''; }
 
-  var _data = null, _busy = false;
+  var _data = null, _busy = false, _syncedAt = 0, _stampV = '', _stampOkAt = 0, _stampBusy = false;
+  /* Every 10 seconds: has anything on HOME's day changed anywhere (a dose marked on HOME's phone, a visit logged by a
+     carer, an alert)? One small question; the full day is reloaded only when the answer moved, so every phone in the
+     circle shows the same timeline within about 10 seconds of the change. */
+  async function stampCheck() {
+    var s = subject();
+    if (!s || !s.edit || !authed() || document.hidden || _stampBusy) return;
+    _stampBusy = true;
+    try {
+      var r = await api('/care/stamp' + q(s));
+      if (r.ok && r.data) {
+        _stampOkAt = Date.now();
+        if (r.data.v !== _stampV) {
+          var first = !_stampV; _stampV = r.data.v;
+          if (!first || !_data) { load(); try { if (window.CovaraNav && CovaraNav.summaryNow) CovaraNav.summaryNow(); } catch (e) {} }
+        }
+      }
+    } catch (e) {} finally { _stampBusy = false; }
+  }
   async function load() {
     var s = subject();
     if (!s || !authed()) { _data = null; render(); syncSpheres(); return; }
@@ -308,7 +326,7 @@
       var ib = await api('/care/inbox' + q(s)).catch(function () { return { ok: false }; });
       var lg = await api('/care/log' + (q(s) ? q(s) + '&' : '?') + 'days=7').catch(function () { return { ok: false }; }), sh = await api('/care/sheet' + q(s)).catch(function () { return { ok: false }; });
       var vt = await api('/care/vitals' + q(s)).catch(function () { return { ok: false }; });
-      if (a.ok && b.ok) { _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
+      if (a.ok && b.ok) { _syncedAt = Date.now(); _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
     } catch (e) {} finally { _busy = false; }
   }
 
@@ -319,9 +337,9 @@
     var late = open.filter(function (x) { return x.state === 'late'; })[0];
     var due = open.filter(function (x) { return x.state === 'due'; })[0];
     var later = open.filter(function (x) { return x.state === 'later'; })[0];
-    if (late) return { state: 'late', slot: late.slot, at: slotMs(late.slot), rank: 0 };
-    if (due) return { state: 'due', slot: due.slot, at: slotMs(due.slot), rank: 1 };
-    if (later) return { state: 'later', slot: later.slot, at: slotMs(later.slot), rank: 2 };
+    if (late) return { state: 'late', slot: late.slot, at: late.at || slotMs(late.slot), rank: 0 };
+    if (due) return { state: 'due', slot: due.slot, at: due.at || slotMs(due.slot), rank: 1 };
+    if (later) return { state: 'later', slot: later.slot, at: later.at || slotMs(later.slot), rank: 2 };
     var first = (it.times || [])[0];
     return { state: slots.length ? 'done' : 'off', slot: null, at: first ? slotMs(first, 1) : Infinity, rank: 3 };
   }
@@ -1106,9 +1124,9 @@
     for (var i = 0; i < labels.length; i++) {
       var ly = y0 + i * lineH;
       var on = onKey && keys[i] === onKey;
-      ctx.globalAlpha = (on ? 0.95 : 0.72) * fade; ctx.fillStyle = on ? 'rgba(56,189,248,0.32)' : 'rgba(12,14,24,0.88)';
+      ctx.globalAlpha = (on ? 0.95 : 0.9) * fade; ctx.fillStyle = on ? 'rgba(56,189,248,0.32)' : 'rgba(40,90,190,0.26)'; ctx.shadowColor = 'rgba(80,160,255,0.45)'; ctx.shadowBlur = 10;
       ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, ly - phh / 2, pw, phh, 6); else ctx.rect(x, ly - phh / 2, pw, phh); ctx.fill();
-      ctx.globalAlpha = (on ? 0.9 : 0.45) * fade; ctx.strokeStyle = on ? '#38bdf8' : 'rgba(100,180,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.shadowBlur = 0; ctx.globalAlpha = (on ? 0.9 : 0.75) * fade; ctx.strokeStyle = on ? '#38bdf8' : 'rgba(150,200,255,0.5)'; ctx.lineWidth = 1; ctx.stroke();
       var tx = x + pw / 2;
       if (states) {
         tx = x + dotW / 2 + (pw - dotW / 2) / 2;
@@ -1353,10 +1371,11 @@
     if (role() === 'home') { try { api('/care/state', { method: 'POST', body: { tz: Intl.DateTimeFormat().resolvedOptions().timeZone } }); } catch (e) {} }
     setInterval(tick, 500);
     setInterval(function () { if (_subj) load(); }, 60000);
+    setInterval(stampCheck, 10000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden && _subj) load(); });
     window.addEventListener('localeChanged', function () { _html = ''; render(); syncSpheres(); });
   }
   window.CovaraView = { _hits: function () { return _pillHits; }, source: source, centre: centre, drawCentre: drawCentre, hitCentre: hitCentre, centreSingle: centreSingle, centreDouble: centreDouble,
-    openNode: openNode, load: load, openEdit: openEdit, open: function (k, id) { _open = { appt: 'visit', sub: 'med', rec: 'papers' }[k] || k || ''; _openItem = id || ''; _html = ''; render(); }, section: sectionOpen, data: function () { return _data; }, lists: function () { return _ls; } };
+    openNode: openNode, load: load, openEdit: openEdit, open: function (k, id) { _open = { appt: 'visit', sub: 'med', rec: 'papers' }[k] || k || ''; _openItem = id || ''; _html = ''; render(); }, section: sectionOpen, data: function () { return _data; }, fresh: function () { return { syncedAt: _syncedAt, checkedAt: _stampOkAt }; }, lists: function () { return _ls; } };
   setTimeout(boot, 1500);
 })();
