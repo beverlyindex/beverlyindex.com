@@ -1080,9 +1080,11 @@
     return { name: ((h.first || '') + ' ' + (h.last || '')).trim(), frame: p && p.img ? p.img : null, w: p ? (p.w || (p.img && p.img.naturalWidth)) : 0, h: p ? (p.h || (p.img && p.img.naturalHeight)) : 0, contact: h };
   }
   var _pillHits = [];
+  /* the canvas width in screen points; the canvas is drawn at no more than 2x even on 3x phones, so the device pixel ratio can't be used to get it */
+  function cssW(ctx) { var c = ctx.canvas; return c.clientWidth || c.width / (typeof DPR !== 'undefined' ? DPR : (window.devicePixelRatio || 1)); }
   var DOT = { late: '#ef4444', due: '#ffd24d' };
   function pills(ctx, labels, keys, cx, cy, cr, t0, left, states, onKey) {
-    var W = ctx.canvas.width / (window.devicePixelRatio || 1);
+    var W = cssW(ctx);
     var fs = (W < 500 ? 11 : 12) + (window.CovaraCalm ? 3 : 0), lineH = (W < 500 ? 24 : 26) + (window.CovaraCalm ? 8 : 0), gap = 16, px = 12, py = 5;
     ctx.save();
     ctx.font = '500 ' + fs + 'px -apple-system, system-ui, "Segoe UI", sans-serif';
@@ -1124,7 +1126,7 @@
     if (typeof IsoView !== 'undefined' && IsoView.active && IsoView.active()) return;
     /* all on the right of HOME's sphere: HOME's care on top, calling HOME (AWAY's phone) beneath it,
        so the lower left stays clear for the day's schedule */
-    var W0 = ctx.canvas.width / (window.devicePixelRatio || 1), lh = (W0 < 500 ? 24 : 26) + (window.CovaraCalm ? 8 : 0);
+    var W0 = cssW(ctx), lh = (W0 < 500 ? 24 : 26) + (window.CovaraCalm ? 8 : 0);
     var comm = role() === 'away', nCare = _data ? SECTIONS.length : 0, nComm = comm ? 4 : 0, gapG = nCare && nComm ? lh * 0.7 : 0;
     var total = (nCare + nComm) * lh + gapG, top = cy - total / 2;
     if (_data) pills(ctx, SECTIONS.map(function (k) { return t('sec_' + k); }), SECTIONS.map(function (k) { return 'sec:' + k; }), cx, top + nCare * lh / 2, cr, t0, false, SECTIONS.map(pillState), _open ? 'sec:' + _open : '');
@@ -1354,7 +1356,7 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden && _subj) load(); });
     window.addEventListener('localeChanged', function () { _html = ''; render(); syncSpheres(); });
   }
-  window.CovaraView = { source: source, centre: centre, drawCentre: drawCentre, hitCentre: hitCentre, centreSingle: centreSingle, centreDouble: centreDouble,
+  window.CovaraView = { _hits: function () { return _pillHits; }, source: source, centre: centre, drawCentre: drawCentre, hitCentre: hitCentre, centreSingle: centreSingle, centreDouble: centreDouble,
     openNode: openNode, load: load, openEdit: openEdit, open: function (k, id) { _open = { appt: 'visit', sub: 'med', rec: 'papers' }[k] || k || ''; _openItem = id || ''; _html = ''; render(); }, section: sectionOpen, data: function () { return _data; }, lists: function () { return _ls; } };
   setTimeout(boot, 1500);
 })();
