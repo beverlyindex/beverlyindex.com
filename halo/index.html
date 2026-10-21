@@ -1291,7 +1291,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-21.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-21.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3887,7 +3887,7 @@ function modeStep(tL){ if(!(tL>TMODE.t)) return; const b=posAt(tL)||posHeld(tL),
    counts, and it must show itself plainly, GROUP.minCrowd devices or more first heard within GROUP.arriveCrowd, a vehicle among them or two at least
    seen moving at the pace of wheels. A passing bus or tram is named by its timetable when one is due at a stop near you, or else by the lines that
    run on your street, from the Transport layer. In a vehicle the checks rest. ---------- */
-const GROUP={arrive:12000, fresh:90000, min:3, near:25, rise:4, crowd:70, arriveCrowd:8000, minCrowd:4, stopNear:10, stopMs:30000, stopFresh:180000, wheel:2.5, wheelApp:4, keep:10*60000, people:3};
+const GROUP={burst:12, earMs:20000, arrive:12000, fresh:90000, min:3, near:25, rise:4, crowd:70, arriveCrowd:8000, minCrowd:4, stopNear:10, stopMs:30000, stopFresh:180000, wheel:2.5, wheelApp:4, keep:10*60000, people:3};
 const GRP={last:0, seen:{}, stillT:0};
 const PHONE_RE=/iphone|phone|galaxy|pixel/i;
 const grpPhone = d => d.cls==='Phone' || PHONE_RE.test(d.hint||'');
@@ -3901,7 +3901,10 @@ function grpCand(d, nowS){ if(d.band!=='ble' || !d.present || d.sim || isYours(d
 function groupScan(nowS, live){ if(GRP.last && Math.abs(nowS-GRP.last)<1900) return; GRP.last=nowS; if(onWheels() && !SGS.on) return;
   const tL=nowS-LIVE.skew, lf=TRACK.length?TRACK[TRACK.length-1]:null, mv=(lf && tL-(lf.t2||lf.t)<=12000) ? ownMove(tL, 15000) : null, still=!!mv && mv.d<4;          // a position more than 12 seconds old says nothing about now
   if(still){ if(!GRP.stillT) GRP.stillT=nowS; } else if(mv) GRP.stillT=0;
-  let n=0; const C=[]; LIVE.devs.forEach(d=>{ if(d.band==='ble' && d.present) n++; const c=grpCand(d, nowS); if(c) C.push(c); });
+  let n=0; const C0=[]; LIVE.devs.forEach(d=>{ if(d.band==='ble' && d.present) n++; const c=grpCand(d, nowS); if(c) C0.push(c); });
+  // when the phone begins to hear (listening starts, Location comes on, the scanner wakes) everything around is first heard at once: that is no arrival
+  const ear=Math.max(PH.asked||0, LIVE.earAt||0)+LIVE.skew, sinces=[]; LIVE.devs.forEach(x=>{ if(x.band==='ble' && x.since) sinces.push(x.since); });
+  const C=C0.filter(c=>c.mv>=GROUP.wheel || (!(c.since>=ear-2000 && c.since<=ear+GROUP.earMs) && sinces.filter(t=>Math.abs(t-c.since)<=4000).length<GROUP.burst));          // one shown to move at the pace of wheels still counts
   if(window.__GDBG) window.__GDBG.push({t:nowS, n, still, C:C.map(c=>[c.d.sig.slice(-5), Math.round((nowS-c.since)/1000), Math.round(c.rise), c.falling?1:0, Math.round(c.m), +c.mv.toFixed(1), c.d.cls[0]])});
   const crowd=n>GROUP.crowd;
   // coming toward you: arrived together, rising together, not yet past you
@@ -7951,7 +7954,7 @@ function deafAlert(why){ if(!W.on) return; W.deafN=(W.deafN||0)+1; W.deaf=Date.n
   if(alertRaise('deaf:'+W.t0+':'+W.deafN, 'Remiel cannot hear anything', why+' '+fix)) buzz([300,120,300]); }
 function deafTick(){ if(!W.on || !NATIVE()) return; const why=phNoHear();
   if(why && !W.deaf && Date.now()-W.t0>20000){ wEvent('warn', why+' Nothing is heard and no position is recorded until it is fixed.'); deafAlert(why); }          // it stopped hearing during the trip
-  else if(!why && W.deaf){ S.banners=(S.banners||[]).filter(b=>b.key!=='deaf:'+W.t0+':'+W.deafN); renderAlerts(); wEvent('note','Remiel can hear again.'); W.deaf=0; } }
+  else if(!why && W.deaf){ S.banners=(S.banners||[]).filter(b=>b.key!=='deaf:'+W.t0+':'+W.deafN); renderAlerts(); wEvent('note','Remiel can hear again.'); W.deaf=0; LIVE.earAt=Date.now(); } }
 setInterval(deafTick, 3000);
 function walkStart(t0, a, at){
   tripKeep(); const back=!!at; LIVE.alias={}; LIVE.devs.forEach(d=>{ d.ids=1; });
@@ -8016,7 +8019,7 @@ function walkTick(at, only, q){
   if(!back){ walkPos();
     const sen=mobileLive();
     if(!sen && !W.silent && now-W.t0>20000){ W.silent=true; wEvent('warn','Listening paused. Remiel resumes as soon as the sensor reports again.'); }
-    else if(sen && W.silent){ W.silent=false; wEvent('note','Listening again.'); }
+    else if(sen && W.silent){ W.silent=false; LIVE.earAt=Date.now(); wEvent('note','Listening again.'); }
     wpTick(); }
   const each=d=>{ const heard=nowS-d.seenMobile<(d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT); let r=W.devs[d.id];
     if(!r){ if(!heard) return; if(quietAp(d)){ W.aps=W.aps||{}; let a=W.aps[d.id]; if(!a || a===1) a=W.aps[d.id]={call:d.name||'', ssid:d.adv||'', hint:d.hint||'', first:now, last:now, n:0, min:Math.round(d.dist), at:null};
