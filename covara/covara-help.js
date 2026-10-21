@@ -4,6 +4,9 @@
    where, how far away, the nearest emergency room, and who is on the way. WHEREIS opens on the caller by itself:
    the big radar shows the whole area, the small one the room or the tightest circle the phone can give.
    The caller's phone sends a fresh position at once and every 15 seconds for the next hour.
+   Nobody in the circle is assumed to be close: the big radar becomes a locator for every place near the caller
+   that can answer (emergency rooms, fire stations, police, urgent care, defibrillators, pharmacies), the
+   closest first, and Nearby help lists them with Call and Directions.
    Beverly Index LLC */
 (function () {
   'use strict';
@@ -13,12 +16,20 @@
       sent: 'Your circle has been told. Your position goes to them every 15 seconds.', failed: 'Help could not be sent. Check the internet, or call 911.',
       called: '{name} CALLED FOR HELP', youCalled: 'YOU CALLED FOR HELP', at: '{t}', room: 'in the {room}', fromYou: '{d} from you', acc: 'within {d}', er: 'nearest ER: {name}, {d}',
       coming: '{names} on the way', nobody: 'no one on the way yet', live: 'LIVE {t}', noPos: 'finding position', sharing: 'sharing your position with the circle',
-      onWay: "I'm on my way", call: 'Call', resolve: 'Resolved', allRight: "I'm all right", lead: 'HELP', ok: 'Marked resolved.', youOnWay: 'You are on the way.' },
+      onWay: "I'm on my way", call: 'Call', resolve: 'Resolved', allRight: "I'm all right", lead: 'HELP', ok: 'Marked resolved.', youOnWay: 'You are on the way.',
+      nearBtn: 'Nearby help', firstHelp: 'closest help: {name}, {kind}, {d}', comingD: '{name} on the way, {d}', nearTitle: 'Help near {name}', nearYou: 'Help near you',
+      nearSub: 'Closest first, measured from where the phone is now. Call the emergency number first if anyone is in danger.', emerg: 'Call 911', emergNum: '911', callIt: 'Call', dirs: 'Directions', closest: 'CLOSEST HELP',
+      nearNone: 'No places found near this spot yet.', nearFail: 'The list of nearby places could not be loaded. Call 911.', nearWait: 'Finding help nearby...', close: 'Close',
+      k_emergency: 'Emergency room', k_hospital: 'Hospital', k_urgent: 'Urgent care', k_clinic: 'Clinic', k_doctor: 'Doctor', k_police: 'Police', k_fire: 'Fire station', k_pharmacy: 'Pharmacy', k_aed: 'Defibrillator' },
     it: { title: 'Chiedi aiuto', sub: 'Tutta la tua cerchia viene avvisata subito e vede dove sei.', hold: 'Tieni premuto per chiamare la cerchia', holding: 'Continua a tenere premuto…', cancel: 'Annulla',
       sent: 'La tua cerchia è stata avvisata. La tua posizione arriva loro ogni 15 secondi.', failed: 'Non è stato possibile inviare l’aiuto. Controlla internet o chiama il 112.',
       called: '{name} HA CHIESTO AIUTO', youCalled: 'HAI CHIESTO AIUTO', at: '{t}', room: 'in {room}', fromYou: 'a {d} da te', acc: 'entro {d}', er: 'pronto soccorso più vicino: {name}, {d}',
       coming: '{names} in arrivo', nobody: 'ancora nessuno in arrivo', live: 'IN DIRETTA {t}', noPos: 'cerco la posizione', sharing: 'condividi la posizione con la cerchia',
-      onWay: 'Sto arrivando', call: 'Chiama', resolve: 'Risolto', allRight: 'Sto bene', lead: 'AIUTO', ok: 'Segnato come risolto.', youOnWay: 'Sei in arrivo.' }
+      onWay: 'Sto arrivando', call: 'Chiama', resolve: 'Risolto', allRight: 'Sto bene', lead: 'AIUTO', ok: 'Segnato come risolto.', youOnWay: 'Sei in arrivo.',
+      nearBtn: 'Aiuto vicino', firstHelp: 'aiuto più vicino: {name}, {kind}, {d}', comingD: '{name} in arrivo, a {d}', nearTitle: 'Aiuto vicino a {name}', nearYou: 'Aiuto vicino a te',
+      nearSub: 'Dal più vicino, misurato da dove si trova ora il telefono. Se qualcuno è in pericolo, chiama prima il numero di emergenza.', emerg: 'Chiama il 112', emergNum: '112', callIt: 'Chiama', dirs: 'Indicazioni', closest: 'AIUTO PIÙ VICINO',
+      nearNone: 'Nessun luogo trovato ancora qui vicino.', nearFail: 'Non è stato possibile caricare i luoghi vicini. Chiama il 112.', nearWait: 'Cerco aiuto qui vicino...', close: 'Chiudi',
+      k_emergency: 'Pronto soccorso', k_hospital: 'Ospedale', k_urgent: 'Guardia medica', k_clinic: 'Clinica', k_doctor: 'Medico', k_police: 'Polizia', k_fire: 'Vigili del fuoco', k_pharmacy: 'Farmacia', k_aed: 'Defibrillatore' }
   };
   function t(k, p) { var s = (IT() ? S.it : S.en)[k] || S.en[k] || k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
   function esc(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -46,7 +57,17 @@
     '@keyframes cvHm{from{transform:translateX(0)}to{transform:translateX(-50%)}}@media (prefers-reduced-motion:reduce){#cvHelpTicker .track{animation:none}}' +
     '#cvHelpActs{position:fixed;left:0;right:0;z-index:99981;display:none;justify-content:center;flex-wrap:wrap;gap:8px;padding:0 10px}#cvHelpActs.on{display:flex}body.cv-helping #cvnTop{visibility:hidden}'+
     '#cvHelpActs button{min-height:38px;padding:0 16px;border-radius:19px;font:800 13px var(--nous-font,sans-serif);cursor:pointer;border:1px solid rgba(255,255,255,.45);background:rgba(120,20,40,.35);color:#fff;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}' +
-    '#cvHelpActs button.pri{background:#ffd24d;color:#2a1600;border-color:#ffd24d}#cvHelpActs button[disabled]{opacity:.6}';
+    '#cvHelpActs button.pri{background:#ffd24d;color:#2a1600;border-color:#ffd24d}#cvHelpActs button[disabled]{opacity:.6}' +
+    /* Nearby help: a red glass sheet, closest first */
+    '#cvHelpNear{position:fixed;inset:0;z-index:100010;display:flex;align-items:flex-end;justify-content:center;background:rgba(30,4,10,.40);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-family:var(--nous-font,"Hanken Grotesk",sans-serif)}' +
+    '#cvHelpNear .sh{width:min(520px,100%);max-height:82vh;overflow:auto;padding:18px 16px calc(16px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0;border:1.5px solid rgba(255,80,100,.7);border-bottom:0;background:linear-gradient(160deg,rgba(120,20,40,.34),rgba(30,6,16,.55));-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 30px rgba(255,40,70,.3),inset 0 1px 0 rgba(255,255,255,.12);color:#fff}' +
+    '#cvHelpNear h3{margin:0 0 4px;font-size:19px;font-weight:800}#cvHelpNear .sub{margin:0 0 12px;color:#ffd5dc;font-size:13px;line-height:1.4}' +
+    '#cvHelpNear .sos{display:block;width:100%;min-height:48px;margin:0 0 12px;border-radius:24px;background:#e0102e;color:#fff;font:800 16px var(--nous-font,sans-serif);text-align:center;line-height:48px;text-decoration:none;box-shadow:0 0 20px rgba(255,40,70,.5)}' +
+    '#cvHelpNear .pl{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 0 8px;border-radius:16px;border:1px solid rgba(255,170,185,.35);background:rgba(255,255,255,.05)}#cvHelpNear .pl.first{border-color:#ffd24d;box-shadow:0 0 16px rgba(255,210,77,.35)}' +
+    '#cvHelpNear .dot{flex:0 0 12px;height:12px;border-radius:50%;box-shadow:0 0 10px currentColor}#cvHelpNear .nm{flex:1;min-width:0}#cvHelpNear .nm b{display:block;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '#cvHelpNear .nm span{display:block;font:700 11px var(--nous-mono,"JetBrains Mono",monospace);letter-spacing:.04em;margin-top:2px}#cvHelpNear .nm em{display:block;font-style:normal;font:800 10px var(--nous-mono,monospace);color:#ffd24d;letter-spacing:.12em;margin-bottom:2px}' +
+    '#cvHelpNear .pl a{flex:0 0 auto;min-height:36px;padding:0 12px;border-radius:18px;border:1px solid rgba(255,255,255,.45);color:#fff;text-decoration:none;font:800 12.5px var(--nous-font,sans-serif);line-height:34px}#cvHelpNear .pl a.c{background:#ffd24d;color:#2a1600;border-color:#ffd24d}' +
+    '#cvHelpNear .x{display:block;margin:6px auto 0;min-height:42px;padding:0 24px;border-radius:21px;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;font:700 14px var(--nous-font,sans-serif);cursor:pointer}#cvHelpNear .msg{color:#ffe3a8;font-size:14px;margin:8px 0}';
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
   function card() {
@@ -102,6 +123,50 @@
   }
   function unfollow() { try { if (_watch != null) navigator.geolocation.clearWatch(_watch); } catch (e) {} _watch = null; clearInterval(follow._iv); _mine = []; }
 
+  /* ── help nearby: every place that can answer, from the caller's own spot ── */
+  var KC = { emergency: '#ff3d5a', hospital: '#ff4f7a', urgent: '#ff7a9a', clinic: '#ff8fb1', doctor: '#ffb4c8', police: '#5b9cff', fire: '#ff8a3d', pharmacy: '#3ee08f', aed: '#ffd24d' };
+  var _near = {};
+  function moved(a, b) { return Math.hypot((a.lat - b.lat) * 111320, (a.lon - b.lon) * 111320 * Math.cos(a.lat * Math.PI / 180)); }
+  async function fetchNear(h, force) {
+    if (!h.location) return;
+    var c = _near[h.id];
+    if (c && c.busy) return;
+    if (!force && c && c.data && Date.now() - c.at < 10 * 60000 && moved(c.pos, h.location) < 250 && (h.responders || []).length === c.nr) return;
+    _near[h.id] = Object.assign(c || {}, { busy: true });
+    var r = await api('/care-help/' + encodeURIComponent(h.id) + '/near').catch(function () { return { ok: false }; });
+    _near[h.id] = { busy: false, at: Date.now(), pos: { lat: h.location.lat, lon: h.location.lon }, nr: (h.responders || []).length, data: r.ok ? r.data : (c && c.data) || { places: [], failed: true } };
+    paint(); renderNear();
+  }
+  function nearOf(h) { var c = h && _near[h.id]; return c && c.data ? c.data : null; }
+  function firstOf(n) { if (!n || !n.places) return null; return n.places.filter(function (p) { return p.id === n.first; })[0] || null; }
+  var _nearFor = null;
+  function openNear(h) { _nearFor = h.id; renderNear(true); fetchNear(h, false); }
+  function renderNear(make) {
+    var el = document.getElementById('cvHelpNear');
+    if (!el && !make) return;
+    var h = _help.filter(function (x) { return x.id === _nearFor; })[0];
+    if (!h) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'cvHelpNear'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.onclick = function (e) { if (e.target === el) { el.remove(); _nearFor = null; } }; document.body.appendChild(el); }
+    var n = nearOf(h), first = firstOf(n), body = '';
+    if (!n) body = '<div class="msg">' + esc(t('nearWait')) + '</div>';
+    else if (!n.places.length) body = '<div class="msg">' + esc(t(n.failed ? 'nearFail' : 'nearNone')) + '</div>';
+    else {
+      /* the closest that answers emergencies first, then everything else by distance */
+      var list = first ? [first].concat(n.places.filter(function (p) { return p !== first; })) : n.places;
+      body = list.map(function (p) {
+        var col = KC[p.kind] || KC.doctor, isF = first && p.id === first.id;
+        var dir = 'https://www.google.com/maps/dir/?api=1&destination=' + p.lat + ',' + p.lon;
+        return '<div class="pl' + (isF ? ' first' : '') + '"><i class="dot" style="background:' + col + ';color:' + col + '"></i><div class="nm">' + (isF ? '<em>' + esc(t('closest')) + '</em>' : '') +
+          '<b>' + esc(p.name) + '</b><span style="color:' + col + '">' + esc(t('k_' + (p.kind || 'doctor')).toUpperCase()) + ' · ' + esc(dist(p.m)) + '</span></div>' +
+          (p.phone ? '<a class="c" href="tel:' + esc(String(p.phone).replace(/[^\d+]/g, '')) + '">' + esc(t('callIt')) + '</a>' : '') +
+          '<a href="' + esc(dir) + '" target="_blank" rel="noopener">' + esc(t('dirs')) + '</a></div>';
+      }).join('');
+    }
+    var who = h.you ? t('nearYou') : t('nearTitle', { name: String(h.sender.name || '').split(/\s+/)[0] });
+    var html = '<div class="sh"><h3>' + esc(who) + '</h3><p class="sub">' + esc(t('nearSub')) + '</p><a class="sos" href="tel:' + t('emergNum') + '">' + esc(t('emerg')) + '</a>' + body + '<button type="button" class="x">' + esc(t('close')) + '</button></div>';
+    if (el._h !== html) { el._h = html; el.innerHTML = html; el.querySelector('.x').onclick = function () { el.remove(); _nearFor = null; }; }
+  }
+
   /* ── what the circle sees ── */
   var _help = [], _seen = {}, _busy = false, _ack = {};
   async function load(force) {
@@ -112,8 +177,8 @@
       if (r.ok) {
         _help = r.data.help || [];
         if (!_help.some(function (h) { return h.you; }) && _mine.length) unfollow();
-        _help.forEach(function (h) { if (!_seen[h.id]) { _seen[h.id] = Date.now(); if (!h.you) showOnMap(h, true); } });
-        paint();
+        _help.forEach(function (h) { if (!_seen[h.id]) { _seen[h.id] = Date.now(); if (!h.you) showOnMap(h, true); } fetchNear(h, false); });
+        paint(); renderNear();
       }
     } catch (e) {} finally { _busy = false; }
   }
@@ -140,7 +205,7 @@
     tk.style.top = Math.round((top || 90) + 8) + 'px';
     if (ac) {
       var row = document.getElementById('cvnTop'), rr = row ? row.getBoundingClientRect() : null;
-      if (rr && rr.height && rr.top > window.innerHeight * 0.5) { ac.style.top = Math.round(rr.top + rr.height / 2 - 19) + 'px'; }
+      if (rr && rr.height && rr.top > window.innerHeight * 0.5) { ac.style.top = Math.round(rr.top + rr.height / 2 - Math.max(19, ac.offsetHeight / 2)) + 'px'; }
       else { ac.style.top = Math.round((top || 90) + 8 + 52) + 'px'; }
     }
   }
@@ -153,21 +218,25 @@
     else parts.push(esc(t('noPos')));
     if (!me && h.from_you_m != null) parts.push(esc(t('fromYou', { d: dist(h.from_you_m) })));
     if (me) parts.push(esc(t('sharing')));
-    parts.push(esc((h.responders || []).length ? t('coming', { names: h.responders.map(function (x) { return String(x.name || '').split(/\s+/)[0]; }).join(', ') }) : t('nobody')));
-    if (h.nearest) parts.push(esc(t('er', { name: h.nearest.name, d: dist(h.nearest.m) })));
+    var n = nearOf(h), f = firstOf(n);
+    if (f) parts.push('<i>' + esc(t('firstHelp', { name: f.name, kind: t('k_' + f.kind).toLowerCase(), d: dist(f.m) })) + '</i>');
+    if ((h.responders || []).length) {
+      var rd = {}; ((n && n.responders) || []).forEach(function (x) { rd[x.id] = x.m; });
+      h.responders.forEach(function (x) { var nm = String(x.name || '').split(/\s+/)[0]; parts.push(esc(rd[x.id] != null ? t('comingD', { name: nm, d: dist(rd[x.id]) }) : t('coming', { names: nm }))); });
+    } else parts.push(esc(t('nobody')));
     return parts.join(' · ');
   }
   function paint() {
     if (!tk) { tk = document.createElement('div'); tk.id = 'cvHelpTicker'; tk.setAttribute('role', 'alert'); document.body.appendChild(tk); ac = document.createElement('div'); ac.id = 'cvHelpActs'; document.body.appendChild(ac); }
-    if (!_help.length) { tk.classList.remove('on'); ac.classList.remove('on'); document.body.classList.remove('cv-helping'); tk.innerHTML = ''; ac.innerHTML = ''; tk._sig = ''; return; }
+    if (!_help.length) { var nm0 = document.getElementById('cvHelpNear'); if (nm0) nm0.remove(); _nearFor = null; tk.classList.remove('on'); ac.classList.remove('on'); document.body.classList.remove('cv-helping'); tk.innerHTML = ''; ac.innerHTML = ''; tk._sig = ''; return; }
     var h = _help[0], mine = myId(), onWay = (h.responders || []).some(function (x) { return x.id === mine; });
     var first = h.responders && h.responders[0] && h.responders[0].id === mine;
     var text = _help.map(line).join('<span style="padding:0 18px">•</span>');
     var sig = text + onWay + first + _help.length;
     if (tk._sig !== sig) {
       tk._sig = sig;
-      var acts = h.you ? '<button type="button" class="pri" data-a="ok">' + esc(t('allRight')) + '</button>'
-        : '<button type="button" class="pri" data-a="way"' + (onWay ? ' disabled' : '') + '>' + esc(onWay ? t('youOnWay') : t('onWay')) + '</button><button type="button" data-a="call">' + esc(t('call')) + '</button><button type="button" data-a="map">WHEREIS</button>' +
+      var acts = h.you ? '<button type="button" data-a="near">' + esc(t('nearBtn')) + '</button><button type="button" class="pri" data-a="ok">' + esc(t('allRight')) + '</button>'
+        : '<button type="button" class="pri" data-a="way"' + (onWay ? ' disabled' : '') + '>' + esc(onWay ? t('youOnWay') : t('onWay')) + '</button><button type="button" data-a="call">' + esc(t('call')) + '</button><button type="button" data-a="map">WHEREIS</button><button type="button" data-a="near">' + esc(t('nearBtn')) + '</button>' +
           (first || role() === 'home' ? '<button type="button" data-a="ok">' + esc(t('resolve')) + '</button>' : '');
       tk.innerHTML = '<div class="tk"><div class="lead">' + esc(t('lead')) + '</div><div class="track">' + text + '<span style="padding:0 46px"></span>' + text + '</div></div>';
       ac.innerHTML = acts;
@@ -177,6 +246,7 @@
           if (a === 'way') { b.disabled = true; await api('/care-help/' + encodeURIComponent(h.id) + '/coming', { method: 'POST' }).catch(function () {}); load(true); }
           else if (a === 'ok') { var r = await api('/care-help/' + encodeURIComponent(h.id) + '/resolve', { method: 'POST' }).catch(function () { return { ok: false }; }); if (r.ok) { if (h.you) unfollow(); try { showToast(t('ok')); } catch (e) {} } load(true); }
           else if (a === 'map') showOnMap(h, false);
+          else if (a === 'near') openNear(h);
           else if (a === 'call') {
             var c = (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).filter(function (x) { return x.care && x.care.userId === h.sender.id; })[0];
             if (c && typeof runContactQuickAction === 'function') runContactQuickAction('video', c);
@@ -198,5 +268,6 @@
   setTimeout(function () { load(true); if (/#help=/.test(location.hash || '')) setTimeout(function () { if (_help[0]) showOnMap(_help[0], false); }, 2500); }, 3000);
 
   window.CovaraHelp = { open: card, start: start, load: load, list: function () { return _help; },
-    forPerson: function (uid) { return _help.filter(function (h) { return h.sender.id === uid && h.location; })[0] || null; } };
+    forPerson: function (uid) { return _help.filter(function (h) { return h.sender.id === uid && h.location; })[0] || null; },
+    near: function (h) { return nearOf(h); }, first: function (h) { return firstOf(nearOf(h)); }, kindName: function (k) { return t('k_' + (k || 'doctor')); }, colors: KC, openNear: openNear };
 })();
