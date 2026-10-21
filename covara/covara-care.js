@@ -17,7 +17,8 @@
       linkHome: 'Show a code for my family', linkAway: 'Type a code',
       myLocTitle: 'WHO CAN SEE WHERE YOU ARE', myLocHome: 'Only {name}', myLocCircle: 'The whole circle', myLocNone: 'Nobody', myLocSaved: 'Saved. Only the people you chose can see where you are.',
       codeTitle: 'Show this to your family',
-      codeSub: 'One code for everyone you give it to. Each person who uses it joins your circle at once, and you can call each other straight away. It works until {date}.',
+      codeSub: 'One code for everyone you give it to. Each person who uses it joins your circle at once, and you can call each other straight away. Good for 24 hours, until {date}.',
+      inviteHint: 'Good for 24 hours, until {date}. Everyone who uses it joins at once.',
       codeShare: 'Send the link', codeCopied: 'Link copied. Paste it in a message.', codeEnd: 'End this code', codeEnded: 'Code ended. Nobody new can join with it.',
       joinedTitle: 'Joined with your code', joinedNone: 'Nobody yet.', guest: 'GUEST', joinedToast: '{name} joined your circle. Tap their sphere to choose what else they can see.',
       shareText: 'Join my circle on Remiel: Covara so we can video call: {link} (code {code})',
@@ -47,7 +48,8 @@
       linkHome: 'Mostra un codice per la famiglia', linkAway: 'Scrivi un codice',
       myLocTitle: 'CHI PU\u00d2 VEDERE DOVE SEI', myLocHome: 'Solo {name}', myLocCircle: 'Tutta la cerchia', myLocNone: 'Nessuno', myLocSaved: 'Salvato. Solo le persone che hai scelto possono vedere dove sei.',
       codeTitle: 'Mostra questo alla tua famiglia',
-      codeSub: 'Un codice per tutti quelli a cui lo dai. Chi lo usa entra subito nella tua cerchia e potete chiamarvi subito. Vale fino al {date}.',
+      codeSub: 'Un codice per tutti quelli a cui lo dai. Chi lo usa entra subito nella tua cerchia e potete chiamarvi subito. Vale 24 ore, fino al {date}.',
+      inviteHint: 'Vale 24 ore, fino al {date}. Chi lo usa entra subito.',
       codeShare: 'Invia il link', codeCopied: 'Link copiato. Incollalo in un messaggio.', codeEnd: 'Termina questo codice', codeEnded: 'Codice terminato. Nessun altro può entrare con questo.',
       joinedTitle: 'Entrati con il tuo codice', joinedNone: 'Ancora nessuno.', guest: 'OSPITE', joinedToast: '{name} è entrato nella tua cerchia. Tocca la sua sfera per scegliere cos\'altro può vedere.',
       shareText: 'Entra nella mia cerchia su Remiel: Covara così possiamo fare videochiamate: {link} (codice {code})',
@@ -95,6 +97,7 @@
     '.cv-box{width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;text-align:center;padding:8px 0 20px}' +
     '.cv-h{font:400 clamp(26px,5vw,38px)/1.15 "Instrument Serif",Georgia,serif;margin:0 0 6px;color:#f1f6ff}' +
     '.cv-myloc{margin:-2px 0 12px 52px}.cv-myloc small{display:block;font:700 9.5px "JetBrains Mono",monospace;letter-spacing:.14em;color:#9fd8ff;margin-bottom:6px}.cv-myloc div{display:flex;flex-wrap:wrap;gap:6px}.cv-myloc button{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid rgba(150,200,255,.4);background:rgba(40,90,190,.18);color:#e8f2ff;font:600 13px "Hanken Grotesk",sans-serif;cursor:pointer}.cv-myloc button[aria-pressed=true]{background:#38bdf8;color:#04121a;border-color:#38bdf8}' +
+    '.cv-inv{text-align:center;padding:4px 0 6px}.cv-code-sm span{width:42px !important;height:56px !important;font-size:30px !important}.cv-inv-h{margin:8px 0 10px;font-size:13px;color:#b9c9e6}.cv-inv-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}.cv-inv-row .cv-btn{min-height:40px;padding:0 16px;font-size:13px}.cv-inv .cv-joined{margin-top:12px}' +
     '.cv-joined{margin:6px auto 4px;max-width:420px;text-align:left}.cv-jl{margin-top:8px;display:flex;flex-direction:column;gap:6px}.cv-jr{display:flex;align-items:baseline;gap:8px;padding:8px 12px;border-radius:12px;border:1px solid rgba(150,200,255,.3);background:rgba(40,90,190,.16)}.cv-jr b{font-weight:700}.cv-jr i{margin-left:auto;font-style:normal;font-size:12px;color:#9fb4e2}.cv-gt{font:800 10px "JetBrains Mono",monospace;letter-spacing:.12em;color:#0b0d14;background:#fbbf24;border-radius:6px;padding:2px 6px}' +
     '.cv-sub{font-size:14px;color:#8ea3bf;margin:0 0 22px}' +
     '.cv-mono{font:600 11px "JetBrains Mono",monospace;letter-spacing:.18em;color:#5fd0ff;text-transform:uppercase}' +
@@ -239,6 +242,36 @@
     _joinSeen = null; await poll();
     clearInterval(_codeTimer);
     _codeTimer = setInterval(poll, 3000);
+  }
+  /* The same family code, inside the card's top pull: opening the pull issues it (or shows the live one) */
+  async function codeInto(el) {
+    if (!el) return;
+    el.innerHTML = '<div class="cv-inv"><div class="cv-code cv-code-sm" aria-live="polite"><span></span><span></span><span></span><span></span><span></span><span></span></div><p class="cv-inv-h" data-sub></p>' +
+      '<div class="cv-inv-row"><button type="button" class="cv-btn pri" data-a="share">' + esc(t('codeShare')) + '</button><button type="button" class="cv-btn" data-a="new">' + esc(t('codeNew')) + '</button><button type="button" class="cv-btn" data-a="end">' + esc(t('codeEnd')) + '</button></div>' +
+      '<div class="cv-msg"></div><div class="cv-joined"><div class="cv-mono">' + esc(t('joinedTitle')) + '</div><div data-j class="cv-jl"></div></div></div>';
+    var cur = null, msg = el.querySelector('.cv-msg');
+    function paint(c) {
+      var d = c ? String(c.code || '').split('') : [];
+      el.querySelectorAll('.cv-code span').forEach(function (x, i) { x.textContent = d[i] || ''; });
+      el.querySelector('[data-sub]').textContent = c ? t('inviteHint', { date: when(c.expires_at) }) : '';
+    }
+    async function fill(fresh) { try { var r = await api('/code', { method: 'POST', body: fresh ? { fresh: true } : {} }); if (r.ok) { cur = r.data; paint(cur); } else msg.textContent = t('offline'); } catch (e) { msg.textContent = t('offline'); } }
+    async function poll() {
+      if (!el.isConnected) { clearInterval(iv); return; }
+      try { var r = await api('/code'); if (r.ok) { var j = r.data.joined || [];
+        el.querySelector('[data-j]').innerHTML = !j.length ? '<div class="cv-sub" style="margin:0">' + esc(t('joinedNone')) + '</div>' : j.slice(0, 8).map(function (p) { return '<div class="cv-jr"><b>' + esc(p.name || '?') + '</b>' + (p.guest ? '<span class="cv-gt">' + esc(t('guest')) + '</span>' : '') + '<i>' + esc(when(p.at)) + '</i></div>'; }).join('');
+        var ids = j.map(function (p) { return p.id + p.at; }).join(); if (el._seen != null && ids !== el._seen) sync(); el._seen = ids; } } catch (e) {}
+    }
+    el.querySelector('[data-a=new]').onclick = function (e) { e.stopPropagation(); fill(true); };
+    el.querySelector('[data-a=end]').onclick = async function (e) { e.stopPropagation(); try { await api('/code', { method: 'DELETE' }); } catch (x) {} cur = null; paint(null); msg.className = 'cv-msg ok'; msg.textContent = t('codeEnded'); };
+    el.querySelector('[data-a=share]').onclick = async function (e) {
+      e.stopPropagation(); if (!cur) { await fill(false); if (!cur) return; }
+      var link = joinLink(cur.code), text = t('shareText', { link: link, code: cur.code });
+      try { if (navigator.share) { await navigator.share({ title: 'Remiel: Covara', text: text, url: link }); return; } } catch (x) { if (x && x.name === 'AbortError') return; }
+      try { await navigator.clipboard.writeText(text); msg.className = 'cv-msg ok'; msg.textContent = t('codeCopied'); } catch (x) { msg.textContent = text; }
+    };
+    await fill(false); el._seen = null; await poll();
+    var iv = setInterval(poll, 4000);
   }
   function closeCode() { clearInterval(_codeTimer); _codeTimer = null; hide(document.getElementById('cvCode')); }
 
@@ -517,6 +550,6 @@
     var m = /#link=([\w-]+)/.exec(location.hash || '');
     if (m) setTimeout(function () { var c = byLink(m[1]); if (c && role() === 'home') openConsent(c); }, 2500);
   }
-  window.CovaraCare = { relLabel: function (k) { return (L().rel || {})[k] || k; }, sync: sync, openCode: openCode, openPad: openPad, openConsent: openConsent, askRole: askRole, role: role, waitLabel: waitLabel, careContacts: careContacts };
+  window.CovaraCare = { codeInto: codeInto, relLabel: function (k) { return (L().rel || {})[k] || k; }, sync: sync, openCode: openCode, openPad: openPad, openConsent: openConsent, askRole: askRole, role: role, waitLabel: waitLabel, careContacts: careContacts };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 800); }); else setTimeout(boot, 800);
 })();

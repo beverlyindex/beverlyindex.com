@@ -12,6 +12,7 @@
   var STR = {
     en: {
       sec_med: 'Medicines', sec_visit: 'Visits', sec_health: 'Health', sec_safety: 'Safety', sec_papers: 'Papers', me: 'me',
+      sec_invite: 'Invite to my circle', pv_invite: 'One code for the family, 24 hours',
       pv_med: 'Doses, photos of each bottle, refills', pv_visit: 'Appointments, carers, the day log', pv_health: 'Sleep, breathing, how the day went', pv_safety: 'Emergency card, wandering, worries', pv_papers: 'Who decides, documents, records access', pv_late: 'needs attention', pv_due: 'due now',
       dFilled: 'Prescription', filled: 'Filled', filledOn: 'Filled {d}', notFilled: 'Not filled',
       dayOf: 'The day of {name}', dayHint: 'Tap what you saw. Anyone looking after them sees it, and a sudden change warns everyone.', lastDays: 'Last days', warnTail: 'Sudden changes like these can mean an infection, dehydration or pain. Consider calling the doctor.',
@@ -91,6 +92,7 @@
     },
     it: {
       sec_med: 'Medicine', sec_visit: 'Visite', sec_health: 'Salute', sec_safety: 'Sicurezza', sec_papers: 'Documenti', me: 'me',
+      sec_invite: 'Invita nella mia cerchia', pv_invite: 'Un codice per la famiglia, 24 ore',
       pv_med: 'Dosi, foto di ogni flacone, ricariche', pv_visit: 'Appuntamenti, assistenti, il diario', pv_health: 'Sonno, respiro, com\u2019\u00e8 andata la giornata', pv_safety: 'Scheda di emergenza, allontanamento, preoccupazioni', pv_papers: 'Chi decide, documenti, accesso alle cartelle', pv_late: 'richiede attenzione', pv_due: 'da fare ora',
       dFilled: 'Ricetta', filled: 'Ritirata', filledOn: 'Ritirata il {d}', notFilled: 'Da ritirare',
       dayOf: 'La giornata di {name}', dayHint: 'Tocca ciò che hai visto. Chi lo assiste lo vede, e un cambiamento improvviso avvisa tutti.', lastDays: 'Ultimi giorni', warnTail: 'Cambiamenti improvvisi come questi possono indicare un\u2019infezione, disidratazione o dolore. Valuta di chiamare il medico.',
@@ -208,6 +210,7 @@
     '#cvTabs{position:fixed;left:16px;top:84px;width:min(340px,calc(100vw - 32px));z-index:7000;font-family:var(--nous-font,"Hanken Grotesk",system-ui,sans-serif);color:#e8ecf4;opacity:0;transform:translateY(-6px);transition:opacity .45s ease,transform .45s ease;pointer-events:none}' +
     '#cvTabs.show{opacity:1;transform:none;pointer-events:auto}' +
     '#cvTabs.in-card{position:static;width:auto;opacity:1;transform:none;pointer-events:auto;margin:4px 0 2px}#cvTabs.in-card .cvx-head{display:none}#cvTabs.in-card .cvx-list{max-height:none;overflow:visible}' +
+    '.cv-pull-invite{border-color:rgba(255,210,77,.6) !important;box-shadow:0 0 18px rgba(255,210,77,.22) !important}.cv-pull-invite .bluf-section-label{color:#ffd24d !important}.cv-pull-invite .bluf-pull-preview{color:#fde68a}' +
     '.cv-pull.cvp-late .bluf-pull-preview{color:#ff8a8a}.cv-pull.cvp-due .bluf-pull-preview{color:#fde68a}.cv-pull.cvp-late .bluf-section-label:after,.cv-pull.cvp-due .bluf-section-label:after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:8px;vertical-align:1px;background:#fbbf24;box-shadow:0 0 8px #fbbf24}.cv-pull.cvp-late .bluf-section-label:after{background:#ff4d6a;box-shadow:0 0 8px #ff4d6a}' +
     'body.rs-overlay-open #cvTabs,body.cv-asking #cvTabs{opacity:0 !important;pointer-events:none !important}' +
     '.cvx-tab{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;margin:0 0 6px;padding:8px 12px;border-radius:12px;background:rgba(10,12,20,0.72);border:1px solid rgba(56,189,248,0.22);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:inherit;font:inherit;cursor:pointer;text-align:left}' +
@@ -1410,7 +1413,9 @@
     var anchor = document.getElementById('pull_videonote'); if (!anchor) return null;
     if (_cardPulls && _cardPulls.parentNode) return _cardPulls;
     var wrap = document.createElement('div'); wrap.id = 'cvCarePulls';
-    wrap.innerHTML = SECTIONS.map(function (k) {
+    /* first of all, on HOME's own phone: invite the family (the code is issued the moment it opens) */
+    var invite = role() === 'home' ? '<div class="bluf-pull cv-pull cv-pull-invite" data-inv><div class="bluf-pull-header" role="button" tabindex="0"><div class="bluf-section-label">' + esc(t('sec_invite')) + '</div><span class="bluf-pull-preview">' + esc(t('pv_invite')) + '</span><span class="bluf-pull-chevron">&#9660;</span></div><div class="bluf-pull-body"><div class="bluf-pull-content" data-inv-slot></div></div></div>' : '';
+    wrap.innerHTML = invite + SECTIONS.map(function (k) {
       return '<div class="bluf-pull cv-pull" data-cvp="' + k + '"><div class="bluf-pull-header" role="button" tabindex="0"><div class="bluf-section-label">' + esc(t('sec_' + k)) + '</div>' +
         '<span class="bluf-pull-preview" data-pv></span><span class="bluf-pull-chevron">&#9660;</span></div><div class="bluf-pull-body"><div class="bluf-pull-content" data-slot></div></div></div>';
     }).join('');
@@ -1420,6 +1425,19 @@
       function go(e) { if (e) e.stopPropagation(); openCardPull(p.getAttribute('data-cvp')); }
       hd.addEventListener('click', go); hd.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } });
     });
+    var inv = wrap.querySelector('[data-inv]');
+    if (inv) {
+      var ih = inv.querySelector('.bluf-pull-header');
+      var openInv = function (e) {
+        if (e) e.stopPropagation();
+        var on = !inv.classList.contains('open');
+        document.querySelectorAll('#blufCard .bluf-pull.open').forEach(function (x) { x.classList.remove('open'); });
+        if (_inCard) foldCard();
+        inv.classList.toggle('open', on);
+        if (on) { try { CovaraCare.codeInto(inv.querySelector('[data-inv-slot]')); } catch (err) {} }
+      };
+      ih.addEventListener('click', openInv); ih.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInv(e); } });
+    }
     /* opening one of the card's own pulls folds ours */
     anchor.parentNode.addEventListener('click', function (e) { var hd = e.target.closest && e.target.closest('.bluf-pull-header'); if (hd && !hd.closest('.cv-pull') && _inCard) foldCard(); }, true);
     _cardPulls = wrap; return wrap;
@@ -1427,14 +1445,14 @@
   function openCardPull(k) {
     var wrap = cardPulls(); if (!wrap) return;
     if (_inCard && _open === k) { foldCard(); return; }
-    document.querySelectorAll('#blufCard .bluf-pull.open').forEach(function (x) { if (!x.classList.contains('cv-pull')) x.classList.remove('open'); });
+    document.querySelectorAll('#blufCard .bluf-pull.open').forEach(function (x) { if (!x.classList.contains('cv-pull') || x.hasAttribute('data-inv')) x.classList.remove('open'); });
     wrap.querySelectorAll('.cv-pull').forEach(function (x) { x.classList.toggle('open', x.getAttribute('data-cvp') === k); });
     var slot = wrap.querySelector('[data-cvp="' + k + '"] [data-slot]');
     _inCard = true; box.classList.add('in-card'); slot.appendChild(box);
     _open = k; _openItem = ''; _html = ''; render();
   }
   function foldCard() {
-    if (_cardPulls) _cardPulls.querySelectorAll('.cv-pull').forEach(function (x) { x.classList.remove('open'); });
+    if (_cardPulls) _cardPulls.querySelectorAll('.cv-pull[data-cvp]').forEach(function (x) { x.classList.remove('open'); });
     _open = ''; _openItem = ''; _html = ''; render();
   }
   function leaveCard() {
@@ -1447,7 +1465,7 @@
     if (cardIsHome()) {
       var wrap = cardPulls(); if (!wrap) return;
       wrap.hidden = false; if (med) med.style.display = 'none';
-      wrap.querySelectorAll('.cv-pull').forEach(function (p) {
+      wrap.querySelectorAll('.cv-pull[data-cvp]').forEach(function (p) {
         var k = p.getAttribute('data-cvp'), st = ''; try { _ls = _ls || lists(); st = pillState(k); } catch (e) {}
         var pv = p.querySelector('[data-pv]'), txt = st === 'late' ? t('pv_late') : st === 'due' ? t('pv_due') : t('pv_' + k);
         if (pv.textContent !== txt) pv.textContent = txt;
