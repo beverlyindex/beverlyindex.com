@@ -348,7 +348,59 @@
       .replace(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g, function (m, h, mi) { h = +h; mi = +mi; if (IT()) return h + (mi ? ' e ' + mi : ''); var ap = h < 12 ? 'A M' : 'P M', h12 = h % 12 || 12; return h12 + (mi ? ' ' + (mi < 10 ? 'oh ' + mi : mi) : '') + ' ' + ap; })
       .replace(/\bmg\b/g, IT() ? 'milligrammi' : 'milligrams').replace(/\bDr\./g, IT() ? 'Dottor' : 'Doctor');
   }
+  /* ── Covara's own voice: a human-sounding voice from Covara's voice server, the same on every phone. Each sentence is
+     asked for once and kept by the server, so a repeated sentence plays at once. When the voice server is not set up,
+     asleep or slow, the phone's own voice speaks instead. ── */
+  var _cv = { ok: null, at: 0, audio: null, seq: 0 };
+  async function cvReady() {
+    if (_cv.ok !== null && Date.now() - _cv.at < 10 * 60000) return _cv.ok;
+    _cv.at = Date.now();
+    try { var r = await SyncEngine.apiFetch('/care-voice/status', { method: 'GET' }); var j = r.ok ? await r.json() : null; _cv.ok = !!(j && j.configured && j.server && j.server.ok); } catch (e) { _cv.ok = false; }
+    return _cv.ok;
+  }
+  function cvHush() { _cv.seq++; try { if (_cv.audio) { _cv.audio.pause(); _cv.audio.src = ''; } } catch (e) {} _cv.audio = null; }
+  async function cvFetch(part, lang) {
+    var ac = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = setTimeout(function () { if (ac) ac.abort(); }, 9000);
+    try {
+      var r = await SyncEngine.apiFetch('/care-voice/say', { method: 'POST', body: JSON.stringify({ text: part, lang: lang }), signal: ac ? ac.signal : undefined });
+      if (!r.ok) return null;
+      return URL.createObjectURL(await r.blob());
+    } catch (e) { return null; } finally { clearTimeout(tm); }
+  }
+  async function speakCovara(text) {
+    var seq = ++_cv.seq, lang = IT() ? 'it' : 'en';
+    var parts = (forEar(text).match(/[^.!?]+[.!?]*/g) || [text]).map(function (x) { return x.trim(); }).filter(Boolean);
+    /* ask for every sentence at once; play them in order as they arrive */
+    var urls = parts.map(function (p) { return cvFetch(p, lang); });
+    var first = await urls[0];
+    if (seq !== _cv.seq) return true;
+    if (!first) { _cv.ok = false; _cv.at = Date.now(); return false; }
+    VV.speakStart(0);
+    var tick = setInterval(function () { if (_cv.audio && !_cv.audio.paused) VV.word(); }, 260);
+    try {
+      for (var i = 0; i < parts.length; i++) {
+        var u = i ? await urls[i] : first;
+        if (seq !== _cv.seq) break;
+        if (!u) { speakDevice(parts.slice(i).join(' ')); break; }
+        await new Promise(function (done) {
+          var a = new Audio(u); _cv.audio = a; a.onended = a.onerror = function () { URL.revokeObjectURL(u); done(); };
+          var p = a.play(); if (p && p.catch) p.catch(function () { done(); });
+        });
+      }
+    } finally { clearInterval(tick); if (seq === _cv.seq) { _cv.audio = null; VV.speakEnd(); } }
+    return true;
+  }
   function speak(text) {
+    if (!String(text || '').trim()) return;
+    cvHush();
+    var authed = false; try { authed = SyncEngine.isAuthenticated() && !SyncEngine.isLocalOnly(); } catch (e) {}
+    if (!authed) { speakDevice(text); return; }
+    cvReady().then(function (ok) {
+      if (!ok) { speakDevice(text); return; }
+      speakCovara(text).then(function (spoke) { if (!spoke) speakDevice(text); }).catch(function () { speakDevice(text); });
+    });
+  }
+  function speakDevice(text) {
     /* in the installed Android app: the phone's own voice engine, which carries Google's natural voices */
     if (window.CovaraNative && typeof CovaraNative.speak === 'function') { if (!String(text || '').trim()) return; try { VV.speakStart(forEar(text).split(/\s+/).length * 420 + 1500); CovaraNative.speak(forEar(text), IT() ? 'it-IT' : 'en-US', window.CovaraCalm ? 0.86 : 0.95); return; } catch (e) {} }
     try {
@@ -399,7 +451,7 @@
     _orb = orb; _cap = cap;
     if (busy) { stop(); return; }
     _to = target();
-    try { if (window.speechSynthesis) speechSynthesis.cancel(); if (window.CovaraNative && CovaraNative.hush) CovaraNative.hush(); } catch (e) {} VV.speakEnd();
+    try { cvHush(); if (window.speechSynthesis) speechSynthesis.cancel(); if (window.CovaraNative && CovaraNative.hush) CovaraNative.hush(); } catch (e) {} VV.speakEnd();
     if (window.CovaraNative && typeof CovaraNative.listen === 'function' && CovaraNative.canHear()) { nativeListen(orb); return; }
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { typed(); return; }
@@ -524,5 +576,5 @@
   /* new messages are fetched every 8 seconds while Covara is on screen, so a Talk message lands at once */
   setInterval(function () { try { if (document.visibilityState === 'visible' && typeof SentinelMessaging !== 'undefined' && SyncEngine.isAuthenticated()) SentinelMessaging.poll(); } catch (e) {} }, 8000);
 
-  window.CovaraTalk = { toggle: toggle, answer: answer, say: say, typed: typed, ask: function (q) { var a = answer(q); say('\u201c' + q + '\u201d: ' + a, a); offerButtons(); }, talkTo: function (c, q) { sendTalk(c, q); }, headline: headline };
+  window.CovaraTalk = { hush: function () { cvHush(); try { if (window.speechSynthesis) speechSynthesis.cancel(); if (window.CovaraNative && CovaraNative.hush) CovaraNative.hush(); } catch (e) {} }, toggle: toggle, answer: answer, say: say, typed: typed, ask: function (q) { var a = answer(q); say('\u201c' + q + '\u201d: ' + a, a); offerButtons(); }, talkTo: function (c, q) { sendTalk(c, q); }, headline: headline };
 })();
