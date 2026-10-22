@@ -1,9 +1,11 @@
-/* Remiel: Covara, HOME's day as the family plans it, and HOME asking the family for something.
-   The family (AWAY) plans meals, HOME's own work hours, routines and tasks. HOME is reminded when each one
-   comes, on the Now card and by a notification, and answers in one tap: "I ate it", "Done", "On my way".
-   HOME asks for something in plain words, by TALK or typed: "pancakes for breakfast tomorrow at 9". The
-   family sees one card, "Rupert asks", and answers "Yes, plan it" (the meal goes on HOME's day at that time)
-   or "Not this time"; HOME sees the answer until "Got it".
+/* Remiel: Covara, HOME's day as the team plans it, and HOME asking the team for something.
+   HOME's team (AWAY: family, a carer, a neighbour) plans meals, HOME's own work hours, routines and tasks. HOME
+   is reminded when each one comes, on the Now card and by a notification, and answers in one tap: "I ate it",
+   "Done", "On my way". HOME asks for something in plain words, by TALK or typed: "pancakes for breakfast
+   tomorrow at 9", of the whole team or of one person ("Ask Vincent..."). While it waits, the ask sits on HOME's
+   day at its time, "Waiting for Vincent". The person asked sees one card and answers "Yes, plan it" (the meal
+   goes on HOME's day at that time, marked "Vincent said yes") or "Not this time"; HOME sees the answer until
+   "Got it". Asked of one person and not answered, HOME is offered to ask the whole team.
    Opened from the care card ("Day"); CovaraPlan.ask(text) is what TALK calls.
    Beverly Index LLC */
 (function () {
@@ -21,10 +23,12 @@
       st_done: 'Done', st_eaten: 'Eaten', st_late: 'Late', st_due: 'Now', st_on: 'At work', st_leave: 'Time to leave', until: 'until {t}',
       ate: 'I ate it', some: 'Some', none: 'Not hungry', doneB: 'Done', later: 'Later', onway: 'On my way', got: 'Got it',
       leadPlan: 'YOUR DAY', timeFor: 'Time for {which}', timeMeal: 'Time to eat', leaveNow: 'Time to leave for work', workAt: 'Work starts at {t}.',
-      ask: 'Ask my family', askTitle: 'What would you like?', askHint: 'Say it or type it. For example: pancakes for breakfast tomorrow at 9.',
-      askSend: 'Send', askSpeak: 'Speak', askListen: 'Listening…', askSent: 'Sent to your family', askWait: 'Waiting for an answer',
+      ask: 'Ask My Team', askTitle: 'What would you like?', who: 'Who to ask', whole: 'Whole team', askedRow: 'Asked: {what}', waitFor: 'Waiting for {name}', waitTeam: 'Waiting for your team', chipAsked: 'Asked',
+      saidYesBy: '{name} said yes', leadAsked: 'ASKED', noAnswer: '{name} has not answered yet', askAll: 'Ask the whole team', keepWait: 'Keep waiting', askedAll: 'Asked the whole team', asksYou: '{name} asks you', sentTo: 'Sent to {name}', toOne: 'I asked {name}.',
+      askHint: 'Say it or type it. For example: pancakes for breakfast tomorrow at 9.',
+      askSend: 'Send', askSpeak: 'Speak', askListen: 'Listening…', askSent: 'Sent to your team', askWait: 'Waiting for an answer',
       leadAsk: 'ASKING', asks: '{name} asks', yesPlan: 'Yes, plan it', yes: 'Yes', notNow: 'Not this time', reply: 'Reply',
-      leadAnswer: 'YOUR FAMILY ANSWERED', saidYes: '{name} said yes', saidNo: '{name} can’t this time', planned: 'Planned: {what}', toFamily: 'I asked your family.',
+      leadAnswer: 'YOUR TEAM ANSWERED', saidYes: '{name} said yes', saidNo: '{name} can’t this time', planned: 'Planned: {what}', toFamily: 'I asked your team.',
       dayNext: 'Next: {what} {t}', dayNow: 'Now: {what}', dayLate: 'Late: {what}', dayNone: 'Nothing planned', dayAsk: '{name} asks for something', loading: 'Loading…',
       d0: 'Sun', d1: 'Mon', d2: 'Tue', d3: 'Wed', d4: 'Thu', d5: 'Fri', d6: 'Sat', close: 'Close'
     },
@@ -39,10 +43,12 @@
       st_done: 'Fatto', st_eaten: 'Mangiato', st_late: 'In ritardo', st_due: 'Ora', st_on: 'Al lavoro', st_leave: 'È ora di uscire', until: 'fino alle {t}',
       ate: 'Ho mangiato', some: 'Un po’', none: 'Non ho fame', doneB: 'Fatto', later: 'Più tardi', onway: 'Sto uscendo', got: 'Ho capito',
       leadPlan: 'LA TUA GIORNATA', timeFor: 'È ora di {which}', timeMeal: 'È ora di mangiare', leaveNow: 'È ora di uscire per il lavoro', workAt: 'Il lavoro inizia alle {t}.',
-      ask: 'Chiedi alla famiglia', askTitle: 'Cosa ti piacerebbe?', askHint: 'Dillo o scrivilo. Per esempio: i pancake a colazione domani alle 9.',
-      askSend: 'Invia', askSpeak: 'Parla', askListen: 'In ascolto…', askSent: 'Inviato alla tua famiglia', askWait: 'In attesa di risposta',
+      ask: 'Chiedi al mio team', askTitle: 'Cosa ti piacerebbe?', who: 'A chi chiedere', whole: 'Tutto il team', askedRow: 'Chiesto: {what}', waitFor: 'In attesa di {name}', waitTeam: 'In attesa del tuo team', chipAsked: 'Chiesto',
+      saidYesBy: '{name} ha detto s\u00ec', leadAsked: 'CHIESTO', noAnswer: '{name} non ha ancora risposto', askAll: 'Chiedi a tutto il team', keepWait: 'Aspetto ancora', askedAll: 'Chiesto a tutto il team', asksYou: '{name} lo chiede a te', sentTo: 'Inviato a {name}', toOne: 'L\u2019ho chiesto a {name}.',
+      askHint: 'Dillo o scrivilo. Per esempio: i pancake a colazione domani alle 9.',
+      askSend: 'Invia', askSpeak: 'Parla', askListen: 'In ascolto…', askSent: 'Inviato al tuo team', askWait: 'In attesa di risposta',
       leadAsk: 'CHIEDE', asks: '{name} chiede', yesPlan: 'Sì, organizza', yes: 'Sì', notNow: 'Non questa volta', reply: 'Rispondi',
-      leadAnswer: 'LA FAMIGLIA HA RISPOSTO', saidYes: '{name} ha detto sì', saidNo: '{name} non può questa volta', planned: 'Organizzato: {what}', toFamily: 'L’ho chiesto alla tua famiglia.',
+      leadAnswer: 'IL TUO TEAM HA RISPOSTO', saidYes: '{name} ha detto sì', saidNo: '{name} non può questa volta', planned: 'Organizzato: {what}', toFamily: 'L\u2019ho chiesto al tuo team.',
       dayNext: 'Dopo: {what} {t}', dayNow: 'Ora: {what}', dayLate: 'In ritardo: {what}', dayNone: 'Niente in programma', dayAsk: '{name} chiede qualcosa', loading: 'Caricamento…',
       d0: 'Dom', d1: 'Lun', d2: 'Mar', d3: 'Mer', d4: 'Gio', d5: 'Ven', d6: 'Sab', close: 'Chiudi'
     }
@@ -82,7 +88,7 @@
     '#cvplSheet h3{margin:16px 4px 8px;font:800 12px "JetBrains Mono","SF Mono",monospace;letter-spacing:.16em;color:#ffd24d;text-transform:uppercase}' +
     '#cvplSheet .pl-none{margin:0 4px 6px;color:#b9cdee;font-size:15px}' +
     '#cvplSheet .pl-row{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:18px;margin-bottom:8px;border:1px solid rgba(150,200,255,.32);background:linear-gradient(155deg,rgba(80,140,240,.18),rgba(18,40,96,.42));box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}' +
-    '#cvplSheet .pl-row.pl-due{border-color:rgba(255,210,77,.85);box-shadow:0 0 18px rgba(255,210,77,.25)}#cvplSheet .pl-row.pl-late{border-color:rgba(239,68,68,.85);box-shadow:0 0 18px rgba(239,68,68,.28)}#cvplSheet .pl-row.pl-done{opacity:.62}' +
+    '#cvplSheet .pl-row.pl-due{border-color:rgba(255,210,77,.85);box-shadow:0 0 18px rgba(255,210,77,.25)}#cvplSheet .pl-row.pl-late{border-color:rgba(239,68,68,.85);box-shadow:0 0 18px rgba(239,68,68,.28)}#cvplSheet .pl-row.pl-done{opacity:.62}#cvplSheet .pl-row.pl-asked{border-style:dashed;border-color:rgba(255,210,77,.7)}' +
     '#cvplSheet .pl-ic{flex:0 0 auto;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(56,189,248,.16);box-shadow:0 0 12px rgba(56,189,248,.25)}' +
     '#cvplSheet .pl-tx{flex:1;min-width:0}#cvplSheet .pl-tm{font:700 13px "JetBrains Mono","SF Mono",monospace;color:#9fd8ff}#cvplSheet .pl-tt{font-size:18px;font-weight:700;line-height:1.25;overflow-wrap:anywhere}#cvplSheet .pl-ds{font-size:14px;color:#c9d8f3;margin-top:2px}' +
     '#cvplSheet .pl-chip{flex:0 0 auto;align-self:center;padding:4px 10px;border-radius:12px;font:800 11px "JetBrains Mono","SF Mono",monospace;letter-spacing:.06em;background:rgba(56,189,248,.18);color:#bfe6ff}' +
@@ -133,10 +139,12 @@
 
   /* ── HOME's day: today's and tomorrow's meals, work and tasks ── */
   async function load() {
-    var s = subject(); if (!s || !authed() || (!s.self && !s.edit)) return false;
+    var s = subject(); if (!s || !authed()) return false;
     _s = s;
-    var a = await api('/care/items' + q(s)).catch(function () { return { ok: false }; });
-    var b = await api('/care/today' + q(s)).catch(function () { return { ok: false }; });
+    /* someone on the team who does not see HOME's care still sees what HOME asks them */
+    var none = { ok: false };
+    var a = s.self || s.edit ? await api('/care/items' + q(s)).catch(function () { return none; }) : none;
+    var b = s.self || s.edit ? await api('/care/today' + q(s)).catch(function () { return none; }) : none;
     var c = await api('/care/asks' + q(s)).catch(function () { return { ok: false }; });
     if (a.ok) _items = (a.data.items || []).filter(function (x) { return PLAN.indexOf(x.kind) >= 0; });
     if (b.ok) _today = b.data;
@@ -160,8 +168,15 @@
       if (it.days && it.days.indexOf(d0.getDay()) < 0) return;
       (it.times || []).forEach(function (s) { var p = s.split(':'), at = new Date(d0); at.setHours(+p[0], +p[1], 0, 0); out.push({ it: it, slot: s, at: at.getTime() }); });
     });
+    _asks.forEach(function (a) { if (a.status === 'open' && a.at && a.at >= d0.getTime() && a.at < d1.getTime()) out.push({ ask: a, at: a.at }); });
     out.sort(function (a, b) { return a.at - b.at; });
     return out;
+  }
+  function askRow(x) {
+    var a = x.ask;
+    return '<div class="pl-row pl-asked"><div class="pl-ic" aria-hidden="true">' + ICON.meal + '</div><div class="pl-tx"><div class="pl-tm">' + esc(hm(x.at)) + '</div>' +
+      '<div class="pl-tt">' + esc(t('askedRow', { what: a.title })) + '</div><div class="pl-ds">' + esc(a.to ? t('waitFor', { name: a.to.name }) : t('waitTeam')) + '</div></div>' +
+      '<span class="pl-chip pl-due">' + esc(t('chipAsked')) + '</span></div>';
   }
   function labelOf(it) { var m = it.meta || {}; return it.kind === 'task' ? (m.routine ? 'routine' : 'task') : it.kind; }
   function chipOf(x, off) {
@@ -175,6 +190,7 @@
     if (it.kind === 'work') { if (m.until) p.push(t('until', { t: hhmmTo(m.until) })); else if (m.end) p.push(t('until', { t: hm(m.end) })); if (m.place) p.push(m.place); }
     if (it.kind === 'meal' && m.food && it.title.toLowerCase().indexOf(String(m.food).toLowerCase()) < 0) p.push(m.food);
     if (it.days && it.days.length) p.push(it.days.map(function (d) { return t('d' + d); }).join(' '));
+    if (m.confirmed_name) p.push(t('saidYesBy', { name: m.confirmed_name }));
     if (m.notes) p.push(m.notes);
     return p.join(' · ');
   }
@@ -191,15 +207,17 @@
     var h = '<div class="pl-grab"></div><button type="button" class="pl-x" aria-label="' + esc(t('close')) + '">×</button>' +
       '<h2>' + esc(self ? t('yourDay') : t('dayOf', { name: s ? s.name : '' })) + '</h2><div class="pl-sub">' + esc(t('sub')) + '</div>';
     if (self) {
-      h += '<button type="button" class="pl-b pl-pri pl-big" data-a="ask">🙋 ' + esc(t('ask')) + '</button>';
-      var open = _asks.filter(function (a) { return a.status === 'open'; });
-      if (open.length) h += '<div class="pl-wait">' + open.map(function (a) { return esc(t('askWait')) + ': ' + esc(a.title) + (a.when ? ', ' + esc(a.when) : ''); }).join('<br>') + '</div>';
+      h += '<button type="button" class="pl-b pl-pri pl-big" data-a="ask">' + esc(t('ask')) + '</button>';
+      /* asks with no time (they are not on the day below) */
+      var open = _asks.filter(function (a) { return a.status === 'open' && !a.at; });
+      if (open.length) h += '<div class="pl-wait">' + open.map(function (a) { return esc(a.to ? t('waitFor', { name: a.to.name }) : t('waitTeam')) + ': ' + esc(a.title); }).join('<br>') + '</div>';
     }
     [0, 1].forEach(function (off) {
       var rows = rowsFor(off);
       h += '<h3>' + esc(off ? t('tomorrow') : t('today')) + '</h3>';
       if (!rows.length) { h += '<div class="pl-none">' + esc(t('nothing')) + '</div>'; return; }
       rows.forEach(function (x) {
+        if (x.ask) { h += askRow(x); return; }
         var stt = off ? null : stateOf(x.it, x.slot), cls = stt ? stt.state : '';
         h += '<div class="pl-row' + (cls ? ' pl-' + esc(cls) : '') + '"><div class="pl-ic" aria-hidden="true">' + ICON[labelOf(x.it)] + '</div><div class="pl-tx"><div class="pl-tm">' + esc(hm(x.at)) + ' · ' + esc(t(labelOf(x.it))) + '</div>' +
           '<div class="pl-tt">' + esc(x.it.title) + '</div>' + (descOf(x.it) ? '<div class="pl-ds">' + esc(descOf(x.it)) + '</div>' : '') + (self && !off ? homeActs(x) : '') + '</div>' +
@@ -233,7 +251,7 @@
     else if (btn) btn.disabled = false;
   }
 
-  /* ── the family adds a meal, work or a routine/task ── */
+  /* ── the team adds a meal, work or a routine/task ── */
   function dayChips(sel) { return '<div class="pl-chips" data-days>' + [1, 2, 3, 4, 5, 6, 0].map(function (d) { return '<button type="button" data-d="' + d + '" aria-pressed="' + (sel.indexOf(d) >= 0) + '">' + esc(t('d' + d)) + '</button>'; }).join('') + '</div>'; }
   function isoDay(off) { var d = new Date(); d.setDate(d.getDate() + (off || 0)); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   var DEF = { breakfast: '08:00', lunch: '12:30', dinner: '18:30', snack: '15:30' };
@@ -313,7 +331,7 @@
     _form = null; toast(t('saved')); await load(); paintDay(); refreshView();
   }
 
-  /* ── HOME asks the family ── */
+  /* ── HOME asks the team ── */
   var _rec = null, _listening = false;
   function stopListen() { _listening = false; try { if (_rec) { _rec.onend = null; _rec.abort(); } } catch (e) {} _rec = null; try { if (window.CovaraNative && CovaraNative.stopListening) CovaraNative.stopListening(); } catch (e) {} }
   window.addEventListener('covara-native', function (e) {
@@ -344,29 +362,50 @@
     sheet.innerHTML = '<div class="pl-grab"></div><button type="button" class="pl-x" aria-label="' + esc(t('close')) + '">×</button>' +
       '<h2>' + esc(t('askTitle')) + '</h2><div class="pl-sub">' + esc(t('askHint')) + '</div>' +
       '<textarea id="cvplAsk" maxlength="300" aria-label="' + esc(t('askTitle')) + '">' + esc(text || '') + '</textarea>' +
+      '<label>' + esc(t('who')) + '</label><div class="pl-chips" data-who><button type="button" data-to="" aria-pressed="true">' + esc(t('whole')) + '</button>' +
+        team().map(function (m) { return '<button type="button" data-to="' + esc(m.id) + '" aria-pressed="false">' + esc(m.name) + '</button>'; }).join('') + '</div>' +
       '<div class="pl-formacts"><button type="button" class="pl-b" data-a="speak">🎙 ' + esc(t('askSpeak')) + '</button><button type="button" class="pl-b pl-pri" data-a="send">' + esc(t('askSend')) + '</button></div><div class="pl-err" aria-live="polite"></div><div data-sent></div>';
     sheet.querySelector('.pl-x').onclick = function () { close(); };
     sheet.querySelector('[data-a=speak]').onclick = speak;
+    sheet.querySelectorAll('[data-to]').forEach(function (b) { b.onclick = function () { sheet.querySelectorAll('[data-to]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }; });
     sheet.querySelector('[data-a=send]').onclick = async function () {
       var b = this, v = String(sheet.querySelector('#cvplAsk').value || '').trim(); if (v.length < 2) return;
       b.disabled = true; stopListen();
-      var a = await ask(v, true);
+      var to = (sheet.querySelector('[data-to][aria-pressed=true]') || {}).getAttribute ? sheet.querySelector('[data-to][aria-pressed=true]').getAttribute('data-to') : '';
+      var a = await ask(v, true, to);
       if (!a) { b.disabled = false; sheet.querySelector('.pl-err').textContent = t('failed'); return; }
-      sheet.querySelector('[data-sent]').innerHTML = '<div class="pl-sent">✅ ' + esc(t('askSent')) + ':<br><b>' + esc(a.title) + '</b>' + (a.when ? ', ' + esc(a.when) : '') + '</div>';
+      sheet.querySelector('[data-sent]').innerHTML = '<div class="pl-sent">✅ ' + esc(a.to ? t('sentTo', { name: a.to.name }) : t('askSent')) + ':<br><b>' + esc(a.title) + '</b>' + (a.when ? ', ' + esc(a.when) : '') + '</div>';
       setTimeout(function () { if (_open && _view === 'ask') { _view = 'day'; paintDay(); } }, 2600);
     };
     if (!_open) show();
     sheet.scrollTop = 0;
   }
   /* sends what HOME asked for; quiet: no voice (the sheet shows it) */
-  async function ask(text, quiet) {
+  /* HOME's team: everyone linked to HOME, by first name */
+  function team() {
+    try {
+      return DEMO_CONTACTS.filter(function (c) { return c.care && c.care.side === 'away' && c.care.state === 'active' && c.care.userId; })
+        .map(function (c) { return { id: c.care.userId, name: first(c.first || c.last || '') }; }).filter(function (m) { return m.name; });
+    } catch (e) { return []; }
+  }
+  /* "Ask Vincent for pancakes..." or "Tell Vincent I want...": the person named, when one of the team is named */
+  function named(text) {
+    var s0 = ' ' + String(text || '').toLowerCase() + ' ', hit = null;
+    team().forEach(function (m) { if (!hit && new RegExp('[^a-z\u00c0-\u024f]' + m.name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^a-z\u00c0-\u024f]').test(s0)) hit = m; });
+    return hit;
+  }
+  /* sends what HOME asked for, to the whole team or one person; quiet: no voice (the sheet shows it) */
+  async function ask(text, quiet, to) {
     var s = subject(); if (!s || !authed()) return null;
-    var r = await api('/care/asks' + q(s), { method: 'POST', body: JSON.stringify({ text: String(text).slice(0, 300) }) }).catch(function () { return { ok: false }; });
+    if (to === undefined) { var n = named(text); to = n ? n.id : ''; }
+    var body = { text: String(text).slice(0, 300) }; if (to) body.to = to;
+    var r = await api('/care/asks' + q(s), { method: 'POST', body: JSON.stringify(body) }).catch(function () { return { ok: false }; });
     if (!r.ok) return null;
     var a = r.data.ask; _asks.unshift(a);
     if (!quiet) {
-      var say = t('toFamily') + ' ' + (a.kind === 'meal' ? a.title + (a.when ? ', ' + a.when : '') + '.' : '');
-      try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say(t('askSent') + ': ' + a.title + (a.when ? ', ' + a.when : ''), say); } catch (e) {}
+      var lead = a.to ? t('toOne', { name: a.to.name }) : t('toFamily');
+      var say = lead + ' ' + (a.kind === 'meal' ? a.title + (a.when ? ', ' + a.when : '') + '.' : '');
+      try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say((a.to ? t('sentTo', { name: a.to.name }) : t('askSent')) + ': ' + a.title + (a.when ? ', ' + a.when : ''), say); } catch (e) {}
     }
     return a;
   }
@@ -374,7 +413,7 @@
   var WANT = /\b(i want|i really want|i'?d (really )?like|i would (really )?like|i'?d love|can i (please )?have|could i (please )?have|may i have|i feel like having|please make me|vorrei|voglio|mi piacerebbe|posso avere|potrei avere|mi prepari|mi fai)\b/i;
   function isAsk(text) { return role() === 'home' && WANT.test(String(text || '')); }
 
-  /* ── the Now card: HOME is reminded; the family sees what HOME asks; HOME sees the answer ── */
+  /* ── the Now card: HOME is reminded; the team sees what HOME asks; HOME sees the answer ── */
   var _snooze = {}, _shown = {};
   function nowSync() {
     if (!window.CovaraNow) return;
@@ -394,6 +433,18 @@
         CovaraNow.push({ id: id, rank: x.state === 'late' ? 1 : 2, icon: ICON[labelOf(it)], lead: t('leadPlan'), title: title, body: body, at: x.at, actions: acts });
         /* HOME hears it once */
         if (!_shown[id]) { _shown[id] = 1; try { if (window.CovaraTalk && CovaraTalk.say) { CovaraTalk.say(title, title + '. ' + body); var bb = document.getElementById('cvTalkBubble'); if (bb) bb.hidden = true; } } catch (e) {} }
+      });
+      _asks.forEach(function (a) {
+        if (a.status !== 'open' || !a.to) return;
+        var nid = 'askw-' + a.id, now = Date.now();
+        if ((_snooze[nid] || 0) > now || !(now - a.created_at > 45 * 60000 || (a.at && a.at - now < 3600000))) return;
+        keep[nid] = 1;
+        CovaraNow.push({ id: nid, rank: 1, icon: '\u23f3', lead: t('leadAsked'), title: t('noAnswer', { name: a.to.name }), body: a.title + (a.when ? ', ' + a.when : ''), at: a.created_at,
+          actions: [{ label: t('askAll'), primary: true, onClick: async function () {
+            this.disabled = true;
+            var r = await api('/care/asks/' + encodeURIComponent(a.id) + '/widen', { method: 'POST' }).catch(function () { return { ok: false }; });
+            if (r.ok) { a.to = null; CovaraNow.remove(nid); toast(t('askedAll')); load(); } else this.disabled = false;
+          } }, { label: t('keepWait'), onClick: function () { _snooze[nid] = Date.now() + 30 * 60000; CovaraNow.remove(nid); } }] });
       });
       _asks.forEach(function (a) {
         if (a.status === 'open' || a.seen_at) return;
@@ -419,12 +470,12 @@
         };
         var acts = [{ label: a.kind === 'meal' && a.at ? t('yesPlan') : t('yes'), primary: true, onClick: function () { answer('yes', this); } }, { label: t('notNow'), onClick: function () { answer('no', this); } }];
         if (s.contact) acts.push({ label: t('reply'), onClick: function () { try { runContactQuickAction('sms', s.contact); } catch (e) {} } });
-        CovaraNow.push({ id: id, rank: 1, icon: '🙋', lead: t('leadAsk'), title: t('asks', { name: a.by.name || s.name }),
+        CovaraNow.push({ id: id, rank: 1, icon: '🙋', lead: t('leadAsk'), title: a.to ? t('asksYou', { name: a.by.name || s.name }) : t('asks', { name: a.by.name || s.name }),
           body: (a.kind === 'meal' ? a.title + (a.when ? ', ' + a.when : '') + '. ' : '') + '“' + a.text + '”', at: a.created_at, actions: acts });
       });
     }
     /* cards no longer needed go */
-    try { CovaraNow.list().forEach(function (c) { if ((/^pl-/.test(c.id) || /^ask-/.test(c.id)) && !keep[c.id]) CovaraNow.remove(c.id); }); } catch (e) {}
+    try { CovaraNow.list().forEach(function (c) { if ((/^pl-/.test(c.id) || /^askw?-/.test(c.id)) && !keep[c.id]) CovaraNow.remove(c.id); }); } catch (e) {}
   }
 
   /* the care card's "Day" tile: one line */
