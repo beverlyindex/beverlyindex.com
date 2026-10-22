@@ -1291,7 +1291,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-22.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-22.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3910,7 +3910,8 @@ function groupScan(nowS, live){ if(GRP.last && Math.abs(nowS-GRP.last)<1900) ret
   // coming toward you: arrived together, rising together, not yet past you
   const A=C.filter(c=>nowS-c.since<=GROUP.fresh && c.rise>=GROUP.rise && !c.falling).sort((a,b)=>a.since-b.since);
   for(let i=0;i<A.length;i++){ const mem=A.filter(c=>c.since>=A[i].since && c.since-A[i].since<=(crowd?GROUP.arriveCrowd:GROUP.arrive));
-    const prov=mem.filter(c=>c.mv>=GROUP.wheel).length, pair=mem.length>=2 && (prov>=2 || (prov>=1 && mem.some(c=>c.d.cls==='Vehicle')));          // two that arrived together and are shown to move at the pace of wheels are a vehicle already: no wait for a third
+    const prov=mem.filter(c=>c.mv>=GROUP.wheel).length, units=mem.filter(c=>/^Unit on a bus or tram/.test(c.d.hint||'')).length,
+      pair=mem.length>=2 && (prov>=2 || (prov>=1 && mem.some(c=>c.d.cls==='Vehicle')) || units>=2);          // two units the bus or tram itself carries need no proof that they move          // two that arrived together and are shown to move at the pace of wheels are a vehicle already: no wait for a third
     if(mem.length<(crowd?GROUP.minCrowd:GROUP.min) && !pair) continue;
     const key='G'+Math.round(A[i].since/1000).toString(36); if(GRP.seen[key]) { i+=mem.length-1; continue; }
     const vs=mem.map(c=>c.mv || (still?c.app:0)).filter(v=>v>0).sort((a,b)=>a-b), v=vs.length?vs[Math.floor(vs.length/2)]:0, veh=mem.some(c=>c.d.cls==='Vehicle'), near=Math.min(...mem.map(c=>c.m));
