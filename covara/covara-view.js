@@ -49,6 +49,8 @@
       helpline: 'Call the 24/7 Helpline 800-272-3900', whoDid: 'Who did what this week', entries: '{n} entries', entry1: '1 entry',
       comfortTitle: 'Comfort', comfortShort: 'Music, photos and stories that calm', comfortEmpty: 'Add the songs, photos and stories that calm {name}. Music from their youth often helps most.', addComfort: 'Add something that comforts',
       ct_music: 'Music', ct_photo: 'Photo', ct_video: 'Video', ct_story: 'Story', play: 'Play', nItems: '{n} saved', ctTitle: 'Name (for example Moon River)', ctUrl: 'Link (optional)', ctPhoto: 'Add a photo', needHttps: 'The link must start with https://',
+      ml_title: 'Meals and medicines', ml_short: 'Photograph a meal to see what it means for the medicines', ml_n: '{n} meals', ml_one: '1 meal', ml_add: 'Photograph a meal',
+      ml_why: 'Each meal photographed with Covara’s camera: the foods, the nutrients from the USDA food database, and what they mean for {name}’s medicines, with what balances each effect.',
       mo_title: 'Morning check-in', mo_why: 'Each morning {name} taps I’m up (or answers How are you, or marks a medicine). If there is no word by this time, the family is told and {name}’s phone rings; 30 minutes later it becomes urgent.',
       mo_off: 'Off', mo_done: 'Checked in today at {t}', mo_late: 'No word yet this morning', mo_wait: 'Expected by {t}',
       nw_title: 'Night watch', nw_on: 'On', nw_why: 'During {name}’s night the family is told when a room sensor or {name}’s room phone goes quiet, when a room moves while {name}’s bed sensor says {name} is in bed, and when there is movement at an hour {name} is not usually up.',
@@ -135,6 +137,8 @@
       helpline: 'Chiama la linea 24/7 (USA) 800-272-3900', whoDid: 'Chi ha fatto cosa questa settimana', entries: '{n} registrazioni', entry1: '1 registrazione',
       comfortTitle: 'Conforto', comfortShort: 'Musica, foto e storie che calmano', comfortEmpty: 'Aggiungi le canzoni, le foto e le storie che calmano {name}. La musica della giovinezza spesso aiuta di più.', addComfort: 'Aggiungi qualcosa che conforta',
       ct_music: 'Musica', ct_photo: 'Foto', ct_video: 'Video', ct_story: 'Storia', play: 'Ascolta', nItems: '{n} salvati', ctTitle: 'Nome (per esempio Volare)', ctUrl: 'Link (facoltativo)', ctPhoto: 'Aggiungi una foto', needHttps: 'Il link deve iniziare con https://',
+      ml_title: 'Pasti e medicine', ml_short: 'Fotografa un pasto per vedere cosa significa per le medicine', ml_n: '{n} pasti', ml_one: '1 pasto', ml_add: 'Fotografa un pasto',
+      ml_why: 'Ogni pasto fotografato con la fotocamera di Covara: i cibi, i nutrienti dalla banca dati USDA, e cosa significano per le medicine di {name}, con cosa bilancia ogni effetto.',
       mo_title: 'Buongiorno', mo_why: 'Ogni mattina {name} tocca Mi sono alzato (o risponde a Come stai, o segna una medicina). Se entro quest’ora non arriva nulla, la famiglia viene avvisata e il telefono di {name} squilla; 30 minuti dopo diventa urgente.',
       mo_off: 'Spento', mo_done: 'Oggi alle {t}', mo_late: 'Ancora nessuna notizia stamattina', mo_wait: 'Atteso entro le {t}',
       nw_title: 'Guardia notturna', nw_on: 'Attiva', nw_why: 'Di notte la famiglia viene avvisata quando un sensore o il telefono di {name} smette di ascoltare, quando una stanza si muove mentre il sensore del letto dice che {name} è a letto, e quando c’è movimento a un’ora in cui {name} di solito non è alzato.',
@@ -346,7 +350,8 @@
       var lg = await api('/care/log' + (q(s) ? q(s) + '&' : '?') + 'days=7').catch(function () { return { ok: false }; }), sh = await api('/care/sheet' + q(s)).catch(function () { return { ok: false }; });
       var vt = await api('/care/vitals' + q(s)).catch(function () { return { ok: false }; });
       var mo = await api('/care/morning' + q(s)).catch(function () { return { ok: false }; });
-      if (a.ok && b.ok) { _syncedAt = Date.now(); _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, morning: mo.ok ? mo.data.morning : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
+      var ml = await api('/care/meals' + (q(s) ? q(s) + '&' : '?') + 'days=2').catch(function () { return { ok: false }; });
+      if (a.ok && b.ok) { _syncedAt = Date.now(); _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, morning: mo.ok ? mo.data.morning : null, meals: ml.ok ? ml.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
     } catch (e) {} finally { _busy = false; }
   }
 
@@ -526,10 +531,22 @@
     }).join('');
     var week = log.filter(function (x) { return LOGV[x.kind]; }).slice(0, 14).map(function (x) { return '<li><b class="' + tone(x.kind, x.value) + '">' + esc(t('lg_' + x.kind) + ': ' + t('lv_' + x.value)) + '</b> <small>' + esc(when(x.at)) + (x.note ? ' · ' + x.note : '') + '</small></li>'; }).join('');
     var sleepB = window.CovaraSleep ? block('sleep', CovaraSleep.title(), CovaraSleep.sub(_data.vitals), CovaraSleep.body(_data.vitals, name1(), role() === 'home'), 'blue') : '';
-    return sleepB + '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 2px">' + esc(t('dayOf', { name: name1() })) + '</div>' +
+    return sleepB + mealsBlock() + '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 2px">' + esc(t('dayOf', { name: name1() })) + '</div>' +
       '<div class="cvx-sub">' + esc(t('dayHint')) + '</div>' + (_data.warn ? '<div class="cvx-warn">' + esc(_data.warn) + '</div>' : '') +
       '<div class="cvh">' + rows + '</div>' +
       (week ? '<div class="cvx-q" style="margin:12px 6px 4px;color:rgba(159,216,255,.8)">' + esc(t('lastDays')) + '</div><ul class="cvh-w">' + week + '</ul>' : '') + comfortBlock();
+  }
+
+  /* ── meals photographed: each photo with what it means for HOME's medicines beneath it ── */
+  function mealsBlock() {
+    var M = _data.meals, ms = (M && M.meals) || [];
+    var top = null; ms.forEach(function (m) { (m.flags || []).forEach(function (f) { if (!top || (f.severity === 'high' && top.severity !== 'high')) top = f; }); });
+    var sub = ms.length ? t(ms.length === 1 ? 'ml_one' : 'ml_n', { n: ms.length }) + (top ? ' · ' + top.med + ': ' + top.foods : '') : t('ml_short');
+    var body = '<div class="cvx-sub">' + esc(t('ml_why', { name: name1() })) + '</div>';
+    if (M && M.needs && M.needs.length) body += '<ul class="cvh-w">' + M.needs.map(function (x) { return '<li><b class="' + (x.tone === 'high' ? 'bad' : x.tone === 'low' ? 'mid' : '') + '">' + esc(x.text) + '</b></li>'; }).join('') + '</ul>';
+    body += ms.map(function (m) { return '<div class="cvm" style="margin:12px 0 18px">' + (m.photo ? '<img class="ph" alt="" src="' + esc(photoUrl(m.photo)) + '">' : '') + (window.CovaraCamera && CovaraCamera.mealHtml ? CovaraCamera.mealHtml(m) : '') + '</div>'; }).join('');
+    body += '<button type="button" class="cvx-add" data-a="meal-photo">' + esc(t('ml_add')) + '</button>';
+    return block('meals', t('ml_title'), sub, body, top ? (top.severity === 'high' ? 'red' : 'gold') : 'blue');
   }
 
   /* ── Safety: the emergency room, and if HOME goes missing ── */
@@ -925,6 +942,7 @@
     }; });
     box.querySelectorAll('[data-me]').forEach(function (b) { b.onclick = async function () { var r = await logPost({ kind: 'me', value: b.getAttribute('data-me') }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } }; });
     box.querySelectorAll('[data-worry]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var n = box.querySelector('#cvWorryNote'); var r = await logPost({ kind: 'worry', value: b.getAttribute('data-worry'), note: n ? n.value.trim() : '' }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } else b.disabled = false; }; });
+    box.querySelectorAll('[data-a=meal-photo]').forEach(function (b) { b.onclick = function () { try { CovaraCamera.open('auto'); } catch (e) {} }; });
     box.querySelectorAll('[data-morn]').forEach(function (b) { b.onclick = async function () { var v = b.getAttribute('data-morn'); b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: v === 'off' ? { on: false } : { on: true, by: v } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
     box.querySelectorAll('[data-nw]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: { night_watch: b.getAttribute('data-nw') === 'on' } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
     box.querySelectorAll('[data-tl]').forEach(function (b) { b.onclick = function () { try { CovaraNight.timeline(_data.s.home || '', +b.getAttribute('data-tl')); } catch (e) {} }; });
