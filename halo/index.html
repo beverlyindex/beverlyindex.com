@@ -1291,7 +1291,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-21.09', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-22.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -7306,6 +7306,16 @@ const _sk={};
 async function unsealSensor(id, blob){ const p=String(blob).split('.'); if(p[0]!=='v1'||p.length!==3) throw new Error('format');
   if(!_sk[id]) _sk[id]=await crypto.subtle.importKey('raw', b64.dec(P.sensors[id].key), 'AES-GCM', false, ['decrypt']);
   return td.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64.dec(p[1]),additionalData:te.encode('sight:'+id)}, _sk[id], b64.dec(p[2]))); }
+// Room for each kind of radio, so the Wi-Fi networks along a street never crowd out the Bluetooth devices passing you. When a kind is full,
+// the device heard longest ago gives way, once a minute has passed since it was last heard, and never one that is yours, tagged, on your
+// Watch list, with you, or part of something Remiel raised on this trip. Its record on the trip stays as it was.
+const DEVS_BAND_MAX={ble:700, wifi:400, cell:150};
+function devsRoom(band, at){ let n=0, old=null;
+  LIVE.devs.forEach(d=>{ if(d.band!==band) return; n++;
+    if(at-(d.lastSeen||0)<60000 || isYours(d) || d.withYou || d.maybe || (P.watch||{})[d.sig] || (P.fol||{})[d.sig] || d.chk || d.grp) return;
+    if(!old || d.lastSeen<old.lastSeen) old=d; });
+  if(n<(DEVS_BAND_MAX[band]||300)) return true;
+  if(!old) return false; LIVE.devs.delete(old.sig); return true; }
 function ingestReport(sid, rowT, p, off){
   if(!p || !Array.isArray(p.s)) return;
   const station=(P.sensors[sid]||{}).kind==='station', who=station?'station':'mobile';
@@ -7329,7 +7339,7 @@ function ingestReport(sid, rowT, p, off){
     if(reading===null) continue;
     LIVE.bands[band]=Math.max(LIVE.bands[band]||0, at);
     let d=LIVE.devs.get(s.id);
-    if(!d){ if(LIVE.devs.size>=DEVS_MAX) continue;
+    if(!d){ if(!devsRoom(band, at)) continue;
       const hsh=hash32(s.id), h2=hash32('~'+s.id);
       d={ id:'L'+hsh.toString(36)+h2.toString(36), sig:s.id, live:true, name:callsign(hsh,h2), glyph:GLY[hsh%GLY.length], firstSeen:at, timesSeen:0, samples:[], hist:[], handleBrg:hsh%360, fix:null, sector:null, fresh:0, seenMobile:0, seenStation:0 }; LIVE.devs.set(s.id,d); }
     d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; { const nw=typeof s.name==='string' ? s.name.replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40) : ''; if(nw && (!d.adv || nw.length>d.adv.length || !d.advT || at-d.advT>86400000)){ d.adv=nw; d.advT=at; } else if(!d.adv) d.adv=''; } d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; { const vn=(band==='ble' && (d.cls==='Unknown'||d.cls==='Vehicle'||d.cls==='Wearable')) ? vehName(d.adv) : ''; if(vn && (d.cls!=='Wearable' || vn==='Car, by its name')){ d.cls='Vehicle'; d.hint=vn; } } if(s.rid && typeof s.rid==='object') d.rid=s.rid; d.name=isDrone(d)?'Drone #'+d.id.slice(-3).toUpperCase():autoName(d); d.rssi=rssi!==null?rssi:rssiOf(reading);
