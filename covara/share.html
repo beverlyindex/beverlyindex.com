@@ -53,7 +53,7 @@
   function row(k, v) { return v ? '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>' : ''; }
   var DNR = { full: 'Full treatment', dnr: 'Do not resuscitate (DNR)', polst: 'POLST on file', unknown: 'Not known' };
   var STATE = { done: 'Taken', late: 'Late', due: 'Due now', later: 'Later', skipped: 'Skipped' };
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) { msg('This link is not complete. Ask the family to send it again.'); return; }
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) { msg('This link is not complete. Ask the team to send it again.'); return; }
   fetch(API + '/care-share/' + encodeURIComponent(token), { credentials: 'omit', referrerPolicy: 'no-referrer' })
     .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
     .then(function (x) {
@@ -61,7 +61,7 @@
       var d = x.j, s = d.sheet || {}, h = '';
       h += '<div class="brand"><img src="covara-logo.png" alt="">REMIEL: COVARA</div>';
       h += '<h1>' + esc(d.name || 'Care sheet') + (s.nickname ? ' <span class="m">(' + esc(s.nickname) + ')</span>' : '') + '</h1>';
-      h += '<div class="sub">Shared by the family for care. Read only.</div><span class="ro">VIEW ENDS ' + esc(new Date(d.expires_at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }).toUpperCase()) + '</span>';
+      h += '<div class="sub">Shared by the team for care. Read only.</div><span class="ro">VIEW ENDS ' + esc(new Date(d.expires_at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }).toUpperCase()) + '</span>';
       var crit = row('Allergies', s.allergies) + row('Diagnosis', [s.diagnosis, s.stage].filter(Boolean).join(', ')) + row('Other conditions', s.conditions) + row('Wishes', DNR[s.dnr] || '') + row('Advance directive', s.directive) + row('Blood type', s.blood) + row('Preferred hospital', s.hospital) + row('Insurance', s.insurance);
       if (crit) h += '<section class="alert"><h2>FIRST, PLEASE KNOW</h2><dl>' + crit + '</dl></section>';
       if (d.meds && d.meds.length) h += '<section><h2>MEDICINES</h2><ul>' + d.meds.map(function (m) { var mt = m.meta || {}; return '<li><div><div class="t">' + esc(m.title) + (mt.strength ? ' ' + esc(mt.strength) + ' ' + esc(mt.unit || '') : '') + '</div><div class="m">' + esc([mt.purpose, mt.prescriber ? 'Prescribed by ' + mt.prescriber : ''].filter(Boolean).join(' · ')) + '</div></div><div class="r">' + esc(mt.as_needed ? 'As needed' : (m.times || []).join(' · ')) + '</div></li>'; }).join('') + '</ul></section>';
@@ -70,11 +70,11 @@
       if (talk) h += '<section><h2>HOW TO HELP</h2><dl>' + talk + '</dl></section>';
       var ppl = [];
       if (d.proxy && d.proxy.name) ppl.push('<li><div><div class="t">' + esc(d.proxy.name) + '</div><div class="m">Health care proxy' + (d.proxy.active ? ', now deciding' : '') + '</div></div></li>');
-      (d.family || []).forEach(function (f) { ppl.push('<li><div><div class="t">' + esc(f.name) + '</div><div class="m">' + esc(f.relation || 'Family') + '</div></div><div class="r">' + tel(f.phone) + '</div></li>'); });
+      (d.family || []).forEach(function (f) { ppl.push('<li><div><div class="t">' + esc(f.name) + '</div><div class="m">' + esc(f.relation || 'Team') + '</div></div><div class="r">' + tel(f.phone) + '</div></li>'); });
       (d.doctors || []).forEach(function (f) { ppl.push('<li><div><div class="t">' + esc(f.name) + '</div><div class="m">' + esc(f.relation || 'Doctor') + '</div></div><div class="r">' + tel(f.phone) + '</div></li>'); });
       if (ppl.length) h += '<section><h2>WHO TO CALL</h2><ul>' + ppl.join('') + '</ul></section>';
       h += '<div style="text-align:center"><button class="p" type="button" onclick="print()">Print</button></div>';
-      h += '<p class="foot">This page shows what the family chose to share, as of ' + esc(new Date().toLocaleString()) + '. It stops working when the time ends or the family ends it.</p>';
+      h += '<p class="foot">This page shows what the team chose to share, as of ' + esc(new Date().toLocaleString()) + '. It stops working when the time ends or the team ends it.</p>';
       root.innerHTML = h;
     })
     .catch(function () { msg('This link could not be opened. Check the internet and try again.'); });
