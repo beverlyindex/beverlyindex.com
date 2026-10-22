@@ -15,7 +15,7 @@
       finding: 'Finding {name}...', notShared: 'Location not shared', unknown: 'Location not known yet', withYou: 'With you', withHome: 'With {home}',
       away: '{d} away', fromHome: '{d} from {home}', atHomeOf: 'At {home}\'s home', atHome: 'At home', out: 'Out, {d} from home', outNoD: 'Out of the house',
       ago: ', seen {t} ago', now: ', seen just now', careOf: 'Care of {name}', yourCare: 'Your care',
-      med: 'Medicines', visit: 'Visits', health: 'Health', safety: 'Safety', papers: 'Papers',
+      day: 'Day', med: 'Medicines', visit: 'Visits', health: 'Health', safety: 'Safety', papers: 'Papers',
       medLate: '{n} late', medLate1: '1 late: {what}', medNow: 'Now: {what}', medNext: 'Next: {what} {t}', medNone: 'Nothing to take',
       visitNext: '{what}, {when}', visitNone: 'No visits coming up', healthWarn: 'A sudden change today', healthOk: 'How the day went',
       safetyLate: 'No word yet this morning', safetyOk: 'Emergency card, if lost', papersOk: 'Who decides, documents', papersDue: 'Name who decides',
@@ -27,7 +27,7 @@
       finding: 'Cerco {name}...', notShared: 'Posizione non condivisa', unknown: 'Posizione non ancora nota', withYou: 'Con te', withHome: 'Con {home}',
       away: 'a {d}', fromHome: 'a {d} da {home}', atHomeOf: 'A casa di {home}', atHome: 'A casa', out: 'Fuori, a {d} da casa', outNoD: 'Fuori casa',
       ago: ', visto {t} fa', now: ', visto adesso', careOf: 'Le cure di {name}', yourCare: 'Le tue cure',
-      med: 'Medicine', visit: 'Visite', health: 'Salute', safety: 'Sicurezza', papers: 'Documenti',
+      day: 'Giornata', med: 'Medicine', visit: 'Visite', health: 'Salute', safety: 'Sicurezza', papers: 'Documenti',
       medLate: '{n} in ritardo', medLate1: 'In ritardo: {what}', medNow: 'Adesso: {what}', medNext: 'Poi: {what} {t}', medNone: 'Niente da prendere',
       visitNext: '{what}, {when}', visitNone: 'Nessuna visita in arrivo', healthWarn: 'Un cambiamento improvviso oggi', healthOk: 'Com\'è andata la giornata',
       safetyLate: 'Nessuna notizia stamattina', safetyOk: 'Scheda di emergenza, se si perde', papersOk: 'Chi decide, documenti', papersDue: 'Scegli chi decide',
@@ -97,7 +97,7 @@
     '#cvpSheet .cvp-calls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 0 12px}#cvpSheet .cvp-calls .cvp-b{min-height:54px;padding:6px 8px;font-size:16px}' +
     '#cvpSheet .cvp-tile{position:relative;min-height:112px;padding:14px 14px 12px;border-radius:20px;border:1px solid rgba(150,200,255,.48);cursor:pointer;text-align:left;color:#f2f7ff;display:flex;flex-direction:column;justify-content:space-between;gap:8px;' +
       'background:linear-gradient(155deg,rgba(80,140,240,.24),rgba(18,40,96,.48));box-shadow:0 0 18px rgba(70,150,255,.26),inset 0 1px 0 rgba(255,255,255,.16);font-family:var(--nous-font,"Hanken Grotesk",system-ui,sans-serif);text-shadow:0 1px 2px rgba(2,8,24,.55)}' +
-    '#cvpSheet .cvp-tile:last-child{grid-column:1 / -1;min-height:84px}' +
+    '#cvpSheet .cvp-tile{min-height:100px}#cvpSheet .cvp-tile[data-k=day]{border-color:rgba(255,210,77,.7)}' +
     '#cvpSheet .cvp-tile b{font-size:24px;font-weight:800;letter-spacing:.2px}' +
     '#cvpSheet .cvp-tile span{font:600 13px/1.3 "JetBrains Mono","SF Mono",monospace;color:#b9d6ff}' +
     '#cvpSheet .cvp-tile.late{border-color:rgba(239,68,68,.85);box-shadow:0 0 22px rgba(239,68,68,.38),inset 0 1px 0 rgba(255,255,255,.14)}#cvpSheet .cvp-tile.late span{color:#ffb4b4}' +
@@ -271,8 +271,9 @@
   }
 
   /* ── the care card: HOME's care in five big tiles ── */
-  var TILES = ['med', 'visit', 'health', 'safety', 'papers'];
+  var TILES = ['day', 'med', 'visit', 'health', 'safety', 'papers'];
   function tileStatus(k) {
+    if (k === 'day') { try { return window.CovaraPlan ? CovaraPlan.status() : { text: '' }; } catch (e) { return { text: '' }; } }
     var d = null, ls = null;
     try { d = window.CovaraView && CovaraView.data(); ls = CovaraView.lists && CovaraView.lists(); } catch (e) {}
     if (!d) return { text: authed() ? t('loading') : '' };
@@ -333,6 +334,7 @@
   /* A tile opens that part of HOME's care in covara-view.js's panel. The panel shows only while no
      other sphere is chosen and WHEREIS is not up, so both are put back first. */
   function openSection(k) {
+    if (k === 'day') { close(); if (window.CovaraPlan) setTimeout(function () { CovaraPlan.open(); }, 120); return; }
     close();
     try { focusedContactId = null; } catch (e) {}
     try { if (typeof WhereIs !== 'undefined' && WhereIs.mode && WhereIs.mode() === 'whereis') WhereIs.setMode('comm'); } catch (e) {}

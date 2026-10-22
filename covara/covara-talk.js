@@ -437,6 +437,8 @@
   }
   function heardWords(q) {
     if (_to) { var c = _to; _to = null; sendTalk(c, q); return; }
+    /* HOME asking for something ("I want pancakes for breakfast tomorrow at 9") goes to the family */
+    try { if (window.CovaraPlan && CovaraPlan.isAsk(q)) { CovaraPlan.ask(q).then(function (a) { if (!a) { var x = answer(q); say('\u201c' + q + '\u201d: ' + x, x); } }); return; } } catch (e) {}
     var a = answer(q); say('“' + q + '”: ' + a, a); offerButtons();
   }
 

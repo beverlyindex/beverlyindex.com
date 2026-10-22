@@ -18,7 +18,7 @@
       shareTitle: 'Share with a doctor', shareWhy: 'A link that opens {name}’s emergency sheet, medicines and today, without signing in. It ends by itself.', for2: '2 hours', for24: '1 day', for72: '3 days',
       shareMake: 'Make the link', copy: 'Copy', sendIt: 'Send', copied: 'Copied', shareActive: 'Links open now', end: 'End', opened: 'opened {n}×', notOpened: 'not opened yet', ends: 'ends {t}', close: 'Close',
       dayTitle: '{name}’s day', dayNothing: 'Nothing at this time', dayDrag: 'Drag along the day to see what happened',
-      ev_taken: 'Taken', ev_late: 'Late', ev_due: 'Due', ev_later: 'Later', ev_visit: 'Visit', ev_log: 'Noted', sched: 'SCHEDULE', ev_shift: 'On duty', ev_appt: 'Appointment', schedNone: 'Nothing scheduled today' },
+      ev_taken: 'Taken', ev_late: 'Late', ev_due: 'Due', ev_done: 'Done', ev_eaten: 'Eaten', ev_on: 'Under way', ev_leave: 'Time to leave', ev_now: 'Now', ev_later: 'Later', ev_visit: 'Visit', ev_log: 'Noted', sched: 'SCHEDULE', ev_shift: 'On duty', ev_appt: 'Appointment', schedNone: 'Nothing scheduled today' },
     it: { home: 'CASA', now: 'TUTTO ORA', calm: 'CALMA', share: 'CONDIVIDI COL MEDICO', shareShort: 'CONDIVIDI', nowShort: 'ORA',
       camera: 'FOTOCAMERA', cameraHint: 'Inquadra un flacone, un pasto, una lettera o una porta', talk: 'PARLA', talkHint: '“Papà ha preso la medicina delle 8?”', where: 'DOVE',
       circle: 'CERCHIA', of: '{i} di {n}', people: '{n} persone', atHome: 'a casa', out: 'fuori', since: 'dalle {t}', mood: 'Umore', live: 'In diretta', updated: 'Aggiornato alle {t}', tagYou: 'Ti hanno taggato', tagged: 'Taggato', tagPill: 'TAGGATO', phone: 'Telefono', charging: 'in carica', moved: 'Ultimo movimento', ago: '{t} fa', justNow: 'adesso',
@@ -28,7 +28,7 @@
       shareTitle: 'Condividi con un medico', shareWhy: 'Un link che apre la scheda di emergenza, le medicine e la giornata di {name}, senza accesso. Scade da solo.', for2: '2 ore', for24: '1 giorno', for72: '3 giorni',
       shareMake: 'Crea il link', copy: 'Copia', sendIt: 'Invia', copied: 'Copiato', shareActive: 'Link aperti ora', end: 'Termina', opened: 'aperto {n}×', notOpened: 'non ancora aperto', ends: 'scade {t}', close: 'Chiudi',
       dayTitle: 'La giornata di {name}', dayNothing: 'Niente a quest’ora', dayDrag: 'Scorri lungo la giornata per vedere cosa è successo',
-      ev_taken: 'Presa', ev_late: 'In ritardo', ev_due: 'Da prendere', ev_later: 'Più tardi', ev_visit: 'Visita', ev_log: 'Annotato', sched: 'PROGRAMMA', ev_shift: 'Di turno', ev_appt: 'Appuntamento', schedNone: 'Niente in programma oggi' }
+      ev_taken: 'Presa', ev_late: 'In ritardo', ev_due: 'Da prendere', ev_done: 'Fatto', ev_eaten: 'Mangiato', ev_on: 'In corso', ev_leave: 'È ora di uscire', ev_now: 'Ora', ev_later: 'Più tardi', ev_visit: 'Visita', ev_log: 'Annotato', sched: 'PROGRAMMA', ev_shift: 'Di turno', ev_appt: 'Appuntamento', schedNone: 'Niente in programma oggi' }
   };
   function IT() { try { return String(I18n.locale || 'en').slice(0, 2) === 'it'; } catch (e) { return false; } }
   function t(k, p) { var s = (IT() ? S.it : S.en)[k] || S.en[k] || k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
@@ -314,7 +314,10 @@
       if (x.item.kind === 'appt') { out.push({ at: x.at, c: x.state === 'done' ? 'b' : 'o', text: x.item.title, k: 'ev_visit' }); return; }
       /* the slot's exact moment from the server (HOME's own time zone), so every phone places it at the same instant */
       var p = String(x.slot || '').split(':'), at = new Date(); at.setHours(+p[0] || 0, +p[1] || 0, 0, 0);
-      out.push({ at: x.done_at || x.at || at.getTime(), c: x.state === 'done' ? 'g' : x.state === 'late' ? 'r' : x.state === 'due' ? 'y' : 'o', text: x.item.title + ' ' + x.slot, k: x.state === 'done' ? 'ev_taken' : 'ev_' + x.state });
+      /* a meal, a task or work: no medicine words ("Taken"), and a single time shows no slot */
+      var pk = ['meal', 'task', 'work'].indexOf(x.item.kind) >= 0, sl = /^\d/.test(String(x.slot || '')) ? ' ' + x.slot : '';
+      out.push({ at: x.done_at || x.at || at.getTime(), c: x.state === 'done' ? 'g' : x.state === 'late' ? 'r' : x.state === 'due' || x.state === 'on' ? 'y' : 'o', text: x.item.title + sl,
+        k: x.state === 'done' ? (x.item.kind === 'meal' ? 'ev_eaten' : pk ? 'ev_done' : 'ev_taken') : x.state === 'on' ? 'ev_on' : pk && x.state === 'due' ? (x.item.kind === 'work' ? 'ev_leave' : 'ev_now') : 'ev_' + x.state });
     });
     (d.log || []).forEach(function (x) { if (x.at < s0.getTime() || x.kind === 'me') return; out.push({ at: x.at, c: x.kind === 'worry' || x.value === 'bad' || x.value === 'flagged' ? 'r' : 'b', text: x.kind + ': ' + x.value + (x.note && x.kind !== 'visit' ? ' · ' + x.note : ''), k: 'ev_log' }); });
     ((_sum && _sum.events) || []).forEach(function (e) { if (e.at < s0.getTime()) return; out.push({ at: e.at, c: e.level >= 3 ? 'r' : 'y', text: e.title, k: '' }); });
