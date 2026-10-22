@@ -49,6 +49,16 @@
       helpline: 'Call the 24/7 Helpline 800-272-3900', whoDid: 'Who did what this week', entries: '{n} entries', entry1: '1 entry',
       comfortTitle: 'Comfort', comfortShort: 'Music, photos and stories that calm', comfortEmpty: 'Add the songs, photos and stories that calm {name}. Music from their youth often helps most.', addComfort: 'Add something that comforts',
       ct_music: 'Music', ct_photo: 'Photo', ct_video: 'Video', ct_story: 'Story', play: 'Play', nItems: '{n} saved', ctTitle: 'Name (for example Moon River)', ctUrl: 'Link (optional)', ctPhoto: 'Add a photo', needHttps: 'The link must start with https://',
+      ml_title: 'Meals and medicines', ml_short: 'Photograph a meal to see what it means for the medicines', ml_n: '{n} meals', ml_one: '1 meal',
+      gal_why: 'This phone can sort every new photo in its gallery by itself: it looks at each photo first, on the phone, and sends only meals, medicines and papers. Every other photo stays on the phone.',
+      gal_start: 'Sort new gallery photos', gal_stop: 'Stop sorting gallery photos', gal_on: 'Sorting new photos: {n} filed so far.', gal_perm: 'Allow Covara to see photos in Android settings.', ml_add: 'Photograph a meal',
+      ml_why: 'Each meal photographed with Covara’s camera: the foods, the nutrients from the USDA food database, and what they mean for {name}’s medicines, with what balances each effect.',
+      mo_title: 'Morning check-in', mo_why: 'Each morning {name} taps I’m up (or answers How are you, or marks a medicine). If there is no word by this time, the family is told and {name}’s phone rings; 30 minutes later it becomes urgent.',
+      mo_off: 'Off', mo_done: 'Checked in today at {t}', mo_late: 'No word yet this morning', mo_wait: 'Expected by {t}',
+      nw_title: 'Night watch', nw_on: 'On', nw_why: 'During {name}’s night the family is told when a room sensor or {name}’s room phone goes quiet, when a room moves while {name}’s bed sensor says {name} is in bed, and when there is movement at an hour {name} is not usually up.',
+      nw_needs: 'It works with room, door and bed sensors, and with the phone listening to the room on its charger. It learns the usual hours over the first five nights.',
+      tl_title: 'Timeline for the police', tl_short: 'Every alert, sensor and position, to the second', tl_why: 'One list of everything Covara recorded at {name}’s home and from {name}’s phone, with exact times, kept on Covara’s server as it happened. Print it or share it with the police.',
+      tl_12: 'Last night (12 h)', tl_24: 'Last 24 hours', tl_72: 'Last 3 days',
       leaving: 'When {name} leaves home', leaveWhy: 'The family is told the moment {name}’s phone leaves home, with the way walked on WHEREIS. Choose when:', lv2_night: 'At night', lv2_always: 'Any time', lv2_off: 'Never',
       leaveDoor: 'If {name} may leave without the phone, add a room sensor on the front door named Front door (Settings, Room sensors). It warns when the door opens at night.',
       moneyTitle: 'Money and scams', moneyShort: 'Report a scam call or unusual spending', worryWhy: 'People with memory loss are often targeted. Report anything worrying and the family is told at once.', worryPh: 'What happened (optional)',
@@ -129,6 +139,16 @@
       helpline: 'Chiama la linea 24/7 (USA) 800-272-3900', whoDid: 'Chi ha fatto cosa questa settimana', entries: '{n} registrazioni', entry1: '1 registrazione',
       comfortTitle: 'Conforto', comfortShort: 'Musica, foto e storie che calmano', comfortEmpty: 'Aggiungi le canzoni, le foto e le storie che calmano {name}. La musica della giovinezza spesso aiuta di più.', addComfort: 'Aggiungi qualcosa che conforta',
       ct_music: 'Musica', ct_photo: 'Foto', ct_video: 'Video', ct_story: 'Storia', play: 'Ascolta', nItems: '{n} salvati', ctTitle: 'Nome (per esempio Volare)', ctUrl: 'Link (facoltativo)', ctPhoto: 'Aggiungi una foto', needHttps: 'Il link deve iniziare con https://',
+      ml_title: 'Pasti e medicine', ml_short: 'Fotografa un pasto per vedere cosa significa per le medicine', ml_n: '{n} pasti', ml_one: '1 pasto',
+      gal_why: 'Questo telefono può ordinare da solo ogni nuova foto della galleria: guarda ogni foto prima, sul telefono, e invia solo pasti, medicine e documenti. Tutte le altre foto restano sul telefono.',
+      gal_start: 'Ordina le nuove foto della galleria', gal_stop: 'Smetti di ordinare le foto', gal_on: 'Ordino le nuove foto: {n} archiviate finora.', gal_perm: 'Consenti a Covara di vedere le foto nelle impostazioni di Android.', ml_add: 'Fotografa un pasto',
+      ml_why: 'Ogni pasto fotografato con la fotocamera di Covara: i cibi, i nutrienti dalla banca dati USDA, e cosa significano per le medicine di {name}, con cosa bilancia ogni effetto.',
+      mo_title: 'Buongiorno', mo_why: 'Ogni mattina {name} tocca Mi sono alzato (o risponde a Come stai, o segna una medicina). Se entro quest’ora non arriva nulla, la famiglia viene avvisata e il telefono di {name} squilla; 30 minuti dopo diventa urgente.',
+      mo_off: 'Spento', mo_done: 'Oggi alle {t}', mo_late: 'Ancora nessuna notizia stamattina', mo_wait: 'Atteso entro le {t}',
+      nw_title: 'Guardia notturna', nw_on: 'Attiva', nw_why: 'Di notte la famiglia viene avvisata quando un sensore o il telefono di {name} smette di ascoltare, quando una stanza si muove mentre il sensore del letto dice che {name} è a letto, e quando c’è movimento a un’ora in cui {name} di solito non è alzato.',
+      nw_needs: 'Funziona con i sensori di stanza, porta e letto, e con il telefono che ascolta la stanza in carica. Impara gli orari abituali nelle prime cinque notti.',
+      tl_title: 'Cronologia per la polizia', tl_short: 'Ogni avviso, sensore e posizione, al secondo', tl_why: 'Un unico elenco di tutto ciò che Covara ha registrato a casa di {name} e dal telefono di {name}, con gli orari esatti, conservato sul server di Covara man mano che accadeva. Stampalo o condividilo con la polizia.',
+      tl_12: 'Stanotte (12 h)', tl_24: 'Ultime 24 ore', tl_72: 'Ultimi 3 giorni',
       leaving: 'Quando {name} esce di casa', leaveWhy: 'La famiglia viene avvisata appena il telefono di {name} esce di casa, con il percorso su WHEREIS. Scegli quando:', lv2_night: 'Di notte', lv2_always: 'Sempre', lv2_off: 'Mai',
       leaveDoor: 'Se {name} può uscire senza telefono, aggiungi un sensore sulla porta d’ingresso chiamato Porta (Impostazioni, Sensori delle stanze). Avvisa quando la porta si apre di notte.',
       moneyTitle: 'Soldi e truffe', moneyShort: 'Segnala una chiamata truffa o spese insolite', worryWhy: 'Le persone con perdita di memoria sono spesso prese di mira. Segnala ciò che ti preoccupa e la famiglia viene avvisata subito.', worryPh: 'Cosa è successo (facoltativo)',
@@ -333,7 +353,9 @@
       var ib = await api('/care/inbox' + q(s)).catch(function () { return { ok: false }; });
       var lg = await api('/care/log' + (q(s) ? q(s) + '&' : '?') + 'days=7').catch(function () { return { ok: false }; }), sh = await api('/care/sheet' + q(s)).catch(function () { return { ok: false }; });
       var vt = await api('/care/vitals' + q(s)).catch(function () { return { ok: false }; });
-      if (a.ok && b.ok) { _syncedAt = Date.now(); _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
+      var mo = await api('/care/morning' + q(s)).catch(function () { return { ok: false }; });
+      var ml = await api('/care/meals' + (q(s) ? q(s) + '&' : '?') + 'days=2').catch(function () { return { ok: false }; });
+      if (a.ok && b.ok) { _syncedAt = Date.now(); _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, morning: mo.ok ? mo.data.morning : null, meals: ml.ok ? ml.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
     } catch (e) {} finally { _busy = false; }
   }
 
@@ -513,10 +535,27 @@
     }).join('');
     var week = log.filter(function (x) { return LOGV[x.kind]; }).slice(0, 14).map(function (x) { return '<li><b class="' + tone(x.kind, x.value) + '">' + esc(t('lg_' + x.kind) + ': ' + t('lv_' + x.value)) + '</b> <small>' + esc(when(x.at)) + (x.note ? ' · ' + x.note : '') + '</small></li>'; }).join('');
     var sleepB = window.CovaraSleep ? block('sleep', CovaraSleep.title(), CovaraSleep.sub(_data.vitals), CovaraSleep.body(_data.vitals, name1(), role() === 'home'), 'blue') : '';
-    return sleepB + '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 2px">' + esc(t('dayOf', { name: name1() })) + '</div>' +
+    return sleepB + mealsBlock() + '<div class="cvx-q" style="color:rgba(240,238,245,.85);margin:6px 6px 2px">' + esc(t('dayOf', { name: name1() })) + '</div>' +
       '<div class="cvx-sub">' + esc(t('dayHint')) + '</div>' + (_data.warn ? '<div class="cvx-warn">' + esc(_data.warn) + '</div>' : '') +
       '<div class="cvh">' + rows + '</div>' +
       (week ? '<div class="cvx-q" style="margin:12px 6px 4px;color:rgba(159,216,255,.8)">' + esc(t('lastDays')) + '</div><ul class="cvh-w">' + week + '</ul>' : '') + comfortBlock();
+  }
+
+  /* ── meals photographed: each photo with what it means for HOME's medicines beneath it ── */
+  function mealsBlock() {
+    var M = _data.meals, ms = (M && M.meals) || [];
+    var top = null; ms.forEach(function (m) { (m.flags || []).forEach(function (f) { if (!top || (f.severity === 'high' && top.severity !== 'high')) top = f; }); });
+    var sub = ms.length ? t(ms.length === 1 ? 'ml_one' : 'ml_n', { n: ms.length }) + (top ? ' · ' + top.med + ': ' + top.foods : '') : t('ml_short');
+    var body = '<div class="cvx-sub">' + esc(t('ml_why', { name: name1() })) + '</div>';
+    if (M && M.needs && M.needs.length) body += '<ul class="cvh-w">' + M.needs.map(function (x) { return '<li><b class="' + (x.tone === 'high' ? 'bad' : x.tone === 'low' ? 'mid' : '') + '">' + esc(x.text) + '</b></li>'; }).join('') + '</ul>';
+    body += ms.map(function (m) { return '<div class="cvm" style="margin:12px 0 18px">' + (m.photo ? '<img class="ph" alt="" src="' + esc(photoUrl(m.photo)) + '">' : '') + (window.CovaraCamera && CovaraCamera.mealHtml ? CovaraCamera.mealHtml(m) : '') + '</div>'; }).join('');
+    body += '<button type="button" class="cvx-add" data-a="meal-photo">' + esc(t('ml_add')) + '</button>';
+    /* the installed Android app can sort every new photo in the gallery by itself */
+    var N = null; try { N = window.CovaraNative && CovaraNative.photoStatus ? JSON.parse(CovaraNative.photoStatus() || '{}') : null; } catch (e) { N = null; }
+    if (N) body += '<div class="cvx-sub" style="margin-top:10px">' + esc(t('gal_why')) + '</div>' + (N.on
+      ? '<div class="cvx-sub">' + esc(t('gal_on', { n: N.kept || 0 })) + (N.error === 'permission' ? ' ' + esc(t('gal_perm')) : '') + '</div><button type="button" class="cvx-btn" data-a="gal-off">' + esc(t('gal_stop')) + '</button>'
+      : '<button type="button" class="cvx-btn pri" data-a="gal-on">' + esc(t('gal_start')) + '</button>');
+    return block('meals', t('ml_title'), sub, body, top ? (top.severity === 'high' ? 'red' : 'gold') : 'blue');
   }
 
   /* ── Safety: the emergency room, and if HOME goes missing ── */
@@ -548,7 +587,7 @@
   }
   function safetyHtml() {
     var d = (_data.sheet && _data.sheet.data) || {};
-    return leaveBlock() + block('er', t('forEr'), d.diagnosis ? d.diagnosis + (d.allergies ? ' · ' + t('sh_allergies') + ': ' + d.allergies : '') : t('erShort'), erHtml(false), 'red') +
+    return morningBlock() + nightBlock() + timelineBlock() + leaveBlock() + block('er', t('forEr'), d.diagnosis ? d.diagnosis + (d.allergies ? ' · ' + t('sh_allergies') + ': ' + d.allergies : '') : t('erShort'), erHtml(false), 'red') +
       block('miss', t('ifMissing', { name: name1() }), t('missShort'), missingHtml(false), 'gold') +
       block('rooms', t('fallsRooms'), t('fallsShort'), '<div class="cvx-sub">' + esc(t('fallsBody')) + '</div>', 'blue') + worryBlock();
   }
@@ -639,6 +678,27 @@
         (_data.s.edit ? '<button type="button" class="cvx-lnk" data-rm-item="' + esc(c.id) + '">' + esc(t('remove')) + '</button>' : '') + '</div>'; }).join('') : '<div class="cvx-sub">' + esc(t('comfortEmpty', { name: name1() })) + '</div>') +
       (_data.s.edit ? '<button type="button" class="cvx-add" data-form="comfort">' + esc(t('addComfort')) + '</button>' : '');
     return block('comfort', t('comfortTitle'), cs.length ? t('nItems', { n: cs.length }) : t('comfortShort'), body, 'gold');
+  }
+  /* the morning check-in, the night watch and the timeline for the police */
+  function morningBlock() {
+    var M = _data.morning || { on: true, by_text: '9:00 AM' }, on = M.on !== false;
+    var status = !on ? t('mo_off') : M.done ? t('mo_done', { t: hhmm(M.done_at) }) : M.late ? t('mo_late') : t('mo_wait', { t: M.by_text });
+    var body = '<div class="cvx-sub">' + esc(t('mo_why', { name: name1() })) + '</div><div class="cvt-chips">' +
+      ['07:00', '08:00', '09:00', '10:00', '11:00'].map(function (v) { var h = +v.slice(0, 2), lab = (h % 12 || 12) + ':00 ' + (h < 12 ? 'AM' : 'PM'); return '<button type="button" class="cvt-chip sm" data-morn="' + v + '" aria-pressed="' + (on && M.by_text === lab) + '">' + esc(lab) + '</button>'; }).join('') +
+      '<button type="button" class="cvt-chip sm bad" data-morn="off" aria-pressed="' + (!on) + '">' + esc(t('lv2_off')) + '</button></div>';
+    return block('morning', t('mo_title'), status, body, !on ? 'red' : M.late ? 'red' : M.done ? 'blue' : 'gold');
+  }
+  function nightBlock() {
+    var on = !(_data.morning && _data.morning.night_watch === false);
+    var body = '<div class="cvx-sub">' + esc(t('nw_why', { name: name1() })) + '</div><div class="cvt-chips">' +
+      '<button type="button" class="cvt-chip sm" data-nw="on" aria-pressed="' + on + '">' + esc(t('nw_on')) + '</button><button type="button" class="cvt-chip sm bad" data-nw="off" aria-pressed="' + (!on) + '">' + esc(t('lv2_off')) + '</button></div>' +
+      '<div class="cvx-sub" style="margin-top:8px">' + esc(t('nw_needs')) + '</div>';
+    return block('nightw', t('nw_title'), on ? t('nw_on') : t('lv2_off'), body, on ? 'blue' : 'red');
+  }
+  function timelineBlock() {
+    var body = '<div class="cvx-sub">' + esc(t('tl_why', { name: name1() })) + '</div><div class="cvt-chips">' +
+      '<button type="button" class="cvt-chip sm" data-tl="12">' + esc(t('tl_12')) + '</button><button type="button" class="cvt-chip sm" data-tl="24">' + esc(t('tl_24')) + '</button><button type="button" class="cvt-chip sm" data-tl="72">' + esc(t('tl_72')) + '</button></div>';
+    return block('timeline', t('tl_title'), t('tl_short'), body, 'gold');
   }
   function leaveBlock() {
     var w = window.CovaraWhere && CovaraWhere.data(), mode = _data.leave || (w && w.leave_alert) || 'night';
@@ -837,7 +897,7 @@
     if (k === 'med') { if ((_data.inbox || []).some(function (x) { return x.status === 'review'; })) return 'due'; var top = _ls.med[0]; if (top && top.n.state === 'late') return 'late'; if (_ls.med.some(function (x) { var f = filled(x.it); return f && !f.ok; })) return 'due'; return top && top.n.state === 'due' ? 'due' : ''; }
     if (k === 'visit') { var a = _ls.appt[0]; var me3 = (_data.log || []).filter(function (x) { return x.kind === 'me'; })[0]; if (me3 && me3.value === 'overwhelmed' && Date.now() - me3.at < 864e5) return 'late'; return a && a.it.at - Date.now() < 864e5 && a.n.state !== 'done' ? 'due' : ''; }
     if (k === 'health') return _data.warn ? 'late' : '';
-    if (k === 'safety') { var d = (_data.sheet && _data.sheet.data) || {}; var wq = (_data.log || []).filter(function (x) { return x.kind === 'worry' && Date.now() - x.at < 864e5; }).length; var wh = window.CovaraWhere && CovaraWhere.data(); if (wq || (wh && wh.at_home === false && wh.left_at)) return 'late'; return d.diagnosis ? '' : 'due'; }
+    if (k === 'safety') { if (_data.morning && _data.morning.late) return 'late'; var d = (_data.sheet && _data.sheet.data) || {}; var wq = (_data.log || []).filter(function (x) { return x.kind === 'worry' && Date.now() - x.at < 864e5; }).length; var wh = window.CovaraWhere && CovaraWhere.data(); if (wq || (wh && wh.at_home === false && wh.left_at)) return 'late'; return d.diagnosis ? '' : 'due'; }
     if (k === 'papers') { var P = _data.proxy || {}; var hasPoa = itemsOf('doc').some(function (x) { return (x.meta || {}).type === 'poa_health'; }); return P.proxy && hasPoa ? '' : 'due'; }
     return '';
   }
@@ -891,6 +951,22 @@
     }; });
     box.querySelectorAll('[data-me]').forEach(function (b) { b.onclick = async function () { var r = await logPost({ kind: 'me', value: b.getAttribute('data-me') }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } }; });
     box.querySelectorAll('[data-worry]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var n = box.querySelector('#cvWorryNote'); var r = await logPost({ kind: 'worry', value: b.getAttribute('data-worry'), note: n ? n.value.trim() : '' }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } else b.disabled = false; }; });
+    box.querySelectorAll('[data-a=gal-on]').forEach(function (b) { b.onclick = async function () {
+      b.disabled = true;
+      var st = {}; try { st = JSON.parse(CovaraNative.photoStatus() || '{}'); } catch (e) {}
+      var r = await api('/location/photo-device', { method: 'POST', body: { name: 'Covara photo sorter', replaces: st.device || undefined } }).catch(function () { return { ok: false }; });
+      if (r.ok) { try { CovaraNative.photoStart(base(), r.data.token, r.data.id); } catch (e) {} setTimeout(function () { _html = ''; render(); }, 1500); } else b.disabled = false;
+    }; });
+    box.querySelectorAll('[data-a=gal-off]').forEach(function (b) { b.onclick = async function () {
+      var st = {}; try { st = JSON.parse(CovaraNative.photoStatus() || '{}'); } catch (e) {}
+      try { CovaraNative.photoStop(true); } catch (e) {}
+      if (st.device) api('/location/device/' + encodeURIComponent(st.device), { method: 'DELETE' }).catch(function () {});
+      _html = ''; render();
+    }; });
+    box.querySelectorAll('[data-a=meal-photo]').forEach(function (b) { b.onclick = function () { try { CovaraCamera.open('auto'); } catch (e) {} }; });
+    box.querySelectorAll('[data-morn]').forEach(function (b) { b.onclick = async function () { var v = b.getAttribute('data-morn'); b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: v === 'off' ? { on: false } : { on: true, by: v } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
+    box.querySelectorAll('[data-nw]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: { night_watch: b.getAttribute('data-nw') === 'on' } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
+    box.querySelectorAll('[data-tl]').forEach(function (b) { b.onclick = function () { try { CovaraNight.timeline(_data.s.home || '', +b.getAttribute('data-tl')); } catch (e) {} }; });
     box.querySelectorAll('[data-leave]').forEach(function (b) { b.onclick = async function () { var m = b.getAttribute('data-leave'); var r = await api('/care/leave', { method: 'PUT', body: Object.assign({ mode: m }, _data.s.home ? { home: _data.s.home } : {}) }).catch(function () { return { ok: false }; }); if (r.ok) { _data.leave = m; _html = ''; render(); } }; });
     box.querySelectorAll('[data-a=voice]').forEach(function (b) { b.onclick = function () { try { new Audio(b.getAttribute('data-src')).play(); } catch (e) {} }; });
     box.querySelectorAll('[data-a=px-on]').forEach(function (b) { b.onclick = function () { openProxyOn(); }; });
