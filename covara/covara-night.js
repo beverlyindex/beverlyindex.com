@@ -27,11 +27,11 @@
   async function api(path, o) { var r = await SyncEngine.apiFetch(path, Object.assign({ method: 'GET' }, o || {})); return { ok: r.ok, data: await r.json().catch(function () { return {}; }) }; }
   function myFirst() { try { var n = String(userSphereName || '').trim().split(/\s+/)[0]; return n ? n[0] + n.slice(1).toLowerCase() : ''; } catch (e) { return ''; } }
 
-  var css = '#cvMorning{position:fixed;left:50%;transform:translateX(-50%);z-index:99988;width:min(560px,calc(100vw - 24px));box-sizing:border-box;padding:16px;border-radius:22px;text-align:center;' +
-    'border:1.5px solid rgba(255,210,77,.85);background:linear-gradient(155deg,rgba(255,190,90,.20),rgba(70,130,235,.18) 45%,rgba(14,30,78,.42));-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);' +
-    'box-shadow:0 0 30px rgba(255,210,77,.40),0 0 22px rgba(70,150,255,.25),inset 0 1px 0 rgba(255,255,255,.16);color:#fff;font-family:var(--nous-font,"Hanken Grotesk",sans-serif);text-shadow:0 1px 2px rgba(2,8,24,.55)}' +
-    '#cvMorning h3{margin:0 0 4px;font-size:21px;font-weight:800}#cvMorning p{margin:0 0 12px;color:#ffe9c2;font-size:14.5px}' +
-    '#cvMorning button{width:100%;min-height:56px;border:0;border-radius:28px;background:radial-gradient(circle at 35% 30%,#ffe58a,#ffc531 60%,#d99a00);color:#2a1600;font:800 19px var(--nous-font,sans-serif);cursor:pointer;box-shadow:0 0 24px rgba(255,200,60,.55)}' +
+  var css = '#cvMorning{position:fixed;left:50%;transform:translateX(-50%);z-index:99988;width:min(560px,calc(100vw - 24px));box-sizing:border-box;padding:8px 8px 8px 14px;border-radius:30px;display:flex;align-items:center;gap:10px;' +
+    'border:1.5px solid rgba(255,210,77,.85);background:linear-gradient(155deg,rgba(255,190,90,.22),rgba(70,130,235,.18) 45%,rgba(14,30,78,.45));-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);' +
+    'box-shadow:0 0 24px rgba(255,210,77,.38),inset 0 1px 0 rgba(255,255,255,.16);color:#fff;font-family:var(--nous-font,"Hanken Grotesk",sans-serif);text-shadow:0 1px 2px rgba(2,8,24,.55)}#cvMorning[hidden]{display:none}' +
+    '#cvMorning .tx{flex:1;min-width:0}#cvMorning h3{margin:0;font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#cvMorning p{margin:1px 0 0;color:#ffe9c2;font-size:12.5px;line-height:1.3}' +
+    '#cvMorning button{flex:0 0 auto;min-height:46px;padding:0 20px;border:0;border-radius:23px;background:radial-gradient(circle at 35% 30%,#ffe58a,#ffc531 60%,#d99a00);color:#2a1600;font:800 16px var(--nous-font,sans-serif);cursor:pointer;box-shadow:0 0 18px rgba(255,200,60,.5)}' +
     '#cvTimeline{position:fixed;inset:0;z-index:100030;display:flex;justify-content:center;background:rgba(4,12,34,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-family:var(--nous-font,"Hanken Grotesk",sans-serif)}' +
     '#cvTimeline .sh{width:min(720px,100%);height:100%;overflow:auto;box-sizing:border-box;padding:18px 16px calc(20px + env(safe-area-inset-bottom));background:linear-gradient(160deg,rgba(70,130,235,.20),rgba(10,24,64,.72));border-left:1px solid rgba(150,200,255,.35);border-right:1px solid rgba(150,200,255,.35);color:#eef4ff}' +
     '#cvTimeline h2{margin:0 0 2px;font-size:20px;font-weight:800}#cvTimeline .who{color:#ffd24d;font:700 13px var(--nous-mono,"JetBrains Mono",monospace);letter-spacing:.04em}#cvTimeline .note{color:#b9c9e6;font-size:12.5px;margin:6px 0 12px}' +
@@ -65,7 +65,7 @@
       document.body.appendChild(card);
     }
     var nm = myFirst();
-    card.innerHTML = '<h3>☀ ' + esc(t('gm', { name: nm }).replace(/, $/, '')) + '</h3><p>' + esc(t('gmSub')) + '</p><button type="button">' + esc(t('up')) + '</button>';
+    card.innerHTML = '<div class="tx"><h3>☀ ' + esc(t('gm', { name: nm }).replace(/, $/, '')) + '</h3><p>' + esc(t('gmSub')) + '</p></div><button type="button">' + esc(t('up')) + '</button>';
     card.querySelector('button').onclick = async function () {
       this.disabled = true;
       var r = await api('/care/morning/ok', { method: 'POST' }).catch(function () { return { ok: false }; });

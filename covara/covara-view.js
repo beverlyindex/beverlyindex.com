@@ -53,6 +53,9 @@
       gal_why: 'This phone can sort every new photo in its gallery by itself: it looks at each photo first, on the phone, and sends only meals, medicines and papers. Every other photo stays on the phone.',
       gal_start: 'Sort new gallery photos', gal_stop: 'Stop sorting gallery photos', gal_on: 'Sorting new photos: {n} filed so far.', gal_perm: 'Allow Covara to see photos in Android settings.', ml_add: 'Photograph a meal',
       ml_why: 'Each meal photographed with Covara’s camera: the foods, the nutrients from the USDA food database, and what they mean for {name}’s medicines, with what balances each effect.',
+      dr_title: 'When {name} drives', dr_notify: 'Tell the family', dr_alert: 'Alert the family', dr_off: 'Never',
+      dr_why: 'Covara knows {name} is driving from the speed of {name}’s phone. The family is told when a drive starts and ends; with Alert, it rings like an alarm.',
+      dr_how: 'When {name} taps someone in the family and Drive to, that person is told {name} is coming and how long it will take. If {name} is plainly heading toward one of the family, Covara tells them too. If {name} drives farther and farther from where {name} was going, the family is told at once.',
       mo_title: 'Morning check-in', mo_why: 'Each morning {name} taps I’m up (or answers How are you, or marks a medicine). If there is no word by this time, the family is told and {name}’s phone rings; 30 minutes later it becomes urgent.',
       mo_off: 'Off', mo_done: 'Checked in today at {t}', mo_late: 'No word yet this morning', mo_wait: 'Expected by {t}',
       nw_title: 'Night watch', nw_on: 'On', nw_why: 'During {name}’s night the family is told when a room sensor or {name}’s room phone goes quiet, when a room moves while {name}’s bed sensor says {name} is in bed, and when there is movement at an hour {name} is not usually up.',
@@ -143,6 +146,9 @@
       gal_why: 'Questo telefono può ordinare da solo ogni nuova foto della galleria: guarda ogni foto prima, sul telefono, e invia solo pasti, medicine e documenti. Tutte le altre foto restano sul telefono.',
       gal_start: 'Ordina le nuove foto della galleria', gal_stop: 'Smetti di ordinare le foto', gal_on: 'Ordino le nuove foto: {n} archiviate finora.', gal_perm: 'Consenti a Covara di vedere le foto nelle impostazioni di Android.', ml_add: 'Fotografa un pasto',
       ml_why: 'Ogni pasto fotografato con la fotocamera di Covara: i cibi, i nutrienti dalla banca dati USDA, e cosa significano per le medicine di {name}, con cosa bilancia ogni effetto.',
+      dr_title: 'Quando {name} guida', dr_notify: 'Avvisa la famiglia', dr_alert: 'Allarme alla famiglia', dr_off: 'Mai',
+      dr_why: 'Covara capisce che {name} è alla guida dalla velocità del telefono di {name}. La famiglia viene avvisata quando un viaggio inizia e finisce; con Allarme, suona come un allarme.',
+      dr_how: 'Quando {name} tocca qualcuno della famiglia e Vai da, quella persona viene avvisata che {name} sta arrivando e quanto ci vorrà. Se {name} si sta chiaramente dirigendo verso qualcuno della famiglia, Covara lo avvisa. Se {name} si allontana sempre di più dalla meta, la famiglia viene avvisata subito.',
       mo_title: 'Buongiorno', mo_why: 'Ogni mattina {name} tocca Mi sono alzato (o risponde a Come stai, o segna una medicina). Se entro quest’ora non arriva nulla, la famiglia viene avvisata e il telefono di {name} squilla; 30 minuti dopo diventa urgente.',
       mo_off: 'Spento', mo_done: 'Oggi alle {t}', mo_late: 'Ancora nessuna notizia stamattina', mo_wait: 'Atteso entro le {t}',
       nw_title: 'Guardia notturna', nw_on: 'Attiva', nw_why: 'Di notte la famiglia viene avvisata quando un sensore o il telefono di {name} smette di ascoltare, quando una stanza si muove mentre il sensore del letto dice che {name} è a letto, e quando c’è movimento a un’ora in cui {name} di solito non è alzato.',
@@ -587,7 +593,7 @@
   }
   function safetyHtml() {
     var d = (_data.sheet && _data.sheet.data) || {};
-    return morningBlock() + nightBlock() + timelineBlock() + leaveBlock() + block('er', t('forEr'), d.diagnosis ? d.diagnosis + (d.allergies ? ' · ' + t('sh_allergies') + ': ' + d.allergies : '') : t('erShort'), erHtml(false), 'red') +
+    return morningBlock() + nightBlock() + timelineBlock() + leaveBlock() + driveBlock() + block('er', t('forEr'), d.diagnosis ? d.diagnosis + (d.allergies ? ' · ' + t('sh_allergies') + ': ' + d.allergies : '') : t('erShort'), erHtml(false), 'red') +
       block('miss', t('ifMissing', { name: name1() }), t('missShort'), missingHtml(false), 'gold') +
       block('rooms', t('fallsRooms'), t('fallsShort'), '<div class="cvx-sub">' + esc(t('fallsBody')) + '</div>', 'blue') + worryBlock();
   }
@@ -694,6 +700,12 @@
       '<button type="button" class="cvt-chip sm" data-nw="on" aria-pressed="' + on + '">' + esc(t('nw_on')) + '</button><button type="button" class="cvt-chip sm bad" data-nw="off" aria-pressed="' + (!on) + '">' + esc(t('lv2_off')) + '</button></div>' +
       '<div class="cvx-sub" style="margin-top:8px">' + esc(t('nw_needs')) + '</div>';
     return block('nightw', t('nw_title'), on ? t('nw_on') : t('lv2_off'), body, on ? 'blue' : 'red');
+  }
+  function driveBlock() {
+    var w = window.CovaraWhere && CovaraWhere.data(), mode = _data.driveMode || (w && w.drive && w.drive.mode) || 'notify';
+    var body = '<div class="cvx-sub">' + esc(t('dr_why', { name: name1() })) + '</div><div class="cvt-chips">' + ['notify', 'alert', 'off'].map(function (m) { return '<button type="button" class="cvt-chip sm' + (m === 'off' ? ' bad' : '') + '" data-drive="' + m + '" aria-pressed="' + (mode === m) + '">' + esc(t('dr_' + m)) + '</button>'; }).join('') + '</div>' +
+      '<div class="cvx-sub" style="margin-top:8px">' + esc(t('dr_how', { name: name1() })) + '</div>';
+    return block('drive', t('dr_title', { name: name1() }), t('dr_' + mode), body, mode === 'off' ? 'red' : mode === 'alert' ? 'gold' : 'blue');
   }
   function timelineBlock() {
     var body = '<div class="cvx-sub">' + esc(t('tl_why', { name: name1() })) + '</div><div class="cvt-chips">' +
@@ -964,6 +976,7 @@
       _html = ''; render();
     }; });
     box.querySelectorAll('[data-a=meal-photo]').forEach(function (b) { b.onclick = function () { try { CovaraCamera.open('auto'); } catch (e) {} }; });
+    box.querySelectorAll('[data-drive]').forEach(function (b) { b.onclick = async function () { var m = b.getAttribute('data-drive'); b.disabled = true; var r = await api('/care/drive' + q(_data.s), { method: 'PUT', body: { mode: m } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.driveMode = m; _html = ''; render(); } else b.disabled = false; }; });
     box.querySelectorAll('[data-morn]').forEach(function (b) { b.onclick = async function () { var v = b.getAttribute('data-morn'); b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: v === 'off' ? { on: false } : { on: true, by: v } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
     box.querySelectorAll('[data-nw]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: { night_watch: b.getAttribute('data-nw') === 'on' } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
     box.querySelectorAll('[data-tl]').forEach(function (b) { b.onclick = function () { try { CovaraNight.timeline(_data.s.home || '', +b.getAttribute('data-tl')); } catch (e) {} }; });
