@@ -377,6 +377,7 @@
     /* not kept and the voice server away: the phone's voice for this one (the next may be a kept sentence) */
     if (!first) return false;
     VV.speakStart(0);
+    var blocked = false;
     var tick = setInterval(function () { if (_cv.audio && !_cv.audio.paused) VV.word(); }, 260);
     try {
       for (var i = 0; i < parts.length; i++) {
@@ -385,8 +386,10 @@
         if (!u) { speakDevice(parts.slice(i).join(' ')); break; }
         await new Promise(function (done) {
           var a = new Audio(u); _cv.audio = a; a.onended = a.onerror = function () { URL.revokeObjectURL(u); done(); };
-          var p = a.play(); if (p && p.catch) p.catch(function () { done(); });
+          var p = a.play(); if (p && p.catch) p.catch(function () { blocked = true; done(); });
         });
+        /* the phone would not play Covara's voice: the phone's own voice says the rest, so nothing goes unsaid */
+        if (blocked) { speakDevice(parts.slice(i).join(' ')); break; }
       }
     } finally { clearInterval(tick); if (seq === _cv.seq) { _cv.audio = null; VV.speakEnd(); } }
     return true;
