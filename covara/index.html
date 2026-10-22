@@ -28141,8 +28141,13 @@ function onPressEnd(e) {
             /* Single tap confirmed */
             sphereTapTimer = null;
             var _tapWasCenter = sphereTapTarget && sphereTapTarget.isCenter;
+            var _cvTapId = sphereTapTarget && sphereTapTarget.contactId; /* Covara: whose face was tapped */
             sphereTapTarget = null;
-            if (_tapWasCenter) {
+            /* Covara: one tap on HOME's face opens the care card, on anyone else's the person sheet (covara-person.js) */
+            let _cvP = false; try { if (window.CovaraPerson && localStorage.getItem('rc:role')) _cvP = !!(_tapWasCenter ? CovaraPerson.openCare() : CovaraPerson.open(_cvTapId)); } catch (e) {}
+            if (_cvP) {
+              /* the sheet has it; nothing else opens */
+            } else if (_tapWasCenter) {
               /* Center sphere tap → open Circle Views panel (Covara: HOME at the centre of AWAY's phone stays put) */
               let _cvS = false; try { _cvS = !!(window.CovaraView && window.CovaraView.centreSingle()); } catch (e) {}
               if (!_cvS) SentinelViews.openPanel();
@@ -45713,5 +45718,6 @@ try { _resolveAppScriptReady(); } catch (e) {}
   <script src="covara-headline.js" defer></script>
   <script src="covara-night.js" defer></script>
   <script src="covara-now.js" defer></script>
+  <script src="covara-person.js" defer></script>
 </body>
 </html>
