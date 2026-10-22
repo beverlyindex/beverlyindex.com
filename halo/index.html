@@ -1291,7 +1291,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-22.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-22.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -5245,11 +5245,11 @@ function placeMarkers(map, store, list, extra){
       if(Date.now()>=(MF.hold||0)){ const o=m.getLngLat(); let la=o.lat, lo=o.lng;
         if(!d.fix && m._c && MAP_CENTER){ la+=MAP_CENTER.lat-m._c.lat; lo+=MAP_CENTER.lon-m._c.lon; }          // a dot drawn from where you are walks with you
         const dd=distLL(la,lo,ll[1],ll[0]); if(dd>4 && dd<400){ la+=(ll[1]-la)*.35; lo+=(ll[0]-lo)*.35; } else if(dd>=400){ la=ll[1]; lo=ll[0]; }          // a new reading slides the dot over a few seconds; it never jumps
-        if(la!==o.lat || lo!==o.lng) m.setLngLat([lo,la]); }
+        if(isFinite(la) && isFinite(lo) && (la!==o.lat || lo!==o.lng)) m.setLngLat([lo,la]); }          // a position that is not a number never stops the other dots from moving
       if(MAP_CENTER) m._c={lat:MAP_CENTER.lat, lon:MAP_CENTER.lon}; const e=m.getElement(); e.style.setProperty('--mk',markerColor(d)); { const lk=lookOf(d); e.classList.toggle('flash',lk.flash); e.classList.toggle('threat',lk.threat); e.classList.toggle('mine',!!lk.mine); e.style.setProperty('--mt',lookText(lk.c)); }
       e.classList.toggle('hollow',mc===' hollow'); e.classList.toggle('rough',mc===' rough'); e.classList.toggle('far',far); e.classList.toggle('ghost',gone); e.classList.toggle('sel',S.identId===d.id); e.title=tip; }
     else{ const m=document.createElement('div'); const lk=lookOf(d); m.className=cls+(lk.flash?' flash':'')+(lk.threat?' threat':'')+(lk.mine?' mine':''); m.style.setProperty('--mk',lk.c); m.style.setProperty('--mt',lookText(lk.c)); m.title=tip; m.classList.add('arr'); setTimeout(()=>m.classList.remove('arr'),1300);
-      m.addEventListener('click',ev=>{ ev.stopPropagation(); if(map===FULL){ MF.pt=null; MF.sel=d.id; mapFullTick(false); } else selectDevice(d.id); }); store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); if(MAP_CENTER) store[d.id]._c={lat:MAP_CENTER.lat, lon:MAP_CENTER.lon}; } });
+      m.addEventListener('click',ev=>{ ev.stopPropagation(); if(map===FULL){ MF.pt=null; MF.sel=d.id; mapFullTick(false); } else selectDevice(d.id); }); if(!(isFinite(ll[0]) && isFinite(ll[1]))) return; store[d.id]=new window.maplibregl.Marker({element:m}).setLngLat(ll).addTo(map); if(MAP_CENTER) store[d.id]._c={lat:MAP_CENTER.lat, lon:MAP_CENTER.lon}; } });
 }
 // Your own position. It feeds the placement of devices, so it does not wait for, or depend on, the map.
 let _geoOn=false;
