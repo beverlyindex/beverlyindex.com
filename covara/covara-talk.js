@@ -355,7 +355,7 @@
   async function cvReady() {
     if (_cv.ok !== null && Date.now() - _cv.at < 10 * 60000) return _cv.ok;
     _cv.at = Date.now();
-    try { var r = await SyncEngine.apiFetch('/care-voice/status', { method: 'GET' }); var j = r.ok ? await r.json() : null; _cv.ok = !!(j && j.configured && j.server && j.server.ok); } catch (e) { _cv.ok = false; }
+    try { var r = await SyncEngine.apiFetch('/care-voice/status', { method: 'GET' }); var j = r.ok ? await r.json() : null; _cv.ok = !!(j && j.configured); } catch (e) { _cv.ok = false; }
     return _cv.ok;
   }
   function cvHush() { _cv.seq++; try { if (_cv.audio) { _cv.audio.pause(); _cv.audio.src = ''; } } catch (e) {} _cv.audio = null; }
@@ -374,7 +374,8 @@
     var urls = parts.map(function (p) { return cvFetch(p, lang); });
     var first = await urls[0];
     if (seq !== _cv.seq) return true;
-    if (!first) { _cv.ok = false; _cv.at = Date.now(); return false; }
+    /* not kept and the voice server away: the phone's voice for this one (the next may be a kept sentence) */
+    if (!first) return false;
     VV.speakStart(0);
     var tick = setInterval(function () { if (_cv.audio && !_cv.audio.paused) VV.word(); }, 260);
     try {
