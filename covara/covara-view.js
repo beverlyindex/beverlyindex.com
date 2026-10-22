@@ -1245,7 +1245,7 @@
     var comm = role() === 'away', nCare = 0, nComm = comm ? 4 : 0, gapG = nCare && nComm ? lh * 0.7 : 0;
     var total = (nCare + nComm) * lh + gapG, top = cy - total / 2;
     /* Medicines, Visits, Health, Safety and Papers now live in the pulls of the card a double tap opens */
-    if (comm) pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, top + nCare * lh + gapG + nComm * lh / 2, cr, t0);
+    if (comm && !window.CovaraPerson) pills(ctx, [t('video'), t('phone'), t('message'), t('email')], ['video', 'phone', 'sms', 'email'], cx, top + nCare * lh + gapG + nComm * lh / 2, cr, t0);
   }
   function hitCentre(clientX, clientY) {
     if (!_pillHits.length || typeof CV === 'undefined') return false;

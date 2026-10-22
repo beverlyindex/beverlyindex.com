@@ -63,7 +63,7 @@
     if (h0 && !_spoken[h0.id + h0.what]) {
       _spoken[h0.id + h0.what] = 1;
       var words = h0.headline + '.' + (h0.what ? ' ' + h0.what.charAt(0).toUpperCase() + h0.what.slice(1) + '.' : '');
-      try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say(words, words); } catch (e) {}
+      try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say(words, words); if (window.CovaraNow) { var bb = document.getElementById('cvTalkBubble'); if (bb) bb.hidden = true; } } catch (e) {}
     }
   }
   function paint() {
@@ -87,7 +87,7 @@
       if (!_spoken[h.id + h.what]) {
         _spoken[h.id + h.what] = 1;
         var words = h.headline + '.' + (h.what ? ' ' + h.what.charAt(0).toUpperCase() + h.what.slice(1) + '.' : '');
-        try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say(words, words); } catch (e) {}
+        try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say(words, words); if (window.CovaraNow) { var bb = document.getElementById('cvTalkBubble'); if (bb) bb.hidden = true; } } catch (e) {}
       }
     }
     el.hidden = false; place();

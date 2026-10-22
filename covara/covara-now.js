@@ -17,9 +17,9 @@
   function hm(ms) { try { return new Date(ms).toLocaleTimeString(IT() ? 'it' : 'en-US', { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
 
   var css = '#cvNow{position:fixed;left:50%;transform:translateX(-50%);z-index:99990;width:min(560px,calc(100vw - 24px));box-sizing:border-box;padding:12px 14px 14px;border-radius:22px;' +
-    'border:1.5px solid rgba(255,210,77,.85);background:linear-gradient(155deg,rgba(90,70,60,.62),rgba(30,60,130,.66) 45%,rgba(10,22,60,.82));-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);' +
+    'border:1.5px solid rgba(255,210,77,.85);background:linear-gradient(155deg,rgba(70,56,52,.92),rgba(24,50,116,.93) 45%,rgba(8,18,52,.96));-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);' +
     'box-shadow:0 0 26px rgba(255,210,77,.36),0 0 22px rgba(70,150,255,.26),inset 0 1px 0 rgba(255,255,255,.16);color:#f4f7ff;font:500 15px/1.4 var(--nous-font,"Hanken Grotesk",sans-serif);text-shadow:0 1px 2px rgba(2,8,24,.55)}' +
-    '#cvNow[hidden],body.cv-cam #cvNow{display:none !important}' +
+    '#cvNow[hidden],body.cv-cam #cvNow,body.cvp-open #cvNow{display:none !important}#cvHelpActs.on{display:none !important}' +
     '#cvNow.r0{border-color:rgba(255,80,100,.9);background:linear-gradient(155deg,rgba(120,16,38,.78),rgba(36,8,20,.86));box-shadow:0 0 30px rgba(255,40,70,.45),inset 0 1px 0 rgba(255,255,255,.14);animation:cvNowP 1.6s ease-in-out infinite}' +
     '@keyframes cvNowP{50%{box-shadow:0 0 44px rgba(255,40,70,.65),inset 0 1px 0 rgba(255,255,255,.14)}}@media (prefers-reduced-motion:reduce){#cvNow.r0{animation:none}}' +
     '#cvNow .top{display:flex;align-items:center;gap:8px;min-height:22px;font:800 11px var(--nous-mono,"JetBrains Mono",monospace);letter-spacing:.14em;color:#ffd24d;text-transform:uppercase}#cvNow.r0 .top{color:#ffb3c0}' +

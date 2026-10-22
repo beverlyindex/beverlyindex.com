@@ -236,7 +236,7 @@
   function wrap() {
     if (_wrapped) return;
     if (typeof window.getContactHeadline === 'function') { var g = window.getContactHeadline; window.getContactHeadline = function (c) { return simpleNow() ? '' : g.apply(this, arguments); }; }
-    if (typeof window.drawQuickActionIcons === 'function') { var q = window.drawQuickActionIcons; window.drawQuickActionIcons = function () { if (simpleNow()) return; return q.apply(this, arguments); }; }
+    if (typeof window.drawQuickActionIcons === 'function') { var q = window.drawQuickActionIcons; window.drawQuickActionIcons = function () { if (simpleNow() || window.CovaraPerson) return; return q.apply(this, arguments); }; }
     if (typeof window.CovaraDreamWanted === 'function') { var d = window.CovaraDreamWanted; window.CovaraDreamWanted = function () { return simpleNow() ? false : d.apply(this, arguments); }; }
     _wrapped = true;
   }

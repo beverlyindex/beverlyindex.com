@@ -94,6 +94,7 @@
     '#cvpSheet .cvp-head .cvp-title{text-align:left;margin:0;font-size:24px}' +
     '#cvpSheet .cvp-head .cvp-sub{text-align:left;margin:2px 0 0}' +
     '#cvpSheet .cvp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}' +
+    '#cvpSheet .cvp-calls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 0 12px}#cvpSheet .cvp-calls .cvp-b{min-height:54px;padding:6px 8px;font-size:16px}' +
     '#cvpSheet .cvp-tile{position:relative;min-height:112px;padding:14px 14px 12px;border-radius:20px;border:1px solid rgba(150,200,255,.48);cursor:pointer;text-align:left;color:#f2f7ff;display:flex;flex-direction:column;justify-content:space-between;gap:8px;' +
       'background:linear-gradient(155deg,rgba(80,140,240,.24),rgba(18,40,96,.48));box-shadow:0 0 18px rgba(70,150,255,.26),inset 0 1px 0 rgba(255,255,255,.16);font-family:var(--nous-font,"Hanken Grotesk",system-ui,sans-serif);text-shadow:0 1px 2px rgba(2,8,24,.55)}' +
     '#cvpSheet .cvp-tile:last-child{grid-column:1 / -1;min-height:84px}' +
@@ -301,7 +302,11 @@
     if (!self && !h) return false;
     var nm = homeName(), seq = ++_seq;
     _who = '__care__';
+    try { if (window.CovaraView && CovaraView.load) CovaraView.load(); } catch (e) {}
     var html = '<div class="cvp-head"><div data-ph></div><div><div class="cvp-title">' + esc(nm) + '</div><div class="cvp-sub" data-line>' + esc(self ? t('yourCare') : t('careOf', { name: nm })) + '</div></div></div>' +
+      /* on the family's phone, calling HOME lives here (it replaces the old pills beside HOME's sphere) */
+      (!self ? '<div class="cvp-calls"><button type="button" class="cvp-b pri" data-c="phone">' + esc(t('call', { name: nm })) + '</button>' +
+        '<button type="button" class="cvp-b" data-c="video">' + esc(t('video')) + '</button><button type="button" class="cvp-b" data-c="sms">' + esc(t('message')) + '</button></div>' : '') +
       '<div class="cvp-grid">' + TILES.map(function (k) { return '<button type="button" class="cvp-tile" data-k="' + k + '"><b>' + esc(t(k)) + '</b><span data-s></span></button>'; }).join('') + '</div>';
     show(html, function (el) { var ph = el.querySelector('[data-ph]'); ph.parentNode.replaceChild(photoCanvas(h, nm), ph); });
     sheet.setAttribute('aria-label', self ? t('yourCare') : t('careOf', { name: nm }));
@@ -316,6 +321,7 @@
     }
     paint();
     sheet.querySelectorAll('.cvp-tile').forEach(function (b) { b.onclick = function () { openSection(b.getAttribute('data-k')); }; });
+    if (h) sheet.querySelectorAll('[data-c]').forEach(function (b) { b.onclick = function () { act(b.getAttribute('data-c'), h, nm, b); }; });
     /* on the family's phone: how HOME is now, and when HOME was last seen */
     if (!self && authed()) api(whereQuery('')).then(function (d) {
       if (seq !== _seq || !isOpen()) return;
