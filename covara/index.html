@@ -8530,7 +8530,12 @@ function uiConfirm(message, okLabel) {
 /* What to tell the person when a picture cannot be used */
 function mediaErrText(err) {
   if (err && err.code === 'heic') return (typeof _t === 'function' ? _t('media.heic', '') : '') || 'This photo is in HEIC format, which this phone cannot show here. Choose another photo, or set the camera to save photos as JPEG.';
-  return (typeof _t === 'function' ? _t('self.error', 'That file could not be used. Try another photo or clip.') : 'That file could not be used. Try another photo or clip.');
+  var T = function (k, d) { return (typeof _t === 'function' ? _t(k, d) : d) || d; };
+  var m = String((err && (err.code || err.message)) || '');
+  if (m === 'empty') return T('media.empty', 'The phone handed over an empty file. If the picture is stored online (Google Photos), open it and download it to the phone first, then choose it again.');
+  if (m === 'image') return T('media.cantOpen', 'This picture could not be opened. Try a JPEG or PNG photo, or a GIF.');
+  if (m === 'store') return T('media.store', 'The picture could not be saved on this phone. Free some space on the phone, then try again.');
+  return T('self.error', 'That file could not be used. Try another photo or clip.') + (m ? ' (' + m.slice(0, 40) + ')' : '');
 }
 /* A JPEG's width and height, read from its header (no decoding): the first frame marker after the start. */
 async function jpegSize(blob) {
@@ -8653,6 +8658,11 @@ var SphereMedia = (function () {
       return { kind: 'video', mime: brand === 'qt  ' ? 'video/quicktime' : (/^video\//.test(mt) ? mt : 'video/mp4') };
     }
     if (head[0] === 0x1A && head[1] === 0x45 && head[2] === 0xDF && head[3] === 0xA3) return { kind: 'video', mime: 'video/webm' };
+    /* Android's file picker often hands over a photo with no type at all: its first bytes say what it is */
+    if (head[0] === 0xFF && head[1] === 0xD8 && head[2] === 0xFF) return { kind: 'photo', mime: 'image/jpeg' };
+    if (head[0] === 0x89 && _str(head, 1, 4) === 'PNG') return { kind: 'photo', mime: 'image/png' };
+    if (_str(head, 0, 4) === 'RIFF' && _str(head, 8, 12) === 'WEBP') return { kind: 'photo', mime: 'image/webp' };
+    if (_str(head, 0, 2) === 'BM') return { kind: 'photo', mime: 'image/bmp' };
     if (/^video\//.test(mt)) return { kind: 'video', mime: mt };
     if (/\.(mp4|m4v)$/.test(nm)) return { kind: 'video', mime: 'video/mp4' };
     if (/\.webm$/.test(nm)) return { kind: 'video', mime: 'video/webm' };
@@ -8675,7 +8685,7 @@ var SphereMedia = (function () {
         if (!hb) { var he = new Error('heic'); he.code = 'heic'; throw he; }
         blob = hb;
       }
-      else blob = await downscalePhoto(file, 1280);
+      else blob = await downscalePhoto(/^image\//.test(String(file.type || '')) ? file : new Blob([file], { type: s.mime }), 1280);
     } else if (String(file.type || '').split(';')[0].toLowerCase() !== s.mime) {
       blob = new Blob([file], { type: s.mime });
     }
@@ -13082,6 +13092,9 @@ const I18n = (function () {
     "self.previewAria": "Preview of your sphere",
     "media.localOnly": "Kept on this device only (over 4 MB)",
     "media.help": "Photos, animated GIFs and short videos up to 4 MB play inside your sphere.",
+    "media.empty": "The phone handed over an empty file. If the picture is stored online (Google Photos), open it and download it to the phone first, then choose it again.",
+    "media.cantOpen": "This picture could not be opened. Try a JPEG or PNG photo, or a GIF.",
+    "media.store": "The picture could not be saved on this phone. Free some space on the phone, then try again.",
     "media.cannotPlay": "This clip cannot play in this browser. A still is shown.",
     "views.newTitle": "New {type} view",
     "views.editTitle": "Edit {type} view",
@@ -13466,6 +13479,9 @@ const I18n = (function () {
     "self.previewAria": "Anteprima della tua sfera",
     "media.localOnly": "Conservato solo su questo dispositivo (oltre 4 MB)",
     "media.help": "Foto, GIF animate e brevi video fino a 4 MB si riproducono nella tua sfera.",
+    "media.empty": "Il telefono ha passato un file vuoto. Se l\u2019immagine \u00e8 salvata online (Google Foto), aprila e scaricala sul telefono, poi sceglila di nuovo.",
+    "media.cantOpen": "Impossibile aprire questa immagine. Prova una foto JPEG o PNG, oppure una GIF.",
+    "media.store": "Impossibile salvare l\u2019immagine su questo telefono. Libera un po\u2019 di spazio, poi riprova.",
     "media.cannotPlay": "Questa clip non può essere riprodotta in questo browser. Viene mostrata un’immagine fissa.",
     "views.newTitle": "Nuova vista {type}",
     "views.editTitle": "Modifica vista {type}",
@@ -28596,16 +28612,23 @@ async function applySelfMedia(file) {
   mediaIsGif = false;
   const blob = f;
   const url = URL.createObjectURL(blob);
-  const img = new Image();
-  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('image')); img.src = url; });
+  let img = new Image();
+  const opened = await new Promise((res) => { img.onload = () => res(true); img.onerror = () => res(false); img.src = url; });
+  /* some phones refuse a picture as an <img> but open it as a bitmap: draw that instead */
+  let bm = null;
+  if (!opened || !(img.naturalWidth || img.width)) {
+    try { bm = await createImageBitmap(blob); } catch (e) { bm = null; }
+    if (!bm) throw new Error('image');
+  }
   mediaType = 'image';
   videoEl.pause();
   videoEl.removeAttribute('src');
-  media = img;
-  cachedMediaW = img.naturalWidth || img.width; cachedMediaH = img.naturalHeight || img.height;
+  cachedMediaW = bm ? bm.width : (img.naturalWidth || img.width); cachedMediaH = bm ? bm.height : (img.naturalHeight || img.height);
   mediaFrame = document.createElement('canvas');
   mediaFrame.width = cachedMediaW; mediaFrame.height = cachedMediaH;
-  mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
+  mediaFrame.getContext('2d').drawImage(bm || img, 0, 0, cachedMediaW, cachedMediaH);
+  if (bm) { try { bm.close(); } catch (e) {} img = mediaFrame; }
+  media = img;
   const ok = await RemielDB.putPhoto('self', blob, prep.kind);
   if (ok === false) throw new Error('store');
   await RemielDB.putSetting('selfSphereClearedAt', null).catch(() => {});
