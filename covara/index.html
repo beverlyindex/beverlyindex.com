@@ -9400,10 +9400,7 @@ function beginVideoIntro() {
   try { _reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
   if (_reduce) { setTimeout(function () { revealApp(); }, 0); return; }
 
-  /* Returning users skip straight in; first launch holds the splash up to 3s. */
-  var _returning = false;
-  try { _returning = localStorage.getItem('rc:obDone') === '1'; } catch (e) {}
-  if (_returning) { setTimeout(function () { revealApp(); }, 0); return; }
+  /* Covara's intro plays on every entry (Skip is always there); before, returning users went straight in */
   var _splashMs = 1200;
 
   /* Phase 2: Beverly Index company splash paints first; the video never delays it */
@@ -9434,20 +9431,21 @@ function beginVideoIntro() {
     videoEl.src = pickNextVideo();
     videoEl.muted = true;
     videoEl.preload = 'auto';
-    videoEl.addEventListener('canplaythrough', function () {
+    /* it starts as soon as it can play (the phone keeps loading the rest while it plays) */
+    videoEl.addEventListener('canplay', function () {
       _videoReady = true;
       _tryCrossfade();
     }, { once: true });
     videoEl.load();
   }, 0); });
 
-  /* Auto skip: if the video cannot play through within 3s, go straight in */
+  /* Auto skip: if the video cannot start within 9s (a slow connection), go straight in */
   setTimeout(function() {
     if (_crossfaded || appRevealed) return;
     _crossfaded = true;
     biSplash.classList.remove('active');
     revealApp();
-  }, 3000);
+  }, 9000);
 
   setTimeout(function() {
     _splashDone = true;
@@ -9469,6 +9467,34 @@ function _stopIntroMedia() {
   if (introEl) introEl.classList.remove('active');
   if (biSplash) biSplash.classList.remove('active');
 }
+
+/* Coming back to Covara after a while away (the installed app is often still open in the background, so the page
+   does not load again): the intro plays again, over the app. Skip, or its end, returns to where the person was. */
+const COVARA_INTRO_AWAY_MS = 5 * 60000;
+let _awaySince = 0;
+function replayIntro() {
+  const introEl = document.getElementById('videoIntro'), videoEl = document.getElementById('introVideo');
+  if (!introEl || !videoEl || introEl.classList.contains('active')) return;
+  try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) {}
+  /* not over a call for help, a call, or the camera */
+  if (document.body.classList.contains('cv-helping') || document.body.classList.contains('cv-cam') || document.querySelector('.sentinel-call-overlay.active')) return;
+  const done = function () { _stopIntroMedia(); };
+  videoEl.src = pickNextVideo(); videoEl.muted = true; videoEl.preload = 'auto';
+  const t = setTimeout(done, 9000);
+  videoEl.addEventListener('canplay', function () {
+    clearTimeout(t);
+    introEl.classList.add('active');
+    videoEl.play().catch(done);
+    videoEl.addEventListener('ended', done, { once: true });
+    videoEl.addEventListener('stalled', done, { once: true });
+  }, { once: true });
+  videoEl.load();
+}
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) { _awaySince = Date.now(); return; }
+  if (_awaySince && appRevealed && Date.now() - _awaySince >= COVARA_INTRO_AWAY_MS) replayIntro();
+  _awaySince = 0;
+});
 
 function skipIntro() {
   /* Skip must always work, even if revealApp already ran. */
