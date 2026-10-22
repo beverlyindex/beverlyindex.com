@@ -9468,34 +9468,6 @@ function _stopIntroMedia() {
   if (biSplash) biSplash.classList.remove('active');
 }
 
-/* Coming back to Covara after a while away (the installed app is often still open in the background, so the page
-   does not load again): the intro plays again, over the app. Skip, or its end, returns to where the person was. */
-const COVARA_INTRO_AWAY_MS = 5 * 60000;
-let _awaySince = 0;
-function replayIntro() {
-  const introEl = document.getElementById('videoIntro'), videoEl = document.getElementById('introVideo');
-  if (!introEl || !videoEl || introEl.classList.contains('active')) return;
-  try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) {}
-  /* not over a call for help, a call, or the camera */
-  if (document.body.classList.contains('cv-helping') || document.body.classList.contains('cv-cam') || document.querySelector('.sentinel-call-overlay.active')) return;
-  const done = function () { _stopIntroMedia(); };
-  videoEl.src = pickNextVideo(); videoEl.muted = true; videoEl.preload = 'auto';
-  const t = setTimeout(done, 9000);
-  videoEl.addEventListener('canplay', function () {
-    clearTimeout(t);
-    introEl.classList.add('active');
-    videoEl.play().catch(done);
-    videoEl.addEventListener('ended', done, { once: true });
-    videoEl.addEventListener('stalled', done, { once: true });
-  }, { once: true });
-  videoEl.load();
-}
-document.addEventListener('visibilitychange', function () {
-  if (document.hidden) { _awaySince = Date.now(); return; }
-  if (_awaySince && appRevealed && Date.now() - _awaySince >= COVARA_INTRO_AWAY_MS) replayIntro();
-  _awaySince = 0;
-});
-
 function skipIntro() {
   /* Skip must always work, even if revealApp already ran. */
   _stopIntroMedia();
