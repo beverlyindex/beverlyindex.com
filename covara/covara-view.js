@@ -49,7 +49,9 @@
       helpline: 'Call the 24/7 Helpline 800-272-3900', whoDid: 'Who did what this week', entries: '{n} entries', entry1: '1 entry',
       comfortTitle: 'Comfort', comfortShort: 'Music, photos and stories that calm', comfortEmpty: 'Add the songs, photos and stories that calm {name}. Music from their youth often helps most.', addComfort: 'Add something that comforts',
       ct_music: 'Music', ct_photo: 'Photo', ct_video: 'Video', ct_story: 'Story', play: 'Play', nItems: '{n} saved', ctTitle: 'Name (for example Moon River)', ctUrl: 'Link (optional)', ctPhoto: 'Add a photo', needHttps: 'The link must start with https://',
-      ml_title: 'Meals and medicines', ml_short: 'Photograph a meal to see what it means for the medicines', ml_n: '{n} meals', ml_one: '1 meal', ml_add: 'Photograph a meal',
+      ml_title: 'Meals and medicines', ml_short: 'Photograph a meal to see what it means for the medicines', ml_n: '{n} meals', ml_one: '1 meal',
+      gal_why: 'This phone can sort every new photo in its gallery by itself: it looks at each photo first, on the phone, and sends only meals, medicines and papers. Every other photo stays on the phone.',
+      gal_start: 'Sort new gallery photos', gal_stop: 'Stop sorting gallery photos', gal_on: 'Sorting new photos: {n} filed so far.', gal_perm: 'Allow Covara to see photos in Android settings.', ml_add: 'Photograph a meal',
       ml_why: 'Each meal photographed with Covara’s camera: the foods, the nutrients from the USDA food database, and what they mean for {name}’s medicines, with what balances each effect.',
       mo_title: 'Morning check-in', mo_why: 'Each morning {name} taps I’m up (or answers How are you, or marks a medicine). If there is no word by this time, the family is told and {name}’s phone rings; 30 minutes later it becomes urgent.',
       mo_off: 'Off', mo_done: 'Checked in today at {t}', mo_late: 'No word yet this morning', mo_wait: 'Expected by {t}',
@@ -137,7 +139,9 @@
       helpline: 'Chiama la linea 24/7 (USA) 800-272-3900', whoDid: 'Chi ha fatto cosa questa settimana', entries: '{n} registrazioni', entry1: '1 registrazione',
       comfortTitle: 'Conforto', comfortShort: 'Musica, foto e storie che calmano', comfortEmpty: 'Aggiungi le canzoni, le foto e le storie che calmano {name}. La musica della giovinezza spesso aiuta di più.', addComfort: 'Aggiungi qualcosa che conforta',
       ct_music: 'Musica', ct_photo: 'Foto', ct_video: 'Video', ct_story: 'Storia', play: 'Ascolta', nItems: '{n} salvati', ctTitle: 'Nome (per esempio Volare)', ctUrl: 'Link (facoltativo)', ctPhoto: 'Aggiungi una foto', needHttps: 'Il link deve iniziare con https://',
-      ml_title: 'Pasti e medicine', ml_short: 'Fotografa un pasto per vedere cosa significa per le medicine', ml_n: '{n} pasti', ml_one: '1 pasto', ml_add: 'Fotografa un pasto',
+      ml_title: 'Pasti e medicine', ml_short: 'Fotografa un pasto per vedere cosa significa per le medicine', ml_n: '{n} pasti', ml_one: '1 pasto',
+      gal_why: 'Questo telefono può ordinare da solo ogni nuova foto della galleria: guarda ogni foto prima, sul telefono, e invia solo pasti, medicine e documenti. Tutte le altre foto restano sul telefono.',
+      gal_start: 'Ordina le nuove foto della galleria', gal_stop: 'Smetti di ordinare le foto', gal_on: 'Ordino le nuove foto: {n} archiviate finora.', gal_perm: 'Consenti a Covara di vedere le foto nelle impostazioni di Android.', ml_add: 'Fotografa un pasto',
       ml_why: 'Ogni pasto fotografato con la fotocamera di Covara: i cibi, i nutrienti dalla banca dati USDA, e cosa significano per le medicine di {name}, con cosa bilancia ogni effetto.',
       mo_title: 'Buongiorno', mo_why: 'Ogni mattina {name} tocca Mi sono alzato (o risponde a Come stai, o segna una medicina). Se entro quest’ora non arriva nulla, la famiglia viene avvisata e il telefono di {name} squilla; 30 minuti dopo diventa urgente.',
       mo_off: 'Spento', mo_done: 'Oggi alle {t}', mo_late: 'Ancora nessuna notizia stamattina', mo_wait: 'Atteso entro le {t}',
@@ -546,6 +550,11 @@
     if (M && M.needs && M.needs.length) body += '<ul class="cvh-w">' + M.needs.map(function (x) { return '<li><b class="' + (x.tone === 'high' ? 'bad' : x.tone === 'low' ? 'mid' : '') + '">' + esc(x.text) + '</b></li>'; }).join('') + '</ul>';
     body += ms.map(function (m) { return '<div class="cvm" style="margin:12px 0 18px">' + (m.photo ? '<img class="ph" alt="" src="' + esc(photoUrl(m.photo)) + '">' : '') + (window.CovaraCamera && CovaraCamera.mealHtml ? CovaraCamera.mealHtml(m) : '') + '</div>'; }).join('');
     body += '<button type="button" class="cvx-add" data-a="meal-photo">' + esc(t('ml_add')) + '</button>';
+    /* the installed Android app can sort every new photo in the gallery by itself */
+    var N = null; try { N = window.CovaraNative && CovaraNative.photoStatus ? JSON.parse(CovaraNative.photoStatus() || '{}') : null; } catch (e) { N = null; }
+    if (N) body += '<div class="cvx-sub" style="margin-top:10px">' + esc(t('gal_why')) + '</div>' + (N.on
+      ? '<div class="cvx-sub">' + esc(t('gal_on', { n: N.kept || 0 })) + (N.error === 'permission' ? ' ' + esc(t('gal_perm')) : '') + '</div><button type="button" class="cvx-btn" data-a="gal-off">' + esc(t('gal_stop')) + '</button>'
+      : '<button type="button" class="cvx-btn pri" data-a="gal-on">' + esc(t('gal_start')) + '</button>');
     return block('meals', t('ml_title'), sub, body, top ? (top.severity === 'high' ? 'red' : 'gold') : 'blue');
   }
 
@@ -942,6 +951,18 @@
     }; });
     box.querySelectorAll('[data-me]').forEach(function (b) { b.onclick = async function () { var r = await logPost({ kind: 'me', value: b.getAttribute('data-me') }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } }; });
     box.querySelectorAll('[data-worry]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var n = box.querySelector('#cvWorryNote'); var r = await logPost({ kind: 'worry', value: b.getAttribute('data-worry'), note: n ? n.value.trim() : '' }); if (r.ok) { _data.log = [r.data.entry].concat(_data.log || []); _html = ''; render(); } else b.disabled = false; }; });
+    box.querySelectorAll('[data-a=gal-on]').forEach(function (b) { b.onclick = async function () {
+      b.disabled = true;
+      var st = {}; try { st = JSON.parse(CovaraNative.photoStatus() || '{}'); } catch (e) {}
+      var r = await api('/location/photo-device', { method: 'POST', body: { name: 'Covara photo sorter', replaces: st.device || undefined } }).catch(function () { return { ok: false }; });
+      if (r.ok) { try { CovaraNative.photoStart(base(), r.data.token, r.data.id); } catch (e) {} setTimeout(function () { _html = ''; render(); }, 1500); } else b.disabled = false;
+    }; });
+    box.querySelectorAll('[data-a=gal-off]').forEach(function (b) { b.onclick = async function () {
+      var st = {}; try { st = JSON.parse(CovaraNative.photoStatus() || '{}'); } catch (e) {}
+      try { CovaraNative.photoStop(true); } catch (e) {}
+      if (st.device) api('/location/device/' + encodeURIComponent(st.device), { method: 'DELETE' }).catch(function () {});
+      _html = ''; render();
+    }; });
     box.querySelectorAll('[data-a=meal-photo]').forEach(function (b) { b.onclick = function () { try { CovaraCamera.open('auto'); } catch (e) {} }; });
     box.querySelectorAll('[data-morn]').forEach(function (b) { b.onclick = async function () { var v = b.getAttribute('data-morn'); b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: v === 'off' ? { on: false } : { on: true, by: v } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
     box.querySelectorAll('[data-nw]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: { night_watch: b.getAttribute('data-nw') === 'on' } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
