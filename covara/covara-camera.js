@@ -11,7 +11,8 @@
 (function () {
   'use strict';
   var S = {
-    en: { auto: 'AUTO', h_auto: 'Point at a medicine, a meal or a letter. Covara sorts it.', sorting: 'Reading the photo…', notKept: 'Not a medicine, a meal or a paper, so it is not kept.',
+    en: { compare: 'COMPARE', h_compare: 'Every photo reader reads this photo side by side. Nothing is saved.', comparing: 'Every reader is looking at the photo…', cmpNow: 'IN USE NOW', cmpSecs: '{s} s', cmpFail: 'No answer', cmpHow: 'To switch: in Vercel, remiel-covara-api, Settings, Environment Variables, set COVARA_VISION_MODEL to the reader’s name exactly as shown, then Redeploy.',
+      auto: 'AUTO', h_auto: 'Point at a medicine, a meal or a letter. Covara sorts it.', sorting: 'Reading the photo…', notKept: 'Not a medicine, a meal or a paper, so it is not kept.',
       noReader: 'The photo reader is not switched on yet. Choose what this is:', readerFail: 'The photo reader did not answer. Choose what this is:',
       mealTitle: { b: 'BREAKFAST', l: 'LUNCH', d: 'DINNER', s: 'SNACK' }, nutr: 'In this meal (estimate)', noNutr: 'Nutrients could not be looked up for these foods.', balance: 'What balances it', source: 'Source',
       sev_high: 'IMPORTANT', sev_watch: 'WATCH', sev_info: 'GOOD TO KNOW', noFlags: 'Nothing in this meal is known to affect {name}’s medicines.', noFlagsMe: 'Nothing in this meal is known to affect your medicines.',
@@ -25,7 +26,8 @@
       roomQ: 'Which room is this?', r_kitchen: 'Kitchen', r_bedroom: 'Bedroom', r_bathroom: 'Bathroom', r_living: 'Living room', r_door: 'Front door', r_hall: 'Hall', roomOk: '{room} saved for the room radar.',
       faceOk: 'Today’s photo of {name} is saved.', moodQ: 'How is {name} today?', g: 'Good', o: 'Okay', l: 'Low',
       noCam: 'The camera is not available here. Choose a photo instead.', choose: 'Choose a photo', failed: 'Could not save. Check the internet and try again.' },
-    it: { auto: 'AUTO', h_auto: 'Inquadra una medicina, un pasto o una lettera. Covara la ordina da sola.', sorting: 'Leggo la foto…', notKept: 'Non è una medicina, un pasto o un documento, quindi non viene conservata.',
+    it: { compare: 'CONFRONTA', h_compare: 'Tutti i lettori leggono questa foto fianco a fianco. Non viene salvato nulla.', comparing: 'Tutti i lettori stanno guardando la foto…', cmpNow: 'IN USO ORA', cmpSecs: '{s} s', cmpFail: 'Nessuna risposta', cmpHow: 'Per cambiare: in Vercel, remiel-covara-api, Settings, Environment Variables, imposta COVARA_VISION_MODEL con il nome del lettore esattamente come mostrato, poi Redeploy.',
+      auto: 'AUTO', h_auto: 'Inquadra una medicina, un pasto o una lettera. Covara la ordina da sola.', sorting: 'Leggo la foto…', notKept: 'Non è una medicina, un pasto o un documento, quindi non viene conservata.',
       noReader: 'Il lettore di foto non è ancora attivo. Scegli che cos’è:', readerFail: 'Il lettore di foto non ha risposto. Scegli che cos’è:',
       mealTitle: { b: 'COLAZIONE', l: 'PRANZO', d: 'CENA', s: 'SPUNTINO' }, nutr: 'In questo pasto (stima)', noNutr: 'Non è stato possibile cercare i nutrienti di questi cibi.', balance: 'Cosa lo bilancia', source: 'Fonte',
       sev_high: 'IMPORTANTE', sev_watch: 'ATTENZIONE', sev_info: 'DA SAPERE', noFlags: 'Niente in questo pasto è noto per influire sulle medicine di {name}.', noFlagsMe: 'Niente in questo pasto è noto per influire sulle tue medicine.',
@@ -114,7 +116,8 @@
   }
   function modes() {
     var m = box.querySelector('.modes');
-    m.innerHTML = ['auto', 'meal', 'medicine', 'letter', 'room', 'face'].map(function (k) { return '<button type="button" data-m="' + k + '" aria-pressed="' + (mode === k) + '">' + esc(t(k)) + '</button>'; }).join('');
+    var cmp = false; try { if (/#compare/.test(location.hash || '')) localStorage.setItem('rc:compare', '1'); cmp = localStorage.getItem('rc:compare') === '1'; } catch (e) {}
+    m.innerHTML = ['auto', 'meal', 'medicine', 'letter', 'room', 'face'].concat(cmp ? ['compare'] : []).map(function (k) { return '<button type="button" data-m="' + k + '" aria-pressed="' + (mode === k) + '">' + esc(t(k)) + '</button>'; }).join('');
     m.querySelectorAll('[data-m]').forEach(function (b) { b.onclick = function () { setMode(b.getAttribute('data-m')); }; });
     box.querySelector('.top').textContent = t('title') + ' · ' + t(mode);
   }
@@ -234,7 +237,24 @@
       ask(' ', again(), after);
     });
   }
+  /* every reader on the account, side by side, on the same photo */
+  function cmpHtml(d) {
+    var rs = (d.results || []).slice().sort(function (a, b) { return (b.ok - a.ok) || a.ms - b.ms; });
+    return '<div class="mt">' + esc(t('compare')) + '</div>' + rs.map(function (r) {
+      var what = !r.ok ? t('cmpFail') + (r.error ? ' · ' + r.error : '') : r.type === 'food' ? (r.foods || []).map(function (f) { return f.name + (f.grams ? ' ' + f.grams + ' g' : ''); }).join(', ') || 'food' :
+        r.type === 'medicine' ? 'MEDICINE · ' + ((r.medicine && [r.medicine.name, r.medicine.strength, r.medicine.unit, r.medicine.form].filter(Boolean).join(' ')) || '?') : String(r.type || '').toUpperCase();
+      return '<div class="fl ' + (r.ok ? 'info' : 'high') + '"' + (r.model === d.current ? ' style="border-color:#ffd24d"' : '') + '><h5>' + esc(r.model) + ' · ' + esc(t('cmpSecs', { s: (r.ms / 1000).toFixed(1) })) + (r.model === d.current ? ' · ' + esc(t('cmpNow')) : '') + '</h5><p>' + esc(what) + '</p></div>';
+    }).join('') + '<div class="dis">' + esc(t('cmpHow')) + '</div>';
+  }
   var H2 = {
+    compare: async function (blob) {
+      card(t('comparing'), ''); frame('warn', '…');
+      var id = await upload(blob); if (!id) throw new Error('up');
+      var r = await api('/care/vision/compare', { method: 'POST', body: { photo: id } }).catch(function () { return { ok: false, data: {} }; });
+      if (!r.ok) { card((r.data && r.data.detail) || t('failed'), 'bad'); ask(' ', again(), after); return; }
+      box.classList.add('mealview'); var mv = box.querySelector('.meal'); mv.innerHTML = cmpHtml(r.data); mv.hidden = false; mv.scrollTop = 0;
+      ask(' ', again(), after);
+    },
     meal: async function (blob) {
       ask(t('mealQ'), [{ label: t('m_all'), v: 'all', pri: true }, { label: t('m_some'), v: 'some' }, { label: t('m_none'), v: 'none' }], async function (o) {
         ask(''); card(t('sending'), '');
