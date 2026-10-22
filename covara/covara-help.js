@@ -16,7 +16,7 @@
       sent: 'Your circle has been told. Your position goes to them every 15 seconds.', failed: 'Help could not be sent. Check the internet, or call 911.',
       called: '{name} CALLED FOR HELP', youCalled: 'YOU CALLED FOR HELP', at: '{t}', room: 'in the {room}', fromYou: '{d} from you', acc: 'within {d}', er: 'nearest ER: {name}, {d}',
       coming: '{names} on the way', nobody: 'no one on the way yet', live: 'LIVE {t}', noPos: 'finding position', sharing: 'sharing your position with the circle',
-      onWay: "I'm on my way", call: 'Call', resolve: 'Resolved', allRight: "I'm all right", lead: 'HELP', ok: 'Marked resolved.', youOnWay: 'You are on the way.',
+      onWay: "I'm on my way", call: 'Call', resolve: 'Resolved', allRight: "I'm all right", lead: 'HELP', nowCalled: '{name} called for help', nowYou: 'You called for help', ok: 'Marked resolved.', youOnWay: 'You are on the way.',
       nearBtn: 'Nearby help', firstHelp: 'closest help: {name}, {kind}, {d}', comingD: '{name} on the way, {d}', nearTitle: 'Help near {name}', nearYou: 'Help near you',
       nearSub: 'Closest first, measured from where the phone is now. Call the emergency number first if anyone is in danger.', emerg: 'Call 911', emergNum: '911', callIt: 'Call', dirs: 'Directions', closest: 'CLOSEST HELP',
       nearNone: 'No places found near this spot yet.', nearFail: 'The list of nearby places could not be loaded. Call 911.', nearWait: 'Finding help nearby...', close: 'Close',
@@ -25,7 +25,7 @@
       sent: 'La tua cerchia è stata avvisata. La tua posizione arriva loro ogni 15 secondi.', failed: 'Non è stato possibile inviare l’aiuto. Controlla internet o chiama il 112.',
       called: '{name} HA CHIESTO AIUTO', youCalled: 'HAI CHIESTO AIUTO', at: '{t}', room: 'in {room}', fromYou: 'a {d} da te', acc: 'entro {d}', er: 'pronto soccorso più vicino: {name}, {d}',
       coming: '{names} in arrivo', nobody: 'ancora nessuno in arrivo', live: 'IN DIRETTA {t}', noPos: 'cerco la posizione', sharing: 'condividi la posizione con la cerchia',
-      onWay: 'Sto arrivando', call: 'Chiama', resolve: 'Risolto', allRight: 'Sto bene', lead: 'AIUTO', ok: 'Segnato come risolto.', youOnWay: 'Sei in arrivo.',
+      onWay: 'Sto arrivando', call: 'Chiama', resolve: 'Risolto', allRight: 'Sto bene', lead: 'AIUTO', nowCalled: '{name} ha chiesto aiuto', nowYou: 'Hai chiesto aiuto', ok: 'Segnato come risolto.', youOnWay: 'Sei in arrivo.',
       nearBtn: 'Aiuto vicino', firstHelp: 'aiuto più vicino: {name}, {kind}, {d}', comingD: '{name} in arrivo, a {d}', nearTitle: 'Aiuto vicino a {name}', nearYou: 'Aiuto vicino a te',
       nearSub: 'Dal più vicino, misurato da dove si trova ora il telefono. Se qualcuno è in pericolo, chiama prima il numero di emergenza.', emerg: 'Chiama il 112', emergNum: '112', callIt: 'Chiama', dirs: 'Indicazioni', closest: 'AIUTO PIÙ VICINO',
       nearNone: 'Nessun luogo trovato ancora qui vicino.', nearFail: 'Non è stato possibile caricare i luoghi vicini. Chiama il 112.', nearWait: 'Cerco aiuto qui vicino...', close: 'Chiudi',
@@ -228,7 +228,7 @@
   }
   function paint() {
     if (!tk) { tk = document.createElement('div'); tk.id = 'cvHelpTicker'; tk.setAttribute('role', 'alert'); document.body.appendChild(tk); ac = document.createElement('div'); ac.id = 'cvHelpActs'; document.body.appendChild(ac); }
-    if (!_help.length) { var nm0 = document.getElementById('cvHelpNear'); if (nm0) nm0.remove(); _nearFor = null; tk.classList.remove('on'); ac.classList.remove('on'); document.body.classList.remove('cv-helping'); tk.innerHTML = ''; ac.innerHTML = ''; tk._sig = ''; return; }
+    if (!_help.length) { var nm0 = document.getElementById('cvHelpNear'); if (nm0) nm0.remove(); _nearFor = null; tk.classList.remove('on'); ac.classList.remove('on'); document.body.classList.remove('cv-helping'); tk.innerHTML = ''; ac.innerHTML = ''; tk._sig = ''; nowSync(); return; }
     var h = _help[0], mine = myId(), onWay = (h.responders || []).some(function (x) { return x.id === mine; });
     var first = h.responders && h.responders[0] && h.responders[0].id === mine;
     var text = _help.map(line).join('<span style="padding:0 18px">•</span>');
@@ -241,20 +241,41 @@
       tk.innerHTML = '<div class="tk"><div class="lead">' + esc(t('lead')) + '</div><div class="track">' + text + '<span style="padding:0 46px"></span>' + text + '</div></div>';
       ac.innerHTML = acts;
       ac.querySelectorAll('[data-a]').forEach(function (b) {
-        b.onclick = async function () {
-          var a = b.getAttribute('data-a');
-          if (a === 'way') { b.disabled = true; await api('/care-help/' + encodeURIComponent(h.id) + '/coming', { method: 'POST' }).catch(function () {}); load(true); }
-          else if (a === 'ok') { var r = await api('/care-help/' + encodeURIComponent(h.id) + '/resolve', { method: 'POST' }).catch(function () { return { ok: false }; }); if (r.ok) { if (h.you) unfollow(); try { showToast(t('ok')); } catch (e) {} } load(true); }
-          else if (a === 'map') showOnMap(h, false);
-          else if (a === 'near') openNear(h);
-          else if (a === 'call') {
-            var c = (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).filter(function (x) { return x.care && x.care.userId === h.sender.id; })[0];
-            if (c && typeof runContactQuickAction === 'function') runContactQuickAction('video', c);
-          }
-        };
+        b.onclick = function () { return act(b.getAttribute('data-a'), h, b); };
       });
     }
+    nowSync();
     tk.classList.add('on'); ac.classList.add('on'); document.body.classList.add('cv-helping'); place();
+  }
+  /* the same answers, from the ticker's buttons or from the Now strip */
+  async function act(a, h, b) {
+    if (a === 'way') { b.disabled = true; await api('/care-help/' + encodeURIComponent(h.id) + '/coming', { method: 'POST' }).catch(function () {}); load(true); }
+    else if (a === 'ok') { var r = await api('/care-help/' + encodeURIComponent(h.id) + '/resolve', { method: 'POST' }).catch(function () { return { ok: false }; }); if (r.ok) { if (h.you) unfollow(); try { showToast(t('ok')); } catch (e) {} } load(true); }
+    else if (a === 'map') showOnMap(h, false);
+    else if (a === 'near') openNear(h);
+    else if (a === 'call') {
+      var c = (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).filter(function (x) { return x.care && x.care.userId === h.sender.id; })[0];
+      if (c && typeof runContactQuickAction === 'function') runContactQuickAction('video', c);
+    }
+  }
+  /* the Now strip shows each call for help first, in red */
+  var _nowIds = {};
+  function nowSync() {
+    if (!window.CovaraNow) return;
+    var keep = {}, mine = myId();
+    _help.forEach(function (h) {
+      var id = 'help-' + h.id; keep[id] = 1;
+      var onWay = (h.responders || []).some(function (x) { return x.id === mine; }), nm = String(h.sender.name || '').split(/\s+/)[0];
+      var body = [];
+      if (h.room) body.push(t('room', { room: h.room }));
+      if (!h.you && h.from_you_m != null) body.push(t('fromYou', { d: dist(h.from_you_m) }));
+      body.push((h.responders || []).length ? t('coming', { names: h.responders.map(function (x) { return String(x.name || '').split(/\s+/)[0]; }).join(', ') }) : t('nobody'));
+      var acts = h.you ? [{ label: t('allRight'), primary: true, onClick: function () { return act('ok', h, this); } }, { label: t('nearBtn'), onClick: function () { return act('near', h, this); } }]
+        : [{ label: onWay ? t('youOnWay') : t('onWay'), primary: true, disabled: onWay, onClick: function () { return act('way', h, this); } }, { label: t('call'), onClick: function () { return act('call', h, this); } }, { label: t('nearBtn'), onClick: function () { return act('near', h, this); } }];
+      CovaraNow.push({ id: id, rank: 0, icon: '🚨', lead: t('lead'), title: h.you ? t('nowYou') : t('nowCalled', { name: nm }), body: body.join(' · '), at: h.started_at, actions: acts });
+    });
+    Object.keys(_nowIds).forEach(function (id) { if (!keep[id]) CovaraNow.remove(id); });
+    _nowIds = keep;
   }
 
   /* the Help button: in Covara it calls the whole circle */

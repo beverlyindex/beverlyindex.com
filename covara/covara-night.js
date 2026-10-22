@@ -9,12 +9,12 @@
   'use strict';
   var IT = function () { try { return String(I18n.locale || 'en').slice(0, 2) === 'it'; } catch (e) { return false; } };
   var S = {
-    en: { gm: 'Good morning, {name}', gmSub: 'Tap so your family knows you are all right.', up: "I'm up", thanks: 'Your family knows you are up. Have a good day.',
+    en: { lead: 'GOOD MORNING', gm: 'Good morning, {name}', gmSub: 'Tap so your family knows you are all right.', up: "I'm up", thanks: 'Your family knows you are up. Have a good day.',
       tlTitle: 'What Covara recorded', tlFor: '{name}, {from} to {to}', tlNote: 'Recorded on Covara’s server as it happened. Times are {tz}.', tlNone: 'Nothing was recorded in this time.',
       print: 'Print or save as PDF', share: 'Share', copied: 'Copied. Paste it into a message or an email.', close: 'Close', loading: 'Gathering the timeline...', failed: 'The timeline could not be loaded. Check the internet and try again.',
       notShared: 'Not shared with you: {what}.', loc: 'positions', rooms: 'rooms and sensors',
       s_alert: 'ALERT', s_sensor: 'SENSOR', s_room: 'ROOM', s_phone: 'PHONE', s_care: 'CARE', generated: 'Made {t}' },
-    it: { gm: 'Buongiorno, {name}', gmSub: 'Tocca perché la tua famiglia sappia che stai bene.', up: 'Mi sono alzato', thanks: 'La tua famiglia sa che sei sveglio. Buona giornata.',
+    it: { lead: 'BUONGIORNO', gm: 'Buongiorno, {name}', gmSub: 'Tocca perché la tua famiglia sappia che stai bene.', up: 'Mi sono alzato', thanks: 'La tua famiglia sa che sei sveglio. Buona giornata.',
       tlTitle: 'Cosa ha registrato Covara', tlFor: '{name}, da {from} a {to}', tlNote: 'Registrato sul server di Covara man mano che accadeva. Orari: {tz}.', tlNone: 'In questo periodo non è stato registrato nulla.',
       print: 'Stampa o salva in PDF', share: 'Condividi', copied: 'Copiato. Incollalo in un messaggio o in una email.', close: 'Chiudi', loading: 'Raccolgo la cronologia...', failed: 'Non è stato possibile caricare la cronologia. Controlla internet e riprova.',
       notShared: 'Non condiviso con te: {what}.', loc: 'posizioni', rooms: 'stanze e sensori',
@@ -57,8 +57,23 @@
     ['cvTalkHeadline', 'cvHeadline'].forEach(function (id) { var e = document.getElementById(id); if (e && !e.hidden && e.offsetHeight) top = Math.max(top, e.getBoundingClientRect().bottom + 8); });
     card.style.top = Math.round(top) + 'px';
   }
+  var _dayAt = 0;
+  function dayAt() { if (!_dayAt || new Date(_dayAt).toDateString() !== new Date().toDateString()) _dayAt = Date.now(); return _dayAt; }
   function paint() {
     var show = _m && _m.due;
+    /* through the Now strip when it is there */
+    if (window.CovaraNow) {
+      if (card) card.hidden = true;
+      if (!show) { CovaraNow.remove('morning'); return; }
+      CovaraNow.push({ id: 'morning', rank: 2, icon: '☀', lead: t('lead'), title: t('gm', { name: myFirst() }).replace(/, $/, ''), body: t('gmSub'), at: dayAt(),
+        actions: [{ label: t('up'), primary: true, onClick: async function () {
+          this.disabled = true;
+          var r = await api('/care/morning/ok', { method: 'POST' }).catch(function () { return { ok: false }; });
+          if (r.ok) { _m = r.data.morning; CovaraNow.remove('morning'); try { showToast(t('thanks')); } catch (e) {} try { if (window.CovaraTalk) CovaraTalk.say(t('thanks'), t('thanks')); } catch (e) {} }
+          else this.disabled = false;
+        } }] });
+      return;
+    }
     if (!show) { if (card) card.hidden = true; return; }
     if (!card) {
       card = document.createElement('div'); card.id = 'cvMorning'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', 'Good morning');

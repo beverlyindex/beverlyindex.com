@@ -442,7 +442,25 @@
 
   /* ── the headline: a Talk message, or a reply, at the top of the screen until it is seen ── */
   var hl = null, hlQueue = [];
+  /* through the Now strip when it is there: one card per person, the same three answers */
+  var _hlNow = {};
+  function hlNowSync() {
+    var keep = {};
+    hlQueue.forEach(function (m) {
+      var id = 'talk-' + m.contactId; keep[id] = 1;
+      var who = String(m.name || '').trim().split(/\s+/)[0] || '';
+      var txt = String(m.text || '').replace(MARK, '').replace(/^🎙\s*/, '');
+      var done = function () { hlQueue = hlQueue.filter(function (x) { return x !== m; }); hlNowSync(); };
+      CovaraNow.push({ id: id, rank: 1, icon: '🎙', lead: t('hlTalk') + ' · ' + who, title: '“' + txt + '”', at: m.ts || Date.now(), actions: [
+        { label: '🎙 ' + t('hlTalkBack'), primary: true, onClick: function () { done(); try { focusedContactId = m.contactId; } catch (e) {} var orb = _orb || document.querySelector('.cvn-orb') || document.body; setTimeout(function () { toggle(orb, _cap); }, 150); } },
+        { label: t('hlReply'), onClick: function () { done(); try { SentinelMessaging.openFor(m.contactId); } catch (e) {} } },
+        { label: t('hlGot'), onClick: done }] });
+    });
+    Object.keys(_hlNow).forEach(function (id) { if (!keep[id]) CovaraNow.remove(id); });
+    _hlNow = keep;
+  }
   function headline(m) {
+    if (window.CovaraNow) { hlQueue = hlQueue.filter(function (x) { return x.contactId !== m.contactId; }); hlQueue.unshift(m); if (hl) hl.hidden = true; hlNowSync(); return; }
     if (!hl) {
       hl = document.createElement('div'); hl.id = 'cvTalkHeadline'; hl.setAttribute('role', 'alert');
       hl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 74px);z-index:99990;width:min(560px,calc(100vw - 24px));box-sizing:border-box;padding:12px 14px;border-radius:18px;border:1.5px solid rgba(255,210,77,.75);background:linear-gradient(155deg,rgba(70,130,235,.22),rgba(14,30,78,.42));-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);box-shadow:0 0 26px rgba(255,210,77,.35),0 0 22px rgba(70,150,255,.28),inset 0 1px 0 rgba(255,255,255,.14);color:#f4f7ff;font:500 15px/1.4 var(--nous-font,"Hanken Grotesk",sans-serif);text-shadow:0 1px 2px rgba(2,8,24,.55)';

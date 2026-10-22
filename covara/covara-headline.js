@@ -43,7 +43,31 @@
     else { var tk = document.getElementById('cvHelpTicker'); if (tk && tk.classList.contains('on')) top = tk.getBoundingClientRect().bottom + 8; }
     el.style.top = Math.round(top) + 'px';
   }
+  /* through the Now strip when it is there: each headline is its own card, the same answers as before */
+  var _pushed = {};
+  function seen(h) { _list = _list.filter(function (x) { return x.id !== h.id; }); paint(); SyncEngine.apiFetch('/care/headlines/' + encodeURIComponent(h.id) + '/seen', { method: 'POST' }).catch(function () {}); }
+  function paintNow() {
+    if (el) el.hidden = true;
+    var keep = {};
+    _list.forEach(function (h) {
+      keep['hl-' + h.id] = 1;
+      var acts = [];
+      if (h.action !== 'removed') acts.push({ label: t('show'), primary: true, onClick: async function () { seen(h); try { if (window.CovaraView) { await CovaraView.load(); setTimeout(function () { CovaraView.open(h.kind, h.item_id); }, 300); } } catch (e) {} } });
+      acts.push({ label: t('got'), primary: h.action === 'removed', onClick: function () { seen(h); } });
+      CovaraNow.push({ id: 'hl-' + h.id, rank: 1, icon: h.kind === 'med' ? '💊' : '📅', lead: t('lead'), title: h.headline, body: h.what ? h.what.charAt(0).toUpperCase() + h.what.slice(1) : '', at: h.at, actions: acts });
+    });
+    Object.keys(_pushed).forEach(function (id) { if (!keep[id]) CovaraNow.remove(id); });
+    _pushed = keep;
+    /* HOME hears the newest one, once */
+    var h0 = _list[0];
+    if (h0 && !_spoken[h0.id + h0.what]) {
+      _spoken[h0.id + h0.what] = 1;
+      var words = h0.headline + '.' + (h0.what ? ' ' + h0.what.charAt(0).toUpperCase() + h0.what.slice(1) + '.' : '');
+      try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say(words, words); } catch (e) {}
+    }
+  }
   function paint() {
+    if (window.CovaraNow) { paintNow(); return; }
     var h = _list[0];
     if (!h) { if (el) el.hidden = true; return; }
     if (!el) { el = document.createElement('div'); el.id = 'cvHeadline'; el.setAttribute('role', 'alert'); document.body.appendChild(el); }
