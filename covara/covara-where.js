@@ -251,9 +251,21 @@
     });
   }
   /* The radius the radar spans: the street around HOME at home; out, as far as the nearest health facilities */
+  /* during a call for help: everything near the caller that can answer, from covara-help.js */
+  function helpNear() {
+    var d = _data; if (!d || !d.home || !window.CovaraHelp) return null;
+    try { var hp = CovaraHelp.forPerson(d.home.id); if (!hp) return null; var n = CovaraHelp.near(hp); return { hp: hp, places: (n && n.places) || [], first: CovaraHelp.first(hp) }; } catch (e) { return null; }
+  }
   function spanM() {
     var d = _data;
     if (!d || !d.location) return 150;
+    var hn0 = helpNear();
+    if (hn0 && hn0.places.length) {
+      /* wide enough for the closest few, and always the first place to call */
+      var f0 = 300; hn0.places.slice(0, 4).forEach(function (x) { f0 = Math.max(f0, x.m * 1.2); });
+      if (hn0.first) f0 = Math.max(f0, hn0.first.m * 1.2);
+      return Math.min(8000, f0);
+    }
     if (d.at_home === false) {
       var far = 250, L0 = d.location;
       (d.health || []).slice(0, 3).forEach(function (x) { far = Math.max(far, x.m * 1.18); });
@@ -314,7 +326,8 @@
     x.beginPath(); x.arc(px, py, r, 0, Math.PI * 2); x.strokeStyle = '#d3b577'; x.lineWidth = 2; x.stroke();
   }
   function initials(n) { return String(n || '').trim().split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase(); }
-  var HC = { emergency: '#ff3d5a', hospital: '#ff4f7a', clinic: '#ff8fb1', doctor: '#ffb4c8' };
+  var HC = { emergency: '#ff3d5a', hospital: '#ff4f7a', urgent: '#ff7a9a', clinic: '#ff8fb1', doctor: '#ffb4c8', police: '#5b9cff', fire: '#ff8a3d', pharmacy: '#3ee08f', aed: '#ffd24d' };
+  function kname(k) { try { if (window.CovaraHelp) return CovaraHelp.kindName(k); } catch (e) {} return t(k || 'doctor'); }
 
   function drawMacro(cx, cy, R, now, alpha) {
     ensureBox();
@@ -357,6 +370,7 @@
     if (!reduce) sweep(x, c, c, R - 3, now, true);
     /* where home is, when HOME is out and it fits on the radar */
     var hn = d.member ? first(d.member.home_name) : '';
+    var hlp = helpNear();
     if (d.home_spot && d.at_home === false) {
       var hp = at(d.home_spot.lat, d.home_spot.lon), hr = Math.hypot(hp.x - c, hp.y - c);
       if (hr < R * 0.9) { x.beginPath(); x.arc(hp.x, hp.y, 4, 0, Math.PI * 2); x.fillStyle = '#9fd8ff'; x.fill(); text(x, (d.member ? t('homeOf', { home: hn }) : t('home')).toUpperCase(), hp.x, hp.y - 10, '700 ' + Math.max(8, fs - 1) + 'px ' + MONO, '#9fd8ff'); }
@@ -366,21 +380,25 @@
       var rp = at(d.with_home.lat, d.with_home.lon), rr = Math.hypot(rp.x - c, rp.y - c);
       if (rr < R * 0.9) { x.beginPath(); x.arc(rp.x, rp.y, Math.max(6, R * 0.06), 0, Math.PI * 2); x.fillStyle = '#d3b577'; x.fill(); x.strokeStyle = '#fff4d6'; x.lineWidth = 1.2; x.stroke(); text(x, initials(d.member.home_name), rp.x, rp.y + 0.5, '800 ' + Math.max(7, Math.round(R * 0.05)) + 'px ' + SANS, '#1a1200'); }
     }
-    /* the nearest health facilities, when HOME is out */
-    (d.at_home === false ? (d.health || []) : []).slice(0, 5).forEach(function (f, i) {
+    /* the nearest health facilities, when HOME is out; during a call for help, every place near the caller that can answer */
+    var hq = hlp, fac = hq && hq.places.length ? hq.places.slice(0, 10) : d.at_home === false ? (d.health || []).slice(0, 5) : [];
+    /* the first place to call comes first, so its name is always written */
+    if (hq && hq.first) fac = [hq.first].concat(fac.filter(function (f) { return f.id !== hq.first.id; }));
+    fac.forEach(function (f, i) {
       var p = at(f.lat, f.lon), rr = Math.hypot(p.x - c, p.y - c); if (rr > R * 0.92) return;
       var col = HC[f.kind] || HC.doctor, lit = reduce ? 1 : sweepLit(now, Math.atan2(p.y - c, p.x - c));
       var g = x.createRadialGradient(p.x, p.y, 0, p.x, p.y, 10 + 6 * lit); g.addColorStop(0, col); g.addColorStop(.4, col + '88'); g.addColorStop(1, col + '00');
       x.fillStyle = g; x.beginPath(); x.arc(p.x, p.y, 10 + 6 * lit, 0, Math.PI * 2); x.fill();
       x.beginPath(); x.arc(p.x, p.y, 3.6, 0, Math.PI * 2); x.fillStyle = '#fff'; x.fill();
       var clearOf = Math.hypot(p.x - c, p.y - c) > R * 0.24 && p.y > R * 0.3 && p.y < c + R * 0.36;
+      if (hq && hq.first && f.id === hq.first.id) { x.beginPath(); x.arc(p.x, p.y, 9, 0, Math.PI * 2); x.strokeStyle = '#ffd24d'; x.lineWidth = 2; x.stroke(); }
       if (i < 3 && clearOf) {
         /* the words go outward, away from HOME, and stop at the rim */
         var right = p.x >= c, half = chord(R - 8, c, p.y) / 2, room = right ? (c + half) - (p.x + 8) : (p.x - 8) - (c - half);
         if (room > 40) {
           var f1 = '700 ' + Math.max(9, fs) + 'px ' + SANS, f2 = '600 ' + Math.max(8, fs - 2) + 'px ' + MONO, ax = p.x + (right ? 8 : -8), al = right ? 'left' : 'right';
           text(x, fit(x, f.name, f1, room), ax, p.y - 1, f1, '#ffe3ea', al);
-          text(x, fit(x, t(f.kind || 'doctor').toUpperCase() + ' · ' + dist(f.m), f2, room), ax, p.y + fs + 1, f2, col, al);
+          text(x, fit(x, kname(f.kind).toUpperCase() + ' · ' + dist(f.m), f2, room), ax, p.y + fs + 1, f2, col, al);
         }
       }
     });
@@ -410,14 +428,14 @@
       : d.at_home === true ? t('atHome') : d.at_home === false ? (t('out') + (d.from_home_m != null ? ', ' + t('fromHome', { d: dist(d.from_home_m) }) : '')) : '';
     var line3 = d.member ? (d.with_home ? (d.with_home.with ? t('withHome', { home: hn }) : t('homeAway', { home: hn, d: dist(d.with_home.m) })) : '') : withL.length ? (withL.some(function (m) { return m.you; }) && withL.length === 1 ? t('withYou') : t('with', { name: withL.map(function (m) { return m.you ? (IT() ? 'te' : 'you') : first(m.name); }).join(', ') }))
       : d.closest ? (d.closest.you ? t('nearestYou', { d: dist(d.closest.m) }) : t('nearest', { name: first(d.closest.name), d: dist(d.closest.m) })) : '';
-    var nf = d.at_home === false && d.health && d.health[0] && !d.inside ? d.health[0] : null;
+    var nf = hlp && hlp.first ? hlp.first : d.at_home === false && d.health && d.health[0] && !d.inside ? d.health[0] : null;
     var line4 = nf ? nf.name : '';
     var y = c + R * (line4 ? 0.44 : 0.5);
     x.fillStyle = 'rgba(8,10,16,0.62)'; x.fillRect(0, y - fb * 0.9, D, fb + fs * (line4 ? 3.4 : 2) + 22);
     text(x, first(name) + '  ·  ' + ago(d.location.at), c, y, '700 ' + fb + 'px ' + SANS, '#f0eef5');
     if (where) text(x, fit(x, where, '600 ' + fs + 'px ' + MONO, chord(R - 10, c, y + fb) - 16), c, y + fb * 0.6 + fs * 0.9, '600 ' + fs + 'px ' + MONO, d.at_home === false ? '#fbbf24' : '#c7d2e2');
     if (line3) text(x, line3, c, y + fb * 0.6 + fs * 2.3, '600 ' + fs + 'px ' + MONO, withL.length ? '#5eead4' : '#9fb4e2');
-    if (line4) { var y4 = y + fb * 0.6 + fs * 3.7, f4 = '700 ' + fs + 'px ' + MONO, tail = ' · ' + t(nf.kind || 'doctor').toUpperCase() + ' ' + dist(nf.m); x.font = f4; text(x, fit(x, line4, f4, chord(R - 10, c, y4 + fs) - x.measureText(tail).width - 16) + tail, c, y4, f4, HC[nf.kind] || HC.doctor); }
+    if (line4) { var y4 = y + fb * 0.6 + fs * 3.7, f4 = '700 ' + fs + 'px ' + MONO, tail = hlp && hlp.first ? ' · ' + dist(nf.m) : ' · ' + kname(nf.kind).toUpperCase() + ' ' + dist(nf.m); x.font = f4; text(x, fit(x, line4, f4, chord(R - 10, c, y4 + fs) - x.measureText(tail).width - 16) + tail, c, y4, f4, HC[nf.kind] || HC.doctor); }
     rim(x, c, c, R);
     if (mapState === 'ready') text(x, '© OpenStreetMap · OpenFreeMap', c, D - Math.max(10, R * 0.07), '500 7.5px ' + SANS, 'rgba(240,238,245,.75)');
   }
@@ -582,6 +600,11 @@
     var R = dr.r * 0.74;
     var cx = Math.max(R + 10, Math.min(dr.cx - dr.r - R - W * 0.03, R + W * 0.05));
     var cy = dr.cy + (dr.r - R) * 0.6;
+    /* during a call for help the red ticker runs under the top buttons: the radar sits just below it, whole */
+    try {
+      var tk = document.body.classList.contains('cv-helping') && document.getElementById('cvHelpTicker'), cvr = ctx.canvas.getBoundingClientRect();
+      if (tk) { var tb = tk.getBoundingClientRect().bottom - cvr.top + 8; if (cy - R < tb) cy = tb + R; }
+    } catch (e) {}
     drawMacro(cx, cy, R, now, dr.alpha || 0.5);
     window._dreamWhereHit = { x: cx - R, y: cy - R, w: R * 2, h: R * 2, cx: cx, cy: cy, r: R };
     var r2 = dr.r * 0.5, cx2 = cx, cy2 = cy + R + r2 + 10;
