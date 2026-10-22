@@ -12,11 +12,11 @@
   var STR = {
     en: {
       roleTitle: 'Who is this phone for?',
-      roleHome: 'For me', roleHomeSub: 'My family looks after me',
+      roleHome: 'For me', roleHomeSub: 'My team looks after me',
       roleAway: 'For someone I look after', roleAwaySub: 'A parent, a partner, a friend',
-      linkHome: 'Show a code for my family', linkAway: 'Type a code',
+      linkHome: 'Show a code for my team', linkAway: 'Type a code',
       myLocTitle: 'WHO CAN SEE WHERE YOU ARE', myLocHome: 'Only {name}', myLocCircle: 'The whole circle', myLocNone: 'Nobody', myLocSaved: 'Saved. Only the people you chose can see where you are.',
-      codeTitle: 'Show this to your family',
+      codeTitle: 'Show this to your team',
       codeSub: 'One code for everyone you give it to. Each person who uses it joins your circle at once, and you can call each other straight away. Good for 24 hours, until {date}.',
       inviteHint: 'Good for 24 hours, until {date}. Everyone who uses it joins at once.',
       codeShare: 'Send the link', codeCopied: 'Link copied. Paste it in a message.', codeEnd: 'End this code', codeEnded: 'Code ended. Nobody new can join with it.',
@@ -37,17 +37,17 @@
       asks: '{name} asks to look after you. Tap their sphere.',
       offline: 'Covara needs the internet for this. Try again in a moment.',
       snTitle: 'Room sensors (falls, sleep, breathing)', snHelp: 'A 60 GHz radar sensor sees without a camera. Beside the bed it follows sleep, breathing and heart rate; on a ceiling it sees a fall and where they are in the room, and rings everyone who sees falls at once. Name the room, choose where it goes, tap Pair, and type the code on the sensor\u2019s setup page.', snNone: 'No room sensor yet.', snAdd: 'Add a room sensor', snNamePh: 'Room name, for example Bathroom', snRemove: 'Remove', snKeyOnce: 'Put this line in the sensor now. It is shown only once:', snCopy: 'Copy', snOn: 'Watching', snQuiet: 'Not heard from in a while', snNever: 'Waiting for its first report', snFall: 'Saw a fall in the last hour', snKind: 'Where it goes', k_bed: 'Bedside: sleep, breathing and heart rate', k_fall: 'Ceiling: falls, and where they are in the room', k_room: 'Other: someone in the room, or a door', snPair: 'Pair a Covara sensor', snKeyAdv: 'Get a key line instead (for your own device)', snCode: 'On the sensor\u2019s setup page, enter this code within 15 minutes:', snNeedName: 'Type the room name first.', kb_bed: 'Bedside', kb_fall: 'Ceiling', kb_room: 'Room',
-      famTitle: 'My family in Covara', lookTitle: 'Who I look after', famEmpty: 'Nobody yet. Show your code to your family.', lookEmpty: 'Nobody yet. Type the code from their phone.', sees: 'Sees:', seesNothing: 'nothing yet',
+      famTitle: 'My team in Covara', lookTitle: 'Who I look after', famEmpty: 'Nobody yet. Show your code to your team.', lookEmpty: 'Nobody yet. Type the code from their phone.', sees: 'Sees:', seesNothing: 'nothing yet',
       sh: { location: 'Where I am', rooms: 'Which room', falls: 'If I fall', care: 'Medicines and visits', mood: 'How I feel', activity: 'If I stop moving' },
       rel: { child: 'Son or daughter', partner: 'Partner', sibling: 'Brother or sister', friend: 'Friend', carer: 'Carer', doctor: 'Doctor' }
     },
     it: {
       roleTitle: 'Per chi è questo telefono?',
-      roleHome: 'Per me', roleHomeSub: 'La mia famiglia si prende cura di me',
+      roleHome: 'Per me', roleHomeSub: 'Il mio team si prende cura di me',
       roleAway: 'Per una persona di cui mi prendo cura', roleAwaySub: 'Un genitore, un partner, un amico',
-      linkHome: 'Mostra un codice per la famiglia', linkAway: 'Scrivi un codice',
+      linkHome: 'Mostra un codice per il team', linkAway: 'Scrivi un codice',
       myLocTitle: 'CHI PU\u00d2 VEDERE DOVE SEI', myLocHome: 'Solo {name}', myLocCircle: 'Tutta la cerchia', myLocNone: 'Nessuno', myLocSaved: 'Salvato. Solo le persone che hai scelto possono vedere dove sei.',
-      codeTitle: 'Mostra questo alla tua famiglia',
+      codeTitle: 'Mostra questo al tuo team',
       codeSub: 'Un codice per tutti quelli a cui lo dai. Chi lo usa entra subito nella tua cerchia e potete chiamarvi subito. Vale 24 ore, fino al {date}.',
       inviteHint: 'Vale 24 ore, fino al {date}. Chi lo usa entra subito.',
       codeShare: 'Invia il link', codeCopied: 'Link copiato. Incollalo in un messaggio.', codeEnd: 'Termina questo codice', codeEnded: 'Codice terminato. Nessun altro può entrare con questo.',
@@ -68,7 +68,7 @@
       asks: '{name} chiede di prendersi cura di te. Tocca la sua sfera.',
       offline: 'Covara ha bisogno di internet. Riprova tra poco.',
       snTitle: 'Sensori nelle stanze (cadute, sonno, respiro)', snHelp: 'Un sensore radar a 60 GHz vede senza telecamera. Accanto al letto segue sonno, respiro e battito; sul soffitto vede una caduta e dove si trova nella stanza, e avvisa subito chi vede le cadute. Dai un nome alla stanza, scegli dove va, tocca Abbina e scrivi il codice nella pagina di configurazione del sensore.', snNone: 'Ancora nessun sensore.', snAdd: 'Aggiungi un sensore', snNamePh: 'Nome della stanza, per esempio Bagno', snRemove: 'Rimuovi', snKeyOnce: 'Inserisci ora questa riga nel sensore. Viene mostrata una sola volta:', snCopy: 'Copia', snOn: 'Attivo', snQuiet: 'Nessun segnale da un po\u2019', snNever: 'In attesa del primo segnale', snFall: 'Ha visto una caduta nell\u2019ultima ora', snKind: 'Dove va', k_bed: 'Accanto al letto: sonno, respiro e battito', k_fall: 'Soffitto: cadute, e dove si trova nella stanza', k_room: 'Altro: qualcuno nella stanza, o una porta', snPair: 'Abbina un sensore Covara', snKeyAdv: 'Ottieni invece una riga chiave (per un tuo dispositivo)', snCode: 'Nella pagina di configurazione del sensore, inserisci questo codice entro 15 minuti:', snNeedName: 'Scrivi prima il nome della stanza.', kb_bed: 'Letto', kb_fall: 'Soffitto', kb_room: 'Stanza',
-      famTitle: 'La mia famiglia in Covara', lookTitle: 'Di chi mi prendo cura', famEmpty: 'Ancora nessuno. Mostra il codice alla tua famiglia.', lookEmpty: 'Ancora nessuno. Scrivi il codice del suo telefono.', sees: 'Vede:', seesNothing: 'ancora niente',
+      famTitle: 'Il mio team in Covara', lookTitle: 'Di chi mi prendo cura', famEmpty: 'Ancora nessuno. Mostra il codice al tuo team.', lookEmpty: 'Ancora nessuno. Scrivi il codice del suo telefono.', sees: 'Vede:', seesNothing: 'ancora niente',
       sh: { location: 'Dove sono', rooms: 'In quale stanza', falls: 'Se cado', care: 'Medicine e visite', mood: 'Come sto', activity: 'Se non mi muovo' },
       rel: { child: 'Figlio o figlia', partner: 'Partner', sibling: 'Fratello o sorella', friend: 'Amico', carer: 'Badante', doctor: 'Medico' }
     }

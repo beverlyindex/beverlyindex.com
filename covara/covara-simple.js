@@ -11,22 +11,22 @@
   'use strict';
   var IT = function () { try { return String(I18n.locale || 'en').slice(0, 2) === 'it'; } catch (e) { return false; } };
   var S = {
-    en: { care: 'Care', camera: 'Camera', words: 'Words', messages: 'Messages', me: 'Me', callFamily: 'Call family', meTitle: 'Me',
+    en: { care: 'Care', camera: 'Camera', words: 'Words', messages: 'Messages', me: 'Me', callFamily: 'Call team', meTitle: 'Me',
       settings: 'Settings', settingsSub: 'Language, sound, your name and picture',
       calm: 'Calm', calmSub: 'Larger words, less movement', on: 'On', off: 'Off',
       share: 'Share with doctor', shareSub: 'A private link to what the doctor needs',
       add: 'Add someone', addSub: 'Family, a carer or a doctor',
       signOut: 'Sign out', signOutSub: 'Leave Covara on this phone',
-      simpleFor: 'Simple screen for {name}', simpleSub: '{name} sees only the next thing to do, the family, Help, TALK and Words. {name} cannot change this.',
+      simpleFor: 'Simple screen for {name}', simpleSub: '{name} sees only the next thing to do, the team, Help, TALK and Words. {name} cannot change this.',
       simpleFail: 'Could not change it. Check the internet and try again.', close: 'Close',
       next: 'Next: {what} at {time}', nowDo: 'Now: {what}, {time}', nothing: 'Nothing more today', visit: 'Visit' },
-    it: { care: 'Cure', camera: 'Foto', words: 'Parole', messages: 'Messaggi', me: 'Io', callFamily: 'Chiama la famiglia', meTitle: 'Io',
+    it: { care: 'Cure', camera: 'Foto', words: 'Parole', messages: 'Messaggi', me: 'Io', callFamily: 'Chiama il team', meTitle: 'Io',
       settings: 'Impostazioni', settingsSub: 'Lingua, suoni, il tuo nome e la tua foto',
       calm: 'Calma', calmSub: 'Parole più grandi, meno movimento', on: 'Sì', off: 'No',
       share: 'Condividi col medico', shareSub: 'Un link privato con ciò che serve al medico',
       add: 'Aggiungi qualcuno', addSub: 'Famiglia, un assistente o un medico',
       signOut: 'Esci', signOutSub: 'Lascia Covara su questo telefono',
-      simpleFor: 'Schermata semplice per {name}', simpleSub: '{name} vede solo la prossima cosa da fare, la famiglia, Aiuto, PARLA e Parole. {name} non può cambiarlo.',
+      simpleFor: 'Schermata semplice per {name}', simpleSub: '{name} vede solo la prossima cosa da fare, il team, Aiuto, PARLA e Parole. {name} non può cambiarlo.',
       simpleFail: 'Non è stato possibile cambiarlo. Controlla internet e riprova.', close: 'Chiudi',
       next: 'Dopo: {what} alle {time}', nowDo: 'Ora: {what}, {time}', nothing: 'Niente altro oggi', visit: 'Visita' }
   };
