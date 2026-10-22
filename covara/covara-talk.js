@@ -436,9 +436,20 @@
     SentinelMessaging.sendTo(c.id, MARK + text).then(function (ok) { if (!ok) say(t('talkFail', { who: who })); }).catch(function () { say(t('talkFail', { who: who })); });
   }
   function heardWords(q) {
-    if (_to) { var c = _to; _to = null; sendTalk(c, q); return; }
-    /* HOME asking for something ("I want pancakes for breakfast tomorrow at 9") goes to the family */
-    try { if (window.CovaraPlan && CovaraPlan.isAsk(q)) { CovaraPlan.ask(q).then(function (a) { if (!a) { var x = answer(q); say('\u201c' + q + '\u201d: ' + x, x); } }); return; } } catch (e) {}
+    /* HOME asking for something ("I want pancakes for breakfast tomorrow at 9") goes to the team, or, with one of
+       the team's faces tapped first, to that person; it waits on HOME's day until they answer */
+    var c0 = _to; _to = null;
+    try {
+      if (window.CovaraPlan && CovaraPlan.isAsk(q) && (!c0 || (c0.care && c0.care.side === 'away' && c0.care.userId))) {
+        CovaraPlan.ask(q, false, c0 ? c0.care.userId : undefined).then(function (a) {
+          if (a) return;
+          if (c0) { sendTalk(c0, q); return; }
+          var x = answer(q); say('\u201c' + q + '\u201d: ' + x, x);
+        });
+        return;
+      }
+    } catch (e) {}
+    if (c0) { sendTalk(c0, q); return; }
     var a = answer(q); say('“' + q + '”: ' + a, a); offerButtons();
   }
 

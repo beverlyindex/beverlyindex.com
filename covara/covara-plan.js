@@ -60,6 +60,8 @@
   async function api(path, o) { var r = await SyncEngine.apiFetch(path, Object.assign({ method: 'GET' }, o || {})); return { ok: r.ok, status: r.status, data: await r.json().catch(function () { return {}; }) }; }
   function hm(ms) { try { return new Date(ms).toLocaleTimeString(IT() ? 'it' : 'en-US', { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
   function hhmmTo(s) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); if (!m) return ''; var d = new Date(); d.setHours(+m[1], +m[2], 0, 0); return hm(d.getTime()); }
+  /* when an ask is for, in HOME's own language (the server writes English) */
+  function whenOf(a) { if (!a || !a.at) return ''; try { return new Date(a.at).toLocaleString(IT() ? 'it' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
   function toast(s) { try { showToast(s); } catch (e) {} }
   function first(s) { return String(s || '').trim().split(/\s+/)[0] || ''; }
   var PLAN = ['meal', 'work', 'task'];
@@ -374,7 +376,7 @@
       var to = (sheet.querySelector('[data-to][aria-pressed=true]') || {}).getAttribute ? sheet.querySelector('[data-to][aria-pressed=true]').getAttribute('data-to') : '';
       var a = await ask(v, true, to);
       if (!a) { b.disabled = false; sheet.querySelector('.pl-err').textContent = t('failed'); return; }
-      sheet.querySelector('[data-sent]').innerHTML = '<div class="pl-sent">✅ ' + esc(a.to ? t('sentTo', { name: a.to.name }) : t('askSent')) + ':<br><b>' + esc(a.title) + '</b>' + (a.when ? ', ' + esc(a.when) : '') + '</div>';
+      sheet.querySelector('[data-sent]').innerHTML = '<div class="pl-sent">✅ ' + esc(a.to ? t('sentTo', { name: a.to.name }) : t('askSent')) + ':<br><b>' + esc(a.title) + '</b>' + (whenOf(a) ? ', ' + esc(whenOf(a)) : '') + '</div>';
       setTimeout(function () { if (_open && _view === 'ask') { _view = 'day'; paintDay(); } }, 2600);
     };
     if (!_open) show();
@@ -398,20 +400,29 @@
   async function ask(text, quiet, to) {
     var s = subject(); if (!s || !authed()) return null;
     if (to === undefined) { var n = named(text); to = n ? n.id : ''; }
-    var body = { text: String(text).slice(0, 300) }; if (to) body.to = to;
+    var body = { text: String(text).slice(0, 300), lang: IT() ? 'it' : 'en' }; if (to) body.to = to;
     var r = await api('/care/asks' + q(s), { method: 'POST', body: JSON.stringify(body) }).catch(function () { return { ok: false }; });
     if (!r.ok) return null;
     var a = r.data.ask; _asks.unshift(a);
     if (!quiet) {
       var lead = a.to ? t('toOne', { name: a.to.name }) : t('toFamily');
-      var say = lead + ' ' + (a.kind === 'meal' ? a.title + (a.when ? ', ' + a.when : '') + '.' : '');
-      try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say((a.to ? t('sentTo', { name: a.to.name }) : t('askSent')) + ': ' + a.title + (a.when ? ', ' + a.when : ''), say); } catch (e) {}
+      var say = lead + ' ' + (a.kind === 'meal' ? a.title + (whenOf(a) ? ', ' + whenOf(a) : '') + '.' : '');
+      try { if (window.CovaraTalk && CovaraTalk.say) CovaraTalk.say((a.to ? t('sentTo', { name: a.to.name }) : t('askSent')) + ': ' + a.title + (whenOf(a) ? ', ' + whenOf(a) : ''), say); } catch (e) {}
     }
     return a;
   }
   /* TALK: is this HOME asking for something? */
-  var WANT = /\b(i want|i really want|i'?d (really )?like|i would (really )?like|i'?d love|can i (please )?have|could i (please )?have|may i have|i feel like having|please make me|vorrei|voglio|mi piacerebbe|posso avere|potrei avere|mi prepari|mi fai)\b/i;
-  function isAsk(text) { return role() === 'home' && WANT.test(String(text || '')); }
+  /* the same ways of asking the server understands: "I'd like", "can you make me", "ask Vincent for", "vorrei",
+     "mi porti", "chiedi a Vincent di portarmi" ... (phones write "I'd" with a curly apostrophe) */
+  var WANT = new RegExp('\\b(?:' + [
+    "i(?:\\s+would|'d)\\s+(?:really\\s+|so\\s+)?(?:like|love)", "i\\s+(?:really\\s+)?want", "i\\s+need", "i'?m\\s+hungry\\s+for", "i\\s+feel\\s+like",
+    "(?:can|could|may)\\s+i\\s+(?:please\\s+)?(?:have|get)", "(?:can|could|would|will)\\s+(?:you|someone|somebody)\\s+(?:please\\s+)?(?:make|bring|get|cook|buy)", "please\\s+(?:make|bring|get|cook)",
+    "ask\\s+(?:my\\s+team|the\\s+team|everyone|\\w+)\\s+(?:for|to\\s+(?:make|bring|get|cook|buy)|if\\s+i\\s+can\\s+have)",
+    "vorrei", "voglio", "mi\\s+piacerebbe", "ho\\s+voglia\\s+di", "mi\\s+va", "(?:posso|potrei)\\s+avere", "mi\\s+(?:fai|prepari|porti|cucini|compri|faresti|porteresti|prepareresti)",
+    "(?:puoi|potresti)\\s+(?:farmi|portarmi|prepararmi|cucinarmi|comprarmi)", "chiedi\\s+a\\s+\\w+"
+  ].join('|') + ')\\b', 'i');
+  function norm(text) { return String(text || '').replace(/[‘’ʼ`]/g, "'").normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function isAsk(text) { return role() === 'home' && WANT.test(norm(text)); }
 
   /* ── the Now card: HOME is reminded; the team sees what HOME asks; HOME sees the answer ── */
   var _snooze = {}, _shown = {};
@@ -439,7 +450,7 @@
         var nid = 'askw-' + a.id, now = Date.now();
         if ((_snooze[nid] || 0) > now || !(now - a.created_at > 45 * 60000 || (a.at && a.at - now < 3600000))) return;
         keep[nid] = 1;
-        CovaraNow.push({ id: nid, rank: 1, icon: '\u23f3', lead: t('leadAsked'), title: t('noAnswer', { name: a.to.name }), body: a.title + (a.when ? ', ' + a.when : ''), at: a.created_at,
+        CovaraNow.push({ id: nid, rank: 1, icon: '\u23f3', lead: t('leadAsked'), title: t('noAnswer', { name: a.to.name }), body: a.title + (whenOf(a) ? ', ' + whenOf(a) : ''), at: a.created_at,
           actions: [{ label: t('askAll'), primary: true, onClick: async function () {
             this.disabled = true;
             var r = await api('/care/asks/' + encodeURIComponent(a.id) + '/widen', { method: 'POST' }).catch(function () { return { ok: false }; });
@@ -451,7 +462,7 @@
         var id = 'ask-' + a.id; keep[id] = 1;
         var who = a.answered ? a.answered.by.name : '';
         CovaraNow.push({ id: id, rank: 1, icon: a.status === 'yes' ? '✅' : '💬', lead: t('leadAnswer'), title: a.status === 'yes' ? t('saidYes', { name: who }) : t('saidNo', { name: who }),
-          body: (a.status === 'yes' && a.kind === 'meal' ? a.title + (a.when ? ', ' + a.when : '') + '. ' : '') + (a.note || (a.status === 'no' ? '“' + a.text + '”' : '')),
+          body: (a.status === 'yes' && a.kind === 'meal' ? a.title + (whenOf(a) ? ', ' + whenOf(a) : '') + '. ' : '') + (a.note || (a.status === 'no' ? '“' + a.text + '”' : '')),
           at: (a.answered && a.answered.at) || a.created_at, actions: [{ label: t('got'), primary: true, onClick: function () { a.seen_at = Date.now(); CovaraNow.remove(id); api('/care/asks/' + encodeURIComponent(a.id) + '/seen', { method: 'POST' }).catch(function () {}); } }] });
         if (!_shown[id]) { _shown[id] = 1; var w = a.status === 'yes' ? t('saidYes', { name: who }) + '. ' + (a.kind === 'meal' ? a.title + '.' : '') : t('saidNo', { name: who }) + '.'; try { if (window.CovaraTalk && CovaraTalk.say) { CovaraTalk.say(w, w + (a.note ? ' ' + a.note : '')); var b2 = document.getElementById('cvTalkBubble'); if (b2) b2.hidden = true; } } catch (e) {} }
       });
@@ -464,14 +475,14 @@
           var r = await api('/care/asks/' + encodeURIComponent(a.id) + '/answer', { method: 'POST', body: JSON.stringify({ answer: ans }) }).catch(function () { return { ok: false, status: 0 }; });
           if (r.ok || r.status === 409) {
             a.status = (r.data && r.data.ask && r.data.ask.status) || ans; CovaraNow.remove(id);
-            if (r.ok && ans === 'yes' && a.kind === 'meal') toast(t('planned', { what: a.title + (a.when ? ', ' + a.when : '') }));
+            if (r.ok && ans === 'yes' && a.kind === 'meal') toast(t('planned', { what: a.title + (whenOf(a) ? ', ' + whenOf(a) : '') }));
             await load(); refreshView();
           } else if (btn) btn.disabled = false;
         };
         var acts = [{ label: a.kind === 'meal' && a.at ? t('yesPlan') : t('yes'), primary: true, onClick: function () { answer('yes', this); } }, { label: t('notNow'), onClick: function () { answer('no', this); } }];
         if (s.contact) acts.push({ label: t('reply'), onClick: function () { try { runContactQuickAction('sms', s.contact); } catch (e) {} } });
         CovaraNow.push({ id: id, rank: 1, icon: '🙋', lead: t('leadAsk'), title: a.to ? t('asksYou', { name: a.by.name || s.name }) : t('asks', { name: a.by.name || s.name }),
-          body: (a.kind === 'meal' ? a.title + (a.when ? ', ' + a.when : '') + '. ' : '') + '“' + a.text + '”', at: a.created_at, actions: acts });
+          body: (a.kind === 'meal' ? a.title + (whenOf(a) ? ', ' + whenOf(a) : '') + '. ' : '') + '“' + a.text + '”', at: a.created_at, actions: acts });
       });
     }
     /* cards no longer needed go */
