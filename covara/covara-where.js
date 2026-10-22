@@ -19,6 +19,8 @@
       addSensor: 'Rooms appear once a room sensor is added: Settings, Room sensors.', outRooms: '{first} is out of the house.', home: 'Home', ago: '{t} ago', now: 'now',
       emergency: 'Emergency', hospital: 'Hospital', clinic: 'Clinic', doctor: 'Doctor', fall: 'FALL', here: 'HERE',
       atHomeOf: 'At {home}\'s home', fromHomeOf: '{d} from {home}\'s home', withHome: 'With {home}', homeAway: '{home} is {d} away', homeOf: '{home}\'s home', memberNoShare: '{first} has not shared where they are with you.', memberRooms: 'Rooms are watched in {home}\'s home.',
+      driveTo: 'Drive to {name}', driveToTold: '{name} has been told you are coming, about {n} minutes away.', driveToNo: '{name} has not shared where they are with you, so Covara cannot give directions.',
+      driving: 'Driving', drivingTo: 'Driving to {name}, about {t}',
       moving: 'MOVING NOW', still: 'STILL', stillFor: 'STILL · {t}', heardBy: '{first}\'s phone · {t}', lastHeard: '{first}\'s phone last heard the room {t}',
       tapListen: 'Tap here to let this phone listen to the room for movement.', listenStarting: 'Starting to listen to the room...', listenDenied: 'Bluetooth was not allowed. Tap here to ask again.',
       installApp: 'Open Remiel: Covara in the Android app on {first}\'s phone to listen to the room.', notListening: '{first}\'s phone is not listening to the room yet.', learning: 'LISTENING · LEARNING THE ROOM' },
@@ -28,6 +30,8 @@
       addSensor: 'Le stanze appaiono quando si aggiunge un sensore: Impostazioni, Sensori delle stanze.', outRooms: '{first} è fuori casa.', home: 'Casa', ago: '{t} fa', now: 'adesso',
       emergency: 'Pronto soccorso', hospital: 'Ospedale', clinic: 'Clinica', doctor: 'Medico', fall: 'CADUTA', here: 'QUI',
       atHomeOf: 'A casa di {home}', fromHomeOf: 'a {d} dalla casa di {home}', withHome: 'Con {home}', homeAway: '{home} \u00e8 a {d}', homeOf: 'Casa di {home}', memberNoShare: '{first} non condivide con te dove si trova.', memberRooms: 'Le stanze sono quelle della casa di {home}.',
+      driveTo: 'Vai da {name}', driveToTold: '{name} sa che stai arrivando, tra circa {n} minuti.', driveToNo: '{name} non ha condiviso con te dove si trova, quindi Covara non può darti indicazioni.',
+      driving: 'Alla guida', drivingTo: 'Alla guida verso {name}, arrivo verso le {t}',
       moving: 'IN MOVIMENTO', still: 'FERMO', stillFor: 'FERMO · {t}', heardBy: 'Telefono di {first} · {t}', lastHeard: 'Il telefono di {first} ha sentito la stanza {t}',
       tapListen: 'Tocca qui perché questo telefono ascolti i movimenti nella stanza.', listenStarting: 'Inizio ad ascoltare la stanza...', listenDenied: 'Il Bluetooth non è stato permesso. Tocca qui per chiedere di nuovo.',
       installApp: 'Apri Remiel: Covara nell\'app Android sul telefono di {first} per ascoltare la stanza.', notListening: 'Il telefono di {first} non ascolta ancora la stanza.', learning: 'IN ASCOLTO · IMPARO LA STANZA' }
@@ -329,12 +333,42 @@
   var HC = { emergency: '#ff3d5a', hospital: '#ff4f7a', urgent: '#ff7a9a', clinic: '#ff8fb1', doctor: '#ffb4c8', police: '#5b9cff', fire: '#ff8a3d', pharmacy: '#3ee08f', aed: '#ffd24d' };
   function kname(k) { try { if (window.CovaraHelp) return CovaraHelp.kindName(k); } catch (e) {} return t(k || 'doctor'); }
 
+  var driveBtn = null;
+  function driveButton(L, T, D) {
+    var d = _data, show = role() === 'home' && d && d.member && d.location && d.home && d.home.id;
+    if (!driveBtn) {
+      driveBtn = document.createElement('button'); driveBtn.type = 'button'; driveBtn.className = 'cvw-drive';
+      driveBtn.style.cssText = 'position:absolute;z-index:6;min-height:40px;padding:0 16px;border-radius:20px;border:1px solid #ffd24d;background:linear-gradient(155deg,rgba(255,210,77,.95),rgba(217,154,0,.95));color:#2a1600;font:800 14px var(--nous-font,"Hanken Grotesk",sans-serif);box-shadow:0 0 18px rgba(255,200,60,.45);cursor:pointer;white-space:nowrap';
+      driveBtn.onclick = driveGo;
+      (document.getElementById('stage') || document.body).appendChild(driveBtn);
+    }
+    driveBtn.hidden = !show;
+    if (!show) return;
+    var label = '🚗 ' + t('driveTo', { name: first(d.home.name) });
+    if (driveBtn.textContent !== label) driveBtn.textContent = label;
+    driveBtn.style.left = Math.round(L + D / 2 - driveBtn.offsetWidth / 2) + 'px'; driveBtn.style.top = Math.round(T + D - 22) + 'px';
+  }
+  async function driveGo() {
+    var d = _data; if (!d || !d.home) return;
+    driveBtn.disabled = true;
+    var body = { user: d.home.id }; if (_fix) { body.lat = _fix.lat; body.lon = _fix.lon; }
+    var r = null; try { r = await SyncEngine.apiFetch('/care/drive/to', { method: 'POST', body: JSON.stringify(body) }); } catch (e) { r = null; }
+    var j = r ? await r.json().catch(function () { return {}; }) : {};
+    driveBtn.disabled = false;
+    var nm = first(d.home.name);
+    if (!r || !r.ok) { try { showToast(t('driveToNo', { name: nm })); } catch (e) {} return; }
+    try { showToast(t('driveToTold', { name: nm, n: j.minutes || '?' })); } catch (e) {}
+    var lat = j.to.lat, lon = j.to.lon, ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    var url = ios ? 'https://maps.apple.com/?daddr=' + lat + ',' + lon + '&dirflg=d' : 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lon + '&travelmode=driving';
+    setTimeout(function () { try { window.open(url, '_blank'); } catch (e) { location.href = url; } }, 900);
+  }
   function drawMacro(cx, cy, R, now, alpha) {
     ensureBox();
     var cv = document.getElementById('sphere'), st = box.parentNode, cr = cv ? cv.getBoundingClientRect() : { left: 0, top: 0 }, sr = st && st !== document.body ? st.getBoundingClientRect() : { left: 0, top: 0 };
     var off = { left: cr.left - sr.left, top: cr.top - sr.top };
     var L = Math.round(off.left + cx - R), T = Math.round(off.top + cy - R), D = Math.round(R * 2);
     if (box.hidden) box.hidden = false;
+    driveButton(L, T, D);
     if (box._k !== L + ',' + T + ',' + D) { box._k = L + ',' + T + ',' + D; box.style.left = L + 'px'; box.style.top = T + 'px'; box.style.width = D + 'px'; box.style.height = D + 'px'; _R = R; if (map) { try { map.resize(); } catch (e) {} } mapTo(); }
     box.style.opacity = String(Math.min(1, 0.72 + alpha * 0.6));
     var d = _data, has = !!(d && d.location);
@@ -424,7 +458,8 @@
     });
     homeDot(x, c, c, hr2, reduce ? 0 : now, name);
     /* words: who and where, at the foot of the circle */
-    var where = d.inside ? t('inside', { place: d.inside.name }) : d.member ? (d.at_home === true ? t('atHomeOf', { home: hn }) : d.at_home === false && d.from_home_m != null ? t('fromHomeOf', { d: dist(d.from_home_m), home: hn }) : '')
+    var dv = !d.member && d.drive && d.drive.driving ? d.drive : null;
+    var where = dv ? (dv.to && dv.to.eta_at ? t('drivingTo', { name: first(dv.to.name), t: new Date(dv.to.eta_at).toLocaleTimeString(IT() ? 'it' : 'en-US', { hour: 'numeric', minute: '2-digit' }) }) : t('driving')) : d.inside ? t('inside', { place: d.inside.name }) : d.member ? (d.at_home === true ? t('atHomeOf', { home: hn }) : d.at_home === false && d.from_home_m != null ? t('fromHomeOf', { d: dist(d.from_home_m), home: hn }) : '')
       : d.at_home === true ? t('atHome') : d.at_home === false ? (t('out') + (d.from_home_m != null ? ', ' + t('fromHome', { d: dist(d.from_home_m) }) : '')) : '';
     var line3 = d.member ? (d.with_home ? (d.with_home.with ? t('withHome', { home: hn }) : t('homeAway', { home: hn, d: dist(d.with_home.m) })) : '') : withL.length ? (withL.some(function (m) { return m.you; }) && withL.length === 1 ? t('withYou') : t('with', { name: withL.map(function (m) { return m.you ? (IT() ? 'te' : 'you') : first(m.name); }).join(', ') }))
       : d.closest ? (d.closest.you ? t('nearestYou', { d: dist(d.closest.m) }) : t('nearest', { name: first(d.closest.name), d: dist(d.closest.m) })) : '';
@@ -612,9 +647,9 @@
     drawMicro(ctx, cx2, cy2, r2, now, dr.alpha || 0.5);
     window._dreamMicroHit = { x: cx2 - r2, y: cy2 - r2, w: r2 * 2, h: r2 * 2, cx: cx2, cy: cy2, r: r2 };
   }
-  function hide() { if (box && !box.hidden) box.hidden = true; }
+  function hide() { if (box && !box.hidden) box.hidden = true; if (driveBtn && !driveBtn.hidden) driveBtn.hidden = true; }
   /* nothing else draws over the radar while the canvas is not drawing it */
-  (function guard() { if (box && !box.hidden && Date.now() - _shownAt > 250) box.hidden = true; requestAnimationFrame(guard); })();
+  (function guard() { if (box && !box.hidden && Date.now() - _shownAt > 250) { box.hidden = true; if (driveBtn) driveBtn.hidden = true; } requestAnimationFrame(guard); })();
   function shown() { return Date.now() - _shownAt < 300; }
 
   window.CovaraWhere = { on: on, draw: draw, hide: hide, shown: shown, load: load, data: function () { return _data; } };
