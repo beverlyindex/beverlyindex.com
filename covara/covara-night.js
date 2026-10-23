@@ -59,36 +59,24 @@
   }
   var _dayAt = 0;
   function dayAt() { if (!_dayAt || new Date(_dayAt).toDateString() !== new Date().toDateString()) _dayAt = Date.now(); return _dayAt; }
+  /* No card any more: HOME using the phone is the morning check-in. The first touch on Covara after waking
+     (a tap, a scroll, a key) tells the team HOME is up, quietly; if HOME does not use Covara by the time the team
+     set, the team is told, exactly as before. The owner found the card pointless (23 Oct 2026). */
+  var _sent = false;
   function paint() {
-    /* only on this person's own team: while they look at someone else's team it is put away */
-    var show = _m && _m.due && role() === 'home';
-    /* through the Now strip when it is there */
-    if (window.CovaraNow) {
-      if (card) card.hidden = true;
-      if (!show) { CovaraNow.remove('morning'); return; }
-      CovaraNow.push({ id: 'morning', rank: 2, icon: '☀', lead: t('lead'), title: t('gm', { name: myFirst() }).replace(/, $/, ''), body: t('gmSub'), at: dayAt(),
-        actions: [{ label: t('up'), primary: true, onClick: async function () {
-          this.disabled = true;
-          var r = await api('/care/morning/ok', { method: 'POST' }).catch(function () { return { ok: false }; });
-          if (r.ok) { _m = r.data.morning; CovaraNow.remove('morning'); try { showToast(t('thanks')); } catch (e) {} try { if (window.CovaraTalk) CovaraTalk.say(t('thanks'), t('thanks')); } catch (e) {} }
-          else this.disabled = false;
-        } }] });
-      return;
+    var due = _m && _m.due && role() === 'home';
+    try { if (window.CovaraNow) CovaraNow.remove('morning'); } catch (e) {}
+    if (card) card.hidden = true;
+    if (!due) { _sent = false; return; }
+    if (_sent) return;
+    _sent = true;
+    var done = false;
+    function up() {
+      if (done) return; done = true;
+      ['pointerdown', 'keydown', 'wheel'].forEach(function (ev) { window.removeEventListener(ev, up, true); });
+      api('/care/morning/ok', { method: 'POST' }).then(function (r) { if (r.ok) _m = r.data.morning; else _sent = false; }).catch(function () { _sent = false; });
     }
-    if (!show) { if (card) card.hidden = true; return; }
-    if (!card) {
-      card = document.createElement('div'); card.id = 'cvMorning'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', 'Good morning');
-      document.body.appendChild(card);
-    }
-    var nm = myFirst();
-    card.innerHTML = '<div class="tx"><h3>☀ ' + esc(t('gm', { name: nm }).replace(/, $/, '')) + '</h3><p>' + esc(t('gmSub')) + '</p></div><button type="button">' + esc(t('up')) + '</button>';
-    card.querySelector('button').onclick = async function () {
-      this.disabled = true;
-      var r = await api('/care/morning/ok', { method: 'POST' }).catch(function () { return { ok: false }; });
-      if (r.ok) { _m = r.data.morning; card.hidden = true; try { showToast(t('thanks')); } catch (e) {} try { if (window.CovaraTalk) CovaraTalk.say(t('thanks'), t('thanks')); } catch (e) {} }
-      else this.disabled = false;
-    };
-    card.hidden = false; place();
+    ['pointerdown', 'keydown', 'wheel'].forEach(function (ev) { window.addEventListener(ev, up, true); });
   }
   setInterval(function () { morning(); if (card && !card.hidden) place(); }, 60000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) morning(); });
