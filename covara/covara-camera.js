@@ -22,6 +22,7 @@
       h_medicine: 'Point at the label of a bottle or box.', h_meal: 'Photograph the plate after the meal.', h_letter: 'Photograph the letter or bill, flat and in good light.', h_room: 'Stand in the doorway and photograph the room.', h_face: 'A photo of {name} for today.', h_face_me: 'A photo of you for today.', moodMe: 'How are you today?',
       sending: 'Sending…', reading: 'Reading the label…', medFilled: '{name}: marked Filled', medNew: '{name}: a new medicine. Open Medicines, Photos waiting, to add it in one tap.', medUnread: 'The label could not be read. It waits in Medicines, Photos waiting.',
       mealQ: 'How much was eaten?', m_all: 'All', m_some: 'Some', m_none: 'None', mealOk: 'Saved in {name}’s day.',
+      readAll: 'Read it to me', readShort: 'In short', stop: 'Stop', shortening: 'Putting it in a few words…', noShort: 'The short version is not available now, so here is the whole letter.',
       letterOk: 'Nothing on this letter looks like a scam.', letterBad: 'This letter shows signs of a scam: {why}. The team has been told. Do not pay it or call the number on it.', letterNone: 'The words could not be read. Try closer, flat, in good light.',
       roomQ: 'Which room is this?', r_kitchen: 'Kitchen', r_bedroom: 'Bedroom', r_bathroom: 'Bathroom', r_living: 'Living room', r_door: 'Front door', r_hall: 'Hall', roomOk: '{room} saved for the room radar.',
       faceOk: 'Today’s photo of {name} is saved.', moodQ: 'How is {name} today?', g: 'Good', o: 'Okay', l: 'Low',
@@ -37,6 +38,7 @@
       h_medicine: 'Inquadra l’etichetta del flacone o della scatola.', h_meal: 'Fotografa il piatto dopo il pasto.', h_letter: 'Fotografa la lettera o la bolletta, piatta e con buona luce.', h_room: 'Dalla porta, fotografa la stanza.', h_face: 'Una foto di {name} per oggi.', h_face_me: 'Una tua foto per oggi.', moodMe: 'Come stai oggi?',
       sending: 'Invio…', reading: 'Lettura dell’etichetta…', medFilled: '{name}: segnata Ritirata', medNew: '{name}: una nuova medicina. Apri Medicine, Foto in attesa, per aggiungerla con un tocco.', medUnread: 'Non è stato possibile leggere l’etichetta. Aspetta in Medicine, Foto in attesa.',
       mealQ: 'Quanto ha mangiato?', m_all: 'Tutto', m_some: 'Un po’', m_none: 'Niente', mealOk: 'Salvato nella giornata di {name}.', mealOkMe: 'Salvato nella tua giornata.', faceOkMe: 'La tua foto di oggi \u00e8 salvata.',
+      readAll: 'Leggimela', readShort: 'In breve', stop: 'Basta', shortening: 'La riassumo in poche parole…', noShort: 'Il riassunto ora non è disponibile, quindi ecco la lettera intera.',
       letterOk: 'Niente in questa lettera sembra una truffa.', letterBad: 'Questa lettera mostra segni di truffa: {why}. Il team è stato avvisato. Non pagarla e non chiamare il numero indicato.', letterNone: 'Non è stato possibile leggere le parole. Riprova più vicino, piatta, con buona luce.',
       roomQ: 'Che stanza è?', r_kitchen: 'Cucina', r_bedroom: 'Camera', r_bathroom: 'Bagno', r_living: 'Soggiorno', r_door: 'Porta d’ingresso', r_hall: 'Corridoio', roomOk: '{room} salvata per il radar delle stanze.',
       faceOk: 'La foto di oggi di {name} è salvata.', moodQ: 'Come sta {name} oggi?', g: 'Bene', o: 'Così così', l: 'Giù',
@@ -123,6 +125,31 @@
   }
   function card(text, cls) { var c = box.querySelector('.card'); c.className = 'card' + (cls ? ' ' + cls : ''); c.textContent = text; c.hidden = !text; }
   function frame(cls, tag) { var f = box.querySelector('.frame'); f.className = 'frame' + (cls ? ' ' + cls : ''); var g = box.querySelector('.tag'); g.textContent = tag || ''; g.hidden = !tag; g.style.borderColor = cls === 'bad' ? '#ef4444' : cls === 'warn' ? '#ffd24d' : '#22d3a6'; }
+  /* ── a letter read aloud: the whole letter, or in short (a few plain sentences from Token Factory) ── */
+  function speakIt(s) { try { if (window.CovaraTalk && CovaraTalk.speak) CovaraTalk.speak(s); } catch (e) {} }
+  function hushIt() { try { if (window.CovaraTalk && CovaraTalk.hush) CovaraTalk.hush(); } catch (e) {} }
+  /* the text read from the photo, made fit to hear: lines joined into sentences, stray marks left out */
+  function forReading(text) {
+    return String(text || '').split(/\n+/).map(function (l) { return l.trim(); })
+      .filter(function (l) { return (l.match(/[A-Za-z\u00C0-\u017F]/g) || []).length >= 3; })
+      .join(' ').replace(/\s+([,.;:!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  }
+  var _short = {};
+  function readOffer(text, cls) {
+    var opts = [{ label: t('readAll'), k: 'all', pri: true }, { label: t('readShort'), k: 'short' }, { label: t('stop'), k: 'stop' }].concat(again().map(function (x) { return Object.assign({}, x, { pri: false }); }));
+    ask(' ', opts, async function (o) {
+      if (!o.k) return after(o);
+      if (o.k === 'stop') { hushIt(); return; }
+      if (o.k === 'all') { var r = forReading(text); card(r.slice(0, 1400) + (r.length > 1400 ? '\u2026' : ''), cls); speakIt(r); return; }
+      card(t('shortening'), cls);
+      if (!_short[text]) {
+        var res = await api('/care/letter/summary', { method: 'POST', body: JSON.stringify({ text: text, lang: IT() ? 'it' : 'en' }) }).catch(function () { return { ok: false }; });
+        if (res.ok && res.data && res.data.summary) _short[text] = res.data.summary;
+      }
+      if (_short[text]) { card(_short[text], cls); speakIt(_short[text]); }
+      else { var r2 = forReading(text); card(t('noShort'), 'warn'); speakIt(t('noShort') + ' ' + r2); }
+    });
+  }
   function ask(q, opts, cb) {
     var a = box.querySelector('.ask'); a.hidden = !q; box.classList.toggle('asking', !!q);
     if (!q) { a.innerHTML = ''; return; }
@@ -273,7 +300,7 @@
       var why = scamCheck(text), id = await upload(blob);
       await api('/care/log', { method: 'POST', body: Object.assign({ kind: 'letter', value: why.length ? 'flagged' : 'ok', note: why.join(', ') || undefined, photo: id || undefined }, homeBody()) });
       if (why.length) { card(t('letterBad', { why: why.join(', ') }), 'bad'); frame('bad', 'SCAM SIGNS · ' + why.length); } else { card(t('letterOk'), 'good'); frame('good', t('letter') + ' · OK'); }
-      ask(' ', again(), after);
+      readOffer(text, why.length ? 'bad' : 'good');
     },
     room: async function (blob) {
       ask(t('roomQ'), ['kitchen', 'bedroom', 'bathroom', 'living', 'door', 'hall'].map(function (k) { return { label: t('r_' + k) }; }), async function (o) {
@@ -296,5 +323,5 @@
     }
   };
   Object.keys(H2).forEach(function (k) { H[k] = H2[k]; });
-  window.CovaraCamera = { open: open, close: close, scamCheck: scamCheck, showMeal: showMeal, mealHtml: mealHtml };
+  window.CovaraCamera = { open: open, close: close, scamCheck: scamCheck, showMeal: showMeal, mealHtml: mealHtml, letter: function (blob) { return H.letter(blob); } };
 })();
