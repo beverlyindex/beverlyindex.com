@@ -18,6 +18,8 @@
       add: 'Add someone', addSub: 'Family, a carer or a doctor',
       signOut: 'Sign out', signOutSub: 'Leave Covara on this phone',
       simpleFor: 'Simple screen for {name}', simpleSub: '{name} sees only the next thing to do, the team, Help, the Camera, the Covara Button and Words. {name} cannot change this.',
+      fullTitle: 'Full view on this phone', fullSub: 'Your team chose the simple screen. The full view shows everything Covara has: the day, WHEREIS, the care, every button. You can go back to simple at any time from Me.', fullYes: 'Show the full view', fullNo: 'Keep it simple', fullHint: 'Hold the Covara logo for 2 seconds to show the full view',
+      backSimple: 'Simple screen', backSimpleSub: 'Go back to the simple screen your team chose',
       simpleFail: 'Could not change it. Check the internet and try again.', close: 'Close',
       next: 'Next: {what} at {time}', nowDo: 'Now: {what}, {time}', nothing: 'Nothing more today', visit: 'Visit' },
     it: { care: 'Cure', camera: 'Foto', words: 'Parole', messages: 'Messaggi', me: 'Io', callFamily: 'Chiama il team', meTitle: 'Io',
@@ -27,6 +29,8 @@
       add: 'Aggiungi qualcuno', addSub: 'Famiglia, un assistente o un medico',
       signOut: 'Esci', signOutSub: 'Lascia Covara su questo telefono',
       simpleFor: 'Schermata semplice per {name}', simpleSub: '{name} vede solo la prossima cosa da fare, il team, Aiuto, la Fotocamera, il pulsante Covara e Parole. {name} non può cambiarlo.',
+      fullTitle: 'Vista completa su questo telefono', fullSub: 'Il tuo team ha scelto la schermata semplice. La vista completa mostra tutto ciò che Covara ha: la giornata, WHEREIS, le cure, tutti i pulsanti. Puoi tornare alla schermata semplice in qualsiasi momento da Io.', fullYes: 'Mostra la vista completa', fullNo: 'Resta semplice', fullHint: 'Tieni premuto il logo Covara per 2 secondi per la vista completa',
+      backSimple: 'Schermata semplice', backSimpleSub: 'Torna alla schermata semplice scelta dal tuo team',
       simpleFail: 'Non è stato possibile cambiarlo. Controlla internet e riprova.', close: 'Chiudi',
       next: 'Dopo: {what} alle {time}', nowDo: 'Ora: {what}, {time}', nothing: 'Niente altro oggi', visit: 'Visita' }
   };
@@ -190,6 +194,7 @@
       h += row('simple', 'simple', t('simpleFor', { name: nm }), t('simpleSub', { name: nm }), _fam.on, 'gold');
       if (_fam.err) h += '<div class="cvs-err">' + esc(t('simpleFail')) + '</div>';
     }
+    if (role() === 'home' && _simple && full()) h += row('backsimple', 'simple', t('backSimple'), t('backSimpleSub'), null, 'gold');
     h += row('settings', 'settings', t('settings'), t('settingsSub')) + row('calm', 'calm', t('calm'), t('calmSub'), calm) +
       row('share', 'share', t('share'), t('shareSub')) + row('add', 'add', t('add'), t('addSub')) + row('out', 'out', t('signOut'), t('signOutSub'), null, 'out') + '</div>';
     me.innerHTML = h;
@@ -209,6 +214,7 @@
   function closeMe() { me.hidden = true; }
   async function meAct(k) {
     if (k === 'x') return closeMe();
+    if (k === 'backsimple') { closeMe(); setFull(false); return; }
     if (k === 'settings') { closeMe(); var sb = document.getElementById('settingsBtn'); if (sb) sb.click(); else if (typeof SettingsPanel !== 'undefined') SettingsPanel.open(); return; }
     if (k === 'calm') { if (window.CovaraNav) CovaraNav.calm(!document.body.classList.contains('cv-calm')); drawMe(); return; }
     if (k === 'share') { closeMe(); if (window.CovaraNav) CovaraNav.share(); return; }
@@ -234,7 +240,10 @@
     try { var r = await api('/care/simple'); if (r.ok && typeof r.data.on === 'boolean') _simple = r.data.on; } catch (e) { /* stays as it was: on, unless the family turned it off */ }
     _simpleBusy = false;
   }
-  function simpleNow() { return role() === 'home' && _simple; }
+  /* HOME may show the full view on their own phone (the team's choice stays as it is, and HOME can go back) */
+  function full() { try { return localStorage.getItem('rc:fullView') === '1'; } catch (e) { return false; } }
+  function setFull(v) { try { if (v) localStorage.setItem('rc:fullView', '1'); else localStorage.removeItem('rc:fullView'); } catch (e) {} tick(); }
+  function simpleNow() { return role() === 'home' && _simple && !full(); }
   /* While simple: no status words on the spheres, no Video, Phone, Message, Email beside them, and no big picture */
   var _wrapped = false;
   function wrap() {
@@ -333,5 +342,32 @@
   requestAnimationFrame(frame);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') loadSimple(true); });
   window.addEventListener('localeChanged', words);
-  window.CovaraSimple = { on: function () { return simpleNow(); }, refresh: function () { return loadSimple(true); }, openMe: openMe, closeMe: closeMe, act: act };
+  /* hold the Covara logo for 2 seconds on the simple screen: the full view, after a clear yes */
+  (function holdLogo() {
+    var tm = 0, at = null;
+    window.addEventListener('pointerdown', function (e) {
+      clearTimeout(tm);
+      /* the logo itself may not take touches, so the finger's place is what counts */
+      var lg = document.getElementById('appLogo'); if (!lg || !simpleNow()) return;
+      var r = lg.getBoundingClientRect(); if (!r.width || e.clientX < r.left - 8 || e.clientX > r.right + 8 || e.clientY < r.top - 8 || e.clientY > r.bottom + 8) return;
+      at = { x: e.clientX, y: e.clientY };
+      tm = setTimeout(askFull, 2000);
+    }, true);
+    window.addEventListener('pointermove', function (e) { if (at && Math.abs(e.clientX - at.x) + Math.abs(e.clientY - at.y) > 24) { clearTimeout(tm); at = null; } }, true);
+    ['pointerup', 'pointercancel'].forEach(function (ev) { window.addEventListener(ev, function () { clearTimeout(tm); at = null; }, true); });
+  })();
+  function askFull() {
+    var el = document.getElementById('cvsFull');
+    if (!el) { el = document.createElement('div'); el.id = 'cvsFull'; el.className = 'cv-ov'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); document.body.appendChild(el); }
+    var box = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,calc(100vw - 32px));box-sizing:border-box;z-index:99995;padding:20px 18px 18px;border-radius:24px;color:#eef3fb;font-family:var(--nous-font,"Hanken Grotesk",sans-serif);background:linear-gradient(160deg,rgba(70,130,235,.30),rgba(10,22,60,.92));-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,210,77,.6);box-shadow:0 0 34px rgba(255,210,77,.22),0 24px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.16)';
+    el.innerHTML = '<div style=\'' + box + '\'><div style="font:700 11px var(--nous-mono,monospace);letter-spacing:.2em;color:#ffd24d;text-transform:uppercase;margin-bottom:6px">Covara</div><div style="font-size:24px;font-weight:800;line-height:1.2">' + esc(t('fullTitle')) + '</div>' +
+      '<p style="margin:10px 0 16px;font-size:16px;line-height:1.45;color:#dbe7ff">' + esc(t('fullSub')) + '</p>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" data-f="yes" style="min-height:52px;flex:1;padding:0 16px;border-radius:26px;font:800 15px var(--nous-font,\'Hanken Grotesk\',sans-serif);white-space:nowrap;cursor:pointer;border:0;color:#2a1600;background:radial-gradient(circle at 35% 30%,#ffe58a,#ffc531 60%,#d99a00);box-shadow:0 0 18px rgba(255,200,60,.45)">' + esc(t('fullYes')) + '</button>' +
+      '<button type="button" data-f="no" style="min-height:52px;flex:1;padding:0 16px;border-radius:26px;font:800 15px var(--nous-font,\'Hanken Grotesk\',sans-serif);white-space:nowrap;cursor:pointer;border:1px solid rgba(150,200,255,.5);color:#eef5ff;background:linear-gradient(155deg,rgba(80,140,240,.28),rgba(18,40,96,.5))">' + esc(t('fullNo')) + '</button></div></div>';
+    el.classList.add('open'); el.style.cssText = 'position:fixed;inset:0;z-index:99994;background:rgba(3,8,24,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)';
+    el.querySelector('[data-f=yes]').onclick = function () { el.classList.remove('open'); el.remove(); setFull(true); };
+    el.querySelector('[data-f=no]').onclick = function () { el.classList.remove('open'); el.remove(); };
+  }
+
+  window.CovaraSimple = { full: full, setFull: setFull, on: function () { return simpleNow(); }, refresh: function () { return loadSimple(true); }, openMe: openMe, closeMe: closeMe, act: act };
 })();
