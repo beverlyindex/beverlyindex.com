@@ -7,7 +7,7 @@
    Beverly Index LLC */
 (function () {
   'use strict';
-  var IT = function () { try { return /^it/.test((window.I18n && I18n.locale) || navigator.language || ''); } catch (e) { return false; } };
+  var IT = function () { try { return /^it/.test((typeof I18n !== 'undefined' && I18n.locale) || navigator.language || ''); } catch (e) { return false; } };
   var S = {
     en: { checking: 'Checking the code...', bad: 'This code has ended or is not right. Ask for a new one.', title: '{name} invited you to their circle',
       titleNo: 'You are invited to a circle', sub: 'Join as a guest to video call {name}. No setup needed.', name: 'Your name', phone: 'Your phone number (optional)',

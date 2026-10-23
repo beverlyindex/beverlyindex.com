@@ -60,7 +60,8 @@
   var _dayAt = 0;
   function dayAt() { if (!_dayAt || new Date(_dayAt).toDateString() !== new Date().toDateString()) _dayAt = Date.now(); return _dayAt; }
   function paint() {
-    var show = _m && _m.due;
+    /* only on this person's own team: while they look at someone else's team it is put away */
+    var show = _m && _m.due && role() === 'home';
     /* through the Now strip when it is there */
     if (window.CovaraNow) {
       if (card) card.hidden = true;
@@ -119,4 +120,5 @@
     };
   }
   window.CovaraNight = { morning: morning, timeline: timeline, data: function () { return { morning: _m, timeline: _tl }; } };
+  setInterval(function () { if (_m && _m.due) paint(); }, 2000);
 })();
