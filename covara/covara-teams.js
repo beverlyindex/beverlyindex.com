@@ -9,7 +9,8 @@
      Leave is in that team's care card and asks first.
    - Urgent alerts (Help, falls, missed medicines) reach this phone from every team whichever team is on screen;
      each one names whose team it is from, and tapping it goes to that team.
-   The team on screen lives only in memory, so every open starts again on My team.
+   The team on screen lives only in memory, so every open starts again on My team (someone who only looks after
+   another person, with no team of their own yet, opens on that person's team).
 
    How the rest of Covara follows: every module asks localStorage for 'rc:role' and takes the first linked HOME
    in DEMO_CONTACTS. This file answers 'rc:role' with 'home' on My team and 'away' in someone else's team (the
@@ -325,6 +326,23 @@
     var m = /[#&]home=([\w-]+)/.exec(location.hash || ''); if (!m) return;
     var tries = 0;
     (function wait() { if (show(m[1]) || ++tries > 40) return; setTimeout(wait, 750); })();
+  })();
+
+  /* someone who only looks after another person (they chose the team role and nobody is on a team of their own yet)
+     opens straight on that person's team, as before; an empty circle of their own would only confuse. Once they
+     have a team of their own, Covara opens on My team like everyone else. */
+  (function startWhereTheyCare() {
+    if (/[#&]home=/.test(location.hash || '')) return;
+    var tries = 0;
+    (function wait() {
+      if (_view || stored() !== 'away') return;
+      var care = contacts().filter(function (c) { return c.care && c.care.state === 'active'; });
+      var own = care.some(function (c) { return c.care.side === 'away'; });
+      var h = care.filter(function (c) { return c.care.side === 'home'; })[0];
+      if (own) return;
+      if (h) { _view = h.care.userId; putFirst(h); apply(); return; }
+      if (++tries < 40) setTimeout(wait, 750);
+    })();
   })();
 
   window.CovaraTeams = {
