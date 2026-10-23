@@ -210,6 +210,16 @@
       { only: 'home', t: MORNING, stop: true, optional: true, say: { en: 'Tap I’m up each morning. Pressing it now would tell your team for real, so the lesson stops here.', it: 'Tocca Mi sono alzato ogni mattina. Premerlo adesso avviserebbe davvero il tuo team, quindi la lezione si ferma qui.' } }
     ]) },
 
+    { id: 'records', title: { en: 'Medical records', it: 'Cartelle cliniche' }, steps: openCare().concat([
+      { t: '#cvpSheet [data-k=records]', wait: 'click', say: { en: 'Tap Records. Covara does not keep medical records: it keeps where they are and who may get them.', it: 'Tocca Cartelle. Covara non tiene le cartelle cliniche: tiene dove sono e chi può averle.' } },
+      { t: '#cvrSheet [data-tab=where]', wait: 'click', say: { en: 'Tap Where. Here are the places that hold the records: doctors, hospitals, pharmacies, labs and insurers, with their phone and patient portal.', it: 'Tocca Dove. Qui ci sono i luoghi che tengono le cartelle: medici, ospedali, farmacie, laboratori e assicurazioni, con il telefono e il portale pazienti.' } },
+      { t: '#cvrSheet [data-tab=who]', wait: 'click', say: { en: 'Tap Who may obtain. Each entry says who may get the records, what they may get, from where, and until when.', it: 'Tocca Chi può averle. Ogni voce dice chi può avere le cartelle, cosa, da dove e fino a quando.' } },
+      { only: 'home', t: '#cvrSheet [data-a=new-auth]', optional: true, say: { en: 'Authorize someone opens a form. Only you, or the person you named to decide for you, can give, change or end one. Sensitive records, like therapy notes, need their own tick.', it: 'Autorizza qualcuno apre un modulo. Solo tu, o la persona che hai scelto per decidere per te, puoi darne, cambiarne o chiuderne una. Le cartelle sensibili, come le note di terapia, vanno spuntate a parte.' } },
+      { only: 'away', say: { en: 'You see only the authorizations that name you. Only the person you look after, or the person who decides for them, can give, change or end one.', it: 'Vedi solo le autorizzazioni che ti nominano. Solo la persona che segui, o chi decide per lei, può darne, cambiarne o chiuderne una.' } },
+      { t: '#cvrSheet [data-a=print]', optional: true, say: { en: 'Print the form makes a HIPAA authorization ready to sign on paper. Some providers ask for their own form.', it: 'Stampa il modulo prepara un’autorizzazione HIPAA da firmare su carta. Alcune strutture chiedono il proprio modulo.' } },
+      { t: '#cvrSheet [data-tab=how]', wait: 'click', say: { en: 'Tap How to obtain. It shows the steps in plain words for each place: the portal, a call, or the signed form.', it: 'Tocca Come ottenerle. Mostra i passi, in parole semplici, per ogni luogo: il portale, una telefonata o il modulo firmato.' } }
+    ]) },
+
     { id: 'simple', title: { en: 'Simple mode', it: 'Modalità semplice' }, steps: [
       { only: 'home', t: '#cvnDock', say: function () {
           var on = false; try { on = !!(window.CovaraSimple && CovaraSimple.on()); } catch (e) {}
