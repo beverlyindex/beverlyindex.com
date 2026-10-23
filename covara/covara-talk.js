@@ -111,7 +111,8 @@
   function circle() {
     var seen = {}, out = [];
     (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).forEach(function (c) {
-      if (!c || !c.care || c.care.state !== 'active' || !c.sentinelId || seen[c.id]) return; seen[c.id] = 1; out.push(c);
+      /* everyone on the team with an account, as Ask My Team counts them (a message ID is not needed to reach them) */
+      if (!c || !c.care || c.care.state !== 'active' || !(c.sentinelId || c.care.userId) || seen[c.id]) return; seen[c.id] = 1; out.push(c);
     });
     return out;
   }
@@ -123,7 +124,7 @@
   }
   function tell(name, text) {
     var c = findPerson(name);
-    if (!c || !c.sentinelId) return t('whoCall', { who: name });
+    if (!c || !(c.sentinelId || (c.care && c.care.userId))) return t('whoCall', { who: name });
     sendMsg([c], text).then(function (n) { say(n ? t('sentTo', { who: nameOf(c) }) : t('notSent')); });
     return t('sentTo', { who: nameOf(c) });
   }
@@ -360,7 +361,8 @@
   }
   function cvHush() { _cv.seq++; try { if (_cv.audio) { _cv.audio.pause(); _cv.audio.src = ''; } } catch (e) {} _cv.audio = null; }
   async function cvFetch(part, lang) {
-    var ac = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = setTimeout(function () { if (ac) ac.abort(); }, 9000);
+    /* a sentence can wait behind others on the one GPU: give it time rather than switch to another voice */
+    var ac = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = setTimeout(function () { if (ac) ac.abort(); }, 35000);
     try {
       var r = await SyncEngine.apiFetch('/care-voice/say', { method: 'POST', body: JSON.stringify({ text: part, lang: lang }), signal: ac ? ac.signal : undefined });
       if (!r.ok) return null;
@@ -370,9 +372,11 @@
   async function speakCovara(text) {
     var seq = ++_cv.seq, lang = IT() ? 'it' : 'en';
     var parts = (forEar(text).match(/[^.!?]+[.!?]*/g) || [text]).map(function (x) { return x.trim(); }).filter(Boolean);
-    /* ask for every sentence at once; play them in order as they arrive */
-    var urls = parts.map(function (p) { return cvFetch(p, lang); });
-    var first = await urls[0];
+    /* one sentence at a time, the next asked for while this one plays, so none waits behind a queue on the GPU;
+       a sentence that fails is asked for once more before anything else is tried */
+    var urls = [];
+    function get(i) { if (!urls[i]) urls[i] = cvFetch(parts[i], lang).then(function (u) { return u || (seq === _cv.seq ? cvFetch(parts[i], lang) : null); }); return urls[i]; }
+    var first = await get(0);
     if (seq !== _cv.seq) return true;
     /* not kept and the voice server away: the phone's voice for this one (the next may be a kept sentence) */
     if (!first) return false;
@@ -381,7 +385,8 @@
     var tick = setInterval(function () { if (_cv.audio && !_cv.audio.paused) VV.word(); }, 260);
     try {
       for (var i = 0; i < parts.length; i++) {
-        var u = i ? await urls[i] : first;
+        if (i + 1 < parts.length) get(i + 1);
+        var u = i ? await get(i) : first;
         if (seq !== _cv.seq) break;
         if (!u) { speakDevice(parts.slice(i).join(' ')); break; }
         await new Promise(function (done) {

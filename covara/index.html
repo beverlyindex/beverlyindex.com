@@ -1422,6 +1422,20 @@
     height: 100dvh;
     object-fit: cover;
   }
+  /* A tall phone screen cannot show the 16:9 intro full screen without cutting its bottom lines at the sides.
+     So, upright, the intro keeps its own proportions and is framed on the Remiel Covara logo: the tagline lines
+     beneath it are cut off rather than squeezed, and the black around it is the intro's own background.
+     Only the framing changes; the video itself is untouched. */
+  @media (orientation: portrait) {
+    .video-intro { overflow: hidden; }
+    .video-intro video {
+      flex: none;
+      width: 320vw;
+      height: 180vw;
+      object-fit: contain;
+      clip-path: inset(35vw 110vw 40vw 110vw);
+    }
+  }
   .video-intro .skip-btn, .bi-splash .skip-btn {
     position: absolute;
     bottom: max(32px, env(safe-area-inset-bottom, 0px));
@@ -19684,7 +19698,7 @@ const SentinelMessaging = (() => {
     const contactId = _activeContactId;
     const contact = _findContact(contactId);
     const canDeliver = _authed() && (
-      (contact && _isValidSid(contact.sentinelId)) || String(contactId).indexOf('unknown:') === 0
+      (contact && (_isValidSid(contact.sentinelId) || _teamUser(contact))) || String(contactId).indexOf('unknown:') === 0
     );
 
     /* Magnet: a matched person who has not accepted yet gets a link
@@ -19712,12 +19726,16 @@ const SentinelMessaging = (() => {
     if (canDeliver) await _deliver(contactId, msg.id);
   }
 
+  /* A Covara team member's account: messages reach them by it when they have no message ID */
+  function _teamUser(c) { return (c && c.care && c.care.state === 'active' && c.care.userId) ? String(c.care.userId) : null; }
+  function _findTeamByUser(uid) { try { return uid ? (DEMO_CONTACTS || []).find(c => _teamUser(c) === String(uid)) || null : null; } catch (e) { return null; } }
+
   /* Send a message to one person without the message screen open (Talk uses it). The message lands
      in that person's thread, as if typed there. Returns true once it is on its way. */
   async function sendTo(contactId, text) {
     text = String(text || '').trim(); if (!text) return false;
     const contact = _findContact(contactId); if (!contact) return false;
-    const canDeliver = _authed() && _isValidSid(contact.sentinelId);
+    const canDeliver = _authed() && (_isValidSid(contact.sentinelId) || !!_teamUser(contact));
     const msg = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), from: 'center', text: text, ts: Date.now(), state: canDeliver ? 'pending' : 'local' };
     const thread = await _loadThread(contactId);
     thread.push(msg);
@@ -19758,6 +19776,7 @@ const SentinelMessaging = (() => {
     const body = { client_msg_id: msg.id, text: msg.text, ts: msg.ts };
     if (sid && peerMap[sid]) body.to_user_id = peerMap[sid];
     else if (sid) body.to_sentinel_id = sid;
+    else if (_teamUser(contact)) body.to_user_id = _teamUser(contact);
     else { await _updateMsg(contactId, msgId, { state: 'local' }); return _refresh(contactId); }
 
     await _updateMsg(contactId, msgId, { state: 'pending' });
@@ -19854,7 +19873,7 @@ const SentinelMessaging = (() => {
         /* Sent from this account (possibly another device) */
         if (myUserId && m.from_user_id === myUserId) {
           const sid = sidByUser[m.to_user_id];
-          const c = sid ? _findContactBySid(sid) : null;
+          const c = (sid ? _findContactBySid(sid) : null) || _findTeamByUser(m.to_user_id);
           if (!c) continue;
           const thread = await _loadThread(c.id);
           if (thread.some(x => (serverId && x.serverId === serverId) || (m.client_msg_id && x.id === m.client_msg_id))) continue;
@@ -19867,7 +19886,7 @@ const SentinelMessaging = (() => {
 
         const fromSid = m.from_sentinel_id ? String(m.from_sentinel_id).toUpperCase() : null;
         if (fromSid && m.from_user_id) { await _learnPeer(fromSid, m.from_user_id); sidByUser[m.from_user_id] = fromSid; }
-        const contact = _findContactBySid(fromSid || sidByUser[m.from_user_id]);
+        const contact = _findContactBySid(fromSid || sidByUser[m.from_user_id]) || _findTeamByUser(m.from_user_id);
         let key;
         if (contact) {
           key = contact.id;
@@ -19913,7 +19932,7 @@ const SentinelMessaging = (() => {
     const contact = _findContact(contactId);
     const contactName = _escHtml(_contactLabel(contactId));
     const isUnknown = String(contactId).indexOf('unknown:') === 0;
-    const noSid = !isUnknown && !(contact && _isValidSid(contact.sentinelId));
+    const noSid = !isUnknown && !(contact && (_isValidSid(contact.sentinelId) || _teamUser(contact)));
 
     let note = '';
     if (noSid) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.noSidNote', 'Saved on this device. Add their Sentinel ID to deliver: Person card, Edit, Sentinel ID.')) + ' ' + Guide.linkHtml('contact.sentinelId', { contactId: contactId }, 'guide.addItNow') + '</div>';
