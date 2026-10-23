@@ -17,7 +17,7 @@
       share: 'Share with doctor', shareSub: 'A private link to what the doctor needs',
       add: 'Add someone', addSub: 'Family, a carer or a doctor',
       signOut: 'Sign out', signOutSub: 'Leave Covara on this phone',
-      simpleFor: 'Simple screen for {name}', simpleSub: '{name} sees only the next thing to do, the team, Help, TALK and Words. {name} cannot change this.',
+      simpleFor: 'Simple screen for {name}', simpleSub: '{name} sees only the next thing to do, the team, Help, the Camera, the Covara Button and Words. {name} cannot change this.',
       simpleFail: 'Could not change it. Check the internet and try again.', close: 'Close',
       next: 'Next: {what} at {time}', nowDo: 'Now: {what}, {time}', nothing: 'Nothing more today', visit: 'Visit' },
     it: { care: 'Cure', camera: 'Foto', words: 'Parole', messages: 'Messaggi', me: 'Io', callFamily: 'Chiama il team', meTitle: 'Io',
@@ -26,7 +26,7 @@
       share: 'Condividi col medico', shareSub: 'Un link privato con ciò che serve al medico',
       add: 'Aggiungi qualcuno', addSub: 'Famiglia, un assistente o un medico',
       signOut: 'Esci', signOutSub: 'Lascia Covara su questo telefono',
-      simpleFor: 'Schermata semplice per {name}', simpleSub: '{name} vede solo la prossima cosa da fare, il team, Aiuto, PARLA e Parole. {name} non può cambiarlo.',
+      simpleFor: 'Schermata semplice per {name}', simpleSub: '{name} vede solo la prossima cosa da fare, il team, Aiuto, la Fotocamera, il pulsante Covara e Parole. {name} non può cambiarlo.',
       simpleFail: 'Non è stato possibile cambiarlo. Controlla internet e riprova.', close: 'Chiudi',
       next: 'Dopo: {what} alle {time}', nowDo: 'Ora: {what}, {time}', nothing: 'Niente altro oggi', visit: 'Visita' }
   };
@@ -99,7 +99,11 @@
     'body.cv-simple #cvnDock .cvs-b[data-s=words] svg{width:30px;height:30px}' +
     'body.cv-simple.cvs-nowords #cvnDock .cvs-b[data-s=words]{display:none !important}' +
     'body.cv-simple #cvnDock .cvs-b[data-s=words]{order:2}body.cv-simple #cvnDock .cvn-talk{order:3}body.cv-simple #cvnDock .cvs-b[data-s=call]{order:4}body.cv-simple #cvnDock .cvn-orb{width:104px !important;height:104px !important;font-size:15px}' +
-    'body.cv-simple.cvs-nocall #cvnDock .cvs-b[data-s=call]{display:none !important}';
+    'body.cv-simple.cvs-nocall #cvnDock .cvs-b[data-s=call]{display:none !important}' +
+    /* the camera stays on the simple screen too: showing a medicine, a meal or a letter is one tap */
+    'body.cv-simple #cvnDock .cvs-b[data-s=camera]{display:flex !important;order:1;flex:0 0 auto;width:72px;height:72px;min-height:0;border-radius:50%;font-size:12.5px;gap:3px;border-color:rgba(255,210,77,.55);box-shadow:0 0 0 5px rgba(255,210,77,.12),0 0 22px rgba(255,210,77,.35),inset 0 1px 0 rgba(255,255,255,.18)}' +
+    'body.cv-simple #cvnDock .cvs-b[data-s=camera] svg{width:26px;height:26px}' +
+    '@media (max-width:440px){body.cv-simple #cvnDock{gap:10px}body.cv-simple #cvnDock .cvs-b[data-s=words]{width:80px;height:80px;font-size:13.5px}body.cv-simple #cvnDock .cvn-orb{width:94px !important;height:94px !important}body.cv-simple #cvnDock .cvs-b[data-s=call]{min-width:76px;padding:0 8px}}';
   var st = document.createElement('style'); st.id = 'cvsStyle'; st.textContent = css; document.head.appendChild(st);
 
   var ICON = {
