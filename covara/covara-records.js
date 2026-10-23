@@ -245,7 +245,8 @@
 
   function open(tab) {
     build();
-    try { if (window.CovaraPerson && CovaraPerson.isOpen()) CovaraPerson.close(); } catch (e) {}
+    /* from the care card: the card's own back step must land first, or its popstate would shut Records at once */
+    try { if (window.CovaraPerson && CovaraPerson.isOpen()) { if (CovaraPerson.closeThen) { CovaraPerson.closeThen(function () { open(tab); }); return true; } CovaraPerson.close(); } } catch (e) {}
     _tab = tab || _tab || 'where'; _form = null; _f = null; _sure = '';
     _open = true; render();
     requestAnimationFrame(function () { dim.classList.add('open'); sheet.classList.add('open'); });
