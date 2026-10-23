@@ -28,8 +28,8 @@
   /* ── what each main button says: the first match wins, so the narrow ones come first ── */
   var EXPLAIN = [
     { k: 'cbutton', sel: '#cvCButton', listen: true,
-      en: 'The Covara Button. Tap the C and speak a note. Covara reads back what it heard, and Yes files it in your private journal.',
-      it: 'Il pulsante Covara. Tocca la C e detta una nota. Covara ti rilegge ciò che ha sentito, e Sì la mette nel tuo diario privato.' },
+      en: 'The Covara Button. Tap the C and speak a note. Covara reads back what it heard, and Yes files it in your private journal. Hold the C to open your journal.',
+      it: 'Il pulsante Covara. Tocca la C e detta una nota. Covara ti rilegge ciò che ha sentito, e Sì la mette nel tuo diario privato. Tieni premuta la C per aprire il diario.' },
     { k: 'talk', sel: '.cvn-orb', listen: true,
       en: 'TALK. Tap it and ask out loud. Covara answers out loud and on the screen.',
       it: 'PARLA. Toccalo e fai la domanda a voce. Covara risponde a voce e sullo schermo.' },
@@ -187,6 +187,8 @@
     clearTimeout(_lpT); _lp = null;
     if (!on() || !role()) return;
     var m = keyOf(e.target); if (!m) return;
+    /* holding the C opens the journal, so the C is not explained by a long press */
+    if (m.x.k === 'cbutton') return;
     _lp = { el: m.el, x: e.clientX, y: e.clientY, k: m.x.k };
     _lpT = setTimeout(function () {
       if (!_lp) return;
