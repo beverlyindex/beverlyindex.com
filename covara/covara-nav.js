@@ -299,7 +299,7 @@
     else if (k === 'next' || k === 'who') step(1);
     else if (k === 'where') { try { if (typeof WhereIs !== 'undefined') WhereIs.setMode(WhereIs.mode() === 'whereis' ? 'comm' : 'whereis'); if (window.CovaraView) CovaraView.open(''); } catch (e) {} }
     else if (k === 'camera') { if (window.CovaraCamera) CovaraCamera.open(); }
-    else if (k === 'talk') { if (window.CovaraTalk) CovaraTalk.toggle(dock.querySelector('[data-k=talk]'), dock.querySelector('.cvn-talk small')); }
+    else if (k === 'talk') { var cb = dock.querySelector('[data-k=talk]'), cs = dock.querySelector('.cvn-talk small'); if (window.CovaraNotes) CovaraNotes.toggle(cb, cs); else if (window.CovaraTalk) CovaraTalk.toggle(cb, cs); }
   }
   function whereSlot() {
     var w = wh(), sp = dock.querySelector('[data-k=where] span'); if (!sp) return;
