@@ -104,6 +104,7 @@
   }
   function mine(quiet) {
     if (!_view) return;
+    _choseMine = true;
     _view = null; apply();
     if (!quiet) speak(t('backMine'));
   }
@@ -331,19 +332,16 @@
   /* someone who only looks after another person (they chose the team role and nobody is on a team of their own yet)
      opens straight on that person's team, as before; an empty circle of their own would only confuse. Once they
      have a team of their own, Covara opens on My team like everyone else. */
-  (function startWhereTheyCare() {
-    if (/[#&]home=/.test(location.hash || '')) return;
-    var tries = 0;
-    (function wait() {
-      if (_view || stored() !== 'away') return;
-      var care = contacts().filter(function (c) { return c.care && c.care.state === 'active'; });
-      var own = care.some(function (c) { return c.care.side === 'away'; });
-      var h = care.filter(function (c) { return c.care.side === 'home'; })[0];
-      if (own) return;
-      if (h) { _view = h.care.userId; putFirst(h); apply(); return; }
-      if (++tries < 40) setTimeout(wait, 750);
-    })();
-  })();
+  var _choseMine = false;
+  function startWhereTheyCare() {
+    if (_view || _choseMine || stored() !== 'away' || /[#&]home=/.test(location.hash || '')) return;
+    var care = contacts().filter(function (c) { return c.care && c.care.state === 'active'; });
+    if (care.some(function (c) { return c.care.side === 'away'; })) return;
+    var h = care.filter(function (c) { return c.care.side === 'home'; })[0];
+    if (h) { _view = h.care.userId; putFirst(h); apply(); }
+  }
+  /* checked all the time, so a team joined while Covara is open is entered at once too */
+  setInterval(startWhereTheyCare, 700);
 
   window.CovaraTeams = {
     /* the team on screen: '' for My team, else that HOME's user id */

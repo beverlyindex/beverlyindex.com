@@ -217,7 +217,7 @@
       { only: 'home', t: '#cvsLine', optional: true, say: { en: 'Under your picture is the next thing to do today.', it: 'Sotto la tua foto c’è la prossima cosa da fare oggi.' } },
       { only: 'away', t: '#cvnDock .cvs-b[data-s=me]', wait: W.me, miss: MISS_ME, say: { en: 'Tap Me.', it: 'Tocca Io.' } },
       { only: 'away', t: '#cvsMe [data-m=simple]', miss: { en: 'This switch shows here when you may change the screen of the person you look after.', it: 'Questo interruttore appare qui quando puoi cambiare lo schermo della persona che segui.' },
-        say: { en: 'Simple screen: the person you look after sees only the next thing to do, the team, TALK and Words. Tap it to turn it on or off.', it: 'Schermata semplice: la persona che segui vede solo la prossima cosa da fare, il team, PARLA e Parole. Toccalo per accenderla o spegnerla.' } }
+        say: { en: 'Simple screen: the person you look after sees only the next thing to do, the team, Help, the Covara Button and Words. Tap it to turn it on or off.', it: 'Schermata semplice: la persona che segui vede solo la prossima cosa da fare, il team, Aiuto, il pulsante Covara e Parole. Toccalo per accenderla o spegnerla.' } }
     ] },
 
     { id: 'cbutton', title: { en: 'The Covara Button', it: 'Il pulsante Covara' }, steps: [
@@ -229,7 +229,7 @@
       { t: ['#cvCButton', '.cvn-orb'], wait: 'click', quietEnd: true, say: { en: 'Try it now: tap the C and speak a note.', it: 'Prova adesso: tocca la C e detta una nota.' } }
     ] }
   ];
-  var SIMPLE_ON = { en: 'Your screen is simple: your team, Words, TALK and Call team. Your team chose this for you.', it: 'Il tuo schermo è semplice: il tuo team, Parole, PARLA e Chiama il team. L’ha scelto il tuo team per te.' };
+  var SIMPLE_ON = { en: 'Your screen is simple: your team, Help, Words, the Covara Button and Call team. Your team chose this for you.', it: 'Il tuo schermo è semplice: il tuo team, Aiuto, Parole, il pulsante Covara e Chiama il team. L’ha scelto il tuo team per te.' };
   var SIMPLE_OFF = { en: 'The simple screen is off on this phone. Someone on your team can turn it on from their own phone.', it: 'La schermata semplice è spenta su questo telefono. Qualcuno del tuo team può accenderla dal proprio telefono.' };
 
   /* While a lesson runs, these are held back: each would send, ring or change who is in the circle */
