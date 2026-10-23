@@ -33,6 +33,8 @@ const PRECACHE_URLS = [
   './covara-person.js',
   './covara-words.js',
   './covara-simple.js',
+  './covara-guide.js',
+  './covara-learn.js',
   './covara-notes.js',
   './share.html',
   './health-privacy.html',
