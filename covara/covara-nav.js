@@ -382,7 +382,8 @@
   function drawDay() {
     var S = schedule(), R = range(); _range = R; _sch = S;
     var ev = S.ev.filter(function (e) { return e.at >= R.a && e.at < R.b; });
-    var fr0 = fresh(), sig = (fr0 ? fr0.text + fr0.c : '') + '|' + (who() ? who().id : 'home') + '|' + ev.map(function (e) { return e.at + e.c; }).join() + '|' + S.bands.map(function (b) { return b.a + '-' + b.b; }).join() + '|' + Math.floor(Date.now() / 60000) + '|' + _scrub + '|' + loc() + '|' + new Date().toDateString();
+    /* the name is in the signature too, so a switch to another team redraws the header at once */
+    var fr0 = fresh(), sig = (S.name || '') + '|' + (fr0 ? fr0.text + fr0.c : '') + '|' + (who() ? who().id : 'home') + '|' + ev.map(function (e) { return e.at + e.c; }).join() + '|' + S.bands.map(function (b) { return b.a + '-' + b.b; }).join() + '|' + Math.floor(Date.now() / 60000) + '|' + _scrub + '|' + loc() + '|' + new Date().toDateString();
     if (sig === _dsig) return; _dsig = sig;
     var pos = function (ms) { return Math.max(0, Math.min(100, (ms - R.a) / (R.b - R.a) * 100)); };
     var tk = '';
