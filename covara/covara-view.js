@@ -200,9 +200,9 @@
   var SLOTS = [['morning', '08:00'], ['midday', '13:00'], ['evening', '18:00'], ['night', '22:00']];
   var FORMS = ['tablet', 'pill', 'capsule', 'drop', 'ml', 'puff', 'injection', 'patch', 'spoon', 'sachet'];
   var UNITS = ['mg', 'mcg', 'g', 'ml', 'IU', '%', 'mg/ml'];
-  function L() { var l = (window.I18n && I18n.locale) || 'en'; return STR[String(l).slice(0, 2)] || STR.en; }
+  function L() { var l = (typeof I18n !== 'undefined' && I18n.locale) || 'en'; return STR[String(l).slice(0, 2)] || STR.en; }
   function t(k, p) { var v = L()[k] || STR.en[k] || k; Object.keys(p || {}).forEach(function (n) { v = v.split('{' + n + '}').join(p[n]); }); return v; }
-  function loc() { return (window.I18n && I18n.locale) || 'en'; }
+  function loc() { return (typeof I18n !== 'undefined' && I18n.locale) || 'en'; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function authed() { try { return typeof SyncEngine !== 'undefined' && SyncEngine.isAuthenticated(); } catch (e) { return false; } }
   function base() { try { return SyncEngine.getStatus().apiBase || ''; } catch (e) { return ''; } }

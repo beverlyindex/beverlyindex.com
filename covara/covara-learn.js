@@ -229,7 +229,7 @@
       { t: ['#cvCButton', '.cvn-orb'], wait: 'click', quietEnd: true, say: { en: 'Try it now: tap the C and speak a note.', it: 'Prova adesso: tocca la C e detta una nota.' } }
     ] }
   ];
-  var SIMPLE_ON = { en: 'Your screen is simple: your team, Help, Words, the Covara Button and Call team. Your team chose this for you.', it: 'Il tuo schermo è semplice: il tuo team, Aiuto, Parole, il pulsante Covara e Chiama il team. L’ha scelto il tuo team per te.' };
+  var SIMPLE_ON = { en: 'Your screen is simple: your team, Help, the Camera, Words, the Covara Button and Call team. Your team chose this for you. To see everything, hold the Covara logo for 2 seconds.', it: 'Il tuo schermo è semplice: il tuo team, Aiuto, la Fotocamera, Parole, il pulsante Covara e Chiama il team. L’ha scelto il tuo team per te. Per vedere tutto, tieni premuto il logo Covara per 2 secondi.' };
   var SIMPLE_OFF = { en: 'The simple screen is off on this phone. Someone on your team can turn it on from their own phone.', it: 'La schermata semplice è spenta su questo telefono. Qualcuno del tuo team può accenderla dal proprio telefono.' };
 
   /* While a lesson runs, these are held back: each would send, ring or change who is in the circle */

@@ -25,7 +25,8 @@
     en: {
       teamOf: '{name}’s team', myTeam: 'My team', team: 'TEAM', goTeam: 'Go to {name}’s team',
       askJoin: 'Ask to join {name}’s team',
-      askHow: '{name} decides who joins {name}’s team. Ask {name} to send you a team code from Covara. When it arrives, tap Type a code.',
+      askHow: '{name} decides who joins {name}’s team. You can also ask {name} for a team code from Covara. When it arrives, tap Type a code.',
+      asked: 'Asked. {name} will be asked to let you into {name}’s team.',
       typeCode: 'Type a code', waiting: 'Waiting for {name} to let you in',
       nowWith: 'You are now with {name}’s team.', backMine: 'You are back with your team.',
       leave: 'Leave {name}’s team', leaveTitle: 'Leave {name}’s team?',
@@ -37,7 +38,8 @@
     it: {
       teamOf: 'Il team di {name}', myTeam: 'Il mio team', team: 'TEAM', goTeam: 'Vai al team di {name}',
       askJoin: 'Chiedi di entrare nel team di {name}',
-      askHow: '{name} decide chi entra nel suo team. Chiedi a {name} di mandarti un codice del team da Covara. Quando arriva, tocca Scrivi un codice.',
+      askHow: '{name} decide chi entra nel suo team. Puoi anche chiedere a {name} un codice del team da Covara. Quando arriva, tocca Scrivi un codice.',
+      asked: 'Fatto. A {name} verrà chiesto di farti entrare nel suo team.',
       typeCode: 'Scrivi un codice', waiting: 'In attesa che {name} ti faccia entrare',
       nowWith: 'Sei ora con il team di {name}.', backMine: 'Sei di nuovo con il tuo team.',
       leave: 'Lascia il team di {name}', leaveTitle: 'Lasciare il team di {name}?',
@@ -216,12 +218,26 @@
     } else if (askedOf(uid)) {
       wrap.innerHTML = '<div class="cvt-wait">' + esc(t('waiting', { name: nm })) + '</div>';
     } else {
-      /* Joining needs {name}'s consent: {name} (or whoever decides for {name}) gives a team code. Covara's server
-         has no way to ask without one, so this explains it and opens the code pad. */
-      wrap.innerHTML = '<button type="button" class="cvp-b cvt-ask" aria-expanded="false">' + esc(t('askJoin', { name: nm })) + '</button>' +
+      /* Joining needs {name}'s consent: the ask goes to {name} (or whoever decides for {name}), who lets this person
+         in from their own circle; a team code still works too */
+      wrap.innerHTML = '<button type="button" class="cvp-b cvt-ask">' + esc(t('askJoin', { name: nm })) + '</button>' +
         '<div class="cvt-how">' + esc(t('askHow', { name: nm })) + '<button type="button" class="cvp-b pri" data-a="pad">' + esc(t('typeCode')) + '</button></div>';
       var ask = wrap.querySelector('.cvt-ask'), how = wrap.querySelector('.cvt-how');
-      ask.onclick = function (e) { e.stopPropagation(); var o = !how.classList.contains('open'); how.classList.toggle('open', o); ask.setAttribute('aria-expanded', String(o)); };
+      ask.onclick = async function (e) {
+        e.stopPropagation(); ask.disabled = true;
+        var r = null;
+        try { r = await SyncEngine.apiFetch('/care/join', { method: 'POST', body: JSON.stringify({ user_id: uid }) }); } catch (x) { r = null; }
+        if (r && r.ok) {
+          wrap.innerHTML = '<div class="cvt-wait">' + esc(t('waiting', { name: nm })) + '</div>';
+          toast(t('asked', { name: nm })); speak(t('asked', { name: nm }));
+          try { if (window.CovaraCare && CovaraCare.sync) CovaraCare.sync(); } catch (x) {}
+          return;
+        }
+        ask.disabled = false;
+        /* not allowed to ask (not in each other's circle yet) or offline: the code is the way */
+        how.classList.add('open');
+        if (!r) toast(t('offline'));
+      };
       how.querySelector('[data-a=pad]').onclick = function (e) { e.stopPropagation(); try { CovaraPerson.close(); } catch (x) {} setTimeout(function () { try { CovaraCare.openPad(); } catch (x) {} }, 200); };
     }
     btns.insertBefore(wrap, btns.firstChild);

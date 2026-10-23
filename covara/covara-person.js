@@ -11,7 +11,7 @@
   var IT = function () { try { return String(I18n.locale || '').slice(0, 2) === 'it'; } catch (e) { return false; } };
   var S = {
     en: {
-      call: 'Call {name}', video: 'Video call', message: 'Send a message', where: 'Where is {name}', drive: 'Drive to {name}', close: 'Close',
+      call: 'Call {name}', video: 'Video call', message: 'Send a message', email: 'Email', where: 'Where is {name}', drive: 'Drive to {name}', close: 'Close',
       finding: 'Finding {name}...', notShared: 'Location not shared', unknown: 'Location not known yet', withYou: 'With you', withHome: 'With {home}',
       away: '{d} away', fromHome: '{d} from {home}', atHomeOf: 'At {home}\'s home', atHome: 'At home', out: 'Out, {d} from home', outNoD: 'Out of the house',
       ago: ', seen {t} ago', now: ', seen just now', careOf: 'Care of {name}', yourCare: 'Your care',
@@ -23,7 +23,7 @@
       driveTold: '{name} has been told you are coming, about {n} minutes away.', driveNo: '{name} has not shared where they are with you, so Covara cannot give directions.'
     },
     it: {
-      call: 'Chiama {name}', video: 'Videochiamata', message: 'Manda un messaggio', where: 'Dov\'è {name}', drive: 'Vai da {name}', close: 'Chiudi',
+      call: 'Chiama {name}', video: 'Videochiamata', message: 'Manda un messaggio', email: 'Email', where: 'Dov\'è {name}', drive: 'Vai da {name}', close: 'Chiudi',
       finding: 'Cerco {name}...', notShared: 'Posizione non condivisa', unknown: 'Posizione non ancora nota', withYou: 'Con te', withHome: 'Con {home}',
       away: 'a {d}', fromHome: 'a {d} da {home}', atHomeOf: 'A casa di {home}', atHome: 'A casa', out: 'Fuori, a {d} da casa', outNoD: 'Fuori casa',
       ago: ', visto {t} fa', now: ', visto adesso', careOf: 'Le cure di {name}', yourCare: 'Le tue cure',
@@ -94,7 +94,7 @@
     '#cvpSheet .cvp-head .cvp-title{text-align:left;margin:0;font-size:24px}' +
     '#cvpSheet .cvp-head .cvp-sub{text-align:left;margin:2px 0 0}' +
     '#cvpSheet .cvp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}' +
-    '#cvpSheet .cvp-calls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 0 12px}#cvpSheet .cvp-calls .cvp-b{min-height:54px;padding:6px 8px;font-size:16px}' +
+    '#cvpSheet .cvp-calls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}#cvpSheet .cvp-calls .cvp-b{min-height:54px;padding:6px 8px;font-size:16px}' +
     '#cvpSheet .cvp-tile{position:relative;min-height:112px;padding:14px 14px 12px;border-radius:20px;border:1px solid rgba(150,200,255,.48);cursor:pointer;text-align:left;color:#f2f7ff;display:flex;flex-direction:column;justify-content:space-between;gap:8px;' +
       'background:linear-gradient(155deg,rgba(80,140,240,.24),rgba(18,40,96,.48));box-shadow:0 0 18px rgba(70,150,255,.26),inset 0 1px 0 rgba(255,255,255,.16);font-family:var(--nous-font,"Hanken Grotesk",system-ui,sans-serif);text-shadow:0 1px 2px rgba(2,8,24,.55)}' +
     '#cvpSheet .cvp-tile{min-height:100px}#cvpSheet .cvp-tile[data-k=day]{border-color:rgba(255,210,77,.7)}' +
@@ -216,6 +216,7 @@
         '<button type="button" class="cvp-b pri" data-a="phone">' + esc(t('call', { name: nm })) + '</button>' +
         '<button type="button" class="cvp-b" data-a="video">' + esc(t('video')) + '</button>' +
         '<button type="button" class="cvp-b" data-a="sms">' + esc(t('message')) + '</button>' +
+        '<button type="button" class="cvp-b" data-a="email">' + esc(t('email')) + '</button>' +
         (isMember ? '<button type="button" class="cvp-b" data-a="where">' + esc(t('where', { name: nm })) + '</button>' : '') +
         (isMember && role() === 'home' ? '<button type="button" class="cvp-b gold" data-a="drive" hidden>' + esc(t('drive', { name: nm })) + '</button>' : '') +
       '</div>';
@@ -234,7 +235,7 @@
   function fresh(c) { return byId(c.id) || c; }
   function act(a, c, nm, btn) {
     c = fresh(c);
-    if (a === 'phone' || a === 'video' || a === 'sms') {
+    if (a === 'phone' || a === 'video' || a === 'sms' || a === 'email') {
       close();
       setTimeout(function () { try { runContactQuickAction(a, c); } catch (e) {} }, 60);
       return;
@@ -308,7 +309,7 @@
     var html = '<div class="cvp-head"><div data-ph></div><div><div class="cvp-title">' + esc(nm) + '</div><div class="cvp-sub" data-line>' + esc(self ? t('yourCare') : t('careOf', { name: nm })) + '</div></div></div>' +
       /* on the family's phone, calling HOME lives here (it replaces the old pills beside HOME's sphere) */
       (!self ? '<div class="cvp-calls"><button type="button" class="cvp-b pri" data-c="phone">' + esc(t('call', { name: nm })) + '</button>' +
-        '<button type="button" class="cvp-b" data-c="video">' + esc(t('video')) + '</button><button type="button" class="cvp-b" data-c="sms">' + esc(t('message')) + '</button></div>' : '') +
+        '<button type="button" class="cvp-b" data-c="video">' + esc(t('video')) + '</button><button type="button" class="cvp-b" data-c="sms">' + esc(t('message')) + '</button><button type="button" class="cvp-b" data-c="email">' + esc(t('email')) + '</button></div>' : '') +
       '<div class="cvp-grid">' + TILES.map(function (k) { return '<button type="button" class="cvp-tile" data-k="' + k + '"><b>' + esc(t(k)) + '</b><span data-s></span></button>'; }).join('') + '</div>';
     show(html, function (el) { var ph = el.querySelector('[data-ph]'); ph.parentNode.replaceChild(photoCanvas(h, nm), ph); });
     sheet.setAttribute('aria-label', self ? t('yourCare') : t('careOf', { name: nm }));

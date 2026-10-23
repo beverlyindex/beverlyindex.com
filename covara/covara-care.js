@@ -73,7 +73,7 @@
       rel: { child: 'Figlio o figlia', partner: 'Partner', sibling: 'Fratello o sorella', friend: 'Amico', carer: 'Badante', doctor: 'Medico' }
     }
   };
-  function L() { var l = (window.I18n && I18n.locale) || 'en'; return STR[String(l).slice(0, 2)] || STR.en; }
+  function L() { var l = (typeof I18n !== 'undefined' && I18n.locale) || 'en'; return STR[String(l).slice(0, 2)] || STR.en; }
   function t(k, p) { var v = L()[k] || STR.en[k] || k; Object.keys(p || {}).forEach(function (n) { v = v.split('{' + n + '}').join(p[n]); }); return v; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function role() { try { return localStorage.getItem(ROLE_KEY) || ''; } catch (e) { return ''; } }
