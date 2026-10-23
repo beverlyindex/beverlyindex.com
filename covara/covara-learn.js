@@ -7,7 +7,7 @@
    Practice is safe: a lesson never sends a message, an ask, a call for Help or an invite. While a lesson runs,
    every button that would send something or ring someone is held back, and a lesson stops at the step before a
    real send: it shows the Send button, says that pressing it would send for real, and ends without pressing it.
-   Room motion has no lesson: it has nothing on the screen yet (covara-room.js is read by the phone app only).
+   Room motion has its own lesson: the room radar in WHEREIS (or Safety, on HOME's phone) opens its screen.
    window.CovaraLearn = { open(), close(), start(id), stop(), active(), lessons(), sentences(lang) }
    Beverly Index LLC */
 (function () {
@@ -104,7 +104,14 @@
     settings: function () { var p = document.getElementById('settingsPanel'); return !!(p && p.classList.contains('open')); },
     circle: function () { return shown(document.querySelector('#cvFamilySection [data-a=link]')); },
     where: function () { try { return WhereIs.mode() === 'whereis'; } catch (e) { return false; } },
-    code: function () { var c = document.getElementById('cvCode'); return !!(c && c.classList.contains('open')); }
+    code: function () { var c = document.getElementById('cvCode'); return !!(c && c.classList.contains('open')); },
+    room: function () { try { return !!(window.CovaraWhere && CovaraWhere.roomOpen()); } catch (e) { return false; } }
+  };
+  /* the room radar: the small circle under the WHEREIS map, drawn on the canvas */
+  var ROOMDOT = function () {
+    try { if (!(window.CovaraWhere && CovaraWhere.on() && WhereIs.mode() === 'whereis')) return null; } catch (e) { return null; }
+    var m = window._dreamMicroHit, r = sphereRect(); if (!m || !r) return null;
+    return { rect: { left: r.left + m.cx - m.r, top: r.top + m.cy - m.r, width: 2 * m.r, height: 2 * m.r }, round: true };
   };
 
   /* ── lessons: every line fixed (no names), so it can be made in Covara's voice ahead of time ── */
@@ -177,6 +184,22 @@
       { only: 'away', t: '#cvFamilySection .cv-myloc', say: { en: 'Here you choose who can see where you are: only the person you look after, the whole circle, or nobody.', it: 'Qui scegli chi può vedere dove sei: solo la persona che segui, tutta la cerchia, o nessuno.' } }
     ]) },
 
+    { id: 'room', title: { en: 'Room motion', it: 'Movimento in stanza' }, steps: [
+      { only: 'home', say: { en: 'Room motion tells your team whether your room is moving or quiet. It uses only your own phone, resting on its charger. No other device is needed.', it: 'Movimento in stanza dice al tuo team se nella tua stanza c’è movimento o quiete. Usa solo il tuo telefono, appoggiato sul caricatore. Non serve nessun altro dispositivo.' } },
+      { only: 'home', t: CENTRE, wait: W.care, say: OPEN_MINE },
+      { only: 'home', t: '#cvpSheet .cvp-tile[data-k=safety]', wait: 'click', say: { en: 'Tap Safety.', it: 'Tocca Sicurezza.' } },
+      { only: 'home', t: '#cvTabs .cvr-entry button', wait: W.room, say: { en: 'Tap Room motion.', it: 'Tocca Movimento in stanza.' } },
+      { only: 'away', say: { en: 'Room motion tells you whether the room of the person you look after is moving or quiet. It uses only their own phone, resting on its charger. No other device is needed.', it: 'Movimento in stanza ti dice se nella stanza della persona che segui c’è movimento o quiete. Usa solo il suo telefono, appoggiato sul caricatore. Non serve nessun altro dispositivo.' } },
+      { only: 'away', start: true, t: '#whereisAnchor', wait: W.where, miss: { en: 'WHEREIS is under the circle at the top, beside Communication.', it: 'WHEREIS è sotto il cerchio in alto, accanto a Comunicazione.' }, say: { en: 'Tap WHEREIS.', it: 'Tocca WHEREIS.' } },
+      { only: 'away', t: ROOMDOT, wait: W.room, miss: { en: 'The room radar is the small circle under the map in WHEREIS.', it: 'Il radar della stanza è il cerchio piccolo sotto la mappa in WHEREIS.' }, say: { en: 'The small circle under the map is the room radar. Tap it.', it: 'Il cerchio piccolo sotto la mappa è il radar della stanza. Toccalo.' } },
+      { t: '#cvRoom .rm-radar', say: { en: 'The radar sweeps the whole room once every 10 seconds. Gold ripples mean movement now. The ring around it is the last two hours, gold where the room moved.', it: 'Il radar controlla tutta la stanza una volta ogni 10 secondi. Le onde dorate indicano movimento adesso. L’anello intorno sono le ultime due ore, dorato dove la stanza si è mossa.' } },
+      { t: '#cvRoom .rm-now', say: { en: 'Here it says in plain words: movement now, or quiet since a time.', it: 'Qui lo dice in parole semplici: movimento adesso, oppure quiete da una certa ora.' } },
+      { t: '#cvRoom .rm-phone', say: { en: 'Here you see whether the phone is listening, when it last swept the room, and, when the phone tells it, whether it is on its charger.', it: 'Qui vedi se il telefono è in ascolto, quando ha controllato la stanza l’ultima volta e, quando il telefono lo dice, se è sul caricatore.' } },
+      { t: '#cvRoom .rm-how', optional: true, say: { en: 'When the phone is not listening, these steps turn it on.', it: 'Quando il telefono non è in ascolto, questi passi lo accendono.' } },
+      { t: '#cvRoom .rm-limits', say: { en: 'It senses movement and stillness only. It does not tell who is moving, and it does not detect breathing or falls.', it: 'Sente solo movimento e quiete. Non dice chi si muove, e non rileva il respiro né le cadute.' } },
+      { t: '#cvRoom [data-a=done]', wait: function () { return !W.room(); }, say: { en: 'Tap Close.', it: 'Tocca Chiudi.' } }
+    ] },
+
     { id: 'med', title: { en: 'Medicines', it: 'Medicine' }, steps: openCare().concat([
       { t: '#cvpSheet .cvp-tile[data-k=med]', wait: 'click', say: { en: 'Tap Medicines. The tile shows the next dose, and turns red when one is late.', it: 'Tocca Medicine. La casella mostra la prossima dose, e diventa rossa quando una è in ritardo.' } },
       { t: '#cvTabs [data-add=med]', say: { en: 'Add a medicine opens a form. Take a photo of the bottle, and Covara reads the label: the name, the dose and how often. Check each line before you save.', it: 'Aggiungi una medicina apre un modulo. Fotografa la confezione, e Covara legge l’etichetta: il nome, la dose e ogni quanto. Controlla ogni riga prima di salvare.' } },
@@ -245,7 +268,7 @@
   /* While a lesson runs, these are held back: each would send, ring or change who is in the circle */
   var GUARD = ['#cvplSheet [data-a=send]', '#cvplSheet form [type=submit]', '#cvHelpCard [data-hold]', '#helpFab', '#cvCode [data-a=share]', '#cvCode [data-a=end]', '#cvCode [data-a=new]',
     '#cvpSheet [data-a=phone]', '#cvpSheet [data-a=video]', '#cvpSheet [data-a=sms]', '#cvpSheet [data-a=drive]', '#cvpSheet [data-c]', '#cvnDock .cvs-b[data-s=call]',
-    '#cvNow .row button', '#cvMorning button', '#cvFamilySection [data-a=link]', '#cvsMe [data-m=out]'].join(',');
+    '#cvNow .row button', '#cvMorning button', '#cvFamilySection [data-a=link]', '#cvsMe [data-m=out]', '#cvRoom [data-a=listen]'].join(',');
 
   function stepsFor(ls) { var r = role() === 'away' ? 'away' : 'home'; return ls.steps.filter(function (s) { return !s.only || s.only === r; }); }
   function lessons() { return LESSONS.filter(function (ls) { return stepsFor(ls).length > 0; }); }
@@ -362,6 +385,7 @@
     try { var p = document.getElementById('settingsPanel'); if (p && p.classList.contains('open') && typeof SettingsPanel !== 'undefined') SettingsPanel.close(); } catch (e) {}
     try { if (window.CovaraWords && CovaraWords.isOpen()) CovaraWords.close(); } catch (e) {}
     try { var c = document.getElementById('cvCode'); if (c) c.classList.remove('open'); } catch (e) {}
+    try { if (window.CovaraWhere && CovaraWhere.roomOpen()) CovaraWhere.closeRoom(); } catch (e) {}
     try { var tb = document.getElementById('cvTabs'); if (tb && tb.classList.contains('show') && window.CovaraView) CovaraView.open(''); } catch (e) {}
   }
   function start(id, fresh) {
