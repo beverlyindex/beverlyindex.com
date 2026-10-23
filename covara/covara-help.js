@@ -184,6 +184,7 @@
   }
   /* WHEREIS on the caller: the big radar is the area, the small one the room or the tightest circle */
   function showOnMap(h, first) {
+    try { if (window.CovaraTeams && !h.you) CovaraTeams.go(h.home); } catch (e) {} /* Covara teams: the caller's team comes on screen */
     try {
       var c = null;
       if (!h.sender.is_home) c = (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).filter(function (x) { return x.care && x.care.userId === h.sender.id; })[0] || null;
@@ -211,7 +212,8 @@
   }
   function line(h) {
     var me = h.you, parts = [];
-    parts.push('<b>' + esc(me ? t('youCalled') : t('called', { name: String(h.sender.name || '').toUpperCase() })) + '</b>');
+    var tp = window.CovaraTeams ? CovaraTeams.prefix(h.home) : ''; /* Covara teams: whose team it is from */
+    parts.push('<b>' + esc(tp + (me ? t('youCalled') : t('called', { name: String(h.sender.name || '').toUpperCase() }))) + '</b>');
     parts.push(esc(hm(h.started_at)));
     if (h.room) parts.push(esc(t('room', { room: h.room })));
     if (h.location) { parts.push('<i>' + esc(t('live', { t: ago(h.location.at) })) + '</i>'); if (h.location.accuracy) parts.push(esc(t('acc', { d: dist(h.location.accuracy) }))); }
@@ -272,7 +274,8 @@
       body.push((h.responders || []).length ? t('coming', { names: h.responders.map(function (x) { return String(x.name || '').split(/\s+/)[0]; }).join(', ') }) : t('nobody'));
       var acts = h.you ? [{ label: t('allRight'), primary: true, onClick: function () { return act('ok', h, this); } }, { label: t('nearBtn'), onClick: function () { return act('near', h, this); } }]
         : [{ label: onWay ? t('youOnWay') : t('onWay'), primary: true, disabled: onWay, onClick: function () { return act('way', h, this); } }, { label: t('call'), onClick: function () { return act('call', h, this); } }, { label: t('nearBtn'), onClick: function () { return act('near', h, this); } }];
-      CovaraNow.push({ id: id, rank: 0, icon: '🚨', lead: t('lead'), title: h.you ? t('nowYou') : t('nowCalled', { name: nm }), body: body.join(' · '), at: h.started_at, actions: acts });
+      var tp = window.CovaraTeams ? CovaraTeams.prefix(h.home) : ''; /* Covara teams: whose team it is from; a tap on the card goes there */
+      CovaraNow.push({ id: id, rank: 0, icon: '🚨', lead: t('lead'), title: tp + (h.you ? t('nowYou') : t('nowCalled', { name: nm })), body: body.join(' · '), at: h.started_at, actions: acts, onTap: function () { showOnMap(h, false); } });
     });
     Object.keys(_nowIds).forEach(function (id) { if (!keep[id]) CovaraNow.remove(id); });
     _nowIds = keep;

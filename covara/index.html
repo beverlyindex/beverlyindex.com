@@ -43911,7 +43911,8 @@ var AlarmCenter = (function () {
     el.setAttribute('aria-labelledby', 'alarmTkTitle');
     function add(tag, cls, text, id) { var n = document.createElement(tag); n.className = cls; if (id) n.id = id; n.textContent = text; el.appendChild(n); return n; }
     add('div', 'tk-lvl', _t('alarm.urgent', 'URGENT'));
-    add('div', 'tk-title', a.title, 'alarmTkTitle');
+    var _tkTitle = add('div', 'tk-title', a.title, 'alarmTkTitle');
+    try { if (window.CovaraTeams) CovaraTeams.alarm(a, _tkTitle); } catch (e) {} /* Covara teams: whose team it is from, and a tap goes there */
     if (a.body) add('div', 'tk-body', a.body);
     if (a.raised_by_name && a.raised_by !== _myId()) add('div', 'tk-meta', _t('alarm.from', 'From {name}', { name: a.raised_by_name }));
     if (a.escalation_step > 0) add('div', 'tk-meta', _t('alarm.escalated', 'Escalated: nobody acknowledged it in time.'));
@@ -43955,6 +43956,7 @@ var AlarmCenter = (function () {
       lvl.className = 'alarm-lvl';
       lvl.textContent = a.level === 3 ? _t('alarm.urgent', 'URGENT') : _t('alarm.attention', 'ATTENTION');
       var ti = document.createElement('div'); ti.className = 'alarm-title'; ti.textContent = a.title;
+      try { if (window.CovaraTeams) CovaraTeams.alarm(a, ti); } catch (e) {} /* Covara teams: whose team it is from, and a tap goes there */
       bar.appendChild(lvl); bar.appendChild(ti);
       if (a.body) { var bo = document.createElement('div'); bo.className = 'alarm-body'; bo.textContent = a.body; bar.appendChild(bo); }
       if (a.escalation_step > 0) { var es = document.createElement('div'); es.className = 'alarm-esc'; es.textContent = _t('alarm.escalated', 'Escalated: nobody acknowledged it in time.'); bar.appendChild(es); }
@@ -45759,6 +45761,7 @@ try { _resolveAppScriptReady(); } catch (e) {}
 
   <!-- Hidden host for GIF images so browser keeps animating them for canvas -->
   <div id="gifAnimationHost"></div>
+  <script src="covara-teams.js" defer></script>
   <script src="covara-care.js" defer></script>
   <script src="covara-label.js" defer></script>
   <script src="covara-view.js" defer></script>

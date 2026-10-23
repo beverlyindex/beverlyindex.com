@@ -204,7 +204,8 @@
     /* things in HOME's care drawn as spheres keep their own behaviour */
     if (c.cvItem && c.cvItem.kind !== 'person') return false;
     /* HOME's own face opens HOME's care, wherever it is drawn */
-    if (c.care && c.care.side === 'home' && c.care.state === 'active') return openCare();
+    /* Covara teams: only the HOME whose team is on screen; on My team, another HOME's face opens their sheet (with TEAM) */
+    if (c.care && c.care.side === 'home' && c.care.state === 'active' && role() === 'away' && c === homeContact()) return openCare();
     var nm = first(c.first || c.last || c.cvTitle) || '';
     var isMember = !!(c.care && c.care.userId && c.care.state === 'active');
     var seq = ++_seq;

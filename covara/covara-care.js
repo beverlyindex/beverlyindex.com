@@ -163,7 +163,7 @@
       b.onclick = async function () {
         setRole(b.getAttribute('data-r')); hide(el); document.body.classList.remove('cv-asking'); renderFamily();
         await sync();
-        if (!careContacts().length) { if (role() === 'home') openCode(); else openPad(); }
+        if (!careContacts().length) { if (b.getAttribute('data-r') === 'home') openCode(); else openPad(); }
       };
     });
     document.body.classList.add('cv-asking');
@@ -292,6 +292,8 @@
         if (!r.ok) { msg.textContent = r.status === 400 ? t('padOwn') : t('padWrong'); val = ''; paint(); return; }
         msg.className = 'cv-msg ok'; msg.textContent = t('padSent');
         await sync();
+        /* Covara teams: having just joined, this person is taken into that team */
+        try { if (window.CovaraTeams && r.data && r.data.link && r.data.link.home) CovaraTeams.show(r.data.link.home.id); } catch (x) {}
         setTimeout(function () { hide(el); openCircle(); }, 1400);
       } catch (e) { msg.textContent = t('offline'); }
     }
@@ -542,7 +544,7 @@
       try { sessionStorage.removeItem('rc:join'); } catch (e) {}
       try { if (/join=/.test(location.hash)) history.replaceState({}, '', location.pathname); } catch (e) {}
       api('/claim', { method: 'POST', body: { code: jc } }).then(function (r) {
-        if (r.ok) { toast(t('padSent')); sync(); } else toast(r.status === 400 ? t('padOwn') : t('padWrong'));
+        if (r.ok) { toast(t('padSent')); sync().then(function () { try { if (window.CovaraTeams && r.data && r.data.link && r.data.link.home) CovaraTeams.show(r.data.link.home.id); } catch (x) {} }); } else toast(r.status === 400 ? t('padOwn') : t('padWrong'));
       }).catch(function () {});
     })();
     (function wait() { if (authed()) { sync(); setInterval(function () { if (!document.hidden) sync(); }, role() === 'home' ? 8000 : 20000); } else setTimeout(wait, 1000); })();
