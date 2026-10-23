@@ -23261,6 +23261,9 @@ const WhereIs = (() => {
           const pt = (e.touches && e.touches[0]) || e;
           const w = which(pt);
           if (w) { _down = w; e.stopImmediatePropagation(); }
+          /* Covara radar fix (covara-where.js): a new press elsewhere clears a press left over from the mouse events a phone
+             sends after a touch, so the next tap on the radar does not flip WHEREIS back to Communication */
+          else if (evt !== 'mousedown') _down = null;
         }, true));
         ['pointerup', 'mouseup', 'touchend', 'click'].forEach(evt => st.addEventListener(evt, e => {
           if (!_down) return;
@@ -43911,7 +43914,8 @@ var AlarmCenter = (function () {
     el.setAttribute('aria-labelledby', 'alarmTkTitle');
     function add(tag, cls, text, id) { var n = document.createElement(tag); n.className = cls; if (id) n.id = id; n.textContent = text; el.appendChild(n); return n; }
     add('div', 'tk-lvl', _t('alarm.urgent', 'URGENT'));
-    add('div', 'tk-title', a.title, 'alarmTkTitle');
+    var _tkTitle = add('div', 'tk-title', a.title, 'alarmTkTitle');
+    try { if (window.CovaraTeams) CovaraTeams.alarm(a, _tkTitle); } catch (e) {} /* Covara teams: whose team it is from, and a tap goes there */
     if (a.body) add('div', 'tk-body', a.body);
     if (a.raised_by_name && a.raised_by !== _myId()) add('div', 'tk-meta', _t('alarm.from', 'From {name}', { name: a.raised_by_name }));
     if (a.escalation_step > 0) add('div', 'tk-meta', _t('alarm.escalated', 'Escalated: nobody acknowledged it in time.'));
@@ -43955,6 +43959,7 @@ var AlarmCenter = (function () {
       lvl.className = 'alarm-lvl';
       lvl.textContent = a.level === 3 ? _t('alarm.urgent', 'URGENT') : _t('alarm.attention', 'ATTENTION');
       var ti = document.createElement('div'); ti.className = 'alarm-title'; ti.textContent = a.title;
+      try { if (window.CovaraTeams) CovaraTeams.alarm(a, ti); } catch (e) {} /* Covara teams: whose team it is from, and a tap goes there */
       bar.appendChild(lvl); bar.appendChild(ti);
       if (a.body) { var bo = document.createElement('div'); bo.className = 'alarm-body'; bo.textContent = a.body; bar.appendChild(bo); }
       if (a.escalation_step > 0) { var es = document.createElement('div'); es.className = 'alarm-esc'; es.textContent = _t('alarm.escalated', 'Escalated: nobody acknowledged it in time.'); bar.appendChild(es); }
@@ -44322,11 +44327,16 @@ var AlarmCenter = (function () {
     var b = _fab();
     var ex = document.getElementById('exitBtn');
     var er = ex ? ex.getBoundingClientRect() : null;
-    /* Help lives under Exit: it shows only while Exit does */
-    var on = _authed() && !_locked() && !!(er && er.width && er.height);
+    /* Help lives under Exit; where Exit is hidden (Simple mode hides it), Help stays, at the top right on its own.
+       Before, Help vanished with Exit, so HOME's simple screen had no Help button at all. */
+    var on = _authed() && !_locked();
     b.classList.toggle('on', on);
-    if (on) {
-      var r = er;
+    if (on && !(er && er.width && er.height)) {
+      b.style.width = ''; b.style.height = '40px'; b.style.fontSize = '13px';
+      b.style.top = 'calc(' + (document.body.classList.contains('cv-team-other') ? 64 : 18) + 'px + env(safe-area-inset-top, 0px))'; b.style.right = '16px';
+    }
+    if (on && er && er.width && er.height) {
+      var r = er; b.style.fontSize = '';
       if (r.width && r.height) {
         /* A compact pill: about two thirds of Exit's height, as wide as its word */
         b.style.width = '';
@@ -45759,6 +45769,7 @@ try { _resolveAppScriptReady(); } catch (e) {}
 
   <!-- Hidden host for GIF images so browser keeps animating them for canvas -->
   <div id="gifAnimationHost"></div>
+  <script src="covara-teams.js" defer></script>
   <script src="covara-care.js" defer></script>
   <script src="covara-label.js" defer></script>
   <script src="covara-view.js" defer></script>
@@ -45778,5 +45789,9 @@ try { _resolveAppScriptReady(); } catch (e) {}
   <script src="covara-person.js" defer></script>
   <script src="covara-words.js" defer></script>
   <script src="covara-simple.js" defer></script>
+  <script src="covara-guide.js" defer></script>
+  <script src="covara-learn.js" defer></script>
+  <script src="covara-notes.js" defer></script>
+  <script src="covara-records.js" defer></script>
 </body>
 </html>

@@ -83,6 +83,8 @@
         '<h4>' + esc(c.title) + '</h4>' + (c.body ? '<p>' + esc(c.body) + '</p>' : '') +
         ((c.actions || []).length ? '<div class="row">' + c.actions.map(function (a, i) { return '<button type="button" data-i="' + i + '"' + (a.primary ? ' class="pri"' : '') + (a.disabled ? ' disabled' : '') + '>' + esc(a.label) + '</button>'; }).join('') + '</div>' : '');
       var mb = el.querySelector('.more'); if (mb) mb.onclick = function (e) { e.stopPropagation(); next(); };
+      /* a card may go somewhere when tapped outside its buttons (a call for help goes to its team) */
+      el.onclick = typeof c.onTap === 'function' ? function () { try { c.onTap(); } catch (x) {} } : null; el.style.cursor = el.onclick ? 'pointer' : '';
       el.querySelectorAll('[data-i]').forEach(function (b) {
         b.onclick = function (e) {
           e.stopPropagation();
