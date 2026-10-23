@@ -44324,11 +44324,16 @@ var AlarmCenter = (function () {
     var b = _fab();
     var ex = document.getElementById('exitBtn');
     var er = ex ? ex.getBoundingClientRect() : null;
-    /* Help lives under Exit: it shows only while Exit does */
-    var on = _authed() && !_locked() && !!(er && er.width && er.height);
+    /* Help lives under Exit; where Exit is hidden (Simple mode hides it), Help stays, at the top right on its own.
+       Before, Help vanished with Exit, so HOME's simple screen had no Help button at all. */
+    var on = _authed() && !_locked();
     b.classList.toggle('on', on);
-    if (on) {
-      var r = er;
+    if (on && !(er && er.width && er.height)) {
+      b.style.width = ''; b.style.height = '40px'; b.style.fontSize = '13px';
+      b.style.top = 'calc(' + (document.body.classList.contains('cv-team-other') ? 64 : 18) + 'px + env(safe-area-inset-top, 0px))'; b.style.right = '16px';
+    }
+    if (on && er && er.width && er.height) {
+      var r = er; b.style.fontSize = '';
       if (r.width && r.height) {
         /* A compact pill: about two thirds of Exit's height, as wide as its word */
         b.style.width = '';
