@@ -1310,7 +1310,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-23.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-23.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -6906,8 +6906,14 @@ function sigDrop(d){ const g=sigGet(), b=g.by[d.id]; if(P.mine) delete P.mine[d.
   g.t=Date.now(); }
 const sigSize = () => { const g=sigGet(); return g.names.length+Object.keys(g.counts).reduce((n,k)=>n+g.counts[k],0); };
 // After every reading: a device with one of your names is yours. Unnamed devices fill the places your signature holds for their kind, nearest first,
-// and only while they are beside this phone (FOLLOW.sigNear meters). A device of the same maker and kind that keeps its distance is tested like any other.
-const sigNear = d => { if(d.atHome || (typeof d.dist==='number' && d.dist<=FOLLOW.sigNear)){ d.sigAt=Date.now(); return true; } return !!d.sigAt && Date.now()-d.sigAt<60000 && typeof d.dist==='number' && d.dist<=FOLLOW.sigNear*2; };
+// and only once they have kept beside this phone: within 12 m without a break for 45 seconds or more, and within 6 m (FOLLOW.sigNear) in the last minute.
+// Your own watch or earphones stay that close all the time. A stranger walking past, or someone who stops beside you for a moment, does not, and is
+// never taken for yours. A device of the same maker and kind that keeps its distance is tested like any other.
+const SIG_HOLD=45000;
+const sigNear = d => { if(d.atHome) return true; const now=Date.now(), dd=typeof d.dist==='number' ? d.dist : Infinity;
+  if(!d.present || dd>FOLLOW.sigNear*2){ d.sigSince=0; d.sigAt=0; return false; }
+  if(!d.sigSince) d.sigSince=now; if(dd<=FOLLOW.sigNear) d.sigAt=now;
+  return now-d.sigSince>=SIG_HOLD && !!d.sigAt && now-d.sigAt<60000; };
 function sigApply(){ const g=sigGet();
   LIVE.devs.forEach(d=>{ if(d.paired){ d.mine=true; d.withYou=false; d.maybe=false; d.onRoute=false; d.knownBefore=true; } });          // paired with this phone: yours, without a tap
   if(!g.names.length && !Object.keys(g.counts).length) return;
@@ -8468,7 +8474,7 @@ function fsRender(){ const F=S.fs, b=el('fsBody'); if(!F || !b) return; if(F.mod
    cameras, drones and anything moving with you are never suggested: you decide those yourself. Threat is set one device at a time, from its card. */
 const SORT_F=['mine','house','known','nb','pub','sus'];
 function sortSug(d){ if(d.cls==='Tag' || d.cls==='Camera' || d.rid || d.withYou || d.maybe) return '';
-  if(/^Unit on a bus or tram/.test(d.hint||'')) return 'pub';
+  if(/^Unit on a bus or tram/.test(d.hint||'') || /^(lime|bird|tier|dott|voi|bolt|helbiz|bike ?mi)[-_ ]?[0-9a-f]{4,}/i.test(d.adv||'')) return 'pub';          // a bus or tram unit, a shared scooter or bicycle
   if(houseDev(d)) return 'nb';
   if(tagOf(d)==='local') return 'nb';
   if(!isWorn(d) && !grpPhone(d) && (d.verdict==='fixed' || d.retFix || stayPut(d))) return 'nb';
