@@ -8533,7 +8533,8 @@ function mediaErrText(err) {
   var T = function (k, d) { return (typeof _t === 'function' ? _t(k, d) : d) || d; };
   var m = String((err && (err.code || err.message)) || '');
   if (m === 'empty') return T('media.empty', 'The phone handed over an empty file. If the picture is stored online (Google Photos), open it and download it to the phone first, then choose it again.');
-  if (m === 'image') return T('media.cantOpen', 'This picture could not be opened. Try a JPEG or PNG photo, or a GIF.');
+  if (m === 'image') return T('media.cantOpen', 'This picture could not be opened. Try a JPEG or PNG photo, or a GIF.') + (err && err.detail ? ' (' + err.detail + ')' : '');
+  if (m === 'read') return T('media.read', 'The phone did not hand over the picture. Choose it from Gallery rather than an online album, then try again.');
   if (m === 'store') return T('media.store', 'The picture could not be saved on this phone. Free some space on the phone, then try again.');
   return T('self.error', 'That file could not be used. Try another photo or clip.') + (m ? ' (' + m.slice(0, 40) + ')' : '');
 }
@@ -8674,6 +8675,13 @@ var SphereMedia = (function () {
      downscalePhoto; animated GIFs and videos are kept byte for byte. */
   async function prepare(file) {
     if (!file || !file.size) throw new Error('empty');
+    /* Read the whole picture into memory first. The installed app hands over a file that still lives with the
+       gallery or Files app; reading it once, here, means every later step works on these bytes, not on that link. */
+    var bytes = null;
+    try { bytes = await file.arrayBuffer(); } catch (e) { bytes = null; }
+    if (!bytes) { var re = new Error('read'); re.code = 'read'; throw re; }
+    if (!bytes.byteLength) throw new Error('empty');
+    try { file = new File([bytes], file.name || 'picked', { type: file.type || '' }); } catch (e) { var nm0 = file.name; file = new Blob([bytes], { type: file.type || '' }); try { file.name = nm0; } catch (e2) {} }
     var s = await sniff(file);
     var blob = file;
     if (s.kind === 'photo') {
@@ -13094,6 +13102,7 @@ const I18n = (function () {
     "media.help": "Photos, animated GIFs and short videos up to 4 MB play inside your sphere.",
     "media.empty": "The phone handed over an empty file. If the picture is stored online (Google Photos), open it and download it to the phone first, then choose it again.",
     "media.cantOpen": "This picture could not be opened. Try a JPEG or PNG photo, or a GIF.",
+    "media.read": "The phone did not hand over the picture. Choose it from Gallery rather than an online album, then try again.",
     "media.store": "The picture could not be saved on this phone. Free some space on the phone, then try again.",
     "media.cannotPlay": "This clip cannot play in this browser. A still is shown.",
     "views.newTitle": "New {type} view",
@@ -13481,6 +13490,7 @@ const I18n = (function () {
     "media.help": "Foto, GIF animate e brevi video fino a 4 MB si riproducono nella tua sfera.",
     "media.empty": "Il telefono ha passato un file vuoto. Se l\u2019immagine \u00e8 salvata online (Google Foto), aprila e scaricala sul telefono, poi sceglila di nuovo.",
     "media.cantOpen": "Impossibile aprire questa immagine. Prova una foto JPEG o PNG, oppure una GIF.",
+    "media.read": "Il telefono non ha passato l'immagine. Sceglila dalla Galleria invece che da un album online, poi riprova.",
     "media.store": "Impossibile salvare l\u2019immagine su questo telefono. Libera un po\u2019 di spazio, poi riprova.",
     "media.cannotPlay": "Questa clip non può essere riprodotta in questo browser. Viene mostrata un’immagine fissa.",
     "views.newTitle": "Nuova vista {type}",
@@ -28618,7 +28628,12 @@ async function applySelfMedia(file) {
   let bm = null;
   if (!opened || !(img.naturalWidth || img.width)) {
     try { bm = await createImageBitmap(blob); } catch (e) { bm = null; }
-    if (!bm) throw new Error('image');
+    if (!bm) {
+      /* a short code on the message says what the phone handed over, so a failure can be traced */
+      const ie = new Error('image'); ie.code = 'image';
+      try { const h = new Uint8Array(await blob.slice(0, 4).arrayBuffer()); ie.detail = (String(blob.type || 'none').replace('image/', '')) + ' ' + (blob.size / 1048576).toFixed(1) + 'MB ' + Array.from(h).map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) {}
+      throw ie;
+    }
   }
   mediaType = 'image';
   videoEl.pause();
