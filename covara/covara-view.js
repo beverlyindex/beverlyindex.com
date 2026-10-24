@@ -56,6 +56,10 @@
       dr_title: 'When {name} drives', dr_notify: 'Tell the team', dr_alert: 'Alert the team', dr_off: 'Never',
       dr_why: 'Covara knows {name} is driving from the speed of {name}’s phone. The team is told when a drive starts and ends; with Alert, it rings like an alarm.',
       dr_how: 'When {name} taps someone on the team and Drive to, that person is told {name} is coming and how long it will take. If {name} is plainly heading toward someone on the team, Covara tells them too. If {name} drives farther and farther from where {name} was going, the team is told at once.',
+      em_title: 'Emergency location', em_on: 'On', em_off: 'Off', em_short_on: 'Shared with the team after an alarm', em_short_off: 'Not shared in an emergency',
+      em_why: 'When an alarm goes off (a fall, no word in the morning, leaving home at night, a door or someone in the home at night, a still room or phone, lost on the road), the whole team sees where {name} is for one hour, even if {name} does not share where {name} is. Help works this way too.',
+      em_need: 'It works only while Covara on {name}’s phone has location turned on.', em_only: 'Only {name}, or the person who decides for {name}, can change this.',
+      em_warn: 'If this is off, in an emergency your team will not know where {name} is.', em_sure: 'Turn off anyway', em_open: 'Open now: {why}',
       mo_title: 'Morning check-in', mo_why: 'Each morning, {name} using Covara (any tap), answering How are you, or marking a medicine tells the team {name} is up. If there is no word by this time, the team is told and {name}’s phone rings; 30 minutes later it becomes urgent.',
       mo_off: 'Off', mo_done: 'Checked in today at {t}', mo_late: 'No word yet this morning', mo_wait: 'Expected by {t}',
       nw_title: 'Night watch', nw_on: 'On', nw_why: 'During {name}’s night the team is told when a room sensor or {name}’s room phone goes quiet, when a room moves while {name}’s bed sensor says {name} is in bed, and when there is movement at an hour {name} is not usually up.',
@@ -149,6 +153,10 @@
       dr_title: 'Quando {name} guida', dr_notify: 'Avvisa il team', dr_alert: 'Allarme al team', dr_off: 'Mai',
       dr_why: 'Covara capisce che {name} è alla guida dalla velocità del telefono di {name}. Il team viene avvisato quando un viaggio inizia e finisce; con Allarme, suona come un allarme.',
       dr_how: 'Quando {name} tocca qualcuno del team e Vai da, quella persona viene avvisata che {name} sta arrivando e quanto ci vorrà. Se {name} si sta chiaramente dirigendo verso qualcuno del team, Covara lo avvisa. Se {name} si allontana sempre di più dalla meta, il team viene avvisato subito.',
+      em_title: 'Posizione in emergenza', em_on: 'Attiva', em_off: 'Spenta', em_short_on: 'Condivisa con il team dopo un allarme', em_short_off: 'Non condivisa in emergenza',
+      em_why: 'Quando scatta un allarme (una caduta, nessuna notizia al mattino, uscire di casa di notte, una porta o qualcuno in casa di notte, una stanza o un telefono immobili, perso per strada), tutto il team vede dove si trova {name} per un’ora, anche se {name} non condivide dove si trova. Aiuto funziona già così.',
+      em_need: 'Funziona solo se Covara sul telefono di {name} ha la posizione attiva.', em_only: 'Solo {name}, o la persona che decide per {name}, può cambiarlo.',
+      em_warn: 'Se è spenta, in un’emergenza il tuo team non saprà dove si trova {name}.', em_sure: 'Spegni comunque', em_open: 'Aperta ora: {why}',
       mo_title: 'Buongiorno', mo_why: 'Ogni mattina, quando {name} usa Covara (qualsiasi tocco), risponde a Come stai o segna una medicina, il team sa che {name} è sveglio. Se entro quest’ora non arriva nulla, il team viene avvisato e il telefono di {name} squilla; 30 minuti dopo diventa urgente.',
       mo_off: 'Spento', mo_done: 'Oggi alle {t}', mo_late: 'Ancora nessuna notizia stamattina', mo_wait: 'Atteso entro le {t}',
       nw_title: 'Guardia notturna', nw_on: 'Attiva', nw_why: 'Di notte il team viene avvisato quando un sensore o il telefono di {name} smette di ascoltare, quando una stanza si muove mentre il sensore del letto dice che {name} è a letto, e quando c’è movimento a un’ora in cui {name} di solito non è alzato.',
@@ -360,8 +368,9 @@
       var lg = await api('/care/log' + (q(s) ? q(s) + '&' : '?') + 'days=7').catch(function () { return { ok: false }; }), sh = await api('/care/sheet' + q(s)).catch(function () { return { ok: false }; });
       var vt = await api('/care/vitals' + q(s)).catch(function () { return { ok: false }; });
       var mo = await api('/care/morning' + q(s)).catch(function () { return { ok: false }; });
+      var em = await api('/care/emergency-location' + q(s)).catch(function () { return { ok: false }; });
       var ml = await api('/care/meals' + (q(s) ? q(s) + '&' : '?') + 'days=2').catch(function () { return { ok: false }; });
-      if (a.ok && b.ok) { _syncedAt = Date.now(); _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, morning: mo.ok ? mo.data.morning : null, meals: ml.ok ? ml.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
+      if (a.ok && b.ok) { _syncedAt = Date.now(); _data = { s: s, today: a.data, items: b.data.items || [], family: c.ok ? (c.data.family || []) : [], proxy: px.ok ? px.data : null, log: lg.ok ? lg.data.log : [], sheet: sh.ok ? sh.data : null, inbox: ib.ok ? ib.data.inbox : [], vitals: vt.ok ? vt.data : null, morning: mo.ok ? mo.data.morning : null, emergency: em.ok ? em.data : null, meals: ml.ok ? ml.data : null, warn: _data && _data.s && _data.s.home === s.home ? _data.warn : null }; render(); syncSpheres(); }
     } catch (e) {} finally { _busy = false; }
   }
 
@@ -593,7 +602,7 @@
   }
   function safetyHtml() {
     var d = (_data.sheet && _data.sheet.data) || {};
-    return morningBlock() + nightBlock() + timelineBlock() + leaveBlock() + driveBlock() + block('er', t('forEr'), d.diagnosis ? d.diagnosis + (d.allergies ? ' · ' + t('sh_allergies') + ': ' + d.allergies : '') : t('erShort'), erHtml(false), 'red') +
+    return emergencyBlock() + morningBlock() + nightBlock() + timelineBlock() + leaveBlock() + driveBlock() + block('er', t('forEr'), d.diagnosis ? d.diagnosis + (d.allergies ? ' · ' + t('sh_allergies') + ': ' + d.allergies : '') : t('erShort'), erHtml(false), 'red') +
       block('miss', t('ifMissing', { name: name1() }), t('missShort'), missingHtml(false), 'gold') +
       block('rooms', t('fallsRooms'), t('fallsShort'), '<div class="cvx-sub">' + esc(t('fallsBody')) + '</div>', 'blue') + worryBlock();
   }
@@ -693,6 +702,15 @@
       ['07:00', '08:00', '09:00', '10:00', '11:00'].map(function (v) { var h = +v.slice(0, 2), lab = (h % 12 || 12) + ':00 ' + (h < 12 ? 'AM' : 'PM'); return '<button type="button" class="cvt-chip sm" data-morn="' + v + '" aria-pressed="' + (on && M.by_text === lab) + '">' + esc(lab) + '</button>'; }).join('') +
       '<button type="button" class="cvt-chip sm bad" data-morn="off" aria-pressed="' + (!on) + '">' + esc(t('lv2_off')) + '</button></div>';
     return block('morning', t('mo_title'), status, body, !on ? 'red' : M.late ? 'red' : M.done ? 'blue' : 'gold');
+  }
+  /* emergency location: on unless HOME (or the decider) turned it off; only they can change it */
+  function emergencyBlock() {
+    var E = _data.emergency || { on: true, can_change: false }, on = E.on !== false;
+    var body = '<div class="cvx-sub">' + esc(t('em_why', { name: name1() })) + '</div>' +
+      (E.can_change ? '<div class="cvt-chips"><button type="button" class="cvt-chip sm" data-em="on" aria-pressed="' + on + '">' + esc(t('em_on')) + '</button><button type="button" class="cvt-chip sm bad" data-em="off" aria-pressed="' + (!on) + '">' + esc(t('em_off')) + '</button></div>' : '<div class="cvx-sub" style="margin-top:6px">' + esc(t('em_only', { name: name1() })) + '</div>') +
+      (!on ? '<div class="cvx-sub" style="margin-top:8px;color:#fca5a5">' + esc(t('em_warn', { name: name1() })) + '</div>' : '') +
+      '<div class="cvx-sub" style="margin-top:8px">' + esc(t('em_need', { name: name1() })) + '</div>';
+    return block('emergency', t('em_title'), on ? t('em_short_on') : t('em_short_off'), body, on ? 'blue' : 'red');
   }
   function nightBlock() {
     var on = !(_data.morning && _data.morning.night_watch === false);
@@ -978,6 +996,13 @@
     box.querySelectorAll('[data-a=meal-photo]').forEach(function (b) { b.onclick = function () { try { CovaraCamera.open('auto'); } catch (e) {} }; });
     box.querySelectorAll('[data-drive]').forEach(function (b) { b.onclick = async function () { var m = b.getAttribute('data-drive'); b.disabled = true; var r = await api('/care/drive' + q(_data.s), { method: 'PUT', body: { mode: m } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.driveMode = m; _html = ''; render(); } else b.disabled = false; }; });
     box.querySelectorAll('[data-morn]').forEach(function (b) { b.onclick = async function () { var v = b.getAttribute('data-morn'); b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: v === 'off' ? { on: false } : { on: true, by: v } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
+    box.querySelectorAll('[data-em]').forEach(function (b) { b.onclick = async function () {
+      var on = b.getAttribute('data-em') === 'on';
+      if (!on && !b.getAttribute('data-sure')) { b.setAttribute('data-sure', '1'); b.textContent = t('em_sure'); return; }
+      b.disabled = true;
+      var r = await api('/care/emergency-location' + q(_data.s), { method: 'PUT', body: { on: on } }).catch(function () { return { ok: false }; });
+      if (r.ok) { _data.emergency = Object.assign({}, _data.emergency || {}, r.data); _html = ''; render(); } else b.disabled = false;
+    }; });
     box.querySelectorAll('[data-nw]').forEach(function (b) { b.onclick = async function () { b.disabled = true; var r = await api('/care/morning' + q(_data.s), { method: 'PUT', body: { night_watch: b.getAttribute('data-nw') === 'on' } }).catch(function () { return { ok: false }; }); if (r.ok) { _data.morning = r.data.morning; _html = ''; render(); } else b.disabled = false; }; });
     box.querySelectorAll('[data-tl]').forEach(function (b) { b.onclick = function () { try { CovaraNight.timeline(_data.s.home || '', +b.getAttribute('data-tl')); } catch (e) {} }; });
     box.querySelectorAll('[data-leave]').forEach(function (b) { b.onclick = async function () { var m = b.getAttribute('data-leave'); var r = await api('/care/leave', { method: 'PUT', body: Object.assign({ mode: m }, _data.s.home ? { home: _data.s.home } : {}) }).catch(function () { return { ok: false }; }); if (r.ok) { _data.leave = m; _html = ''; render(); } }; });
