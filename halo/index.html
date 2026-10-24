@@ -233,7 +233,7 @@ select.inp{flex:none}
 .ans-l{display:flex;flex-direction:column;gap:2px} .loc-v.ans .ans-l>b{font-size:16.5px;line-height:1.3;font-weight:700} .ans-k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)} .ans-l>b{font-size:16px;line-height:1.3;color:var(--ink)} .ans-l>span{font-size:12.5px;line-height:1.4;color:#c3cbda}
 .ans-r{display:grid;grid-template-columns:12px 1fr;column-gap:8px;align-items:center;text-align:left;width:100%;padding:7px 0 6px;border:0;border-top:1px solid rgba(143,180,255,.14);background:none;color:inherit;font:inherit;cursor:pointer}
 .loc-v .ans-r b{font-family:inherit;font-size:14.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .ans-r small{grid-column:2;font-size:11.5px;color:var(--mut)} .ans-r small.tm{color:#b9cdf5}
-.ans-t{font-size:11.5px;color:var(--mut)} .ans-h{font-size:12px;color:#b9cdf5} .ans-h .linkbtn{font-size:12px;padding:0;margin-left:2px}
+.ans-t{font-size:11.5px;color:var(--mut)} .loc-v.ans b span,.loc-v.ans .tm span,.loc-v.ans .ans-h span{display:inline;font-size:inherit;color:inherit;margin:0} .ans-h{font-size:12px;color:#b9cdf5} .ans-h .linkbtn{font-size:12px;padding:0;margin-left:2px}
 .hs-row{grid-template-columns:14px 1fr auto} .hs-step{display:flex;align-items:center;gap:6px} .hs-step .btn{min-width:34px;padding:4px 0} .hs-n{min-width:22px;text-align:center;font-variant-numeric:tabular-nums;color:var(--ink)}
 .loc-v.v-clear{--vc:var(--clear);background:rgba(74,232,138,.09)} .loc-v.v-watch{--vc:#ff8a3c;background:rgba(255,138,60,.12)} .loc-v.v-act{--vc:var(--action);background:rgba(255,90,90,.17)} .loc-v.v-off{--vc:var(--line2);background:rgba(120,160,220,.06)}
 .loc-v svg{width:30px;height:30px;flex:none;stroke:var(--vc);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -2953,8 +2953,8 @@ function homeSigRender(b){ const F=S.fs, g=psigGet();
   x+='</div><div class="formrow fs-btns"><button class="btn" data-act="file-close">Cancel</button><button class="btn primary" data-act="hs-save">Save</button></div>';
   b.innerHTML=x; }
 function homeSigSave(){ const F=S.fs; if(!F || F.mode!=='home') return; const g=psigGet(); g.home.set={}; Object.keys(F.set).forEach(k=>{ if(F.set[k]>0) g.home.set[k]=Math.min(30, F.set[k]); });
-  S.fs=null; ovHide('fsheet'); save(); PSIG.at=0; psigTick(); const w=Object.keys(g.home.set).map(k=>g.home.set[k]+' '+kindPl(k, g.home.set[k])).join(', ');
-  toast(w ? 'Usual at home: '+w+'.' : 'No usual numbers set for home. Remiel learns them from three days at home.'); S._rsig=''; renderVicinity(); }
+  S.fs=null; ovHide('fsheet'); save(); PSIG.at=0; psigTick(); const w=Object.keys(g.home.set).map(k=>g.home.set[k]+' '+kindPl(k, g.home.set[k])).join(' · ');
+  toast(w ? 'Usual at home · '+w : 'No usual numbers set for home. Remiel learns them from three days at home.'); S._rsig=''; renderVicinity(); }
 function tagOf(d){ d._seen=null; if(isYours(d)) return 'yours'; const f=fileOfD(d);
   if(f==='mine' || f==='house') return 'yours';          // filed as yours, found by its own name under an address it took since
   if(f==='known') return 'known';          // someone you know: walking with you is what they do
@@ -3003,13 +3003,15 @@ function ansMoved(now){ const t0=now-ANS.win, L=TRACK.filter(p=>(p.t2||p.t)>=t0)
   let a=L[0], m=0; for(let i=1;i<L.length;i++){ const p=L[i], d=Math.hypot(p.x-a.x, p.y-a.y); if(d>=ANS.step){ if(d<400 && !p.brk) m+=d; a=p; } }
   const last=L[L.length-1]; return {m, t0:L[0].t, t1:last.t2||last.t, fresh:now-(last.t2||last.t)<=60000}; }
 function ansFollow(M){ const now=Date.now(), fol=M.red.filter(r=>r.tag==='with').map(r=>r.d);
-  if(fol.length){ const d=fol[0]; return {k:'yes', t:fol.length===1 ? devName(d)+' follows your location.' : fol.length+' devices follow your location: '+fol.slice(0,3).map(devName).join(', ')+'.', s:devName(d)+' '+followText(d)+'.'+ansSince(d)}; }
+  if(fol.length){ const d=fol[0]; return {k:'yes', names:fol.slice(0,3).map(devName), t:fol.length===1 ? 'follows your location.' : fol.length+' devices follow your location:', s:'It '+followText(d)+'.'+ansSince(d)}; }
   const may=M.all.map(r=>r.d).filter(d=>d.maybe && !isYours(d) && !fileQuiet(d));
-  if(may.length){ const d=may[0]; return {k:'may', t:devName(d)+' may follow your location.', s:'It '+followText(d)+'. The test completes at '+du(d.cls==='Tag'?FOLLOW.tagReach:FOLLOW.reach)+' of your movement.'+ansSince(d)}; }
+  if(may.length){ const d=may[0]; return {k:'may', names:[devName(d)], t:'might follow your location.', s:'It '+followText(d)+'. The test completes at '+du(d.cls==='Tag'?FOLLOW.tagReach:FOLLOW.reach)+' of your movement.'+ansSince(d)}; }
   const mv=ansMoved(now), D=W.on && W.pd;
   if(!mv.fresh) return {k:'unk', t:'Remiel cannot tell yet whether a device follows you.', s:(D && D.out ? 'No GPS position since '+hms(D.out)+'.' : 'No GPS position just now.')+' Remiel tests for a follower from your own position.'};
   if(mv.m<ANS.m || now-mv.t0<ANS.mins) return {k:'unk', t:'Remiel cannot tell yet whether a device follows you.', s:'In the last ten minutes you have moved '+du(mv.m)+' with GPS. Remiel tests once you have moved '+du(ANS.m)+' over four minutes or more.'};
   return {k:'no', t:'No device follows your location.', s:'Tested over the '+du(mv.m)+' you moved with GPS from '+hms(mv.t0)+' to '+hms(mv.t1)+'.'}; }
+const ansHead = F => !F.names ? esc(F.t) : F.names.length===1 && !/:$/.test(F.t) ? '<span class="notr">'+esc(F.names[0])+'</span> '+esc(F.t) : esc(F.t)+' '+F.names.map(n=>'<span class="notr">'+esc(n)+'</span>').join(', ');
+const ansPlain = F => !F.names ? F.t : F.names.length===1 && !/:$/.test(F.t) ? F.names[0]+' '+F.t : F.t+' '+F.names.join(', ')+'.';
 const ansSince = d => { const w=W.on && W.devs ? winNow(W.devs[d.id]) : null; return w ? ' In earshot since '+hms(w[0])+'.' : ''; };
 // How much a device that is not usual here matters: what it did first, then what it is, then how close it came and how long it stayed.
 function oddRank(r){ const d=r.d, w=W.on && W.devs ? winNow(W.devs[d.id]) : null, near=w ? w[2] : d.dist, long=w ? w[1]-w[0] : 0;
@@ -3026,36 +3028,39 @@ function nowAnswer(M){ const F=ansFollow(M), O=ansOdd(M), N=M.n||{}, n=M.all.len
   const hs=PSIG.place==='home' ? homeSigLine() : '';
   const tail=[n+(n===1?' device':' devices')+' in earshot', N.local?N.local+' in the neighborhood':'', N.known?N.known+(N.known===1?' person you know':' people you know'):'', N.pub?N.pub+' transit and public':'', N.yours?N.yours+' yours':''].filter(Boolean).join(' · '), sl=stretchLine();
   return '<div class="loc-v ans '+cls+'" role="status"><svg viewBox="0 0 24 24" aria-hidden="true">'+ic+'</svg><div class="ans-b">'+
-    '<div class="ans-l"><span class="ans-k">Following</span><b>'+esc(F.t)+'</b><span>'+esc(F.s)+'</span></div>'+
-    '<div class="ans-l"><span class="ans-k">Not usual here</span><b>'+esc(ob)+'</b>'+O.top.map(oddRow).join('')+(restW?'<span>'+esc(restW)+'</span>':'')+(hs?'<span class="ans-h">'+esc(hs)+' <button class="linkbtn" data-act="hs-open">Set what is usual at home</button></span>':'')+'</div>'+
+    '<div class="ans-l"><span class="ans-k">Following</span><b>'+ansHead(F)+'</b><span>'+esc(F.s)+'</span></div>'+
+    '<div class="ans-l"><span class="ans-k">Not usual here</span><b>'+esc(ob)+'</b>'+O.top.map(oddRow).join('')+(restW?'<span>'+esc(restW)+'</span>':'')+(hs?'<span class="ans-h">'+hs+' · <button class="linkbtn" data-act="hs-open">Set what is usual at home</button></span>':'')+'</div>'+
     '<span class="ans-t">'+esc(tail)+(M.V.test?' Test data.':'')+'</span>'+(sl?'<span class="strl">'+esc(sl)+'</span>':'')+'</div></div>'; }
 // What is usual at home, in a line.
 function homeSigLine(){ const by={}; LIVE.devs.forEach(d=>{ if(d._hab==='home') by[sigKey(d)]=(by[sigKey(d)]||0)+1; }); const ks=Object.keys(by);
-  return ks.length ? 'Usual at home and quiet: '+ks.map(k=>by[k]+' '+kindPl(k, by[k])).join(', ')+'.' : 'Remiel has not yet learned what is usual at home.'; }
+  return ks.length ? 'Usual at home and quiet · '+ks.map(k=>'<span>'+esc(by[k]+' '+kindPl(k, by[k]))+'</span>').join(' · ') : esc('Remiel has not yet learned what is usual at home.'); }
 // The same two lines for a trip, from its own record.
 function tripAnswer(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, st=withTrip(R, walkStats), noPos=tripNoPos(R), nm=r=>(P.labels||{})[r.id]||r.label||r.adv||r.call||'Device';
   const ds=Object.values(R.devs||{}).filter(r=>!r.sim && !r.mine && tags[r.id]!=='yours' && !r.pr), fol=ds.filter(r=>tags[r.id]==='with' || (r.withYou && r.wy));
   let F;
-  if(fol.length) F={k:'yes', t:fol.length===1 ? nm(fol[0])+' followed your location.' : fol.length+' devices followed your location: '+fol.slice(0,3).map(nm).join(', ')+'.', s:'In earshot '+winText(fol[0])+'.', devs:fol.slice(0,3)};
+  if(fol.length) F={k:'yes', names:fol.slice(0,3).map(nm), t:fol.length===1 ? 'followed your location.' : fol.length+' devices followed your location:', s:'In earshot '+winText(fol[0])+'.', devs:fol.slice(0,3)};
   else if(noPos) F={k:'unk', t:'Remiel cannot tell whether a device followed you.', s:'No GPS position was received on this trip.'};
   else if((st.distance_m||0)<ANS.m || (R.t1||Date.now())-R.t0<ANS.mins) F={k:'unk', t:'Remiel cannot tell whether a device followed you.', s:'You moved '+du(st.distance_m||0)+' with GPS. Remiel tests once you have moved '+du(ANS.m)+' over four minutes or more.'};
   else F={k:'no', t:'No device followed your location.', s:'Tested over the '+du(st.distance_m)+' you moved with GPS.'+((R.pd&&R.pd.gaps&&R.pd.gaps.length)?' GPS was missing at times: the timeline shows when.':'')};
   const lim=r=>r.cls==='Tag' ? TLK.tag : (r.cls==='Vehicle' || /^Unit on a bus or tram/.test(r.hint||'')) ? TLK.car : TLK.near;
   const inE=r=>(winsOf(r)||[[r.first, r.last]]).reduce((a,w)=>a+(w[1]-w[0]), 0);
-  const rk=r=>{ const t=tags[r.id]||'fresh'; return (t==='with'?1000:t==='watch'?900:t==='place'?800:t==='sus'?700:0)+(r.cls==='Tag'?300:r.cls==='Camera'||r.dr?250:0)+(r.min<=lim(r)?120:0)+(inE(r)>=ANS.long?80:0)-Math.min(60, r.min||60)/10; };
-  const odd=ds.filter(r=>ANS.odd.has(tags[r.id]||'fresh') && !(r.hab && (tags[r.id]||'fresh')==='fresh') && r.band!=='wifi' && !HOUSE_RE.test((r.hint||'')+' '+(r.adv||''))).map(r=>({r, k:rk(r)})).sort((a,b)=>b.k-a.k);
+  const tg=r=>(r.withYou && r.wy) ? 'with' : tags[r.id]||'fresh', rk=r=>{ const t=tg(r); return (t==='with'?1000:t==='watch'?900:t==='place'?800:t==='sus'?700:0)+(r.cls==='Tag'?300:r.cls==='Camera'||r.dr?250:0)+(r.min<=lim(r)?120:0)+(inE(r)>=ANS.long?80:0)-Math.min(60, r.min||60)/10; };
+  const odd=ds.filter(r=>ANS.odd.has(tg(r)) && !(r.hab && tg(r)==='fresh') && r.band!=='wifi' && !HOUSE_RE.test((r.hint||'')+' '+(r.adv||''))).map(r=>({r, k:rk(r)})).sort((a,b)=>b.k-a.k);
   const top=odd.filter(x=>x.k>=100).slice(0, 6), left=odd.filter(x=>top.indexOf(x)<0), stand=left.filter(x=>x.r.v==='fixed' || x.r.ret).length;
-  return {F, odd, top, rest:left.length-stand, stand, hab:ds.filter(r=>r.hab).length, row:x=>({name:nm(x.r), kind:[x.r.cls==='Unknown'?'':x.r.cls, x.r.hint].filter(Boolean).join(', '), near:'closest '+du(x.r.min)+' at '+hms(x.r.minT||x.r.first), r:x.r, tag:tags[x.r.id]||'fresh'})}; }
+  return {F, odd, top, rest:left.length-stand, stand, hab:ds.filter(r=>r.hab).length, row:x=>({name:nm(x.r), kind:[x.r.cls==='Unknown'?'':x.r.cls, x.r.hint].filter(Boolean).join(', '), near:'closest '+du(x.r.min)+' at '+hms(x.r.minT||x.r.first), r:x.r, tag:tg(x.r)})}; }
 function tripAnswerHTML(R, C){ const A=tripAnswer(R, C), F=A.F, hot=A.top.some(x=>(x.r.cls==='Tag') || ['with','watch','place','sus'].indexOf((R.cor&&R.cor.tags||{})[x.r.id])>=0);
   const cls=F.k==='yes' ? 'v-act' : hot ? 'v-watch' : F.k==='no' ? 'v-clear' : 'v-unk', ic=F.k==='yes'||hot ? LOC_IC.warn : F.k==='no' ? LOC_IC.ok : LOC_IC.off;
   const ob=!A.odd.length ? 'Nothing. Every device heard was yours, in your files or your neighborhood\'s.' : A.odd.length===1 ? '1 device.' : A.odd.length+' devices.';
   const restW=[A.stand>0 ? (A.stand===1?'1 more stood in one place, as a home\'s devices do.':A.stand+' more stood in one place, as homes\' devices do.') : '', A.rest>0 ? (A.top.length||A.stand ? (A.rest===1?'1 more, ':A.rest+' more, ')+'only at a distance and not for long.' : (A.rest===1?'It was':'All were')+' heard only at a distance and not for long.') : '', A.hab ? (A.hab===1?'1 device was one of the usual number of its kind where you were, learned by habit, and is not counted.':A.hab+' devices were among the usual number of their kind where you were, learned by habit, and are not counted.') : ''].filter(Boolean).join(' ');
   return '<div class="loc-v ans '+cls+'" role="status" style="margin-top:10px"><svg viewBox="0 0 24 24" aria-hidden="true">'+ic+'</svg><div class="ans-b">'+
-    '<div class="ans-l"><span class="ans-k">Following</span><b>'+esc(F.t)+'</b><span>'+esc(F.s)+'</span></div>'+
+    '<div class="ans-l"><span class="ans-k">Following</span><b>'+ansHead(F)+'</b><span'+(F.k==='yes'?' class="tm">'+winHTML(F.devs[0]):'>'+esc(F.s))+'</span></div>'+
     '<div class="ans-l"><span class="ans-k">Not usual here</span><b>'+esc(ob)+'</b>'+A.top.map(x=>{ const w=A.row(x);
       return '<button class="ans-r" data-act="art" data-k="'+esc(x.r.sig||'')+'"><i class="sdot'+(x.r.cls==='Tag'?' k-tag':'')+'" style="--mk:'+TAG[w.tag].c+'"></i><b class="notr">'+esc(w.name)+'</b><small>'+esc(w.kind)+(w.kind?' · ':'')+esc(w.near)+'</small><small class="tm">'+winHTML(x.r)+'</small></button>'; }).join('')+(restW?'<span>'+esc(restW)+'</span>':'')+'</div></div></div>'; }
 function tripAnswerText(R, C){ const A=tripAnswer(R, C);
-  return {following:A.F.t+' '+A.F.s, notUsualHere:A.top.map(x=>{ const w=A.row(x); return w.name+(w.kind?' ('+w.kind+')':'')+', '+w.near+', in earshot '+winText(x.r); }), notUsualCount:A.odd.length}; }
+  return {following:ansPlain(A.F)+' '+A.F.s, notUsualHere:A.top.map(x=>{ const w=A.row(x); return w.name+(w.kind?' ('+w.kind+')':'')+', '+w.near+', in earshot '+winText(x.r); }), notUsualCount:A.odd.length,
+    rows:A.top.map(x=>A.row(x)), head:ansHead(A.F), s:A.F.s}; }
+// One device of Not usual here on paper: its name as it is, the words round it in your language.
+const ansPaperRow = (w, e) => '<span class="notr">'+e(w.name)+'</span>'+(w.kind?' · '+e(w.kind):'')+' · '+e(w.near)+' · '+winHTML(w.r);
 function nowVerdict(M){ let c='v-clear', i=LOC_IC.ok, t, s; const N=M.n||{}, n=M.all.length, wy=M.red.filter(r=>r.tag==='with').length, pl=M.red.length-wy, am=M.amber.length, wt=M.watch.length, su=M.sus.length;
   const tail=[n+(n===1?' device':' devices')+' in earshot', N.fresh?N.fresh+' new':'', N.local?N.local+' in the neighborhood':'', N.known?N.known+(N.known===1?' person you know':' people you know'):'', N.pub?N.pub+' transit and public':'', N.yours?N.yours+' yours':''].filter(Boolean).join(' · ');
   if(!M.live){ c='v-off'; i=LOC_IC.off; t=stateWords(M.V.mode).count||'waiting for a sensor'; t=t.charAt(0).toUpperCase()+t.slice(1); s=stateWords(M.V.mode).long; }
@@ -3436,7 +3441,7 @@ function tripSummaryHTML(R, C){ const L=tripSummaryLines(R, C), nm=r=>(P.labels|
 function tripSummaryPaper(R, C, H){ const L=tripSummaryLines(R, C), F=tripFindings(R, C);
   const nm=r=>(P.labels||{})[r.id]||r.label||r.adv||r.call||'Device';
   const T=tripTimeline(R, C), A=tripAnswerText(R, C);
-  return H('The answer')+'<ul class="rp-sum"><li><b>Following:</b> '+esc(A.following)+'</li><li><b>Not usual here:</b> '+(A.notUsualCount ? esc(A.notUsualCount===1?'1 device.':A.notUsualCount+' devices.')+(A.notUsualHere.length?'<ul>'+A.notUsualHere.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'') : esc('Nothing. Every device heard was yours, in your files or your neighborhood\'s.'))+'</li></ul>'+H('What happened')+'<ul class="rp-sum">'+(F.length?F.map(f=>'<li>'+esc(f.text)+(f.win?'<br><small>'+winHTML(f.win)+'</small>':'')+'</li>').join(''):'<li>'+esc(NOTHING_FOUND)+'</li>')+'</ul>'+(T.length?H('Timeline, to the second')+'<ul class="rp-sum">'+T.map(x=>'<li><b>'+hms(x.t)+'</b> '+tlLine(x, esc)+'</li>').join('')+'</ul>':'')+H('Trip Summary')+'<ul class="rp-sum">'+L.map(l=>'<li>'+(l.lead?'<b>'+esc(l.text)+'</b> ':esc(l.text)+' ')+(l.bold?'<b>'+esc(l.bold)+'</b> ':'')+(l.next?esc(l.next)+' ':'')+((l.devs||[]).length?'<span class="rp-names">'+l.devs.map(r=>esc(nm(r))).join(', ')+'</span>':'')+'</li>').join('')+'</ul>'; }
+  return H('The answer')+'<ul class="rp-sum"><li><b>Following:</b> '+A.head+' '+esc(A.s)+'</li><li><b>Not usual here:</b> '+(A.notUsualCount ? esc(A.notUsualCount===1?'1 device.':A.notUsualCount+' devices.')+(A.rows.length?'<ul>'+A.rows.map(w=>'<li>'+ansPaperRow(w, esc)+'</li>').join('')+'</ul>':'') : esc('Nothing. Every device heard was yours, in your files or your neighborhood\'s.'))+'</li></ul>'+H('What happened')+'<ul class="rp-sum">'+(F.length?F.map(f=>'<li>'+esc(f.text)+(f.win?'<br><small>'+winHTML(f.win)+'</small>':'')+'</li>').join(''):'<li>'+esc(NOTHING_FOUND)+'</li>')+'</ul>'+(T.length?H('Timeline, to the second')+'<ul class="rp-sum">'+T.map(x=>'<li><b>'+hms(x.t)+'</b> '+tlLine(x, esc)+'</li>').join('')+'</ul>':'')+H('Trip Summary')+'<ul class="rp-sum">'+L.map(l=>'<li>'+(l.lead?'<b>'+esc(l.text)+'</b> ':esc(l.text)+' ')+(l.bold?'<b>'+esc(l.bold)+'</b> ':'')+(l.next?esc(l.next)+' ':'')+((l.devs||[]).length?'<span class="rp-names">'+l.devs.map(r=>esc(nm(r))).join(', ')+'</span>':'')+'</li>').join('')+'</ul>'; }
 function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},hw:{},cnt:{},cams:[]}, ds=Object.values(R.devs||{}), c=C.cnt||{}, d0=new Date(R.t0);
   const of=t=>ds.filter(r=>C.tags[r.id]===t), red=of('with').concat(of('place')), amber=of('again'), wat=of('watch'), seen=red.concat(wat, amber), trk=ds.filter(r=>r.cls==='Tag' && C.tags[r.id]!=='yours' && seen.indexOf(r)<0);
   const nm=r=>esc((P.labels||{})[r.id]||r.label||r.adv||r.call||'Device'), kd=r=>esc([r.cls==='Unknown'?'':r.cls, r.hint].filter(Boolean).join(', '));
@@ -8498,7 +8503,7 @@ function walkDocHTML(){
   const dline=r=>{ const L=r.dl||[]; if(!L.length) return 'about '+du(r.min); const n=Math.min(6,L.length), pick=[]; for(let i=0;i<n;i++) pick.push(L[Math.round(i*(L.length-1)/Math.max(1,n-1))]); return pick.map(x=>hhmm(x[0])+' '+du(x[1])).join(' · '); };
   let h='<h1>Remiel Technologies Trip Report</h1><p class="rp-sub">What was around you, and what stayed with you</p>'+
     '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded '+(PH.native?'in the Remiel app on this phone':'on '+e(Y.name||'this device'))+(W.test?' &nbsp;·&nbsp; <b>Test data</b>':'')+'</div>';
-  { const A=tripAnswerText(W, W.cor||{}); h+='<h2>The answer</h2><ul class="rp-sum"><li><b>Following:</b> '+e(A.following)+'</li><li><b>Not usual here:</b> '+(A.notUsualCount ? e(A.notUsualCount===1?'1 device.':A.notUsualCount+' devices.')+(A.notUsualHere.length?'<ul>'+A.notUsualHere.map(x=>'<li>'+e(x)+'</li>').join('')+'</ul>':'') : e('Nothing. Every device heard was yours, in your files or your neighborhood\'s.'))+'</li></ul>'; }
+  { const A=tripAnswerText(W, W.cor||{}); h+='<h2>The answer</h2><ul class="rp-sum"><li><b>Following:</b> '+A.head+' '+e(A.s)+'</li><li><b>Not usual here:</b> '+(A.notUsualCount ? e(A.notUsualCount===1?'1 device.':A.notUsualCount+' devices.')+(A.rows.length?'<ul>'+A.rows.map(w=>'<li>'+ansPaperRow(w, e)+'</li>').join('')+'</ul>':'') : e('Nothing. Every device heard was yours, in your files or your neighborhood\'s.'))+'</li></ul>'; }
   { const F=tripFindings(W, W.cor||{}); h+='<h2>What happened</h2><ul class="rp-sum">'+(F.length?F.map(f=>'<li>'+e(f.text)+(f.win?'<br><small>'+winHTML(f.win)+'</small>':'')+'</li>').join(''):'<li>'+e(NOTHING_FOUND)+'</li>')+'</ul>'; }
   { const T=tripTimeline(W, W.cor||{}); if(T.length) h+='<h2>Timeline, to the second</h2><ul class="rp-sum">'+T.map(x=>'<li><b>'+hms(x.t)+'</b> '+tlLine(x, e)+'</li>').join('')+'</ul>'; }
   // 1
