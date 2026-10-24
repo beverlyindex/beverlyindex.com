@@ -1311,7 +1311,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-24.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-24.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3105,24 +3105,25 @@ async function tripsRender(){ const box=el('tripBox'); if(!box) return; const T=
    devices seen before elsewhere or on the Watch list, the waypoints, the cameras, and how the trip ended. Each finding names what to do. ----- */
 function tripSummaryLines(R, C){
   const tags=C.tags||{}, dayN=C.days||{}, ds=Object.values(R.devs||{}).filter(r=>!r.sim), other=ds.filter(r=>tags[r.id]!=='yours' && !r.mine);
-  const nm=r=>(P.labels||{})[r.id]||r.label||r.adv||r.call||'Device', durMin=(R.t1-R.t0)/60000, rt=R.route||[], st=withTrip(R, walkStats), L=[];
+  const nm=r=>(P.labels||{})[r.id]||r.label||r.adv||r.call||'Device', durMin=(R.t1-R.t0)/60000, rt=R.route||[], st=withTrip(R, walkStats), L=[], noPos=tripNoPos(R);
   const mins=x=>{ const k=Math.round(x||0); return k<=1?'about a minute':'about '+k+' minutes'; };
   const loop=rt.length>=2 && distLL(rt[0].lat,rt[0].lon,rt[rt.length-1].lat,rt[rt.length-1].lon)<60 && (st.distance_m||0)>=150;
   // the bottom line
   const withs=other.filter(r=>tags[r.id]==='with');
   L.push({lead:true, text:[walkDur(R.t1-R.t0), (loop?'a loop of ':'')+du(st.distance_m), ds.length+(ds.length===1?' device heard.':' devices heard.')].join(' · '),
-    bold:withs.length ? (withs.length===1?'1 device moved with you.':withs.length+' devices moved with you.') : 'No device moved with you.', hot:withs.length>0,
+    bold:withs.length ? (withs.length===1?'1 device moved with you.':withs.length+' devices moved with you.') : noPos ? 'No GPS position was received, so Remiel cannot tell whether a device moved with you.' : 'No device moved with you.', hot:withs.length>0,
     next:withs.length ? 'Open each one and decide whether it is yours.' : '', devs:withs.slice(0,4)});
   // the trackers
   const tg=other.filter(r=>r.cls==='Tag'), tw=tg.filter(r=>tags[r.id]==='with');
   if(tw.length) L.push({hot:true, text:tw.length===1?'A tracker moved with you.':tw.length+' trackers moved with you.', next:'Open it for the steps to find it, and check your bag, your coat and your car.', devs:tw.slice(0,3)});
+  else if(tg.length && noPos) L.push({text:(tg.length===1?'1 tracker was heard.':tg.length+' trackers were heard.')+' With no GPS position, Remiel cannot tell whether one followed you.'});
   else if(tg.length){ const near=tg.filter(r=>(r.share||0)>=0.75 && (r.legs||0)>=2).sort((a,b)=>(b.span||0)-(a.span||0))[0];
     L.push({text:(tg.length===1?'1 tracker was heard, and it did not follow you.':tg.length+' trackers were heard, and none followed you.')+
       (near ? ' The closest was '+nm(near)+', heard on '+((near.share||0)>=0.99?'every leg':'most legs')+' of '+du(st.distance_m ? Math.min(near.span||0, st.distance_m) : (near.span||0))+' of your route for '+mins(near.mins)+'. A tracker needs '+du(FOLLOW.tagReach)+' before Remiel calls it traveling with you.'
             : ' Each was near you only briefly, or stayed in one place.'), devs:near?[near]:[]}); }
   // a device heard for most of the trip that is not a follower, and why
   const home=!!(P.home && P.home.loc && rt.length && distLL(P.home.loc.lat,P.home.loc.lon,rt[0].lat,rt[0].lon)<200);
-  other.filter(r=>tags[r.id]!=='with' && r.cls!=='Tag' && durMin>=5 && (r.mins||0)>=0.8*durMin && (r.share||0)>=FOLLOW.share).sort((a,b)=>(b.mins||0)-(a.mins||0)).slice(0,2).forEach(r=>{
+  if(!noPos) other.filter(r=>tags[r.id]!=='with' && r.cls!=='Tag' && durMin>=5 && (r.mins||0)>=0.8*durMin && (r.share||0)>=FOLLOW.share).sort((a,b)=>(b.mins||0)-(a.mins||0)).slice(0,2).forEach(r=>{
     const weak=(r.level||0)<FOLLOW.level, uneven=(r.spread||0)>FOLLOW.spread, d=dayN[r.id]||0;
     let s=nm(r)+' was heard for '+((r.mins||0)>=durMin-1?'the whole trip':'most of the trip')+', but '+(weak?'weakly':uneven?'at an uneven strength':'not across enough of your route')+'.';
     if(d) s+=' It has been seen around here on '+d+(d===1?' other day.':' other days.');
@@ -3146,7 +3147,7 @@ function tripSummaryLines(R, C){
   if(wps.length>3) L.push({text:'There are '+(wps.length-3)+' more waypoints on the trip page.'});
   // the cameras, and how the trip ended
   const cams=(C.cams||[]).length; if(cams) L.push({text:cams===1?'1 camera on Remiel\'s maps was near your route.':cams+' cameras on Remiel\'s maps were near your route.'});
-  const lastMove=rt.length?rt[rt.length-1].t:R.t0; if(R.t1-lastMove>=3*60000) L.push({text:'The trip ended at '+hhmm(R.t1)+', '+Math.round((R.t1-lastMove)/60000)+' minutes after you last moved.'});
+  const lastMove=rt.length?rt[rt.length-1].t:R.t0; if(!noPos && R.t1-lastMove>=3*60000) L.push({text:'The trip ended at '+hhmm(R.t1)+', '+Math.round((R.t1-lastMove)/60000)+' minutes after you last moved.'});
   if((R.gaps||0)>=60) L.push({text:'Remiel was off the screen for '+walkDur(R.gaps*1000)+', and the record has a gap there.'});
   return L; }
 /* ----- What happened: what the trip found, one plain sentence each, in time order. Only findings are written; what Remiel could not tell is left out. ----- */
@@ -3211,7 +3212,8 @@ function tripAhead(R, r, A, stops){ const L=r.dl||[]; if(!L.length) return false
   const B=stops.find(s=>s!==A && s.t>A.end && mn[0]>=s.t-60000 && mn[0]<=s.end+60000 && s.pos); if(!B) return false;
   const lp=(R.route||[]).find(q=>q.t>B.end && distLL(q.lat,q.lon,B.pos.lat,B.pos.lon)>=WENT.move); if(!lp) return false;          // you never walked on from there: it cannot be told
   const after=L.filter(x=>x[0]>=lp.t); return !after.length || Math.min(...after.map(x=>x[1]))>=Math.max(2*mn[1], mn[1]+12); }          // a faint signal reads as about 25 m however far it is, so farther means twice as far and 12 m more
-function tripFindings(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, ds=Object.values(R.devs||{}).filter(r=>!r.sim && !r.mine && tags[r.id]!=='yours' && !r.pr), F=[], stops=tripStops(R);
+const tripNoPos = R => R.pd ? !R.pd.used : !(R.route||[]).length;          // a trip on which no GPS position of yours arrived: nothing can be said about your own movement
+function tripFindings(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, ds=Object.values(R.devs||{}).filter(r=>!r.sim && !r.mine && tags[r.id]!=='yours' && !r.pr), F=[], stops=tripStops(R), noPos=tripNoPos(R);
   const span=(a,b)=>hhmm(a)+(hhmm(b)!==hhmm(a)?' to '+hhmm(b):''), mins=ms=>{ const m=Math.round(ms/60000); return m<=1?'about a minute':m+' minutes'; };
   // stayed with you
   ds.filter(r=>tags[r.id]==='with' || (r.withYou && r.wy)).forEach(r=>F.push({t:r.withYou||r.first, hot:true, devs:[r],
@@ -3224,7 +3226,7 @@ function tripFindings(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, ds=Object.va
   // a car's own tracker that stays put (seen here before, local, or placed in one spot) is a parked car you walked past: said calmly, never as a headline
   const parkedCar = r => /vehicle GPS tracker/i.test((r.hint||'')+' '+(r.adv||'')) && (r.v==='fixed' || tags[r.id]==='local' || tags[r.id]==='again');
   ds.filter(r=>r.cls==='Tag' && !done.has(r.id) && (r.min<=4 || (r.min<=10 && r.last-r.first>=120000))).forEach(r=>F.push(parkedCar(r)
-    ? {t:r.minT||r.first, hot:false, calm:true, devs:[r], text:hhmm(r.minT||r.first)+': '+plainName(r)+' sits in a parked car you walked past, about '+du(r.min)+' away. It stays in this area and did not move with you.'}
+    ? {t:r.minT||r.first, hot:false, calm:true, devs:[r], text:noPos ? hhmm(r.minT||r.first)+': '+plainName(r)+' sits in a parked car, about '+du(r.min)+' away. Remiel has met it in this area before.' : hhmm(r.minT||r.first)+': '+plainName(r)+' sits in a parked car you walked past, about '+du(r.min)+' away. It stays in this area and did not move with you.'}
     : {t:r.minT||r.first, hot:true, devs:[r],
     text:hhmm(r.minT||r.first)+': '+plainName(r)+' came within '+du(r.min)+' of you.'+(r.last-r.first>=60000?' It was in earshot for '+mins(r.last-r.first)+'.':'')}));
   // passed you twice
@@ -3250,11 +3252,13 @@ function tripFindings(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, ds=Object.va
       F.push({t:e.t, hot:e.k!=='sg-close', devs:r?[r]:[], text:hhmm(e.t)+': '+e.text.replace(/^(Skimmer check|Close by|Left with you): /,'')}); }); }
   // groups: what came toward you or stopped by you, one line each; what passed on wheels, one calm line for the trip
   { const byId=new Map(Object.values(R.devs||{}).map(r=>[r.id,r]));
-    (R.events||[]).filter(e=>e.k==='grp-come' || e.k==='grp-stop' || e.k==='grp-up').forEach(e=>{ const r=byId.get(e.id); F.push({t:e.t, hot:false, devs:r?[r]:[], text:hhmm(e.t)+': '+e.text.replace(/^(Group( stopped)?|Came up to you): /,'')}); });
+    // "after you stopped" on a trip with no position of yours was never known: older records are read without it
+    (R.events||[]).filter(e=>e.k==='grp-come' || ((e.k==='grp-stop' || e.k==='grp-up') && !noPos)).forEach(e=>{ const r=byId.get(e.id); F.push({t:e.t, hot:false, devs:r?[r]:[], text:hhmm(e.t)+': '+e.text.replace(/^(Group( stopped)?|Came up to you): /,'')}); });
     (R.events||[]).filter(e=>e.k==='chg').forEach(e=>{ const r=byId.get(e.id); F.push({t:e.t, hot:/^Away/.test(e.text), devs:r?[r]:[], text:hhmm(e.t)+': '+e.text}); });          // what changed on your route
     const ps=(R.events||[]).filter(e=>e.k==='grp-pass');
     if(ps.length){ const named=ps.map(e=>(/most likely (.+?)(?: \(the lines on this street\))?\.$/.exec(e.text)||[])[1]).filter(Boolean);
       F.push({t:ps[0].t, hot:false, calm:true, devs:[], text:(ps.length===1?'1 vehicle or group on wheels':ps.length+' vehicles or groups on wheels')+' passed you'+(named.length?', among them '+[...new Set(named)].slice(0,3).join(', '):'')+'.'}); } }
+  if(noPos) F.push({t:R.t0||0, hot:false, calm:true, nopos:true, devs:[], text:'This trip had no GPS position, so Remiel cannot say whether anything followed you or stayed with you, and says nothing about your own movement.'});
   F.sort((a,b)=>(a.calm?1:0)-(b.calm?1:0) || a.t-b.t);          // calm notes (a parked car) come after everything that matters
   return F; }
 const NOTHING_FOUND='Nothing followed you, stayed near you, or passed you twice.';
@@ -3275,8 +3279,8 @@ function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},h
     return '<div class="t-row"><button class="loc-row t-'+tg+'" data-act="art" data-k="'+esc(r.sig||'')+'"><span class="sdot'+(r.cls==='Tag'?' k-tag':'')+'" style="--mk:'+TAG[tg].c+'"></span><span class="loc-t"><b>'+nm(r)+'</b><small>'+kd(r)+'</small>'+(tripChips(r)?'<small class="chips">'+tripChips(r)+'</small>':'')+'<small class="sw">'+esc(C.hw[r.id]||TAG[tg].w)+'</small><small class="sw">On this trip: '+hhmm(r.minT||r.first)+', '+minsIn(r.minT||r.first,R.t0)+', nearest '+esc(du(r.min))+(r.at?' · '+whSpan(r.at.lat,r.at.lon):'')+'</small></span></button>'+(r.sig?tagBtn(r.sig):'')+'</div>'; };
   let t, cls='v-clear', ic=LOC_IC.ok; const nW=of('with').length, nP=of('place').length;
   if(nW||nP){ cls='v-act'; ic=LOC_IC.warn; t=[nW?nW+(nW===1?' device moved with you':' devices moved with you'):'', nP?nP+(nP===1?' device had been seen before, in a different place':' devices had been seen before, in a different place'):''].filter(Boolean).join(', and '); }
-  else if(amber.length||wat.length){ cls='v-watch'; ic=LOC_IC.warn; const k=amber.length+wat.length; t=k+(k===1?' device had been seen here before':' devices had been seen here before')+'. None moved with you'; }
-  else t=ds.length?'No device on this trip had been seen before, and none moved with you':'Your path was recorded';
+  else if(amber.length||wat.length){ cls='v-watch'; ic=LOC_IC.warn; const k=amber.length+wat.length; t=k+(k===1?' device had been seen here before':' devices had been seen here before')+(tripNoPos(R)?'. With no GPS position, Remiel cannot tell whether any moved with you':'. None moved with you'); }
+  else t=tripNoPos(R) ? (ds.length?'No device on this trip had been seen before. With no GPS position, Remiel cannot tell whether any moved with you':'No GPS position was received on this trip') : ds.length?'No device on this trip had been seen before, and none moved with you':'Your path was recorded';
   let h='<div class="idsub">'+DOW3[d0.getDay()]+' '+d0.getDate()+' '+MON[d0.getMonth()]+' '+d0.getFullYear()+' · '+hhmm(R.t0)+' to '+hhmm(R.t1)+' · '+esc(walkDur(R.t1-R.t0))+' · '+esc(du(st.distance_m))+(R.test?' · test data':'')+'</div>'+
     (T.ren ? '<div class="formrow" style="margin-top:8px"><input class="inp" id="tripNameIn" maxlength="40" value="'+esc(R.name||'')+'" placeholder="A name for this trip" autocomplete="off" style="flex:1;min-width:0"><button class="btn sm primary" data-act="trip-ren-save">Save the name</button></div>' : '')+
     '<div class="loc-v '+cls+'" role="status" style="margin-top:10px"><svg viewBox="0 0 24 24" aria-hidden="true">'+ic+'</svg><div><b>'+esc(t)+'</b><span>'+st.heard+' heard · '+(c.fresh||0)+' new · '+(c.local||0)+' local · '+(c.yours||0)+' yours · '+seen.length+' seen before</span></div></div>'+tripSketch(R,{h:170}).replace(/<\/div>$/, tripMapBtn(R)+'</div>')+tripSummaryHTML(R, C);
@@ -3970,7 +3974,7 @@ function grpCand(d, nowS){ if(d.band!=='ble' || !d.present || d.sim || isYours(d
   return {d, since:d.since||M[0][0], rise:now-f0, falling:top-now>=6, m:near, mv:!!(d.mov && d.mov.v && nowS-d.mov.t<MOVE.keep) ? d.mov.v : 0, app, t:M[n-1][0]}; }
 function groupScan(nowS, live){ if(GRP.last && Math.abs(nowS-GRP.last)<1900) return; GRP.last=nowS; if(onWheels() && !SGS.on) return;
   const tL=nowS-LIVE.skew, lf=TRACK.length?TRACK[TRACK.length-1]:null, mv=(lf && tL-(lf.t2||lf.t)<=12000) ? ownMove(tL, 15000) : null, still=!!mv && mv.d<4;          // a position more than 12 seconds old says nothing about now
-  if(still){ if(!GRP.stillT) GRP.stillT=nowS; } else if(mv) GRP.stillT=0;
+  if(still){ if(!GRP.stillT) GRP.stillT=nowS; } else if(mv || !lf || tL-(lf.t2||lf.t)>45000) GRP.stillT=0;          // with no position of yours for 45 seconds, nothing says you stand still, so no claim that you stopped
   let n=0; const C0=[]; LIVE.devs.forEach(d=>{ if(d.band==='ble' && d.present) n++; const c=grpCand(d, nowS); if(c) C0.push(c); });
   // when the phone begins to hear (listening starts, Location comes on, the scanner wakes) everything around is first heard at once: that is no arrival
   const ear=Math.max(PH.asked||0, LIVE.earAt||0)+LIVE.skew, sinces=[]; LIVE.devs.forEach(x=>{ if(x.band==='ble' && x.since) sinces.push(x.since); });
@@ -8302,7 +8306,7 @@ function walkDocHTML(){
     '<div class="rp-meta">'+dstr(t0)+', '+hhmm(W.t0)+' to '+hhmm(W.t1||Date.now())+' &nbsp;·&nbsp; Recorded '+(PH.native?'in the Remiel app on this phone':'on '+e(Y.name||'this device'))+(W.test?' &nbsp;·&nbsp; <b>Test data</b>':'')+'</div>';
   { const F=tripFindings(W, W.cor||{}); h+='<h2>What happened</h2><ul class="rp-sum">'+(F.length?F.map(f=>'<li>'+e(f.text)+'</li>').join(''):'<li>'+e(NOTHING_FOUND)+'</li>')+'</ul>'; }
   // 1
-  const bottom = !ds.length ? 'Route recorded' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : maybe.length ? plural(maybe.length,'device','devices')+' stayed with you for part of the trip' : longEnough ? 'No device moved with you' : 'A short route: '+du(reach)+' end to end';
+  const bottom = tripNoPos(W) ? (withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : 'No GPS position was received, so Remiel cannot tell whether a device moved with you') : !ds.length ? 'Route recorded' : withYou.length ? plural(withYou.length,'device','devices')+' moved with you' : maybe.length ? plural(maybe.length,'device','devices')+' stayed with you for part of the trip' : longEnough ? 'No device moved with you' : 'A short route: '+du(reach)+' end to end';
   h+=H('Summary')+'<p>Bottom line: <span class="rp-tier">'+e(bottom)+'</span></p>'+
     '<div class="rp-bar4"><div><span>Traveled</span><b>'+e(miText(st.distance_m))+' in '+e(walkDur(durMs))+'</b></div><div><span>Heard</span><b>'+plural(st.heard,'device','devices')+'</b></div><div><span>On the map</span><b>'+st.placed+' placed</b></div><div><span>With you</span><b>'+withYou.length+'</b></div></div>';
   if(!ds.length) h+='<p>Remiel recorded your route for this trip. Start listening before the next one, and Remiel also records every device along it.</p>';
