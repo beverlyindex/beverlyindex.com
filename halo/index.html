@@ -728,7 +728,7 @@ select.inp.sm{padding:4px 8px;font-size:12px;width:auto;min-width:0}
 .fixbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 10px;padding:10px 12px;border:1px solid rgba(79,141,240,.55);border-radius:13px;background:linear-gradient(180deg,rgba(60,100,200,.22),rgba(20,34,72,.4));font-size:13px;line-height:1.4;color:var(--ink)}
 .fixbar span{flex:1 1 180px}
 .fixbar .btn{flex:none}
-.tline li{line-height:1.45} .tline li b.mono{font-variant-numeric:tabular-nums;color:#cfe0ff;margin-right:4px} .tline .tl-gps{color:#ffd58a} .tline .tl-you{color:#b9cdf5}
+.tline li{line-height:1.45} .tline .tsum-a{display:inline-flex;margin:0 0 0 8px;vertical-align:middle} .tline .tsum-a .btn{padding:3px 10px;min-height:0} .tline li b.mono{font-variant-numeric:tabular-nums;color:#cfe0ff;margin-right:4px} .tline .tl-gps{color:#ffd58a} .tline .tl-you{color:#b9cdf5}
 .tsum-l small.tm{display:block;color:#b9cdf5;font-size:12px;margin-top:2px;font-variant-numeric:tabular-nums} .loc-row small.tm,.t-row small.tm{color:#b9cdf5;font-variant-numeric:tabular-nums}
 .fixbar.posban{border-color:rgba(232,170,60,.72);background:linear-gradient(180deg,rgba(232,170,60,.18),rgba(20,34,72,.42))} .fixbar.posban b{color:#ffd58a}
 #vicCount.fix{cursor:pointer;text-decoration:underline;text-underline-offset:3px}
@@ -3287,7 +3287,7 @@ function tripTimeline(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, noPos=tripNo
       text:[nm(h.r), kd(h.r), 'closest '+du(h.w[2]), span].filter(Boolean).join(' · ')+(M.length ? ' · with it, first heard in the same moment: '+M.map(x=>x.name+' (closest '+du(x.m)+' at '+hms(x.t)+')').join(', ') : '')}); });
   (R.contacts||[]).forEach(c=>{ if((c.devs||[]).length>=3) out.push({t:c.t, k:'grp', devs:[], text:contactLine(c).replace(/^./, ch=>ch.toUpperCase())+'.'}); });
   (R.events||[]).forEach(e=>{
-    if(e.k==='start' || e.k==='stop') out.push({t:e.t, k:'you', devs:[], text:e.k==='start'?'Trip started.':'Trip ended.'});
+    if(e.k==='start' || e.k==='stop') out.push({t:e.k==='start'?e.t-1:e.t+1, k:'you', devs:[], text:e.k==='start'?'Trip started.':'Trip ended.'});          // the start comes before what was heard in its first second, the end after
     else if(e.k==='mark' && /set\.$/.test(e.text)) out.push({t:e.t, k:'you', devs:[], text:e.text});
     else if((e.k==='warn' || e.k==='note') && /^(No GPS position|GPS position (received|back)|Listening restarted)/.test(e.text)) out.push({t:e.t, k:'gps', devs:[], text:e.text});
     else if(e.k==='grp-pass' || e.k==='grp-come' || ((e.k==='grp-up' || e.k==='grp-stop') && !noPos)) out.push({t:e.t, k:'grp', devs:[], text:e.text.replace(/^(Group( stopped)?|Came up to you|Passing): /,'')}); });
