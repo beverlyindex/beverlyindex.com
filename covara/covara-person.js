@@ -169,6 +169,18 @@
     if (_hist && !fromBack) { _hist = false; try { history.back(); } catch (e) {} }
   }
 
+  /* Close the card, then open something else once the back step the card took has landed. A sheet that
+     pushes its own history step and closes on popstate (Records, the Day) would otherwise be shut by that
+     late popstate the moment it opens: on a phone the step lands after the next sheet is already up. */
+  function closeThen(fn) {
+    if (!sheet || !_isOpen || !_hist) { close(); try { fn(); } catch (e) {} return; }
+    var done = false, tm = 0;
+    function go() { if (done) return; done = true; clearTimeout(tm); window.removeEventListener('popstate', go); try { fn(); } catch (e) {} }
+    window.addEventListener('popstate', go);
+    tm = setTimeout(go, 800);
+    close();
+  }
+
   /* ── where a person is, in one line: GET /care/whereis as WHEREIS asks it ── */
   function api(path) { return SyncEngine.apiFetch(path, { method: 'GET' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); }
   function homeUser() { var h = homeContact(); return role() === 'away' && h ? h.care.userId : ''; }
@@ -243,6 +255,8 @@
     if (a === 'where') {
       close();
       try { focusedContactId = c.id; } catch (e) {}
+      /* the simple screen lets go of a chosen face at once; this one stays chosen while WHEREIS shows it */
+      try { if (window.CovaraSimple && CovaraSimple.keep) CovaraSimple.keep(c.id); } catch (e) {}
       try { netSpin = false; } catch (e) {}
       try { WhereIs.setMode('whereis'); } catch (e) {}
       try { if (window.CovaraWhere) CovaraWhere.load(true); } catch (e) {}
@@ -336,7 +350,7 @@
   /* A tile opens that part of HOME's care in covara-view.js's panel. The panel shows only while no
      other sphere is chosen and WHEREIS is not up, so both are put back first. */
   function openSection(k) {
-    if (k === 'day') { close(); if (window.CovaraPlan) setTimeout(function () { CovaraPlan.open(); }, 120); return; }
+    if (k === 'day') { closeThen(function () { if (window.CovaraPlan) CovaraPlan.open(); }); return; }
     close();
     try { focusedContactId = null; } catch (e) {}
     try { if (typeof WhereIs !== 'undefined' && WhereIs.mode && WhereIs.mode() === 'whereis') WhereIs.setMode('comm'); } catch (e) {}
@@ -351,5 +365,5 @@
     } catch (e) {}
   }
 
-  window.CovaraPerson = { open: open, openCare: openCare, close: function () { close(); }, isOpen: isOpen };
+  window.CovaraPerson = { open: open, openCare: openCare, close: function () { close(); }, closeThen: closeThen, isOpen: isOpen };
 })();
