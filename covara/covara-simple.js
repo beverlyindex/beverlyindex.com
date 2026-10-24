@@ -1,17 +1,20 @@
 /* Remiel: Covara, the calm main screen, the five buttons, the Me sheet and Simple mode.
    - Everyone: the galaxy stands still. The family sit in a fixed ring around the centre; there is no turning,
-     no zoom, no arrows, no hint and no row of chips. The bottom row is five plain buttons:
-     Care, Camera, TALK (the largest, in the middle), Words (live captions) beside it, Messages and Me.
+     no zoom, no arrows, no hint and no row of chips. The bottom row: Me, Care and Camera on the left, the C
+     (the Covara Button, the largest) exactly in the middle, then Words (live captions) and Messages. Camera
+     just left of the C and Words just right of it, as on the simple screen.
    - Me: Settings, Calm, Share with doctor, Add someone and Sign out. On the family's phone, also the switch
      for the simple screen on HOME's phone, when this person may change it.
    - Simple mode, on HOME's phone (on unless the family turned it off): the logo, Help, the Now strip,
-     HOME's own picture with the next thing to do under it, the family's faces, TALK and Words. Nothing else.
+     HOME's own picture with the next thing to do under it, the family's faces, and three round glass buttons
+     at the foot: the camera, the C in the centre and live captions (a speaking person). No words on them.
+     Calling stays one tap away: a tap on a face on the team opens that person's card with Call.
    Beverly Index LLC */
 (function () {
   'use strict';
   var IT = function () { try { return String(I18n.locale || 'en').slice(0, 2) === 'it'; } catch (e) { return false; } };
   var S = {
-    en: { care: 'Care', camera: 'Camera', words: 'Words', messages: 'Messages', me: 'Me', callFamily: 'Call team', meTitle: 'Me',
+    en: { care: 'Care', camera: 'Camera', words: 'Words', messages: 'Messages', me: 'Me', callFamily: 'Call team', meTitle: 'Me', camAria: 'Camera', wordsAria: 'Live captions',
       settings: 'Settings', settingsSub: 'Language, sound, your name and picture',
       calm: 'Calm', calmSub: 'Larger words, less movement', on: 'On', off: 'Off',
       share: 'Share with doctor', shareSub: 'A private link to what the doctor needs',
@@ -22,7 +25,7 @@
       backSimple: 'Simple screen', backSimpleSub: 'Go back to the simple screen your team chose',
       simpleFail: 'Could not change it. Check the internet and try again.', close: 'Close',
       next: 'Next: {what} at {time}', nowDo: 'Now: {what}, {time}', nothing: 'Nothing more today', visit: 'Visit' },
-    it: { care: 'Cure', camera: 'Foto', words: 'Parole', messages: 'Messaggi', me: 'Io', callFamily: 'Chiama il team', meTitle: 'Io',
+    it: { care: 'Cure', camera: 'Foto', words: 'Parole', messages: 'Messaggi', me: 'Io', callFamily: 'Chiama il team', meTitle: 'Io', camAria: 'Fotocamera', wordsAria: 'Sottotitoli dal vivo',
       settings: 'Impostazioni', settingsSub: 'Lingua, suoni, il tuo nome e la tua foto',
       calm: 'Calma', calmSub: 'Parole più grandi, meno movimento', on: 'Sì', off: 'No',
       share: 'Condividi col medico', shareSub: 'Un link privato con ciò che serve al medico',
@@ -51,24 +54,30 @@
     'body.cvs-on #sphereSize,body.cvs-on .app-logo-tag,body.cvs-on #networkHint,body.cvs-on #cvnTop,body.cvs-on #cvnCircle,body.cvs-on #backBtn,' +
     'body.cvs-on #alertBell,body.cvs-on #settingsBtn,body.cvs-on #exitBtn,body.cvs-on #addPersonFab,body.cvs-on #cvnHudL,body.cvs-on #cvnHudR,' +
     'body.cvs-on #cvnDock .cvn-step,body.cvs-on #cvnDock .cvn-slot{display:none !important}' +
-    /* 2. the bottom row: Care, Camera, TALK, Messages, Me */
-    'body.cvs-on #cvnDock{display:flex;align-items:flex-end;gap:12px;bottom:max(14px,env(safe-area-inset-bottom))}' +
+    /* 2. the bottom row: three columns, so the C sits exactly in the middle of the screen whatever is beside it.
+       Left: Me, Care, Camera. Right: Words, Messages. On a phone each side shares its half evenly. */
+    'body.cvs-on #cvnDock{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;column-gap:12px;bottom:max(14px,env(safe-area-inset-bottom))}' +
     'body.cvs-on #cvnDock[hidden]{display:none}' +
+    'body.cvs-on #cvnDock .cvn-talk{grid-column:2;grid-row:1;padding:0 2px}' +
+    '.cvs-side{display:flex;align-items:center;gap:12px;min-width:0;grid-row:1}.cvs-side.l{grid-column:1;justify-content:flex-end}.cvs-side.r{grid-column:3;justify-content:flex-start}' +
+    'body:not(.cvs-on) .cvs-side{display:none}' +
     'body.cvs-on #cvnDay{bottom:118px !important}' +
-    '.cvs-b{flex:0 0 auto;min-width:84px;min-height:60px;padding:8px 10px 7px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:#e6f1ff;' +
+    '.cvs-b{flex:0 0 auto;min-width:84px;min-height:60px;padding:8px 10px 7px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:#e6f1ff;-webkit-tap-highlight-color:transparent;' +
       'font:600 13px/1.1 "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.01em;' + GLASS + ';transition:transform .15s,box-shadow .2s}' +
+    '.cvs-b span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     '.cvs-b svg{width:24px;height:24px;stroke:#9fd8ff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 5px rgba(56,189,248,.55))}' +
     '.cvs-b:active{transform:scale(.96)}.cvs-b:focus-visible{outline:2px solid #C5A55A;outline-offset:2px}' +
     '.cvs-b[data-s=care] svg{stroke:#ffd98a;filter:drop-shadow(0 0 5px rgba(255,210,77,.5))}' +
-    'body.cvs-on #cvnDock .cvn-talk{order:3;padding:0 2px}body.cvs-on #cvnDock .cvs-b[data-s=care]{order:1}body.cvs-on #cvnDock .cvs-b[data-s=camera]{order:2}' +
-    'body.cvs-on #cvnDock .cvs-b[data-s=words]{order:4}body.cvs-on #cvnDock .cvs-b[data-s=messages]{order:5}body.cvs-on #cvnDock .cvs-b[data-s=me]{order:6}body.cvs-on #cvnDock .cvs-b[data-s=call]{order:7}' +
+    '.cvs-b[data-s=me]{order:1}.cvs-b[data-s=care]{order:2}.cvs-b[data-s=camera]{order:3}.cvs-b[data-s=words]{order:1}.cvs-b[data-s=messages]{order:2}.cvs-b[data-s=call]{order:3}' +
     'body.cvs-nowords #cvnDock .cvs-b[data-s=words]{display:none !important}' +
     '.cvs-b[data-s=words] svg{stroke:#7ff0ff}' +
     'body.cvs-on #cvnDock .cvn-orb{width:86px;height:86px;font-size:13px;box-shadow:0 0 0 2px rgba(255,255,255,.24),0 0 0 7px rgba(197,165,90,.22),0 0 26px rgba(255,210,77,.38),0 0 46px rgba(56,189,248,.7)}' +
     '.cvs-b[data-s=call]{display:none}' +
-    '@media (max-width:700px){body.cvs-on #cvnDock{width:calc(100vw - 16px);gap:6px;justify-content:space-between;align-items:center;bottom:max(10px,env(safe-area-inset-bottom))}' +
-      '.cvs-b{flex:1 1 0;min-width:0;padding:7px 1px 6px;font-size:11.5px;letter-spacing:-.01em;border-radius:18px;overflow:hidden}.cvs-b svg{width:22px;height:22px}' +
-      'body.cvs-on #cvnDock .cvn-talk{flex:0 0 auto}body.cvs-on #cvnDock .cvn-orb{width:80px;height:80px}}' +
+    /* a phone: each side shares its half evenly, so the longer names (Messages, Messaggi) fit whole */
+    '@media (max-width:700px){body.cvs-on #cvnDock{width:calc(100vw - 16px);column-gap:6px;bottom:max(10px,env(safe-area-inset-bottom))}' +
+      '.cvs-side{gap:4px}.cvs-b{flex:1 1 0;min-width:0;min-height:58px;padding:7px 1px 6px;font-size:10.5px;letter-spacing:0;border-radius:18px;overflow:hidden}.cvs-b svg{width:22px;height:22px}' +
+      'body.cvs-on #cvnDock .cvn-talk{flex:0 0 auto}body.cvs-on #cvnDock .cvn-orb{width:74px;height:74px}}' +
+    '@media (max-width:380px){body.cvs-on #cvnDock{column-gap:4px}.cvs-side{gap:3px}.cvs-b{padding:7px 0 6px;font-size:9.8px}body.cvs-on #cvnDock .cvn-orb{width:64px;height:64px}}' +
     /* the one line under the centre picture */
     '#cvsLine{position:fixed;left:50%;transform:translateX(-50%);z-index:60;max-width:calc(100vw - 40px);box-sizing:border-box;padding:7px 16px;border-radius:999px;text-align:center;pointer-events:none;' +
       'font:600 15px/1.3 "Hanken Grotesk",system-ui,sans-serif;color:#f2f7ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' + GLASS + '}' +
@@ -94,27 +103,29 @@
     '#cvsMe .cvs-row.gold{border-color:rgba(255,210,77,.5);box-shadow:0 0 18px rgba(255,210,77,.22),inset 0 1px 0 rgba(255,255,255,.14)}#cvsMe .cvs-row.gold svg{stroke:#ffd98a}' +
     '#cvsMe .cvs-row.out b{color:#ffb4b4}#cvsMe .cvs-row.out svg{stroke:#ff9b9b;filter:none}' +
     '#cvsMe .cvs-err{color:#ffb4b4;font-size:13px;margin:-2px 4px 8px}' +
-    /* 4. Simple mode on HOME's phone */
+    /* 4. Simple mode on HOME's phone: the camera, the C in the centre and live captions, three round glass buttons, no words */
     'body.cv-simple #cvnDay,body.cv-simple #cvnDayTip,body.cv-simple #dreamBrief,body.cv-simple .dream-brief,body.cv-simple .dream-comm,body.cv-simple #whereisAnchor,' +
     'body.cv-simple #cvnDock .cvs-b{display:none !important}' +
-    'body.cv-simple #cvnDock{justify-content:center !important;gap:18px}' +
-    'body.cv-simple #cvnDock .cvs-b[data-s=call]{display:flex !important;flex:0 0 auto;min-width:88px;min-height:56px;font-size:13px}' +
-    'body.cv-simple #cvnDock .cvs-b[data-s=words]{display:flex !important;flex:0 0 auto;width:96px;height:96px;min-height:0;border-radius:50%;font-size:15px;font-weight:700;gap:5px;border-color:rgba(127,240,255,.55);box-shadow:0 0 0 6px rgba(56,189,248,.14),0 0 30px rgba(56,189,248,.5),inset 0 1px 0 rgba(255,255,255,.18)}' +
-    'body.cv-simple #cvnDock .cvs-b[data-s=words] svg{width:30px;height:30px}' +
+    'body.cv-simple #cvnDock{column-gap:24px}body.cv-simple .cvs-side{gap:0}' +
+    'body.cv-simple #cvnDock .cvs-b[data-s=camera],body.cv-simple #cvnDock .cvs-b[data-s=words]{display:flex !important;flex:0 0 auto;width:78px;height:78px;min-width:0;min-height:0;padding:0;border-radius:50%;' +
+      'background:radial-gradient(circle at 32% 24%,rgba(255,255,255,.17) 0,rgba(159,216,255,.07) 34%,rgba(56,189,248,.04) 62%,rgba(10,30,70,.12) 100%);-webkit-backdrop-filter:blur(10px) saturate(150%);backdrop-filter:blur(10px) saturate(150%);' +
+      'border:1.5px solid rgba(159,216,255,.55);box-shadow:0 0 0 4px rgba(56,189,248,.07),0 0 22px rgba(56,189,248,.34),inset 0 1px 0 rgba(255,255,255,.3),inset 0 0 16px rgba(56,189,248,.14)}' +
+    'body.cv-simple #cvnDock .cvs-b[data-s=camera]{border-color:rgba(255,210,77,.58);box-shadow:0 0 0 4px rgba(255,210,77,.07),0 0 22px rgba(255,210,77,.3),inset 0 1px 0 rgba(255,255,255,.3),inset 0 0 16px rgba(255,210,77,.12)}' +
+    'body.cv-simple #cvnDock .cvs-b span{display:none}' +
+    'body.cv-simple #cvnDock .cvs-b svg{width:36px;height:36px;stroke-width:1.6;stroke:#eaf6ff;filter:drop-shadow(0 0 6px rgba(56,189,248,.75))}' +
+    'body.cv-simple #cvnDock .cvs-b[data-s=camera] svg{stroke:#fff3c4;filter:drop-shadow(0 0 6px rgba(255,210,77,.7))}' +
+    'body.cv-simple #cvnDock .cvs-b[data-s=words] svg{stroke:#bff7ff}' +
     'body.cv-simple.cvs-nowords #cvnDock .cvs-b[data-s=words]{display:none !important}' +
-    'body.cv-simple #cvnDock .cvs-b[data-s=words]{order:2}body.cv-simple #cvnDock .cvn-talk{order:3}body.cv-simple #cvnDock .cvs-b[data-s=call]{order:4}body.cv-simple #cvnDock .cvn-orb{width:104px !important;height:104px !important;font-size:15px}' +
-    'body.cv-simple.cvs-nocall #cvnDock .cvs-b[data-s=call]{display:none !important}' +
-    /* the camera stays on the simple screen too: showing a medicine, a meal or a letter is one tap */
-    'body.cv-simple #cvnDock .cvs-b[data-s=camera]{display:flex !important;order:1;flex:0 0 auto;width:72px;height:72px;min-height:0;border-radius:50%;font-size:12.5px;gap:3px;border-color:rgba(255,210,77,.55);box-shadow:0 0 0 5px rgba(255,210,77,.12),0 0 22px rgba(255,210,77,.35),inset 0 1px 0 rgba(255,255,255,.18)}' +
-    'body.cv-simple #cvnDock .cvs-b[data-s=camera] svg{width:26px;height:26px}' +
-    '@media (max-width:440px){body.cv-simple #cvnDock{gap:10px}body.cv-simple #cvnDock .cvs-b[data-s=words]{width:80px;height:80px;font-size:13.5px}body.cv-simple #cvnDock .cvn-orb{width:94px !important;height:94px !important}body.cv-simple #cvnDock .cvs-b[data-s=call]{min-width:76px;padding:0 8px}}';
+    'body.cv-simple #cvnDock .cvn-orb{width:104px !important;height:104px !important;font-size:15px}' +
+    '@media (max-width:440px){body.cv-simple #cvnDock{column-gap:18px}body.cv-simple #cvnDock .cvs-b[data-s=camera],body.cv-simple #cvnDock .cvs-b[data-s=words]{width:72px;height:72px}body.cv-simple #cvnDock .cvs-b svg{width:33px;height:33px}body.cv-simple #cvnDock .cvn-orb{width:96px !important;height:96px !important}}';
   var st = document.createElement('style'); st.id = 'cvsStyle'; st.textContent = css; document.head.appendChild(st);
 
   var ICON = {
     care: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/><path d="M12 9.5v5M9.5 12h5"/></svg>',
-    camera: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.6"/></svg>',
+    camera: '<svg viewBox="0 0 24 24"><path d="M3.5 8.5a1.5 1.5 0 0 1 1.5-1.5h2.6l1.6-2.2h5.6L16.4 7H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/><circle cx="12" cy="12.9" r="3.5"/><path d="M17.3 9.7h.01"/></svg>',
     messages: '<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>',
-    words: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M6.5 10.5h6M14.5 10.5h3M6.5 14h3M11.5 14h6"/></svg>',
+    /* a person speaking: a head in profile, the sound coming from the mouth */
+    words: '<svg viewBox="0 0 24 24"><path d="M5.2 21v-3.3C3.4 16.4 2.4 14.3 2.4 11.8 2.4 7.1 5.9 3.6 10.2 3.6c3.6 0 6 2.5 6 5.6l1.5 3.1-1.6.6v1.6c0 1-.8 1.8-1.8 1.8h-2.1V21"/><path d="M19.3 8.4l2.3-1.4M19.9 11.6h2.6M19.3 14.8l2.3 1.4"/></svg>',
     me: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-4 4.2-5.8 7.5-5.8s6.3 1.8 7.5 5.8"/></svg>',
     call: '<svg viewBox="0 0 24 24"><path d="M6.5 4h3l1.5 4-2 1.3a10 10 0 0 0 5.7 5.7L16 13l4 1.5v3a2 2 0 0 1-2.2 2A15.5 15.5 0 0 1 4.5 6.2 2 2 0 0 1 6.5 4z"/></svg>',
     settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg>',
@@ -132,16 +143,27 @@
   function buildRow() {
     var dock = document.getElementById('cvnDock'); if (!dock || !dock.querySelector('.cvn-talk')) return false;
     if (dock.querySelector('.cvs-b')) { _built = true; return true; }
+    /* two sides around the C (the grid keeps the C in the middle): Me, Care and Camera on the left, Words and Messages on the right */
+    var L = document.createElement('div'); L.className = 'cvs-side l';
+    var R = document.createElement('div'); R.className = 'cvs-side r';
+    dock.appendChild(L); dock.appendChild(R);
     ['care', 'camera', 'words', 'messages', 'me', 'call'].forEach(function (k) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'cvs-b'; b.setAttribute('data-s', k);
       b.innerHTML = ICON[k] + '<span></span>';
       b.addEventListener('click', function (e) { e.stopPropagation(); act(k); });
-      dock.appendChild(b);
+      (k === 'me' || k === 'care' || k === 'camera' ? L : R).appendChild(b);
     });
     _built = true; words(); return true;
   }
   function words() {
-    document.querySelectorAll('#cvnDock .cvs-b').forEach(function (b) { var k = b.getAttribute('data-s'); var s = b.querySelector('span'); var w = t(k === 'call' ? 'callFamily' : k); if (s.textContent !== w) s.textContent = w; b.setAttribute('aria-label', w); });
+    /* on the simple screen there are no words on the buttons, so the name a screen reader says is the plain one */
+    var simple = document.body.classList.contains('cv-simple');
+    document.querySelectorAll('#cvnDock .cvs-b').forEach(function (b) {
+      var k = b.getAttribute('data-s'); var s = b.querySelector('span'); var w = t(k === 'call' ? 'callFamily' : k);
+      if (s.textContent !== w) s.textContent = w;
+      var a = simple && k === 'camera' ? t('camAria') : simple && k === 'words' ? t('wordsAria') : w;
+      if (b.getAttribute('aria-label') !== a) b.setAttribute('aria-label', a);
+    });
     var me = document.getElementById('cvsMe'); if (me && !me.hidden) drawMe();
   }
   function family() {
@@ -320,11 +342,22 @@
   }
   ['pointermove', 'mousemove', 'touchmove'].forEach(function (ev) { window.addEventListener(ev, still, { capture: true, passive: true }); });
 
+  /* "Where is" on a person's card: the simple screen keeps that person chosen while WHEREIS shows them,
+     so their radar stays up; once WHEREIS is turned back to Communication or another face is chosen, it lets go */
+  var _keep = null;
+  function keep(id) { _keep = id == null ? null : id; }
+  function keptForWhere() {
+    if (_keep == null) return false;
+    var m = 'comm'; try { m = WhereIs.mode(); } catch (e) {}
+    if (m === 'whereis' && focusedContactId === _keep) return true;
+    _keep = null; return false;
+  }
+
   /* ── keep it all current ── */
   function frame() {
     var o = on();
     document.body.classList.toggle('cvs-on', o);
-    if (o) { lockRing(); if (simpleNow()) { try { if (focusedContactId != null && !(window.CovaraPerson && CovaraPerson.isOpen && CovaraPerson.isOpen())) focusedContactId = null; } catch (e) {} } }
+    if (o) { lockRing(); if (simpleNow()) { try { if (focusedContactId != null && !(window.CovaraPerson && CovaraPerson.isOpen && CovaraPerson.isOpen()) && !keptForWhere()) focusedContactId = null; } catch (e) {} } }
     requestAnimationFrame(frame);
   }
   function tick() {
@@ -332,7 +365,9 @@
     wrap();
     if (!_built) buildRow();
     loadSimple(false);
+    var wasSimple = document.body.classList.contains('cv-simple');
     document.body.classList.toggle('cv-simple', on() && simpleNow());
+    if (wasSimple !== document.body.classList.contains('cv-simple')) words();
     document.body.classList.toggle('cvs-nocall', !family().length);
     document.body.classList.toggle('cvs-nowords', !(window.CovaraWords && CovaraWords.open));
     var dock = document.getElementById('cvnDock');
@@ -369,5 +404,5 @@
     el.querySelector('[data-f=no]').onclick = function () { el.classList.remove('open'); el.remove(); };
   }
 
-  window.CovaraSimple = { full: full, setFull: setFull, on: function () { return simpleNow(); }, refresh: function () { return loadSimple(true); }, openMe: openMe, closeMe: closeMe, act: act };
+  window.CovaraSimple = { full: full, setFull: setFull, on: function () { return simpleNow(); }, refresh: function () { return loadSimple(true); }, openMe: openMe, closeMe: closeMe, act: act, keep: keep };
 })();
