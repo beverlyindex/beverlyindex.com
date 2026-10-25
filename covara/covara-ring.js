@@ -168,11 +168,28 @@
     var R = Math.min(g.cR * 1.78, g.W / 2 - 46), d = Math.max(50, Math.min(60, Math.round(g.cR * 0.72)));
     stage(g, titleKey || null);
     layer.appendChild(ringSvg(g, R));
-    keys.forEach(function (k, i) {
+    var nodes = keys.map(function (k, i) {
       var a = -Math.PI / 2 + i * 2 * Math.PI / keys.length;
-      layer.appendChild(node(k, g.cx + Math.cos(a) * R, g.cy + Math.sin(a) * R, d, extras && extras[k]));
+      var el = node(k, g.cx + Math.cos(a) * R, g.cy + Math.sin(a) * R, d, extras && extras[k]);
+      layer.appendChild(el); return { el: el, a: a };
     });
+    spin(nodes, g, R);
     return g;
+  }
+  /* The rings turn slowly the whole time they are open (25 Oct 2026: "in-motion, slowly so that
+     selections can be made comfortably"): one full turn every 90 seconds, clockwise, labels upright. */
+  var _spinId = 0;
+  function spin(nodes, g, R) {
+    var id = ++_spinId, t0 = performance.now(), still = false;
+    try { still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    if (still) return;
+    function step(now) {
+      if (id !== _spinId || !_state) return;
+      var off = ((now - t0) / 90000) * 2 * Math.PI;
+      nodes.forEach(function (n) { var a = n.a + off; n.el.style.left = (g.cx + Math.cos(a) * R) + 'px'; n.el.style.top = (g.cy + Math.sin(a) * R) + 'px'; });
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
   }
   /* Labels beside the sphere follow its edge: each sits a little further out or in, on a circle just
      outside HOME's sphere, so the column curves with the sphere. Text starts at the sphere's side. */
@@ -229,7 +246,7 @@
   }
   function cat(k) { return HOME_RING.filter(function (c) { return c.k === k; })[0]; }
   function close() {
-    _state = ''; layer.classList.remove('open');
+    _spinId++; _state = ''; layer.classList.remove('open');
     setTimeout(function () { if (!_state) { layer.hidden = true; layer.innerHTML = ''; } }, 320);
   }
   function stopWhere() {
@@ -299,9 +316,9 @@
       case 'calendar': case 'alarms': case 'invites': return notYet(k);
       case 'camera': return run(function () { CovaraCamera.open(); });
       case 'words': return run(function () { CovaraWords.open(); });
-      case 'mode': try { CovaraSimple.setFull(!CovaraSimple.full()); } catch (e) {} return show('sub:tools');
-      case 'speak': try { CovaraGuide.setOn(!CovaraGuide.on()); } catch (e) {} return show('sub:covara');
-      case 'broadcast': try { localStorage.setItem('rc:broadcast', broadcastOn() ? '0' : '1'); } catch (e) {} return show('sub:covara');
+      case 'mode': try { CovaraSimple.setFull(!CovaraSimple.full()); } catch (e) {} close(); return toast(t('mode') + ': ' + modeState());
+      case 'speak': try { CovaraGuide.setOn(!CovaraGuide.on()); } catch (e) {} close(); return toast(t('speak') + ': ' + speakState());
+      case 'broadcast': try { localStorage.setItem('rc:broadcast', broadcastOn() ? '0' : '1'); } catch (e) {} close(); return toast(t('broadcast') + ': ' + broadcastState());
       case 'code': return run(function () { CovaraCare.openCode(); });
       case 'settings': return run(function () { SettingsPanel.open(); });
       case 'where': close(); _where = true; try { if (away) focusedContactId = null; WhereIs.setMode('whereis'); } catch (e) {} return;
