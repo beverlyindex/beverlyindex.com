@@ -291,7 +291,8 @@
       /* a gold ring round the centre while in someone else's team */
       V.drawCentre = function (ctx, cx, cy, cr, t0) {
         var r = dc.apply(this, arguments);
-        if (_view && viewed()) {
+        /* 25 Oct 2026: not on the main screen, which shows Sentinel's centre sphere exactly */
+        if (_view && viewed() && !document.body.classList.contains('cv-main')) {
           try {
             var a = 0.85 + 0.15 * Math.sin((t0 || 0) * 0.003);
             ctx.save();

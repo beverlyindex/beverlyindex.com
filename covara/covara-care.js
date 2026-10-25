@@ -355,8 +355,28 @@
 
   var _syncing = null, _synced = false;
   function sync() { if (!_syncing) _syncing = _sync().finally(function () { _syncing = null; }); return _syncing; }
+  /* One sphere per person (25 Oct 2026): a sync that ran before the saved contacts had loaded added the
+     same team member a second time. Any copies of one link are folded into one, keeping the one with a picture. */
+  async function dedupe() {
+    var byL = {}, drop = [];
+    careContacts().forEach(function (c) { (byL[c.care.linkId] = byL[c.care.linkId] || []).push(c); });
+    Object.keys(byL).forEach(function (k) {
+      var list = byL[k]; if (list.length < 2) return;
+      var hasPic = function (c) { try { return typeof contactPhotos !== 'undefined' && contactPhotos.has(c.id); } catch (e) { return false; } };
+      list.sort(function (a, b) { return (hasPic(b) ? 1 : 0) - (hasPic(a) ? 1 : 0) || a.id - b.id; });
+      drop = drop.concat(list.slice(1));
+    });
+    for (var i = 0; i < drop.length; i++) {
+      var idx = DEMO_CONTACTS.indexOf(drop[i]); if (idx >= 0) DEMO_CONTACTS.splice(idx, 1);
+      try { await RemielDB.deleteContact(drop[i].id); } catch (e) {}
+      try { if (focusedContactId === drop[i].id) focusedContactId = null; } catch (e) {}
+    }
+    return drop.length;
+  }
   async function _sync() {
     if (!authed()) return;
+    /* the saved contacts first, so a person already on this phone is never added again */
+    try { if (typeof RemielDB !== 'undefined' && RemielDB.getAllContacts) { var saved = await RemielDB.getAllContacts(); (saved || []).forEach(function (s) { if (s && s.care && s.care.linkId && !DEMO_CONTACTS.some(function (d) { return d.id === s.id; }) && !byLink(s.care.linkId)) DEMO_CONTACTS.push(s); }); } } catch (e) {}
     var r; try { r = await api('/links'); } catch (e) { return; }
     if (!r.ok) return;
     var links = [];
@@ -389,6 +409,7 @@
       if (typeof focusedContactId !== 'undefined' && focusedContactId === gone[g].id) focusedContactId = null;
       changed = true;
     }
+    if (await dedupe()) changed = true;
     if (changed) {
       try { if (typeof buildNodes === 'function') buildNodes(false); } catch (e) {}
       refreshLabels();

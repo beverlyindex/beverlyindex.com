@@ -340,7 +340,7 @@
       var p = e.touches ? e.touches[0] : e; _pressOriginX = p.clientX; _pressOriginY = p.clientY; _pressMaxDist = 0;
     } catch (err) {}
   }
-  ['pointermove', 'mousemove', 'touchmove'].forEach(function (ev) { window.addEventListener(ev, still, { capture: true, passive: true }); });
+  /* 25 Oct 2026: the galaxy revolves again as in Sentinel; the still ring and the finger lock are gone */
 
   /* "Where is" on a person's card: the simple screen keeps that person chosen while WHEREIS shows them,
      so their radar stays up; once WHEREIS is turned back to Communication or another face is chosen, it lets go */
@@ -357,7 +357,7 @@
   function frame() {
     var o = on();
     document.body.classList.toggle('cvs-on', o);
-    if (o) { lockRing(); if (simpleNow()) { try { if (focusedContactId != null && !(window.CovaraPerson && CovaraPerson.isOpen && CovaraPerson.isOpen()) && !keptForWhere()) focusedContactId = null; } catch (e) {} } }
+    if (o) { if (simpleNow() && !document.body.classList.contains('cv-main')) { try { if (focusedContactId != null && !(window.CovaraPerson && CovaraPerson.isOpen && CovaraPerson.isOpen()) && !keptForWhere()) focusedContactId = null; } catch (e) {} } }
     requestAnimationFrame(frame);
   }
   function tick() {
