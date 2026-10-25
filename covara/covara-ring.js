@@ -12,7 +12,7 @@
   var S = {
     en: { contact: 'Contact', health: 'Health', journal: 'Journal', tools: 'Tools', where: 'WHEREIS / Safety', covara: 'Covara', alert: 'ALERT',
       video: 'Video call', phone: 'Phone call', message: 'Message', email: 'Email',
-      hHealth: 'Health', visits: 'Visits', meds: 'Medicines', docs: 'Records', broadcast: 'Broadcast Contact', team: 'TEAM', bSent: 'Sent to {n} on your team.', bNone: 'Your message is empty.', bTitle: 'Message to your whole team', bSend: 'Send to everyone', bPh: 'Write your message', noEmail: 'No one on your team has an email address in Covara yet.',
+      hHealth: 'Health', visits: 'Visits', meds: 'Medicines', docs: 'Records', broadcast: 'Broadcast Contact', team: 'TEAM', bSent: 'Sent to {n} on your team.', bNone: 'Your message is empty.', bTitle: 'Message to your whole team', bSend: 'Send to everyone', bPh: 'Write your message', noEmail: 'No one on your team has an email address in Covara yet.', eTitle: 'Email', eTitleAll: 'Email to your whole team', eSubj: 'Subject', ePh: 'Write your email', eSend: 'Send email', eSent: 'Email sent to {n}.', eNoMail: '{n} has no email address in Covara yet.', eLimit: "Today's email allowance is used up. Try again tomorrow.", eFail: 'The email could not be sent. Check the internet.', eOwn: 'Opening your mail app instead.',
       notes: 'Notes', calendar: 'Calendar', daily: 'Daily Schedule', alarms: 'Alarms', invites: 'Invites',
       camera: 'Camera', words: 'Words', mode: 'Mode', modeFull: 'Full view', modeOne: 'One-on-one',
       speak: 'Speak', on: 'ON', off: 'OFF', code: 'Team code', settings: 'Settings',
@@ -21,7 +21,7 @@
       notYet: 'is not built yet. It is next on the list.', tapHome: 'Tap your sphere to close' },
     it: { contact: 'Contatti', health: 'Salute', journal: 'Diario', tools: 'Strumenti', where: 'WHEREIS / Sicurezza', covara: 'Covara', alert: 'ALLERTA',
       video: 'Videochiamata', phone: 'Telefonata', message: 'Messaggio', email: 'Email',
-      hHealth: 'Salute', visits: 'Visite', meds: 'Medicine', docs: 'Cartelle', broadcast: 'Contatta tutti', team: 'TEAM', bSent: 'Inviato a {n} del tuo team.', bNone: 'Il messaggio è vuoto.', bTitle: 'Messaggio a tutto il team', bSend: 'Invia a tutti', bPh: 'Scrivi il messaggio', noEmail: 'Nessuno del tuo team ha ancora un indirizzo email in Covara.',
+      hHealth: 'Salute', visits: 'Visite', meds: 'Medicine', docs: 'Cartelle', broadcast: 'Contatta tutti', team: 'TEAM', bSent: 'Inviato a {n} del tuo team.', bNone: 'Il messaggio è vuoto.', bTitle: 'Messaggio a tutto il team', bSend: 'Invia a tutti', bPh: 'Scrivi il messaggio', noEmail: 'Nessuno del tuo team ha ancora un indirizzo email in Covara.', eTitle: 'Email', eTitleAll: 'Email a tutto il team', eSubj: 'Oggetto', ePh: 'Scrivi la tua email', eSend: 'Invia email', eSent: 'Email inviata a {n}.', eNoMail: '{n} non ha ancora un indirizzo email in Covara.', eLimit: 'Le email di oggi sono finite. Riprova domani.', eFail: 'Non è stato possibile inviare l’email. Controlla internet.', eOwn: 'Apro la tua app di posta.',
       notes: 'Note', calendar: 'Calendario', daily: 'Programma del giorno', alarms: 'Promemoria', invites: 'Inviti',
       camera: 'Fotocamera', words: 'Parole', mode: 'Modalità', modeFull: 'Vista completa', modeOne: 'Uno a uno',
       speak: 'Voce', on: 'SÌ', off: 'NO', code: 'Codice del team', settings: 'Impostazioni',
@@ -98,6 +98,7 @@
     '#cvrMsg .box{position:relative;width:min(420px,100%);padding:22px 18px 18px;border-radius:22px;border:1px solid rgba(150,210,255,.45);background:linear-gradient(155deg,rgba(70,130,235,.20),rgba(14,30,78,.36));-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.28);color:#eef6ff;font-family:"Hanken Grotesk",system-ui,sans-serif}',
     '#cvrMsg h2{margin:0 0 6px;font-size:19px;font-weight:800}#cvrMsg .who{color:#ffd24d;font:600 12px "JetBrains Mono",monospace;letter-spacing:.06em;margin-bottom:12px}',
     '#cvrMsg textarea{width:100%;box-sizing:border-box;border-radius:14px;border:1px solid rgba(150,200,255,.4);background:rgba(20,44,100,.3);color:#fff;font:500 16px "Hanken Grotesk",system-ui,sans-serif;padding:12px;resize:none}',
+    '#cvrMsg input{width:100%;box-sizing:border-box;margin:0 0 10px;min-height:46px;border-radius:14px;border:1px solid rgba(150,200,255,.4);background:rgba(20,44,100,.3);color:#fff;font:600 16px "Hanken Grotesk",system-ui,sans-serif;padding:0 12px}#cvrMsg .send[disabled]{opacity:.6}',
     '#cvrMsg .send{margin-top:12px;width:100%;min-height:50px;border-radius:16px;border:0;background:linear-gradient(180deg,#7ee3ff,#38bdf8);color:#04203a;font:800 16px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}',
     '#cvrMsg .x{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(150,215,255,.5);background:transparent;color:#eaf6ff;font-size:20px;cursor:pointer}',
     '#cvrToast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 40px);transform:translateX(-50%);z-index:100060;max-width:340px;padding:12px 18px;border-radius:16px;border:1px solid rgba(150,215,255,.5);background:linear-gradient(155deg,rgba(80,160,255,.22),rgba(14,40,96,.5));-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);color:#eef6ff;font:600 15px/1.35 "Hanken Grotesk",system-ui,sans-serif;text-align:center;box-shadow:0 0 18px rgba(56,189,248,.3);opacity:0;transition:opacity .3s;pointer-events:none}',
@@ -304,7 +305,7 @@
       if (c && c.sub) return show('sub:' + k);
     }
     if (QUICK[k]) {
-      if (away) { var h = homeOf(); return run(function () { runContactQuickAction(QUICK[k], h); }); }
+      if (away) { var h = homeOf(); if (k === 'email') return run(function () { emailTo([h], false); }); return run(function () { runContactQuickAction(QUICK[k], h); }); }
       if (broadcastOn()) {
         if (k === 'video') return run(function () { callEveryone(false); });
         if (k === 'phone') return run(function () { callEveryone(true); });
@@ -366,11 +367,34 @@
       shut(); toast(t('bSent').replace('{n}', n));
     };
   }
-  /* Email to everyone: the phone's mail opens with the whole team as recipients */
-  function emailEveryone() {
-    var to = team().map(function (c) { return c.email; }).filter(function (e) { return e && /@/.test(e); });
-    if (!to.length) { toast(t('noEmail')); return; }
-    window.location.href = 'mailto:' + to.map(encodeURIComponent).join(',');
+  /* Email, written and sent inside Covara: it goes out from Covara's server, so nobody leaves the app.
+     Only when the server cannot send (not set up) does the phone's own mail open instead. */
+  function emailEveryone() { emailTo(team(), true); }
+  function myEmail() { try { var st = SyncEngine.getStatus(); var e = st && st.email ? String(st.email).trim() : ''; return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && !/@remiel\.local$/.test(e) ? e : ''; } catch (e) { return ''; } }
+  function emailTo(people, all) {
+    var with_ = people.filter(function (c) { return c && c.email && /@/.test(c.email); });
+    if (!with_.length) { toast(all ? t('noEmail') : t('eNoMail').replace('{n}', ((people[0] && (people[0].first || people[0].name)) || '').split(/\s+/)[0])); return; }
+    var el = document.getElementById('cvrMsg');
+    if (!el) { el = document.createElement('div'); el.id = 'cvrMsg'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); document.body.appendChild(el); }
+    el.innerHTML = '<div class="box"><button class="x" type="button" aria-label="' + t('close') + '">&times;</button><h2>' + (all ? t('eTitleAll') : t('eTitle')) + '</h2>' +
+      '<div class="who">' + with_.map(function (c) { return (c.first || c.last || '').replace(/</g, '&lt;'); }).join(' · ') + '</div>' +
+      '<input id="cvrMsgS" type="text" maxlength="150" placeholder="' + t('eSubj') + '"><textarea id="cvrMsgT" rows="5" placeholder="' + t('ePh') + '"></textarea><button class="send" type="button">' + t('eSend') + '</button></div>';
+    el.hidden = false; requestAnimationFrame(function () { el.classList.add('open'); try { el.querySelector('input').focus(); } catch (e) {} });
+    function shut() { el.classList.remove('open'); setTimeout(function () { el.hidden = true; }, 250); }
+    el.querySelector('.x').onclick = shut;
+    var btn = el.querySelector('.send');
+    btn.onclick = async function () {
+      var subj = (el.querySelector('input').value || '').trim(), txt = (el.querySelector('textarea').value || '').trim();
+      if (!txt) { toast(t('bNone')); return; }
+      var to = with_.map(function (c) { return c.email.trim(); });
+      btn.disabled = true;
+      var r = null; try { r = await SyncEngine.apiFetch('/care-email', { method: 'POST', body: JSON.stringify({ to: to, subject: subj, text: txt, reply_to: myEmail() }) }); } catch (e) { r = null; }
+      btn.disabled = false;
+      if (r && r.ok) { var d = {}; try { d = await r.json(); } catch (e) {} shut(); toast(t('eSent').replace('{n}', with_.length === 1 ? (with_[0].first || '') : String(d.sent || to.length))); return; }
+      if (r && r.status === 429) { toast(t('eLimit')); return; }
+      if (r && r.status === 501) { shut(); toast(t('eOwn')); window.location.href = 'mailto:' + to.map(encodeURIComponent).join(',') + '?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(txt); return; }
+      toast(t('eFail'));
+    };
   }
 
   /* ── the roster page: the team as spheres; tap one to call, message or email them ── */
@@ -389,7 +413,7 @@
     el.innerHTML = html; el.hidden = false; requestAnimationFrame(function () { el.classList.add('open'); });
     function shut() { el.classList.remove('open'); setTimeout(function () { el.hidden = true; }, 300); }
     el.querySelector('.x').onclick = shut;
-    el.querySelectorAll('.who').forEach(function (b) { b.onclick = function () { var c = team[+b.getAttribute('data-i')]; shut(); setTimeout(function () { try { runContactQuickAction(QUICK[k], c); } catch (e) {} }, 150); }; });
+    el.querySelectorAll('.who').forEach(function (b) { b.onclick = function () { var c = team[+b.getAttribute('data-i')]; shut(); setTimeout(function () { try { if (k === 'email') emailTo([c], false); else runContactQuickAction(QUICK[k], c); } catch (e) {} }, 150); }; });
   }
 
   /* keep the tap area on HOME's sphere and hold the galaxy still while the ring is open */
@@ -422,6 +446,7 @@
     var keys = focusKeys(c);
     if (_fid !== c.id) { aim(node); dreamPanel(c); }
     if (_dpFor) { if (_where) { dp.classList.remove('on'); document.body.classList.remove('cv-dreaml'); } else { dp.classList.add('on'); document.body.classList.add('cv-dreaml'); placePanel(); } }
+    holdSpot(node);
     steer();
     if (_fid !== c.id || _fkeys !== keys.join()) {
       _fid = c.id; _fkeys = keys.join(); focusLayer.innerHTML = '';
@@ -472,12 +497,20 @@
       var x = xp * cy - z1 * syw, z = xp * syw + z1 * cy;
       restoreSpot();
       node._cvSpot = { tx: node.tx, ty: node.ty, tz: node.tz }; _spotNode = node;
-      node.tx = x; node.ty = y; node.tz = z;
+      node.tx = x; node.ty = y; node.tz = z; _spotAt = { x: x, y: y, z: z };
       _aim = best;
     } catch (e) { _aim = null; }
   }
-  var _spotNode = null;
-  function restoreSpot() { var n = _spotNode; if (n && n._cvSpot) { n.tx = n._cvSpot.tx; n.ty = n._cvSpot.ty; n.tz = n._cvSpot.tz; delete n._cvSpot; } _spotNode = null; }
+  var _spotNode = null, _spotAt = null;
+  /* the galaxy rebuilds its layout now and then (new pictures, a sync): the chosen sphere keeps its spot */
+  function holdSpot(node) {
+    var a = _spotAt; if (!a || !node) return;
+    if (_spotNode !== node) { _spotNode = node; node._cvSpot = { tx: node.tx, ty: node.ty, tz: node.tz }; }
+    else if (node.tx !== a.x || node.ty !== a.y || node.tz !== a.z) node._cvSpot = { tx: node.tx, ty: node.ty, tz: node.tz };
+    node.tx = a.x; node.ty = a.y; node.tz = a.z;
+  }
+  function restoreSpot() { _spotAt = null; restoreSpot0(); }
+  function restoreSpot0() { var n = _spotNode; if (n && n._cvSpot) { n.tx = n._cvSpot.tx; n.ty = n._cvSpot.ty; n.tz = n._cvSpot.tz; delete n._cvSpot; } _spotNode = null; }
   function steer() {
     if (!_aim) return;
     try {
@@ -541,9 +574,15 @@
   }
   function focusPick(k, c) {
     _labelsOff = true;   /* a choice is made: the labels go until the sphere is tapped again; the sphere stays chosen */
+    if (k === 'email') { emailTo([c], false); return; }
     if (QUICK[k]) { try { runContactQuickAction(QUICK[k], c); } catch (e) {} return; }
     if (k === 'where') { _where = true; try { WhereIs.setMode('whereis'); } catch (e) {} return; }
-    if (k === 'alert') { try { CovaraHelp.open(); } catch (e) {} return; }
+    /* ALERT on someone's sphere goes to that one person only; ALERT on HOME's own sphere (the ring) goes to the whole team */
+    if (k === 'alert') {
+      var uid = c && c.care && c.care.userId, nm = (c && (c.first || c.name)) || '';
+      if (!uid) { try { showToast((String(I18n.locale || 'en').slice(0, 2) === 'it' ? '{n} non è ancora nella tua squadra su Covara.' : '{n} is not on your team in Covara yet.').replace('{n}', String(nm).split(/\s+/)[0])); } catch (e) {} return; }
+      try { CovaraHelp.open({ to: uid, name: nm }); } catch (e) {} return;
+    }
     if (k === 'team') { try { focusedContactId = null; CovaraTeams.go(c.care.userId); } catch (e) {} return; }
   }
 

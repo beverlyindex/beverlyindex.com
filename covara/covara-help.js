@@ -20,7 +20,9 @@
       nearBtn: 'Nearby help', firstHelp: 'closest help: {name}, {kind}, {d}', comingD: '{name} on the way, {d}', nearTitle: 'Help near {name}', nearYou: 'Help near you',
       nearSub: 'Closest first, measured from where the phone is now. Call the emergency number first if anyone is in danger.', emerg: 'Call 911', emergNum: '911', callIt: 'Call', dirs: 'Directions', closest: 'CLOSEST HELP',
       nearNone: 'No places found near this spot yet.', nearFail: 'The list of nearby places could not be loaded. Call 911.', nearWait: 'Finding help nearby...', close: 'Close',
-      k_emergency: 'Emergency room', k_hospital: 'Hospital', k_urgent: 'Urgent care', k_clinic: 'Clinic', k_doctor: 'Doctor', k_police: 'Police', k_fire: 'Fire station', k_pharmacy: 'Pharmacy', k_aed: 'Defibrillator' },
+      k_emergency: 'Emergency room', k_hospital: 'Hospital', k_urgent: 'Urgent care', k_clinic: 'Clinic', k_doctor: 'Doctor', k_police: 'Police', k_fire: 'Fire station', k_pharmacy: 'Pharmacy', k_aed: 'Defibrillator',
+      oneTitle: 'ALERT {name}', oneSub: 'Only {name} is told, and sees where you are.', oneHold: 'Hold to alert {name}', oneSent: '{name} has been told. Your position goes to {name} every 15 seconds.',
+      oneCalled: '{name} SENT YOU AN ALERT', oneYou: 'YOU ALERTED {name}', oneSharing: 'sharing your position with {name}', oneNow: '{name} sent you an ALERT', oneNowYou: 'You alerted {name}', notOn: '{name} is not on your team in Covara yet.' },
     it: { title: 'Chiedi aiuto', sub: 'Tutta la tua cerchia viene avvisata subito e vede dove sei.', hold: 'Tieni premuto per chiamare la cerchia', holding: 'Continua a tenere premuto…', cancel: 'Annulla',
       sent: 'La tua cerchia è stata avvisata. La tua posizione arriva loro ogni 15 secondi.', failed: 'Non è stato possibile inviare l’aiuto. Controlla internet o chiama il 112.',
       called: '{name} HA CHIESTO AIUTO', youCalled: 'HAI CHIESTO AIUTO', at: '{t}', room: 'in {room}', fromYou: 'a {d} da te', acc: 'entro {d}', er: 'pronto soccorso più vicino: {name}, {d}',
@@ -29,7 +31,9 @@
       nearBtn: 'Aiuto vicino', firstHelp: 'aiuto più vicino: {name}, {kind}, {d}', comingD: '{name} in arrivo, a {d}', nearTitle: 'Aiuto vicino a {name}', nearYou: 'Aiuto vicino a te',
       nearSub: 'Dal più vicino, misurato da dove si trova ora il telefono. Se qualcuno è in pericolo, chiama prima il numero di emergenza.', emerg: 'Chiama il 112', emergNum: '112', callIt: 'Chiama', dirs: 'Indicazioni', closest: 'AIUTO PIÙ VICINO',
       nearNone: 'Nessun luogo trovato ancora qui vicino.', nearFail: 'Non è stato possibile caricare i luoghi vicini. Chiama il 112.', nearWait: 'Cerco aiuto qui vicino...', close: 'Chiudi',
-      k_emergency: 'Pronto soccorso', k_hospital: 'Ospedale', k_urgent: 'Guardia medica', k_clinic: 'Clinica', k_doctor: 'Medico', k_police: 'Polizia', k_fire: 'Vigili del fuoco', k_pharmacy: 'Farmacia', k_aed: 'Defibrillatore' }
+      k_emergency: 'Pronto soccorso', k_hospital: 'Ospedale', k_urgent: 'Guardia medica', k_clinic: 'Clinica', k_doctor: 'Medico', k_police: 'Polizia', k_fire: 'Vigili del fuoco', k_pharmacy: 'Farmacia', k_aed: 'Defibrillatore',
+      oneTitle: 'ALLERTA a {name}', oneSub: 'Viene avvisato solo {name}, che vede dove sei.', oneHold: 'Tieni premuto per avvisare {name}', oneSent: '{name} è stato avvisato. La tua posizione arriva a {name} ogni 15 secondi.',
+      oneCalled: '{name} TI HA INVIATO UN’ALLERTA', oneYou: 'HAI AVVISATO {name}', oneSharing: 'condividi la posizione con {name}', oneNow: '{name} ti ha inviato un’allerta', oneNowYou: 'Hai avvisato {name}', notOn: '{name} non è ancora nella tua squadra su Covara.' }
   };
   function t(k, p) { var s = (IT() ? S.it : S.en)[k] || S.en[k] || k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
   function esc(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -70,14 +74,17 @@
     '#cvHelpNear .x{display:block;margin:6px auto 0;min-height:42px;padding:0 24px;border-radius:21px;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;font:700 14px var(--nous-font,sans-serif);cursor:pointer}#cvHelpNear .msg{color:#ffe3a8;font-size:14px;margin:8px 0}';
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
-  function card() {
+  /* one: { to: the teammate's user id, name } when HOME (or anyone) alerts one person only; nothing for the whole team */
+  function card(one) {
+    one = one && one.to ? one : null;
+    var nm1 = one ? String(one.name || '').split(/\s+/)[0] : '';
     var old = document.getElementById('cvHelpCard'); if (old) old.remove();
     var el = document.createElement('div'); el.id = 'cvHelpCard'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
-    el.innerHTML = '<div class="card"><h2>' + esc(t('title')) + '</h2><p>' + esc(t('sub')) + '</p><button type="button" class="hold" data-hold><svg viewBox="0 0 186 186"><circle cx="93" cy="93" r="88" stroke-dasharray="553" stroke-dashoffset="553"/></svg><span>' + esc(t('hold')) + '</span></button>' +
+    el.innerHTML = '<div class="card"><h2>' + esc(one ? t('oneTitle', { name: nm1 }) : t('title')) + '</h2><p>' + esc(one ? t('oneSub', { name: nm1 }) : t('sub')) + '</p><button type="button" class="hold" data-hold><svg viewBox="0 0 186 186"><circle cx="93" cy="93" r="88" stroke-dasharray="553" stroke-dashoffset="553"/></svg><span>' + esc(one ? t('oneHold', { name: nm1 }) : t('hold')) + '</span></button>' +
       '<button type="button" class="cx" data-x>' + esc(t('cancel')) + '</button><div class="msg" aria-live="assertive"></div></div>';
     document.body.appendChild(el);
     var b = el.querySelector('[data-hold]'), ring = b.querySelector('circle'), lab = b.querySelector('span'), msg = el.querySelector('.msg'), t0 = 0, raf = 0, done = false;
-    function stop() { cancelAnimationFrame(raf); t0 = 0; if (!done) { ring.style.strokeDashoffset = '553'; lab.textContent = t('hold'); } }
+    function stop() { cancelAnimationFrame(raf); t0 = 0; if (!done) { ring.style.strokeDashoffset = '553'; lab.textContent = one ? t('oneHold', { name: nm1 }) : t('hold'); } }
     function tick() { var k = Math.min(1, (Date.now() - t0) / 1200); ring.style.strokeDashoffset = String(553 * (1 - k)); if (k >= 1) { done = true; fire(); return; } raf = requestAnimationFrame(tick); }
     function down(e) { e.preventDefault(); if (done) return; t0 = Date.now(); lab.textContent = t('holding'); raf = requestAnimationFrame(tick); try { navigator.vibrate && navigator.vibrate(30); } catch (x) {} }
     b.addEventListener('pointerdown', down); ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { b.addEventListener(ev, stop); });
@@ -85,20 +92,22 @@
     el.querySelector('[data-x]').onclick = function () { el.remove(); };
     async function fire() {
       lab.textContent = '✓'; try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (x) {}
-      var ok = await start();
-      msg.textContent = ok ? t('sent') : t('failed');
+      var ok = await start(one);
+      msg.textContent = ok ? (one ? t('oneSent', { name: nm1 }) : t('sent')) : t('failed');
       setTimeout(function () { el.remove(); }, ok ? 1800 : 6000);
     }
   }
 
   /* ── sending: at once, then the position as soon as the phone has it, then every 15 seconds ── */
   var _mine = [], _watch = null, _lastSent = 0, _pos = null;
-  async function start() {
+  async function start(one) {
     if (!authed()) return false;
-    var r = await api('/care-help', { method: 'POST', body: _pos && Date.now() - _pos.at < 60000 ? { lat: _pos.lat, lon: _pos.lon, acc: _pos.acc } : {} }).catch(function () { return { ok: false }; });
+    var body = _pos && Date.now() - _pos.at < 60000 ? { lat: _pos.lat, lon: _pos.lon, acc: _pos.acc } : {};
+    if (one && one.to) body.to = one.to;
+    var r = await api('/care-help', { method: 'POST', body: body }).catch(function () { return { ok: false }; });
     if (!r.ok) return false;
-    _mine = r.data.ids || [];
-    try { if (typeof AlarmCenter !== 'undefined' && AlarmCenter.sendHelp) AlarmCenter.sendHelp('cvHelpNull'); } catch (e) {} /* the person chosen in Settings also gets the ringing alarm */
+    (r.data.ids || []).forEach(function (id) { if (_mine.indexOf(id) < 0) _mine.push(id); });
+    if (!(one && one.to)) try { if (typeof AlarmCenter !== 'undefined' && AlarmCenter.sendHelp) AlarmCenter.sendHelp('cvHelpNull'); } catch (e) {} /* the person chosen in Settings also gets the ringing alarm */
     follow();
     load(true);
     return true;
@@ -210,16 +219,24 @@
       else { ac.style.top = Math.round((top || 90) + 8 + 52) + 'px'; }
     }
   }
+  /* the one person an ALERT went to, by first name, from the people on screen */
+  function toName(h) {
+    if (!h || !h.only_to) return '';
+    try { var c = (typeof DEMO_CONTACTS !== 'undefined' ? DEMO_CONTACTS : []).filter(function (x) { return x.care && x.care.userId === h.only_to; })[0]; if (c) return String(c.first || c.name || '').split(/\s+/)[0]; } catch (e) {}
+    return '';
+  }
   function line(h) {
     var me = h.you, parts = [];
     var tp = window.CovaraTeams ? CovaraTeams.prefix(h.home) : ''; /* Covara teams: whose team it is from */
-    parts.push('<b>' + esc(tp + (me ? t('youCalled') : t('called', { name: String(h.sender.name || '').toUpperCase() }))) + '</b>');
+    var head = h.only_to ? (me ? t('oneYou', { name: toName(h).toUpperCase() }) : t('oneCalled', { name: String(h.sender.name || '').split(/\s+/)[0].toUpperCase() }))
+      : (me ? t('youCalled') : t('called', { name: String(h.sender.name || '').toUpperCase() }));
+    parts.push('<b>' + esc(tp + head) + '</b>');
     parts.push(esc(hm(h.started_at)));
     if (h.room) parts.push(esc(t('room', { room: h.room })));
     if (h.location) { parts.push('<i>' + esc(t('live', { t: ago(h.location.at) })) + '</i>'); if (h.location.accuracy) parts.push(esc(t('acc', { d: dist(h.location.accuracy) }))); }
     else parts.push(esc(t('noPos')));
     if (!me && h.from_you_m != null) parts.push(esc(t('fromYou', { d: dist(h.from_you_m) })));
-    if (me) parts.push(esc(t('sharing')));
+    if (me) parts.push(esc(h.only_to ? t('oneSharing', { name: toName(h) }) : t('sharing')));
     var n = nearOf(h), f = firstOf(n);
     if (f) parts.push('<i>' + esc(t('firstHelp', { name: f.name, kind: t('k_' + f.kind).toLowerCase(), d: dist(f.m) })) + '</i>');
     if ((h.responders || []).length) {
@@ -275,7 +292,7 @@
       var acts = h.you ? [{ label: t('allRight'), primary: true, onClick: function () { return act('ok', h, this); } }, { label: t('nearBtn'), onClick: function () { return act('near', h, this); } }]
         : [{ label: onWay ? t('youOnWay') : t('onWay'), primary: true, disabled: onWay, onClick: function () { return act('way', h, this); } }, { label: t('call'), onClick: function () { return act('call', h, this); } }, { label: t('nearBtn'), onClick: function () { return act('near', h, this); } }];
       var tp = window.CovaraTeams ? CovaraTeams.prefix(h.home) : ''; /* Covara teams: whose team it is from; a tap on the card goes there */
-      CovaraNow.push({ id: id, rank: 0, icon: '🚨', lead: t('lead'), title: tp + (h.you ? t('nowYou') : t('nowCalled', { name: nm })), body: body.join(' · '), at: h.started_at, actions: acts, onTap: function () { showOnMap(h, false); } });
+      CovaraNow.push({ id: id, rank: 0, icon: '🚨', lead: t('lead'), title: tp + (h.only_to ? (h.you ? t('oneNowYou', { name: toName(h) }) : t('oneNow', { name: nm })) : (h.you ? t('nowYou') : t('nowCalled', { name: nm }))), body: body.join(' · '), at: h.started_at, actions: acts, onTap: function () { showOnMap(h, false); } });
     });
     Object.keys(_nowIds).forEach(function (id) { if (!keep[id]) CovaraNow.remove(id); });
     _nowIds = keep;

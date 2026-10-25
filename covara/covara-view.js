@@ -1143,6 +1143,8 @@
       /* the rest of HOME's family in Covara, on AWAY's phone */
       (_data.family || []).forEach(function (f) { if (f.you || !f.name) return; add(f.name, { group: 'family', relation: f.relation && window.CovaraCare ? CovaraCare.relLabel(f.relation) : '', profession: f.role, records: !!f.sees_care, covara: true }); });
     }
+    /* someone already on the team has their own sphere: a care item that names them does not make a second one */
+    try { if (window.CovaraCare) CovaraCare.careContacts().forEach(function (c) { var f = key(c.first), n = key([c.first, c.last].filter(Boolean).join(' ')); if (f && out[f] && !out[f].itemId) delete out[f]; if (n && out[n] && !out[n].itemId) delete out[n]; }); } catch (e) {}
     _people = Object.keys(out).map(function (k) {
       var o = out[k];
       o.soon = isFinite(o.next) && o.next - now < 864e5;
