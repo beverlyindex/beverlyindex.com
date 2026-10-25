@@ -13,7 +13,7 @@
     en: { contact: 'Contact', health: 'Health', journal: 'Journal', tools: 'Tools', where: 'WHEREIS / Safety', covara: 'Covara', alert: 'ALERT',
       video: 'Video call', phone: 'Phone call', message: 'Message', email: 'Email',
       hHealth: 'Health', visits: 'Visits', meds: 'Medicines', docs: 'Vital Records & Docs',
-      notes: 'Notes', calendar: 'Calendar', daily: 'Daily Schedule', alarms: 'Alarms', invites: 'Meeting Schedule Invites',
+      notes: 'Notes', calendar: 'Calendar', daily: 'Daily Schedule', alarms: 'Alarms', invites: 'Invites',
       camera: 'Camera', words: 'Words', mode: 'Mode', modeFull: 'Full view', modeOne: 'One-on-one',
       speak: 'Speak', on: 'ON', off: 'OFF', code: 'Team code', settings: 'Settings',
       whoVideo: 'Who do you want to video call?', whoPhone: 'Who do you want to call?', whoMessage: 'Who do you want to message?', whoEmail: 'Who do you want to email?',
@@ -22,14 +22,23 @@
     it: { contact: 'Contatti', health: 'Salute', journal: 'Diario', tools: 'Strumenti', where: 'WHEREIS / Sicurezza', covara: 'Covara', alert: 'ALLERTA',
       video: 'Videochiamata', phone: 'Telefonata', message: 'Messaggio', email: 'Email',
       hHealth: 'Salute', visits: 'Visite', meds: 'Medicine', docs: 'Documenti e cartelle',
-      notes: 'Note', calendar: 'Calendario', daily: 'Programma del giorno', alarms: 'Promemoria', invites: 'Inviti a riunioni',
+      notes: 'Note', calendar: 'Calendario', daily: 'Programma del giorno', alarms: 'Promemoria', invites: 'Inviti',
       camera: 'Fotocamera', words: 'Parole', mode: 'Modalità', modeFull: 'Vista completa', modeOne: 'Uno a uno',
       speak: 'Voce', on: 'SÌ', off: 'NO', code: 'Codice del team', settings: 'Impostazioni',
       whoVideo: 'Chi vuoi videochiamare?', whoPhone: 'Chi vuoi chiamare?', whoMessage: 'A chi vuoi scrivere?', whoEmail: 'A chi vuoi mandare una email?',
       noTeam: 'Nel tuo team non c\'è ancora nessuno. Covara, poi Codice del team, invita qualcuno.', close: 'Chiudi',
       notYet: 'non è ancora pronto. È il prossimo della lista.', tapHome: 'Tocca la tua sfera per chiudere' }
   };
-  function t(k) { return (S[IT() ? 'it' : 'en'][k]) || S.en[k] || k; }
+  function t(k) { if (k === 'daily') return today(); return (S[IT() ? 'it' : 'en'][k]) || S.en[k] || k; }
+  /* "Daily Schedule" is today's name and the half of the day, from the phone's own clock:
+     Monday AM, Monday PM (Italian: Lunedì mattina, Lunedì pomeriggio) */
+  function today() {
+    var d = new Date(), it = IT(), am = d.getHours() < 12, day = '';
+    try { day = d.toLocaleDateString(it ? 'it-IT' : 'en-US', { weekday: 'long' }); } catch (e) {}
+    if (!day) day = (it ? ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'] : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'])[d.getDay()];
+    day = day.charAt(0).toUpperCase() + day.slice(1);
+    return day + ' ' + (it ? (am ? 'mattina' : 'pomeriggio') : (am ? 'AM' : 'PM'));
+  }
 
   /* ── the menu, exactly as designed ── */
   var HOME_RING = [
@@ -65,8 +74,8 @@
     '@keyframes cvrBreathe{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.06);filter:brightness(1.12)}}',
     /* Sentinel's own quick-action labels (drawQuickActionIcons in index.html): 12px text, a frosted see-through
        pill with only a faint edge, 26px apart, one width for the column, gently fading in and out */
-    '.cvr-col{position:absolute;display:flex;flex-direction:column;align-items:stretch;gap:4px;width:max-content;transform:translateY(-50%)}',
-    '.cvr-pill{position:relative;display:block;padding:5px 12px;box-sizing:border-box;border-radius:6px;border:1px solid rgba(100,180,255,.07);background:rgba(12,14,24,.28);color:#d8e8ff;font:500 12px/1.15 -apple-system,system-ui,"Segoe UI",sans-serif;text-align:center;max-width:var(--mw);cursor:pointer;opacity:0;transform:translateX(var(--from));transition:opacity .3s,transform .35s ease}',
+    '.cvr-pill{position:absolute;display:block;width:max-content;padding:5px 10px;box-sizing:border-box;border-radius:6px;border:1px solid rgba(100,180,255,.07);background:rgba(12,14,24,.28);color:#d8e8ff;font:500 12px/1.15 -apple-system,system-ui,"Segoe UI",sans-serif;text-align:left;max-width:var(--mw);cursor:pointer;opacity:0;transform:translateX(var(--from));transition:opacity .3s,transform .35s ease}',
+    '.cvr-pill.l{text-align:right}',
     '.cvr-pill::after{content:"";position:absolute;inset:-3px -6px}',
     '#cvrLayer.open .cvr-pill.show{opacity:1;transform:none;animation:cvrFade 1.57s ease-in-out infinite}',
     '@keyframes cvrFade{0%,100%{opacity:1}50%{opacity:.6}}',
@@ -159,19 +168,27 @@
     });
     return g;
   }
+  /* Labels beside the sphere follow its edge: each sits a little further out or in, on a circle just
+     outside HOME's sphere, so the column curves with the sphere. Text starts at the sphere's side. */
   function sideOf(rightKeys, leftKeys, titleKey) {
     var g = geo(); if (!g) return;
     stage(g, titleKey);
+    var gap = Math.max(14, 18 * (g.cR / 80)), Rr = g.cR + gap, step = 6;
     [[rightKeys, 'right'], [leftKeys, 'left']].forEach(function (p) {
       var keys = p[0] || []; if (!keys.length) return;
-      /* a column beside the sphere, centred on it; long names wrap and the column grows evenly */
-      var col = document.createElement('div'); col.className = 'cvr-col ' + p[1];
-      col.style.top = g.cy + 'px';
-      col.style.setProperty('--mw', Math.floor(g.W / 2 - g.cR - Math.max(14, 18 * (g.cR / 80)) - 8) + 'px');
-      var gap = Math.max(14, 18 * (g.cR / 80));
-      if (p[1] === 'right') col.style.left = (g.cx + g.cR + gap) + 'px'; else col.style.right = (g.W - (g.cx - g.cR - gap)) + 'px';
-      keys.forEach(function (k) { col.appendChild(pill(k, p[1])); });
-      layer.appendChild(col);
+      var right = p[1] === 'right';
+      var els = keys.map(function (k) { var b = pill(k, p[1]); b.style.setProperty('--mw', Math.floor(g.W / 2 - Rr - 8) + 'px'); b.style.visibility = 'hidden'; layer.appendChild(b); return b; });
+      var hs = els.map(function (b) { return b.offsetHeight || 22; });
+      var total = hs.reduce(function (a, h) { return a + h; }, 0) + step * (els.length - 1), y = g.cy - total / 2;
+      els.forEach(function (b, i) {
+        var mid = y + hs[i] / 2, dy = mid - g.cy;
+        var off = Math.sqrt(Math.max(Rr * Rr - dy * dy, Math.pow(g.cR * 0.55, 2)));
+        b.style.setProperty('--mw', Math.floor(g.W / 2 - off - 6) + 'px');
+        b.style.top = y + 'px';
+        if (right) b.style.left = (g.cx + off) + 'px'; else b.style.right = (g.W - (g.cx - off)) + 'px';
+        b.style.visibility = '';
+        y += hs[i] + step;
+      });
     });
     return g;
   }
