@@ -50,7 +50,7 @@
     '#cvrHit{position:fixed;border-radius:50%;z-index:6;background:transparent;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}',
     '#cvrHit[hidden],#cvrLayer[hidden]{display:none!important}',
     '#cvrLayer{position:fixed;inset:0;z-index:9000;font-family:"Hanken Grotesk",system-ui,sans-serif;-webkit-tap-highlight-color:transparent}',
-    '#cvrLayer .veil{position:absolute;inset:0;background:radial-gradient(circle at var(--cx) var(--cy),rgba(6,15,36,0) 0,rgba(6,15,36,0) var(--hole),rgba(6,15,36,.62) calc(var(--hole) + 40px),rgba(6,15,36,.78) 100%);opacity:0;transition:opacity .35s}',
+    '#cvrLayer .veil{position:absolute;inset:0;background:radial-gradient(circle at var(--cx) var(--cy),rgba(6,15,36,0) 0,rgba(6,15,36,0) var(--hole),rgba(6,15,36,.30) calc(var(--hole) + 40px),rgba(6,15,36,.42) 100%);opacity:0;transition:opacity .35s}',
     '#cvrLayer.open .veil{opacity:1}',
     '#cvrLayer svg.ring{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;opacity:0;transition:opacity .35s}',
     '#cvrLayer.open svg.ring.show{opacity:1}',
@@ -63,11 +63,14 @@
     '.cvr-node.alert .cvr-lab{color:#ff4d4d;letter-spacing:.12em}',
     '.cvr-state{display:block;font:600 11px "JetBrains Mono",ui-monospace,monospace;color:#ffd24d;letter-spacing:.08em;margin-top:2px}',
     '@keyframes cvrBreathe{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.06);filter:brightness(1.12)}}',
-    '.cvr-col{position:absolute;display:flex;flex-direction:column;gap:10px;transform:translateY(-50%)}',
-    '.cvr-pill{position:relative;min-height:44px;width:100%;display:flex;align-items:center;padding:6px 14px;box-sizing:border-box;border-radius:22px;border:1px solid rgba(150,215,255,.55);background:linear-gradient(155deg,rgba(80,160,255,.20),rgba(14,40,96,.32));-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 0 16px rgba(56,189,248,.30),inset 0 1px 0 rgba(255,255,255,.18);color:#f2f9ff;font:700 14px/1.15 "Hanken Grotesk",system-ui,sans-serif;text-align:left;cursor:pointer;opacity:0;transform:translateX(var(--from));transition:opacity .3s,transform .35s cubic-bezier(.2,1.2,.4,1)}',
-    '.cvr-pill.l{text-align:right;justify-content:flex-end}',
-    '#cvrLayer.open .cvr-pill.show{opacity:1;transform:none}',
-    '.cvr-pill.alert{border:2px solid #ff2a2a;color:#ff4d4d;background:rgba(255,40,40,.06);box-shadow:0 0 18px rgba(255,40,40,.45);letter-spacing:.12em}',
+    /* Sentinel's own quick-action labels (drawQuickActionIcons in index.html): 12px text, a frosted see-through
+       pill with only a faint edge, 26px apart, one width for the column, gently fading in and out */
+    '.cvr-col{position:absolute;display:flex;flex-direction:column;align-items:stretch;gap:4px;width:max-content;transform:translateY(-50%)}',
+    '.cvr-pill{position:relative;display:block;padding:5px 12px;box-sizing:border-box;border-radius:6px;border:1px solid rgba(100,180,255,.07);background:rgba(12,14,24,.28);color:#d8e8ff;font:500 12px/1.15 -apple-system,system-ui,"Segoe UI",sans-serif;text-align:center;max-width:var(--mw);cursor:pointer;opacity:0;transform:translateX(var(--from));transition:opacity .3s,transform .35s ease}',
+    '.cvr-pill::after{content:"";position:absolute;inset:-3px -6px}',
+    '#cvrLayer.open .cvr-pill.show{opacity:1;transform:none;animation:cvrFade 1.57s ease-in-out infinite}',
+    '@keyframes cvrFade{0%,100%{opacity:1}50%{opacity:.6}}',
+    '.cvr-pill.alert{border:1px solid #ff2a2a;color:#ff3b3b;background:rgba(255,40,40,.06);letter-spacing:.1em;font-weight:600}',
     '.cvr-title{position:absolute;left:0;right:0;text-align:center;font:600 12px "JetBrains Mono",ui-monospace,monospace;letter-spacing:.22em;text-transform:uppercase;color:#ffd24d;text-shadow:0 1px 8px rgba(0,0,0,.8);opacity:0;transition:opacity .3s;pointer-events:none}',
     '#cvrLayer.open .cvr-title.show{opacity:1}',
     '.cvr-hint{position:absolute;left:0;right:0;text-align:center;font:500 12px "Hanken Grotesk",system-ui,sans-serif;color:rgba(200,225,255,.7);pointer-events:none;opacity:0;transition:opacity .4s}',
@@ -159,13 +162,14 @@
   function sideOf(rightKeys, leftKeys, titleKey) {
     var g = geo(); if (!g) return;
     stage(g, titleKey);
-    var w = Math.min(150, g.W / 2 - g.cR - 22);
     [[rightKeys, 'right'], [leftKeys, 'left']].forEach(function (p) {
       var keys = p[0] || []; if (!keys.length) return;
       /* a column beside the sphere, centred on it; long names wrap and the column grows evenly */
       var col = document.createElement('div'); col.className = 'cvr-col ' + p[1];
-      col.style.top = g.cy + 'px'; col.style.width = w + 'px';
-      if (p[1] === 'right') col.style.left = (g.cx + g.cR + 12) + 'px'; else col.style.left = (g.cx - g.cR - 12 - w) + 'px';
+      col.style.top = g.cy + 'px';
+      col.style.setProperty('--mw', Math.floor(g.W / 2 - g.cR - Math.max(14, 18 * (g.cR / 80)) - 8) + 'px');
+      var gap = Math.max(14, 18 * (g.cR / 80));
+      if (p[1] === 'right') col.style.left = (g.cx + g.cR + gap) + 'px'; else col.style.right = (g.W - (g.cx - g.cR - gap)) + 'px';
       keys.forEach(function (k) { col.appendChild(pill(k, p[1])); });
       layer.appendChild(col);
     });
@@ -183,7 +187,7 @@
     layer.classList.remove('open');
     if (state === 'ring') ringOf(HOME_RING.map(function (c) { return c.k; }));
     else if (state === 'away') sideOf(AWAY_RIGHT, AWAY_LEFT, null);
-    else if (/^side:/.test(state)) { var c = cat(state.slice(5)); sideOf(c.side === 'right' ? c.items : [], c.side === 'left' ? c.items : [], c.k); }
+    else if (/^side:/.test(state)) { var c = cat(state.slice(5)); sideOf(c.side === 'right' ? c.items : [], c.side === 'left' ? c.items : [], null); }
     else if (/^sub:/.test(state)) {
       var s = cat(state.slice(4)), ex = {};
       if (s.k === 'covara') ex.speak = speakState();
@@ -245,6 +249,7 @@
     }
     if (QUICK[k]) {
       if (away) { var h = homeOf(); return run(function () { runContactQuickAction(QUICK[k], h); }); }
+      if (k === 'video') return run(callEveryone);
       return run(function () { roster(k); });
     }
     switch (k) {
@@ -264,6 +269,16 @@
       case 'where': close(); _where = true; try { if (away) focusedContactId = null; WhereIs.setMode('whereis'); } catch (e) {} return;
       case 'alert': return run(function () { CovaraHelp.open(); });
     }
+  }
+
+  /* HOME's own Video call: every sphere on the screen is called at once, no second screen
+     (25 Oct 2026: "If I press my own video call BUTTON, all of the spheres on the screen get called.") */
+  function team() { try { return CovaraCare.careContacts().filter(function (c) { return c.care.state === 'active' && c.care.side === 'away'; }); } catch (e) { return []; } }
+  function callEveryone() {
+    var all = team();
+    if (!all.length) { toast(t('noTeam')); return; }
+    if (all.length === 1) { runContactQuickAction('video', all[0]); return; }
+    SentinelCall.callGroup({ contactIds: all.map(function (c) { return c.id; }), name: IT() ? 'Il mio team' : 'My team' });
   }
 
   /* ── the roster page: the team as spheres; tap one to call, message or email them ── */
