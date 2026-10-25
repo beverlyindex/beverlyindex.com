@@ -8297,6 +8297,9 @@ function posWhy(){ const N=NATIVE(), st=N ? (PH.nstat||nativeStatus()||{}) : {},
     if(D.rough>=D.held) return {k:'rough', t:'GPS answers, but only to within '+du(D.acc)+'. Remiel draws your route from positions within '+du(POS_MAX_ACC)+'.', h:'Hold the phone in the open for a minute, away from walls and overhangs, and it sharpens.'};
     return {k:'held', t:'GPS positions arrive, but they jump about, so Remiel holds them back until they agree.', h:'Keep going in the open: they settle within a minute.'}; }
   const ga=typeof st.gpsAge==='number' ? st.gpsAge : null, net=D.netAt && now-D.netAt<POSCHK.lost;
+  // GPS arriving with every fix stamped 2^32 ms (49.7 days) in the past: the phone has run that long without a restart (25 Oct 2026)
+  if(ga!=null && ga>=4294967296 && ga<4294967296+3600000) return {k:'clock', t:'GPS positions arrive, but the phone stamps each one 49.7 days in the past, so Remiel takes them as old. This happens when a phone has run 49.7 days without a restart.',
+    h:'Restart the phone: swipe down twice from the top of the screen, tap the power icon, then tap Restart. The Remiel app 0.9.10 and later uses these positions anyway.'};
   return {k:'gps', t:(ga===-1 ? 'The phone\'s GPS has given no position since this phone began listening.' : ga!=null && ga>POSCHK.lost ? 'The phone\'s GPS last gave a position '+walkDur(ga)+' ago.' : 'No GPS position has reached Remiel.')+(net ? ' Only the network\'s rough position arrives, and Remiel never draws your route from it.' : ''),
     h:'Take the phone out and hold it in the open for a minute: GPS finds its satellites faster with a clear view of the sky. If Battery Saver (on Samsung phones, Power saving) is on, switch it off, because on many phones it stops GPS while the screen is off. Then tap Restart listening.',
     b:N ? 'pos-restart' : '', bw:'Restart listening'}; }
