@@ -495,8 +495,8 @@
     '#cvDreamL .nm{font:800 14px/1.2 "Hanken Grotesk",system-ui,sans-serif;margin:0 0 4px}#cvDreamL .it{margin:0 0 4px;overflow-wrap:anywhere}#cvDreamL .tm{color:#9fc4ea;font:600 10px "JetBrains Mono",monospace}#cvDreamL .no{color:#8fa8cc;font-style:italic}' +
     'body.cv-main.cv-dreaml #dreamComm{display:none!important}';
   document.head.appendChild(dcss);
-  var DS = { en: { msgs: 'Messages', notes: 'Notes', today: 'Today', coming: 'Coming up', noMsgs: 'No messages yet', noNotes: 'No notes about {n}', noToday: 'Nothing with {n} today', notShared: '{n}\u2019s own day is not shared with you', you: 'You' },
-             it: { msgs: 'Messaggi', notes: 'Note', today: 'Oggi', coming: 'In arrivo', noMsgs: 'Nessun messaggio', noNotes: 'Nessuna nota su {n}', noToday: 'Niente con {n} oggi', notShared: 'La giornata di {n} non è condivisa con te', you: 'Tu' } };
+  var DS = { en: { msgs: 'Messages', notes: 'Notes', today: 'Today', coming: 'Coming up', noMsgs: 'No messages yet', noNotes: 'No notes about {n}', agreed: 'Agreed with {n}', noAgreed: 'Nothing agreed with {n} yet', todayW: 'Today', you: 'You' },
+             it: { msgs: 'Messaggi', notes: 'Note', today: 'Oggi', coming: 'In arrivo', noMsgs: 'Nessun messaggio', noNotes: 'Nessuna nota su {n}', agreed: 'Concordato con {n}', noAgreed: 'Ancora niente di concordato con {n}', todayW: 'Oggi', you: 'Tu' } };
   function dt(k, n) { return ((DS[IT() ? 'it' : 'en'][k]) || k).replace('{n}', n || ''); }
   function esc(x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
   function hm(ts) { try { return new Date(ts).toLocaleTimeString(IT() ? 'it-IT' : 'en-US', { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
@@ -515,17 +515,18 @@
     /* notes from the Covara Button that name this person */
     var nr = await apiJ('/care-notes'), notes = nr.ok ? (nr.data.notes || []).filter(function (n) { return n.status !== 'deleted' && n.status !== 'dropped' && n.status !== 'joined' && ((n.person || '').toLowerCase() === low || (n.text || '').toLowerCase().indexOf(low) >= 0); }) : [];
     h += '<h4>' + dt('notes') + '</h4>' + (notes.length ? notes.slice(0, 3).map(function (n) { return '<div class="it">' + esc(n.text || n.title || '') + '</div>'; }).join('') : '<div class="it no">' + esc(dt('noNotes', nm)) + '</div>');
-    /* the day: this person's own day when it is shared with this phone; otherwise what HOME's day holds with them */
-    var uid = c.care && c.care.userId, own = uid ? await apiJ('/care/today?home=' + encodeURIComponent(uid)) : { ok: false };
-    var mine = await apiJ('/care/today'), items = [];
-    function rows(d) { return (d && d.today && d.today.items) || (d && d.items) || []; }
-    if (own.ok) items = rows(own.data);
-    else items = rows(mine.ok ? mine.data : null).filter(function (x) { var it = x.item || x; var meta = it.meta || {}; var tags = meta.tags || []; return (it.title || '').toLowerCase().indexOf(low) >= 0 || String(meta.with || '').toLowerCase().indexOf(low) >= 0 || tags.indexOf(uid) >= 0; });
-    h += '<h4>' + dt('today') + '</h4>' + (items.length ? items.slice(0, 4).map(function (x) { var it = x.item || x; return '<div class="it"><span class="tm">' + esc(hm(x.at || it.at)) + '</span> ' + esc(it.title || '') + '</div>'; }).join('') : '<div class="it no">' + esc(own.ok ? dt('noToday', nm) : dt('notShared', nm)) + '</div>');
-    /* coming up: appointments in HOME's calendar with this person */
-    var all = await apiJ('/care/items'), now = Date.now();
-    var up = all.ok ? (all.data.items || []).filter(function (it) { var meta = it.meta || {}; return it.kind === 'appt' && it.at > now && ((it.title || '').toLowerCase().indexOf(low) >= 0 || String(meta.with || '').toLowerCase().indexOf(low) >= 0 || (meta.tags || []).indexOf(uid) >= 0); }) : [];
-    if (up.length) h += '<h4>' + dt('coming') + '</h4>' + up.slice(0, 3).map(function (it) { return '<div class="it"><span class="tm">' + esc(dayAt(it.at)) + '</span> ' + esc(it.title) + '</div>'; }).join('');
+    /* 25 Oct 2026: "HOME only needs to see what is agreed upon between the two." Never the teammate's own
+       calendar: only what sits in HOME's own day and calendar with this person, today first, then what is coming. */
+    var uid = c.care && c.care.userId;
+    function withThem(it) { var meta = it.meta || {}; return (it.title || '').toLowerCase().indexOf(low) >= 0 || String(meta.with || '').toLowerCase().indexOf(low) >= 0 || (uid && (meta.tags || []).indexOf(uid) >= 0); }
+    var mine = await apiJ('/care/today');
+    var today = ((mine.ok && (mine.data.items || (mine.data.today && mine.data.today.items))) || []).filter(function (x) { return withThem(x.item || x); });
+    var all = await apiJ('/care/items'), now = Date.now(), end = new Date(); end.setHours(23, 59, 59, 999);
+    var up = all.ok ? (all.data.items || []).filter(function (it) { return it.at && it.at > end.getTime() && withThem(it); }).sort(function (a, b) { return a.at - b.at; }) : [];
+    h += '<h4>' + dt('agreed', nm) + '</h4>';
+    if (!today.length && !up.length) h += '<div class="it no">' + esc(dt('noAgreed', nm)) + '</div>';
+    h += today.slice(0, 4).map(function (x) { var it = x.item || x; return '<div class="it"><span class="tm">' + esc(dt('todayW')) + ' ' + esc(hm(x.at || it.at)) + '</span><br>' + esc(it.title || '') + '</div>'; }).join('');
+    h += up.slice(0, 3).map(function (it) { return '<div class="it"><span class="tm">' + esc(dayAt(it.at)) + ' ' + esc(hm(it.at)) + '</span><br>' + esc(it.title || '') + '</div>'; }).join('');
     if (seq !== _dpSeq) return;
     dp.innerHTML = h; dp.hidden = false; placePanel();
     document.body.classList.add('cv-dreaml');
