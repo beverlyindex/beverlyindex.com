@@ -16550,6 +16550,7 @@ function rebuildNodeTargets() {
     node.ty = ty / L * shellR;
     node.tz = tz / L * shellR;
   });
+  try { if (window.CovaraOrbit) NODES.forEach(window.CovaraOrbit); } catch (e) {}
 }
 
 /* The name under a sphere: the surname, which tells teammates apart; the
@@ -16611,6 +16612,8 @@ function buildNodes(fresh) {
       initials: (((contact.first || '')[0] || '') + ((contact.last || '')[0] || '')).toUpperCase() || '?'
     };
   });
+  /* Covara: people orbit outside HOME's things, a little closer in than Sentinel's shell (covara-main.js) */
+  try { if (window.CovaraOrbit) NODES.forEach(window.CovaraOrbit); } catch (e) {}
   networkExpanded = true;
 }
 
@@ -16687,6 +16690,11 @@ function hitTestNetwork(clientX, clientY) {
     if (d >= r * 1.45) continue;
     /* on the sphere itself beats near its edge; then nearest the viewer */
     const on = d < r;
+    /* Covara: a person's sphere is never hidden behind one of HOME's things: a person in reach wins the tap */
+    const person = !(node.contact && node.contact.cvItem && node.contact.cvItem.kind !== 'person');
+    const closestPerson = closest && !(closest.contact && closest.contact.cvItem && closest.contact.cvItem.kind !== 'person');
+    if (closest && closestPerson && !person) continue;
+    if (closest && person && !closestPerson) { closest = node; closestZ = p.z; inside = on; continue; }
     if ((on && !inside) || (on === inside && p.z < closestZ)) { closest = node; closestZ = p.z; inside = on; }
   }
   if (closest && (!centreHit || closestZ < NET_DIST)) return { isCenter: false, node: closest };
@@ -29705,12 +29713,16 @@ function drawNetworkView(t) {
     if (_drIso && W <= 480) { _drR = W * 0.30; _drCx = W / 2; _drCy = _drR + H * 0.07; }
     else if (_drIso) { _drR = Math.min(W, H) * 0.40; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
     else { _drR = Math.min(W, H) * 0.28; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
+    /* Covara: a chosen person's picture is large and breathes (window.CovaraDreamPulse) */
+    var _cvPulse = 1; try { if (window.CovaraDreamPulse && focusedContactId) _cvPulse = window.CovaraDreamPulse(t); } catch (e) {}
+    _drR *= _cvPulse;
     ctx.beginPath();
     ctx.arc(_drCx, _drCy, _drR, 0, Math.PI * 2);
     ctx.clip();
     /* Breathing: a clear pulse from dark to light (about 8 s); inside a Unit, bright to full */
     var _dreamAlpha = _drIso ? 0.9 : (_drBoost ? 0.75 + 0.15 * Math.sin(t * 0.0008) : 0.34 + 0.24 * Math.sin(t * 0.0008));
     if (_cvDream) _dreamAlpha = 0.82 + 0.14 * Math.sin(t * 0.0016);
+    if (_cvPulse !== 1) _dreamAlpha = 0.84 + 0.12 * Math.sin(t * 0.0021);
     if (_memPhoto && _memPhoto.img) {
       const _memImg = _memPhoto.img;
       const _mw = _memPhoto.isVideo ? _memImg.videoWidth : (_memImg.naturalWidth || _memImg.width);
@@ -29913,6 +29925,7 @@ function drawNetworkView(t) {
 
   /* ── Helper: draw one contact sphere with all its decorations ── */
   function _drawOneContactSphere({ node, p }, alphaOverride) {
+    try { if (alphaOverride == null && window.CovaraSphereAlpha) alphaOverride = window.CovaraSphereAlpha(node); } catch (e) {}
     const cat = CATS[node.contact.cat] || CATS.other;
     const sev = SEVS[node.contact.sev];
     const col = `rgb(${cat.r},${cat.g},${cat.b})`;
@@ -29975,7 +29988,8 @@ function drawNetworkView(t) {
     }
 
     /* Glass-orb lighting: volume, key light, glint, coloured rim */
-    try { drawOrbLight(ctx, sx, sy, r, cat, (alphaOverride || 1), !!(cPhoto && cPhoto.img)); } catch (e) {}
+    /* Covara: the revolving spheres are see-through glass with a lit edge, as on Sentinel's (window.CovaraGlassOrbs) */
+    try { drawOrbLight(ctx, sx, sy, r, cat, (alphaOverride || 1), !!(cPhoto && cPhoto.img) || !!window.CovaraGlassOrbs); } catch (e) {}
 
     /* ── Inner energy ring (category-colored) ── */
     const _cRing = (typeof Biometrics !== 'undefined' && Biometrics.getRingState)
@@ -45793,6 +45807,8 @@ try { _resolveAppScriptReady(); } catch (e) {}
   <script src="covara-learn.js" defer></script>
   <script src="covara-notes.js" defer></script>
   <script src="covara-emergency.js" defer></script>
+  <script src="covara-main.js" defer></script>
+  <script src="covara-ring.js" defer></script>
   <script src="covara-records.js" defer></script>
 </body>
 </html>
