@@ -12,7 +12,7 @@
   var S = {
     en: { contact: 'Contact', health: 'Health', journal: 'Journal', tools: 'Tools', where: 'WHEREIS / Safety', covara: 'Covara', alert: 'ALERT',
       video: 'Video call', phone: 'Phone call', message: 'Message', email: 'Email',
-      hHealth: 'Health', visits: 'Visits', meds: 'Medicines', docs: 'Records', broadcast: 'Broadcast Contact', bSent: 'Sent to {n} on your team.', bNone: 'Your message is empty.', bTitle: 'Message to your whole team', bSend: 'Send to everyone', bPh: 'Write your message', noEmail: 'No one on your team has an email address in Covara yet.',
+      hHealth: 'Health', visits: 'Visits', meds: 'Medicines', docs: 'Records', broadcast: 'Broadcast Contact', team: 'TEAM', bSent: 'Sent to {n} on your team.', bNone: 'Your message is empty.', bTitle: 'Message to your whole team', bSend: 'Send to everyone', bPh: 'Write your message', noEmail: 'No one on your team has an email address in Covara yet.',
       notes: 'Notes', calendar: 'Calendar', daily: 'Daily Schedule', alarms: 'Alarms', invites: 'Invites',
       camera: 'Camera', words: 'Words', mode: 'Mode', modeFull: 'Full view', modeOne: 'One-on-one',
       speak: 'Speak', on: 'ON', off: 'OFF', code: 'Team code', settings: 'Settings',
@@ -21,7 +21,7 @@
       notYet: 'is not built yet. It is next on the list.', tapHome: 'Tap your sphere to close' },
     it: { contact: 'Contatti', health: 'Salute', journal: 'Diario', tools: 'Strumenti', where: 'WHEREIS / Sicurezza', covara: 'Covara', alert: 'ALLERTA',
       video: 'Videochiamata', phone: 'Telefonata', message: 'Messaggio', email: 'Email',
-      hHealth: 'Salute', visits: 'Visite', meds: 'Medicine', docs: 'Cartelle', broadcast: 'Contatta tutti', bSent: 'Inviato a {n} del tuo team.', bNone: 'Il messaggio è vuoto.', bTitle: 'Messaggio a tutto il team', bSend: 'Invia a tutti', bPh: 'Scrivi il messaggio', noEmail: 'Nessuno del tuo team ha ancora un indirizzo email in Covara.',
+      hHealth: 'Salute', visits: 'Visite', meds: 'Medicine', docs: 'Cartelle', broadcast: 'Contatta tutti', team: 'TEAM', bSent: 'Inviato a {n} del tuo team.', bNone: 'Il messaggio è vuoto.', bTitle: 'Messaggio a tutto il team', bSend: 'Invia a tutti', bPh: 'Scrivi il messaggio', noEmail: 'Nessuno del tuo team ha ancora un indirizzo email in Covara.',
       notes: 'Note', calendar: 'Calendario', daily: 'Programma del giorno', alarms: 'Promemoria', invites: 'Inviti',
       camera: 'Fotocamera', words: 'Parole', mode: 'Modalità', modeFull: 'Vista completa', modeOne: 'Uno a uno',
       speak: 'Voce', on: 'SÌ', off: 'NO', code: 'Codice del team', settings: 'Impostazioni',
@@ -269,6 +269,13 @@
     if (!window.CovaraPerson || CovaraPerson._ring) return;
     var oc = CovaraPerson.openCare;
     CovaraPerson.openCare = function () { if (document.body.classList.contains('cv-main')) { homeTap(); return true; } return oc.apply(this, arguments); };
+    /* AWAY spheres (25 Oct 2026): no card. The sphere stays chosen, the dream state shows it, and its
+       choices sit beside it like HOME's Contact (see focusLabels below). */
+    var op = CovaraPerson.open;
+    CovaraPerson.open = function (id) {
+      if (document.body.classList.contains('cv-main')) { var c = contactOf(id); if (c && isPerson(c)) { try { focusedContactId = c.id; netSpin = false; } catch (e) {} _tapped = c.id; return true; } }
+      return op.apply(this, arguments);
+    };
     CovaraPerson._ring = 1;
   }
   hit.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); homeTap(); });
@@ -390,5 +397,59 @@
   function quietTips() { try { if (typeof SentinelGuide !== 'undefined' && !SentinelGuide._ring) { SentinelGuide.onCall = function () {}; SentinelGuide._ring = 1; } } catch (e) {} }
   setInterval(function () { wrapCare(); quietTips(); place(); if (_state) hold(true); }, 300);
   window.addEventListener('resize', function () { if (_state) show(_state); });
+  /* ── a teammate's sphere: Video call, Phone call, Message, Email, WHEREIS and ALERT beside it ── */
+  function contactOf(id) { try { return DEMO_CONTACTS.filter(function (c) { return String(c.id) === String(id); })[0] || null; } catch (e) { return null; } }
+  function isPerson(c) { return !!c && !(c.cvItem && c.cvItem.kind !== 'person'); }
+  var focusLayer = document.createElement('div'); focusLayer.id = 'cvrFocus';
+  var fcss = document.createElement('style');
+  fcss.textContent = '#cvrFocus{position:fixed;inset:0;z-index:8990;pointer-events:none}#cvrFocus .cvr-pill{pointer-events:auto;opacity:1;transform:none;animation:cvrFade 1.57s ease-in-out infinite}#cvrFocus .cvr-pill.team{color:#ffd24d;border-color:rgba(255,210,77,.45)}';
+  document.head.appendChild(fcss);
+  var _fid = null, _fkeys = '', _fEls = [], _tapped = null;
+  function focusKeys(c) {
+    var k = ['video', 'phone', 'message', 'email', 'where', 'alert'];
+    try { if (c.care && c.care.userId && window.CovaraTeams && CovaraTeams.teamOf && CovaraTeams.teamOf(c.care.userId)) k.push('team'); } catch (e) {}
+    return k;
+  }
+  function focusTick() {
+    requestAnimationFrame(focusTick);
+    if (!focusLayer.parentNode && document.body) document.body.appendChild(focusLayer);
+    var id = null; try { id = focusedContactId; } catch (e) {}
+    var c = id != null ? contactOf(id) : null;
+    /* only for a sphere the person tapped; the galaxy's own rest-mode turns show the dream state alone */
+    var ok = c && isPerson(c) && String(_tapped) === String(c.id) && !_state && document.body.classList.contains('cv-main') && typeof appState !== 'undefined' && appState === 'network';
+    var node = null; if (ok) { try { node = NODES.filter(function (n) { return n.contact === c || String(n.contact.id) === String(c.id); })[0]; } catch (e) {} }
+    if (!ok || !node) { if (_fid !== null) { focusLayer.innerHTML = ''; _fEls = []; _fid = null; _fkeys = ''; } return; }
+    var keys = focusKeys(c);
+    if (_fid !== c.id || _fkeys !== keys.join()) {
+      _fid = c.id; _fkeys = keys.join(); focusLayer.innerHTML = '';
+      _fEls = keys.map(function (k) { var b = pill(k, 'right'); if (k === 'team') b.classList.add('team'); b.onclick = function (e) { e.stopPropagation(); focusPick(k, c); }; focusLayer.appendChild(b); return b; });
+    }
+    var cv = document.getElementById('sphere'); if (!cv) return;
+    var rect = cv.getBoundingClientRect(), p = projectNode(node);
+    var r = node.r * p.scale * (typeof FOCUS_SCALE !== 'undefined' ? FOCUS_SCALE : 1.8);
+    var sx = rect.left + p.sx, sy = rect.top + p.sy, W = rect.width;
+    /* the labels go on the side away from the dream picture (upper right) and away from the edge */
+    var dr = window._dreamRect, nearDream = dr && dr.r && Math.hypot(sx - (rect.left + dr.cx), sy - (rect.top + dr.cy)) < dr.r + r + 150;
+    var left = sx > W * 0.6 || (nearDream && sx > W * 0.3), gap = 10, Rr = r + gap, step = 5;
+    var hs = _fEls.map(function (b) { return b.offsetHeight || 22; });
+    var total = hs.reduce(function (a, h) { return a + h; }, 0) + step * (_fEls.length - 1), y = sy - total / 2;
+    _fEls.forEach(function (b, i) {
+      var mid = y + hs[i] / 2, dy = mid - sy, off = Math.sqrt(Math.max(Rr * Rr - dy * dy, Math.pow(r * 0.55, 2)));
+      b.classList.toggle('l', left);
+      b.style.setProperty('--mw', Math.floor((left ? sx - off : W - (sx + off)) - 8) + 'px');
+      b.style.top = y + 'px';
+      if (left) { b.style.left = ''; b.style.right = (W - (sx - off)) + 'px'; } else { b.style.right = ''; b.style.left = (sx + off) + 'px'; }
+      y += hs[i] + step;
+    });
+  }
+  requestAnimationFrame(focusTick);
+  function focusPick(k, c) {
+    _tapped = null;   /* a choice is made: the labels go until the sphere is tapped again */
+    if (QUICK[k]) { try { runContactQuickAction(QUICK[k], c); } catch (e) {} return; }
+    if (k === 'where') { _where = true; try { WhereIs.setMode('whereis'); } catch (e) {} return; }
+    if (k === 'alert') { try { CovaraHelp.open(); } catch (e) {} return; }
+    if (k === 'team') { try { focusedContactId = null; CovaraTeams.go(c.care.userId); } catch (e) {} return; }
+  }
+
   window.CovaraRing = { isOpen: function () { return !!_state; }, where: function () { return _where; }, open: show, close: close, state: function () { return _state; } };
 })();

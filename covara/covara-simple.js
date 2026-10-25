@@ -357,7 +357,7 @@
   function frame() {
     var o = on();
     document.body.classList.toggle('cvs-on', o);
-    if (o) { if (simpleNow()) { try { if (focusedContactId != null && !(window.CovaraPerson && CovaraPerson.isOpen && CovaraPerson.isOpen()) && !keptForWhere()) focusedContactId = null; } catch (e) {} } }
+    if (o) { if (simpleNow() && !document.body.classList.contains('cv-main')) { try { if (focusedContactId != null && !(window.CovaraPerson && CovaraPerson.isOpen && CovaraPerson.isOpen()) && !keptForWhere()) focusedContactId = null; } catch (e) {} } }
     requestAnimationFrame(frame);
   }
   function tick() {

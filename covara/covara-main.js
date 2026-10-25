@@ -47,7 +47,12 @@
     }
     if (window.CovaraWhere && typeof CovaraWhere.on === 'function' && !CovaraWhere.on._main) {
       var w = CovaraWhere.on;
-      CovaraWhere.on = function () { return quiet() ? false : w.apply(this, arguments); };
+      CovaraWhere.on = function () {
+        if (quiet()) return false;
+        /* a chosen teammate: WHEREIS is about that person (Sentinel's own WHEREIS), not HOME */
+        try { if (focusedContactId != null) { var hc = window.CovaraView && CovaraView.centre && CovaraView.centre(); if (!hc || String(hc.contact.id) !== String(focusedContactId)) return false; } } catch (e) {}
+        return w.apply(this, arguments);
+      };
       CovaraWhere.on._main = 1;
     }
   }
@@ -65,7 +70,9 @@
     try { if (typeof window.openBluf === 'function' && !window.openBluf._main) { var ob = window.openBluf; window.openBluf = function () { if (document.body.classList.contains('cv-main')) return; return ob.apply(this, arguments); }; window.openBluf._main = 1; } } catch (e) {}
     try {
       if (typeof SentinelGuide !== 'undefined' && !SentinelGuide._main) {
-        SentinelGuide.show = function () {}; SentinelGuide.showBanner = function () {}; SentinelGuide._main = 1;
+        /* every Sentinel tip, including the ones a tap on a sphere brings up */
+        Object.keys(SentinelGuide).forEach(function (k) { if (typeof SentinelGuide[k] === 'function' && /^(show|on)/.test(k)) SentinelGuide[k] = function () {}; });
+        SentinelGuide._main = 1;
         try { SentinelGuide.hideAll(); } catch (e) {}
       }
     } catch (e) {}
@@ -84,7 +91,28 @@
       enterNetwork();
     } catch (e) {}
   }
-  function tick() { document.body.classList.add('cv-main'); placeName(); quietCards(); toGalaxy(); wrap(); alive(); }
+  /* The revolving spheres (25 Oct 2026): "slightly smaller and more transparent - the same as what we see for the
+     spheres on Sentinel", closer to HOME, the team outside HOME's own things so every person can be tapped. */
+  var TEAM_ORBIT = 0.86, ITEM_ORBIT = 0.66, SIZE = 0.78, ALPHA = 0.55;
+  function isPerson(c) { return !(c && c.cvItem && c.cvItem.kind !== 'person'); }
+  window.CovaraOrbit = function (n) {
+    if (!n || n._cvOrbit) return;
+    var k = isPerson(n.contact) ? TEAM_ORBIT : ITEM_ORBIT;
+    n.tx *= k; n.ty *= k; n.tz *= k; n.x *= k; n.y *= k; n.z *= k; n._cvOrbit = 1;
+  };
+  window.CovaraGlassOrbs = true;
+  window.CovaraSphereAlpha = function (n) { return isPerson(n && n.contact) ? ALPHA : ALPHA * 0.9; };
+  var _sized = false;
+  function sizeOnce() {
+    if (_sized) return;
+    try { if (typeof SphereSize === 'undefined' || typeof NODES === 'undefined' || !NODES.length) return; } catch (e) { return; }
+    _sized = true;
+    /* unless this person has set a size with the slider */
+    try { RemielDB.getSetting('sphereSize').then(function (v) { if (!v) SphereSize.apply(SIZE); }).catch(function () { SphereSize.apply(SIZE); }); } catch (e) {}
+  }
+  /* a chosen sphere holds still (25 Oct 2026: "screens will be static and hold") */
+  function holdFocus() { try { if (focusedContactId != null && typeof netSpin !== 'undefined') netSpin = false; } catch (e) {} }
+  function tick() { document.body.classList.add('cv-main'); sizeOnce(); holdFocus(); placeName(); quietCards(); toGalaxy(); wrap(); alive(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tick); else tick();
   setInterval(tick, 500);
   window.CovaraMain = { quiet: quiet };

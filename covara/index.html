@@ -16550,6 +16550,7 @@ function rebuildNodeTargets() {
     node.ty = ty / L * shellR;
     node.tz = tz / L * shellR;
   });
+  try { if (window.CovaraOrbit) NODES.forEach(window.CovaraOrbit); } catch (e) {}
 }
 
 /* The name under a sphere: the surname, which tells teammates apart; the
@@ -16611,6 +16612,8 @@ function buildNodes(fresh) {
       initials: (((contact.first || '')[0] || '') + ((contact.last || '')[0] || '')).toUpperCase() || '?'
     };
   });
+  /* Covara: people orbit outside HOME's things, a little closer in than Sentinel's shell (covara-main.js) */
+  try { if (window.CovaraOrbit) NODES.forEach(window.CovaraOrbit); } catch (e) {}
   networkExpanded = true;
 }
 
@@ -16687,6 +16690,11 @@ function hitTestNetwork(clientX, clientY) {
     if (d >= r * 1.45) continue;
     /* on the sphere itself beats near its edge; then nearest the viewer */
     const on = d < r;
+    /* Covara: a person's sphere is never hidden behind one of HOME's things: a person in reach wins the tap */
+    const person = !(node.contact && node.contact.cvItem && node.contact.cvItem.kind !== 'person');
+    const closestPerson = closest && !(closest.contact && closest.contact.cvItem && closest.contact.cvItem.kind !== 'person');
+    if (closest && closestPerson && !person) continue;
+    if (closest && person && !closestPerson) { closest = node; closestZ = p.z; inside = on; continue; }
     if ((on && !inside) || (on === inside && p.z < closestZ)) { closest = node; closestZ = p.z; inside = on; }
   }
   if (closest && (!centreHit || closestZ < NET_DIST)) return { isCenter: false, node: closest };
@@ -29913,6 +29921,7 @@ function drawNetworkView(t) {
 
   /* ── Helper: draw one contact sphere with all its decorations ── */
   function _drawOneContactSphere({ node, p }, alphaOverride) {
+    try { if (alphaOverride == null && window.CovaraSphereAlpha) alphaOverride = window.CovaraSphereAlpha(node); } catch (e) {}
     const cat = CATS[node.contact.cat] || CATS.other;
     const sev = SEVS[node.contact.sev];
     const col = `rgb(${cat.r},${cat.g},${cat.b})`;
@@ -29975,7 +29984,8 @@ function drawNetworkView(t) {
     }
 
     /* Glass-orb lighting: volume, key light, glint, coloured rim */
-    try { drawOrbLight(ctx, sx, sy, r, cat, (alphaOverride || 1), !!(cPhoto && cPhoto.img)); } catch (e) {}
+    /* Covara: the revolving spheres are see-through glass with a lit edge, as on Sentinel's (window.CovaraGlassOrbs) */
+    try { drawOrbLight(ctx, sx, sy, r, cat, (alphaOverride || 1), !!(cPhoto && cPhoto.img) || !!window.CovaraGlassOrbs); } catch (e) {}
 
     /* ── Inner energy ring (category-colored) ── */
     const _cRing = (typeof Biometrics !== 'undefined' && Biometrics.getRingState)
