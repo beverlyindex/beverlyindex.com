@@ -3490,7 +3490,7 @@ async function tripFile(R){ if(!R.cor || R.cor.v!==3){ try{ await tripCor(R); }c
   rep.contacts=(R.contacts||[]).map(c=>({t:iso(c.t), youWereAt:c.pos, provedMoving:!!c.mv, youStoodStill:c.mv ? !!c.still : (c.stood==null ? null : !!c.stood), speed_mps:c.v||0, inEarshot_s:c.s||0, words:contactLine(c), devices:c.devs.map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, wornOrCarried:!!x.worn, provedMoving:!!x.mv}))}));
   rep.waypoints=(R.wps||[]).map(w=>({n:w.n, t:iso(w.t), youWereAt:w.pos, note:w.note||'', devices:Object.values(w.devs||{}).map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, yours:!!x.yours, tag:(TAG[C.tags[x.id]]||TAG.fresh).w, passedYou:wpPassed(R,w,x)}))}));
   rep.whatHappened=tripFindings(R, C).map(f=>({t:iso(f.t), text:f.text+(f.win?' In earshot '+winText(f.win)+'.':''), devices:(f.devs||[]).map(r=>r.id)}));
-  rep.answer=tripAnswerText(R, C);
+  { const A=tripAnswerText(R, C); rep.answer={following:A.following, notUsualHere:A.notUsualHere, worthALook:A.worthALook, notUsualCount:A.notUsualCount}; }
   rep.timeline=tripTimeline(R, C).map(x=>({t:iso(x.t), kind:x.k, text:x.text, devices:(x.devs||[]).map(r=>r.id)}));
   rep.camerasPassed=(C.cams||[]).map(x=>({kind:x.kind, name:x.name, operator:x.op, nearest_m:x.d, t:iso(x.t), lat:x.la, lon:x.lo}));
   const text=JSON.stringify(rep,null,1), d=new Date(R.t0), name='remiel-trip-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.json';
