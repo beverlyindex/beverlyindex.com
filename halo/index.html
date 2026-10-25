@@ -233,7 +233,7 @@ select.inp{flex:none}
 .ans-l{display:flex;flex-direction:column;gap:2px} .loc-v.ans .ans-l>b{font-size:16.5px;line-height:1.3;font-weight:700} .ans-k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)} .ans-l>b{font-size:16px;line-height:1.3;color:var(--ink)} .ans-l>span{font-size:12.5px;line-height:1.4;color:#c3cbda}
 .ans-r{display:grid;grid-template-columns:12px 1fr;column-gap:8px;align-items:center;text-align:left;width:100%;padding:7px 0 6px;border:0;border-top:1px solid rgba(143,180,255,.14);background:none;color:inherit;font:inherit;cursor:pointer}
 .loc-v .ans-r b{font-family:inherit;font-size:14.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .ans-r small{grid-column:2;font-size:11.5px;color:var(--mut)} .ans-r small.tm{color:#b9cdf5}
-.ans-t{font-size:11.5px;color:var(--mut)} .loc-v.ans b span,.loc-v.ans .tm span,.loc-v.ans .ans-h span{display:inline;font-size:inherit;color:inherit;margin:0} .ans-h{font-size:12px;color:#b9cdf5} .ans-h .linkbtn{font-size:12px;padding:0;margin-left:2px}
+.ans-t{font-size:11.5px;color:var(--mut)} .tcor{margin:8px 2px 0;color:#b9cdf5} .loc-v.ans b span,.loc-v.ans .tm span,.loc-v.ans .ans-h span{display:inline;font-size:inherit;color:inherit;margin:0} .ans-h{font-size:12px;color:#b9cdf5} .ans-h .linkbtn{font-size:12px;padding:0;margin-left:2px}
 .hs-row{grid-template-columns:14px 1fr auto} .hs-step{display:flex;align-items:center;gap:6px} .hs-step .btn{min-width:34px;padding:4px 0} .hs-n{min-width:22px;text-align:center;font-variant-numeric:tabular-nums;color:var(--ink)}
 .loc-v.v-clear{--vc:var(--clear);background:rgba(74,232,138,.09)} .loc-v.v-watch{--vc:#ff8a3c;background:rgba(255,138,60,.12)} .loc-v.v-act{--vc:var(--action);background:rgba(255,90,90,.17)} .loc-v.v-off{--vc:var(--line2);background:rgba(120,160,220,.06)}
 .loc-v svg{width:30px;height:30px;flex:none;stroke:var(--vc);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -1320,7 +1320,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-24.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-25.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2716,6 +2716,10 @@ function elogInit(){ try{ if(!window.indexedDB) return; const rq=indexedDB.open(
     rq.onerror=()=>{}; }catch(e){} }
 const elogTx = (stores, mode) => ELOG.db.transaction(stores, mode);
 const elogAll = (name, index, key) => new Promise(res=>{ try{ const s=elogTx([name],'readonly').objectStore(name), rq=index?s.index(index).getAll(key):s.getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); }catch(e){ res([]); } });
+// Many reads in one go: every key's rows from one index, in a single transaction, so a trip of 400 devices is read in one pass, not 400.
+const elogAllMany = (name, index, keys) => new Promise(res=>{ const out=new Map(), ks=[...new Set(keys)]; if(!ks.length) return res(out);
+  try{ const tx=elogTx([name],'readonly'), ix=tx.objectStore(name).index(index); ks.forEach(k=>{ const rq=ix.getAll(k); rq.onsuccess=()=>out.set(k, rq.result||[]); });
+    tx.oncomplete=()=>res(out); tx.onerror=()=>res(out); tx.onabort=()=>res(out); }catch(e){ res(out); } });
 const elogCount = name => new Promise(res=>{ try{ const rq=elogTx([name],'readonly').objectStore(name).count(); rq.onsuccess=()=>res(rq.result||0); rq.onerror=()=>res(0); }catch(e){ res(0); } });
 function elogCache(r){ if(String(r.k).slice(0,4)==='imp:') ELOG.imp=true; ELOG.hist.set(r.k,{id:r.id, min:r.min==null?null:r.min, name:r.name||'', hint:r.hint||'', cls:r.cls||'Unknown', enc:r.enc, occ:r.occ||1, fx:r.fx||0, days:(r.days||[]).length, pl:(r.places||[]).map(p=>[p.la,p.lo,p.first,p.last,p.occ||1]), first:r.first, last:r.last});
   if(r.name){ let s=ELOG.names.get(r.name); if(!s) ELOG.names.set(r.name, s=new Set()); s.add(r.k); } }
@@ -3046,9 +3050,9 @@ function tripAnswer(R, C){ C=C||R.cor||{}; const tags=C.tags||{}, st=withTrip(R,
   const inE=r=>(winsOf(r)||[[r.first, r.last]]).reduce((a,w)=>a+(w[1]-w[0]), 0);
   const tg=r=>(r.withYou && r.wy) ? 'with' : tags[r.id]||'fresh', rk=r=>{ const t=tg(r); return (t==='with'?1000:t==='watch'?900:t==='place'?800:t==='sus'?700:0)+(r.cls==='Tag'?300:r.cls==='Camera'||r.dr?250:0)+(r.min<=lim(r)?120:0)+(inE(r)>=ANS.long?80:0)-Math.min(60, r.min||60)/10; };
   const odd=ds.filter(r=>ANS.odd.has(tg(r)) && !(r.hab && tg(r)==='fresh') && r.band!=='wifi' && !HOUSE_RE.test((r.hint||'')+' '+(r.adv||''))).map(r=>({r, k:rk(r)})).sort((a,b)=>b.k-a.k);
-  const top=odd.filter(x=>x.k>=100).slice(0, 6), left=odd.filter(x=>top.indexOf(x)<0), stand=left.filter(x=>x.r.v==='fixed' || x.r.ret).length;
-  return {F, odd, top, rest:left.length-stand, stand, hab:ds.filter(r=>r.hab).length, row:x=>({name:nm(x.r), kind:[x.r.cls==='Unknown'?'':x.r.cls, x.r.hint].filter(Boolean).join(', '), near:'closest '+du(x.r.min)+' at '+hms(x.r.minT||x.r.first), r:x.r, tag:tg(x.r)})}; }
-function tripAnswerHTML(R, C){ const A=tripAnswer(R, C), F=A.F, hot=A.top.some(x=>(x.r.cls==='Tag') || ['with','watch','place','sus'].indexOf((R.cor&&R.cor.tags||{})[x.r.id])>=0);
+  const worth=odd.filter(x=>x.k>=100), top=worth.slice(0, 6), left=odd.filter(x=>worth.indexOf(x)<0), stand=left.filter(x=>x.r.v==='fixed' || x.r.ret).length;
+  return {F, odd, worth, top, more:worth.length-top.length, rest:left.length-stand, stand, hab:ds.filter(r=>r.hab).length, row:x=>({name:nm(x.r), kind:[x.r.cls==='Unknown'?'':x.r.cls, x.r.hint].filter(Boolean).join(', '), near:'closest '+du(x.r.min)+' at '+hms(x.r.minT||x.r.first), r:x.r, tag:tg(x.r)})}; }
+function tripAnswerHTML(R, C){ const A=tripAnswer(R, C), F=A.F, ready=!!(R.cor && R.cor.v===3), hot=A.top.some(x=>(x.r.cls==='Tag') || ['with','watch','place','sus'].indexOf((R.cor&&R.cor.tags||{})[x.r.id])>=0);
   const cls=F.k==='yes' ? 'v-act' : hot ? 'v-watch' : F.k==='no' ? 'v-clear' : 'v-unk', ic=F.k==='yes'||hot ? LOC_IC.warn : F.k==='no' ? LOC_IC.ok : LOC_IC.off;
   const ob=!A.odd.length ? 'Nothing. Every device heard was yours, in your files or your neighborhood\'s.' : A.odd.length===1 ? '1 device.' : A.odd.length+' devices.';
   const restW=[A.stand>0 ? (A.stand===1?'1 more stood in one place, as a home\'s devices do.':A.stand+' more stood in one place, as homes\' devices do.') : '', A.rest>0 ? (A.top.length||A.stand ? (A.rest===1?'1 more, ':A.rest+' more, ')+'only at a distance and not for long.' : (A.rest===1?'It was':'All were')+' heard only at a distance and not for long.') : '', A.hab ? (A.hab===1?'1 device was one of the usual number of its kind where you were, learned by habit, and is not counted.':A.hab+' devices were among the usual number of their kind where you were, learned by habit, and are not counted.') : ''].filter(Boolean).join(' ');
@@ -3147,9 +3151,11 @@ function tripEnd(){ if(!W.on) return; const open=(W.wps||[]).find(x=>!x.done);
     text:'Remiel stops recording this trip and keeps it in Trips. Standing still does not end a trip.' }); }
 function tripEndNow(){ if(!W.on) return; S.endArm=0; const t0=W.t0; walkStop(); toast('Trip ended and saved.'); tripFinish(t0, true); }
 // The moment a trip ends: what it recorded is set against the record of earlier days, and the whole trip is kept on this phone.
-async function tripFinish(t0, show){ try{ (W.wps||[]).forEach(wpClose); await tripCorrelate(W); }catch(e){}
-  if(W.t0!==t0) return; tripMeta(W); tripArchive();
-  if(show){ S.trips={t0}; if(!locMode()) S.wview='list'; renderVicinity(); await tripsRender(); const b=el('tripBox'); if(b) b.scrollIntoView({block:'start'}); } }
+// The trip page, with Save and Share, opens the moment you press End; the comparison with earlier days fills it in a moment later.
+async function tripFinish(t0, show){ try{ (W.wps||[]).forEach(wpClose); }catch(e){}
+  if(show){ S.trips={t0}; if(!locMode()) S.wview='list'; renderVicinity(); tripsRender().then(()=>{ const b=el('tripBox'); if(b) b.scrollIntoView({block:'start'}); }); }
+  try{ await tripCor(W); }catch(e){}
+  if(W.t0!==t0) return; tripMeta(W); tripArchive(); }
 function tripMeta(R){ const st=withTrip(R, walkStats), c=(R.cor&&R.cor.cnt)||{}; P.trips=(P.trips||[]).filter(x=>x.t0!==R.t0);
   P.trips.unshift({t0:R.t0, t1:R.t1, m:st.distance_m, heard:st.heard, placed:st.placed, withYou:st.withYou, name:R.name||'', wps:(R.wps||[]).length, seen:(c.place||0)+(c.again||0)+(c.watch||0)+(c.with||0), red:(c.place||0)+(c.with||0)});
   P.trips.sort((a,b)=>b.t0-a.t0); P.trips.length=Math.min(P.trips.length,200); save(); }
@@ -3187,10 +3193,12 @@ async function tripRecover(){ if(!ELOG.ok || TRIP_AUTO) return;
   if(!W.t0 || W.test) return;
   if(!W.on && W.t1 && !W.arch){ tripCut(W); tripFinish(W.t0, false); } }
 async function tripCorrelate(R){ const ds=Object.values(R.devs||{}), tags={}, hw={}, dayN={}, cnt={with:0,place:0,watch:0,again:0,local:0,fresh:0,yours:0};
+  const want=[]; if(ELOG.ok) ds.forEach(r=>{ const h=r.sig?histFor(r.sig, r.adv):null; if(!h) return; want.push(r.sig); if(h.byName) want.push(...nameSigs(r.adv, r.sig)); });
+  const ENC=await elogAllMany('enc','k',want);          // every device's earlier meetings, read in one pass
   for(const r of ds){ let tag='fresh', words=rotates(r)?'':'First sighting'; const h=r.sig?histFor(r.sig, r.adv):null;
     if(r.mine || r.pr || (P.mine||{})[r.id]){ tag='yours'; words='Yours'; }
     else if(r.withYou && (r.wy===1 || r.v==='with') && !HOUSE_RE.test((r.hint||'')+' '+(r.adv||''))){ tag='with'; if(r.sig && !r.sim) watchMark(r.sig, R.t1||R.t0); words='Moved with you'+(r.mins?' for '+(r.mins<1.5?'a minute':Math.round(r.mins)+' minutes'):'')+(r.span?', across '+du(r.span):''); }
-    else if(h && ELOG.ok){ let enc=await elogAll('enc','k',r.sig); if(h.byName) for(const k of nameSigs(r.adv, r.sig)) enc=enc.concat(await elogAll('enc','k',k));
+    else if(h && ELOG.ok){ let enc=ENC.get(r.sig)||[]; if(h.byName) for(const k of nameSigs(r.adv, r.sig)) enc=enc.concat(ENC.get(k)||[]);
       const pre=h.byName?'By its name · ':'', prior=enc.filter(x=>x.trip!==R.t0 && x.t1<r.first), mine=enc.filter(x=>x.trip===R.t0 && x.la!=null), at=r.at; let far=null, split=null;
       if(at) prior.forEach(x=>{ if(x.la==null) return; const m=distLL(at.lat,at.lon,x.la,x.lo); if(m>ELOG.FAR_M && (!far || x.t1>far.x.t1)) far={x,m}; });
       for(let i=0;i<mine.length && !split;i++) for(let j=i+1;j<mine.length;j++){ const m=distLL(mine[i].la,mine[i].lo,mine[j].la,mine[j].lo); if(m>ELOG.FAR_M){ split={m}; break; } }
@@ -3204,6 +3212,9 @@ async function tripCorrelate(R){ const ds=Object.values(R.devs||{}), tags={}, hw
     tags[r.id]=tag; hw[r.id]=words; cnt[tag]++; }
   let cams=[]; if(ELOG.ok){ const by={}; (await elogAll('cam')).filter(c=>c.trip===R.t0).forEach(c=>{ const g=by[c.pid]; if(!g || c.d<g.d) by[c.pid]={kind:c.kind, name:c.name||'', op:c.op||'', d:c.d, t:c.t, la:c.la, lo:c.lo}; }); cams=Object.values(by).sort((a,b)=>a.t-b.t).slice(0,60); }
   R.cor={v:3, t:Date.now(), tags, hw, cnt, cams, days:dayN}; return R.cor; }
+// One comparison at a time for each trip: the trip page, End and Save wait on the same one.
+const COR={};
+function tripCor(R){ if(R.cor && R.cor.v===3) return Promise.resolve(R.cor); const k=R.t0; if(!COR[k]) COR[k]=tripCorrelate(R).finally(()=>{ delete COR[k]; }); return COR[k]; }
 /* The street at a place this phone recorded, so a place reads in words. One lookup a second, each answer kept on the phone. */
 const WH={c:null, q:[], busy:false};
 const whKey = (la,lo) => (+la).toFixed(4)+','+(+lo).toFixed(4);
@@ -3232,9 +3243,10 @@ async function tripsRender(){ const box=el('tripBox'); if(!box) return; const T=
         : '<div class="loc-none">No trip yet. Press Start, and Remiel records your path and every device along it.</div>')+'</div>'; return; }
   const R=await tripGet(T.t0); if(S.trips!==T) return;
   if(!R){ const x=(P.trips||[]).find(q=>q.t0===T.t0); box.innerHTML=head(esc(x?tripName(x):'Trip'),true)+'<p class="limit" style="margin:8px 2px 0">'+(x?esc(walkDur(x.t1-x.t0))+', '+esc(du(x.m||0))+', '+(x.heard||0)+' devices heard. ':'')+'This trip was taken before Remiel began keeping trips in full. Every trip from this build onwards opens here with all of its detail.</p></div>'; return; }
-  if(!R.on && tripCut(R)){ try{ await tripCorrelate(R); tripPut(R); tripMeta(R); renderVicinity(); }catch(e){} if(S.trips!==T) return; }
-  if(!R.cor || R.cor.v!==3){ try{ await tripCorrelate(R); tripPut(R); tripMeta(R); renderVicinity(); }catch(e){} if(S.trips!==T) return; }
-  box.innerHTML=head(esc(tripName(R)),true)+tripSumHTML(R, T)+'</div>'; }
+  if(!R.on && tripCut(R)) R.cor=null;          // cut short: compared again
+  const pend=!R.cor || R.cor.v!==3;
+  box.innerHTML=head(esc(tripName(R)),true)+(pend?'<p class="limit tcor">Setting this trip against your record of earlier days. Save and Share are ready now.</p>':'')+tripSumHTML(R, T)+'</div>';
+  if(pend) tripCor(R).then(()=>{ tripPut(R); tripMeta(R); if(S.trips===T){ renderVicinity(); tripsRender(); } }).catch(()=>{}); }
 /* ----- Trip Summary. What this trip's own record says, written from the record each time the trip opens. Only what holds for this trip is
    said: the bottom line, the trackers, a device heard for most of the trip and why it is not a follower, a device that was flagged and dropped,
    devices seen before elsewhere or on the Watch list, the waypoints, the cameras, and how the trip ended. Each finding names what to do. ----- */
@@ -3471,7 +3483,8 @@ function tripSumHTML(R, T){ const st=withTrip(R, walkStats), C=R.cor||{tags:{},h
   if((C.cams||[]).length) h+='<div class="elog-h4">Cameras passed · '+C.cams.length+'</div>'+C.cams.map(x=>'<div class="elog-line"><span><b>'+esc(x.kind+(x.name?', '+x.name:''))+'</b> · '+hms(x.t)+', '+minsIn(x.t,R.t0)+' · '+whSpan(x.la,x.lo)+'</span><span class="mono">'+esc(du(x.d))+'</span></div>').join('');
   return h+'<div class="loc-bar trip-save"><button class="btn primary mk" data-act="trip-save">Save the data file</button><button class="btn" data-act="trip-share">Share</button><button class="btn" data-act="trip-print">Print</button></div>'+
     '<div class="limit" style="text-align:center;margin-top:8px"><button class="linkbtn'+(T.ren?' on':'')+'" data-act="trip-ren">'+(R.name?'Change the name':'Name this trip')+'</button> · The data file holds every device and every reading of this trip.</div>'; }
-async function tripFile(R){ const rep=withTrip(R, walkReport), iso=t=>new Date(t).toISOString(), C=R.cor||{tags:{},hw:{},cams:[]};
+async function tripFile(R){ if(!R.cor || R.cor.v!==3){ try{ await tripCor(R); }catch(e){} }          // the file carries what the record of earlier days says
+  const rep=withTrip(R, walkReport), iso=t=>new Date(t).toISOString(), C=R.cor||{tags:{},hw:{},cams:[]};
   rep.version=2; rep.name=tripName(R); rep.devices.forEach(x=>{ x.tag=(TAG[C.tags[x.id]]||TAG.fresh).w; x.record=C.hw[x.id]||''; const r=(R.devs||{})[x.id]||{};
     x.motion=r.mv?'moving':r.v==='fixed'?'stays in place':'not yet known'; if(r.mv){ x.speed_mps=r.mv; x.speedClass=speedClass(r.mv); x.signalChange_dB=r.mvDb||0; x.youStoodStill=!!r.mvS; } x.wornOrCarried=!!r.wn; if(r.dr) x.drone=r.rid||true; });
   rep.contacts=(R.contacts||[]).map(c=>({t:iso(c.t), youWereAt:c.pos, provedMoving:!!c.mv, youStoodStill:c.mv ? !!c.still : (c.stood==null ? null : !!c.stood), speed_mps:c.v||0, inEarshot_s:c.s||0, words:contactLine(c), devices:c.devs.map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, wornOrCarried:!!x.worn, provedMoving:!!x.mv}))}));
