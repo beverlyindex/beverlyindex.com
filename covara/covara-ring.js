@@ -12,7 +12,7 @@
   var S = {
     en: { contact: 'Contact', health: 'Health', journal: 'Journal', tools: 'Tools', where: 'WHEREIS / Safety', covara: 'Covara', alert: 'ALERT',
       video: 'Video call', phone: 'Phone call', message: 'Message', email: 'Email',
-      hHealth: 'Health', visits: 'Visits', meds: 'Medicines', docs: 'Vital Records & Docs',
+      hHealth: 'Health', visits: 'Visits', meds: 'Medicines', docs: 'Records', broadcast: 'Broadcast Contact', bSent: 'Sent to {n} on your team.', bNone: 'Your message is empty.', bTitle: 'Message to your whole team', bSend: 'Send to everyone', bPh: 'Write your message', noEmail: 'No one on your team has an email address in Covara yet.',
       notes: 'Notes', calendar: 'Calendar', daily: 'Daily Schedule', alarms: 'Alarms', invites: 'Invites',
       camera: 'Camera', words: 'Words', mode: 'Mode', modeFull: 'Full view', modeOne: 'One-on-one',
       speak: 'Speak', on: 'ON', off: 'OFF', code: 'Team code', settings: 'Settings',
@@ -21,7 +21,7 @@
       notYet: 'is not built yet. It is next on the list.', tapHome: 'Tap your sphere to close' },
     it: { contact: 'Contatti', health: 'Salute', journal: 'Diario', tools: 'Strumenti', where: 'WHEREIS / Sicurezza', covara: 'Covara', alert: 'ALLERTA',
       video: 'Videochiamata', phone: 'Telefonata', message: 'Messaggio', email: 'Email',
-      hHealth: 'Salute', visits: 'Visite', meds: 'Medicine', docs: 'Documenti e cartelle',
+      hHealth: 'Salute', visits: 'Visite', meds: 'Medicine', docs: 'Cartelle', broadcast: 'Contatta tutti', bSent: 'Inviato a {n} del tuo team.', bNone: 'Il messaggio è vuoto.', bTitle: 'Messaggio a tutto il team', bSend: 'Invia a tutti', bPh: 'Scrivi il messaggio', noEmail: 'Nessuno del tuo team ha ancora un indirizzo email in Covara.',
       notes: 'Note', calendar: 'Calendario', daily: 'Programma del giorno', alarms: 'Promemoria', invites: 'Inviti',
       camera: 'Fotocamera', words: 'Parole', mode: 'Modalità', modeFull: 'Vista completa', modeOne: 'Uno a uno',
       speak: 'Voce', on: 'SÌ', off: 'NO', code: 'Codice del team', settings: 'Impostazioni',
@@ -47,7 +47,7 @@
     { k: 'journal', sub: ['notes', 'calendar', 'daily', 'alarms', 'invites'] },
     { k: 'tools', sub: ['camera', 'words', 'mode'] },
     { k: 'where' },
-    { k: 'covara', sub: ['speak', 'code', 'settings'] },
+    { k: 'covara', sub: ['speak', 'broadcast', 'code', 'settings'] },
     { k: 'alert' }
   ];
   var AWAY_RIGHT = ['video', 'phone', 'message', 'email', 'where'];
@@ -94,6 +94,12 @@
     '#cvrRoster .who .cvr-orb{--d:92px;width:92px;height:92px;display:flex;align-items:center;justify-content:center;font:800 30px "Hanken Grotesk",system-ui,sans-serif;color:#0b2540;background-size:cover;background-position:center}',
     '#cvrRoster .none{max-width:300px;text-align:center;color:#b9cbe8;font-size:16px;line-height:1.45}',
     '#cvrRoster .x{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);right:16px;width:48px;height:48px;border-radius:50%;border:1px solid rgba(150,215,255,.5);background:rgba(40,90,180,.18);color:#eaf6ff;font-size:22px;cursor:pointer;box-shadow:0 0 14px rgba(56,189,248,.3)}',
+    '#cvrMsg{position:fixed;inset:0;z-index:100040;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(6,15,36,.55);opacity:0;transition:opacity .25s}#cvrMsg.open{opacity:1}#cvrMsg[hidden]{display:none}',
+    '#cvrMsg .box{position:relative;width:min(420px,100%);padding:22px 18px 18px;border-radius:22px;border:1px solid rgba(150,210,255,.45);background:linear-gradient(155deg,rgba(70,130,235,.20),rgba(14,30,78,.36));-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.28);color:#eef6ff;font-family:"Hanken Grotesk",system-ui,sans-serif}',
+    '#cvrMsg h2{margin:0 0 6px;font-size:19px;font-weight:800}#cvrMsg .who{color:#ffd24d;font:600 12px "JetBrains Mono",monospace;letter-spacing:.06em;margin-bottom:12px}',
+    '#cvrMsg textarea{width:100%;box-sizing:border-box;border-radius:14px;border:1px solid rgba(150,200,255,.4);background:rgba(20,44,100,.3);color:#fff;font:500 16px "Hanken Grotesk",system-ui,sans-serif;padding:12px;resize:none}',
+    '#cvrMsg .send{margin-top:12px;width:100%;min-height:50px;border-radius:16px;border:0;background:linear-gradient(180deg,#7ee3ff,#38bdf8);color:#04203a;font:800 16px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}',
+    '#cvrMsg .x{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(150,215,255,.5);background:transparent;color:#eaf6ff;font-size:20px;cursor:pointer}',
     '#cvrToast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 40px);transform:translateX(-50%);z-index:100060;max-width:340px;padding:12px 18px;border-radius:16px;border:1px solid rgba(150,215,255,.5);background:linear-gradient(155deg,rgba(80,160,255,.22),rgba(14,40,96,.5));-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);color:#eef6ff;font:600 15px/1.35 "Hanken Grotesk",system-ui,sans-serif;text-align:center;box-shadow:0 0 18px rgba(56,189,248,.3);opacity:0;transition:opacity .3s;pointer-events:none}',
     '#cvrToast.on{opacity:1}',
     '@media (prefers-reduced-motion:reduce){.cvr-orb{animation:none}.cvr-node,.cvr-pill{transition:opacity .2s}}'
@@ -195,6 +201,15 @@
   function hold(on) {
     try { if (on) { netSpin = false; netVelYaw = 0; netVelPitch = 0; focusedContactId = null; } } catch (e) {}
   }
+  /* Broadcast Contact (25 Oct 2026): ON by default. On HOME's own sphere, Contact reaches the whole team at once.
+     OFF: once anyone on the team is on screen, Contact leaves HOME's ring; each person is reached from their own sphere. */
+  function broadcastOn() { try { return localStorage.getItem('rc:broadcast') !== '0'; } catch (e) { return true; } }
+  function broadcastState() { return broadcastOn() ? t('on') : t('off'); }
+  function homeRingKeys() {
+    var keys = HOME_RING.map(function (c) { return c.k; });
+    if (!broadcastOn() && team().length) keys = keys.filter(function (k) { return k !== 'contact'; });
+    return keys;
+  }
   function speakState() { var on = false; try { on = !!(window.CovaraGuide && CovaraGuide.on()); } catch (e) {} return on ? t('on') : t('off'); }
   function modeState() { var f = false; try { f = !!(window.CovaraSimple && CovaraSimple.full()); } catch (e) {} return f ? t('modeFull') : t('modeOne'); }
 
@@ -202,12 +217,12 @@
   function show(state) {
     _state = state; hold(true); _openedAt = Date.now();
     layer.classList.remove('open');
-    if (state === 'ring') ringOf(HOME_RING.map(function (c) { return c.k; }));
+    if (state === 'ring') ringOf(homeRingKeys());
     else if (state === 'away') sideOf(AWAY_RIGHT, AWAY_LEFT, null);
     else if (/^side:/.test(state)) { var c = cat(state.slice(5)); sideOf(c.side === 'right' ? c.items : [], c.side === 'left' ? c.items : [], null); }
     else if (/^sub:/.test(state)) {
       var s = cat(state.slice(4)), ex = {};
-      if (s.k === 'covara') ex.speak = speakState();
+      if (s.k === 'covara') { ex.speak = speakState(); ex.broadcast = broadcastState(); }
       if (s.k === 'tools') ex.mode = modeState();
       ringOf(s.sub, ex, s.k);
     }
@@ -266,14 +281,19 @@
     }
     if (QUICK[k]) {
       if (away) { var h = homeOf(); return run(function () { runContactQuickAction(QUICK[k], h); }); }
-      if (k === 'video') return run(callEveryone);
+      if (broadcastOn()) {
+        if (k === 'video') return run(function () { callEveryone(false); });
+        if (k === 'phone') return run(function () { callEveryone(true); });
+        if (k === 'message') return run(messageEveryone);
+        if (k === 'email') return run(emailEveryone);
+      }
       return run(function () { roster(k); });
     }
     switch (k) {
       case 'hHealth': return run(function () { CovaraView.open('health'); });
       case 'visits': return run(function () { CovaraView.open('visit'); });
       case 'meds': return run(function () { CovaraView.open('med'); });
-      case 'docs': return run(function () { CovaraView.open('papers'); });
+      case 'docs': return run(function () { CovaraRecords.open(); });
       case 'notes': return run(function () { CovaraNotes.journal(''); });
       case 'daily': return run(function () { CovaraPlan.open(); });
       case 'calendar': case 'alarms': case 'invites': return notYet(k);
@@ -281,6 +301,7 @@
       case 'words': return run(function () { CovaraWords.open(); });
       case 'mode': try { CovaraSimple.setFull(!CovaraSimple.full()); } catch (e) {} return show('sub:tools');
       case 'speak': try { CovaraGuide.setOn(!CovaraGuide.on()); } catch (e) {} return show('sub:covara');
+      case 'broadcast': try { localStorage.setItem('rc:broadcast', broadcastOn() ? '0' : '1'); } catch (e) {} return show('sub:covara');
       case 'code': return run(function () { CovaraCare.openCode(); });
       case 'settings': return run(function () { SettingsPanel.open(); });
       case 'where': close(); _where = true; try { if (away) focusedContactId = null; WhereIs.setMode('whereis'); } catch (e) {} return;
@@ -291,11 +312,41 @@
   /* HOME's own Video call: every sphere on the screen is called at once, no second screen
      (25 Oct 2026: "If I press my own video call BUTTON, all of the spheres on the screen get called.") */
   function team() { try { return CovaraCare.careContacts().filter(function (c) { return c.care.state === 'active' && c.care.side === 'away'; }); } catch (e) { return []; } }
-  function callEveryone() {
+  /* Phone call to everyone: the same Covara call, with the camera left off */
+  function audioOnlyNext() {
+    var md = navigator.mediaDevices; if (!md || !md.getUserMedia) return;
+    if (!md._cvAudio) { var g = md.getUserMedia.bind(md); md.getUserMedia = function (c) { if (window.__cvAudioOnly) { window.__cvAudioOnly = false; c = Object.assign({}, c || {}, { video: false }); } return g(c); }; md._cvAudio = 1; }
+    window.__cvAudioOnly = true; setTimeout(function () { window.__cvAudioOnly = false; }, 15000);
+  }
+  function callEveryone(voiceOnly) {
     var all = team();
     if (!all.length) { toast(t('noTeam')); return; }
+    if (voiceOnly) audioOnlyNext();
     if (all.length === 1) { runContactQuickAction('video', all[0]); return; }
     SentinelCall.callGroup({ contactIds: all.map(function (c) { return c.id; }), name: IT() ? 'Il mio team' : 'My team' });
+  }
+  /* Message to everyone: one box, one Send; it lands in each person's conversation */
+  function messageEveryone() {
+    var all = team(); if (!all.length) { toast(t('noTeam')); return; }
+    var el = document.getElementById('cvrMsg');
+    if (!el) { el = document.createElement('div'); el.id = 'cvrMsg'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); document.body.appendChild(el); }
+    el.innerHTML = '<div class="box"><button class="x" type="button" aria-label="' + t('close') + '">&times;</button><h2>' + t('bTitle') + '</h2>' +
+      '<div class="who">' + all.map(function (c) { return (c.first || c.last || '').replace(/</g, '&lt;'); }).join(' · ') + '</div>' +
+      '<textarea id="cvrMsgT" rows="4" placeholder="' + t('bPh') + '"></textarea><button class="send" type="button">' + t('bSend') + '</button></div>';
+    el.hidden = false; requestAnimationFrame(function () { el.classList.add('open'); try { el.querySelector('textarea').focus(); } catch (e) {} });
+    function shut() { el.classList.remove('open'); setTimeout(function () { el.hidden = true; }, 250); }
+    el.querySelector('.x').onclick = shut;
+    el.querySelector('.send').onclick = async function () {
+      var txt = (el.querySelector('textarea').value || '').trim(); if (!txt) { toast(t('bNone')); return; }
+      var n = 0; for (var i = 0; i < all.length; i++) { try { await SentinelMessaging.sendTo(all[i].id, txt); n++; } catch (e) {} }
+      shut(); toast(t('bSent').replace('{n}', n));
+    };
+  }
+  /* Email to everyone: the phone's mail opens with the whole team as recipients */
+  function emailEveryone() {
+    var to = team().map(function (c) { return c.email; }).filter(function (e) { return e && /@/.test(e); });
+    if (!to.length) { toast(t('noEmail')); return; }
+    window.location.href = 'mailto:' + to.map(encodeURIComponent).join(',');
   }
 
   /* ── the roster page: the team as spheres; tap one to call, message or email them ── */

@@ -15,7 +15,9 @@
       tile: 'Records', tileSub: 'Where they are, who may get them', tileN: '{a} may obtain · {h} places', tileMine: 'You may obtain them',
       title: 'Medical records', subMe: 'Your records stay with each provider. Covara keeps where they are and who may get them.',
       subOf: '{name}’s records stay with each provider. Covara keeps where they are and who may get them.',
-      tWhere: 'Where', tWho: 'Who may obtain', tHow: 'How to obtain', tLog: 'Log', close: 'Close', loading: 'Loading...', offline: 'Sign in to see medical records.', notShared: 'Not shared with you.', failed: 'That did not work. Check the internet and try again.',
+      tWhere: 'Where', tWho: 'Who may obtain', tHow: 'How to obtain', tFiles: 'Saved files', tLog: 'Log',
+      filesLead: 'Files you save here stay on this phone only, behind the Records lock. Nothing is sent to Covara.', saveFile: 'Save a file', noFiles: 'No saved files yet.', openFile: 'Open', rmFile: 'Remove', rmSure: 'Tap again to remove', savedOk: 'Saved on this phone.', fileFail: 'That file could not be saved.',
+      lockTitle: 'Records are locked', lockSet: 'Choose a 4-digit lock for Records', lockAgain: 'Enter the same 4 digits again', lockEnter: 'Enter your 4-digit lock', lockWrong: 'That is not the lock. Try again.', lockDiffer: 'The two did not match. Choose again.', lockWhy: 'The lock keeps Records and the files saved here private on this phone.', forgot: 'Forgot the lock', forgotSure: 'Tap again: this removes the lock and every file saved in Records on this phone', lockNow: 'Lock', close: 'Close', loading: 'Loading...', offline: 'Sign in to see medical records.', notShared: 'Not shared with you.', failed: 'That did not work. Check the internet and try again.',
       /* where */
       whereLead: 'The places that hold {name}’s records. Add each doctor, hospital, pharmacy, lab and insurer.', noHolders: 'No record holders yet.', addHolder: 'Add a record holder',
       hk_doctor: 'Doctor', hk_hospital: 'Hospital or clinic', hk_pharmacy: 'Pharmacy', hk_lab: 'Lab', hk_insurer: 'Insurer', hk_other: 'Other',
@@ -62,7 +64,9 @@
       tile: 'Cartelle', tileSub: 'Dove sono, chi può averle', tileN: '{a} autorizzati · {h} luoghi', tileMine: 'Puoi ottenerle',
       title: 'Cartelle cliniche', subMe: 'Le tue cartelle restano presso ogni struttura. Covara tiene dove sono e chi può averle.',
       subOf: 'Le cartelle di {name} restano presso ogni struttura. Covara tiene dove sono e chi può averle.',
-      tWhere: 'Dove', tWho: 'Chi può averle', tHow: 'Come ottenerle', tLog: 'Registro', close: 'Chiudi', loading: 'Carico...', offline: 'Accedi per vedere le cartelle cliniche.', notShared: 'Non condiviso con te.', failed: 'Non ha funzionato. Controlla internet e riprova.',
+      tWhere: 'Dove', tWho: 'Chi può averle', tHow: 'Come ottenerle', tFiles: 'File salvati', tLog: 'Registro',
+      filesLead: 'I file salvati qui restano solo su questo telefono, protetti dal blocco di Cartelle. Niente viene inviato a Covara.', saveFile: 'Salva un file', noFiles: 'Nessun file salvato.', openFile: 'Apri', rmFile: 'Elimina', rmSure: 'Tocca di nuovo per eliminare', savedOk: 'Salvato su questo telefono.', fileFail: 'Non è stato possibile salvare il file.',
+      lockTitle: 'Le cartelle sono bloccate', lockSet: 'Scegli un blocco di 4 cifre per le Cartelle', lockAgain: 'Inserisci di nuovo le stesse 4 cifre', lockEnter: 'Inserisci il tuo blocco di 4 cifre', lockWrong: 'Il blocco non è corretto. Riprova.', lockDiffer: 'Le due cifre non corrispondono. Scegli di nuovo.', lockWhy: 'Il blocco tiene private su questo telefono le Cartelle e i file salvati qui.', forgot: 'Ho dimenticato il blocco', forgotSure: 'Tocca di nuovo: elimina il blocco e tutti i file salvati nelle Cartelle su questo telefono', lockNow: 'Blocca', close: 'Chiudi', loading: 'Carico...', offline: 'Accedi per vedere le cartelle cliniche.', notShared: 'Non condiviso con te.', failed: 'Non ha funzionato. Controlla internet e riprova.',
       whereLead: 'I luoghi che tengono le cartelle di {name}. Aggiungi ogni medico, ospedale, farmacia, laboratorio e assicurazione.', noHolders: 'Ancora nessun luogo.', addHolder: 'Aggiungi un luogo',
       hk_doctor: 'Medico', hk_hospital: 'Ospedale o clinica', hk_pharmacy: 'Farmacia', hk_lab: 'Laboratorio', hk_insurer: 'Assicurazione', hk_other: 'Altro',
       hName: 'Nome', hNamePh: 'Per esempio Dott. Rossi, Ospedale San Carlo', hKind: 'Tipo', hPhone: 'Telefono', hFax: 'Fax', hAddress: 'Indirizzo', hPortal: 'Indirizzo web del portale pazienti', hPortalPh: 'Per esempio mychart.example.org', hNotes: 'Note', hNotesPh: 'Numero paziente, orari dell’ufficio cartelle',
@@ -173,6 +177,17 @@
     '#cvrSheet .pill.gold{color:#1b1405;border-color:#ffd24d;background:linear-gradient(180deg,#ffe08a,#C5A55A);text-shadow:none}' +
     '#cvrSheet .pill.sens{text-transform:none;letter-spacing:.02em;font-size:11.5px;color:#ffd9e0;border-color:rgba(255,120,150,.7);background:rgba(120,20,50,.35)}' +
     '#cvrSheet .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}' +
+    '#cvrSheet .lockbox{display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 0 4px}' +
+    '#cvrSheet .lockbox h3{margin:10px 0 6px;font:800 19px "Hanken Grotesk",system-ui,sans-serif}' +
+    '#cvrSheet .lk-ico{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#fff 0,#bdefff 10%,#5fd4ff 30%,#1a8fd6 70%,#0b4f8a 100%);box-shadow:0 0 22px rgba(56,189,248,.55);position:relative}' +
+    '#cvrSheet .lk-ico::after{content:"";position:absolute;left:50%;top:50%;width:16px;height:12px;margin:-2px 0 0 -8px;border-radius:3px;background:#0b2540;box-shadow:0 -9px 0 -3px transparent}' +
+    '#cvrSheet .lk-ico::before{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-11px 0 0 -7px;border:2.5px solid #0b2540;border-bottom:0;border-radius:7px 7px 0 0}' +
+    '#cvrSheet .dots{display:flex;gap:14px;margin:14px 0 16px}#cvrSheet .dot{width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(150,215,255,.7)}#cvrSheet .dot.on{background:#7ee3ff;box-shadow:0 0 10px #38bdf8}' +
+    '#cvrSheet .pad{display:grid;grid-template-columns:repeat(3,72px);gap:12px 18px;justify-content:center}' +
+    '#cvrSheet .pk{width:72px;height:72px;border-radius:50%;border:1px solid rgba(150,215,255,.4);background:rgba(40,90,180,.16);color:#eaf6ff;font:600 26px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;box-shadow:0 0 12px rgba(56,189,248,.18)}' +
+    '#cvrSheet .pk:active{background:rgba(80,160,255,.35)}' +
+    '#cvrSheet .p.warn{color:#ff8a8a}' +
+    '#cvrSheet .lk-forgot,#cvrSheet .lk-now{margin:18px auto 4px;display:block;min-height:44px;padding:8px 16px;border-radius:14px;border:1px solid rgba(150,200,255,.35);background:transparent;color:#cfe6ff;font:600 14px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}' +
     '#cvrSheet .b{flex:1 1 auto;min-height:46px;padding:8px 14px;border-radius:14px;border:1px solid rgba(150,200,255,.48);background:linear-gradient(155deg,rgba(80,140,240,.26),rgba(18,40,96,.46));color:#f2f7ff;font:700 15px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;text-align:center;box-shadow:0 0 12px rgba(70,150,255,.22)}' +
     '#cvrSheet .b.pri{border-color:rgba(56,189,248,.8);background:linear-gradient(155deg,rgba(56,189,248,.42),rgba(20,70,150,.55));box-shadow:0 0 18px rgba(56,189,248,.4)}' +
     '#cvrSheet .b.gold{border:0;color:#2a1600;text-shadow:none;background:linear-gradient(180deg,#ffe58a,#ffc531 60%,#d99a00);box-shadow:0 0 18px rgba(255,200,60,.45)}' +
@@ -251,12 +266,12 @@
     _open = true; render();
     requestAnimationFrame(function () { dim.classList.add('open'); sheet.classList.add('open'); });
     if (!_hist) { try { history.pushState({ cvr: 1 }, ''); _hist = true; } catch (e) {} }
-    load();
+    load(); loadFiles();
     return true;
   }
   function close(fromBack) {
     if (!sheet || !_open) return;
-    _open = false; dim.classList.remove('open'); sheet.classList.remove('open');
+    _open = false; _unlocked = false; _pin = ''; _pin1 = ''; dim.classList.remove('open'); sheet.classList.remove('open');
     if (_hist && !fromBack) { _hist = false; setTimeout(function () { try { history.back(); } catch (e) {} }, 0); }
   }
 
@@ -265,7 +280,8 @@
     if (!sheet) return;
     var keep = sheet.scrollTop;
     var nm = homeName(), mgr = !!(_d && _d.manage);
-    var tabs = ['where', 'who', 'how'].concat(mgr ? ['log'] : []);
+    var tabs = ['where', 'who', 'how', 'files'].concat(mgr ? ['log'] : []);
+    if (!_unlocked) { sheet.innerHTML = '<div class="gr"></div><button type="button" class="x" data-a="close" aria-label="' + esc(t('close')) + '">×</button><div class="lead">COVARA · HIPAA</div><h2>' + esc(t('title')) + '</h2>' + lockHtml(); return; }
     var h = '<div class="gr"></div><button type="button" class="x" data-a="close" aria-label="' + esc(t('close')) + '">×</button>' +
       '<div class="lead">COVARA · HIPAA</div>' +
       '<h2>' + esc(t('title')) + '</h2>' +
@@ -278,6 +294,7 @@
     else if (_tab === 'where') h += whereHtml();
     else if (_tab === 'who') h += whoHtml();
     else if (_tab === 'how') h += howHtml();
+    else if (_tab === 'files') h += filesHtml();
     else if (_tab === 'log') h += logHtml();
     sheet.innerHTML = h;
     sheet.setAttribute('aria-label', t('title'));
@@ -464,9 +481,19 @@
     var b = e.target.closest && e.target.closest('[data-a],[data-tab]'); if (!b || !sheet.contains(b)) return;
     var a = b.getAttribute('data-a'), id = b.getAttribute('data-id'), k = b.getAttribute('data-k');
     if (b.hasAttribute('data-tab')) { _tab = b.getAttribute('data-tab'); _form = null; _f = null; _sure = ''; sheet.scrollTop = 0; return render(); }
-    if (a !== 'rm-holder' && a !== 'end-auth') _sure = '';
+    if (a !== 'rm-holder' && a !== 'end-auth' && a !== 'rm-file' && a !== 'forgot') _sure = '';
     switch (a) {
       case 'close': return close();
+      case 'pin': return pinKey(b.getAttribute('data-d'));
+      case 'forgot':
+        if (_sure !== 'forgot') { _sure = 'forgot'; return render(); }
+        _sure = ''; try { localStorage.removeItem(LOCK_KEY); } catch (x) {} await filesClear(); _files = []; _pin = ''; _pin1 = ''; _lockMsg = ''; return render();
+      case 'lock-now': _unlocked = false; _pin = ''; return render();
+      case 'save-file': return pickFile();
+      case 'open-file': return openFile(id);
+      case 'rm-file':
+        if (_sure !== 'rf-' + id) { _sure = 'rf-' + id; return render(); }
+        _sure = ''; await filesDel(id); return loadFiles();
       case 'new-holder': _form = 'holder'; _f = { kind: 'doctor' }; sheet.scrollTop = 0; return render();
       case 'edit-holder': _form = 'holder'; _f = Object.assign({}, (_d.holders || []).filter(function (x) { return x.id === id; })[0] || {}); sheet.scrollTop = 0; return render();
       case 'hk': _f.kind = k; return render();
@@ -662,6 +689,96 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   window.addEventListener('localeChanged', function () { if (_open) render(); paintTile(); if (printEl && !printEl.hidden) drawPrint(); });
+
+  /* ── the Records lock (25 Oct 2026: "Records also needs a lock") ──
+     Four digits, chosen on this phone the first time Records opens, asked every time Records opens again.
+     Only a salted hash is kept. Forgetting it removes the lock and the files saved here. */
+  var LOCK_KEY = 'rc:recLock', _unlocked = false, _pin = '', _pin1 = '', _lockMsg = '';
+  function lockSaved() { try { return JSON.parse(localStorage.getItem(LOCK_KEY) || 'null'); } catch (e) { return null; } }
+  async function hashPin(pin, salt) {
+    var data = new TextEncoder().encode(salt + ':' + pin);
+    var buf = await crypto.subtle.digest('SHA-256', data);
+    return Array.prototype.map.call(new Uint8Array(buf), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  }
+  function lockHtml() {
+    var have = lockSaved(), msg = have ? t('lockEnter') : (_pin1 ? t('lockAgain') : t('lockSet'));
+    var dots = ''; for (var i = 0; i < 4; i++) dots += '<span class="dot' + (i < _pin.length ? ' on' : '') + '"></span>';
+    var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '<'].map(function (d) {
+      if (!d) return '<span></span>';
+      return '<button type="button" class="pk" data-a="pin" data-d="' + d + '" aria-label="' + (d === '<' ? 'Delete' : d) + '">' + (d === '<' ? '⌫' : d) + '</button>'; }).join('');
+    return '<div class="lockbox"><div class="lk-ico" aria-hidden="true"></div><h3>' + esc(have ? t('lockTitle') : t('lockSet')) + '</h3>' +
+      '<div class="p">' + esc(have ? msg : t('lockWhy')) + '</div>' + (!have && _pin1 ? '<div class="p us">' + esc(msg) + '</div>' : '') +
+      (_lockMsg ? '<div class="p warn">' + esc(_lockMsg) + '</div>' : '') +
+      '<div class="dots">' + dots + '</div><div class="pad">' + keys + '</div>' +
+      (have ? '<button type="button" class="lk-forgot" data-a="forgot">' + esc(_sure === 'forgot' ? t('forgotSure') : t('forgot')) + '</button>' : '') + '</div>';
+  }
+  async function pinKey(d) {
+    _lockMsg = '';
+    if (d === '<') { _pin = _pin.slice(0, -1); return render(); }
+    if (_pin.length >= 4) return;
+    _pin += d; render();
+    if (_pin.length < 4) return;
+    var have = lockSaved();
+    if (have) {
+      var h = await hashPin(_pin, have.s);
+      if (h === have.h) { _unlocked = true; _pin = ''; } else { _pin = ''; _lockMsg = t('lockWrong'); }
+      return render();
+    }
+    if (!_pin1) { _pin1 = _pin; _pin = ''; return render(); }
+    if (_pin1 !== _pin) { _pin1 = ''; _pin = ''; _lockMsg = t('lockDiffer'); return render(); }
+    var salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem(LOCK_KEY, JSON.stringify({ s: salt, h: await hashPin(_pin, salt) })); } catch (e) {}
+    _pin = ''; _pin1 = ''; _unlocked = true; return render();
+  }
+
+  /* ── Saved files: kept on this phone only (IndexedDB), never sent anywhere ── */
+  var _files = [], _idb = null;
+  function db() {
+    if (_idb) return _idb;
+    _idb = new Promise(function (res, rej) {
+      var r = indexedDB.open('covara-records-files', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('files', { keyPath: 'id' }); };
+      r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); };
+    });
+    return _idb;
+  }
+  function tx(mode, fn) { return db().then(function (d) { return new Promise(function (res, rej) { var x = d.transaction('files', mode), st = x.objectStore('files'), out = fn(st); x.oncomplete = function () { res(out && out.result !== undefined ? out.result : out); }; x.onerror = function () { rej(x.error); }; }); }); }
+  async function loadFiles() { try { var all = await tx('readonly', function (st) { return st.getAll(); }); _files = (all || []).map(function (f) { return { id: f.id, name: f.name, size: f.size, ts: f.ts, type: f.type }; }).sort(function (a, b) { return b.ts - a.ts; }); } catch (e) { _files = []; } if (_open && _tab === 'files') render(); }
+  function filesDel(id) { return tx('readwrite', function (st) { return st.delete(id); }).catch(function () {}); }
+  function filesClear() { return tx('readwrite', function (st) { return st.clear(); }).catch(function () {}); }
+  function pickFile() {
+    var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*,application/pdf,.doc,.docx,.txt'; inp.style.display = 'none';
+    inp.onchange = async function () {
+      var f = inp.files && inp.files[0]; inp.remove(); if (!f) return;
+      try {
+        var buf = await f.arrayBuffer();
+        await tx('readwrite', function (st) { return st.put({ id: 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: f.name, type: f.type || 'application/octet-stream', size: f.size, ts: Date.now(), data: buf }); });
+        toast(t('savedOk')); loadFiles();
+      } catch (e) { toast(t('fileFail')); }
+    };
+    document.body.appendChild(inp); inp.click();
+  }
+  async function openFile(id) {
+    try {
+      var f = await tx('readonly', function (st) { return st.get(id); }); if (!f) return;
+      var url = URL.createObjectURL(new Blob([f.data], { type: f.type }));
+      var w = window.open(url, '_blank'); if (!w) { var a = document.createElement('a'); a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); }
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    } catch (e) {}
+  }
+  function kb(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+  function filesHtml() {
+    var out = '<div class="p">' + esc(t('filesLead')) + '</div><button type="button" class="add" data-a="save-file">+ ' + esc(t('saveFile')) + '</button>';
+    if (!_files.length) out += '<div class="empty">' + esc(t('noFiles')) + '</div>';
+    _files.forEach(function (f) {
+      var d = ''; try { d = new Date(f.ts).toLocaleString(IT() ? 'it-IT' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) {}
+      out += '<div class="card"><h3>' + esc(f.name) + '</h3><div class="m">' + esc(d) + ' · ' + esc(kb(f.size)) + '</div><div class="row">' +
+        '<button type="button" class="b" data-a="open-file" data-id="' + esc(f.id) + '">' + esc(t('openFile')) + '</button>' +
+        '<button type="button" class="b" data-a="rm-file" data-id="' + esc(f.id) + '">' + esc(_sure === 'rf-' + f.id ? t('rmSure') : t('rmFile')) + '</button></div></div>';
+    });
+    out += '<button type="button" class="lk-now" data-a="lock-now">' + esc(t('lockNow')) + '</button>';
+    return out;
+  }
 
   window.CovaraRecords = { open: open, close: function () { close(); }, isOpen: function () { return _open; }, data: function () { return _d; }, print: showPrint, closePrint: closePrint, printDoc: function (id, lg) { var a = _d && (_d.auths || []).filter(function (x) { return x.id === id; })[0]; return a ? printDoc(a, lg || lang()) : ''; }, reload: load };
 })();
