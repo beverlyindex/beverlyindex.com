@@ -22,6 +22,7 @@
      the large empty dark circle on the team's screen came from these two. */
   function quiet() {
     var noFocus = true; try { noFocus = focusedContactId == null; } catch (e) {}
+    try { if (window.CovaraRing && CovaraRing.where()) return false; } catch (e) {}
     return noFocus;
   }
   function wrap() {
@@ -40,6 +41,7 @@
   function alive() {
     try {
       if (!mainState()) return;
+      if (window.CovaraRing && (CovaraRing.isOpen() || CovaraRing.where())) return;
       if (quiet() && typeof netSpin !== 'undefined' && !window.CovaraCalm) netSpin = true;
     } catch (e) {}
   }
