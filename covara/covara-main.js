@@ -101,6 +101,8 @@
     n.tx *= k; n.ty *= k; n.tz *= k; n.x *= k; n.y *= k; n.z *= k; n._cvOrbit = 1;
   };
   window.CovaraGlassOrbs = true;
+  /* the chosen person's dream picture: a little larger, breathing (about 3 s) */
+  window.CovaraDreamPulse = function (t) { return 1.04 * (1 + 0.035 * Math.sin((t || 0) * 0.0021)); };
   window.CovaraSphereAlpha = function (n) { return isPerson(n && n.contact) ? ALPHA : ALPHA * 0.9; };
   var _sized = false;
   function sizeOnce() {
