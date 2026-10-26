@@ -1339,7 +1339,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-26.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-26.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3141,10 +3141,9 @@ function portPaint(){ const w=document.createElement('div'); w.innerHTML=portBar
 function portClose(){ const p=P.portrait; if(!p) return; const now=Date.now(); p.on=false; save(); PORT.hide=new Set(); PORT.why=new Map();
   if(W.on) wEvent('port', 'Portrait closed at '+hms(now)+', after '+walkDur(now-p.t)+'. Every device shows again.', '', now);
   toast('Portrait off. Every device shows again.'); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
-const portToggle = () => portBuilding() ? portCancel() : portOn() ? portClose() : !P.portIntro ? portIntro(true) : portOpen();
-// What a Portrait is, in three points. It opens by itself once, on the first press, before the first build; after that, "What is a Portrait?"
-// under the button opens it.
-function portIntro(first){ if(first){ P.portIntro=Date.now(); save(); } S.fs={mode:'port', first:!!first}; fsRender(); ovShow('fsheet'); }
+const portToggle = () => portBuilding() ? portCancel() : portOn() ? portClose() : portOpen();          // one press, always
+// What a Portrait is, in three points: "What is a Portrait?" under the button opens it. It never stands between a press and the build.
+function portIntro(){ S.fs={mode:'port'}; fsRender(); ovShow('fsheet'); }
 function portIntroRender(b){ const on=portOn();
   b.innerHTML='<h3 id="fsTitle">Portrait</h3><p class="fs-p pi-sub">Know what is around you, then see only what changes.</p><ol class="pi-steps">'
     +'<li><b>Press Portrait.</b> For 10 seconds Remiel counts every device around you: phones, watches, earbuds, trackers, cars, TVs and networks. You watch the account fill.</li>'
@@ -9530,7 +9529,7 @@ document.addEventListener('click', e=>{
     case 'sort-open': sortOpen(); break;
     case 'port': portToggle(); break;
     case 'port-acct': S.portAcct=!S.portAcct; S._rsig=''; renderVicinity(); break;
-    case 'port-intro': portIntro(false); break;
+    case 'port-intro': portIntro(); break;
     case 'port-go': S.fs=null; ovHide('fsheet'); if(!portOn()) portOpen(); break;
     case 'hs-open': homeSigOpen(); break;
     case 'hs-up': case 'hs-dn': { const F=S.fs; if(F && F.mode==='home'){ const k=a.dataset.k; F.set[k]=Math.max(0, Math.min(30, (F.set[k]||0)+(act==='hs-up'?1:-1))); fsRender(); } break; }
