@@ -3120,10 +3120,10 @@ function portBuildTick(){ const p=P.portrait; if(!p || !p.on || !p.build){ clear
   const from=p.t+LIVE.skew-PORT_BUILD.back;
   LIVE.devs.forEach(d=>{ if(!d.sim && d.seenMobile>=from) portAdd(p, d); });
   if(p.b0 && now-p.b0>=PORT_BUILD.ms) portDone(); else portPaint(); }
-// The phone back to how it listened before the build.
+// The phone back to how it listened before the Portrait: when it closes, or when a build is cancelled.
 function portPower(p){ if(!p || !p.pm) return; const N=NATIVE(); try{ if(N && typeof N.setPower==='function') N.setPower(p.pm); }catch(e){} p.pm=null; }
 function portDone(){ const p=P.portrait; if(!p || !p.build) return; clearInterval(PORT.bt); PORT.bt=0; const now=Date.now();
-  p.build=false; p.t1=now; p.n=p.sigs.length; p.names=[...new Set(p.names)]; portPower(p); save();
+  p.build=false; p.t1=now; p.n=p.sigs.length; p.names=[...new Set(p.names)]; save();          // the fastest listening stays on while the Portrait is lit
   const n=p.n, ds=n===1?'1 device':n+' devices';
   if(W.on){ wEvent('port', 'Portrait taken at '+hms(p.t)+', complete at '+hms(now)+': '+ds+' known and hidden.', '', now); portKeep(p); }
   toast(n ? 'Portrait complete: '+ds+' known and hidden. Only new and moving devices show now.' : 'Portrait complete, but Remiel heard nothing. Every device that comes is new.');
@@ -3138,7 +3138,7 @@ function portPaint(){ const w=document.createElement('div'); w.innerHTML=portBar
   document.querySelectorAll('.port-bar').forEach(e=>{ const ob=e.querySelector('.portbtn'), nbb=nb.querySelector('.portbtn'), oa=e.querySelector('.port-acct'), na=nb.querySelector('.port-acct');
     if(ob && nbb){ ob.className=nbb.className; ob.innerHTML=nbb.innerHTML; }          // the same button stays under your finger
     if(oa && na) oa.innerHTML=na.innerHTML; else if(na) e.appendChild(na.cloneNode(true)); else if(oa) oa.remove(); }); }
-function portClose(){ const p=P.portrait; if(!p) return; const now=Date.now(); p.on=false; save(); PORT.hide=new Set(); PORT.why=new Map();
+function portClose(){ const p=P.portrait; if(!p) return; const now=Date.now(); p.on=false; portPower(p); save(); PORT.hide=new Set(); PORT.why=new Map();
   if(W.on) wEvent('port', 'Portrait closed at '+hms(now)+', after '+walkDur(now-p.t)+'. Every device shows again.', '', now);
   toast('Portrait off. Every device shows again.'); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
 const portToggle = () => portBuilding() ? portCancel() : portOn() ? portClose() : portOpen();          // one press, always
