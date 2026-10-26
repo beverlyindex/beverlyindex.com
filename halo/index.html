@@ -505,7 +505,7 @@ select.inp{flex:none}
 .walk-e .with{color:var(--action);font-weight:600} .walk-e .placed{color:var(--clear)} .walk-e .gone,.walk-e .gap{color:var(--mut)} .walk-e .warn{color:var(--warn)}
 .alertb{display:flex;align-items:flex-start;gap:10px;margin:0 0 10px;padding:11px 12px;border:1px solid rgba(255,90,90,.6);border-left:5px solid var(--action);border-radius:12px;background:linear-gradient(180deg,rgba(120,22,30,.5),rgba(60,12,20,.5));box-shadow:0 8px 22px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);font-size:13.5px;line-height:1.4}
 .alertb .tx{flex:1;min-width:0} .alertb .tx b{display:block;color:#fff;font-size:14.5px;margin-bottom:2px} .alertb .more{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:4px;display:block}
-.alertb .x{background:none;border:0;color:var(--mut);font-size:20px;line-height:1;padding:2px 4px}
+.alertb .al-kind{display:block;font-style:normal;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#ffd27a;margin-bottom:3px} .alertb .x{background:none;border:0;color:var(--mut);font-size:20px;line-height:1;padding:2px 4px}
 .rate{display:inline-flex;align-items:center;gap:6px;vertical-align:middle;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--rc);border:1px solid var(--rc);border-radius:999px;padding:1px 9px 1px 2px;white-space:nowrap;background:rgba(0,0,0,.25)}
 .rate b{flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--rc);color:#0a0f1e;font-size:11px;font-weight:700}
 .ratekey{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -8765,17 +8765,55 @@ function alertSystem(key, title, text){ title=langOut(title); text=langOut(text)
     const opt={body:text, tag:key, icon:'icon-192.png', badge:'icon-192.png', data:{key}};
     if(navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.ready.then(r=>r.showNotification(title,opt)).catch(()=>{ try{ new Notification(title,opt); }catch(e){} });
     else new Notification(title,opt); }catch(e){} }
+/* What a device most likely is, in a few words, from what it tells about itself: its kind, its maker, its name. A banner says it first, so you know at
+   a glance whether it is a phone, earbuds, a tracker, a microphone or something that says nothing about itself. No radio signal says that a device is
+   hidden; what Remiel can name is the kind hidden devices use: a hobby Bluetooth module, a GPS tracker, or a device that gives no name or maker. */
+const MIC_RE=/(?<![a-z])(dji ?mic|wireless ?go|rode|hollyland|lark ?(m1|m2|c1|max|150)|boya|saramonic|comica|synco|microphone|lavalier|wireless mic)(?![a-z])/i;
+const LIGHT_RE=/(?<![a-z])(govee|ihoment|hue|lifx|yeelight|nanoleaf|elk-bledom|triones|lednet|magic ?home|bulb|lamp|light ?strip|led ?strip)(?![a-z])/i;
+const AV_RE=/(?<![a-z])(television|tv|\[tv\]|soundbar|speaker|display|\[av\]|qled|oled|uhd|webos|jbl|marshall|acton|stanmore|woburn|sonos|bose|ultimea|poseidon|tribit|soundcore|ue boom|beosound|harman|echo dot|homepod|set-top)(?![a-z])/i;
+const EAR_RE=/airpods|beats|buds|earbud|earphone|headset|headphone|jabra|jlab|sony w[hf]|\bw[hf]-\d|soundcore life|jbl (tune|live|wave|junior|endurance|reflect|tour)/i;
+const WATCH_RE=/watch|smart band|fitness|garmin|fitbit|whoop|amazfit|oura|polar |suunto|coros|mi band|huawei band/i;
+function devType(d){ if(!d) return ''; const h=d.hint||'', n=d.adv||'', hn=h+' '+n;
+  if(isDrone(d)) return 'Drone';
+  if(d.band==='cell') return 'Cell tower';
+  if(d.band==='wifi') return d.cls==='Camera' ? 'Wi-Fi camera' : d.cls==='Vehicle' ? 'Car (its Wi-Fi)' : /iphone|android|galaxy|pixel|hotspot|redmi|xiaomi|oppo|huawei/i.test(n) ? 'Phone hotspot' : 'Wi-Fi network (router or hotspot)';
+  if(d.cls==='Tag') return /AirTag/.test(h) ? 'AirTag (tracker)' : /Find My network tag/.test(h) ? 'Find My tracker (not made by Apple)' : /SmartTag/.test(h) ? 'Samsung SmartTag (tracker)' : /Tile/.test(h) ? 'Tile (tracker)' : /Chipolo/.test(h) ? 'Chipolo (tracker)'
+    : /Find My Device network/.test(h) ? 'Tracker or beacon (Google network)' : /GPS tracker/i.test(h) ? 'Vehicle GPS tracker' : 'Tracker';
+  if(d.cls==='Wearable') return /AirPods/.test(hn) ? 'AirPods (earbuds)' : /hearing aid/i.test(hn) ? 'Hearing aid' : EAR_RE.test(hn) ? 'Earbuds or headphones' : WATCH_RE.test(hn) ? 'Watch or fitness band' : /Fast Pair/.test(h) ? 'Earbuds, headphones or speaker' : 'Wearable';
+  if(d.cls==='Phone') return 'Phone';
+  if(d.cls==='Laptop') return /Microsoft|Windows/.test(h) ? 'Computer (Windows)' : 'Computer';
+  if(d.cls==='Vehicle') return /bus or tram/.test(h) ? 'Bus or tram' : /^Car\b/.test(h) ? 'Car' : 'Vehicle';
+  if(d.cls==='Camera') return 'Camera';
+  if(SKIM_RE.test(n)) return 'Bluetooth module of the kind used in skimmers and hidden devices';
+  if(MIC_RE.test(hn)) return 'Wireless microphone';
+  if(trackerName(n)) return 'GPS tracker';
+  if(EAR_RE.test(hn)) return 'Earbuds or headphones';
+  if(LIGHT_RE.test(hn)) return 'Smart light';
+  if(AV_RE.test(hn)) return 'TV, soundbar or speaker';
+  if(houseDev(d)) return 'Home appliance or electronics';
+  if(WATCH_RE.test(n)) return 'Watch or fitness band';
+  if(/^Apple, iPhone, iPad, Mac or Watch/.test(h)) return 'Apple phone, watch, tablet or computer';
+  if(/^Apple, iPhone, iPad or Mac/.test(h)) return 'Apple phone, tablet or computer';
+  if(/^Apple, AirPlay/.test(h)) return 'Apple TV or speaker';
+  if(/^Apple/.test(h)) return 'Apple device';
+  if(/^Samsung/.test(h)) return 'Samsung device (phone, earbuds, watch or TV)';
+  if(/^Google/.test(h)) return 'Google device (phone, earbuds or speaker)';
+  if(/^Microsoft/.test(h)) return 'Computer (Windows)';
+  if(/Beacon/i.test(h)) return 'Beacon (shop, venue or transit)';
+  if(n && !randName(n)) return 'Kind not known: only its name';
+  return makerOf(d) ? 'Kind not known: only its maker' : 'Unknown: gives no name or maker'; }
 function alertRaise(key, title, text, go, quiet){
   if(!can(ALERT_PLAN(key))) return false;
   const day=new Date().toISOString().slice(0,10); P.alerted=P.alerted||{};
   if(P.alerted[key]===day) return false; P.alerted[key]=day;
   const ks=Object.keys(P.alerted); if(ks.length>300) ks.filter(k=>P.alerted[k]!==day).slice(0,ks.length-200).forEach(k=>delete P.alerted[k]);
   save();
-  S.banners=(S.banners||[]).filter(b=>b.key!==key); S.banners.unshift({key, title, text, go:go||null, t:Date.now()}); S.banners.length=Math.min(S.banners.length,6);
-  renderAlerts(); if(!quiet) alertSystem(key, title, text);
+  const dv=go && go.dev ? findDevice(go.dev) : null, kind=dv && dv.live ? devType(dv) : '';          // what it most likely is, first
+  S.banners=(S.banners||[]).filter(b=>b.key!==key); S.banners.unshift({key, title, text, kind, go:go||null, t:Date.now()}); S.banners.length=Math.min(S.banners.length,6);
+  renderAlerts(); if(!quiet) alertSystem(key, kind ? kind+' · '+title : title, text);
   return true; }
 function renderAlerts(){ const box=el('alertBar'); if(!box) return; const bs=S.banners||[], b=bs[0];
-  setHTML(box, b ? '<div class="alertb" role="alert"><span class="dot" style="background:var(--action);margin-top:5px"></span><span class="tx"><b>'+esc(b.title)+'</b>'+esc(b.text)+(bs.length>1?'<span class="more">'+(bs.length-1)+' more after this one</span>':'')+'</span>'+
+  setHTML(box, b ? '<div class="alertb" role="alert"><span class="dot" style="background:var(--action);margin-top:5px"></span><span class="tx">'+(b.kind?'<i class="al-kind">'+esc(b.kind)+'</i>':'')+'<b>'+esc(b.title)+'</b>'+esc(b.text)+(bs.length>1?'<span class="more">'+(bs.length-1)+' more after this one</span>':'')+'</span>'+
     (b.go?'<button class="btn sm primary" data-act="alert-open">Open</button>':'')+'<button class="x" data-act="alert-x" title="Put away" aria-label="Put away">&times;</button></div>' : ''); }
 function alertGo(key){ const bs=S.banners||[], b=(key?bs.find(x=>x.key===key):bs[0]) || (/^ray:/.test(String(key||'')) ? {key, go:{res:'w_tower'}} : null); if(!b) return; S.banners=bs.filter(x=>x!==b); renderAlerts(); const g=b.go; if(!g) return;
   if(g.art){ artOpen(g.art); return; }
