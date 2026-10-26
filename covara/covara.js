@@ -25,7 +25,7 @@
       aHold: 'Hold to send', aHolding: 'Keep holding', aSentAll: 'Your team has been told.', aSent: '{n} has been told.', aFail: 'The ALERT could not be sent. Check the internet, or call 911.', cancel: 'Cancel',
       cTitle: 'Team code', cSub: 'Give this code to the person joining your team. It works for 24 hours.', cFail: 'A code could not be made. Check the internet.', cShare: 'Share', cCopied: 'Copied.',
       added: '{n} is on your team.', pending: 'wants to join',
-      pVideo: 'Video', pPhone: 'Phone',
+      pVideo: 'Video', pPhone: 'Phone', everyone: 'Everyone on screen',
       callOne: '{n} is not on Covara yet, so {n} cannot be called. Give {n} your team code: tap your sphere, then Covara, then Team code.',
       callMany: '{n} are not on Covara yet, so they cannot be called. Give them your team code: tap your sphere, then Covara, then Team code.',
       jTitle: 'Join a team', jSub: 'Someone gave you their team code? Type it here.', jPh: '6-digit code', jGo: 'Join', jBad: 'That code is not right, or it has expired. Ask for a new one.',
@@ -48,7 +48,7 @@
       aHold: 'Tieni premuto per inviare', aHolding: 'Continua a tenere premuto', aSentAll: 'Il team è stato avvisato.', aSent: '{n} è stato avvisato.', aFail: 'Non è stato possibile inviare l’allerta. Controlla internet o chiama il 112.', cancel: 'Annulla',
       cTitle: 'Codice team', cSub: 'Dai questo codice a chi entra nel tuo team. Vale 24 ore.', cFail: 'Non è stato possibile creare un codice. Controlla internet.', cShare: 'Condividi', cCopied: 'Copiato.',
       added: '{n} è nel tuo team.', pending: 'vuole entrare',
-      pVideo: 'Video', pPhone: 'Telefono',
+      pVideo: 'Video', pPhone: 'Telefono', everyone: 'Tutti sullo schermo',
       callOne: '{n} non è ancora su Covara, quindi non si può chiamare. Dai a {n} il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       callMany: '{n} non sono ancora su Covara, quindi non si possono chiamare. Dai loro il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       jTitle: 'Entra in un team', jSub: 'Qualcuno ti ha dato il suo codice team? Scrivilo qui.', jPh: 'Codice di 6 cifre', jGo: 'Entra', jBad: 'Il codice non è giusto o è scaduto. Chiedine uno nuovo.',
@@ -100,7 +100,7 @@
     '@keyframes cvBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}',
     /* labels beside a sphere: small, unframed, transparent, staggered around it, never centred */
     '#cvLabels{position:fixed;inset:0;z-index:8990;pointer-events:none}',
-    '.cvl{position:absolute;pointer-events:auto;cursor:pointer;padding:5px 2px;font:600 15px/18px "Hanken Grotesk",system-ui,sans-serif;color:#e6f5ff;white-space:nowrap;text-shadow:0 0 8px rgba(0,20,60,.95),0 0 16px rgba(56,189,248,.4);animation:cvFade 2.6s ease-in-out infinite}',
+    '.cvl{position:absolute;pointer-events:auto;cursor:pointer;padding:3px 2px;font:600 15px/18px "Hanken Grotesk",system-ui,sans-serif;color:#e6f5ff;white-space:nowrap;text-shadow:0 0 8px rgba(0,20,60,.95),0 0 16px rgba(56,189,248,.4);animation:cvFade 2.6s ease-in-out infinite}',
     '.cvl.alert{color:#ff5a5a;letter-spacing:.1em;font-weight:700}.cvl.gold{color:#ffd24d}',
     '@keyframes cvFade{0%,100%{opacity:1}50%{opacity:.78}}',
     /* glass cards (message, email, ALERT, team code): transparent glass with a glowing frame */
@@ -131,6 +131,14 @@
     'html.cv.cv-sending .sentinel-msg-overlay{opacity:0!important}',
     /* one thing at a time under the logo: a card or a message there sets aside what was there, and the labels beside a sphere wait behind it */
     'html.cv .sentinel-msg-overlay{z-index:9500!important}',
+    '#cvRoster{position:fixed;right:max(10px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:8980;width:min(168px,40vw);font-family:"Hanken Grotesk",system-ui,sans-serif}#cvRoster[hidden]{display:none}',
+    '#cvRoster .cvro-list{max-height:300px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,210,77,.45) transparent;-webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);mask-image:linear-gradient(180deg,#000 88%,transparent)}',
+    '.cvro-row{display:flex;align-items:center;gap:8px;height:30px;padding:0 4px;cursor:pointer;color:#ffd24d;opacity:.72;font-size:13px;font-weight:600;white-space:nowrap;text-shadow:0 0 8px rgba(0,20,60,.9)}',
+    '.cvro-row span{overflow:hidden;text-overflow:ellipsis}.cvro-row.on{opacity:1}.cvro-row:hover{opacity:1}',
+    '.cvro-row i{flex:0 0 22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 9px "JetBrains Mono",monospace;font-style:normal;color:#04203a;background:radial-gradient(circle at 34% 28%,#e8fbff 0,#7ee3ff 35%,#38bdf8 70%,#1e6fb8 100%);background-size:cover;background-position:center;box-shadow:0 0 8px rgba(56,189,248,.5)}',
+    '.cvro-row.on i{box-shadow:0 0 0 1.5px #ffd24d,0 0 10px rgba(255,210,77,.55)}',
+    '.cvro-all{margin-top:6px;padding:4px;color:#dff2ff;font:600 12px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;opacity:.85;text-shadow:0 0 8px rgba(0,20,60,.9)}.cvro-all em{font-style:normal;margin-left:6px;font:700 10px "JetBrains Mono",monospace;color:#ffd24d}',
+    'html.cv:has(.cvc) #cvRoster,html.cv:has(.contact-modal-overlay.open) #cvRoster,html.cv:has(.settings-panel.open) #cvRoster,html.cv:has(.sentinel-msg-overlay.open) #cvRoster,html.cv:has(#cvRing.on) #cvRoster{visibility:hidden}',
     /* the labels and the ring wait behind any card that is open */
     'html.cv:has(.contact-modal-overlay.open) #cvLabels,html.cv:has(.contact-modal-overlay.open) #cvRing,html.cv:has(.quick-dial-overlay.open) #cvLabels,html.cv:has(.ui-confirm-overlay) #cvLabels,html.cv:has(.settings-panel.open) #cvLabels,html.cv:has(.settings-panel.open) #cvRing{visibility:hidden!important}',
     /* Edit Person: a transparent glass card under the logo */
@@ -193,7 +201,7 @@
       if (!text) return;
       if (node && window.__cvNames && !window.__cvNames[node.contact.id]) return;   /* large team: names on the front spheres only */
       ctx.save();
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff';   /* names on the spheres are white */
       var R0 = r + fs * 0.95, widths = [], total = 0, sp = fs * 0.06;
       for (var i = 0; i < text.length; i++) { var w = ctx.measureText(text[i]).width + sp; widths.push(w); total += w; }
       var span = total / R0;
@@ -242,6 +250,7 @@
   }
   function avoidAreas() {
     var out = [];
+    try { window.__cvRB = roster.box(); } catch (e) { window.__cvRB = null; }
     try {
       if (focusedContactId == null || appState !== 'network') { window.__cvAvoid = out; return; }
       var rect = CV.getBoundingClientRect();
@@ -422,7 +431,7 @@
   /* the whole team revolves around HOME; Sentinel's sample people never appear in Covara */
   function teamFilter() {
     try {
-      SentinelViews.getFilteredContacts = function () { var k = new Set(); people().forEach(function (c) { k.add(c.id); k.add(String(c.id)); }); return k; };
+      SentinelViews.getFilteredContacts = function () { var k = new Set(); onScreen().forEach(function (c) { k.add(c.id); k.add(String(c.id)); }); return k; };
     } catch (e) {}
     /* a person added (or removed) the Sentinel way is on screen at once */
     try {
@@ -503,21 +512,82 @@
       }
     } catch (e) {}
   }
-  /* who needs attention: a message to HOME in the last day that HOME has not answered */
+  /* 26 Oct: 10 spheres on screen by default. The people HOME picks from the roster come first (the latest pick
+     first), then the most active (latest message or note, newest first). With Everyone on screen, the whole
+     team revolves, ordered the same way. */
+  var SHOWN = 10, _act = {};
+  function pinned() { try { return JSON.parse(lsGet('rc:pinned') || '[]'); } catch (e) { return []; } }
+  function everyone() { return lsGet('rc:everyone') === '1'; }
+  function ranked() {
+    var pins = pinned(), all = people();
+    return all.slice().sort(function (a, b) {
+      var pa = pins.indexOf(String(a.id)), pb = pins.indexOf(String(b.id));
+      if (pa >= 0 || pb >= 0) return (pa < 0 ? 1e9 : pa) - (pb < 0 ? 1e9 : pb);
+      return (_act[b.id] || 0) - (_act[a.id] || 0) || nameKey(a).localeCompare(nameKey(b));
+    });
+  }
+  function onScreen() { var r = ranked(); return everyone() ? r : r.slice(0, SHOWN); }
+  function nameKey(c) { var l = String(c.last || '').trim(), f = String(c.first || '').trim(); return ((l || f) + ' ' + f).toLowerCase(); }   /* no last name: sorted by the first name */
+  function pin(c) {
+    var p = pinned().filter(function (x) { return x !== String(c.id); }); p.unshift(String(c.id)); p = p.slice(0, SHOWN);
+    lsSet('rc:pinned', JSON.stringify(p)); rebuild(); roster.paint();
+  }
+  /* who needs attention (a message to HOME in the last day not yet answered), and how recently each was active */
   async function attention() {
-    var out = {};
+    var out = {}, act = {};
     var list = people();
     for (var i = 0; i < list.length; i++) {
       try {
         var d = await RemielDB.getSetting('sentinelMsg_' + list[i].id), th = Array.isArray(d) ? d : (d && Array.isArray(d.value) ? d.value : []);
         var last = th[th.length - 1];
+        if (last) act[list[i].id] = last.ts || 0;
         if (last && last.from !== 'center' && Date.now() - (last.ts || 0) < 864e5) out[list[i].id] = 1;
       } catch (e) {}
+      try { var ints = await RemielDB.getInteractionsByContact(list[i].id); (ints || []).forEach(function (x) { var ts = x.ts || x.timestamp || x.createdAt || 0; if (ts > (act[list[i].id] || 0)) act[list[i].id] = ts; }); } catch (e) {}
     }
+    var shownBefore = onScreen().map(function (c) { return c.id; }).join();
+    _act = act;
     var was = JSON.stringify(Object.keys(_attn).sort()), now = JSON.stringify(Object.keys(out).sort());
     _attn = out;
-    if (was !== now) layout();
+    if (onScreen().map(function (c) { return c.id; }).join() !== shownBefore) rebuild();
+    else if (was !== now) layout();
+    roster.paint();
   }
+
+  /* ── The roster: the whole team, by last name then first name, ten at a time with scrolling, on the right.
+     A tap on a name brings that person's sphere on screen. Shown when the team is larger than ten. ── */
+  var roster = (function () {
+    var el = document.createElement('div'); el.id = 'cvRoster';
+    var sig = '';
+    function photo(c) { try { var p = contactPhotos.get(c.id); return p && p.img && p.img.src && !p.isVideo ? p.img.src : ''; } catch (e) { return ''; } }
+    function paint() {
+      if (!document.body) return;
+      var all = people();
+      var show = all.length > SHOWN && typeof appState !== 'undefined' && appState === 'network';
+      /* on a phone, the roster steps aside while someone is chosen, so their labels have the room */
+      try { if (show && focusedContactId != null && window.innerWidth < 700) show = false; } catch (e) {}
+      if (!show) { el.hidden = true; return; }
+      if (!el.parentNode) document.body.appendChild(el);
+      el.hidden = false;
+      var on = {}; onScreen().forEach(function (c) { on[c.id] = 1; });
+      var list = all.slice().sort(function (a, b) { return nameKey(a).localeCompare(nameKey(b)); });
+      var s2 = list.map(function (c) { return c.id + (on[c.id] ? '+' : '') + photo(c).slice(-8); }).join() + everyone() + IT();
+      if (s2 === sig) return; sig = s2;
+      var top = el.querySelector('.cvro-list'), keep = top ? top.scrollTop : 0;
+      el.innerHTML = '<div class="cvro-list">' + list.map(function (c) {
+        var ph = photo(c), ini = ((c.first || '')[0] || '') + ((c.last || '')[0] || '');
+        var nm = c.last ? esc(c.last) + ', ' + esc(c.first || '') : esc(c.first || '');
+        return '<div class="cvro-row' + (on[c.id] ? ' on' : '') + '" role="button" tabindex="0" data-id="' + esc(c.id) + '"><i' + (ph ? ' style="background-image:url(' + ph + ')"' : '') + '>' + (ph ? '' : esc(ini.toUpperCase())) + '</i><span>' + nm + '</span></div>';
+      }).join('') + '</div><div class="cvro-all" role="button" tabindex="0">' + esc(t('everyone')) + '<em>' + (everyone() ? t('on') : t('off')) + '</em></div>';
+      el.querySelector('.cvro-list').scrollTop = keep;
+      Array.prototype.forEach.call(el.querySelectorAll('.cvro-row'), function (row) {
+        press(row, function () { var c = all.filter(function (x) { return String(x.id) === row.getAttribute('data-id'); })[0]; if (c) pin(c); });
+      });
+      press(el.querySelector('.cvro-all'), function () { lsSet('rc:everyone', everyone() ? '0' : '1'); rebuild(); sig = ''; paint(); });
+    }
+    function box() { if (el.hidden || !el.parentNode) return null; var r = el.getBoundingClientRect(); return r.width ? r : null; }
+    return { paint: paint, box: box };
+  })();
   var __proj = null;
   function wrapGalaxy() {
     if (wrapGalaxy.done || typeof buildNodes !== 'function' || typeof projectNode !== 'function') return;
@@ -537,6 +607,11 @@
         if (d < need) { if (d < 0.5) { dx = 0; dy = 1; d = 1; } p.sx = g.cx + dx / d * need; p.sy = g.cy + dy / d * need; }
         /* while someone is chosen, the other spheres stay off the dream picture, the words, the chosen person
            with their labels, and the logo and name at the top; a few passes settle any knock-on push */
+        var rb = window.__cvRB;
+        if (rb) {
+          var cr = CV.getBoundingClientRect(), L0 = rb.left - cr.left - r - 6, T0 = rb.top - cr.top - r - 6;
+          if (p.sx > L0 && p.sy > T0) { if (p.sx - L0 < p.sy - T0) p.sx = L0; else p.sy = T0; }
+        }
         var dr = window._dreamRect;
         if (dr && focusedContactId != null && node.contact.id !== focusedContactId) {
           var rects = (window.__cvAvoid || []).concat([{ x: 0, y: 0, w: g.W, h: 70 }]);
@@ -726,7 +801,7 @@
     }
     /* staggered around the circumference of the sphere, text left-aligned so each reads as part of it */
     function arrange(sx, sy, r, side) {
-      var n = els.length, step = 34, top = -((n - 1) * step) / 2;
+      var n = els.length, step = 26, top = -((n - 1) * step) / 2;   /* compact, still easy to tap */
       els.forEach(function (b, i) {
         var dy = top + i * step, off = Math.sqrt(Math.max(0, (r + 14) * (r + 14) - dy * dy * 0.55)) + 6;
         b.style.top = (sy + dy - 14) + 'px';
@@ -992,6 +1067,7 @@
     setInterval(function () { try { if (authed() && !document.hidden) syncTeam(); } catch (e) {} }, 8000);   /* a new teammate appears within seconds */
     var kick = setInterval(function () { if (authed()) { clearInterval(kick); syncTeam(); } }, 1500);
     setInterval(function () { try { if (!document.hidden) attention(); } catch (e) {} }, 8000);
+    setInterval(function () { try { roster.paint(); } catch (e) {} }, 300);
     /* someone changed language: the ring and the labels follow */
     document.addEventListener('click', function (e) { if (e.target && e.target.closest && e.target.closest('[data-lang],.lang-btn')) setTimeout(function () { ring.rebuild(); }, 50); }, true);
   }
