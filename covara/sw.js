@@ -4,44 +4,16 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-covara-v177';
+const CACHE_NAME = 'remiel-covara-v200';
 
 const PRECACHE_URLS = [
   './',
   './index.html',
+  './covara-logo.png',
+  './covara.js',
   './manifest.json',
   './sw.js',
   './remiel-logo.png',
-  './covara-logo.png',
-  './covara-teams.js',
-  './covara-care.js',
-  './covara-label.js',
-  './covara-view.js',
-  './covara-where.js',
-  './covara-camera.js',
-  './covara-talk.js',
-  './covara-nav.js',
-  './covara-callwave.js',
-  './covara-sleep.js',
-  './covara-glass.js',
-  './covara-join.js',
-  './covara-help.js',
-  './covara-headline.js',
-  './covara-night.js',
-  './covara-plan.js',
-  './covara-now.js',
-  './covara-person.js',
-  './covara-words.js',
-  './covara-simple.js',
-  './covara-guide.js',
-  './covara-learn.js',
-  './covara-notes.js',
-  './covara-emergency.js',
-  './covara-records.js',
-  './covara-main.js',
-  './covara-ring.js',
-  './share.html',
-  './health-privacy.html',
   './badge-96.png',
   './icon-192.png',
   './icon-512.png',
@@ -67,7 +39,7 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((names) => Promise.all(
         names
-          .filter((name) => name !== CACHE_NAME && name !== 'covara-share')
+          .filter((name) => name !== CACHE_NAME)
           .map((name) => caches.delete(name))
       ))
       .then(() => self.clients.claim())
@@ -96,26 +68,6 @@ function _offlineFallback(request) {
     status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
   }));
 }
-
-/* ── Share to Covara: photos shared from the phone's gallery or camera wait here
-   until Covara sends them to HOME's photos waiting, then Covara opens on Medicines ── */
-self.addEventListener('fetch', (event) => {
-  const u = new URL(event.request.url);
-  if (event.request.method !== 'POST' || u.origin !== self.location.origin || !u.pathname.endsWith('/share-target')) return;
-  event.respondWith((async () => {
-    let n = 0;
-    try {
-      const fd = await event.request.formData();
-      const files = fd.getAll('photos').filter((f) => f && f.size && /^image\//.test(f.type || 'image/'));
-      const cache = await caches.open('covara-share');
-      for (const f of files.slice(0, 30)) {
-        await cache.put(new Request(new URL('./__shared/' + Date.now() + '-' + n, self.location.href).href), new Response(f, { headers: { 'content-type': f.type || 'image/jpeg', 'x-name': encodeURIComponent(f.name || 'photo.jpg') } }));
-        n++;
-      }
-    } catch (e) {}
-    return Response.redirect(new URL('./?shared=' + n, self.location.href).href, 303);
-  })());
-});
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;

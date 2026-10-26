@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta name="robots" content="noindex, nofollow">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#080a10">
+<meta name="theme-color" content="#0a1834">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=78">
 <link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png?v=78">
@@ -16,7 +15,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>body.cv-guest-call .sentinel-guide{display:none !important}</style>
 </head>
 <body>
 <title>Remiel: Covara</title>
@@ -58,7 +56,7 @@
   [hidden] { display: none !important; }
 
   body {
-    background: #0a1834;
+    background: var(--bg);
     color: var(--text);
     font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
     display: flex;
@@ -1421,20 +1419,6 @@
     height: 100vh;
     height: 100dvh;
     object-fit: cover;
-  }
-  /* A tall phone screen cannot show the 16:9 intro full screen without cutting its bottom lines at the sides.
-     So, upright, the intro keeps its own proportions and is framed on the Remiel Covara logo: the tagline lines
-     beneath it are cut off rather than squeezed, and the black around it is the intro's own background.
-     Only the framing changes; the video itself is untouched. */
-  @media (orientation: portrait) {
-    .video-intro { overflow: hidden; }
-    .video-intro video {
-      flex: none;
-      width: 320vw;
-      height: 180vw;
-      object-fit: contain;
-      clip-path: inset(35vw 110vw 40vw 110vw);
-    }
   }
   .video-intro .skip-btn, .bi-splash .skip-btn {
     position: absolute;
@@ -7968,8 +7952,8 @@ body #importContactsFab {
 </div>
 
 <div class="sentinel-call-overlay" id="scOverlay">
-  <video poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="sc-remote-video" id="scRemoteVideo" autoplay playsinline></video>
-  <video poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="sc-local-video" id="scLocalVideo" autoplay playsinline muted></video>
+  <video class="sc-remote-video" id="scRemoteVideo" autoplay playsinline></video>
+  <video class="sc-local-video" id="scLocalVideo" autoplay playsinline muted></video>
   <div class="sc-duo-label sc-duo-remote" id="scRemoteLabel" hidden></div>
   <div class="sc-duo-label sc-duo-local" id="scLocalLabel" hidden></div>
   <div class="sc-media-state" id="scMediaState" role="status" aria-live="polite" hidden></div>
@@ -8541,52 +8525,10 @@ function uiConfirm(message, okLabel) {
 
 /* Downscale a large photo off the tap: createImageBitmap with resize options where
    available (decoded off the main thread), else a canvas pass after the UI updates. */
-/* What to tell the person when a picture cannot be used */
-function mediaErrText(err) {
-  if (err && err.code === 'heic') return (typeof _t === 'function' ? _t('media.heic', '') : '') || 'This photo is in HEIC format, which this phone cannot show here. Choose another photo, or set the camera to save photos as JPEG.';
-  var T = function (k, d) { return (typeof _t === 'function' ? _t(k, d) : d) || d; };
-  var m = String((err && (err.code || err.message)) || '');
-  if (m === 'empty') return T('media.empty', 'The phone handed over an empty file. If the picture is stored online (Google Photos), open it and download it to the phone first, then choose it again.');
-  if (m === 'image') return T('media.cantOpen', 'This picture could not be opened. Try a JPEG or PNG photo, or a GIF.') + (err && err.detail ? ' (' + err.detail + ')' : '');
-  if (m === 'read') return T('media.read', 'The phone did not hand over the picture. Choose it from Gallery rather than an online album, then try again.');
-  if (m === 'store') return T('media.store', 'The picture could not be saved on this phone. Free some space on the phone, then try again.');
-  return T('self.error', 'That file could not be used. Try another photo or clip.') + (m ? ' (' + m.slice(0, 40) + ')' : '');
-}
-/* A JPEG's width and height, read from its header (no decoding): the first frame marker after the start. */
-async function jpegSize(blob) {
-  try {
-    var b = new Uint8Array(await blob.slice(0, Math.min(blob.size, 262144)).arrayBuffer());
-    if (b[0] !== 0xFF || b[1] !== 0xD8) return null;
-    var i = 2;
-    while (i + 9 < b.length) {
-      if (b[i] !== 0xFF) { i++; continue; }
-      var m = b[i + 1], len = (b[i + 2] << 8) | b[i + 3];
-      if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) return { h: (b[i + 5] << 8) | b[i + 6], w: (b[i + 7] << 8) | b[i + 8] };
-      if (m === 0xD8 || m === 0x01 || (m >= 0xD0 && m <= 0xD7)) { i += 2; continue; }
-      i += 2 + len;
-    }
-  } catch (e) {}
-  return null;
-}
 async function downscalePhoto(blob, maxEdge) {
   maxEdge = maxEdge || 1280;
   try {
     if (!blob || !/^image\//.test(blob.type || '') || /gif|svg/.test(blob.type)) return blob;
-    /* Fast path for camera photos: the size comes from the file header, and the photo is decoded once, off the
-       main thread, then drawn at the reduced size. Before, it was decoded twice on the main thread. */
-    var js = /jpe?g/.test(blob.type) ? await jpegSize(blob) : null;
-    if (js && js.w && js.h && typeof createImageBitmap === 'function') {
-      if (Math.max(js.w, js.h) <= maxEdge && blob.size < 1500000) return blob;
-      try {
-        var bm = await createImageBitmap(blob, { imageOrientation: 'from-image' });
-        var sc0 = Math.min(1, maxEdge / Math.max(bm.width, bm.height)), w0 = Math.round(bm.width * sc0), h0 = Math.round(bm.height * sc0);
-        var c0 = (typeof OffscreenCanvas !== 'undefined') ? new OffscreenCanvas(w0, h0) : Object.assign(document.createElement('canvas'), { width: w0, height: h0 });
-        c0.getContext('2d').drawImage(bm, 0, 0, w0, h0);
-        try { bm.close(); } catch (e) {}
-        var o0 = c0.convertToBlob ? await c0.convertToBlob({ type: 'image/jpeg', quality: 0.86 }) : await new Promise(function (r) { c0.toBlob(r, 'image/jpeg', 0.86); });
-        if (o0 && o0.size) return o0;
-      } catch (e) { /* the slower path below */ }
-    }
     var im = new Image();
     var u = URL.createObjectURL(blob);
     im.src = u;
@@ -8667,17 +8609,9 @@ var SphereMedia = (function () {
     }
     if (_str(head, 4, 8) === 'ftyp') {
       var brand = _str(head, 8, 12);
-      /* HEIC and AVIF photos share the same box as MP4 video; their brand tells them apart */
-      if (/^(heic|heix|heim|heis|hevc|hevx|mif1|msf1)$/.test(brand)) return { kind: 'photo', mime: 'image/heic' };
-      if (/^(avif|avis)$/.test(brand)) return { kind: 'photo', mime: 'image/avif' };
       return { kind: 'video', mime: brand === 'qt  ' ? 'video/quicktime' : (/^video\//.test(mt) ? mt : 'video/mp4') };
     }
     if (head[0] === 0x1A && head[1] === 0x45 && head[2] === 0xDF && head[3] === 0xA3) return { kind: 'video', mime: 'video/webm' };
-    /* Android's file picker often hands over a photo with no type at all: its first bytes say what it is */
-    if (head[0] === 0xFF && head[1] === 0xD8 && head[2] === 0xFF) return { kind: 'photo', mime: 'image/jpeg' };
-    if (head[0] === 0x89 && _str(head, 1, 4) === 'PNG') return { kind: 'photo', mime: 'image/png' };
-    if (_str(head, 0, 4) === 'RIFF' && _str(head, 8, 12) === 'WEBP') return { kind: 'photo', mime: 'image/webp' };
-    if (_str(head, 0, 2) === 'BM') return { kind: 'photo', mime: 'image/bmp' };
     if (/^video\//.test(mt)) return { kind: 'video', mime: mt };
     if (/\.(mp4|m4v)$/.test(nm)) return { kind: 'video', mime: 'video/mp4' };
     if (/\.webm$/.test(nm)) return { kind: 'video', mime: 'video/webm' };
@@ -8689,25 +8623,11 @@ var SphereMedia = (function () {
      downscalePhoto; animated GIFs and videos are kept byte for byte. */
   async function prepare(file) {
     if (!file || !file.size) throw new Error('empty');
-    /* Read the whole picture into memory first. The installed app hands over a file that still lives with the
-       gallery or Files app; reading it once, here, means every later step works on these bytes, not on that link. */
-    var bytes = null;
-    try { bytes = await file.arrayBuffer(); } catch (e) { bytes = null; }
-    if (!bytes) { var re = new Error('read'); re.code = 'read'; throw re; }
-    if (!bytes.byteLength) throw new Error('empty');
-    try { file = new File([bytes], file.name || 'picked', { type: file.type || '' }); } catch (e) { var nm0 = file.name; file = new Blob([bytes], { type: file.type || '' }); try { file.name = nm0; } catch (e2) {} }
     var s = await sniff(file);
     var blob = file;
     if (s.kind === 'photo') {
       if (s.mime === 'image/gif') blob = file.type === 'image/gif' ? file : new Blob([file], { type: 'image/gif' });
-      else if (s.mime === 'image/heic') {
-        /* HEIC: kept as a JPEG when this browser can read it; otherwise say so plainly */
-        var hb = null;
-        try { var bmh = await createImageBitmap(new Blob([file], { type: 'image/heic' })); var ch0 = document.createElement('canvas'); var sch = Math.min(1, 1280 / Math.max(bmh.width, bmh.height)); ch0.width = Math.round(bmh.width * sch); ch0.height = Math.round(bmh.height * sch); ch0.getContext('2d').drawImage(bmh, 0, 0, ch0.width, ch0.height); hb = await new Promise(function (r) { ch0.toBlob(r, 'image/jpeg', 0.86); }); } catch (e) { hb = null; }
-        if (!hb) { var he = new Error('heic'); he.code = 'heic'; throw he; }
-        blob = hb;
-      }
-      else blob = await downscalePhoto(/^image\//.test(String(file.type || '')) ? file : new Blob([file], { type: s.mime }), 1280);
+      else blob = await downscalePhoto(file, 1280);
     } else if (String(file.type || '').split(';')[0].toLowerCase() !== s.mime) {
       blob = new Blob([file], { type: s.mime });
     }
@@ -9081,7 +9001,6 @@ var SphereMedia = (function () {
    Gate Screen / Video Intro / App Reveal
    ═══════════════════════════════════════════════════════════ */
 
-/* Covara's own intro, branded for Covara (the Remiel Sentinel intros stay with Sentinel) */
 const INTRO_VIDEOS = [
   'videos/covara-intro.mp4'
 ];
@@ -9109,9 +9028,12 @@ async function sha256(str) {
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/* Remiel: Covara access codes, its own: stored as SHA-256 of 'covara:' + the code
-   in capitals. Remiel Sentinel codes do not open Covara. Issued 20 Oct 2026. */
-async function _gateHash(code) { return sha256('covara:' + String(code).toUpperCase()); }
+/* Stored access-code hashes — the carecircle: salt prefix is
+   retained for backward compatibility with existing codes.
+   Note: index.html uppercases input before hashing; we do the same.
+   To add a code: sha256('covara:' + CODE_UPPERCASED) and add the hex here. */
+/* Access codes, stored as SHA-256 of 'covara:' + code. A code with an
+   expiry stops working at that moment (epoch ms, UTC). Issued 28 Sep 2026. */
 const VALID_HASHES = new Set([
   '4d28010ea0fd1c438d3e8396e4c5be4168c2bf25d131129f58ed729f530d8716'  /* permanent 1 */,
   '54c8ce69cb3858da9423263c0c1f605f4feed7fe4cd20a55c4886c2a5f39a8d1'  /* permanent 2 */,
@@ -9123,7 +9045,8 @@ const VALID_HASHES = new Set([
 ]);
 /* Codes that stop working a fixed time after their FIRST use, anywhere. The
    first use is recorded by the API (POST /gate/use) so a code passed between
-   devices shares one clock. */
+   devices shares one clock; when the API cannot be reached, this device's own
+   record of the first use is used instead. */
 const CODE_TTL_MS = {
   '5469ac511c0f3cece93cec3ef0bb6bc71a54ad648d1cf3551b5f1fd7b54ba20d': 24 * 3600 * 1000,
   'd863cfea76c97c98df3837e1b03b9db931eccde25edd11d9a60119539f45aab1': 24 * 3600 * 1000,
@@ -9329,9 +9252,6 @@ let appRevealed = false;
 })();
 let _guestCallMode = false;
 try { _guestCallMode = !!new URLSearchParams(window.location.search).get('call'); } catch (e) {}
-/* A family code's join link (#join=123456): kept for this visit, so it can be used once Covara is open */
-let _joinCode = null;
-try { var _jm = /[#&?]join=(\d{6})/.exec((window.location.hash || '') + '&' + (window.location.search || '')); if (_jm) { _joinCode = _jm[1]; sessionStorage.setItem('rc:join', _joinCode); } } catch (e) {}
 /* B1: revealApp needs RemielDB, I18n and the modules declared further down
    this script. _appScriptReady resolves at the very end of the script block,
    so a reveal requested early (reduced motion, fast skip) waits instead of
@@ -9357,10 +9277,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
     if (_guestCallMode) { beginVideoIntro(); return; }
     var stored = '';
     try { stored = localStorage.getItem('rc:access') || ''; } catch (e) {}
-    /* Someone without Covara opening a family code's link: the join card shows instead of the gate (covara-join.js) */
-    if (_joinCode && (!stored || stored === 'open')) { window.CovaraJoinGuest = _joinCode; var _gj = document.getElementById('gateScreen'); if (_gj) _gj.style.display = 'none'; return; }
     if (!stored || stored === 'open') { showGate(); return; }
-    _gateHash(stored).then(function (h) { return codeState(h); }).then(function (st) {
+    sha256('covara:' + stored.toUpperCase()).then(function (h) { return codeState(h); }).then(function (st) {
       if (st === 'ok') beginVideoIntro(); else { try { localStorage.removeItem('rc:access'); } catch (e) {} showGate(); }
     }).catch(function () { showGate(); });
   } catch (e) { showGate(); }
@@ -9381,7 +9299,7 @@ async function submitGateCode() {
   const code = input.value.trim().toUpperCase();
   if (!code) { flashGateError(I18n.t('gate.error.empty'), input); return; }
 
-  const hash = await _gateHash(code);
+  const hash = await sha256('covara:' + code);
   const state = await codeState(hash);
   if (state === 'ok') {
     errEl.innerHTML = '&nbsp;';
@@ -9422,7 +9340,10 @@ function beginVideoIntro() {
   try { _reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
   if (_reduce) { setTimeout(function () { revealApp(); }, 0); return; }
 
-  /* Covara's intro plays on every entry (Skip is always there); before, returning users went straight in */
+  /* Returning users skip straight in; first launch holds the splash up to 3s. */
+  var _returning = false;
+  try { _returning = localStorage.getItem('rc:obDone') === '1'; } catch (e) {}
+  if (_returning) { setTimeout(function () { revealApp(); }, 0); return; }
   var _splashMs = 1200;
 
   /* Phase 2: Beverly Index company splash paints first; the video never delays it */
@@ -9437,9 +9358,7 @@ function beginVideoIntro() {
     if (appRevealed || _crossfaded) return;
     _crossfaded = true;
     introEl.classList.add('active');
-    /* with sound when the phone allows it; otherwise silent, as before */
-    videoEl.muted = false;
-    videoEl.play().catch(function() { videoEl.muted = true; videoEl.play().catch(function() { revealApp(); }); });
+    videoEl.play().catch(function() { revealApp(); });
     videoEl.addEventListener('ended', function() { revealApp(); }, { once: true });
     videoEl.addEventListener('stalled', function() { revealApp(); }, { once: true });
     requestAnimationFrame(function() {
@@ -9455,21 +9374,20 @@ function beginVideoIntro() {
     videoEl.src = pickNextVideo();
     videoEl.muted = true;
     videoEl.preload = 'auto';
-    /* it starts as soon as it can play (the phone keeps loading the rest while it plays) */
-    videoEl.addEventListener('canplay', function () {
+    videoEl.addEventListener('canplaythrough', function () {
       _videoReady = true;
       _tryCrossfade();
     }, { once: true });
     videoEl.load();
   }, 0); });
 
-  /* Auto skip: if the video cannot start within 9s (a slow connection), go straight in */
+  /* Auto skip: if the video cannot play through within 3s, go straight in */
   setTimeout(function() {
     if (_crossfaded || appRevealed) return;
     _crossfaded = true;
     biSplash.classList.remove('active');
     revealApp();
-  }, 9000);
+  }, 3000);
 
   setTimeout(function() {
     _splashDone = true;
@@ -11187,11 +11105,6 @@ const I18n = (function () {
     'bg.inLedger': "a Ledger note",
     'guest.title': "Video Call",
     'guest.callingYou': "{name} is calling you",
-    'cv.familyCodeLbl': "Team code: calls, messages and your circle",
-    'cv.familyCodeBtn': "Show my team code",
-    'guest.circleTitle': "Video call {name}",
-    'guest.circleSub': "You are a guest in {name}'s circle. Call any time from this same link.",
-    'guest.callNow': "Call {name}",
     'guest.sub': "Enter your name to join the call",
     'guest.namePh': "Your name",
     'guest.join': "Join Call",
@@ -12069,11 +11982,6 @@ const I18n = (function () {
     'bg.inLedger': "una nota del Registro",
     'guest.title': "Videochiamata",
     'guest.callingYou': "{name} ti sta chiamando",
-    'cv.familyCodeLbl': "Codice del team: chiamate, messaggi e la tua cerchia",
-    'cv.familyCodeBtn': "Mostra il mio codice del team",
-    'guest.circleTitle': "Videochiama {name}",
-    'guest.circleSub': "Sei ospite nella cerchia di {name}. Chiama quando vuoi da questo stesso link.",
-    'guest.callNow': "Chiama {name}",
     'guest.sub': "Scrivi il tuo nome per entrare nella chiamata",
     'guest.namePh': "Il tuo nome",
     'guest.join': "Entra nella chiamata",
@@ -13114,10 +13022,6 @@ const I18n = (function () {
     "self.previewAria": "Preview of your sphere",
     "media.localOnly": "Kept on this device only (over 4 MB)",
     "media.help": "Photos, animated GIFs and short videos up to 4 MB play inside your sphere.",
-    "media.empty": "The phone handed over an empty file. If the picture is stored online (Google Photos), open it and download it to the phone first, then choose it again.",
-    "media.cantOpen": "This picture could not be opened. Try a JPEG or PNG photo, or a GIF.",
-    "media.read": "The phone did not hand over the picture. Choose it from Gallery rather than an online album, then try again.",
-    "media.store": "The picture could not be saved on this phone. Free some space on the phone, then try again.",
     "media.cannotPlay": "This clip cannot play in this browser. A still is shown.",
     "views.newTitle": "New {type} view",
     "views.editTitle": "Edit {type} view",
@@ -13208,23 +13112,6 @@ const I18n = (function () {
     "wx.checked": "Checked {n} min ago.",
     "wx.noneNow": "No official warnings there now.",
     "wx.close": "Close",
-    "media.heic": "This photo is in HEIC format, which this phone cannot show here. Choose another photo, or set the camera to save photos as JPEG.",
-    "wx.keep": "Keep watching",
-    "wx.remove": "Remove",
-    "wx.removed": "Removed. It will not show again unless it gets worse.",
-    "wx.hiddenN": "{n} removed on this device.",
-    "wx.showAgain": "Show them again",
-    "wx.areasMore": "and {n} more areas",
-    "wx.sameN": "{n} official notices say the same thing; shown once.",
-    "wx.stLive": "In force now",
-    "wx.stSoon": "Starts {time}",
-    "wx.stEnded": "Ended {time}",
-    "wx.issuedAt": "Issued {time}",
-    "wx.fromAt": "From {time}",
-    "wx.untilAt": "until {time}",
-    "wx.keptAt": "You chose Keep watching {time}",
-    "wx.seenAt": "First shown on this phone {time}",
-    "wx.newHere": "New on this phone",
     "ledger.reviewDictation": "Review, then tap Log",
     "medimg.title": "Scan a medication label",
     "medimg.hint": "Point the camera at the medication label or upload a photo",
@@ -13502,10 +13389,6 @@ const I18n = (function () {
     "self.previewAria": "Anteprima della tua sfera",
     "media.localOnly": "Conservato solo su questo dispositivo (oltre 4 MB)",
     "media.help": "Foto, GIF animate e brevi video fino a 4 MB si riproducono nella tua sfera.",
-    "media.empty": "Il telefono ha passato un file vuoto. Se l\u2019immagine \u00e8 salvata online (Google Foto), aprila e scaricala sul telefono, poi sceglila di nuovo.",
-    "media.cantOpen": "Impossibile aprire questa immagine. Prova una foto JPEG o PNG, oppure una GIF.",
-    "media.read": "Il telefono non ha passato l'immagine. Sceglila dalla Galleria invece che da un album online, poi riprova.",
-    "media.store": "Impossibile salvare l\u2019immagine su questo telefono. Libera un po\u2019 di spazio, poi riprova.",
     "media.cannotPlay": "Questa clip non può essere riprodotta in questo browser. Viene mostrata un’immagine fissa.",
     "views.newTitle": "Nuova vista {type}",
     "views.editTitle": "Modifica vista {type}",
@@ -13596,23 +13479,6 @@ const I18n = (function () {
     "wx.checked": "Controllato {n} min fa.",
     "wx.noneNow": "Nessun avviso ufficiale l\u00EC ora.",
     "wx.close": "Chiudi",
-    "media.heic": "Questa foto è in formato HEIC, che questo telefono non può mostrare qui. Scegli un'altra foto, oppure imposta la fotocamera per salvare in JPEG.",
-    "wx.keep": "Continua a seguire",
-    "wx.remove": "Rimuovi",
-    "wx.removed": "Rimosso. Non riapparir\u00e0 a meno che non peggiori.",
-    "wx.hiddenN": "{n} rimossi su questo dispositivo.",
-    "wx.showAgain": "Mostrali di nuovo",
-    "wx.areasMore": "e altre {n} zone",
-    "wx.sameN": "{n} avvisi ufficiali dicono la stessa cosa; mostrati una volta.",
-    "wx.stLive": "In vigore ora",
-    "wx.stSoon": "Inizia {time}",
-    "wx.stEnded": "Terminato {time}",
-    "wx.issuedAt": "Emesso {time}",
-    "wx.fromAt": "Dal {time}",
-    "wx.untilAt": "fino al {time}",
-    "wx.keptAt": "Hai scelto Continua a seguire {time}",
-    "wx.seenAt": "Mostrato per la prima volta su questo telefono {time}",
-    "wx.newHere": "Nuovo su questo telefono",
     "ledger.reviewDictation": "Controlla, poi tocca Registra",
     "medimg.title": "Leggi l’etichetta di un farmaco",
     "medimg.hint": "Inquadra l’etichetta del farmaco o carica una foto",
@@ -15552,7 +15418,7 @@ async function _obSaveAndLaunch() {
         const prep = await SphereMedia.prepare(p.photoBlob);
         await RemielDB.putPhoto(cid, prep.blob, prep.kind);
         await SphereMedia.show(cid, prep.blob, prep.kind);
-      } catch (err) { console.warn('obContactPhoto save error', err); try { showToast(mediaErrText(err)); } catch (e2) {} }
+      } catch (err) { console.warn('obContactPhoto save error', err); }
     }
   }
 
@@ -16354,8 +16220,20 @@ let userSev = 4;
 let userSphereName = '';
 
 /* ── Demo contacts ── */
-/* Covara: the circle holds only real people HOME or AWAY has linked; no sample people */
-const DEMO_CONTACTS = [];
+const DEMO_CONTACTS = [
+  { id:1,  first:'Angela',  last:'Rivera',   cat:'family',       sev:0, phone:'+15558675309', email:'' },
+  { id:2,  first:'James',   last:'Chen',     cat:'family',       sev:3, phone:'+15551234567', email:'' },
+  { id:3,  first:'Marcus',  last:'Santos',   cat:'professional', sev:1, phone:'+15559876543', email:'' },
+  { id:4,  first:'Kim',     last:'Williams', cat:'friend',       sev:4, phone:'+15554567890', email:'' },
+  { id:5,  first:'Robert',  last:'Okafor',   cat:'friend',       sev:2, phone:'+15557654321', email:'' },
+  { id:6,  first:'Dina',    last:'Patel',    cat:'professional', sev:4, phone:'+15552345678', email:'' },
+  { id:7,  first:'Tomás', last:'Reyes', cat:'family',       sev:3, phone:'+15558765432', email:'' },
+  { id:8,  first:'Sarah',   last:'Kwon',     cat:'friend',       sev:2, phone:'+15553456789', email:'' },
+  { id:9,  first:'David',   last:'Okonkwo',  cat:'other',        sev:1, phone:'+15556543210', email:'' },
+  { id:10, first:'Lisa',    last:'Berg',     cat:'family',       sev:4, phone:'+15554321098', email:'' },
+  { id:11, first:'Carlos',  last:'Mendez',   cat:'professional', sev:3, phone:'+15551112233', email:'' },
+  { id:12, first:'Priya',   last:'Nair',     cat:'friend',       sev:4, phone:'+15554445566', email:'' },
+];
 
 
 /* ── Ensure every contact has a bio field for biometric data ── */
@@ -16550,13 +16428,11 @@ function rebuildNodeTargets() {
     node.ty = ty / L * shellR;
     node.tz = tz / L * shellR;
   });
-  try { if (window.CovaraOrbit) NODES.forEach(window.CovaraOrbit); } catch (e) {}
 }
 
 /* The name under a sphere: the surname, which tells teammates apart; the
    first name when there is no surname. */
 function sphereLabel(c) {
-  if (c && c.cvItem) return c.cvTitle || ''; /* Covara: a medicine or a visit is named in full */
   var l = c && c.last ? String(c.last).trim() : '';
   return l || (c && c.first ? String(c.first).trim() : '');
 }
@@ -16575,8 +16451,6 @@ function buildNodes(fresh) {
   /* ── SentinelViews filter: only show contacts in active view ── */
   var _viewFilter = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
   var _source = _viewFilter ? DEMO_CONTACTS.filter(function(c) { return _viewFilter.has(c.id) || _viewFilter.has(String(c.id)); }) : DEMO_CONTACTS;
-  /* Covara: HOME's things to do orbit as spheres; on AWAY's phone HOME is the centre */
-  try { if (window.CovaraView) _source = window.CovaraView.source(_source); } catch (e) {}
 
   const N = _source.length;
   const smaller = Math.min(CV.width / DPR, CV.height / DPR);
@@ -16612,8 +16486,6 @@ function buildNodes(fresh) {
       initials: (((contact.first || '')[0] || '') + ((contact.last || '')[0] || '')).toUpperCase() || '?'
     };
   });
-  /* Covara: people orbit outside HOME's things, a little closer in than Sentinel's shell (covara-main.js) */
-  try { if (window.CovaraOrbit) NODES.forEach(window.CovaraOrbit); } catch (e) {}
   networkExpanded = true;
 }
 
@@ -16678,27 +16550,17 @@ function hitTestNetwork(clientX, clientY) {
   // Center sphere (user) — matches render size (CSS px)
   const W = CV.width / DPR;
   const centerR = netCenterR(W);
-  /* The sphere drawn on top wins. A smaller depth is nearer the viewer (projectNode's scale grows as z falls),
-     and the centre sphere sits at depth NET_DIST: a person's sphere passing in front of it takes the tap, so a
-     double tap on that person never opens the centre's own card by mistake. */
-  const centreHit = !_iso && Math.hypot(mx - cx, my - cy) < centerR * 1.2;
-  let closest = null, closestZ = Infinity, inside = false;
+  if (!_iso && Math.hypot(mx - cx, my - cy) < centerR * 1.3) return { isCenter: true };
+  // Contact nodes — find front-most hit
+  let closest = null;
+  let closestZ = -Infinity;
   for (const node of NODES) {
     if (_iso && node.contact.id !== focusedContactId) continue;
     const p = projectNode(node);
-    const d = Math.hypot(mx - p.sx, my - p.sy), r = node.r * p.scale;
-    if (d >= r * 1.45) continue;
-    /* on the sphere itself beats near its edge; then nearest the viewer */
-    const on = d < r;
-    /* Covara: a person's sphere is never hidden behind one of HOME's things: a person in reach wins the tap */
-    const person = !(node.contact && node.contact.cvItem && node.contact.cvItem.kind !== 'person');
-    const closestPerson = closest && !(closest.contact && closest.contact.cvItem && closest.contact.cvItem.kind !== 'person');
-    if (closest && closestPerson && !person) continue;
-    if (closest && person && !closestPerson) { closest = node; closestZ = p.z; inside = on; continue; }
-    if ((on && !inside) || (on === inside && p.z < closestZ)) { closest = node; closestZ = p.z; inside = on; }
+    const d = Math.hypot(mx - p.sx, my - p.sy);
+    const hitR = node.r * p.scale * 1.6;
+    if (d < hitR && p.z > closestZ) { closest = node; closestZ = p.z; }
   }
-  if (closest && (!centreHit || closestZ < NET_DIST)) return { isCenter: false, node: closest };
-  if (centreHit) return { isCenter: true };
   return closest ? { isCenter: false, node: closest } : null;
 }
 
@@ -16802,8 +16664,6 @@ var IsoView = (function () {
     if (!_btn) return;
     var show = _eligible();
     try { if (blufOpen && window.innerWidth < 700) show = false; } catch (e) {}
-    /* Covara: never float over full-screen panels (Settings, The Pulse) */
-    try { if (document.querySelector('.settings-panel.open, .pulse-overlay.open, .pulse-overlay.active')) show = false; } catch (e) {}
     var on = active(), lk = locked();
     var sig = [show, on, lk, (typeof I18n !== 'undefined' ? I18n.locale : '')].join('|');
     if (sig !== _sig) {
@@ -16918,7 +16778,6 @@ function enterNetwork() {
 }
 
 function enterDetail(contact, sphereScreenY) {
-  try { if (contact && contact.cvItem && window.CovaraView && window.CovaraView.openNode(contact)) return; } catch (e) {}
   selectedContact = contact;
   /* Stay in network mode — BLUF opens as overlay on galaxy */
   openBluf(sphereScreenY);
@@ -17642,7 +17501,6 @@ function openBluf(sphereScreenY) {
   }
 
   overlay.classList.add('open');
-  try { if (window.CovaraNav && CovaraNav.refresh) CovaraNav.refresh(); } catch (e) {}
 
   /* Start at the top of the card. scrollIntoView pushed the card up under the
      fixed app header, so the overlay itself is scrolled to 0 instead. */
@@ -17664,7 +17522,6 @@ function closeBluf() {
   const overlay = document.getElementById('blufOverlay');
   overlay.classList.remove('open');
   overlay.style.paddingTop = '';
-  try { if (window.CovaraNav && CovaraNav.refresh) CovaraNav.refresh(); } catch (e) {}
   overlay.style.justifyContent = '';
   if (appState === 'network') {
     setTimeout(() => { netSpin = true; }, 400);
@@ -17905,14 +17762,12 @@ async function updateBlufContent() {
     if (!_qaBar.querySelector('.qa-self-note')) {
       const _selfNote = document.createElement('div');
       _selfNote.className = 'qa-self-note';
-      /* Covara: one bridge for everyone, the family code. Whoever uses it joins at once and can video call;
-         no separate ID or call link to pass around. */
-      const _isHome = (function () { try { return localStorage.getItem('rc:role') !== 'away'; } catch (e) { return true; } })();
-      /* the family code now lives in the card's top pull, Invite to my circle */
-      _selfNote.innerHTML = false ? '<div style="text-align:center;padding:4px 0;">'
-        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.6;margin-bottom:6px;">' + _t('cv.familyCodeLbl', 'Team code: calls, messages and your circle') + '</div>'
-        + '<button onclick="try{closeBluf()}catch(e){};setTimeout(function(){CovaraCare.openCode()},250)" style="background:#38bdf8;border:0;color:#04121f;border-radius:22px;padding:10px 20px;font-size:14px;font-weight:800;cursor:pointer;">' + _t('cv.familyCodeBtn', 'Show my team code') + '</button>'
-        + '</div>' : '';
+      const _myScId = SentinelCall.getMyId ? SentinelCall.getMyId() : '...';
+      _selfNote.innerHTML = '<div style="text-align:center;padding:4px 0;">'
+        + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.5;margin-bottom:4px;">Your Sentinel ID</div>'
+        + '<div style="font-family:monospace;font-size:18px;letter-spacing:3px;font-weight:700;">' + (_myScId || '...') + '</div>'
+        + '<button onclick="SentinelCall.shareCallLink()" style="margin-top:8px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:rgb(56,189,248);border-radius:8px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;">Share Call Link</button>'
+        + '</div>';
       _qaBar.appendChild(_selfNote);
     }
     if (_editBtn) _editBtn.style.display = 'none';
@@ -18055,8 +17910,6 @@ function _enterRestMode() {
   if (_restModeActive) return;
   if (_reducedMotionNow()) return; /* rest mode auto-cycles focus: off under reduced motion */
   if (blufOpen || appState !== 'network') return;
-  /* Covara: on AWAY's phone HOME stays in view; nothing drifts to another sphere */
-  try { if (localStorage.getItem('rc:role') === 'away') return; } catch (e) {}
   _restModeActive = true;
   if (typeof SentinelGuide !== 'undefined') SentinelGuide.onRestMode();
   _cycleDreamContact();
@@ -18076,7 +17929,7 @@ function _cycleDreamContact() {
     var vf = (typeof SentinelViews !== 'undefined') ? SentinelViews.getFilteredContacts() : null;
     if (vf) pool = pool.filter(function(c) { return vf.has(c.id) || vf.has(String(c.id)); });
   } catch (e) {}
-  if (pool.length === 0) { _restModeActive = false; if (_restCycleTimer) { clearInterval(_restCycleTimer); _restCycleTimer = null; } return; }
+  if (pool.length === 0) { _exitRestMode(); return; }
   /* Avoid showing the same contact twice in a row */
   var pick;
   var attempts = 0;
@@ -19246,8 +19099,6 @@ const SentinelHeadlines = (() => {
   };
 
   async function computeHeadline(contact) {
-    /* Covara: a sphere waiting on a link says so above it */
-    try { if (contact && contact.care && contact.care.state === 'pending' && window.CovaraCare) return { headline: window.CovaraCare.waitLabel(contact), priority: 1000 }; } catch (_) {}
     if (!contact) return { headline: '', priority: 0 };
     const cid = contact.id;
     const now = Date.now();
@@ -19706,7 +19557,7 @@ const SentinelMessaging = (() => {
     const contactId = _activeContactId;
     const contact = _findContact(contactId);
     const canDeliver = _authed() && (
-      (contact && (_isValidSid(contact.sentinelId) || _teamUser(contact))) || String(contactId).indexOf('unknown:') === 0
+      (contact && _isValidSid(contact.sentinelId)) || String(contactId).indexOf('unknown:') === 0
     );
 
     /* Magnet: a matched person who has not accepted yet gets a link
@@ -19732,25 +19583,6 @@ const SentinelMessaging = (() => {
       return;
     }
     if (canDeliver) await _deliver(contactId, msg.id);
-  }
-
-  /* A Covara team member's account: messages reach them by it when they have no message ID */
-  function _teamUser(c) { return (c && c.care && c.care.state === 'active' && c.care.userId) ? String(c.care.userId) : null; }
-  function _findTeamByUser(uid) { try { return uid ? (DEMO_CONTACTS || []).find(c => _teamUser(c) === String(uid)) || null : null; } catch (e) { return null; } }
-
-  /* Send a message to one person without the message screen open (Talk uses it). The message lands
-     in that person's thread, as if typed there. Returns true once it is on its way. */
-  async function sendTo(contactId, text) {
-    text = String(text || '').trim(); if (!text) return false;
-    const contact = _findContact(contactId); if (!contact) return false;
-    const canDeliver = _authed() && (_isValidSid(contact.sentinelId) || !!_teamUser(contact));
-    const msg = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), from: 'center', text: text, ts: Date.now(), state: canDeliver ? 'pending' : 'local' };
-    const thread = await _loadThread(contactId);
-    thread.push(msg);
-    await _saveThread(contactId, thread);
-    if (_activeContactId === contactId) { try { await _renderThread(contactId); } catch (e) {} }
-    if (canDeliver) await _deliver(contactId, msg.id);
-    return canDeliver;
   }
 
   /* Deliver every message that waited for a link request to be accepted */
@@ -19784,7 +19616,6 @@ const SentinelMessaging = (() => {
     const body = { client_msg_id: msg.id, text: msg.text, ts: msg.ts };
     if (sid && peerMap[sid]) body.to_user_id = peerMap[sid];
     else if (sid) body.to_sentinel_id = sid;
-    else if (_teamUser(contact)) body.to_user_id = _teamUser(contact);
     else { await _updateMsg(contactId, msgId, { state: 'local' }); return _refresh(contactId); }
 
     await _updateMsg(contactId, msgId, { state: 'pending' });
@@ -19881,7 +19712,7 @@ const SentinelMessaging = (() => {
         /* Sent from this account (possibly another device) */
         if (myUserId && m.from_user_id === myUserId) {
           const sid = sidByUser[m.to_user_id];
-          const c = (sid ? _findContactBySid(sid) : null) || _findTeamByUser(m.to_user_id);
+          const c = sid ? _findContactBySid(sid) : null;
           if (!c) continue;
           const thread = await _loadThread(c.id);
           if (thread.some(x => (serverId && x.serverId === serverId) || (m.client_msg_id && x.id === m.client_msg_id))) continue;
@@ -19894,7 +19725,7 @@ const SentinelMessaging = (() => {
 
         const fromSid = m.from_sentinel_id ? String(m.from_sentinel_id).toUpperCase() : null;
         if (fromSid && m.from_user_id) { await _learnPeer(fromSid, m.from_user_id); sidByUser[m.from_user_id] = fromSid; }
-        const contact = _findContactBySid(fromSid || sidByUser[m.from_user_id]) || _findTeamByUser(m.from_user_id);
+        const contact = _findContactBySid(fromSid || sidByUser[m.from_user_id]);
         let key;
         if (contact) {
           key = contact.id;
@@ -19906,11 +19737,7 @@ const SentinelMessaging = (() => {
           const isNew = !(serverId && before.some(x => x.serverId === serverId));
           await _noteUnknown(key, _unknownNames[key], isNew);
         }
-        let _isNewMsg = true;
-        try { const _th = await _loadThread(key); _isNewMsg = !(serverId && _th.some(x => x.serverId === serverId)); } catch (_) {}
         await receiveResponse(key, m.text, { serverId: serverId, ts: m.ts });
-        /* Covara: a new message reaches the headline (Talk messages) and, after a Talk message, opens the thread */
-        if (_isNewMsg) { try { window.dispatchEvent(new CustomEvent('covara-message', { detail: { contactId: key, text: m.text, ts: m.ts || Date.now(), name: contact ? ((contact.first || '') + ' ' + (contact.last || '')).trim() : (_unknownNames[key] || '') } })); } catch (_) {} }
       }
 
       if (data.cursor != null) {
@@ -19940,7 +19767,7 @@ const SentinelMessaging = (() => {
     const contact = _findContact(contactId);
     const contactName = _escHtml(_contactLabel(contactId));
     const isUnknown = String(contactId).indexOf('unknown:') === 0;
-    const noSid = !isUnknown && !(contact && (_isValidSid(contact.sentinelId) || _teamUser(contact)));
+    const noSid = !isUnknown && !(contact && _isValidSid(contact.sentinelId));
 
     let note = '';
     if (noSid) note = '<div class="sentinel-msg-note">' + _escHtml(_t('msg.noSidNote', 'Saved on this device. Add their Sentinel ID to deliver: Person card, Edit, Sentinel ID.')) + ' ' + Guide.linkHtml('contact.sentinelId', { contactId: contactId }, 'guide.addItNow') + '</div>';
@@ -20077,7 +19904,7 @@ const SentinelMessaging = (() => {
   }
 
   return {
-    openFor, close, send, sendTo, retry, receiveResponse, poll, addUnknownSender, flushAwaiting, adoptUnknown,
+    openFor, close, send, retry, receiveResponse, poll, addUnknownSender, flushAwaiting, adoptUnknown,
     getTickerData, getLatestMessageText,
     loadBlufSection,
     get activeContactId() { return _activeContactId; },
@@ -22430,7 +22257,7 @@ const Comm = (() => {
     let show = false;
     try {
       show = !!(focusedContactId && appState === 'network' && window._dreamRect &&
-                !(blufOpen && window.innerWidth < 700)) && !/^cvi:/.test(String(focusedContactId));
+                !(blufOpen && window.innerWidth < 700));
     } catch (e) { show = false; }
     if (!show) {
       if (!el.hidden) { el.hidden = true; }
@@ -23255,12 +23082,11 @@ const WhereIs = (() => {
         return x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
       };
       const which = e => {
-        const _cvW = !!(window.CovaraWhere && window.CovaraWhere.on());
-        if ((typeof focusedContactId === 'undefined' || !focusedContactId) && !_cvW) return null;
+        if (typeof focusedContactId === 'undefined' || !focusedContactId) return null;
         /* A sphere under the finger always wins over the drawn regions */
         try { if (typeof hitTestNetwork === 'function' && hitTestNetwork(e.clientX, e.clientY)) return null; } catch (err) {}
         if (hit(e, window._dreamToggleHit)) return 'toggle';
-        if (_mode === 'whereis' && !_cvW && (hit(e, window._dreamWhereHit) || hit(e, window._dreamMicroHit))) return 'map';
+        if (_mode === 'whereis' && (hit(e, window._dreamWhereHit) || hit(e, window._dreamMicroHit))) return 'map';
         return null;
       };
       let _down = null;
@@ -23269,9 +23095,6 @@ const WhereIs = (() => {
           const pt = (e.touches && e.touches[0]) || e;
           const w = which(pt);
           if (w) { _down = w; e.stopImmediatePropagation(); }
-          /* Covara radar fix (covara-where.js): a new press elsewhere clears a press left over from the mouse events a phone
-             sends after a touch, so the next tap on the radar does not flip WHEREIS back to Communication */
-          else if (evt !== 'mousedown') _down = null;
         }, true));
         ['pointerup', 'mouseup', 'touchend', 'click'].forEach(evt => st.addEventListener(evt, e => {
           if (!_down) return;
@@ -24016,7 +23839,7 @@ const WhereIs = (() => {
     }));
   }
 
-  return { init, bind: _bind, mode, setMode, drawToggle, drawDream, hideAnchor, openPanel, closePanel, arrivalItemsFor, pulseLine, placeChipHtml, matchContact, entryFor,
+  return { init, mode, setMode, drawToggle, drawDream, hideAnchor, openPanel, closePanel, arrivalItemsFor, pulseLine, placeChipHtml, matchContact, entryFor,
            circle, circleFor, stateFor, stateText, ask, shareWith, checkAsks, approxFor, approxText, forgetApprox, renderCircleShare, fillCard,
            updateVisibility, renderPlaces, addPlace, editPlace, closeEditor, savePlace, deletePlace, printQr, setOpenShare, renderCheckin, checkIn, onSettingsOpen,
            sharedLocations, myPlaces, sharedPlaces, nowFor, arrivalsFor, trail, tile, drawTiles, ageText, invalidate,
@@ -24049,42 +23872,13 @@ var Warnings = (function () {
   function _contact(id) { try { return DEMO_CONTACTS.find(function (c) { return String(c.id) === String(id); }) || null; } catch (e) { return null; } }
   function _first(c) { return c ? (c.first || ((c.last || '') + '')).trim() : ''; }
   function _levelLabel(l) { return l >= 4 ? _t('wx.level4', 'Extreme') : l === 3 ? _t('wx.level3', 'Severe') : _t('wx.level2', 'Moderate'); }
-  function _when(t) { try { return new Date(t).toLocaleString(I18n.locale === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } }
-  /* When this phone first showed each warning, and when it was kept: so a warning read before can be told from a new one */
-  var _seenAt = {}, _keptAt = {};
-  try { _seenAt = JSON.parse(localStorage.getItem('wx:seenAt') || '{}') || {}; _keptAt = JSON.parse(localStorage.getItem('wx:keptAt') || '{}') || {}; } catch (e) {}
-  function _saveTimes() { try { var cut = Date.now() - 14 * 864e5; [_seenAt, _keptAt].forEach(function (o) { Object.keys(o).forEach(function (k) { if (o[k] < cut) delete o[k]; }); }); localStorage.setItem('wx:seenAt', JSON.stringify(_seenAt)); localStorage.setItem('wx:keptAt', JSON.stringify(_keptAt)); } catch (e) {} }
+  function _when(t) { try { return new Date(t).toLocaleString(I18n.locale === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
 
-  /* The same warning is often issued many times (one notice per county or zone, plus each update). They are
-     shown once, as one kind of warning: the same event, at the same level, from the same office. */
-  function _gk(w) { return [String(w.event || w.headline || '').toLowerCase().trim(), w.level, String(w.sender || '').toLowerCase().trim()].join('|'); }
-  /* Removed on this device: hidden until it ends, unless it is raised to a higher level (a new kind, so it shows). */
-  var DKEY = 'wx:removed', _dis = null;
-  function _disLoad() {
-    if (_dis) return _dis;
-    try { _dis = JSON.parse(localStorage.getItem(DKEY) || '{}') || {}; } catch (e) { _dis = {}; }
-    var now = Date.now(), ch = false; Object.keys(_dis).forEach(function (k) { if (!_dis[k] || _dis[k] < now) { delete _dis[k]; ch = true; } });
-    if (ch) _disSave(); return _dis;
-  }
-  function _disSave() { try { localStorage.setItem(DKEY, JSON.stringify(_dis || {})); } catch (e) {} }
-  function _hidden(w) { var d = _disLoad()[_gk(w)]; return !!(d && d > Date.now()); }
-  function remove(gk, until) { _disLoad()[gk] = Math.max(until || 0, Date.now() + 6 * 3600e3); _disSave(); _sig++; _paintChip(true); }
-  function restoreAll() { _dis = {}; _disSave(); _sig++; _paintChip(true); }
-  function _hiddenCount() { var n = 0; _by.forEach(function (v) { (v.list || []).forEach(function (w) { if (w.level >= 2 && _hidden(w)) n++; }); }); var g = {}; _by.forEach(function (v) { (v.list || []).forEach(function (w) { if (w.level >= 2 && _hidden(w)) g[_gk(w)] = 1; }); }); return Object.keys(g).length; }
-  /* Read: the mark stops pulsing once the warning has been opened */
-  var _read = {};
-  /* Shown warnings for a sphere: Moderate and above, still running, not removed, one per kind */
+  /* Shown warnings for a sphere: Moderate and above, still running */
   function listFor(id) {
     var e = _by.get(String(id)); if (!e) return [];
-    var now = Date.now(), seen = {}, out = [];
-    e.list.forEach(function (w) {
-      if (w.level < 2 || (w.expires && w.expires < now) || _hidden(w)) return;
-      var k = _gk(w);
-      if (seen[k]) { seen[k]._n = (seen[k]._n || 1) + 1; if (w.area && seen[k]._areas.indexOf(w.area) < 0) seen[k]._areas.push(w.area); if (w.expires > (seen[k]._until || 0)) seen[k]._until = w.expires; return; }
-      var c = Object.assign({}, w, { _gk: k, _n: 1, _areas: w.area ? [w.area] : [], _until: w.expires || 0 });
-      seen[k] = c; out.push(c);
-    });
-    return out.sort(function (a, b) { return b.level - a.level; });
+    var now = Date.now();
+    return e.list.filter(function (w) { return w.level >= 2 && !(w.expires && w.expires < now); });
   }
   function levelFor(id) { var l = listFor(id); return l.length ? l[0].level : 0; }
 
@@ -24142,14 +23936,10 @@ var Warnings = (function () {
     } finally { _busy = false; }
   }
 
-  function _allRead() { var all = true; _by.forEach(function (v, k) { listFor(k).forEach(function (w) { if (!_read[w._gk]) all = false; }); }); return all; }
   /* ── The mark on a sphere: a small triangle in the level's colour ── */
-  /* Where each mark was drawn this frame, so a tap on the triangle opens that person's warnings */
-  var _marks = [], _markFrame = 0;
-  function drawMark(ctx, x, y, size, level, alpha, t, key) {
+  function drawMark(ctx, x, y, size, level, alpha, t) {
     var col = COLORS[level]; if (!col) return;
-    if (key != null) { var nowF = Math.floor(performance.now() / 50); if (nowF !== _markFrame) { _markFrame = nowF; _marks = _marks.filter(function (m) { return nowF - m.f < 3; }); } _marks = _marks.filter(function (m) { return m.key !== String(key); }); _marks.push({ x: x, y: y, r: Math.max(18, size * 1.6), key: String(key), f: nowF }); }
-    var pulse = (level >= 4 && !_allRead() && !(typeof _reducedMotionNow === 'function' && _reducedMotionNow())) ? 0.75 + 0.25 * Math.sin((t || 0) * 0.006) : 1;
+    var pulse = (level >= 4 && !(typeof _reducedMotionNow === 'function' && _reducedMotionNow())) ? 0.75 + 0.25 * Math.sin((t || 0) * 0.006) : 1;
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = Math.max(0.35, Math.min(1, (alpha || 1))) * pulse;
@@ -24222,15 +24012,10 @@ var Warnings = (function () {
       '.wx-card .wx-lv{display:inline-block;font:800 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#0b0d14;border-radius:6px;padding:2px 7px;margin-right:6px;vertical-align:1px}' +
       '.wx-card .wx-ev{font-size:16px;font-weight:800}.wx-card .wx-hl{margin:6px 0 4px;font-weight:600}' +
       '.wx-card .wx-meta{color:#9ca3af;font-size:12.5px;margin:2px 0}' +
-      '.wx-card .wx-st{display:inline-block;font:800 10.5px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;border:1px solid;border-radius:999px;padding:3px 9px;margin:0 0 7px}' +
-      '.wx-card .wx-dates{font:700 12.5px "Hanken Grotesk",system-ui,sans-serif;color:#e0f2fe;margin:6px 0 2px}' +
-      '.wx-card .wx-mine{font-size:12px;color:#9fb4e2;margin:2px 0 4px}.wx-card .wx-mine.new{color:#fde68a;font-weight:700}' +
       '.wx-card .wx-sec{font:700 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9fd8ff;margin:10px 0 3px}' +
       '.wx-card .wx-txt{white-space:pre-line;line-height:1.45;font-size:13.5px}' +
       '.wx-card a{display:inline-block;margin-top:10px;color:#38d4ff;font-weight:700;text-decoration:none}' +
       '.wx-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}' +
-      '.wx-act{display:flex;gap:8px;margin-top:12px}.wx-act button{min-height:40px;padding:0 16px;border-radius:20px;font:700 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}.wx-keep{border:1px solid #38bdf8;background:rgba(56,189,248,.16);color:#e0f2fe}.wx-rm{border:1px solid #ff3b3b;background:transparent;color:#ff6b6b}.wx-done{color:#86efac;font-size:12.5px;margin-top:8px}' +
-      '.wx-hidden{color:#9ca3af;font-size:12.5px;margin:4px 0 0}.wx-hidden button{background:none;border:0;color:#38d4ff;font:700 12.5px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;padding:0 4px}' +
       '.wx-names button{font:600 13px "Hanken Grotesk",system-ui,sans-serif;padding:6px 10px;border-radius:14px;border:1px solid rgba(56,212,255,.5);background:transparent;color:#e5e7eb;cursor:pointer}' +
       '.dream-brief .db-wx{border:1.5px solid #ff8c1a;border-radius:10px;padding:7px 9px;margin:0 0 9px;background:rgba(10,12,18,.72)}' +
       '.dream-brief .db-wx-t{font:800 11px "Hanken Grotesk",system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#fde68a;margin-bottom:4px}' +
@@ -24242,34 +24027,17 @@ var Warnings = (function () {
   }
   function _card(w, names) {
     var col = COLORS[w.level] || '#ff8c1a';
-    var now = Date.now(), seenNew = false;
-    if (w._gk && !_seenAt[w._gk]) { _seenAt[w._gk] = now; seenNew = true; _saveTimes(); }
-    /* the plain state: in force now, starting later, or over */
-    var st = w.expires && w.expires < now ? { k: 'ended', c: '#9ca3af', t: _t('wx.stEnded', 'Ended {time}', { time: _when(w.expires) }) }
-      : w.onset && w.onset > now ? { k: 'soon', c: '#fbbf24', t: _t('wx.stSoon', 'Starts {time}', { time: _when(w.onset) }) }
-      : { k: 'live', c: '#22d3a6', t: _t('wx.stLive', 'In force now') };
-    var dates = [w.issued ? _t('wx.issuedAt', 'Issued {time}', { time: _when(w.issued) }) : '',
-      w.onset ? _t('wx.fromAt', 'From {time}', { time: _when(w.onset) }) : '',
-      w.expires ? _t('wx.untilAt', 'until {time}', { time: _when(w.expires) }) : ''].filter(Boolean).join(' · ');
-    var mine = w._gk && _keptAt[w._gk] ? _t('wx.keptAt', 'You chose Keep watching {time}', { time: _when(_keptAt[w._gk]) })
-      : w._gk && _seenAt[w._gk] && !seenNew ? _t('wx.seenAt', 'First shown on this phone {time}', { time: _when(_seenAt[w._gk]) }) : _t('wx.newHere', 'New on this phone');
-    var times = '';
+    var times = [w.onset && w.onset > Date.now() ? _t('wx.from', 'From {time}', { time: _when(w.onset) }) : '', w.expires ? _t('wx.until', 'Until {time}', { time: _when(w.expires) }) : ''].filter(Boolean).join(' · ');
     var h = '<div class="wx-card" style="border-left-color:' + col + '">' +
-      '<div class="wx-st wx-st-' + st.k + '" style="color:' + st.c + ';border-color:' + st.c + '">' + (st.k === 'live' ? '● ' : '') + _esc(st.t) + '</div>' +
       '<div><span class="wx-lv" style="background:' + col + '">' + _esc(_levelLabel(w.level)) + '</span><span class="wx-ev">' + _esc(w.event || w.headline) + '</span></div>' +
-      (dates ? '<div class="wx-dates">' + _esc(dates) + '</div>' : '') +
-      '<div class="wx-mine' + (seenNew || !_seenAt[w._gk] ? ' new' : '') + '">' + _esc(mine) + '</div>' +
       (w.headline && w.headline !== w.event ? '<div class="wx-hl">' + _esc(w.headline) + '</div>' : '') +
-      (w._areas && w._areas.length ? '<div class="wx-meta">' + _esc(w._areas.slice(0, 3).join('; ')) + (w._areas.length > 3 ? ' ' + _esc(_t('wx.areasMore', 'and {n} more areas', { n: w._areas.length - 3 })) : '') + (w.km != null && w._areas.length === 1 ? ' · ' + _esc(_t('wx.km', '{n} km away', { n: w.km })) : '') + '</div>' : (w.area ? '<div class="wx-meta">' + _esc(w.area) + '</div>' : '')) +
-      (w._n > 1 ? '<div class="wx-meta">' + _esc(_t('wx.sameN', '{n} official notices say the same thing; shown once.', { n: w._n })) + '</div>' : '') +
+      (w.area ? '<div class="wx-meta">' + _esc(w.area) + (w.km != null ? ' · ' + _esc(_t('wx.km', '{n} km away', { n: w.km })) : '') + '</div>' : '') +
       (times ? '<div class="wx-meta">' + _esc(times) + '</div>' : '') +
       '<div class="wx-meta">' + _esc([w.sender ? _t('wx.issued', 'Issued by {sender}', { sender: w.sender }) : '', _t('wx.source', 'Source: {source}', { source: w.source })].filter(Boolean).join(' · ')) + '</div>' +
       (w.instruction ? '<div class="wx-sec">' + _esc(_t('wx.whatToDo', 'What to do')) + '</div><div class="wx-txt">' + _esc(w.instruction) + '</div>' : '') +
       (w.description ? '<div class="wx-sec">' + _esc(_t('wx.details', 'Details')) + '</div><div class="wx-txt">' + _esc(w.description) + '</div>' : '') +
       (names ? '<div class="wx-names">' + names + '</div>' : '') +
       (w.url ? '<a href="' + _esc(w.url) + '" target="_blank" rel="noopener">' + _esc(_t('wx.open', 'Open the official warning')) + ' ›</a>' : '') +
-      '<div class="wx-act"><button type="button" class="wx-keep" data-keep="' + _esc(w._gk) + '">' + _esc(_t('wx.keep', 'Keep watching')) + '</button>' +
-      '<button type="button" class="wx-rm" data-rm="' + _esc(w._gk) + '" data-until="' + (w._until || w.expires || 0) + '">' + _esc(_t('wx.remove', 'Remove')) + '</button></div>' +
       '</div>';
     return h;
   }
@@ -24284,10 +24052,8 @@ var Warnings = (function () {
       var groups = new Map();
       _by.forEach(function (v, k) {
         listFor(k).forEach(function (w) {
-          var g0 = groups.get(w._gk);
-          if (!g0) { g0 = { w: Object.assign({}, w, { _areas: (w._areas || []).slice() }), keys: [] }; groups.set(w._gk, g0); }
-          else { g0.w._n += w._n; (w._areas || []).forEach(function (a) { if (g0.w._areas.indexOf(a) < 0) g0.w._areas.push(a); }); if (w._until > g0.w._until) g0.w._until = w._until; }
-          if (g0.keys.indexOf(k) < 0) g0.keys.push(k);
+          if (!groups.has(w.id)) groups.set(w.id, { w: w, keys: [] });
+          groups.get(w.id).keys.push(k);
         });
       });
       var list = Array.from(groups.values()).sort(function (a, b) { return (b.w.level - a.w.level) || (b.keys.length - a.keys.length); });
@@ -24307,10 +24073,6 @@ var Warnings = (function () {
       note = [how, checked].filter(Boolean).join(' ');
       html = listFor(forKey).map(function (w) { return _card(w, ''); }).join('') || '<p class="wx-note">' + _esc(_t('wx.noneNow', 'No official warnings there now.')) + '</p>';
     }
-    var hc = _hiddenCount();
-    if (hc) html += '<p class="wx-hidden">' + _esc(_t('wx.hiddenN', '{n} removed on this device.', { n: hc })) + '<button type="button" data-restore="1">' + _esc(_t('wx.showAgain', 'Show them again')) + '</button></p>';
-    if (!html) html = '<p class="wx-note">' + _esc(_t('wx.noneNow', 'No official warnings there now.')) + '</p>';
-    _by.forEach(function (v, k) { if (forKey === 'circle' || String(k) === String(forKey)) listFor(k).forEach(function (w) { _read[w._gk] = 1; }); });
     _closeSheet();
     var wrap = document.createElement('div'); wrap.className = 'wx-wrap'; wrap.id = 'wxSheetWrap';
     wrap.innerHTML = '<div class="wx-sheet" role="dialog" aria-modal="true" aria-labelledby="wxTitle"><button type="button" class="wx-x" aria-label="' + _esc(_t('wx.close', 'Close')) + '">×</button>' +
@@ -24318,16 +24080,6 @@ var Warnings = (function () {
     wrap._for = forKey;
     wrap.addEventListener('click', function (ev) {
       if (ev.target === wrap || ev.target.closest('.wx-x')) { _closeSheet(); return; }
-      var kb = ev.target.closest('[data-keep]');
-      if (kb) { _read[kb.getAttribute('data-keep')] = 1; _keptAt[kb.getAttribute('data-keep')] = Date.now(); _saveTimes(); _closeSheet(); return; }
-      var rb = ev.target.closest('[data-rm]');
-      if (rb) {
-        remove(rb.getAttribute('data-rm'), Number(rb.getAttribute('data-until')) || 0);
-        var card = rb.closest('.wx-card'); if (card) { card.innerHTML = '<div class="wx-done">' + _esc(_t('wx.removed', 'Removed. It will not show again unless it gets worse.')) + '</div>'; card.style.borderLeftColor = '#334155'; }
-        setTimeout(function () { if (_sheet && !_sheet.querySelector('.wx-card .wx-act')) _closeSheet(); }, 1400);
-        return;
-      }
-      if (ev.target.closest('[data-restore]')) { restoreAll(); _openSheet(forKey); return; }
       var b = ev.target.closest('.wx-names button'); if (!b) return;
       _closeSheet();
       try {
@@ -24350,22 +24102,6 @@ var Warnings = (function () {
     var st = document.getElementById('stage'), cv = document.getElementById('sphere');
     if (!st || !cv) return;
     var down = false;
-    var markAt = function (e) {
-      var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-      for (var i = _marks.length - 1; i >= 0; i--) { var m = _marks[i]; if (Math.hypot(x - m.x, y - m.y) <= m.r) return m.key; }
-      return null;
-    };
-    var markDown = null;
-    ['pointerdown', 'mousedown', 'touchstart'].forEach(function (evt) {
-      st.addEventListener(evt, function (e) { var p = (e.touches && e.touches[0]) || e; var k = markAt(p); if (k) { markDown = k; e.stopImmediatePropagation(); } }, true);
-    });
-    ['pointerup', 'mouseup', 'touchend', 'click'].forEach(function (evt) {
-      st.addEventListener(evt, function (e) {
-        if (!markDown) return;
-        e.stopImmediatePropagation(); e.preventDefault();
-        if (evt === 'pointerup' || evt === 'touchend') { var k = markDown; markDown = null; _openSheet(k); }
-      }, true);
-    });
     var inHit = function (e) {
       var h = window._dreamWarnHit; if (!h) return false;
       var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -24405,7 +24141,7 @@ var Warnings = (function () {
     window.addEventListener('localeChanged', function () { _sig++; _paintChip(true); });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else setTimeout(init, 0);
-  return { refresh: refresh, listFor: listFor, levelFor: levelFor, drawMark: drawMark, briefHtml: briefHtml, frame: frame, open: _openSheet, remove: remove, restoreAll: restoreAll,
+  return { refresh: refresh, listFor: listFor, levelFor: levelFor, drawMark: drawMark, briefHtml: briefHtml, frame: frame, open: _openSheet,
     _setForTest: function (map) { _by = new Map(Object.keys(map).map(function (k) { return [k, map[k]]; })); _at = Date.now(); _sig++; _paintChip(true); },
     get sig() { return _sig; } };
 })();
@@ -26860,13 +26596,11 @@ var RosterImport = (function() {
 })();
 
 function getContactHeadline(contact) {
-  if (contact && contact.cvItem) return contact.cvHeadline || '';
   return SentinelHeadlines.get(contact);
 }
 
 /* ── Quick-action icon drawing for focused spheres ── */
 function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
-  if (contact && contact.cvItem && contact.cvItem.kind !== 'person') return; /* Covara: only people have Video, Phone, Message, Email */
   /* Modern action labels — vertically stacked beside the focused sphere */
   var labelFs = Math.max(10, Math.round(12 * s));
   var lineH = Math.max(22, Math.round(26 * s));
@@ -26896,8 +26630,6 @@ function drawQuickActionIcons(ctx, sx, sy, r, s, contact, t) {
   var pillW = maxW + px * 2;
   var pillH = labelFs + py * 2;
   var cr = 6;
-  /* Covara: where the pills sit, so the left dream window never covers them */
-  window._qaRect = { x0: flipLeft ? startX - pillW : startX, x1: flipLeft ? startX : startX + pillW, y0: startY - lineH / 2, y1: startY + totalH - lineH / 2, sx: sx, sy: sy, r: r, t: Date.now() };
 
   for (var i = 0; i < labels.length; i++) {
     var ly = startY + i * lineH;
@@ -27965,11 +27697,6 @@ async function startVideoWith(c) {
 
 function runContactQuickAction(type, c) {
   if (!c) return;
-  /* Covara: one of HOME's people without a Covara account is messaged by text */
-  if (c.cvItem && c.cvItem.kind === 'person' && type === 'sms') {
-    if (c.phone) window.location.href = 'sms:' + normalizePhone(c.phone); else showToast(I18n.t('qa.noPhone'));
-    return;
-  }
   if (type === 'video') {
     startVideoWith(c);
   } else if (type === 'phone' && c.phone) {
@@ -28100,16 +27827,11 @@ function onPressEnd(e) {
     /* Whole-press travel, not just the final displacement */
     const _totalDist = _pressMaxDist;
 
-    /* Covara: the pills beside HOME's centre sphere */
-    if (pressStarted && !netDragging && _totalDist < NET_DRAG_THRESHOLD && window.CovaraView) {
-      let _cvHit = false; try { _cvHit = window.CovaraView.hitCentre(clientX, clientY); } catch (e) {}
-      if (_cvHit) { pressStarted = false; netDragging = false; stage.classList.remove('pressing'); return; }
-    }
     /* ── Quick-action icon tap: only for a real tap (total drag < 8px) ── */
     if (pressStarted && !netDragging && focusedContactId && _totalDist < NET_DRAG_THRESHOLD) {
       if (focusedContactId) {
         const _qaNode = NODES.find(n => n.contact.id === focusedContactId);
-        if (_qaNode && !(_qaNode.contact.cvItem && _qaNode.contact.cvItem.kind !== 'person')) {
+        if (_qaNode) {
           const _qaP = projectNode(_qaNode);
           const _qaS = _qaP.scale;
           const _qaMul = FOCUS_SCALE;
@@ -28177,8 +27899,8 @@ function onPressEnd(e) {
           sphereTapTimer = null;
           sphereTapTarget = null;
           if (hit.isCenter) {
-            let _cvD = false; try { _cvD = !!(window.CovaraView && window.CovaraView.centreDouble()); } catch (e) {}
-            if (!_cvD) { selectedContact = null; openBluf(sphereBottomY); }
+            selectedContact = null;
+            openBluf(sphereBottomY);
           } else {
             enterDetail(hit.node.contact, sphereBottomY);
           }
@@ -28196,16 +27918,10 @@ function onPressEnd(e) {
             /* Single tap confirmed */
             sphereTapTimer = null;
             var _tapWasCenter = sphereTapTarget && sphereTapTarget.isCenter;
-            var _cvTapId = sphereTapTarget && sphereTapTarget.contactId; /* Covara: whose face was tapped */
             sphereTapTarget = null;
-            /* Covara: one tap on HOME's face opens the care card, on anyone else's the person sheet (covara-person.js) */
-            let _cvP = false; try { if (window.CovaraPerson && localStorage.getItem('rc:role')) _cvP = !!(_tapWasCenter ? CovaraPerson.openCare() : CovaraPerson.open(_cvTapId)); } catch (e) {}
-            if (_cvP) {
-              /* the sheet has it; nothing else opens */
-            } else if (_tapWasCenter) {
-              /* Center sphere tap → open Circle Views panel (Covara: HOME at the centre of AWAY's phone stays put) */
-              let _cvS = false; try { _cvS = !!(window.CovaraView && window.CovaraView.centreSingle()); } catch (e) {}
-              if (!_cvS) SentinelViews.openPanel();
+            if (_tapWasCenter) {
+              /* Center sphere tap → open Circle Views panel */
+              SentinelViews.openPanel();
             } else {
               /* Contact sphere stays focused/enlarged */
               /* Resume gentle spin after focus */
@@ -28385,7 +28101,7 @@ function handleContactPhoto(e) {
     else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
   }).catch(function(err) {
     console.error('RemielDB: photo save FAILED for', contactId, err);
-    showToast(mediaErrText(err));
+    showToast(_t('self.error', 'That file could not be used. Try another photo or clip.'));
   });
 }
 
@@ -28652,28 +28368,16 @@ async function applySelfMedia(file) {
   mediaIsGif = false;
   const blob = f;
   const url = URL.createObjectURL(blob);
-  let img = new Image();
-  const opened = await new Promise((res) => { img.onload = () => res(true); img.onerror = () => res(false); img.src = url; });
-  /* some phones refuse a picture as an <img> but open it as a bitmap: draw that instead */
-  let bm = null;
-  if (!opened || !(img.naturalWidth || img.width)) {
-    try { bm = await createImageBitmap(blob); } catch (e) { bm = null; }
-    if (!bm) {
-      /* a short code on the message says what the phone handed over, so a failure can be traced */
-      const ie = new Error('image'); ie.code = 'image';
-      try { const h = new Uint8Array(await blob.slice(0, 4).arrayBuffer()); ie.detail = (String(blob.type || 'none').replace('image/', '')) + ' ' + (blob.size / 1048576).toFixed(1) + 'MB ' + Array.from(h).map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) {}
-      throw ie;
-    }
-  }
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('image')); img.src = url; });
   mediaType = 'image';
   videoEl.pause();
   videoEl.removeAttribute('src');
-  cachedMediaW = bm ? bm.width : (img.naturalWidth || img.width); cachedMediaH = bm ? bm.height : (img.naturalHeight || img.height);
+  media = img;
+  cachedMediaW = img.naturalWidth || img.width; cachedMediaH = img.naturalHeight || img.height;
   mediaFrame = document.createElement('canvas');
   mediaFrame.width = cachedMediaW; mediaFrame.height = cachedMediaH;
-  mediaFrame.getContext('2d').drawImage(bm || img, 0, 0, cachedMediaW, cachedMediaH);
-  if (bm) { try { bm.close(); } catch (e) {} img = mediaFrame; }
-  media = img;
+  mediaFrame.getContext('2d').drawImage(img, 0, 0, cachedMediaW, cachedMediaH);
   const ok = await RemielDB.putPhoto('self', blob, prep.kind);
   if (ok === false) throw new Error('store');
   await RemielDB.putSetting('selfSphereClearedAt', null).catch(() => {});
@@ -28819,7 +28523,7 @@ const SelfSphere = (() => {
     } catch (err) {
       unbusy(b);
       console.warn('[SelfSphere] update failed', err);
-      _status(root, mediaErrText(err), true);
+      _status(root, _t('self.error', 'That file could not be used. Try another photo or clip.'), true);
     }
   }
 
@@ -29683,9 +29387,9 @@ function drawNetworkView(t) {
   const cx = W / 2, cy = H / 2;
   ctx.clearRect(0, 0, W, H);
 
-  /* Covara: a deep, warm night blue, lighter at the centre where HOME is, so the screen feels inviting rather than black */
-  const bg = ctx.createRadialGradient(cx, cy * 0.9, 0, cx, cy, Math.max(W, H) * 0.8);
-  bg.addColorStop(0, '#173262'); bg.addColorStop(0.45, '#0f2348'); bg.addColorStop(0.8, '#0a1834'); bg.addColorStop(1, '#060f24');
+  /* Deep space background */
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.78);
+  bg.addColorStop(0, '#1b3f7d'); bg.addColorStop(0.55, '#0e2756'); bg.addColorStop(1, '#06142f');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
@@ -29697,12 +29401,8 @@ function drawNetworkView(t) {
   }
 
   /* ── Interaction Memory — dreamy faded image of focused contact ── */
-  /* Covara: the dream picture also shows HOME's medicine that is due, or the entry open in the tabs */
-  let _cvWantDream = false; try { _cvWantDream = !focusedContactId && !!(window.CovaraDreamWanted && window.CovaraDreamWanted()); } catch (e) {}
-  if (focusedContactId || _cvWantDream) {
-    /* Covara: when HOME's medicine is due, its photo is the dream picture */
-    let _cvDream = null; try { if (window.CovaraDream) _cvDream = window.CovaraDream(focusedContactId); } catch (e) {}
-    const _memPhoto = _cvDream || contactPhotos.get(focusedContactId);
+  if (focusedContactId) {
+    const _memPhoto = contactPhotos.get(focusedContactId);
     const _focNode = NODES.find(n => n.contact.id === focusedContactId);
     const _focCat = _focNode ? (CATS[_focNode.contact.cat] || CATS.other) : CATS.other;
     ctx.save();
@@ -29713,16 +29413,11 @@ function drawNetworkView(t) {
     if (_drIso && W <= 480) { _drR = W * 0.30; _drCx = W / 2; _drCy = _drR + H * 0.07; }
     else if (_drIso) { _drR = Math.min(W, H) * 0.40; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
     else { _drR = Math.min(W, H) * 0.28; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
-    /* Covara: a chosen person's picture is large and breathes (window.CovaraDreamPulse) */
-    var _cvPulse = 1; try { if (window.CovaraDreamPulse && focusedContactId) _cvPulse = window.CovaraDreamPulse(t); } catch (e) {}
-    _drR *= _cvPulse;
     ctx.beginPath();
     ctx.arc(_drCx, _drCy, _drR, 0, Math.PI * 2);
     ctx.clip();
     /* Breathing: a clear pulse from dark to light (about 8 s); inside a Unit, bright to full */
     var _dreamAlpha = _drIso ? 0.9 : (_drBoost ? 0.75 + 0.15 * Math.sin(t * 0.0008) : 0.34 + 0.24 * Math.sin(t * 0.0008));
-    if (_cvDream) _dreamAlpha = 0.82 + 0.14 * Math.sin(t * 0.0016);
-    if (_cvPulse !== 1) _dreamAlpha = 0.84 + 0.12 * Math.sin(t * 0.0021);
     if (_memPhoto && _memPhoto.img) {
       const _memImg = _memPhoto.img;
       const _mw = _memPhoto.isVideo ? _memImg.videoWidth : (_memImg.naturalWidth || _memImg.width);
@@ -29772,9 +29467,7 @@ function drawNetworkView(t) {
     /* COMMUNICATION | WHEREIS: the small toggle line under the member's picture */
     var _dreamWhere = false;
     try {
-      /* Covara: WHEREIS is always about HOME, so it is there on AWAY's main screen too */
-      var _cvWhereOn = false; try { _cvWhereOn = !!(window.CovaraWhere && window.CovaraWhere.on()); } catch (e) {}
-      if (typeof WhereIs !== 'undefined' && (_cvWhereOn || (_focNode && !_focNode.contact.cvItem))) {
+      if (typeof WhereIs !== 'undefined') {
         /* The focused sphere's action pills (Video, Phone, Message, Email) must stay clear of the line */
         var _tgAvoid = null;
         try {
@@ -29787,11 +29480,10 @@ function drawNetworkView(t) {
           } else window._focusOrb = null;
         } catch (e) { _tgAvoid = null; window._focusOrb = null; }
         window._dreamPillAvoid = _tgAvoid;
-        WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId || (_cvWhereOn ? 'covara-home' : null), _tgAvoid);
+        WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId, _tgAvoid);
         _dreamWhere = WhereIs.mode() === 'whereis';
-        if (_dreamWhere && _cvWhereOn) { try { WhereIs.bind(); } catch (e) {} window.CovaraWhere.draw(ctx, W, H, t, window._dreamRect); }
-        else if (_dreamWhere) WhereIs.drawDream(ctx, W, H, focusedContactId, t, window._dreamRect, _focNode, _focCat);
-        else { window._dreamWhereHit = null; window._dreamMicroHit = null; try { if (window.CovaraWhere) window.CovaraWhere.hide(); } catch (e) {} }
+        if (_dreamWhere) WhereIs.drawDream(ctx, W, H, focusedContactId, t, window._dreamRect, _focNode, _focCat);
+        else { window._dreamWhereHit = null; window._dreamMicroHit = null; }
       }
     } catch (e) { window._dreamWhereHit = null; window._dreamMicroHit = null; }
     /* The communication summary beside the picture is HTML (#dreamBrief), placed by Comm.frame,
@@ -29925,7 +29617,6 @@ function drawNetworkView(t) {
 
   /* ── Helper: draw one contact sphere with all its decorations ── */
   function _drawOneContactSphere({ node, p }, alphaOverride) {
-    try { if (alphaOverride == null && window.CovaraSphereAlpha) alphaOverride = window.CovaraSphereAlpha(node); } catch (e) {}
     const cat = CATS[node.contact.cat] || CATS.other;
     const sev = SEVS[node.contact.sev];
     const col = `rgb(${cat.r},${cat.g},${cat.b})`;
@@ -29988,8 +29679,7 @@ function drawNetworkView(t) {
     }
 
     /* Glass-orb lighting: volume, key light, glint, coloured rim */
-    /* Covara: the revolving spheres are see-through glass with a lit edge, as on Sentinel's (window.CovaraGlassOrbs) */
-    try { drawOrbLight(ctx, sx, sy, r, cat, (alphaOverride || 1), !!(cPhoto && cPhoto.img) || !!window.CovaraGlassOrbs); } catch (e) {}
+    try { drawOrbLight(ctx, sx, sy, r, cat, (alphaOverride || 1), !!(cPhoto && cPhoto.img)); } catch (e) {}
 
     /* ── Inner energy ring (category-colored) ── */
     const _cRing = (typeof Biometrics !== 'undefined' && Biometrics.getRingState)
@@ -30252,7 +29942,7 @@ function drawNetworkView(t) {
     }
 
     /* Urgency label for sev 0 or 1 */
-    if (isUrgent && s > 0.38 && node._lblName !== 0.28 && !node.contact.cvItem) {
+    if (isUrgent && s > 0.38 && node._lblName !== 0.28) {
       ctx.globalAlpha = (0.55 + 0.35 * pulseA) * (alphaOverride || 1);
       ctx.font = `600 ${Math.round(9 * s)}px "Hanken Grotesk", system-ui, sans-serif`;
       ctx.fillText(sevLabel(node.contact.sev).toLowerCase(), sx, _roleTxt ? _roleY + 12 : sy + r + 24 * s);
@@ -30271,7 +29961,7 @@ function drawNetworkView(t) {
     /* ── Official warning where this person is ── */
     try {
       const _wl = Warnings.levelFor(node.contact.id);
-      if (_wl >= 2) Warnings.drawMark(ctx, sx + r * 0.78, sy - r * 0.78, Math.max(6, Math.min(16, r * 0.36)), _wl, alphaOverride || 1, t, node.contact.id);
+      if (_wl >= 2) Warnings.drawMark(ctx, sx + r * 0.78, sy - r * 0.78, Math.max(6, Math.min(16, r * 0.36)), _wl, alphaOverride || 1, t);
     } catch (e) {}
 
     /* ── Quick-action icons beneath focused/enlarged sphere ── */
@@ -30331,18 +30021,6 @@ function drawNetworkView(t) {
 
   ctx.globalCompositeOperation = 'source-over';
 
-  /* Covara: on AWAY's phone HOME is the centre sphere: HOME's name and picture */
-  let _cvc = null; try { if (window.CovaraView) _cvc = window.CovaraView.centre(); } catch (e) {}
-  if (_cvc && _cvc.frame && _cvc.w > 0 && _cvc.h > 0) {
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, cr * 0.82, 0, Math.PI * 2); ctx.clip();
-    ctx.globalAlpha = 1.0;
-    PhotoFit.draw(ctx, _cvc.frame, _cvc.w, _cvc.h, cx, cy, cr * 0.82, null);
-    const _cvVig = ctx.createRadialGradient(cx, cy, cr * 0.35, cx, cy, cr * 0.84);
-    _cvVig.addColorStop(0, 'rgba(0,0,0,0)'); _cvVig.addColorStop(0.72, 'rgba(4,2,10,0.25)'); _cvVig.addColorStop(0.88, 'rgba(4,2,10,0.65)'); _cvVig.addColorStop(1, 'rgba(4,2,10,0.95)');
-    ctx.fillStyle = _cvVig; ctx.fillRect(cx - cr, cy - cr, cr * 2, cr * 2);
-    ctx.restore();
-  } else if (!_cvc) {
   /* Media (photo/video) clipped inside the center sphere — always draw from mediaFrame */
   /* Fallback: if media loaded but mediaFrame was never captured, build it now */
   if (!mediaFrame && media) {
@@ -30387,9 +30065,8 @@ function drawNetworkView(t) {
     ctx.restore();
   }
 
-  } /* end own media (Covara) */
   /* Glass-orb lighting on my own sphere */
-  try { drawOrbLight(ctx, cx, cy, cr, uc, 1, _cvc ? !!_cvc.frame : !!mediaFrame); } catch (e) {}
+  try { drawOrbLight(ctx, cx, cy, cr, uc, 1, !!mediaFrame); } catch (e) {}
 
   /* Inner energy ring (category), enhanced by BioMotion. Ring state comes from
      Biometrics.getRingState: heart rate works even when motion is off. */
@@ -30458,8 +30135,8 @@ function drawNetworkView(t) {
   }
 
   /* User initials (only if no media loaded) */
-  if (_cvc ? !_cvc.frame : !mediaFrame) {
-    const userInit = ((_cvc && _cvc.name) || userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0,2) || 'ME';
+  if (!mediaFrame) {
+    const userInit = (userSphereName || 'ME').split(/\s+/).map(w => (w[0] || '')).join('').toUpperCase().slice(0,2) || 'ME';
     ctx.fillStyle = `rgba(10,8,20,0.88)`;
     ctx.font = `bold ${Math.round(cr * 0.5)}px "Hanken Grotesk", system-ui, sans-serif`;
     ctx.textAlign = 'center';
@@ -30474,9 +30151,7 @@ function drawNetworkView(t) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   const _nameY = cy + centerR * 1.1 + 6; /* fixed position based on unbreathed centerR */
-  ctx.fillText((_cvc && _cvc.name) || userSphereName || 'You', cx, _nameY);
-  /* Covara: Appointments, Medications, Subscriptions (and Video, Phone, Message, Email on AWAY's phone) */
-  try { if (window.CovaraView) window.CovaraView.drawCentre(ctx, cx, cy, centerR, t); } catch (e) {}
+  ctx.fillText(userSphereName || 'You', cx, _nameY);
   ctx.textBaseline = 'alphabetic';
 
   /* ── Circle Aggregate HUD — only on center sphere (command center) ── */
@@ -30506,7 +30181,7 @@ function drawNetworkView(t) {
   }
 
   /* Official warning where I am */
-  try { const _swl = Warnings.levelFor('self'); if (_swl >= 2) Warnings.drawMark(ctx, cx + centerR * 0.74, cy - centerR * 0.74, Math.max(9, centerR * 0.16), _swl, 1, t, 'self'); } catch (e) {}
+  try { const _swl = Warnings.levelFor('self'); if (_swl >= 2) Warnings.drawMark(ctx, cx + centerR * 0.74, cy - centerR * 0.74, Math.max(9, centerR * 0.16), _swl, 1, t); } catch (e) {}
   } /* end centre sphere (not drawn in ISO VIEW) */
 
   /* ── PASS 2: Draw contact spheres IN FRONT of center (with transparency) ── */
@@ -41465,7 +41140,6 @@ const SentinelCall = (function() {
   let _guestConnected = false; /* this guest call reached picture and sound */
   let _guestShared = null;   /* null not sent, else 'pending' | 'accepted' | 'failed' */
   let _guestRelabel = null;  /* re-applies the guest card's wording */
-  let _guestCircle = false;  /* a guest of the circle calling in (family code) */
 
   function checkCallInvite() {
     const params = new URLSearchParams(window.location.search);
@@ -41475,9 +41149,6 @@ const SentinelCall = (function() {
     const hn = (params.get('n') || '').replace(/[<>"]/g, '').trim().slice(0, 30);
     _guestHostName = hn;
     const gn = (params.get('g') || '').replace(/[<>"]/g, '').trim().slice(0, 30);
-    /* gj=1: a guest of this circle (joined with the family code) calling in, not someone being called */
-    _guestCircle = params.get('gj') === '1';
-    try { document.body.classList.add('cv-guest-call'); } catch (e) {}
     const room = params.get('room');
     _guestRoom = (room && /^[A-Za-z0-9-]{4,40}$/.test(room)) ? room : null;
     const m = params.get('m');
@@ -41498,11 +41169,10 @@ const SentinelCall = (function() {
       /* After a call that connected, the card says so instead of "is calling you" */
       const ended = _guestConnected && !_currentCall && !_group;
       if (_gt) _gt.textContent = ended ? _t('guest.endedTitle', 'Call ended')
-        : _guestCircle ? _tp('guest.circleTitle', 'Video call {name}', { name: _guestHostName || '' })
         : (_guestHostName ? _tp('guest.callingYou', '{name} is calling you', { name: _guestHostName }) : _t('guest.title', 'Video Call'));
-      if (_gs) _gs.textContent = ended ? '' : _guestCircle ? _tp('guest.circleSub', 'You are a guest in {name}\'s circle. Call any time from this same link.', { name: _guestHostName || '' }) : _t('guest.sub', 'Enter your name to join the call');
+      if (_gs) _gs.textContent = ended ? '' : _t('guest.sub', 'Enter your name to join the call');
       if (_gi) _gi.placeholder = _t('guest.namePh', 'Your name');
-      if (_gb && !_gb.dataset.joining) _gb.textContent = ended ? _tp('guest.callAgain', 'Call {name} again', { name: _guestHostLabel() }) : _guestCircle ? _tp('guest.callNow', 'Call {name}', { name: _guestHostLabel() }) : _t('guest.join', 'Join Call');
+      if (_gb && !_gb.dataset.joining) _gb.textContent = ended ? _tp('guest.callAgain', 'Call {name} again', { name: _guestHostLabel() }) : _t('guest.join', 'Join Call');
     };
     _guestRelabel = _guestLabels;
     _guestLabels();
@@ -43105,7 +42775,7 @@ async function saveContactModal() {
           const shown = await SphereMedia.show(_cmEditId, prep.blob, prep.kind);
           if (shown && shown.failed) showToast(SphereMedia.cannotPlayNotice());
           else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
-        } catch (e) { console.error('Modal photo save FAILED', _cmEditId, e); showToast(mediaErrText(e)); }
+        } catch (e) { console.error('Modal photo save FAILED', _cmEditId, e); }
       }
 
       // Rebuild constellation nodes and refresh BLUF
@@ -43142,7 +42812,7 @@ async function saveContactModal() {
         const shown = await SphereMedia.show(newId, prep.blob, prep.kind);
         if (shown && shown.failed) showToast(SphereMedia.cannotPlayNotice());
         else if (prep.localOnly) showToast(SphereMedia.localOnlyNotice());
-      } catch(e) { console.error('Modal photo save FAILED', newId, e); showToast(mediaErrText(e)); }
+      } catch(e) { console.error('Modal photo save FAILED', newId, e); }
     }
 
     // Rebuild constellation nodes
@@ -43815,7 +43485,7 @@ var AlarmCenter = (function () {
       '.help-hold-btn{position:relative;overflow:hidden;display:block;width:100%;padding:14px;border-radius:12px;border:2px solid #E10600;background:transparent;color:#ff3b30;font:inherit;font-size:15px;font-weight:800;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}' +
       '.help-hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(225,6,0,.3)}' +
       '.help-fab{position:fixed;z-index:8000;box-sizing:border-box;border:1px solid #FF1E1E;background:transparent;color:#FF1E1E;font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;line-height:1;padding:0 12px;border-radius:14px;display:none;align-items:center;justify-content:center;cursor:pointer}' +
-      '.help-fab.on{display:flex;background:rgba(24,4,10,.82);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 0 14px rgba(255,30,30,.35)}.help-fab:focus-visible{outline:2px solid #C5A55A;outline-offset:2px}' +
+      '.help-fab.on{display:flex}.help-fab:focus-visible{outline:2px solid #C5A55A;outline-offset:2px}' +
       'body.rs-overlay-open .help-fab{display:none !important}' +
       '.help-card-wrap{position:fixed;inset:0;z-index:8800;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}' +
       '.help-card{position:relative;width:min(440px,100%);background:#10131c;border:2px solid #E10600;border-radius:18px;padding:20px 16px 16px;color:#e8ecf4;box-shadow:0 12px 40px rgba(0,0,0,.6)}' +
@@ -43928,8 +43598,7 @@ var AlarmCenter = (function () {
     el.setAttribute('aria-labelledby', 'alarmTkTitle');
     function add(tag, cls, text, id) { var n = document.createElement(tag); n.className = cls; if (id) n.id = id; n.textContent = text; el.appendChild(n); return n; }
     add('div', 'tk-lvl', _t('alarm.urgent', 'URGENT'));
-    var _tkTitle = add('div', 'tk-title', a.title, 'alarmTkTitle');
-    try { if (window.CovaraTeams) CovaraTeams.alarm(a, _tkTitle); } catch (e) {} /* Covara teams: whose team it is from, and a tap goes there */
+    add('div', 'tk-title', a.title, 'alarmTkTitle');
     if (a.body) add('div', 'tk-body', a.body);
     if (a.raised_by_name && a.raised_by !== _myId()) add('div', 'tk-meta', _t('alarm.from', 'From {name}', { name: a.raised_by_name }));
     if (a.escalation_step > 0) add('div', 'tk-meta', _t('alarm.escalated', 'Escalated: nobody acknowledged it in time.'));
@@ -43973,7 +43642,6 @@ var AlarmCenter = (function () {
       lvl.className = 'alarm-lvl';
       lvl.textContent = a.level === 3 ? _t('alarm.urgent', 'URGENT') : _t('alarm.attention', 'ATTENTION');
       var ti = document.createElement('div'); ti.className = 'alarm-title'; ti.textContent = a.title;
-      try { if (window.CovaraTeams) CovaraTeams.alarm(a, ti); } catch (e) {} /* Covara teams: whose team it is from, and a tap goes there */
       bar.appendChild(lvl); bar.appendChild(ti);
       if (a.body) { var bo = document.createElement('div'); bo.className = 'alarm-body'; bo.textContent = a.body; bar.appendChild(bo); }
       if (a.escalation_step > 0) { var es = document.createElement('div'); es.className = 'alarm-esc'; es.textContent = _t('alarm.escalated', 'Escalated: nobody acknowledged it in time.'); bar.appendChild(es); }
@@ -44341,16 +44009,11 @@ var AlarmCenter = (function () {
     var b = _fab();
     var ex = document.getElementById('exitBtn');
     var er = ex ? ex.getBoundingClientRect() : null;
-    /* Help lives under Exit; where Exit is hidden (Simple mode hides it), Help stays, at the top right on its own.
-       Before, Help vanished with Exit, so HOME's simple screen had no Help button at all. */
-    var on = _authed() && !_locked();
+    /* Help lives under Exit: it shows only while Exit does */
+    var on = _authed() && !_locked() && !!(er && er.width && er.height);
     b.classList.toggle('on', on);
-    if (on && !(er && er.width && er.height)) {
-      b.style.width = ''; b.style.height = '40px'; b.style.fontSize = '13px';
-      b.style.top = 'calc(' + (document.body.classList.contains('cv-team-other') ? 64 : 18) + 'px + env(safe-area-inset-top, 0px))'; b.style.right = '16px';
-    }
-    if (on && er && er.width && er.height) {
-      var r = er; b.style.fontSize = '';
+    if (on) {
+      var r = er;
       if (r.width && r.height) {
         /* A compact pill: about two thirds of Exit's height, as wide as its word */
         b.style.width = '';
@@ -45783,32 +45446,6 @@ try { _resolveAppScriptReady(); } catch (e) {}
 
   <!-- Hidden host for GIF images so browser keeps animating them for canvas -->
   <div id="gifAnimationHost"></div>
-  <script src="covara-teams.js" defer></script>
-  <script src="covara-care.js" defer></script>
-  <script src="covara-label.js" defer></script>
-  <script src="covara-view.js" defer></script>
-  <script src="covara-where.js" defer></script>
-  <script src="covara-camera.js" defer></script>
-  <script src="covara-talk.js" defer></script>
-  <script src="covara-nav.js" defer></script>
-  <script src="covara-callwave.js" defer></script>
-  <script src="covara-sleep.js" defer></script>
-  <script src="covara-glass.js" defer></script>
-  <script src="covara-join.js" defer></script>
-  <script src="covara-help.js" defer></script>
-  <script src="covara-headline.js" defer></script>
-  <script src="covara-night.js" defer></script>
-  <script src="covara-plan.js" defer></script>
-  <script src="covara-now.js" defer></script>
-  <script src="covara-person.js" defer></script>
-  <script src="covara-words.js" defer></script>
-  <script src="covara-simple.js" defer></script>
-  <script src="covara-guide.js" defer></script>
-  <script src="covara-learn.js" defer></script>
-  <script src="covara-notes.js" defer></script>
-  <script src="covara-emergency.js" defer></script>
-  <script src="covara-main.js" defer></script>
-  <script src="covara-ring.js" defer></script>
-  <script src="covara-records.js" defer></script>
+<script src="covara.js?v=200"></script>
 </body>
 </html>
