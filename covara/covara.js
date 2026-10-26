@@ -468,7 +468,6 @@
       mode = 'person'; forId = c.id;
       var keys = ['video', 'phone', 'message', 'email', 'where', 'alert'];
       if (c.care && c.care.state === 'pending' && c.care.side === 'home') keys = ['add'];
-      else if (!onCovara(c)) keys = ['video', 'phone', 'email', 'invite'];   /* not on Covara yet: reach them, and invite them */
       make(keys, function (x) { personPick(x, c); });
     }
     function clear() { mode = null; forId = null; el.innerHTML = ''; els = []; }
