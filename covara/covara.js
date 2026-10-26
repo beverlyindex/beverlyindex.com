@@ -83,6 +83,7 @@
     '.cvq b{position:absolute;left:-23px;top:-23px;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;',
     'background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.28) 0,rgba(150,210,255,.10) 32%,rgba(40,110,220,.06) 70%,rgba(20,60,140,.04) 100%);',
     'box-shadow:0 0 0 1.5px rgba(126,220,255,.85) inset,0 0 16px rgba(56,189,248,.45);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);animation:cvBreath 3.2s ease-in-out infinite}',
+    '.cvq b img{width:24px;height:24px;display:block;object-fit:contain;pointer-events:none;filter:drop-shadow(0 0 4px rgba(120,210,255,.6));opacity:.95}',
     '.cvq b svg{width:22px;height:22px;display:block;stroke:#dff4ff;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 4px rgba(120,210,255,.6))}',
     '.cvq.alert b{box-shadow:0 0 0 1.5px #ff2a2a inset,0 0 16px rgba(255,40,40,.55);background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.26) 0,rgba(255,150,150,.10) 32%,rgba(220,30,40,.06) 70%,rgba(120,0,10,.04) 100%)}',
     '.cvq.alert b svg{stroke:#ffdede;filter:drop-shadow(0 0 4px rgba(255,80,80,.7))}',
@@ -313,7 +314,12 @@
     meds: '<rect x="7" y="3" width="10" height="5" rx="1"/><rect x="6" y="8" width="12" height="13" rx="2"/><path d="M12 11.5v6M9 14.5h6"/>',
     records: '<path d="M4 7h6l2 2h8v10H4z"/><rect x="9" y="12" width="6" height="5" rx="1"/><path d="M10.5 12v-1.2a1.5 1.5 0 0 1 3 0V12"/>'
   };
-  function svg(k) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.covara) + '</svg>'; }
+  /* 26 Oct: Contact, Health, Journal, Tools and Covara use his own icons, white on a transparent background */
+  var PIC = { contact: 1, health: 1, journal: 1, tools: 1, covara: 1 };
+  function svg(k) {
+    if (PIC[k]) return '<img src="icons/' + k + '.png?v=1" alt="" aria-hidden="true" draggable="false">';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.covara) + '</svg>';
+  }
   function today() {
     var d = new Date(), loc = IT() ? 'it' : 'en-US';
     var day = d.toLocaleDateString(loc, { weekday: 'long' }); day = day.charAt(0).toUpperCase() + day.slice(1);
