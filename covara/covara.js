@@ -26,10 +26,13 @@
       cTitle: 'Team code', cSub: 'Give this code to the person joining your team. It works for 24 hours.', cFail: 'A code could not be made. Check the internet.', cShare: 'Share', cCopied: 'Copied.',
       added: '{n} is on your team.', pending: 'wants to join',
       pVideo: 'Video', pPhone: 'Phone', imp: 'Import Contacts',
-      impSub: 'Choose people from this phone. Their names, numbers, email and photos come with them.', impPick: 'Choose from this phone',
-      impFileSub: 'This browser cannot open your phone contacts. Export your contacts as a vCard (.vcf) file, then choose it here. Photos come with them.', impFile: 'Choose a contacts file',
-      impAll: 'Select all', impGo: 'Add {n} to my team', impNone: 'Tick at least one name.', impEmpty: 'No contacts were found in that file.',
-      impDone: '{n} added to your team.', impPh: '{n} with photos.', impDup: '{n} already on your team.', impNoNew: 'Everyone chosen is already on your team.', impFail: 'The contacts could not be read.', impBusy: 'Adding…',
+      impNo: 'This browser does not let Covara open the contacts on this device.', impAsk: 'Would you like to select and add your contacts?',
+      impAll: 'Select all', impGo: 'Add {n} to my team', impNone: 'Tick at least one name.', impHave: 'Already on your Covara app',
+      impDone: '{n} added to your team.', impPh: '{n} with photos.', impFail: 'The contacts could not be read.', impBusy: 'Adding…',
+      impDupQ: 'The contact is already on your Covara app. Would you like to add this contact’s information or replace to update Covara with the latest information?',
+      impAdd: 'Add', impRep: 'Replace', impAddd: 'Covara now has the information of {n} from your phone.', impRepd: '{n} is updated with the latest information.',
+      rAdd: 'Add', rDel: 'Delete', rDelOn: 'Done', rPick: 'Tap a name to delete',
+      dTitle: 'Delete {n}?', dSub: '{n} is removed from Covara on this phone.', dSubL: '{n} is removed from Covara on this phone and leaves your team.', dGo: 'Delete', dDone: '{n} is deleted.', dFail: 'Could not delete. Check the internet.',
       callOne: '{n} is not on Covara yet, so {n} cannot be called. Give {n} your team code: tap your sphere, then Covara, then Team code.',
       callMany: '{n} are not on Covara yet, so they cannot be called. Give them your team code: tap your sphere, then Covara, then Team code.',
       jTitle: 'Join a team', jSub: 'Someone gave you their team code? Type it here.', jPh: '6-digit code', jGo: 'Join', jBad: 'That code is not right, or it has expired. Ask for a new one.',
@@ -53,10 +56,13 @@
       cTitle: 'Codice team', cSub: 'Dai questo codice a chi entra nel tuo team. Vale 24 ore.', cFail: 'Non è stato possibile creare un codice. Controlla internet.', cShare: 'Condividi', cCopied: 'Copiato.',
       added: '{n} è nel tuo team.', pending: 'vuole entrare',
       pVideo: 'Video', pPhone: 'Telefono', imp: 'Importa contatti',
-      impSub: 'Scegli le persone da questo telefono. Nomi, numeri, email e foto arrivano con loro.', impPick: 'Scegli da questo telefono',
-      impFileSub: 'Questo browser non può aprire i contatti del telefono. Esporta i contatti come file vCard (.vcf), poi sceglilo qui. Le foto arrivano con loro.', impFile: 'Scegli un file di contatti',
-      impAll: 'Seleziona tutti', impGo: 'Aggiungi {n} al team', impNone: 'Spunta almeno un nome.', impEmpty: 'Nel file non ci sono contatti.',
-      impDone: '{n} aggiunti al team.', impPh: '{n} con foto.', impDup: '{n} già nel team.', impNoNew: 'Tutte le persone scelte sono già nel team.', impFail: 'Non è stato possibile leggere i contatti.', impBusy: 'Aggiungo…',
+      impNo: 'Questo browser non permette a Covara di aprire i contatti del dispositivo.', impAsk: 'Vuoi selezionare e aggiungere i tuoi contatti?',
+      impAll: 'Seleziona tutti', impGo: 'Aggiungi {n} al team', impNone: 'Spunta almeno un nome.', impHave: 'Già nella tua app Covara',
+      impDone: '{n} aggiunti al team.', impPh: '{n} con foto.', impFail: 'Non è stato possibile leggere i contatti.', impBusy: 'Aggiungo…',
+      impDupQ: 'Il contatto è già nella tua app Covara. Vuoi aggiungere le informazioni di questo contatto o sostituirle per aggiornare Covara con le più recenti?',
+      impAdd: 'Aggiungi', impRep: 'Sostituisci', impAddd: 'Covara ora ha le informazioni di {n} dal telefono.', impRepd: '{n} è aggiornato con le informazioni più recenti.',
+      rAdd: 'Aggiungi', rDel: 'Elimina', rDelOn: 'Fatto', rPick: 'Tocca un nome da eliminare',
+      dTitle: 'Eliminare {n}?', dSub: '{n} viene tolto da Covara su questo telefono.', dSubL: '{n} viene tolto da Covara su questo telefono ed esce dal team.', dGo: 'Elimina', dDone: '{n} è stato eliminato.', dFail: 'Non è stato possibile eliminare. Controlla internet.',
       callOne: '{n} non è ancora su Covara, quindi non si può chiamare. Dai a {n} il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       callMany: '{n} non sono ancora su Covara, quindi non si possono chiamare. Dai loro il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       jTitle: 'Entra in un team', jSub: 'Qualcuno ti ha dato il suo codice team? Scrivilo qui.', jPh: 'Codice di 6 cifre', jGo: 'Entra', jBad: 'Il codice non è giusto o è scaduto. Chiedine uno nuovo.',
@@ -147,6 +153,8 @@
     'html.cv .sentinel-msg-overlay{z-index:9500!important}',
     '#cvRoster{position:fixed;right:max(10px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:8980;width:min(168px,40vw);font-family:"Hanken Grotesk",system-ui,sans-serif}#cvRoster[hidden]{display:none}',
     '#cvRoster .cvro-list{max-height:150px;scroll-snap-type:y mandatory;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,210,77,.45) transparent;-webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);mask-image:linear-gradient(180deg,#000 88%,transparent)}',
+    '.cvro-btns{display:flex;gap:8px;margin-top:8px}.cvro-b{flex:1;text-align:center;padding:6px 0;border-radius:14px;border:1px solid rgba(255,210,77,.55);background:rgba(20,44,100,.28);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#ffd24d;font:700 12px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}.cvro-b.on{border-color:rgba(255,90,90,.8);color:#ff8a8a}',
+    '.cvro-hint{margin-top:4px;color:#ff8a8a;font:600 11px "Hanken Grotesk",system-ui,sans-serif;text-shadow:0 0 8px rgba(0,20,60,.9)}#cvRoster:has(.cvro-b.on) .cvro-row{color:#ff9d9d;opacity:1}',
     '.cvro-row{scroll-snap-align:start;display:flex;align-items:center;gap:8px;height:30px;padding:0 4px;cursor:pointer;color:#ffd24d;opacity:.72;font-size:13px;font-weight:600;white-space:nowrap;text-shadow:0 0 8px rgba(0,20,60,.9)}',
     '.cvro-row span{overflow:hidden;text-overflow:ellipsis}.cvro-row.on{opacity:1}.cvro-row:hover{opacity:1}',
     '.cvro-row i{flex:0 0 22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 9px "JetBrains Mono",monospace;font-style:normal;color:#04203a;background:radial-gradient(circle at 34% 28%,#e8fbff 0,#7ee3ff 35%,#38bdf8 70%,#1e6fb8 100%);background-size:cover;background-position:center;box-shadow:0 0 8px rgba(56,189,248,.5)}',
@@ -583,12 +591,12 @@
      A tap on a name brings that person's sphere on screen. Shown when the team is larger than ten. ── */
   var roster = (function () {
     var el = document.createElement('div'); el.id = 'cvRoster';
-    var sig = '';
+    var sig = '', del = false;
     function photo(c) { try { var p = contactPhotos.get(c.id); return p && p.img && p.img.src && !p.isVideo ? p.img.src : ''; } catch (e) { return ''; } }
     function paint() {
       if (!document.body) return;
       var all = people();
-      var show = all.length > SHOWN && typeof appState !== 'undefined' && appState === 'network';
+      var show = typeof appState !== 'undefined' && appState === 'network';
       /* on a phone, the roster steps aside while someone is chosen, so their labels have the room */
       try { if (show && focusedContactId != null && window.innerWidth < 700) show = false; } catch (e) {}
       if (!show) { el.hidden = true; return; }
@@ -596,18 +604,21 @@
       el.hidden = false;
       var on = {}; onScreen().forEach(function (c) { on[c.id] = 1; });
       var list = all.slice().sort(function (a, b) { return nameKey(a).localeCompare(nameKey(b)); });
-      var s2 = list.map(function (c) { return c.id + (on[c.id] ? '+' : '') + photo(c).slice(-8); }).join() + IT();
+      var s2 = list.map(function (c) { return c.id + (on[c.id] ? '+' : '') + photo(c).slice(-8); }).join() + IT() + del;
       if (s2 === sig) return; sig = s2;
       var top = el.querySelector('.cvro-list'), keep = top ? top.scrollTop : 0;
       el.innerHTML = '<div class="cvro-list">' + list.map(function (c) {
         var ph = photo(c), ini = ((c.first || '')[0] || '') + ((c.last || '')[0] || '');
         var nm = c.last ? esc(c.last) + ', ' + esc(c.first || '') : esc(c.first || '');
         return '<div class="cvro-row' + (on[c.id] ? ' on' : '') + '" role="button" tabindex="0" data-id="' + esc(c.id) + '"><i' + (ph ? ' style="background-image:url(' + ph + ')"' : '') + '>' + (ph ? '' : esc(ini.toUpperCase())) + '</i><span>' + nm + '</span></div>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' + (del ? '<div class="cvro-hint">' + esc(t('rPick')) + '</div>' : '') +
+        '<div class="cvro-btns"><span class="cvro-b" role="button" tabindex="0" data-add>' + esc(t('rAdd')) + '</span><span class="cvro-b' + (del ? ' on' : '') + '" role="button" tabindex="0" data-del>' + esc(del ? t('rDelOn') : t('rDel')) + '</span></div>';
       el.querySelector('.cvro-list').scrollTop = keep;
       Array.prototype.forEach.call(el.querySelectorAll('.cvro-row'), function (row) {
-        press(row, function () { var c = all.filter(function (x) { return String(x.id) === row.getAttribute('data-id'); })[0]; if (c) pin(c); });
+        press(row, function () { var c = all.filter(function (x) { return String(x.id) === row.getAttribute('data-id'); })[0]; if (!c) return; if (del) deleteCard(c); else pin(c); });
       });
+      press(el.querySelector('[data-add]'), function () { del = false; sig = ''; paint(); addCard(); });
+      press(el.querySelector('[data-del]'), function () { del = !del; sig = ''; paint(); });
     }
     function box() { if (el.hidden || !el.parentNode) return null; var r = el.getBoundingClientRect(); return r.width ? r : null; }
     return { paint: paint, box: box };
@@ -790,7 +801,7 @@
       case 'broadcast': lsSet('rc:broadcast', broadcastOn() ? '0' : '1'); toast(broadcastOn() ? t('bcOn') : t('bcOff')); return;
       case 'speak': lsSet('rc:speak', speakOn() ? '0' : '1'); toast(speakOn() ? t('spOn') : t('spOff')); return;
       case 'code': return codeCard();
-      case 'imp': return importCard();
+      case 'imp': return importContacts();
       case 'settings': try { SettingsPanel.open(); } catch (e) {} return;
       default: toast(t('soon', { x: k === 'daily' ? today() : t(k) }));
     }
@@ -1014,103 +1025,153 @@
       setTimeout(function () { el.remove(); }, r.ok ? 2200 : 6000);
     }
   }
-  /* Import Contacts (Covara > Import Contacts, 26 Oct): people come in from the phone with their names, numbers,
-     email and photos. Android's browser opens the phone's own contact list. Safari (iPhone and Mac) cannot, so
-     there the contacts come from a vCard (.vcf) file exported from the Contacts app. Everyone is checked
-     before anything is added, and Sentinel's own routine saves them (photos included, no duplicates). */
+  /* Import Contacts (Covara > Import Contacts, 26 Oct): one press opens the contact list already on the phone.
+     The people chosen come in with their names, numbers, email and photos. Anyone already on Covara is
+     matched by number, email or name, and HOME decides for each one: Add (fill in what Covara is missing)
+     or Replace (Covara takes the phone's latest details). Nothing is exported and no file is used. */
   function canPick() { try { return 'contacts' in navigator && 'select' in navigator.contacts; } catch (e) { return false; } }
   function splitName(full) { var p = String(full || '').trim().split(/\s+/); return { first: p[0] || '', last: p.slice(1).join(' ') }; }
-  function vUnesc(v) { return String(v || '').replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1').trim(); }
-  function b64Blob(b64, type) {
-    try { var bin = atob(String(b64).replace(/\s+/g, '')), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: type || 'image/jpeg' }); } catch (e) { return null; }
+  function fullName(c) { return [c.first, c.last].filter(Boolean).join(' ').trim(); }
+  function existing(x) {
+    var ph = digits(x.phone), em = String(x.email || '').trim().toLowerCase(), nm = fullName(x).toLowerCase();
+    return people().filter(function (c) {
+      if (ph && ph.length >= 7 && digits(c.phone) === ph) return true;
+      if (em && String(c.email || '').trim().toLowerCase() === em) return true;
+      return !!nm && fullName(c).toLowerCase() === nm;
+    })[0] || null;
   }
-  function parseVcf(text) {
-    var out = [], cards = String(text || '').replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '').split(/BEGIN:VCARD/i).slice(1);
-    cards.forEach(function (card) {
-      var c = { first: '', last: '', phone: '', email: '', photo: null, extra: [] }, fn = '';
-      card.split('\n').forEach(function (line) {
-        var k = line.indexOf(':'); if (k < 0) return;
-        var head = line.slice(0, k), val = line.slice(k + 1), name = head.split(';')[0].replace(/^item\d+\./i, '').toUpperCase();
-        if (name === 'FN') fn = vUnesc(val);
-        else if (name === 'N') { var n = val.split(';'); c.last = vUnesc(n[0]); c.first = vUnesc([n[1], n[2]].filter(Boolean).join(' ')); }
-        else if (name === 'TEL') { var tel = vUnesc(val.replace(/^tel:/i, '')); if (!c.phone) c.phone = tel; else c.extra.push(tel); }
-        else if (name === 'EMAIL') { var em = vUnesc(val); if (!c.email) c.email = em; }
-        else if (name === 'PHOTO' && !c.photo) {
-          var m = /^data:([^;,]+);base64,(.*)$/i.exec(val);
-          if (m) c.photo = b64Blob(m[2], m[1]);
-          else if (/ENCODING=(b|base64)/i.test(head) || /^[A-Za-z0-9+\/=\s]{200,}$/.test(val)) { var ty = /TYPE=([A-Za-z]+)/i.exec(head); c.photo = b64Blob(val, 'image/' + (ty ? ty[1].toLowerCase().replace('jpg', 'jpeg') : 'jpeg')); }
-        }
-      });
-      if (!c.first && !c.last && fn) { var sp = splitName(fn); c.first = sp.first; c.last = sp.last; }
-      if (!c.first && c.last) { c.first = c.last; c.last = ''; }
-      if (c.first) out.push(c);
-    });
-    return out;
+  async function importContacts() {
+    if (!canPick()) {
+      card('<h2>' + esc(t('imp')) + '</h2><p>' + esc(t('impNo')) + '</p>');
+      return;
+    }
+    var res;
+    try {
+      var props = ['name', 'tel', 'email'];
+      try { var sup = await navigator.contacts.getProperties(); if (sup.indexOf('icon') >= 0) props.push('icon'); } catch (e) {}
+      res = await navigator.contacts.select(props, { multiple: true });
+    } catch (e) { if (e && e.name !== 'AbortError') toast(t('impFail')); return; }
+    var list = (res || []).map(function (r) {
+      var sp = splitName(r.name && r.name[0]);
+      return { first: sp.first, last: sp.last, phone: (r.tel || [])[0] || '', email: (r.email || [])[0] || '', tels: r.tel || [], emails: r.email || [], photo: r.icon && r.icon[0] instanceof Blob ? r.icon[0] : null };
+    }).filter(function (c) { return c.first; });
+    if (list.length) choose(list);
   }
-  function importCard() {
-    var pick = canPick();
-    var el = card('<h2>' + esc(t('imp')) + '</h2><p>' + esc(pick ? t('impSub') : t('impFileSub')) + '</p>' +
-      '<button class="go" type="button" data-src>' + esc(pick ? t('impPick') : t('impFile')) + '</button>' +
-      '<input type="file" accept=".vcf,.vcard,text/vcard,text/x-vcard" hidden>');
-    var src = el.querySelector('[data-src]'), file = el.querySelector('input[type=file]');
-    src.onclick = async function () {
-      if (!pick) { file.click(); return; }
-      try {
-        var props = ['name', 'tel', 'email'];
-        try { var sup = await navigator.contacts.getProperties(); if (sup.indexOf('icon') >= 0) props.push('icon'); } catch (e) {}
-        var res = await navigator.contacts.select(props, { multiple: true });
-        var list = (res || []).map(function (r) {
-          var sp = splitName(r.name && r.name[0]);
-          return { first: sp.first, last: sp.last, phone: (r.tel || [])[0] || '', email: (r.email || [])[0] || '', extra: (r.tel || []).slice(1), photo: r.icon && r.icon[0] instanceof Blob ? r.icon[0] : null };
-        }).filter(function (c) { return c.first; });
-        if (list.length) choose(el, list, true);
-      } catch (e) { if (e && e.name !== 'AbortError') toast(t('impFail')); }
-    };
-    file.onchange = function () {
-      var f = file.files && file.files[0]; if (!f) return;
-      var rd = new FileReader();
-      rd.onload = function () { var list = parseVcf(rd.result); if (!list.length) return toast(t('impEmpty')); choose(el, list, false); };
-      rd.onerror = function () { toast(t('impFail')); };
-      rd.readAsText(f);
-    };
-  }
-  /* the check-list: from the phone everyone chosen is ticked; from a file (often the whole address book) no one
-     is ticked until HOME ticks them, or taps Select all */
-  function choose(el, list, ticked) {
+  function choose(list) {
     list.sort(function (a, b) { return nameKey(a).localeCompare(nameKey(b)); });
-    var on = list.map(function () { return ticked; }), urls = [];
-    var box = el.querySelector('.box');
-    box.innerHTML = '<button class="x" type="button" aria-label="' + esc(t('close')) + '">&times;</button><h2>' + esc(t('imp')) + '</h2>' +
+    list.forEach(function (x) { x.have = existing(x); });
+    var on = list.map(function () { return true; }), urls = [];
+    var el = card('<h2>' + esc(t('imp')) + '</h2><p>' + esc(t('impAsk')) + '</p>' +
       (list.length > 1 ? '<div class="iall" role="button" tabindex="0">' + esc(t('impAll')) + '</div>' : '') +
       '<div class="ilist">' + list.map(function (c, i) {
         var u = c.photo ? URL.createObjectURL(c.photo) : ''; if (u) urls.push(u);
         var ini = ((c.first || '')[0] || '') + ((c.last || '')[0] || '');
-        return '<div class="irow' + (ticked ? '' : ' off') + '" role="checkbox" tabindex="0" data-i="' + i + '"><i' + (u ? ' style="background-image:url(' + u + ')"' : '') + '>' + (u ? '' : esc(ini.toUpperCase())) + '</i><b>' +
-          esc(c.last ? c.last + ', ' + c.first : c.first) + '<small>' + esc([c.phone, c.email].filter(Boolean).join(' · ')) + '</small></b><em>✓</em></div>';
-      }).join('') + '</div><button class="go" type="button" data-add></button>';
-    var add = box.querySelector('[data-add]');
+        return '<div class="irow" role="checkbox" tabindex="0" data-i="' + i + '"><i' + (u ? ' style="background-image:url(' + u + ')"' : '') + '>' + (u ? '' : esc(ini.toUpperCase())) + '</i><b>' +
+          esc(c.last ? c.last + ', ' + c.first : c.first) + '<small>' + esc(c.have ? t('impHave') : [c.phone, c.email].filter(Boolean).join(' · ')) + '</small></b><em>✓</em></div>';
+      }).join('') + '</div><button class="go" type="button" data-add></button>');
+    var add = el.querySelector('[data-add]');
     function count() { var n = on.filter(Boolean).length; add.textContent = t('impGo', { n: n }); add.disabled = !n; }
     function closeIt() { urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} }); el.remove(); }
-    box.querySelector('.x').onclick = closeIt;
-    Array.prototype.forEach.call(box.querySelectorAll('.irow'), function (row) {
+    el.querySelector('.x').onclick = closeIt;
+    Array.prototype.forEach.call(el.querySelectorAll('.irow'), function (row) {
       row.onclick = function () { var i = +row.getAttribute('data-i'); on[i] = !on[i]; row.classList.toggle('off', !on[i]); count(); };
     });
-    var all = box.querySelector('.iall');
-    if (all) all.onclick = function () { var to = on.some(function (x) { return !x; }); on = on.map(function () { return to; }); Array.prototype.forEach.call(box.querySelectorAll('.irow'), function (r) { r.classList.toggle('off', !to); }); count(); };
+    var all = el.querySelector('.iall');
+    if (all) all.onclick = function () { var to = on.some(function (x) { return !x; }); on = on.map(function () { return to; }); Array.prototype.forEach.call(el.querySelectorAll('.irow'), function (r) { r.classList.toggle('off', !to); }); count(); };
     count();
     add.onclick = async function () {
       var sel = list.filter(function (c, i) { return on[i]; });
       if (!sel.length) return toast(t('impNone'));
       add.disabled = true; add.textContent = t('impBusy');
-      var r = { added: 0, dupes: 0, photos: 0 };
-      try {
-        r = await SocialImport.addToCircle(sel, function (c) { return c.extra && c.extra.length ? (IT() ? 'Anche: ' : 'Also: ') + c.extra.join(', ') : ''; }, function (c) { return c.photo || null; });
-      } catch (e) { add.disabled = false; count(); return toast(t('impFail')); }
+      var fresh = sel.filter(function (c) { return !c.have; }), dup = sel.filter(function (c) { return c.have; }), r = { added: 0, photos: 0, ids: [] };
+      if (fresh.length) {
+        try { r = await SocialImport.addToCircle(fresh, function (c) { return extraNote(c); }, function (c) { return c.photo || null; }); }
+        catch (e) { add.disabled = false; count(); return toast(t('impFail')); }
+      }
       closeIt();
-      try { await syncTeam(); } catch (e) {}
+      (r.ids || []).forEach(function (id) { if (_picks.indexOf(String(id)) < 0) _picks.unshift(String(id)); });
       rebuild(); roster.paint();
-      if (!r.added) return toast(r.dupes ? t('impNoNew') : t('impFail'));
-      toast(t('impDone', { n: r.added }) + (r.photos ? ' ' + t('impPh', { n: r.photos }) : '') + (r.dupes ? ' ' + t('impDup', { n: r.dupes }) : ''));
+      for (var k = 0; k < dup.length; k++) { if (!(await already(dup[k], r.added > 0))) break; }
+      if (r.added) toast(t('impDone', { n: r.added }) + (r.photos ? ' ' + t('impPh', { n: r.photos }) : ''));
+    };
+  }
+  function extraNote(x) {
+    var more = (x.tels || []).filter(function (p) { return digits(p) !== digits(x.phone); }).concat((x.emails || []).filter(function (e) { return e !== x.email; }));
+    return more.length ? (IT() ? 'Anche: ' : 'Also: ') + more.join(', ') : '';
+  }
+  /* one person already on Covara: Add or Replace. Closing the card leaves them as they are and stops here. */
+  function already(x, quiet) {
+    return new Promise(function (done) {
+      var c = x.have, el = card('<h2>' + esc(fullName(c)) + '</h2><p>' + esc(t('impDupQ')) + '</p>' +
+        '<button class="go" type="button" data-a>' + esc(t('impAdd')) + '</button><div style="height:10px"></div><button class="go" type="button" data-r>' + esc(t('impRep')) + '</button>');
+      el.querySelector('.x').onclick = function () { el.remove(); done(false); };
+      el.addEventListener('click', function (e) { if (e.target === el) done(false); });
+      async function save(replace) {
+        if (replace) {
+          if (x.first) { c.first = x.first; c.last = x.last || ''; }
+          if (x.phone) c.phone = x.phone;
+          if (x.email) c.email = x.email;
+        } else {
+          if (!c.phone && x.phone) c.phone = x.phone;
+          if (!c.email && x.email) c.email = x.email;
+          if (!c.last && x.last && c.first === x.first) c.last = x.last;
+        }
+        var more = (x.tels || []).concat(x.emails || []).filter(function (v) { return v && digits(v) !== digits(c.phone) && v !== c.email && String(c.notes || '').indexOf(v) < 0; });
+        if (more.length) c.notes = (c.notes ? c.notes + ' | ' : '') + (IT() ? 'Anche: ' : 'Also: ') + more.join(', ');
+        c.updatedAt = Date.now();
+        try { await RemielDB.putContact(c); } catch (e) {}
+        var hasPic = false; try { hasPic = contactPhotos.has(c.id); } catch (e) {}
+        if (x.photo && (replace || !hasPic)) {
+          try {
+            await RemielDB.putPhoto(c.id, x.photo);
+            var im = new Image(); im.onload = function () { try { contactPhotos.set(c.id, { img: im, w: im.naturalWidth, h: im.naturalHeight }); } catch (e) {} }; im.src = URL.createObjectURL(x.photo);
+            try { if (SyncEngine.syncPhotos && SyncEngine.isAuthenticated()) SyncEngine.syncPhotos(); } catch (e) {}
+          } catch (e) {}
+        }
+        try { SyncEngine.markDirty(); } catch (e) {}
+        el.remove(); rebuild(); roster.paint();
+        if (!quiet) toast(t(replace ? 'impRepd' : 'impAddd', { n: first(c) }));
+        done(true);
+      }
+      el.querySelector('[data-a]').onclick = function () { save(false); };
+      el.querySelector('[data-r]').onclick = function () { save(true); };
+    });
+  }
+  /* Roster > Add: one person by hand, on screen at once */
+  function addCard() {
+    var el = card('<h2>' + esc(t('aAddT')) + '</h2><input type="text" autocomplete="name" placeholder="' + esc(t('aName')) + '"><input type="tel" autocomplete="tel" placeholder="' + esc(t('aPhone')) + '"><input type="email" autocomplete="email" placeholder="' + esc(t('aMail')) + '"><button class="go" type="button">' + esc(t('aAdd')) + '</button>');
+    var f = el.querySelectorAll('input'); setTimeout(function () { try { f[0].focus(); } catch (e) {} }, 60);
+    el.querySelector('.go').onclick = async function () {
+      var sp = splitName(f[0].value), x = { first: sp.first, last: sp.last, phone: f[1].value.trim(), email: f[2].value.trim() };
+      if (!x.first) return toast(t('aNeed'));
+      var have = existing(x);
+      if (have) { el.remove(); x.have = have; await already(x); return; }
+      this.disabled = true;
+      var r = { added: 0, ids: [] };
+      try { r = await SocialImport.addToCircle([x], function () { return ''; }, function () { return null; }); } catch (e) {}
+      if (!r.added) { this.disabled = false; return toast(t('impFail')); }
+      el.remove();
+      if (_picks.indexOf(String(r.ids[0])) < 0) _picks.unshift(String(r.ids[0]));
+      rebuild(); roster.paint();
+      toast(t('added', { n: x.first }));
+    };
+  }
+  /* Roster > Delete, then a name: asked once, then that person is gone from Covara on this phone. Someone
+     linked on Covara also leaves the team (the link ends), so they do not come back. */
+  function deleteCard(c) {
+    var el = card('<h2>' + esc(t('dTitle', { n: fullName(c) })) + '</h2><p>' + esc(t(c.care && c.care.linkId ? 'dSubL' : 'dSub', { n: first(c) })) + '</p>' +
+      '<button class="go" type="button" style="background:linear-gradient(180deg,#ff6b6b,#e11d2a);color:#fff">' + esc(t('dGo')) + '</button><div style="height:10px"></div><button type="button" class="cx">' + esc(t('cancel')) + '</button>', true);
+    el.querySelector('.cx').onclick = function () { el.remove(); };
+    el.querySelector('.go').onclick = async function () {
+      this.disabled = true;
+      if (c.care && c.care.linkId) {
+        var r = await api('/care/links/' + encodeURIComponent(c.care.linkId), { method: 'DELETE' }).catch(function () { return { ok: false }; });
+        if (!r.ok && r.status !== 404) { this.disabled = false; return toast(t('dFail')); }
+      }
+      try { await removeContactFromCircle(c.id); } catch (e) {}
+      _picks = _picks.filter(function (x) { return x !== String(c.id); });
+      el.remove(); rebuild(); roster.paint();
+      toast(t('dDone', { n: first(c) }));
     };
   }
   /* Team code: one card for both sides. Your own code to give someone (it works for 24 hours), and a place
