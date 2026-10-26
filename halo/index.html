@@ -234,11 +234,13 @@ select.inp{flex:none}
 .ans-r{display:grid;grid-template-columns:12px 1fr;column-gap:8px;align-items:center;text-align:left;width:100%;padding:7px 0 6px;border:0;border-top:1px solid rgba(143,180,255,.14);background:none;color:inherit;font:inherit;cursor:pointer}
 .loc-v .ans-r b{font-family:inherit;font-size:14.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .ans-r small{grid-column:2;font-size:11.5px;color:var(--mut)} .ans-r small.tm{color:#b9cdf5}
 .ans-t{font-size:11.5px;color:var(--mut)}
-.port-bar{display:flex;align-items:center;gap:10px;margin:6px 0 8px} .port-bar>span{flex:1;min-width:0;font-size:12.5px;line-height:1.35;color:#c3cbda}
-.portbtn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:1px solid #5d6b86;background:linear-gradient(180deg,#2a3346,#1b2232);color:#c9d1df;font:inherit;font-weight:700;font-size:14px;letter-spacing:.02em;cursor:pointer;flex:none}
-.portbtn i,.portchip i{width:10px;height:10px;border-radius:50%;background:#7d8799;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
-.portbtn.lit{border-color:#3fd983;background:linear-gradient(180deg,#1f8f52,#11693a);color:#eafff3;box-shadow:0 0 0 1px rgba(63,217,131,.35),0 0 18px -4px rgba(63,217,131,.8)}
-.portbtn.lit i,.portchip.lit i{background:#7dffb4;box-shadow:0 0 8px #7dffb4}
+/* The Portrait button sits in the Trip buttons, full width and large: grey when closed, gold while it builds, green when lit. */
+.port-bar{margin:10px 0 2px}
+.portbtn{display:flex;align-items:center;gap:12px;width:100%;min-height:62px;padding:10px 16px;border-radius:16px;border:1.5px solid #9aa5b8;background:linear-gradient(180deg,#465165,#2a3243);color:#eef2f8;font:inherit;text-align:left;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 22px -12px rgba(0,0,0,.8)}
+.portbtn b{font-family:var(--disp);font-size:19px;letter-spacing:.04em;flex:none} .portbtn span{flex:1;min-width:0;font-size:12.5px;line-height:1.35;color:#d3d9e3}
+.portbtn i{flex:none;width:20px;height:20px;border-radius:50%;background:#b9c2d1;box-shadow:0 0 0 3px rgba(255,255,255,.16),inset 0 0 0 1px rgba(0,0,0,.35)} .portchip i{width:10px;height:10px;border-radius:50%;background:#7d8799;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+.portbtn.lit{border-color:#3fd983;background:linear-gradient(180deg,#1f8f52,#11693a);color:#eafff3;box-shadow:0 0 0 1px rgba(63,217,131,.35),0 0 22px -4px rgba(63,217,131,.85)} .portbtn.lit span{color:#d6ffe8}
+.portbtn.lit i,.portchip.lit i{background:#7dffb4;box-shadow:0 0 10px #7dffb4}
 .portbtn.build{border-color:#ffc457;background:linear-gradient(180deg,#5a4315,#352608);color:#fff3d6;box-shadow:0 0 0 1px rgba(255,196,87,.35),0 0 18px -4px rgba(255,196,87,.8)} .portbtn.build i,.portchip.build i{background:#ffd27a;animation:portPulse 1s ease-in-out infinite}
 .portbtn{position:relative;overflow:hidden} .portbtn b{font-weight:800} .portbtn em{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,rgba(255,196,87,.38),rgba(255,196,87,.14));transition:width .9s linear;pointer-events:none} .portbtn>*{position:relative}
 @keyframes portPulse{50%{transform:scale(.75);opacity:.55}} .portchip.build{border-color:#ffc457;color:#fff3d6} .port-bar{flex-wrap:wrap} .port-acct{flex-basis:100%}
@@ -3231,7 +3233,7 @@ function locRender(){ const box=el('locBox'); if(!box || !locMode()) return; con
   let h=(STORE_FULL && Date.now()-STORE_FULL<600000 ? '<div class="fixbar"><span>The browser store on this phone is full. Your trips and your record are kept in the phone\'s database, and Remiel keeps recording.</span></div>' : '')+((P.units==='mi'||P.units==='km') ? '' : '<div class="fixbar unitask"><span>Choose how distances read.</span><button class="btn sm primary" data-act="units" data-u="mi">Feet and miles</button><button class="btn sm primary" data-act="units" data-u="km">Meters and kilometers</button></div>');
   h+=posBan();
   if(!can('watchers')) h+=locFree(M);
-  else { h+=(M.live ? portBar()+nowAnswer(M) : nowVerdict(M))+nowFilt(M);
+  else { h+=(M.live ? nowAnswer(M) : nowVerdict(M))+nowFilt(M);
   if(seen.length) h+=nowList('seen','Seen before','what the record on this phone holds',seen,6);
   h+=tripStrip()+(M.live?nowContacts():'');
   if(M.live && M.rest.length) h+=nowList('rest','Nearest',S.omF==='unf'?'new, by distance':'new, neighborhood, your files and yours, by distance',M.rest,5);
@@ -3258,8 +3260,8 @@ function tripSketch(R, o){ const raw=(R.route||[]).filter(okLL), rt=smoothLL(raw
 function tripStrip(){ if(W.on){ const st=walkStats(), wp=W.wps||[], open=wp.find(x=>!x.done), idle=W.idle && Date.now()-W.idle.t>10*60000, arm=false;
     return '<div class="tripbar on" id="tripBar"><div class="tb-l"><span class="dot live"></span><b>Trip recording</b><span>'+esc(walkDur(Date.now()-W.t0))+' · '+esc(du(st.distance_m))+' · '+st.heard+' heard'+(wp.length?' · '+wp.length+(wp.length===1?' waypoint':' waypoints'):'')+(idle?' · in one place for '+Math.round((Date.now()-W.idle.t)/60000)+' minutes':'')+'</span>'+(onWheels()?'<span> · '+MODE_WORD[TMODE.cur]+'</span>':'')+'<span>'+(W.test?' · test data':'')+'</span></div>'+
       tripSketch(W,{h:130})+'<div class="loc-bar tb-btns"><button class="btn primary mk'+(open?' on':'')+'" data-act="trip-wp" aria-label="Mark a waypoint">'+(open?'Saved':'Waypoint')+'</button><button class="btn" data-act="subj-new" data-k="car" aria-label="Record a sighting of a car or a person">Sighting</button><button class="btn end'+(open?' off':arm?' arm':'')+'" data-act="trip-end" aria-label="End the trip">End</button></div>'+
-      (open?'<div class="limit" style="margin:8px 2px 0">Waypoint '+open.n+' closes by itself after one minute. The trip keeps recording.</div>':'')+'</div>'; }
-  return '<div class="tripbar" id="tripBar"><div class="loc-bar tb-btns" style="margin-top:0"><button class="btn primary mk" data-act="trip-start" aria-label="Start a trip">Start</button><button class="btn'+(S.trips?' on':'')+'" data-act="trips-open" aria-label="Your trips">Trips</button><button class="btn'+(S.subj?' on':'')+'" data-act="subj-list" aria-label="Cars and people you recorded">Sightings</button></div></div>'; }
+      (open?'<div class="limit" style="margin:8px 2px 0">Waypoint '+open.n+' closes by itself after one minute. The trip keeps recording.</div>':'')+portBar()+'</div>'; }
+  return '<div class="tripbar" id="tripBar"><div class="loc-bar tb-btns" style="margin-top:0"><button class="btn primary mk" data-act="trip-start" aria-label="Start a trip">Start</button><button class="btn'+(S.trips?' on':'')+'" data-act="trips-open" aria-label="Your trips">Trips</button><button class="btn'+(S.subj?' on':'')+'" data-act="subj-list" aria-label="Cars and people you recorded">Sightings</button></div>'+portBar()+'</div>'; }
 // A device passed you at a waypoint when it came into earshot around that moment and was gone within two minutes. One that was there before, and stayed, was already around you.
 function wpPassed(R, w, x){ const r=(R.devs||{})[x.id]; return !!r && r.first>=w.t-90000 && r.first<=w.t+WP_MS && r.last-r.first<120000; }
 function tripStart(){ if(W.on) return; const me=ePos(), fresh=me && Date.now()-me.t<20000 && me.acc<=POS_MAX_ACC; S.trips=null; tripsRender();
