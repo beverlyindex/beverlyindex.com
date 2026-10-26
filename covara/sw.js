@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-covara-v205';
+const CACHE_NAME = 'remiel-covara-v206';
 
 const PRECACHE_URLS = [
   './',
@@ -33,7 +33,7 @@ const PRECACHE_URLS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) =>
-      Promise.all(PRECACHE_URLS.map((u) => cache.add(u).catch(() => {})))
+      Promise.all(PRECACHE_URLS.map((u) => cache.add(new Request(u, { cache: 'reload' })).catch(() => {})))
     ).then(() => self.skipWaiting())
   );
 });
@@ -85,6 +85,21 @@ self.addEventListener('fetch', (event) => {
 
   /* Range and video requests go straight to the network, never cached */
   if (!_isCacheable(request, url)) return;
+
+  /* Covara (26 Oct): the page and its scripts come from the network first, so a reload always shows the
+     newest version; the saved copy is used only when there is no connection. */
+  if (request.mode === 'navigate' || /\.(html|js)$/.test(url.pathname) || url.pathname.endsWith('/')) {
+    event.respondWith(
+      fetch(request, { cache: 'no-cache' }).then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
+        }
+        return response;
+      }).catch(() => caches.match(request).then((r) => r || _offlineFallback(request)))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(request).then((cached) => {

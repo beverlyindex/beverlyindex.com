@@ -130,6 +130,16 @@
   ].join('');
   var st = document.createElement('style'); st.id = 'cvStyle'; st.textContent = css; document.head.appendChild(st);
 
+  /* a control answers on release: down and up on the same control, with no wait for a click event */
+  function press(node, fn) {
+    var d = null;
+    node.addEventListener('pointerdown', function (e) { e.stopPropagation(); if (e.button > 0) return; d = { x: e.clientX, y: e.clientY }; try { node.setPointerCapture(e.pointerId); } catch (x) {} });
+    node.addEventListener('pointerup', function (e) { e.stopPropagation(); var o = d; d = null; if (!o || Math.hypot(e.clientX - o.x, e.clientY - o.y) > 16) return; e.preventDefault(); fn(); });
+    node.addEventListener('pointercancel', function () { d = null; });
+    node.addEventListener('click', function (e) { e.stopPropagation(); e.preventDefault(); });
+    node.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
+  }
+
   /* the user's own name, in full and in capitals, across from the logo */
   var nameEl = document.createElement('div'); nameEl.id = 'cvName';
   function myName() {
@@ -161,7 +171,58 @@
     try { enterDetail = function () {}; } catch (e) {}
     try { sphereLabel = function (c) { return String((c && (c.first || c.last)) || '').trim(); }; } catch (e) {}   /* first names under the spheres: a family shares a surname */
     try { Object.keys(SentinelGuide).forEach(function (k) { if (typeof SentinelGuide[k] === 'function') SentinelGuide[k] = function () {}; }); } catch (e) {}
-    try { SentinelViews.openPanel = function () { ring.toggle(); }; } catch (e) {}   /* a tap on HOME opens the ring of 7 */
+    /* a tap on HOME opens the ring of 7 at once (below); Sentinel's own late, double-tap-timed route is closed */
+    try { SentinelViews.openPanel = function () {}; } catch (e) {}
+    homeTap();
+    whereToggleFirst();
+  }
+  /* 26 Oct (responsiveness): one tap or click on HOME opens the ring immediately, every time. Sentinel waited
+     300 ms to tell a single tap from a double tap; a second click inside that time cancelled the opening. */
+  function homeTap() {
+    var down = null;
+    function onHome(x, y) {
+      try {
+        if (appState !== 'network' || document.querySelector('.cvc,.sentinel-msg-overlay.open,.settings-panel.open')) return false;
+        var g = geo(), r = CV.getBoundingClientRect();
+        return Math.hypot(x - (r.left + g.cx), y - (r.top + g.cy)) <= g.cR * 1.08;
+      } catch (e) { return false; }
+    }
+    window.addEventListener('pointerdown', function (e) {
+      if (e.button > 0) return;
+      down = onHome(e.clientX, e.clientY) && (!e.target.closest || !e.target.closest('#cvRing .cvq,#cvLabels,.cvc')) ? { x: e.clientX, y: e.clientY, t: Date.now() } : null;
+    }, true);
+    window.addEventListener('pointerup', function (e) {
+      var d = down; down = null;
+      if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12 || Date.now() - d.t > 900) return;
+      var wasOpen = ring.isOpen();
+      if (wasOpen && ring.age() < 600) return;          /* a double click opens it once; it does not open and shut */
+      try { if (typeof sphereTapTimer !== 'undefined' && sphereTapTimer) { clearTimeout(sphereTapTimer); sphereTapTimer = null; sphereTapTarget = null; } } catch (x) {}
+      setTimeout(function () {
+        try { if (typeof sphereTapTimer !== 'undefined' && sphereTapTimer) { clearTimeout(sphereTapTimer); sphereTapTimer = null; sphereTapTarget = null; } } catch (x) {}
+        if (wasOpen) ring.close(); else ring.show(null);
+      }, 0);
+    }, true);
+  }
+  /* WHEREIS was blocked: a teammate's sphere passing over the COMMUNICATION | WHEREIS words took the tap.
+     The words now always take the tap, and they are drawn over the spheres so they are never hidden. */
+  function whereToggleFirst() {
+    try {
+      var ht = hitTestNetwork;
+      hitTestNetwork = function (x, y) {
+        try {
+          var h = window._dreamToggleHit, r = CV.getBoundingClientRect();
+          if (h && focusedContactId != null) { var px = x - r.left, py = y - r.top; if (px >= h.x && px <= h.x + h.w && py >= h.y && py <= h.y + h.h) return null; }
+        } catch (e) {}
+        return ht(x, y);
+      };
+    } catch (e) {}
+    try {
+      var dn = drawNetworkView;
+      drawNetworkView = function (t) {
+        dn(t);
+        try { if (focusedContactId != null && window._dreamRect && typeof WhereIs !== 'undefined') WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId, window._dreamPillAvoid); } catch (e) {}
+      };
+    } catch (e) {}
   }
 
   /* ── 2. The team: everyone on a Covara team with this person, in either direction ── */
@@ -343,10 +404,11 @@
   var ring = (function () {
     var el = document.createElement('div'); el.id = 'cvRing';
     var level = null, opened = 0, rot = 0, raf = 0, items = [], last = 0;
-    el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-    el.addEventListener('click', function (e) {
+    el.addEventListener('pointerdown', function (e) { e.stopPropagation(); el._bg = e.target === el; });
+    el.addEventListener('pointerup', function (e) {
       if (Date.now() - opened < 350) return;
-      if (e.target === el) close();
+      if (e.target === el && el._bg) close();
+      el._bg = false;
     });
     function keys() {
       if (level) return SUB[level];
@@ -360,8 +422,7 @@
       keys().forEach(function (k) {
         var q = document.createElement('div'); q.className = 'cvq' + (k === 'alert' ? ' alert' : '');
         q.innerHTML = '<b role="button" tabindex="0" aria-label="' + esc(t(k)) + '">' + svg(k) + '</b><i>' + lab(k) + '</i>';
-        var go = function (e) { e.stopPropagation(); e.preventDefault(); pick(k); };
-        q.querySelector('b').addEventListener('click', go); q.querySelector('i').addEventListener('click', go);
+        press(q.querySelector('b'), function () { pick(k); }); press(q.querySelector('i'), function () { pick(k); });
         el.appendChild(q); items.push({ k: k, q: q });
       });
     }
@@ -402,7 +463,7 @@
       close();
       run(k);
     }
-    return { show: show, close: close, toggle: toggle, isOpen: isOpen, rebuild: function () { if (isOpen()) build(); } };
+    return { show: show, close: close, toggle: toggle, isOpen: isOpen, age: function () { return Date.now() - opened; }, rebuild: function () { if (isOpen()) build(); } };
   })();
 
   /* What each choice on HOME's own sphere does: on HOME's sphere it is for the whole team (Broadcast Contact) */
@@ -440,8 +501,7 @@
       keys.forEach(function (k) {
         var b = document.createElement('div'); b.className = 'cvl' + (k === 'alert' ? ' alert' : k === 'add' ? ' gold' : ''); b.setAttribute('role', 'button'); b.tabIndex = 0;
         b.textContent = k === 'where' ? t('where') : t(k);
-        b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-        b.addEventListener('click', function (e) { e.stopPropagation(); onPick(k); });
+        press(b, function () { onPick(k); });
         el.appendChild(b); els.push(b);
       });
       if (!el.parentNode) document.body.appendChild(el);
