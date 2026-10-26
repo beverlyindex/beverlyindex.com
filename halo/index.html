@@ -239,7 +239,12 @@ select.inp{flex:none}
 .portbtn i,.portchip i{width:10px;height:10px;border-radius:50%;background:#7d8799;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
 .portbtn.lit{border-color:#3fd983;background:linear-gradient(180deg,#1f8f52,#11693a);color:#eafff3;box-shadow:0 0 0 1px rgba(63,217,131,.35),0 0 18px -4px rgba(63,217,131,.8)}
 .portbtn.lit i,.portchip.lit i{background:#7dffb4;box-shadow:0 0 8px #7dffb4}
-.portbtn.paused{border-color:#3fa36d;background:linear-gradient(180deg,#24463a,#1a3129);color:#bfe8d1} .portbtn.paused i,.portchip.paused i{background:#3fa36d}
+.portbtn.build{border-color:#ffc457;background:linear-gradient(180deg,#5a4315,#352608);color:#fff3d6;box-shadow:0 0 0 1px rgba(255,196,87,.35),0 0 18px -4px rgba(255,196,87,.8)} .portbtn.build i,.portchip.build i{background:#ffd27a;animation:portPulse 1s ease-in-out infinite}
+.portbtn{position:relative;overflow:hidden} .portbtn b{font-weight:800} .portbtn em{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,rgba(255,196,87,.38),rgba(255,196,87,.14));transition:width .9s linear;pointer-events:none} .portbtn>*{position:relative}
+@keyframes portPulse{50%{transform:scale(.75);opacity:.55}} .portchip.build{border-color:#ffc457;color:#fff3d6} .port-bar{flex-wrap:wrap} .port-acct{flex-basis:100%}
+.port-acct{margin:8px 2px 0;font-size:12.5px;line-height:1.35} .pa-h{color:#d6ffe8;font-weight:700;margin-bottom:2px} .pa-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0} .pa-chip{border:1px solid var(--line2);border-radius:999px;padding:3px 9px;color:#c9d1df;background:rgba(255,255,255,.03)} .pa-chip b{color:#fff}
+.pa-note{color:#9aa6ba;margin:2px 0 6px} .pa-list{max-height:280px;overflow:auto;border-top:1px solid var(--line2);margin-top:8px} .pa-r{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.06)}
+.pa-r b{flex:1 1 40%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff} .pa-r small{flex:1 1 40%;min-width:0;color:#9aa6ba} .pa-r .pa-late{flex-basis:100%;color:#ffd27a;order:3} .pa-r span{flex:none;font-family:var(--mono);color:#c9d1df}
 .portchip{display:inline-flex;align-items:center;gap:6px} .portchip.lit{border-color:#3fd983;background:rgba(31,143,82,.35);color:#eafff3} .portchip.paused{border-color:#3fa36d;color:#bfe8d1}
 .loc-row small.port{color:#7dffb4} .tcor{margin:8px 2px 0;color:#b9cdf5} .loc-v.ans b span,.loc-v.ans .tm span,.loc-v.ans .ans-h span{display:inline;font-size:inherit;color:inherit;margin:0} .ans-h{font-size:12px;color:#b9cdf5} .ans-h .linkbtn{font-size:12px;padding:0;margin-left:2px}
 .hs-row{grid-template-columns:14px 1fr auto} .hs-step{display:flex;align-items:center;gap:6px} .hs-step .btn{min-width:34px;padding:4px 0} .hs-n{min-width:22px;text-align:center;font-variant-numeric:tabular-nums;color:var(--ink)}
@@ -1328,7 +1333,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-26.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-26.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3073,31 +3078,66 @@ function tripAnswerText(R, C){ const A=tripAnswer(R, C);
     rows:A.top.map(x=>A.row(x)), head:ansHead(A.F), s:A.F.s}; }
 // One device of Not usual here on paper: its name as it is, the words round it in your language.
 const ansPaperRow = (w, e) => '<span class="notr">'+e(w.name)+'</span>'+(w.kind?' · '+e(w.kind):'')+' · '+e(w.near)+' · '+winHTML(w.r);
-/* The Portrait. At the press of Portrait, everything Remiel hears around you is known and safe, and leaves the screen and the radar. While it is lit
-   (green), only what is new to the Portrait shows, and any device of the Portrait that starts to move: it comes closer while you stand, keeps pace with
+/* The Portrait. At the press of Portrait, Remiel builds it for ten seconds (gold), listening at the phone's fastest rate: every device heard from ten
+   seconds before the press to the end of the ten is counted in an account you watch fill, with its name, its kind and how near it came, and a device
+   first heard after the press is marked as first heard during the build. Then everything in the account is known and safe, and leaves the screen and the
+   radar. While it is lit (green), only what is new to the Portrait shows, and any device of the Portrait that starts to move: it comes closer while you stand, keeps pace with
    you, follows you round a stop or a corner, or leaves and comes back. Phones, watches and AirTags change their Bluetooth address every few minutes: a new
-   address is the Portrait device it replaces only when that device fell silent as it appeared, at the same strength, and no other device could make
-   the match; a named device is matched by its name. It stays lit wherever you go, until you press Portrait again. Trackers in it stay hidden unless
+   address is the Portrait device it replaces only when that device fell silent as it appeared, at the same strength; a named device is matched by its name. It stays lit wherever you go, until you press Portrait again. Trackers in it stay hidden unless
    they move. Your Watch list and what you filed as Threat always show. Something new that a person carries (a phone, a watch, earbuds or a tracker) within
    40 ft, or anything moving toward you, buzzes the phone and raises a banner; every other new device shows in the list, named, without a buzz. Pressing Portrait again closes it (grey). The trip record keeps every device either way, with its times. */
-const PORT={hide:new Set(), why:new Map(), at:0, taken:new Set(), r0:new Map()};
+const PORT={hide:new Set(), why:new Map(), at:0, taken:new Set(), r0:new Map(), bt:0};
 const PORT_NEAR=12, PORT_SWAP={gap:10000, db:6, min:-85, wait:5000};
+const PORT_BUILD={ms:10000, back:10000, wait:30000};
 const portOn = () => !!(P.portrait && P.portrait.on);
-const portLit = () => portOn();
+const portBuilding = () => portOn() && !!P.portrait.build;
+const portLit = () => portOn() && !P.portrait.build;
 const portHidden = d => portLit() && PORT.hide.has(d.sig);
-function portOpen(){ const now=Date.now(), nowS=now+LIVE.skew, me=ePos(), sigs=[], names=[];
-  LIVE.devs.forEach(d=>{ if(d.sim || !(d.present || nowS-d.seenMobile<LIVE_PRESENT)) return; sigs.push(d.sig); if(d.adv && !rotates(d)) names.push(d.adv); });
-  P.portrait={on:true, t:now, at:me && me.acc<=POS_MAX_ACC ? {lat:+me.lat.toFixed(6), lon:+me.lon.toFixed(6)} : null, sigs, names:[...new Set(names)], n:sigs.length};
-  PORT.taken=new Set(); PORT.r0=new Map(); save(); PORT.at=0; portTick();
-  if(W.on) wEvent('port', 'Portrait taken at '+hms(now)+': '+(sigs.length===1?'1 device':sigs.length+' devices')+' known and hidden.', '', now);
-  toast(sigs.length ? 'Portrait on: '+(sigs.length===1?'1 device around you is':sigs.length+' devices around you are')+' known and hidden. Only new and moving devices show.' : 'Portrait on, but Remiel hears nothing just now. Start listening, then take the Portrait again.');
+// Pressing Portrait: the build starts. If the phone is not listening, listening starts, and the ten seconds begin with the first report.
+function portOpen(){ const now=Date.now(), nowS=now+LIVE.skew, me=ePos(), N=NATIVE(), st=N ? (nativeStatus()||{}) : null;
+  if(N && st && st.permission==='granted' && st.locationOn!==false && (!PH.on || PH.lost || st.listening===false)) phStart();
+  const pm=st && typeof N.setPower==='function' && st.powerMode && st.powerMode!=='full' ? st.powerMode : null;          // the fastest rate for the ten seconds, then back
+  if(pm){ try{ N.setPower('full'); }catch(e){} }
+  const heard=LIVE.seen.mobile>0 && nowS-LIVE.seen.mobile<5000, ear=Math.max(PH.asked||0, LIVE.earAt||0);
+  P.portrait={on:true, build:true, t:now, b0:heard?now:0, pm, marks:heard && now-ear>=PORT_BUILD.back, at:me && me.acc<=POS_MAX_ACC ? {lat:+me.lat.toFixed(6), lon:+me.lon.toFixed(6)} : null, sigs:[], names:[], n:0, acct:{}};
+  PORT.taken=new Set(); PORT.r0=new Map(); PORT.hide=new Set(); PORT.why=new Map(); S.portAcct=false; save();
+  clearInterval(PORT.bt); PORT.bt=setInterval(portBuildTick, 1000); portBuildTick(); buzz(40);
   S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
+// One device into the account, or a nearer reading for one already in it.
+function portAdd(p, d){ const m=Math.max(1, Math.round(d.dist||0)), a=p.acct[d.sig];
+  if(a){ if(d.dist>0 && m<a.m) a.m=m; return; }
+  p.sigs.push(d.sig); if(d.adv && !rotates(d)) p.names.push(d.adv);
+  p.acct[d.sig]={n:devName(d), k:devType(d), m, late:!!p.marks && (d.firstSeen||0)>=p.t+LIVE.skew}; }
+function portBuildTick(){ const p=P.portrait; if(!p || !p.on || !p.build){ clearInterval(PORT.bt); PORT.bt=0; return; } const now=Date.now();
+  if(!p.b0){ if(LIVE.seen.mobile>0 && LIVE.seen.mobile-LIVE.skew>=p.t) p.b0=now;          // the first report after the press starts the ten seconds
+    else if(now-p.t>PORT_BUILD.wait){ portCancel('Remiel heard nothing for 30 seconds, so no Portrait was taken. Check that Remiel is listening, then press Portrait again.'); return; } }
+  const from=p.t+LIVE.skew-PORT_BUILD.back;
+  LIVE.devs.forEach(d=>{ if(!d.sim && d.seenMobile>=from) portAdd(p, d); });
+  if(p.b0 && now-p.b0>=PORT_BUILD.ms) portDone(); else portPaint(); }
+// The phone back to how it listened before the build.
+function portPower(p){ if(!p || !p.pm) return; const N=NATIVE(); try{ if(N && typeof N.setPower==='function') N.setPower(p.pm); }catch(e){} p.pm=null; }
+function portDone(){ const p=P.portrait; if(!p || !p.build) return; clearInterval(PORT.bt); PORT.bt=0; const now=Date.now();
+  p.build=false; p.t1=now; p.n=p.sigs.length; p.names=[...new Set(p.names)]; portPower(p); save();
+  const n=p.n, ds=n===1?'1 device':n+' devices';
+  if(W.on){ wEvent('port', 'Portrait taken at '+hms(p.t)+', complete at '+hms(now)+': '+ds+' known and hidden.', '', now); portKeep(p); }
+  toast(n ? 'Portrait complete: '+ds+' known and hidden. Only new and moving devices show now.' : 'Portrait complete, but Remiel heard nothing. Every device that comes is new.');
+  buzz(90); PORT.at=0; portTick(); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
+function portCancel(msg){ const p=P.portrait; clearInterval(PORT.bt); PORT.bt=0; portPower(p); if(p) p.on=false; P.portrait=null; save(); PORT.hide=new Set(); PORT.why=new Map();
+  toast(msg||'Portrait cancelled.'); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
+// The account goes into the trip, so the trip file carries what the Portrait held.
+function portKeep(p){ if(!W.on || !p || p.build) return; W.ports=W.ports||[]; if(W.ports.some(x=>x.t===p.t)) return;
+  W.ports.push({t:p.t, t1:p.t1||p.t, n:p.n||0, marks:!!p.marks, acct:Object.values(p.acct||{}).map(a=>({n:a.n, k:a.k, m:a.m, late:!!a.late}))}); }
+// While it builds, the button and the account change every second without redrawing the screen.
+function portPaint(){ const w=document.createElement('div'); w.innerHTML=portBar(); const nb=w.firstChild; if(!nb) return;
+  document.querySelectorAll('.port-bar').forEach(e=>{ const ob=e.querySelector('.portbtn'), nbb=nb.querySelector('.portbtn'), oa=e.querySelector('.port-acct'), na=nb.querySelector('.port-acct');
+    if(ob && nbb){ ob.className=nbb.className; ob.innerHTML=nbb.innerHTML; }          // the same button stays under your finger
+    if(oa && na) oa.innerHTML=na.innerHTML; else if(na) e.appendChild(na.cloneNode(true)); else if(oa) oa.remove(); }); }
 function portClose(){ const p=P.portrait; if(!p) return; const now=Date.now(); p.on=false; save(); PORT.hide=new Set(); PORT.why=new Map();
   if(W.on) wEvent('port', 'Portrait closed at '+hms(now)+', after '+walkDur(now-p.t)+'. Every device shows again.', '', now);
   toast('Portrait off. Every device shows again.'); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
-const portToggle = () => portOn() ? portClose() : portOpen();
+const portToggle = () => portBuilding() ? portCancel() : portOn() ? portClose() : portOpen();
 // A trip that starts with the Portrait already lit says so at its top: since when, and how many devices it held when it was taken.
-function portAtStart(){ const p=P.portrait; if(!p || !p.on || !W.on) return; const n=p.n||0, d=new Date(p.t), today=new Date().toDateString()===d.toDateString();
+function portAtStart(){ const p=P.portrait; if(!p || !p.on || !W.on || p.build) return; portKeep(p); const n=p.n||0, d=new Date(p.t), today=new Date().toDateString()===d.toDateString();
   wEvent('port', 'Portrait lit since '+hms(p.t)+(today?'':' on '+DOW3[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()])+': '+(n===1?'1 device':n+' devices')+' known and hidden when it was taken.', '', W.t0); }
 // Why a device of the Portrait shows again: it moved.
 function portMoving(d){ const nowS=Date.now()+LIVE.skew;
@@ -3107,6 +3147,7 @@ function portMoving(d){ const nowS=Date.now()+LIVE.skew;
   if(d.mov && d.mov.v && nowS-d.mov.t<MOVE.keep) return 'is moving';
   return ''; }
 function portTick(){ const now=Date.now(); if(now-PORT.at<1500) return; PORT.at=now; PORT.hide=new Set(); PORT.why=new Map(); const p=P.portrait; if(!p || !p.on) return;
+  if(p.build){ if(!PORT.bt){ if(now-p.t>60000) portDone(); else PORT.bt=setInterval(portBuildTick, 1000); } return; }          // a build cut short by a restart finishes with what it holds
   const nowS=now+LIVE.skew, S0=new Set(p.sigs||[]), N0=new Set(p.names||[]);
   const cand=[];
   // every device the radar may still show, fading ones included: a Portrait device stays hidden after it falls silent
@@ -3150,10 +3191,21 @@ function portAlerts(p){ const nowS=Date.now()+LIVE.skew; PORT.why.forEach((w, si
     const txt=devName(d)+' '+(w==='new' ? 'is new to your Portrait'+(mv?', and '+mv:'') : mv||'is moving')+'. It is '+duAbout(d)+' from you.';
     if(alertRaise('port:'+sig+':'+p.t, w==='new' ? 'New in your Portrait' : 'A device in your Portrait is moving', txt+' Look round. Open it to see its story.', {dev:d.id})){ buzz([200,100,200]); if(W.on) wEvent('port', 'Portrait: '+txt, d.id); } }); }
 // The button and its line, on the Now screen and on the map: green while lit, grey while closed.
-function portBar(){ const p=P.portrait, on=portOn(), lit=portLit(); let nNew=0, nMv=0; PORT.why.forEach(w=>{ if(w==='new') nNew++; else nMv++; });
-  const line=!on ? 'Press Portrait, and everything around you now is known and hidden. Only new and moving devices show.'
-    : 'Portrait since '+hms(p.t)+' · '+PORT.hide.size+' hidden'+(nNew?' · '+nNew+' new':'')+(nMv?' · '+nMv+' moving':'');
-  return '<div class="port-bar"><button class="portbtn'+(lit?' lit':'')+'" data-act="port" aria-pressed="'+(on?'true':'false')+'"><i></i>Portrait</button><span>'+esc(line)+'</span></div>'; }
+function portBar(){ const p=P.portrait, on=portOn(), b=portBuilding(), lit=portLit(); let nNew=0, nMv=0; if(lit) PORT.why.forEach(w=>{ if(w==='new') nNew++; else nMv++; });
+  const el0=b && p.b0 ? Date.now()-p.b0 : 0, left=Math.max(0, Math.ceil((PORT_BUILD.ms-el0)/1000)), cnt=b ? Object.keys(p.acct||{}).length : 0, pct=b && p.b0 ? Math.min(100, Math.round(el0/PORT_BUILD.ms*100)) : 0;
+  const line=!on ? 'Press Portrait, and Remiel counts everything around you in 10 seconds and knows it. Then only new and moving devices show.'
+    : b ? (p.b0 ? 'Building your Portrait · '+left+' s left · '+(cnt===1?'1 device':cnt+' devices')+' so far' : 'Building your Portrait · waiting for Remiel to hear')
+    : 'Portrait since '+hms(p.t1||p.t)+' · '+PORT.hide.size+' hidden'+(nNew?' · '+nNew+' new':'')+(nMv?' · '+nMv+' moving':'');
+  return '<div class="port-bar"><button class="portbtn'+(b?' build':lit?' lit':'')+'" data-act="port" aria-pressed="'+(on?'true':'false')+'">'+(b?'<em style="width:'+pct+'%"></em>':'')+'<i></i><b>Portrait</b><span>'+esc(line)+'</span></button>'+portAcct()+'</div>'; }
+// The account: every device the Portrait holds, by kind, with its name, its kind and how near it came. Open while it builds; one press away after.
+function portAcct(){ const p=P.portrait; if(!p || !p.on) return ''; const L=Object.values(p.acct||{}), b=!!p.build, open=b || !!S.portAcct; if(!L.length && !b) return '';
+  const by={}; L.forEach(x=>{ by[x.k]=(by[x.k]||0)+1; });
+  const chips=Object.keys(by).sort((x,y)=>by[y]-by[x]).map(k=>'<span class="pa-chip"><b>'+by[k]+'</b> <span>'+esc(k)+'</span></span>').join('');
+  const rows=open ? L.slice().sort((x,y)=>(y.late?1:0)-(x.late?1:0) || x.m-y.m).map(x=>'<div class="pa-r"><b class="notr">'+esc(x.n)+'</b><small>'+esc(x.k)+'</small>'+(x.late?'<small class="pa-late">first heard during the build</small>':'')+'<span>'+esc(du(x.m))+'</span></div>').join('') : '';
+  return '<div class="port-acct">'+(b?'':'<div class="pa-h">Account at '+hms(p.t1||p.t)+' · '+(L.length===1?'1 device':L.length+' devices')+'</div>')+(chips?'<div class="pa-chips">'+chips+'</div>':'')
+    +(!b && p.marks===false && L.length ? '<div class="pa-note">Remiel was not hearing anything when you pressed, so it cannot tell what was first heard during the build.</div>' : '')
+    +(b?'':'<button class="chipbtn" data-act="port-acct" aria-expanded="'+(open?'true':'false')+'">'+(open?'Hide the account':'Show the account')+'</button>')
+    +(rows?'<div class="pa-list">'+rows+'</div>':'')+'</div>'; }
 const portWhy = d => { if(!portLit()) return ''; const w=PORT.why.get(d.sig); return w==='new' ? 'New to your Portrait'+((m=>m?', and '+m:'')(portMoving(d))) : w==='moving' ? 'In your Portrait, and '+(portMoving(d)||'moved just now') : ''; };
 function nowVerdict(M){ let c='v-clear', i=LOC_IC.ok, t, s; const N=M.n||{}, n=M.all.length, wy=M.red.filter(r=>r.tag==='with').length, pl=M.red.length-wy, am=M.amber.length, wt=M.watch.length, su=M.sus.length;
   const tail=[n+(n===1?' device':' devices')+' in earshot', N.fresh?N.fresh+' new':'', N.local?N.local+' in the neighborhood':'', N.known?N.known+(N.known===1?' person you know':' people you know'):'', N.pub?N.pub+' transit and public':'', N.yours?N.yours+' yours':''].filter(Boolean).join(' · ');
@@ -3587,6 +3639,7 @@ async function tripFile(R){ if(!R.cor || R.cor.v!==3){ try{ await tripCor(R); }c
   rep.version=2; rep.name=tripName(R); rep.devices.forEach(x=>{ x.tag=(TAG[C.tags[x.id]]||TAG.fresh).w; x.record=C.hw[x.id]||''; const r=(R.devs||{})[x.id]||{};
     x.motion=r.mv?'moving':r.v==='fixed'?'stays in place':'not yet known'; if(r.mv){ x.speed_mps=r.mv; x.speedClass=speedClass(r.mv); x.signalChange_dB=r.mvDb||0; x.youStoodStill=!!r.mvS; } x.wornOrCarried=!!r.wn; if(r.dr) x.drone=r.rid||true; });
   rep.contacts=(R.contacts||[]).map(c=>({t:iso(c.t), youWereAt:c.pos, provedMoving:!!c.mv, youStoodStill:c.mv ? !!c.still : (c.stood==null ? null : !!c.stood), speed_mps:c.v||0, inEarshot_s:c.s||0, words:contactLine(c), devices:c.devs.map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, wornOrCarried:!!x.worn, provedMoving:!!x.mv}))}));
+  rep.portraits=(R.ports||[]).map(x=>({taken:iso(x.t), complete:iso(x.t1), devices:x.n, arrivalsMarked:!!x.marks, account:(x.acct||[]).map(a=>({name:a.n, kind:a.k, nearest_m:a.m, arrivedDuringBuild:!!a.late}))}));
   rep.waypoints=(R.wps||[]).map(w=>({n:w.n, t:iso(w.t), youWereAt:w.pos, note:w.note||'', devices:Object.values(w.devs||{}).map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, yours:!!x.yours, tag:(TAG[C.tags[x.id]]||TAG.fresh).w, passedYou:wpPassed(R,w,x)}))}));
   rep.whatHappened=tripFindings(R, C).map(f=>({t:iso(f.t), text:f.text+(f.win?' In earshot '+winText(f.win)+'.':''), devices:(f.devs||[]).map(r=>r.id)}));
   { const A=tripAnswerText(R, C); rep.answer={following:A.following, notUsualHere:A.notUsualHere, worthALook:A.worthALook, notUsualCount:A.notUsualCount}; }
@@ -8458,7 +8511,7 @@ function winLines(r){ const L=winsOf(r); if(!L) return []; const out=[];
 const winNow = r => { const L=winsOf(r); return L && r.here ? L[L.length-1] : null; };          // the window it is in now, on a trip
 function walkStart(t0, a, at){
   tripKeep(); const back=!!at; portCarry(); LIVE.alias={}; LIVE.devs.forEach(d=>{ d.ids=1; });
-  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, off:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0, contacts:[], modes:[], groups:[], sgs:[], pd:{gps:0, used:0, rough:0, held:0, net:0, first:0, last:0, gaps:[], out:0}});
+  Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, off:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0, contacts:[], modes:[], groups:[], sgs:[], ports:[], pd:{gps:0, used:0, rough:0, held:0, net:0, first:0, last:0, gaps:[], out:0}});
   { const N=NATIVE(), st=N ? (nativeStatus()||{}) : null; if(st){ W.pd.a0=typeof st.gpsAge==='number' ? st.gpsAge : null; W.pd.st={app:st.version||null, locationOn:st.locationOn, permission:st.permission, listening:st.listening}; } }
   if(a){ W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10}); Object.assign(W.pd, {gps:1, used:1, first:W.t0, last:W.t0, la:a.lat, lo:a.lon}); }
   { const R=routeLive(); if(R) W.plan=routeInfo(R); }          // a trip that begins while a route is set belongs to that route
@@ -8900,7 +8953,7 @@ function sortOpen(){ const L=sortPool().map(d=>({d, sug:sortSug(d)})).sort((a,b)
   fsRender(); ovShow('fsheet'); }
 // on the map's own bar: Not known, and Sort what's here while anything in earshot is unfiled
 const mapFileBtns = () => { const V=vis(); if(!(V.mode==='live'||V.mode==='sim')) return ''; const all=mfDevices(), nk=all.filter(d=>!QUIET_T.has(tagOf(d))).length, ns=sortPool().length;
-  return '<button class="chipbtn portchip'+(portLit()?' lit':'')+'" data-act="port" aria-pressed="'+(portOn()?'true':'false')+'"><i></i>Portrait'+(portLit()?' · '+PORT.hide.size+' hidden':'')+'</button><button class="chipbtn'+(S.omF==='unf'?' on':'')+'" data-act="om-f" data-f="unf" aria-pressed="'+(S.omF==='unf'?'true':'false')+'">Not known · '+nk+'</button>'+(ns?'<button class="chipbtn" data-act="sort-open">Sort what\'s here · '+ns+'</button>':''); };
+  return '<button class="chipbtn portchip'+(portBuilding()?' build':portLit()?' lit':'')+'" data-act="port" aria-pressed="'+(portOn()?'true':'false')+'"><i></i>Portrait'+(portLit()?' · '+PORT.hide.size+' hidden':'')+'</button><button class="chipbtn'+(S.omF==='unf'?' on':'')+'" data-act="om-f" data-f="unf" aria-pressed="'+(S.omF==='unf'?'true':'false')+'">Not known · '+nk+'</button>'+(ns?'<button class="chipbtn" data-act="sort-open">Sort what\'s here · '+ns+'</button>':''); };
 const sortN = () => Object.values((S.fs&&S.fs.picks)||{}).filter(Boolean).length;
 function sortRender(b){ const F=S.fs, n=F.list.length, ns=Object.keys(F.sug).length;
   let x='<h3 id="fsTitle">Sort what\'s here</h3><p class="fs-p">'+(n===1?'1 device':n+' devices')+' in earshot that you have not filed. '+(ns?'Remiel suggests a file for '+ns+': devices that stand in one place, house devices and bus or tram units.':'Remiel cannot suggest a file for any of them yet.')+' Trackers and anything moving with you are never suggested. Check each one before you file.</p><div class="srt-list">';
@@ -9459,6 +9512,7 @@ document.addEventListener('click', e=>{
     case 'file-save': fsSave(false); break;
     case 'sort-open': sortOpen(); break;
     case 'port': portToggle(); break;
+    case 'port-acct': S.portAcct=!S.portAcct; S._rsig=''; renderVicinity(); break;
     case 'hs-open': homeSigOpen(); break;
     case 'hs-up': case 'hs-dn': { const F=S.fs; if(F && F.mode==='home'){ const k=a.dataset.k; F.set[k]=Math.max(0, Math.min(30, (F.set[k]||0)+(act==='hs-up'?1:-1))); fsRender(); } break; }
     case 'hs-save': homeSigSave(); break;
