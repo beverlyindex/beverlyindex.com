@@ -1339,7 +1339,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-26.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-26.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3093,7 +3093,7 @@ const ansPaperRow = (w, e) => '<span class="notr">'+e(w.name)+'</span>'+(w.kind?
    they move. Your Watch list and what you filed as Threat always show. Something new that a person carries (a phone, a watch, earbuds or a tracker) within
    40 ft, or anything moving toward you, buzzes the phone and raises a banner; every other new device shows in the list, named, without a buzz. Pressing Portrait again closes it (grey). The trip record keeps every device either way, with its times. */
 const PORT={hide:new Set(), why:new Map(), at:0, taken:new Set(), r0:new Map(), bt:0};
-const PORT_NEAR=12, PORT_SWAP={gap:10000, db:6, min:-85, wait:5000};
+const PORT_NEAR=12, PORT_FAR=30, PORT_SWAP={gap:10000, db:6, min:-85, wait:5000};
 const PORT_BUILD={ms:10000, back:10000, wait:30000};
 const portOn = () => !!(P.portrait && P.portrait.on);
 const portBuilding = () => portOn() && !!P.portrait.build;
@@ -3162,7 +3162,7 @@ function portMoving(d){ const nowS=Date.now()+LIVE.skew;
   if(d.bk && Date.now()-d.bk<BACK.show) return 'left and came back';
   if(d.mov && d.mov.v && nowS-d.mov.t<MOVE.keep) return 'is moving';
   return ''; }
-function portTick(){ const now=Date.now(); if(now-PORT.at<1500) return; PORT.at=now; PORT.hide=new Set(); PORT.why=new Map(); const p=P.portrait; if(!p || !p.on) return;
+function portTick(){ const now=Date.now(); if(now-PORT.at<400) return; PORT.at=now; PORT.hide=new Set(); PORT.why=new Map(); const p=P.portrait; if(!p || !p.on) return;
   if(p.build){ if(!PORT.bt){ if(now-p.t>60000) portDone(); else PORT.bt=setInterval(portBuildTick, 1000); } return; }          // a build cut short by a restart finishes with what it holds
   const nowS=now+LIVE.skew, S0=new Set(p.sigs||[]), N0=new Set(p.names||[]);
   const cand=[];
@@ -3179,8 +3179,9 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<1500) return; PORT.at=
   cand.forEach(c=>{ if(!PORT.r0.has(c.sig)) PORT.r0.set(c.sig, typeof c.rssi==='number' ? c.rssi : null); });
   let grew=false; const pend=[], pairs=[];
   cand.forEach(c=>{ const live=c.present || nowS-c.seenMobile<LIVE_PRESENT;
-    if(live && nowS-(c.firstSeen||0)<PORT_SWAP.wait){ PORT.hide.add(c.sig); return; }          // just appeared: Remiel is deciding
-    const r=PORT.r0.get(c.sig); pend.push(c);
+    const r=PORT.r0.get(c.sig);
+    if(live && nowS-(c.firstSeen||0)<PORT_SWAP.wait && portMaySwap(c, r, S0)){ PORT.hide.add(c.sig); return; }          // it could be a Portrait device under a new address: Remiel waits a moment; otherwise it decides at once
+    pend.push(c);
     if(typeof r==='number' && r>=PORT_SWAP.min) LIVE.devs.forEach(o=>{ if(o===c || o.sim || o.band!=='ble' || !S0.has(o.sig) || PORT.taken.has(o.sig)) return;
       if((o.cls||'')!==(c.cls||'') || (o.hint||'')!==(c.hint||'') || (o.adv||'')!==(c.adv||'')) return;
       const gap=(c.firstSeen||0)-(o.seenMobile||0); if(!(gap>0 && gap<=PORT_SWAP.gap)) return;
@@ -3192,20 +3193,43 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<1500) return; PORT.at=
   if(grew){ portTrim(p); save(); }
   if(PORT.r0.size>3000) [...PORT.r0.keys()].forEach(k=>{ if(!LIVE.devs.has(k)) PORT.r0.delete(k); });
   portAlerts(p); }
+// Could this newcomer be a Portrait device that has just changed its address? Only if one of the Portrait's own devices of its kind went silent within
+// PORT_SWAP.gap before it appeared, at about its strength. If none did, the newcomer is new at once, with no wait.
+function portMaySwap(c, r, S0){ if(typeof r!=='number' || r<PORT_SWAP.min) return false; let hit=false;
+  LIVE.devs.forEach(o=>{ if(hit || o===c || o.sim || o.band!=='ble' || !S0.has(o.sig) || PORT.taken.has(o.sig)) return;
+    if((o.cls||'')!==(c.cls||'') || (o.hint||'')!==(c.hint||'') || (o.adv||'')!==(c.adv||'')) return;
+    const so=o.seenMobile||0, f=c.firstSeen||0; if(so<f-PORT_SWAP.gap || so>f+2500) return;          // it fell silent as the newcomer appeared, not heard since
+    if(typeof o.rssi!=='number' || o.rssi<PORT_SWAP.min || Math.abs(o.rssi-r)>PORT_SWAP.db) return; hit=true; });
+  return hit; }
 // The Portrait keeps every address it took over, up to 1500 beyond what it first held: a changed address never comes back, so the oldest go first.
 function portTrim(p){ const n0=p.n||0, s=p.sigs||[]; if(s.length>n0+1500) p.sigs=s.slice(0,n0).concat(s.slice(-1500)); }
 // A trip joins a phone's new address to its first one for the length of the trip. When the trip starts or ends those joins are let go, so a
 // Portrait device known under a joined address keeps that address in the Portrait.
 function portCarry(){ const p=P.portrait, A=LIVE.alias; if(!p || !p.on || !A) return; const S0=new Set(p.sigs||[]); let n=0;
   Object.keys(A).forEach(a=>{ if(S0.has(A[a]) && !S0.has(a)){ (p.sigs=p.sigs||[]).push(a); S0.add(a); n++; } }); if(n){ portTrim(p); save(); } }
-// Something new that a person carries (a phone, a watch, earbuds or a tracker) within 40 ft, or anything moving toward you: a buzz, a banner and a
-// line in the trip record, once each. A network, home electronics or a bus or tram unit that is new shows in the list, named, without a buzz.
+// Something new that a person carries (a phone, a watch, earbuds or a tracker) within 40 ft or coming closer within 100 ft, or anything moving toward
+// you: a buzz, a banner and a line in the trip record, once each. Devices that arrive together share one buzz and one banner. A network, home
+// electronics or a bus or tram unit that is new shows in the list, named, without a buzz.
 const portCarried = d => d.band==='ble' && !houseDev(d) && (d.cls==='Tag' || d.cls==='Phone' || d.cls==='Wearable' || grpPhone(d) || isWorn(d) || (/^(Apple|Samsung|Google)\b/.test(d.hint||'') && !/AirPlay|beacon/i.test(d.hint||'')));
-function portAlerts(p){ const nowS=Date.now()+LIVE.skew; PORT.why.forEach((w, sig)=>{ const d=LIVE.devs.get(sig); if(!d || !(d.dist>0) || nowS-d.seenMobile>=LIVE_PRESENT) return;
-    const near=d.dist<=PORT_NEAR, mv=portMoving(d), toward=!!mv && (d.vel<0 || near);
-    if(!(w==='new' ? (near && portCarried(d)) || toward : toward)) return;
-    const txt=devName(d)+' '+(w==='new' ? 'is new to your Portrait'+(mv?', and '+mv:'') : mv||'is moving')+'. It is '+duAbout(d)+' from you.';
-    if(alertRaise('port:'+sig+':'+p.t, w==='new' ? 'New in your Portrait' : 'A device in your Portrait is moving', txt+' Look round. Open it to see its story.', {dev:d.id})){ buzz([200,100,200]); if(W.on) wEvent('port', 'Portrait: '+txt, d.id); } }); }
+// Coming closer: within PORT_FAR, and the last two readings both clearly nearer than the ones before, or a steady fall over the last readings.
+const portApproach = d => { const h=d.hist||[]; if(!((d.dist||99)<=PORT_FAR) || h.length<3) return false; if(d.vel<0) return true;
+  const L=h.slice(-4), a=Math.max(...L.slice(0, L.length-2)), b=Math.max(...L.slice(-2)); return b<=a*0.7 && a-b>=4; };
+function portAlerts(p){ const nowS=Date.now()+LIVE.skew, day=new Date().toISOString().slice(0,10), F=[];
+  PORT.why.forEach((w, sig)=>{ const d=LIVE.devs.get(sig); if(!d || !(d.dist>0) || nowS-d.seenMobile>=LIVE_PRESENT) return;
+    const key='port:'+sig+':'+p.t; if((P.alerted||{})[key]===day) return;
+    const near=d.dist<=PORT_NEAR, mv=portMoving(d), toward=!!mv && (d.vel<0 || near), app=w==='new' && portCarried(d) && portApproach(d);
+    if(!(w==='new' ? (near && portCarried(d)) || app || toward : toward)) return;
+    const txt=devName(d)+' '+(w==='new' ? 'is new to your Portrait'+(mv?', and '+mv:app && !near?', and is coming toward you':'') : mv||'is moving')+'. It is '+duAbout(d)+' from you.';
+    F.push({d, w, key, txt}); });
+  if(!F.length || !can(ALERT_PLAN('port'))) return;
+  F.sort((a,b)=>a.d.dist-b.d.dist); const lead=F[0];
+  if(F.length===1){ if(alertRaise(lead.key, lead.w==='new' ? 'New in your Portrait' : 'A device in your Portrait is moving', lead.txt+' Look round. Open it to see its story.', {dev:lead.d.id})){ buzz([200,100,200]); if(W.on) wEvent('port', 'Portrait: '+lead.txt, lead.d.id); } return; }
+  // together: one buzz, one banner, the kinds first; each device keeps its own line in the trip record
+  P.alerted=P.alerted||{}; F.forEach(f=>{ P.alerted[f.key]=day; });
+  const kinds=[...new Set(F.map(f=>devType(f.d)).filter(Boolean))].slice(0,3).join(' · '), nn=F.filter(f=>f.w==='new').length;
+  const title=nn ? 'New devices coming toward you' : 'Devices in your Portrait are moving';
+  const text=(nn ? F.length+' new devices are coming toward you.' : F.length+' devices in your Portrait are moving.')+' The nearest is '+devName(lead.d)+' at '+duAbout(lead.d)+'. Look round. Open it to see its story.';
+  if(alertRaise('port:g:'+lead.d.sig+':'+p.t, title, text, {dev:lead.d.id, kind:kinds})){ buzz([200,100,200]); if(W.on) F.forEach(f=>wEvent('port', 'Portrait: '+f.txt, f.d.id)); } }
 // The button and its line, on the Now screen and on the map: green while lit, grey while closed.
 function portBar(){ const p=P.portrait, on=portOn(), b=portBuilding(), lit=portLit(); let nNew=0, nMv=0; if(lit) PORT.why.forEach(w=>{ if(w==='new') nNew++; else nMv++; });
   const el0=b && p.b0 ? Date.now()-p.b0 : 0, left=Math.max(0, Math.ceil((PORT_BUILD.ms-el0)/1000)), cnt=b ? Object.keys(p.acct||{}).length : 0, pct=b && p.b0 ? Math.min(100, Math.round(el0/PORT_BUILD.ms*100)) : 0;
@@ -8296,7 +8320,7 @@ async function nativeDrain(){
       if(!live && W.on && list.length) walkTick(b.t, [...new Set(list.map(x=>(LIVE.alias||{})[x.id]||x.id))], used?q:null);
       if(!live){ try{ contactScan(b.t+LIVE.skew); dirTick(b.t+LIVE.skew); }catch(e){} }
       if(Array.isArray(b.c) && b.c.length) cellIngest(b.c, b.t, okLL(q)?q:null); }
-    if(batches.length){ liveTick(); walkSettle(); }
+    if(batches.length){ PORT.at=0; liveTick(); walkSettle(); }          // the Portrait looks at every report as it arrives
     rayTick(); alertNativeTick();
     const lost = !!PH.nstat && !PH.nstat.listening && Date.now()-PH.asked>6000;
     if(lost!==PH.lost){ PH.lost=lost; softRender(); renderVicinity(); }
@@ -8877,7 +8901,7 @@ function alertRaise(key, title, text, go, quiet){
   if(P.alerted[key]===day) return false; P.alerted[key]=day;
   const ks=Object.keys(P.alerted); if(ks.length>300) ks.filter(k=>P.alerted[k]!==day).slice(0,ks.length-200).forEach(k=>delete P.alerted[k]);
   save();
-  const dv=go && go.dev ? findDevice(go.dev) : null, kind=dv && dv.live ? devType(dv) : '';          // what it most likely is, first
+  const dv=go && go.dev ? findDevice(go.dev) : null, kind=go && go.kind ? go.kind : dv && dv.live ? devType(dv) : '';          // what it most likely is, first
   S.banners=(S.banners||[]).filter(b=>b.key!==key); S.banners.unshift({key, title, text, kind, go:go||null, t:Date.now()}); S.banners.length=Math.min(S.banners.length,6);
   renderAlerts(); if(!quiet) alertSystem(key, kind ? kind+' · '+title : title, text);
   return true; }
