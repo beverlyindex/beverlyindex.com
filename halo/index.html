@@ -236,6 +236,10 @@ select.inp{flex:none}
 .ans-t{font-size:11.5px;color:var(--mut)}
 /* The Portrait button sits in the Trip buttons, full width and large: grey when closed, gold while it builds, green when lit. */
 .port-bar{margin:10px 0 2px}
+.pi-link{display:block;margin:6px 4px 0;padding:4px 0;background:none;border:0;color:#c3cbda;font:inherit;font-size:12.5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.pi-sub{color:#e6ebf3;font-size:14.5px} .pi-steps{margin:4px 0 12px;padding-left:22px;color:#c3cbda;font-size:13.5px;line-height:1.45} .pi-steps li{margin:0 0 8px} .pi-steps b{color:#fff}
+.pi-cols{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 12px;font-size:13px;color:#c3cbda} .pi-cols span{display:inline-flex;align-items:center;gap:7px} .pi-cols i{width:14px;height:14px;border-radius:50%}
+.pi-g{background:#b9c2d1} .pi-y{background:#ffd27a;box-shadow:0 0 8px #ffc457} .pi-n{background:#7dffb4;box-shadow:0 0 8px #3fd983}
 .portbtn{display:flex;align-items:center;gap:12px;width:100%;min-height:62px;padding:10px 16px;border-radius:16px;border:1.5px solid #9aa5b8;background:linear-gradient(180deg,#465165,#2a3243);color:#eef2f8;font:inherit;text-align:left;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 22px -12px rgba(0,0,0,.8)}
 .portbtn b{font-family:var(--disp);font-size:19px;letter-spacing:.04em;flex:none} .portbtn span{flex:1;min-width:0;font-size:12.5px;line-height:1.35;color:#d3d9e3}
 .portbtn i{flex:none;width:20px;height:20px;border-radius:50%;background:#b9c2d1;box-shadow:0 0 0 3px rgba(255,255,255,.16),inset 0 0 0 1px rgba(0,0,0,.35)} .portchip i{width:10px;height:10px;border-radius:50%;background:#7d8799;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
@@ -1335,7 +1339,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-26.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-26.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3137,7 +3141,18 @@ function portPaint(){ const w=document.createElement('div'); w.innerHTML=portBar
 function portClose(){ const p=P.portrait; if(!p) return; const now=Date.now(); p.on=false; save(); PORT.hide=new Set(); PORT.why=new Map();
   if(W.on) wEvent('port', 'Portrait closed at '+hms(now)+', after '+walkDur(now-p.t)+'. Every device shows again.', '', now);
   toast('Portrait off. Every device shows again.'); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
-const portToggle = () => portBuilding() ? portCancel() : portOn() ? portClose() : portOpen();
+const portToggle = () => portBuilding() ? portCancel() : portOn() ? portClose() : !P.portIntro ? portIntro(true) : portOpen();
+// What a Portrait is, in three points. It opens by itself once, on the first press, before the first build; after that, "What is a Portrait?"
+// under the button opens it.
+function portIntro(first){ if(first){ P.portIntro=Date.now(); save(); } S.fs={mode:'port', first:!!first}; fsRender(); ovShow('fsheet'); }
+function portIntroRender(b){ const on=portOn();
+  b.innerHTML='<h3 id="fsTitle">Portrait</h3><p class="fs-p pi-sub">Know what is around you, then see only what changes.</p><ol class="pi-steps">'
+    +'<li><b>Press Portrait.</b> For 10 seconds Remiel counts every device around you: phones, watches, earbuds, trackers, cars, TVs and networks. You watch the account fill.</li>'
+    +'<li><b>Everything in it is known.</b> It leaves your screen and your radar.</li>'
+    +'<li><b>From then on, only changes show.</b> Remiel shows only new devices, and any device in your Portrait that starts to move. A new phone, watch, earbuds or tracker within '+(unitNow()==='km'?'12 m':'40 ft')+', or anything moving toward you, buzzes your phone, and the banner says what it most likely is.</li></ol>'
+    +'<div class="pi-cols"><span><i class="pi-g"></i>Grey: off</span><span><i class="pi-y"></i>Gold: building</span><span><i class="pi-n"></i>Green: on</span></div>'
+    +'<p class="fs-p">It stays on wherever you go, until you press Portrait again. Take a new Portrait each time you settle somewhere new, such as a caf\u00e9 table, your car, your desk or home.</p>'
+    +'<div class="formrow fs-btns">'+(on ? '<button class="btn primary" data-act="file-close">Close</button>' : '<button class="btn" data-act="file-close">Not now</button><button class="btn primary" data-act="port-go">Take my Portrait</button>')+'</div>'; }
 // A trip that starts with the Portrait already lit says so at its top: since when, and how many devices it held when it was taken.
 function portAtStart(){ const p=P.portrait; if(!p || !p.on || !W.on || p.build) return; portKeep(p); const n=p.n||0, d=new Date(p.t), today=new Date().toDateString()===d.toDateString();
   wEvent('port', 'Portrait lit since '+hms(p.t)+(today?'':' on '+DOW3[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()])+': '+(n===1?'1 device':n+' devices')+' known and hidden when it was taken.', '', W.t0); }
@@ -3198,7 +3213,7 @@ function portBar(){ const p=P.portrait, on=portOn(), b=portBuilding(), lit=portL
   const line=!on ? 'Press Portrait, and Remiel counts everything around you in 10 seconds and knows it. Then only new and moving devices show.'
     : b ? (p.b0 ? 'Building your Portrait · '+left+' s left · '+(cnt===1?'1 device':cnt+' devices')+' so far' : 'Building your Portrait · waiting for Remiel to hear')
     : 'Portrait since '+hms(p.t1||p.t)+' · '+PORT.hide.size+' hidden'+(nNew?' · '+nNew+' new':'')+(nMv?' · '+nMv+' moving':'');
-  return '<div class="port-bar"><button class="portbtn'+(b?' build':lit?' lit':'')+'" data-act="port" aria-pressed="'+(on?'true':'false')+'">'+(b?'<em style="width:'+pct+'%"></em>':'')+'<i></i><b>Portrait</b><span>'+esc(line)+'</span></button>'+portAcct()+'</div>'; }
+  return '<div class="port-bar"><button class="portbtn'+(b?' build':lit?' lit':'')+'" data-act="port" aria-pressed="'+(on?'true':'false')+'">'+(b?'<em style="width:'+pct+'%"></em>':'')+'<i></i><b>Portrait</b><span>'+esc(line)+'</span></button><button class="pi-link" data-act="port-intro">What is a Portrait?</button>'+portAcct()+'</div>'; }
 // The account: every device the Portrait holds, by kind, with its name, its kind and how near it came. Open while it builds; one press away after.
 function portAcct(){ const p=P.portrait; if(!p || !p.on) return ''; const L=Object.values(p.acct||{}), b=!!p.build, open=b || !!S.portAcct; if(!L.length && !b) return '';
   const by={}; L.forEach(x=>{ by[x.k]=(by[x.k]||0)+1; });
@@ -8925,7 +8940,7 @@ function fileSet(sig, f, quiet){ if(!sig) return false; f=FILE[f]?f:''; const wa
   return true; }
 // The File sheet: one device, its file, your name for it and a note.
 function fileOpen(sig){ if(!sig) return; S.fs={k:sig, pick:fileOf(sig)}; fsRender(); ovShow('fsheet'); }
-function fsRender(){ const F=S.fs, b=el('fsBody'); if(!F || !b) return; if(F.mode==='sort') return sortRender(b); if(F.mode==='home') return homeSigRender(b); const k=F.k, w=watchInfo(k), d=w.d, h=ELOG.hist.get(k)||{}, nm=watchName(k), lbl=(P.labels||{})[w.id]||'', was=fileOf(k);
+function fsRender(){ const F=S.fs, b=el('fsBody'); if(!F || !b) return; if(F.mode==='sort') return sortRender(b); if(F.mode==='home') return homeSigRender(b); if(F.mode==='port') return portIntroRender(b); const k=F.k, w=watchInfo(k), d=w.d, h=ELOG.hist.get(k)||{}, nm=watchName(k), lbl=(P.labels||{})[w.id]||'', was=fileOf(k);
   const rot = d ? d.randomizes===true : rosterRot({name:w.adv, cls:w.cls, hint:w.hint}), live=!!(d && d.present);
   const opt = f => '<button class="fs-opt'+(F.pick===f.k?' on':'')+'" data-act="file-pick" data-f="'+f.k+'" style="--fc:'+FILE_C[f.k]+'" aria-pressed="'+(F.pick===f.k?'true':'false')+'"><i class="sdot" style="--mk:'+FILE_C[f.k]+'"></i><b>'+esc(f.w)+'</b><small>'+esc(f.s)+'</small></button>';
   let x='<h3 id="fsTitle">File this device</h3><div class="fs-dev"><b>'+esc(nm)+'</b><small>'+esc([d?kindShort(d):(w.hint||KIND_WORD[w.cls]||''), live?'here now, '+duAbout(d):h.last?'last heard '+whenW(h.last):''].filter(Boolean).join(' · '))+'</small></div>'+
@@ -9515,6 +9530,8 @@ document.addEventListener('click', e=>{
     case 'sort-open': sortOpen(); break;
     case 'port': portToggle(); break;
     case 'port-acct': S.portAcct=!S.portAcct; S._rsig=''; renderVicinity(); break;
+    case 'port-intro': portIntro(false); break;
+    case 'port-go': S.fs=null; ovHide('fsheet'); if(!portOn()) portOpen(); break;
     case 'hs-open': homeSigOpen(); break;
     case 'hs-up': case 'hs-dn': { const F=S.fs; if(F && F.mode==='home'){ const k=a.dataset.k; F.set[k]=Math.max(0, Math.min(30, (F.set[k]||0)+(act==='hs-up'?1:-1))); fsRender(); } break; }
     case 'hs-save': homeSigSave(); break;
