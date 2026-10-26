@@ -97,7 +97,25 @@
     '.cvc.red .box{border-color:rgba(255,80,90,.75);background:linear-gradient(155deg,rgba(150,20,40,.30),rgba(40,6,16,.42));box-shadow:0 0 26px rgba(255,40,60,.35)}',
     '.cvc .hold{position:relative;display:block;margin:6px auto 12px;width:170px;height:170px;border-radius:50%;border:2px solid #ff2a2a;background:rgba(255,40,40,.08);color:#fff;font:800 15px "Hanken Grotesk",sans-serif;cursor:pointer;touch-action:none}',
     '.cvc .hold svg{position:absolute;inset:-6px;width:182px;height:182px;transform:rotate(-90deg)}.cvc .hold circle{fill:none;stroke:#ffd24d;stroke-width:5}',
-    '.cvc .msg{min-height:20px;color:#ffe3a8;font-size:14px;text-align:center}.cvc .cx{display:block;margin:0 auto;min-height:42px;padding:0 24px;border-radius:21px;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;font:700 14px "Hanken Grotesk",sans-serif;cursor:pointer}'
+    '.cvc .msg{min-height:20px;color:#ffe3a8;font-size:14px;text-align:center}.cvc .cx{display:block;margin:0 auto;min-height:42px;padding:0 24px;border-radius:21px;border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;font:700 14px "Hanken Grotesk",sans-serif;cursor:pointer}',
+    /* 26 Oct RULE: nothing slides up from the bottom of the screen. Every card and every short message appears
+       directly beneath the logo at the upper left, as a transparent glass card. */
+    'html.cv{--cvTop:calc(max(10px,env(safe-area-inset-top,0px)) + 64px);--cvLeft:max(12px,env(safe-area-inset-left,0px));--cvW:min(420px,calc(100vw - 24px))}',
+    'html.cv .cvc,html.cv .ui-confirm-overlay,html.cv .quick-dial-overlay{align-items:flex-start!important;justify-content:flex-start!important;padding:var(--cvTop) 12px 16px var(--cvLeft)!important;background:rgba(6,15,36,.28)!important}',
+    'html.cv .cvc .box{width:var(--cvW)}',
+    'html.cv .ui-confirm-box,html.cv .quick-dial{width:var(--cvW)!important;max-width:none!important;background:linear-gradient(155deg,rgba(70,130,235,.20),rgba(14,30,78,.34))!important;border:1px solid rgba(150,210,255,.5)!important;border-radius:20px!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.3)!important}',
+    'html.cv .sentinel-toast,html.cv #swUpdateBanner,html.cv .lib-pill{top:var(--cvTop)!important;bottom:auto!important;left:var(--cvLeft)!important;right:auto!important;transform:none!important;max-width:var(--cvW)!important;text-align:left!important;',
+    'background:linear-gradient(155deg,rgba(70,130,235,.24),rgba(14,30,78,.38))!important;color:#eef6ff!important;border:1px solid rgba(150,210,255,.55)!important;border-radius:16px!important;padding:10px 14px!important;font:600 14px/1.35 "Hanken Grotesk",system-ui,sans-serif!important;-webkit-backdrop-filter:blur(14px)!important;backdrop-filter:blur(14px)!important;box-shadow:0 0 18px rgba(70,150,255,.3)!important}',
+    /* the message thread: a glass card under the logo, not a dark drawer */
+    'html.cv .sentinel-msg-overlay{background:rgba(6,15,36,.28)!important;-webkit-backdrop-filter:blur(3px)!important;backdrop-filter:blur(3px)!important}',
+    'html.cv .sentinel-msg-panel{position:fixed!important;top:var(--cvTop);left:var(--cvLeft);width:var(--cvW)!important;height:min(560px,calc(100dvh - var(--cvTop) - 16px))!important;border-radius:20px;border:1px solid rgba(150,210,255,.5)!important;overflow:hidden;',
+    'background:linear-gradient(155deg,rgba(70,130,235,.22),rgba(14,30,78,.42))!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.3);transform:translateY(-8px)!important;opacity:0;transition:transform .25s ease,opacity .25s ease!important}',
+    'html.cv .sentinel-msg-overlay.open .sentinel-msg-panel{transform:none!important;opacity:1}',
+    'html.cv.cv-sending .sentinel-msg-overlay{opacity:0!important}',
+    /* one thing at a time under the logo: a card or a message there sets aside what was there, and the labels beside a sphere wait behind it */
+    'html.cv .sentinel-msg-overlay{z-index:9500!important}',
+    'html.cv:has(.sentinel-toast) #dreamBrief,html.cv:has(.cvc) #dreamBrief,html.cv:has(.sentinel-msg-overlay.open) #dreamBrief{opacity:0!important;transition:opacity .2s}',
+    'html.cv:has(.sentinel-msg-overlay.open) #cvLabels,html.cv:has(.cvc) #cvLabels{visibility:hidden}'
   ].join('');
   var st = document.createElement('style'); st.id = 'cvStyle'; st.textContent = css; document.head.appendChild(st);
 
@@ -244,7 +262,7 @@
   var ICON = {
     contact: '<path d="M4 6h16v10H8l-4 4z"/>', health: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     journal: '<path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6z"/><path d="M9 3v18M11.5 8h4M11.5 11h4"/>', tools: '<path d="M14.5 5.5a3.5 3.5 0 0 0-4.6 4.6L4 16l4 4 5.9-5.9a3.5 3.5 0 0 0 4.6-4.6l-2.2 2.2-2.4-.6-.6-2.4z"/>',
-    where: '<path d="M12 21s-6-6.2-6-11a6 6 0 0 1 12 0c0 4.8-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>', covara: '<circle cx="12" cy="12" r="8"/><path d="M15.5 9.2A4.2 4.2 0 1 0 15.5 14.8"/>',
+    where: '<path d="M12 21s-6-6.2-6-11a6 6 0 0 1 12 0c0 4.8-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>', covara: '<circle cx="12" cy="12" r="4.2"/><ellipse cx="12" cy="12" rx="9.5" ry="3.6" transform="rotate(-24 12 12)"/>',   /* a sphere in orbit; there is no "C" button in Covara */
     alert: '<path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.3"/>',
     video: '<rect x="3" y="7" width="12" height="10" rx="2"/><path d="M15 11l6-3v8l-6-3z"/>', phone: '<path d="M6 3h3l1.5 4.5-2 1.3a11 11 0 0 0 6.7 6.7l1.3-2L21 15v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/>',
     message: '<path d="M4 6h16v10H8l-4 4z"/>', email: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 7l9 6 9-6"/>',
