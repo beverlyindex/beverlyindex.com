@@ -4,7 +4,7 @@
    No server dependency. Everything stays on-device.
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'remiel-covara-v200';
+const CACHE_NAME = 'remiel-covara-v201';
 
 const PRECACHE_URLS = [
   './',
@@ -23,13 +23,13 @@ const PRECACHE_URLS = [
 ];
 
 /* ── Install: pre-cache core shell ──
-   No automatic skipWaiting: an updated worker waits until the app shows the
-   "new version" banner and the user taps Reload (message SKIP_WAITING). */
+   Covara (26 Oct 2026): a new version takes over by itself, so the next time Covara opens it is the new one.
+   There is no "new version" bar at the bottom of the screen to tap. */
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) =>
       Promise.all(PRECACHE_URLS.map((u) => cache.add(u).catch(() => {})))
-    )
+    ).then(() => self.skipWaiting())
   );
 });
 
