@@ -3096,6 +3096,9 @@ function portClose(){ const p=P.portrait; if(!p) return; const now=Date.now(); p
   if(W.on) wEvent('port', 'Portrait closed at '+hms(now)+', after '+walkDur(now-p.t)+'. Every device shows again.', '', now);
   toast('Portrait off. Every device shows again.'); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
 const portToggle = () => portOn() ? portClose() : portOpen();
+// A trip that starts with the Portrait already lit says so at its top: since when, and how many devices it held when it was taken.
+function portAtStart(){ const p=P.portrait; if(!p || !p.on || !W.on) return; const n=p.n||0, d=new Date(p.t), today=new Date().toDateString()===d.toDateString();
+  wEvent('port', 'Portrait lit since '+hms(p.t)+(today?'':' on '+DOW3[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()])+': '+(n===1?'1 device':n+' devices')+' known and hidden when it was taken.', '', W.t0); }
 // Why a device of the Portrait shows again: it moved.
 function portMoving(d){ const nowS=Date.now()+LIVE.skew;
   if(d.withYou) return 'keeps pace with you'; if(d.maybe) return 'may be keeping pace with you';
@@ -3211,7 +3214,7 @@ function tripStart(){ if(W.on) return; const me=ePos(), fresh=me && Date.now()-m
   { const N=NATIVE(), st=N?(nativeStatus()||{}):null;          // a trip listens: if the phone is not listening and nothing stands in the way, listening starts with the trip
     if(N && st.permission==='granted' && st.locationOn!==false && (!PH.on || PH.lost || st.listening===false)){ try{ N.start(); }catch(e){} PH.native=true; PH.on=true; PH.lost=false; PH.asked=Date.now(); store.set('halo_listen','1'); if(!PH.timer) PH.timer=setInterval(phFlush, 2000); S.tripListen=Date.now(); } }
   LIVE.leg=null; LIVE.devs.forEach(d=>{ d.trk=null; d.withYou=false; d.maybe=false; d.tested=false; d.verdict='near'; });          // "moving with you" on this trip is read from this trip's own legs
-  walkStart(Date.now(), fresh?me:null, 0); if(!S.pos) geoAsk().then(()=>renderVicinity());
+  walkStart(Date.now(), fresh?me:null, 0); portAtStart(); if(!S.pos) geoAsk().then(()=>renderVicinity());
   if(S.tripListen && Date.now()-S.tripListen<2000){ wEvent('note','Listening started with the trip.'); const t0=S.tripListen;          // a phone can take 20 seconds to begin: the warning waits for that, and for the first report
     const heard=()=>LIVE.seen.mobile-LIVE.skew>=t0, check=(last)=>{ if(!W.on || heard()) return; PH.nstat=nativeStatus(); if(!PH.nstat || PH.nstat.listening!==false) return;
       if(!last) return void setTimeout(()=>check(true), 12000);
