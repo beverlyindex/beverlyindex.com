@@ -25,7 +25,11 @@
       aHold: 'Hold to send', aHolding: 'Keep holding', aSentAll: 'Your team has been told.', aSent: '{n} has been told.', aFail: 'The ALERT could not be sent. Check the internet, or call 911.', cancel: 'Cancel',
       cTitle: 'Team code', cSub: 'Give this code to the person joining your team. It works for 24 hours.', cFail: 'A code could not be made. Check the internet.', cShare: 'Share', cCopied: 'Copied.',
       added: '{n} is on your team.', pending: 'wants to join',
-      pVideo: 'Video', pPhone: 'Phone', everyone: 'Everyone on screen',
+      pVideo: 'Video', pPhone: 'Phone', imp: 'Import Contacts',
+      impSub: 'Choose people from this phone. Their names, numbers, email and photos come with them.', impPick: 'Choose from this phone',
+      impFileSub: 'This browser cannot open your phone contacts. Export your contacts as a vCard (.vcf) file, then choose it here. Photos come with them.', impFile: 'Choose a contacts file',
+      impAll: 'Select all', impGo: 'Add {n} to my team', impNone: 'Tick at least one name.', impEmpty: 'No contacts were found in that file.',
+      impDone: '{n} added to your team.', impPh: '{n} with photos.', impDup: '{n} already on your team.', impNoNew: 'Everyone chosen is already on your team.', impFail: 'The contacts could not be read.', impBusy: 'Adding…',
       callOne: '{n} is not on Covara yet, so {n} cannot be called. Give {n} your team code: tap your sphere, then Covara, then Team code.',
       callMany: '{n} are not on Covara yet, so they cannot be called. Give them your team code: tap your sphere, then Covara, then Team code.',
       jTitle: 'Join a team', jSub: 'Someone gave you their team code? Type it here.', jPh: '6-digit code', jGo: 'Join', jBad: 'That code is not right, or it has expired. Ask for a new one.',
@@ -48,7 +52,11 @@
       aHold: 'Tieni premuto per inviare', aHolding: 'Continua a tenere premuto', aSentAll: 'Il team è stato avvisato.', aSent: '{n} è stato avvisato.', aFail: 'Non è stato possibile inviare l’allerta. Controlla internet o chiama il 112.', cancel: 'Annulla',
       cTitle: 'Codice team', cSub: 'Dai questo codice a chi entra nel tuo team. Vale 24 ore.', cFail: 'Non è stato possibile creare un codice. Controlla internet.', cShare: 'Condividi', cCopied: 'Copiato.',
       added: '{n} è nel tuo team.', pending: 'vuole entrare',
-      pVideo: 'Video', pPhone: 'Telefono', everyone: 'Tutti sullo schermo',
+      pVideo: 'Video', pPhone: 'Telefono', imp: 'Importa contatti',
+      impSub: 'Scegli le persone da questo telefono. Nomi, numeri, email e foto arrivano con loro.', impPick: 'Scegli da questo telefono',
+      impFileSub: 'Questo browser non può aprire i contatti del telefono. Esporta i contatti come file vCard (.vcf), poi sceglilo qui. Le foto arrivano con loro.', impFile: 'Scegli un file di contatti',
+      impAll: 'Seleziona tutti', impGo: 'Aggiungi {n} al team', impNone: 'Spunta almeno un nome.', impEmpty: 'Nel file non ci sono contatti.',
+      impDone: '{n} aggiunti al team.', impPh: '{n} con foto.', impDup: '{n} già nel team.', impNoNew: 'Tutte le persone scelte sono già nel team.', impFail: 'Non è stato possibile leggere i contatti.', impBusy: 'Aggiungo…',
       callOne: '{n} non è ancora su Covara, quindi non si può chiamare. Dai a {n} il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       callMany: '{n} non sono ancora su Covara, quindi non si possono chiamare. Dai loro il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       jTitle: 'Entra in un team', jSub: 'Qualcuno ti ha dato il suo codice team? Scrivilo qui.', jPh: 'Codice di 6 cifre', jGo: 'Entra', jBad: 'Il codice non è giusto o è scaduto. Chiedine uno nuovo.',
@@ -110,6 +118,12 @@
     '.cvc input,.cvc textarea{width:100%;box-sizing:border-box;border-radius:14px;border:1px solid rgba(150,200,255,.4);background:rgba(20,44,100,.3);color:#fff;font:500 16px "Hanken Grotesk",system-ui,sans-serif;padding:12px;resize:none;margin:0 0 10px}',
     '.cvc .go{width:100%;min-height:50px;border-radius:16px;border:0;background:linear-gradient(180deg,#7ee3ff,#38bdf8);color:#04203a;font:800 16px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}.cvc .go[disabled]{opacity:.6}',
     '.cvc .x{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(150,210,255,.45);background:transparent;color:#eef6ff;font-size:22px;cursor:pointer}',
+    '.cvc .ilist{max-height:240px;overflow-y:auto;overscroll-behavior:contain;margin:0 0 12px;scrollbar-width:thin;scrollbar-color:rgba(255,210,77,.45) transparent}',
+    '.cvc .irow{display:flex;align-items:center;gap:10px;min-height:40px;padding:2px 4px;cursor:pointer;color:#ffd24d;font:600 14px "Hanken Grotesk",system-ui,sans-serif}.cvc .irow.off{opacity:.45}',
+    '.cvc .irow i{flex:0 0 28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 10px "JetBrains Mono",monospace;font-style:normal;color:#04203a;background:radial-gradient(circle at 34% 28%,#e8fbff 0,#7ee3ff 35%,#38bdf8 70%,#1e6fb8 100%);background-size:cover;background-position:center}',
+    '.cvc .irow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.cvc .irow small{display:block;color:#cfe3ff;font:500 11px "JetBrains Mono",monospace;overflow:hidden;text-overflow:ellipsis}',
+    '.cvc .irow em{flex:0 0 20px;height:20px;border-radius:6px;border:1.5px solid #ffd24d;font-style:normal;text-align:center;line-height:18px;color:#04203a;font-size:13px}.cvc .irow:not(.off) em{background:#ffd24d}',
+    '.cvc .iall{margin:0 0 6px;color:#dff2ff;font:600 13px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer}',
     '.cvc .code{font:800 34px "JetBrains Mono",monospace;letter-spacing:.12em;text-align:center;color:#ffd24d;margin:6px 0 14px;user-select:all;-webkit-user-select:all}',
     '.cvc.red .box{border-color:rgba(255,80,90,.75);background:linear-gradient(155deg,rgba(150,20,40,.30),rgba(40,6,16,.42));box-shadow:0 0 26px rgba(255,40,60,.35)}',
     '.cvc .hold{position:relative;display:block;margin:6px auto 12px;width:170px;height:170px;border-radius:50%;border:2px solid #ff2a2a;background:rgba(255,40,40,.08);color:#fff;font:800 15px "Hanken Grotesk",sans-serif;cursor:pointer;touch-action:none}',
@@ -137,7 +151,6 @@
     '.cvro-row span{overflow:hidden;text-overflow:ellipsis}.cvro-row.on{opacity:1}.cvro-row:hover{opacity:1}',
     '.cvro-row i{flex:0 0 22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 9px "JetBrains Mono",monospace;font-style:normal;color:#04203a;background:radial-gradient(circle at 34% 28%,#e8fbff 0,#7ee3ff 35%,#38bdf8 70%,#1e6fb8 100%);background-size:cover;background-position:center;box-shadow:0 0 8px rgba(56,189,248,.5)}',
     '.cvro-row.on i{box-shadow:0 0 0 1.5px #ffd24d,0 0 10px rgba(255,210,77,.55)}',
-    '.cvro-all{margin-top:6px;padding:4px;color:#dff2ff;font:600 12px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer;opacity:.85;text-shadow:0 0 8px rgba(0,20,60,.9)}.cvro-all em{font-style:normal;margin-left:6px;font:700 10px "JetBrains Mono",monospace;color:#ffd24d}',
     'html.cv:has(.cvc) #cvRoster,html.cv:has(.contact-modal-overlay.open) #cvRoster,html.cv:has(.settings-panel.open) #cvRoster,html.cv:has(.sentinel-msg-overlay.open) #cvRoster,html.cv:has(#cvRing.on) #cvRoster{visibility:hidden}',
     /* the labels and the ring wait behind any card that is open */
     'html.cv:has(.contact-modal-overlay.open) #cvLabels,html.cv:has(.contact-modal-overlay.open) #cvRing,html.cv:has(.quick-dial-overlay.open) #cvLabels,html.cv:has(.ui-confirm-overlay) #cvLabels,html.cv:has(.settings-panel.open) #cvLabels,html.cv:has(.settings-panel.open) #cvRing{visibility:hidden!important}',
@@ -435,9 +448,21 @@
     } catch (e) {}
     /* a person added (or removed) the Sentinel way is on screen at once */
     try {
-      var put = RemielDB.putContact, del = RemielDB.deleteContact, t0 = 0;
-      var soon = function () { clearTimeout(t0); t0 = setTimeout(function () { try { if (appState === 'network') rebuild(); } catch (e) {} }, 250); };
-      RemielDB.putContact = function (c) { var r = put.apply(this, arguments); try { if (c && !DEMO_CONTACTS.some(function (x) { return x.id === c.id; })) DEMO_CONTACTS.push(c); } catch (e) {} soon(); return r; };
+      /* a saved person who is not yet in the list is added a moment later, once Sentinel has had the chance to
+         add them itself, so no one is ever listed twice (26 Oct: an import showed each new person twice) */
+      var put = RemielDB.putContact, del = RemielDB.deleteContact, t0 = 0, waiting = [];
+      var soon = function () {
+        clearTimeout(t0);
+        t0 = setTimeout(function () {
+          try {
+            waiting.splice(0).forEach(function (c) { if (!DEMO_CONTACTS.some(function (x) { return x.id === c.id; })) DEMO_CONTACTS.push(c); });
+            var seen = {};
+            for (var i = 0; i < DEMO_CONTACTS.length; i++) { var k = String(DEMO_CONTACTS[i].id); if (seen[k]) DEMO_CONTACTS.splice(i--, 1); else seen[k] = 1; }
+          } catch (e) {}
+          try { if (appState === 'network') rebuild(); } catch (e) {}
+        }, 250);
+      };
+      RemielDB.putContact = function (c) { var r = put.apply(this, arguments); try { if (c) waiting.push(c); } catch (e) {} soon(); return r; };
       RemielDB.deleteContact = function () { var r = del.apply(this, arguments); soon(); return r; };
     } catch (e) {}
   }
@@ -512,12 +537,12 @@
       }
     } catch (e) {}
   }
-  /* 26 Oct: 10 spheres on screen by default. The people HOME picks from the roster come first (the latest pick
-     first), then the most active (latest message or note, newest first). With Everyone on screen, the whole
-     team revolves, ordered the same way. */
-  var SHOWN = 10, _act = {};
-  function pinned() { try { return JSON.parse(lsGet('rc:pinned') || '[]'); } catch (e) { return []; } }
-  function everyone() { return lsGet('rc:everyone') === '1'; }
+  /* 26 Oct: the screen follows what HOME does. When the app opens, the 10 most active are on screen (latest
+     message or note, newest first). Everyone HOME picks from the roster joins them at once, connected to HOME
+     and revolving, and stays on screen until the app is closed. No Everyone-on-screen switch. */
+  var SHOWN = 10, _act = {}, _picks = [];
+  try { localStorage.removeItem('rc:pinned'); localStorage.removeItem('rc:everyone'); } catch (e) {}
+  function pinned() { return _picks.slice(); }
   function ranked() {
     var pins = pinned(), all = people();
     return all.slice().sort(function (a, b) {
@@ -526,11 +551,11 @@
       return (_act[b.id] || 0) - (_act[a.id] || 0) || nameKey(a).localeCompare(nameKey(b));
     });
   }
-  function onScreen() { var r = ranked(); return everyone() ? r : r.slice(0, SHOWN); }
+  function onScreen() { var r = ranked(), n = 0; return r.filter(function (c) { if (_picks.indexOf(String(c.id)) >= 0) return true; return n++ < SHOWN - _picks.length; }); }
   function nameKey(c) { var l = String(c.last || '').trim(), f = String(c.first || '').trim(); return ((l || f) + ' ' + f).toLowerCase(); }   /* no last name: sorted by the first name */
   function pin(c) {
-    var p = pinned().filter(function (x) { return x !== String(c.id); }); p.unshift(String(c.id)); p = p.slice(0, SHOWN);
-    lsSet('rc:pinned', JSON.stringify(p)); rebuild(); roster.paint();
+    if (_picks.indexOf(String(c.id)) < 0) _picks.unshift(String(c.id));
+    rebuild(); roster.paint();
   }
   /* who needs attention (a message to HOME in the last day not yet answered), and how recently each was active */
   async function attention() {
@@ -571,19 +596,18 @@
       el.hidden = false;
       var on = {}; onScreen().forEach(function (c) { on[c.id] = 1; });
       var list = all.slice().sort(function (a, b) { return nameKey(a).localeCompare(nameKey(b)); });
-      var s2 = list.map(function (c) { return c.id + (on[c.id] ? '+' : '') + photo(c).slice(-8); }).join() + everyone() + IT();
+      var s2 = list.map(function (c) { return c.id + (on[c.id] ? '+' : '') + photo(c).slice(-8); }).join() + IT();
       if (s2 === sig) return; sig = s2;
       var top = el.querySelector('.cvro-list'), keep = top ? top.scrollTop : 0;
       el.innerHTML = '<div class="cvro-list">' + list.map(function (c) {
         var ph = photo(c), ini = ((c.first || '')[0] || '') + ((c.last || '')[0] || '');
         var nm = c.last ? esc(c.last) + ', ' + esc(c.first || '') : esc(c.first || '');
         return '<div class="cvro-row' + (on[c.id] ? ' on' : '') + '" role="button" tabindex="0" data-id="' + esc(c.id) + '"><i' + (ph ? ' style="background-image:url(' + ph + ')"' : '') + '>' + (ph ? '' : esc(ini.toUpperCase())) + '</i><span>' + nm + '</span></div>';
-      }).join('') + '</div><div class="cvro-all" role="button" tabindex="0">' + esc(t('everyone')) + '<em>' + (everyone() ? t('on') : t('off')) + '</em></div>';
+      }).join('') + '</div>';
       el.querySelector('.cvro-list').scrollTop = keep;
       Array.prototype.forEach.call(el.querySelectorAll('.cvro-row'), function (row) {
         press(row, function () { var c = all.filter(function (x) { return String(x.id) === row.getAttribute('data-id'); })[0]; if (c) pin(c); });
       });
-      press(el.querySelector('.cvro-all'), function () { lsSet('rc:everyone', everyone() ? '0' : '1'); rebuild(); sig = ''; paint(); });
     }
     function box() { if (el.hidden || !el.parentNode) return null; var r = el.getBoundingClientRect(); return r.width ? r : null; }
     return { paint: paint, box: box };
@@ -658,7 +682,7 @@
     camera: '<path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', words: '<path d="M4 6h16M4 11h12M4 16h8"/><path d="M18 14v6M15 17h6"/>',
     mode: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.5"/>',
     speak: '<path d="M5 10v4h3l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>', broadcast: '<circle cx="12" cy="12" r="2"/><path d="M8 8a5.5 5.5 0 0 0 0 8M16 8a5.5 5.5 0 0 1 0 8M5.2 5.2a9.5 9.5 0 0 0 0 13.6M18.8 5.2a9.5 9.5 0 0 1 0 13.6"/>',
-    code: '<path d="M7 8l-4 4 4 4M17 8l4 4-4 4M14 5l-4 14"/>', settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+    code: '<path d="M7 8l-4 4 4 4M17 8l4 4-4 4M14 5l-4 14"/>', imp: '<circle cx="10" cy="8" r="3.5"/><path d="M3.5 20a6.5 6.5 0 0 1 13 0M19 8v7M16 12l3 3 3-3"/>', settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
     hHealth: '<path d="M3 12h4l2-5 4 10 2-5h6"/>', visits: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M12 13v5M9.5 15.5h5"/>',
     meds: '<rect x="7" y="3" width="10" height="5" rx="1"/><rect x="6" y="8" width="12" height="13" rx="2"/><path d="M12 11.5v6M9 14.5h6"/>',
     records: '<path d="M4 7h6l2 2h8v10H4z"/><rect x="9" y="12" width="6" height="5" rx="1"/><path d="M10.5 12v-1.2a1.5 1.5 0 0 1 3 0V12"/>'
@@ -685,7 +709,7 @@
   var SUB = {
     journal: ['notes', 'calendar', 'daily', 'alarms', 'invites'],
     tools: ['camera', 'words', 'mode'],
-    covara: ['speak', 'broadcast', 'code', 'settings']
+    covara: ['speak', 'broadcast', 'code', 'imp', 'settings']
   };
   var SIDE = { contact: { side: 'right', items: ['video', 'phone', 'message', 'email'] }, health: { side: 'left', items: ['hHealth', 'visits', 'meds', 'records'] } };
 
@@ -766,6 +790,7 @@
       case 'broadcast': lsSet('rc:broadcast', broadcastOn() ? '0' : '1'); toast(broadcastOn() ? t('bcOn') : t('bcOff')); return;
       case 'speak': lsSet('rc:speak', speakOn() ? '0' : '1'); toast(speakOn() ? t('spOn') : t('spOff')); return;
       case 'code': return codeCard();
+      case 'imp': return importCard();
       case 'settings': try { SettingsPanel.open(); } catch (e) {} return;
       default: toast(t('soon', { x: k === 'daily' ? today() : t(k) }));
     }
@@ -988,6 +1013,105 @@
       msg.textContent = r.ok ? (c ? t('aSent', { n: n }) : t('aSentAll')) : t('aFail');
       setTimeout(function () { el.remove(); }, r.ok ? 2200 : 6000);
     }
+  }
+  /* Import Contacts (Covara > Import Contacts, 26 Oct): people come in from the phone with their names, numbers,
+     email and photos. Android's browser opens the phone's own contact list. Safari (iPhone and Mac) cannot, so
+     there the contacts come from a vCard (.vcf) file exported from the Contacts app. Everyone is checked
+     before anything is added, and Sentinel's own routine saves them (photos included, no duplicates). */
+  function canPick() { try { return 'contacts' in navigator && 'select' in navigator.contacts; } catch (e) { return false; } }
+  function splitName(full) { var p = String(full || '').trim().split(/\s+/); return { first: p[0] || '', last: p.slice(1).join(' ') }; }
+  function vUnesc(v) { return String(v || '').replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1').trim(); }
+  function b64Blob(b64, type) {
+    try { var bin = atob(String(b64).replace(/\s+/g, '')), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: type || 'image/jpeg' }); } catch (e) { return null; }
+  }
+  function parseVcf(text) {
+    var out = [], cards = String(text || '').replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '').split(/BEGIN:VCARD/i).slice(1);
+    cards.forEach(function (card) {
+      var c = { first: '', last: '', phone: '', email: '', photo: null, extra: [] }, fn = '';
+      card.split('\n').forEach(function (line) {
+        var k = line.indexOf(':'); if (k < 0) return;
+        var head = line.slice(0, k), val = line.slice(k + 1), name = head.split(';')[0].replace(/^item\d+\./i, '').toUpperCase();
+        if (name === 'FN') fn = vUnesc(val);
+        else if (name === 'N') { var n = val.split(';'); c.last = vUnesc(n[0]); c.first = vUnesc([n[1], n[2]].filter(Boolean).join(' ')); }
+        else if (name === 'TEL') { var tel = vUnesc(val.replace(/^tel:/i, '')); if (!c.phone) c.phone = tel; else c.extra.push(tel); }
+        else if (name === 'EMAIL') { var em = vUnesc(val); if (!c.email) c.email = em; }
+        else if (name === 'PHOTO' && !c.photo) {
+          var m = /^data:([^;,]+);base64,(.*)$/i.exec(val);
+          if (m) c.photo = b64Blob(m[2], m[1]);
+          else if (/ENCODING=(b|base64)/i.test(head) || /^[A-Za-z0-9+\/=\s]{200,}$/.test(val)) { var ty = /TYPE=([A-Za-z]+)/i.exec(head); c.photo = b64Blob(val, 'image/' + (ty ? ty[1].toLowerCase().replace('jpg', 'jpeg') : 'jpeg')); }
+        }
+      });
+      if (!c.first && !c.last && fn) { var sp = splitName(fn); c.first = sp.first; c.last = sp.last; }
+      if (!c.first && c.last) { c.first = c.last; c.last = ''; }
+      if (c.first) out.push(c);
+    });
+    return out;
+  }
+  function importCard() {
+    var pick = canPick();
+    var el = card('<h2>' + esc(t('imp')) + '</h2><p>' + esc(pick ? t('impSub') : t('impFileSub')) + '</p>' +
+      '<button class="go" type="button" data-src>' + esc(pick ? t('impPick') : t('impFile')) + '</button>' +
+      '<input type="file" accept=".vcf,.vcard,text/vcard,text/x-vcard" hidden>');
+    var src = el.querySelector('[data-src]'), file = el.querySelector('input[type=file]');
+    src.onclick = async function () {
+      if (!pick) { file.click(); return; }
+      try {
+        var props = ['name', 'tel', 'email'];
+        try { var sup = await navigator.contacts.getProperties(); if (sup.indexOf('icon') >= 0) props.push('icon'); } catch (e) {}
+        var res = await navigator.contacts.select(props, { multiple: true });
+        var list = (res || []).map(function (r) {
+          var sp = splitName(r.name && r.name[0]);
+          return { first: sp.first, last: sp.last, phone: (r.tel || [])[0] || '', email: (r.email || [])[0] || '', extra: (r.tel || []).slice(1), photo: r.icon && r.icon[0] instanceof Blob ? r.icon[0] : null };
+        }).filter(function (c) { return c.first; });
+        if (list.length) choose(el, list, true);
+      } catch (e) { if (e && e.name !== 'AbortError') toast(t('impFail')); }
+    };
+    file.onchange = function () {
+      var f = file.files && file.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () { var list = parseVcf(rd.result); if (!list.length) return toast(t('impEmpty')); choose(el, list, false); };
+      rd.onerror = function () { toast(t('impFail')); };
+      rd.readAsText(f);
+    };
+  }
+  /* the check-list: from the phone everyone chosen is ticked; from a file (often the whole address book) no one
+     is ticked until HOME ticks them, or taps Select all */
+  function choose(el, list, ticked) {
+    list.sort(function (a, b) { return nameKey(a).localeCompare(nameKey(b)); });
+    var on = list.map(function () { return ticked; }), urls = [];
+    var box = el.querySelector('.box');
+    box.innerHTML = '<button class="x" type="button" aria-label="' + esc(t('close')) + '">&times;</button><h2>' + esc(t('imp')) + '</h2>' +
+      (list.length > 1 ? '<div class="iall" role="button" tabindex="0">' + esc(t('impAll')) + '</div>' : '') +
+      '<div class="ilist">' + list.map(function (c, i) {
+        var u = c.photo ? URL.createObjectURL(c.photo) : ''; if (u) urls.push(u);
+        var ini = ((c.first || '')[0] || '') + ((c.last || '')[0] || '');
+        return '<div class="irow' + (ticked ? '' : ' off') + '" role="checkbox" tabindex="0" data-i="' + i + '"><i' + (u ? ' style="background-image:url(' + u + ')"' : '') + '>' + (u ? '' : esc(ini.toUpperCase())) + '</i><b>' +
+          esc(c.last ? c.last + ', ' + c.first : c.first) + '<small>' + esc([c.phone, c.email].filter(Boolean).join(' · ')) + '</small></b><em>✓</em></div>';
+      }).join('') + '</div><button class="go" type="button" data-add></button>';
+    var add = box.querySelector('[data-add]');
+    function count() { var n = on.filter(Boolean).length; add.textContent = t('impGo', { n: n }); add.disabled = !n; }
+    function closeIt() { urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} }); el.remove(); }
+    box.querySelector('.x').onclick = closeIt;
+    Array.prototype.forEach.call(box.querySelectorAll('.irow'), function (row) {
+      row.onclick = function () { var i = +row.getAttribute('data-i'); on[i] = !on[i]; row.classList.toggle('off', !on[i]); count(); };
+    });
+    var all = box.querySelector('.iall');
+    if (all) all.onclick = function () { var to = on.some(function (x) { return !x; }); on = on.map(function () { return to; }); Array.prototype.forEach.call(box.querySelectorAll('.irow'), function (r) { r.classList.toggle('off', !to); }); count(); };
+    count();
+    add.onclick = async function () {
+      var sel = list.filter(function (c, i) { return on[i]; });
+      if (!sel.length) return toast(t('impNone'));
+      add.disabled = true; add.textContent = t('impBusy');
+      var r = { added: 0, dupes: 0, photos: 0 };
+      try {
+        r = await SocialImport.addToCircle(sel, function (c) { return c.extra && c.extra.length ? (IT() ? 'Anche: ' : 'Also: ') + c.extra.join(', ') : ''; }, function (c) { return c.photo || null; });
+      } catch (e) { add.disabled = false; count(); return toast(t('impFail')); }
+      closeIt();
+      try { await syncTeam(); } catch (e) {}
+      rebuild(); roster.paint();
+      if (!r.added) return toast(r.dupes ? t('impNoNew') : t('impFail'));
+      toast(t('impDone', { n: r.added }) + (r.photos ? ' ' + t('impPh', { n: r.photos }) : '') + (r.dupes ? ' ' + t('impDup', { n: r.dupes }) : ''));
+    };
   }
   /* Team code: one card for both sides. Your own code to give someone (it works for 24 hours), and a place
      to type the code someone gave you. A shared code also arrives as a link that joins by itself. */
