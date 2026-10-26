@@ -3078,8 +3078,8 @@ const ansPaperRow = (w, e) => '<span class="notr">'+e(w.name)+'</span>'+(w.kind?
    you, follows you round a stop or a corner, or leaves and comes back. Phones, watches and AirTags change their Bluetooth address every few minutes: a new
    address is the Portrait device it replaces only when that device fell silent as it appeared, at the same strength, and no other device could make
    the match; a named device is matched by its name. It stays lit wherever you go, until you press Portrait again. Trackers in it stay hidden unless
-   they move. Your Watch list and what you filed as Threat always show. Something new within 40 ft, or a device of the Portrait moving toward you, buzzes
-   the phone and raises a banner. Pressing Portrait again closes it (grey). The trip record keeps every device either way, with its times. */
+   they move. Your Watch list and what you filed as Threat always show. Something new that a person carries (a phone, a watch, earbuds or a tracker) within
+   40 ft, or anything moving toward you, buzzes the phone and raises a banner; every other new device shows in the list, named, without a buzz. Pressing Portrait again closes it (grey). The trip record keeps every device either way, with its times. */
 const PORT={hide:new Set(), why:new Map(), at:0, taken:new Set(), r0:new Map()};
 const PORT_NEAR=12, PORT_SWAP={gap:10000, db:6, min:-85, wait:5000};
 const portOn = () => !!(P.portrait && P.portrait.on);
@@ -3109,9 +3109,8 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<1500) return; PORT.at=
   // every device the radar may still show, fading ones included: a Portrait device stays hidden after it falls silent
   LIVE.devs.forEach(d=>{ if(d.sim) return; const live=d.present || nowS-d.seenMobile<LIVE_PRESENT;
     if(fileOfD(d)==='threat' || (P.watch||{})[d.sig]) return;          // your threats always show
-    const mv=live && portMoving(d); if(mv){ PORT.why.set(d.sig, 'moving'); return; }
-    if(S0.has(d.sig) || (d.adv && N0.has(d.adv))){ PORT.hide.add(d.sig); return; }
-    if(d.band!=='ble' || (d.adv && !rotates(d))){ if(live) PORT.why.set(d.sig, 'new'); return; }          // a network or a named device the Portrait did not hold
+    if(S0.has(d.sig) || (d.adv && N0.has(d.adv))){ if(live && portMoving(d)) PORT.why.set(d.sig, 'moving'); else PORT.hide.add(d.sig); return; }          // in the Portrait: hidden until it moves
+    if(d.band!=='ble' || (d.adv && !rotates(d))){ if(live) PORT.why.set(d.sig, 'new'); return; }          // a network or a named device the Portrait did not hold is new, moving or not
     cand.push(d); });
   // A new address is a Portrait device under a new address only when that device fell silent within PORT_SWAP.gap of the newcomer's first report,
   // both were heard well (PORT_SWAP.min or stronger) at strengths within PORT_SWAP.db of each other, and they are of one maker, kind and name; of
@@ -3129,7 +3128,7 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<1500) return; PORT.at=
       pairs.push([Math.abs(o.rssi-r)+gap/100000, c, o]); }); });
   const got=new Set();          // the closest pairs first, each newcomer and each Portrait device once, so several changing at one moment pair up rightly
   pairs.sort((a,b)=>a[0]-b[0]).forEach(([k,c,o])=>{ if(got.has(c.sig) || PORT.taken.has(o.sig)) return; got.add(c.sig); PORT.taken.add(o.sig); S0.add(c.sig); (p.sigs=p.sigs||[]).push(c.sig); grew=true; });
-  pend.forEach(c=>{ const live=c.present || nowS-c.seenMobile<LIVE_PRESENT; if(S0.has(c.sig)) PORT.hide.add(c.sig); else if(live) PORT.why.set(c.sig, 'new'); });
+  pend.forEach(c=>{ const live=c.present || nowS-c.seenMobile<LIVE_PRESENT; if(S0.has(c.sig)){ if(live && portMoving(c)) PORT.why.set(c.sig, 'moving'); else PORT.hide.add(c.sig); } else if(live) PORT.why.set(c.sig, 'new'); });
   if(grew){ portTrim(p); save(); }
   if(PORT.r0.size>3000) [...PORT.r0.keys()].forEach(k=>{ if(!LIVE.devs.has(k)) PORT.r0.delete(k); });
   portAlerts(p); }
@@ -3139,17 +3138,20 @@ function portTrim(p){ const n0=p.n||0, s=p.sigs||[]; if(s.length>n0+1500) p.sigs
 // Portrait device known under a joined address keeps that address in the Portrait.
 function portCarry(){ const p=P.portrait, A=LIVE.alias; if(!p || !p.on || !A) return; const S0=new Set(p.sigs||[]); let n=0;
   Object.keys(A).forEach(a=>{ if(S0.has(A[a]) && !S0.has(a)){ (p.sigs=p.sigs||[]).push(a); S0.add(a); n++; } }); if(n){ portTrim(p); save(); } }
-// New within 40 ft, or a device of the Portrait moving toward you: a buzz, a banner and a line in the trip record, once each.
+// Something new that a person carries (a phone, a watch, earbuds or a tracker) within 40 ft, or anything moving toward you: a buzz, a banner and a
+// line in the trip record, once each. A network, home electronics or a bus or tram unit that is new shows in the list, named, without a buzz.
+const portCarried = d => d.band==='ble' && !houseDev(d) && (d.cls==='Tag' || d.cls==='Phone' || d.cls==='Wearable' || grpPhone(d) || isWorn(d) || (/^(Apple|Samsung|Google)\b/.test(d.hint||'') && !/AirPlay|beacon/i.test(d.hint||'')));
 function portAlerts(p){ const nowS=Date.now()+LIVE.skew; PORT.why.forEach((w, sig)=>{ const d=LIVE.devs.get(sig); if(!d || !(d.dist>0) || nowS-d.seenMobile>=LIVE_PRESENT) return;
-    const near=d.dist<=PORT_NEAR, toward=w==='moving' && (d.vel<0 || near); if(!(w==='new' ? near : toward)) return;
-    const txt=devName(d)+' '+(w==='new' ? 'is new to your Portrait' : portMoving(d)||'is moving')+'. It is '+duAbout(d)+' from you.';
+    const near=d.dist<=PORT_NEAR, mv=portMoving(d), toward=!!mv && (d.vel<0 || near);
+    if(!(w==='new' ? (near && portCarried(d)) || toward : toward)) return;
+    const txt=devName(d)+' '+(w==='new' ? 'is new to your Portrait'+(mv?', and '+mv:'') : mv||'is moving')+'. It is '+duAbout(d)+' from you.';
     if(alertRaise('port:'+sig+':'+p.t, w==='new' ? 'New in your Portrait' : 'A device in your Portrait is moving', txt+' Look round. Open it to see its story.', {dev:d.id})){ buzz([200,100,200]); if(W.on) wEvent('port', 'Portrait: '+txt, d.id); } }); }
 // The button and its line, on the Now screen and on the map: green while lit, grey while closed.
 function portBar(){ const p=P.portrait, on=portOn(), lit=portLit(); let nNew=0, nMv=0; PORT.why.forEach(w=>{ if(w==='new') nNew++; else nMv++; });
   const line=!on ? 'Press Portrait, and everything around you now is known and hidden. Only new and moving devices show.'
     : 'Portrait since '+hms(p.t)+' · '+PORT.hide.size+' hidden'+(nNew?' · '+nNew+' new':'')+(nMv?' · '+nMv+' moving':'');
   return '<div class="port-bar"><button class="portbtn'+(lit?' lit':'')+'" data-act="port" aria-pressed="'+(on?'true':'false')+'"><i></i>Portrait</button><span>'+esc(line)+'</span></div>'; }
-const portWhy = d => { if(!portLit()) return ''; const w=PORT.why.get(d.sig); return w==='new' ? 'New to your Portrait' : w==='moving' ? 'In your Portrait, and '+(portMoving(d)||'moved just now') : ''; };
+const portWhy = d => { if(!portLit()) return ''; const w=PORT.why.get(d.sig); return w==='new' ? 'New to your Portrait'+((m=>m?', and '+m:'')(portMoving(d))) : w==='moving' ? 'In your Portrait, and '+(portMoving(d)||'moved just now') : ''; };
 function nowVerdict(M){ let c='v-clear', i=LOC_IC.ok, t, s; const N=M.n||{}, n=M.all.length, wy=M.red.filter(r=>r.tag==='with').length, pl=M.red.length-wy, am=M.amber.length, wt=M.watch.length, su=M.sus.length;
   const tail=[n+(n===1?' device':' devices')+' in earshot', N.fresh?N.fresh+' new':'', N.local?N.local+' in the neighborhood':'', N.known?N.known+(N.known===1?' person you know':' people you know'):'', N.pub?N.pub+' transit and public':'', N.yours?N.yours+' yours':''].filter(Boolean).join(' · ');
   if(!M.live){ c='v-off'; i=LOC_IC.off; t=stateWords(M.V.mode).count||'waiting for a sensor'; t=t.charAt(0).toUpperCase()+t.slice(1); s=stateWords(M.V.mode).long; }
