@@ -3077,22 +3077,22 @@ const ansPaperRow = (w, e) => '<span class="notr">'+e(w.name)+'</span>'+(w.kind?
    (green), only what is new to the Portrait shows, and any device of the Portrait that starts to move: it comes closer while you stand, keeps pace with
    you, follows you round a stop or a corner, or leaves and comes back. Phones, watches and AirTags change their Bluetooth address every few minutes: a new
    address is the Portrait device it replaces only when that device fell silent as it appeared, at the same strength, and no other device could make
-   the match; a named device is matched by its name. A Portrait belongs to one place: 300 ft or more from it, it pauses, and it lights again when you are back. Trackers in it stay hidden unless
+   the match; a named device is matched by its name. It stays lit wherever you go, until you press Portrait again. Trackers in it stay hidden unless
    they move. Your Watch list and what you filed as Threat always show. Something new within 40 ft, or a device of the Portrait moving toward you, buzzes
    the phone and raises a banner. Pressing Portrait again closes it (grey). The trip record keeps every device either way, with its times. */
-const PORT={hide:new Set(), why:new Map(), at:0, away:false, awayM:0, gone:0, taken:new Set(), r0:new Map()};
-const PORT_M=90, PORT_NEAR=12, PORT_SWAP={gap:10000, db:6, min:-85, wait:5000};
+const PORT={hide:new Set(), why:new Map(), at:0, taken:new Set(), r0:new Map()};
+const PORT_NEAR=12, PORT_SWAP={gap:10000, db:6, min:-85, wait:5000};
 const portOn = () => !!(P.portrait && P.portrait.on);
-const portLit = () => portOn() && !PORT.away;
+const portLit = () => portOn();
 const portHidden = d => portLit() && PORT.hide.has(d.sig);
 function portOpen(){ const now=Date.now(), nowS=now+LIVE.skew, me=ePos(), sigs=[], names=[];
   LIVE.devs.forEach(d=>{ if(d.sim || !(d.present || nowS-d.seenMobile<LIVE_PRESENT)) return; sigs.push(d.sig); if(d.adv && !rotates(d)) names.push(d.adv); });
   P.portrait={on:true, t:now, at:me && me.acc<=POS_MAX_ACC ? {lat:+me.lat.toFixed(6), lon:+me.lon.toFixed(6)} : null, sigs, names:[...new Set(names)], n:sigs.length};
-  PORT.away=false; PORT.gone=0; PORT.taken=new Set(); PORT.r0=new Map(); save(); PORT.at=0; portTick();
+  PORT.taken=new Set(); PORT.r0=new Map(); save(); PORT.at=0; portTick();
   if(W.on) wEvent('port', 'Portrait taken at '+hms(now)+': '+(sigs.length===1?'1 device':sigs.length+' devices')+' known and hidden.', '', now);
   toast(sigs.length ? 'Portrait on: '+(sigs.length===1?'1 device around you is':sigs.length+' devices around you are')+' known and hidden. Only new and moving devices show.' : 'Portrait on, but Remiel hears nothing just now. Start listening, then take the Portrait again.');
   S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
-function portClose(){ const p=P.portrait; if(!p) return; const now=Date.now(); p.on=false; save(); PORT.hide=new Set(); PORT.why=new Map(); PORT.away=false;
+function portClose(){ const p=P.portrait; if(!p) return; const now=Date.now(); p.on=false; save(); PORT.hide=new Set(); PORT.why=new Map();
   if(W.on) wEvent('port', 'Portrait closed at '+hms(now)+', after '+walkDur(now-p.t)+'. Every device shows again.', '', now);
   toast('Portrait off. Every device shows again.'); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
 const portToggle = () => portOn() ? portClose() : portOpen();
@@ -3104,13 +3104,7 @@ function portMoving(d){ const nowS=Date.now()+LIVE.skew;
   if(d.mov && d.mov.v && nowS-d.mov.t<MOVE.keep) return 'is moving';
   return ''; }
 function portTick(){ const now=Date.now(); if(now-PORT.at<1500) return; PORT.at=now; PORT.hide=new Set(); PORT.why=new Map(); const p=P.portrait; if(!p || !p.on) return;
-  const nowS=now+LIVE.skew, me=ePos(), S0=new Set(p.sigs||[]), N0=new Set(p.names||[]);
-  // one place: by GPS when the Portrait has a place; otherwise it pauses when none of its devices has been heard for a minute
-  let away=PORT.away;
-  if(p.at && me && me.acc<=POS_MAX_ACC){ PORT.awayM=distLL(p.at.lat,p.at.lon,me.lat,me.lon); away=PORT.awayM>PORT_M; }
-  else if(!p.at){ let any=false; LIVE.devs.forEach(d=>{ if(!any && S0.has(d.sig) && nowS-d.seenMobile<60000) any=true; }); if(any) PORT.gone=0; else if(!PORT.gone) PORT.gone=now; away=!!PORT.gone && now-PORT.gone>60000 && S0.size>0; PORT.awayM=0; }
-  if(away!==PORT.away){ PORT.away=away; if(W.on) wEvent('port', away ? 'Portrait paused at '+hms(now)+(PORT.awayM?': you are '+du(PORT.awayM)+' from it.':': none of its devices is heard.') : 'Portrait lit again at '+hms(now)+': you are back.', '', now); }
-  if(PORT.away) return;
+  const nowS=now+LIVE.skew, S0=new Set(p.sigs||[]), N0=new Set(p.names||[]);
   const cand=[];
   // every device the radar may still show, fading ones included: a Portrait device stays hidden after it falls silent
   LIVE.devs.forEach(d=>{ if(d.sim) return; const live=d.present || nowS-d.seenMobile<LIVE_PRESENT;
@@ -3153,9 +3147,8 @@ function portAlerts(p){ const nowS=Date.now()+LIVE.skew; PORT.why.forEach((w, si
 // The button and its line, on the Now screen and on the map: green while lit, grey while closed.
 function portBar(){ const p=P.portrait, on=portOn(), lit=portLit(); let nNew=0, nMv=0; PORT.why.forEach(w=>{ if(w==='new') nNew++; else nMv++; });
   const line=!on ? 'Press Portrait, and everything around you now is known and hidden. Only new and moving devices show.'
-    : PORT.away ? 'Portrait paused: '+(PORT.awayM ? 'you are '+du(PORT.awayM)+' from it.' : 'none of its devices is heard.')+' It lights again when you are back.'
     : 'Portrait since '+hms(p.t)+' · '+PORT.hide.size+' hidden'+(nNew?' · '+nNew+' new':'')+(nMv?' · '+nMv+' moving':'');
-  return '<div class="port-bar"><button class="portbtn'+(lit?' lit':on?' paused':'')+'" data-act="port" aria-pressed="'+(on?'true':'false')+'"><i></i>Portrait</button><span>'+esc(line)+'</span></div>'; }
+  return '<div class="port-bar"><button class="portbtn'+(lit?' lit':'')+'" data-act="port" aria-pressed="'+(on?'true':'false')+'"><i></i>Portrait</button><span>'+esc(line)+'</span></div>'; }
 const portWhy = d => { if(!portLit()) return ''; const w=PORT.why.get(d.sig); return w==='new' ? 'New to your Portrait' : w==='moving' ? 'In your Portrait, and '+(portMoving(d)||'moved just now') : ''; };
 function nowVerdict(M){ let c='v-clear', i=LOC_IC.ok, t, s; const N=M.n||{}, n=M.all.length, wy=M.red.filter(r=>r.tag==='with').length, pl=M.red.length-wy, am=M.amber.length, wt=M.watch.length, su=M.sus.length;
   const tail=[n+(n===1?' device':' devices')+' in earshot', N.fresh?N.fresh+' new':'', N.local?N.local+' in the neighborhood':'', N.known?N.known+(N.known===1?' person you know':' people you know'):'', N.pub?N.pub+' transit and public':'', N.yours?N.yours+' yours':''].filter(Boolean).join(' · ');
@@ -8856,7 +8849,7 @@ function sortOpen(){ const L=sortPool().map(d=>({d, sug:sortSug(d)})).sort((a,b)
   fsRender(); ovShow('fsheet'); }
 // on the map's own bar: Not known, and Sort what's here while anything in earshot is unfiled
 const mapFileBtns = () => { const V=vis(); if(!(V.mode==='live'||V.mode==='sim')) return ''; const all=mfDevices(), nk=all.filter(d=>!QUIET_T.has(tagOf(d))).length, ns=sortPool().length;
-  return '<button class="chipbtn portchip'+(portLit()?' lit':portOn()?' paused':'')+'" data-act="port" aria-pressed="'+(portOn()?'true':'false')+'"><i></i>Portrait'+(portLit()?' · '+PORT.hide.size+' hidden':'')+'</button><button class="chipbtn'+(S.omF==='unf'?' on':'')+'" data-act="om-f" data-f="unf" aria-pressed="'+(S.omF==='unf'?'true':'false')+'">Not known · '+nk+'</button>'+(ns?'<button class="chipbtn" data-act="sort-open">Sort what\'s here · '+ns+'</button>':''); };
+  return '<button class="chipbtn portchip'+(portLit()?' lit':'')+'" data-act="port" aria-pressed="'+(portOn()?'true':'false')+'"><i></i>Portrait'+(portLit()?' · '+PORT.hide.size+' hidden':'')+'</button><button class="chipbtn'+(S.omF==='unf'?' on':'')+'" data-act="om-f" data-f="unf" aria-pressed="'+(S.omF==='unf'?'true':'false')+'">Not known · '+nk+'</button>'+(ns?'<button class="chipbtn" data-act="sort-open">Sort what\'s here · '+ns+'</button>':''); };
 const sortN = () => Object.values((S.fs&&S.fs.picks)||{}).filter(Boolean).length;
 function sortRender(b){ const F=S.fs, n=F.list.length, ns=Object.keys(F.sug).length;
   let x='<h3 id="fsTitle">Sort what\'s here</h3><p class="fs-p">'+(n===1?'1 device':n+' devices')+' in earshot that you have not filed. '+(ns?'Remiel suggests a file for '+ns+': devices that stand in one place, house devices and bus or tram units.':'Remiel cannot suggest a file for any of them yet.')+' Trackers and anything moving with you are never suggested. Check each one before you file.</p><div class="srt-list">';
