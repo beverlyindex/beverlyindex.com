@@ -25,6 +25,8 @@
       aHold: 'Hold to send', aHolding: 'Keep holding', aSentAll: 'Your team has been told.', aSent: '{n} has been told.', aFail: 'The ALERT could not be sent. Check the internet, or call 911.', cancel: 'Cancel',
       cTitle: 'Team code', cSub: 'Give this code to the person joining your team. It works for 24 hours.', cFail: 'A code could not be made. Check the internet.', cShare: 'Share', cCopied: 'Copied.',
       added: '{n} is on your team.', pending: 'wants to join',
+      callOne: '{n} is not on Covara yet, so {n} cannot be called. Give {n} your team code: tap your sphere, then Covara, then Team code.',
+      callMany: '{n} are not on Covara yet, so they cannot be called. Give them your team code: tap your sphere, then Covara, then Team code.',
       jTitle: 'Join a team', jSub: 'Someone gave you their team code? Type it here.', jPh: '6-digit code', jGo: 'Join', jBad: 'That code is not right, or it has expired. Ask for a new one.',
       jOwn: 'That is your own team code. Give it to the person joining you.', jFail: 'Could not join. Check the internet.', jDone: 'You are on {n}’s team.', jBusy: 'Joining…', or: 'or',
       aAddT: 'Add someone to your team', aAddS: 'Their sphere is on your screen at once. Covara then helps you invite them.', aName: 'Name', aPhone: 'Mobile number', aMail: 'Email', aAdd: 'Add to my team', aNeed: 'Type their name first.',
@@ -45,6 +47,8 @@
       aHold: 'Tieni premuto per inviare', aHolding: 'Continua a tenere premuto', aSentAll: 'Il team è stato avvisato.', aSent: '{n} è stato avvisato.', aFail: 'Non è stato possibile inviare l’allerta. Controlla internet o chiama il 112.', cancel: 'Annulla',
       cTitle: 'Codice team', cSub: 'Dai questo codice a chi entra nel tuo team. Vale 24 ore.', cFail: 'Non è stato possibile creare un codice. Controlla internet.', cShare: 'Condividi', cCopied: 'Copiato.',
       added: '{n} è nel tuo team.', pending: 'vuole entrare',
+      callOne: '{n} non è ancora su Covara, quindi non si può chiamare. Dai a {n} il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
+      callMany: '{n} non sono ancora su Covara, quindi non si possono chiamare. Dai loro il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       jTitle: 'Entra in un team', jSub: 'Qualcuno ti ha dato il suo codice team? Scrivilo qui.', jPh: 'Codice di 6 cifre', jGo: 'Entra', jBad: 'Il codice non è giusto o è scaduto. Chiedine uno nuovo.',
       jOwn: 'Questo è il codice del tuo team. Dallo a chi entra con te.', jFail: 'Non è stato possibile entrare. Controlla internet.', jDone: 'Sei nel team di {n}.', jBusy: 'Entro…', or: 'oppure',
       aAddT: 'Aggiungi una persona al team', aAddS: 'La sua sfera è subito sullo schermo. Poi Covara ti aiuta a invitarla.', aName: 'Nome', aPhone: 'Cellulare', aMail: 'Email', aAdd: 'Aggiungi al team', aNeed: 'Scrivi prima il nome.',
@@ -125,6 +129,11 @@
     'html.cv.cv-sending .sentinel-msg-overlay{opacity:0!important}',
     /* one thing at a time under the logo: a card or a message there sets aside what was there, and the labels beside a sphere wait behind it */
     'html.cv .sentinel-msg-overlay{z-index:9500!important}',
+    'html.cv.cv-where #dreamBrief,html.cv.cv-where #dreamComm{display:none!important}',
+    'html.cv .settings-panel{inset:auto!important;top:var(--cvTop)!important;left:var(--cvLeft)!important;width:var(--cvW)!important;max-height:calc(100dvh - var(--cvTop) - 16px)!important;border-radius:20px;border:1px solid rgba(150,210,255,.5);',
+    'background:linear-gradient(155deg,rgba(70,130,235,.22),rgba(14,30,78,.42))!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.3);padding:0 14px 14px!important;box-sizing:border-box}',
+    'html.cv .settings-home-row{background:rgba(255,255,255,.05)!important;border-color:rgba(150,210,255,.28)!important}html.cv .settings-home-row[data-cat=circle]{display:none!important}',
+    'html.cv .settings-panel .settings-card,html.cv .settings-panel .settings-section > div{background-color:transparent}',
     'html.cv:has(.sentinel-toast) #dreamBrief,html.cv:has(.cvc) #dreamBrief,html.cv:has(.sentinel-msg-overlay.open) #dreamBrief{opacity:0!important;transition:opacity .2s}',
     'html.cv:has(.sentinel-msg-overlay.open) #cvLabels,html.cv:has(.cvc) #cvLabels{visibility:hidden}'
   ].join('');
@@ -169,6 +178,7 @@
     try { drawQuickActionIcons = function () {}; } catch (e) {}     /* the labels beside a sphere are Covara's (below), not Sentinel's icons */
     try { openBluf = function () {}; } catch (e) {}                 /* no cards: everything is reached from the spheres */
     try { enterDetail = function () {}; } catch (e) {}
+    try { var gh = getContactHeadline; getContactHeadline = function (c) { var h = gh(c); try { var nl = I18n.t('hl.new'); if (h && (h === nl || /^NOTHING LOGGED YET$/i.test(h))) return ''; } catch (e) {} return h; }; } catch (e) {}
     try { sphereLabel = function (c) { return String((c && (c.first || c.last)) || '').trim(); }; } catch (e) {}   /* first names under the spheres: a family shares a surname */
     try { Object.keys(SentinelGuide).forEach(function (k) { if (typeof SentinelGuide[k] === 'function') SentinelGuide[k] = function () {}; }); } catch (e) {}
     /* a tap on HOME opens the ring of 7 at once (below); Sentinel's own late, double-tap-timed route is closed */
@@ -474,7 +484,6 @@
       case 'phone': if (!all.length) return toast(t('noTeam')); return callTeam(all, true);
       case 'message': if (!all.length) return toast(t('noTeam')); if (!tm.length) return toast(t('msgNone')); return messageBox(tm);
       case 'email': if (!all.length) return toast(t('noTeam')); return emailBox(all, true);
-      case 'invite': return inviteCard(null);
       case 'alert': return alertCard(null);
       case 'broadcast': lsSet('rc:broadcast', broadcastOn() ? '0' : '1'); toast(broadcastOn() ? t('bcOn') : t('bcOff')); return;
       case 'speak': lsSet('rc:speak', speakOn() ? '0' : '1'); toast(speakOn() ? t('spOn') : t('spOff')); return;
@@ -484,7 +493,13 @@
     }
   }
   /* Video call (or a voice-only call) to the whole team at once, with no second screen */
+  function reachable(c) { try { return !!((c.sentinelId && /^[A-Za-z0-9]{8}$/.test(c.sentinelId)) || c.phone || c.email); } catch (e) { return false; } }
+  function names(list) { var n = list.map(first); return n.length < 2 ? n.join('') : n.slice(0, -1).join(', ') + (IT() ? ' e ' : ' and ') + n[n.length - 1]; }
+  function cantCall(list) { toast(t(list.length === 1 ? 'callOne' : 'callMany', { n: names(list) })); }
   function callTeam(tm, voice) {
+    var ok = tm.filter(reachable), no = tm.filter(function (c) { return !reachable(c); });
+    if (!ok.length) return cantCall(no);
+    tm = ok;
     try {
       if (voice && typeof SentinelCall.setAudioOnlyNext === 'function') SentinelCall.setAudioOnlyNext(true);
       if (tm.length === 1) { runContactQuickAction('video', tm[0]); return; }
@@ -552,14 +567,13 @@
   /* A choice beside a teammate's sphere: for that one person. The labels stay until the next command (26 Oct). */
   function personPick(k, c) {
     switch (k) {
-      case 'video': try { runContactQuickAction('video', c); } catch (e) {} return;
-      case 'phone': if (!c.phone) return toast(t('noPhone', { n: first(c) })); try { runContactQuickAction('phone', c); } catch (e) {} return;
+      case 'video': if (!reachable(c)) return cantCall([c]); try { runContactQuickAction('video', c); } catch (e) {} return;
+      case 'phone': if (!c.phone) return reachable(c) ? toast(t('noPhone', { n: first(c) })) : cantCall([c]); try { runContactQuickAction('phone', c); } catch (e) {} return;
       case 'message': try { SentinelMessaging.openFor(c.id); } catch (e) {} return;
       case 'email': return emailBox([c], false);
       case 'where': try { WhereIs.setMode('whereis'); } catch (e) {} return;
       case 'alert': return alertCard(c);
       case 'add': return approve(c);
-      case 'invite': return inviteCard(c);
     }
   }
   async function approve(c) {
@@ -569,7 +583,8 @@
 
   /* ── 6. Choosing a teammate: the galaxy turns, the chosen sphere comes forward to the lower left ── */
   var _fid = null, _aim = null, _spot = null;
-  function spotOf() { var g = geo(); return { x: g.W * 0.27, y: Math.min(g.H - 150, g.cy + g.cR * 2.55) }; }
+  /* below HOME and HOME's name, low enough that the labels beside it never touch the name */
+  function spotOf() { var g = geo(); return { x: g.W * 0.27, y: Math.min(g.H - 120, g.cy + g.cR * 1.15 + 146) }; }
   function aimAt(node) {
     try {
       var g = geo(), y0 = netYaw, best = null;
@@ -601,7 +616,18 @@
     netYaw += d * 0.12; netPitch += (ORBIT_PITCH - netPitch) * 0.12; netSpin = false; netVelYaw = 0; netVelPitch = 0;
     if (Math.abs(d) < 0.002) { netYaw = _aim.yaw; _aim = null; }
   }
+  function mapFloor() {
+    try {
+      var where = focusedContactId != null && typeof WhereIs !== 'undefined' && WhereIs.mode() === 'whereis';
+      document.documentElement.classList.toggle('cv-where', !!where);
+      if (!where) { window.CovaraMapFloor = 0; return; }
+      var n = NODES.filter(function (x) { return x.contact.id === focusedContactId; })[0]; if (!n) { window.CovaraMapFloor = 0; return; }
+      var p = projectNode(n), sp = _spot ? spotOf() : { y: p.sy };
+      window.CovaraMapFloor = Math.min(p.sy, sp.y) - n.r * p.scale * FOCUS_SCALE - 26;
+    } catch (e) { window.CovaraMapFloor = 0; }
+  }
   function focusTick() {
+    mapFloor();
     var id = null; try { id = focusedContactId; } catch (e) {}
     var c = null; try { c = id != null ? DEMO_CONTACTS.filter(function (x) { return x.id === id; })[0] : null; } catch (e) {}
     if (!c || sample(c) || appState !== 'network') {
@@ -697,17 +723,7 @@
       (code ? '<p>' + esc(t('cSub')) + '</p><div class="code">' + esc(code) + '</div><button class="go" type="button" data-share>' + esc(t('cShare')) + '</button>' : '<p>' + esc(t('cFail')) + '</p>') +
       '<h2 style="margin-top:20px">' + esc(t('jTitle')) + '</h2><p>' + esc(t('jSub')) + '</p>' +
       '<input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="' + esc(t('jPh')) + '" style="font:800 22px \'JetBrains Mono\',monospace;letter-spacing:.2em;text-align:center">' +
-      '<button class="go" type="button" data-join>' + esc(t('jGo')) + '</button>' +
-      '<h2 style="margin-top:20px">' + esc(t('aAddT')) + '</h2><p>' + esc(t('aAddS')) + '</p>' +
-      '<input type="text" data-n placeholder="' + esc(t('aName')) + '" autocomplete="name"><input type="tel" data-p placeholder="' + esc(t('aPhone')) + '" autocomplete="tel"><input type="email" data-e placeholder="' + esc(t('aMail')) + '" autocomplete="email">' +
-      '<button class="go" type="button" data-add>' + esc(t('aAdd')) + '</button>');
-    el.querySelector('[data-add]').onclick = async function () {
-      var nm = el.querySelector('[data-n]').value.trim(); if (!nm) return toast(t('aNeed'));
-      var w = nm.split(/\s+/), c = { id: Date.now(), first: w[0], last: w.slice(1).join(' '), cat: 'family', sev: 4, phone: el.querySelector('[data-p]').value.trim(), email: el.querySelector('[data-e]').value.trim() };
-      try { await RemielDB.putContact(c); } catch (e) {}
-      el.remove(); toast(t('added', { n: c.first }));
-      setTimeout(function () { inviteCard(c); }, 600);
-    };
+      '<button class="go" type="button" data-join>' + esc(t('jGo')) + '</button>');
     var sh = el.querySelector('[data-share]');
     if (sh) sh.onclick = async function () {
       var link = 'https://beverly-index.com/covara/?join=' + code;
@@ -725,31 +741,6 @@
       var ok = await join(c);
       jb.disabled = false; jb.textContent = t('jGo');
       if (ok) el.remove();
-    };
-  }
-  /* Invite someone to Covara: their own link, with the team code in it, so they join the team by opening it */
-  async function inviteCard(c) {
-    if (!authed()) { try { await SyncEngine.ensureIdentity(); } catch (e) {} }
-    var r = await api('/care/code', { method: 'POST' }).catch(function () { return { ok: false }; });
-    if (!r.ok || !r.data.code) return toast(t('cFail'));
-    var code = String(r.data.code), link = 'https://beverly-index.com/covara/?join=' + code, n = c ? first(c) : '';
-    var text = (IT() ? (n ? 'Ciao ' + n + ', ' : '') + 'entra nel mio team su Covara: ' : (n ? 'Hi ' + n + ', ' : '') + 'join my team on Covara: ') + link + (IT() ? '  (codice ' : '  (code ') + code + ')';
-    var el = card('<h2>' + esc(n ? t('iTitle', { n: n }) : t('iTitleAll')) + '</h2><p>' + esc(t('iSub')) + '</p><div class="code">' + esc(code) + '</div>' +
-      (c && c.phone ? '<button class="go" type="button" data-sms style="margin-bottom:10px">' + esc(t('iText')) + '</button>' : '') +
-      (c && c.email ? '<button class="go" type="button" data-mail style="margin-bottom:10px">' + esc(t('iMail')) + '</button>' : '') +
-      '<button class="go" type="button" data-share>' + esc(t('cShare')) + '</button>');
-    var b;
-    if ((b = el.querySelector('[data-sms]'))) b.onclick = function () { location.href = 'sms:' + String(c.phone).replace(/[^\d+]/g, '') + '?&body=' + encodeURIComponent(text); };
-    if ((b = el.querySelector('[data-mail]'))) b.onclick = async function () {
-      this.disabled = true;
-      var m = await api('/care-email', { method: 'POST', body: JSON.stringify({ to: [c.email], subject: IT() ? 'Entra nel mio team su Covara' : 'Join my team on Covara', text: text, reply_to: myEmail() }) }).catch(function () { return { ok: false }; });
-      this.disabled = false;
-      if (m.ok) { el.remove(); return toast(t('iSent', { n: n })); }
-      location.href = 'mailto:' + encodeURIComponent(c.email) + '?subject=' + encodeURIComponent(IT() ? 'Entra nel mio team su Covara' : 'Join my team on Covara') + '&body=' + encodeURIComponent(text);
-    };
-    el.querySelector('[data-share]').onclick = async function () {
-      try { if (navigator.share) { await navigator.share({ text: text }); return; } } catch (e) { return; }
-      try { await navigator.clipboard.writeText(text); toast(t('cCopied')); } catch (e) {}
     };
   }
   async function join(code) {
