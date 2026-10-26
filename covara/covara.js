@@ -132,8 +132,8 @@
     /* one thing at a time under the logo: a card or a message there sets aside what was there, and the labels beside a sphere wait behind it */
     'html.cv .sentinel-msg-overlay{z-index:9500!important}',
     '#cvRoster{position:fixed;right:max(10px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:8980;width:min(168px,40vw);font-family:"Hanken Grotesk",system-ui,sans-serif}#cvRoster[hidden]{display:none}',
-    '#cvRoster .cvro-list{max-height:300px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,210,77,.45) transparent;-webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);mask-image:linear-gradient(180deg,#000 88%,transparent)}',
-    '.cvro-row{display:flex;align-items:center;gap:8px;height:30px;padding:0 4px;cursor:pointer;color:#ffd24d;opacity:.72;font-size:13px;font-weight:600;white-space:nowrap;text-shadow:0 0 8px rgba(0,20,60,.9)}',
+    '#cvRoster .cvro-list{max-height:150px;scroll-snap-type:y mandatory;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,210,77,.45) transparent;-webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);mask-image:linear-gradient(180deg,#000 88%,transparent)}',
+    '.cvro-row{scroll-snap-align:start;display:flex;align-items:center;gap:8px;height:30px;padding:0 4px;cursor:pointer;color:#ffd24d;opacity:.72;font-size:13px;font-weight:600;white-space:nowrap;text-shadow:0 0 8px rgba(0,20,60,.9)}',
     '.cvro-row span{overflow:hidden;text-overflow:ellipsis}.cvro-row.on{opacity:1}.cvro-row:hover{opacity:1}',
     '.cvro-row i{flex:0 0 22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 9px "JetBrains Mono",monospace;font-style:normal;color:#04203a;background:radial-gradient(circle at 34% 28%,#e8fbff 0,#7ee3ff 35%,#38bdf8 70%,#1e6fb8 100%);background-size:cover;background-position:center;box-shadow:0 0 8px rgba(56,189,248,.5)}',
     '.cvro-row.on i{box-shadow:0 0 0 1.5px #ffd24d,0 0 10px rgba(255,210,77,.55)}',
