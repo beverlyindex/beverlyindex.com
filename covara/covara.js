@@ -137,7 +137,7 @@
     'html.cv .contact-modal-overlay{z-index:9600!important;align-items:flex-start!important;justify-content:flex-start!important;padding:var(--cvTop) 12px 16px var(--cvLeft)!important;background:rgba(6,15,36,.28)!important}',
     'html.cv .contact-modal{width:var(--cvW)!important;max-width:none!important;max-height:calc(100dvh - var(--cvTop) - 16px)!important;background:linear-gradient(155deg,rgba(70,130,235,.22),rgba(14,30,78,.42))!important;border:1px solid rgba(150,210,255,.5)!important;border-radius:20px!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.3)!important}',
     'html.cv .contact-modal input,html.cv .contact-modal textarea,html.cv .contact-modal select{background:rgba(20,44,100,.3)!important;border-color:rgba(150,200,255,.4)!important;color:#fff!important}',
-    'html.cv.cv-where #dreamBrief,html.cv.cv-where #dreamComm{display:none!important}',
+    'html.cv #dreamBrief,html.cv #dreamComm{display:none!important}',   /* no communication card: the words are part of the dream state */
     'html.cv .settings-panel{inset:auto!important;top:var(--cvTop)!important;left:var(--cvLeft)!important;width:var(--cvW)!important;max-height:calc(100dvh - var(--cvTop) - 16px)!important;border-radius:20px;border:1px solid rgba(150,210,255,.5);',
     'background:linear-gradient(155deg,rgba(70,130,235,.22),rgba(14,30,78,.42))!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.3);padding:0 14px 14px!important;box-sizing:border-box}',
     'html.cv .settings-home-row{background:rgba(255,255,255,.05)!important;border-color:rgba(150,210,255,.28)!important}html.cv .settings-home-row[data-cat=circle]{display:none!important}',
@@ -186,11 +186,12 @@
     try { drawQuickActionIcons = function () {}; } catch (e) {}     /* the labels beside a sphere are Covara's (below), not Sentinel's icons */
     try { openBluf = function () {}; } catch (e) {}                 /* no cards: everything is reached from the spheres */
     try { enterDetail = function () {}; } catch (e) {}
-    try { var gh = getContactHeadline; getContactHeadline = function (c) { var h = gh(c); try { var nl = I18n.t('hl.new'); if (h && (h === nl || /^NOTHING LOGGED YET$/i.test(h))) return ''; } catch (e) {} return h; }; } catch (e) {}
+    try { var gh = getContactHeadline; getContactHeadline = function (c) { var h = gh(c); try { var nl = I18n.t('hl.new'); if (h && (h === nl || h === I18n.t('hl.s4') || /^(NOTHING LOGGED YET|ALL GOOD)$/i.test(h))) return ''; } catch (e) {} return h; }; } catch (e) {}
     try { sphereLabel = function (c) { return [c && c.first, c && c.last].filter(function (x) { return x && String(x).trim() && x !== '\u200b'; }).join(' ').trim(); }; } catch (e) {}   /* first and last name */
     /* 26 Oct: the name wraps around the bottom of the sphere, reading left to right, so it reads as part of it */
-    window.CovaraArcName = function (ctx, text, sx, sy, r, fs) {
+    window.CovaraArcName = function (ctx, text, sx, sy, r, fs, node) {
       if (!text) return;
+      if (node && window.__cvNames && !window.__cvNames[node.contact.id]) return;   /* large team: names on the front spheres only */
       ctx.save();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       var R0 = r + fs * 0.95, widths = [], total = 0, sp = fs * 0.06;
@@ -239,6 +240,95 @@
       }, 0);
     }, true);
   }
+  function avoidAreas() {
+    var out = [];
+    try {
+      if (focusedContactId == null || appState !== 'network') { window.__cvAvoid = out; return; }
+      var rect = CV.getBoundingClientRect();
+      var els = Array.prototype.slice.call(document.querySelectorAll('#cvLabels .cvl'));
+      var n = NODES.filter(function (q) { return q.contact.id === focusedContactId; })[0];
+      if (n && els.length) {
+        var pn = projectNode(n);
+        var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        els.forEach(function (b) { var r = b.getBoundingClientRect(); x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom); });
+        if (pn) { var rr = n.r * pn.scale * FOCUS_SCALE; x0 = Math.min(x0, rect.left + pn.sx - rr); x1 = Math.max(x1, rect.left + pn.sx + rr); y0 = Math.min(y0, rect.top + pn.sy - rr); y1 = Math.max(y1, rect.top + pn.sy + rr); }
+        out.push({ x: x0 - rect.left, y: y0 - rect.top, w: x1 - x0, h: y1 - y0 });
+      }
+      if (_wordsBox) out.push(_wordsBox);
+    } catch (e) {}
+    window.__cvAvoid = out;
+  }
+  function frontNames() {
+    avoidAreas();
+    try {
+      if (NODES.length <= 12) { window.__cvNames = null; return; }
+      var withZ = NODES.map(function (n) { return { n: n, z: projectNode(n).z }; }).sort(function (a, b) { return a.z - b.z; });
+      var ok = {}; withZ.slice(0, 10).forEach(function (x) { ok[x.n.contact.id] = 1; });
+      Object.keys(_attn).forEach(function (k) { ok[k] = 1; });
+      if (focusedContactId != null) ok[focusedContactId] = 1;
+      window.__cvNames = ok;
+    } catch (e) { window.__cvNames = null; }
+  }
+  /* 26 Oct: when a teammate is chosen, the newest messages and notes appear on the left as part of the dream
+     state: soft, breathing words over the background, the newest first, older ones fading; no card or frame. */
+  var _words = { id: null, at: 0, items: [] }, _wordsBox = null;
+  async function loadWords(c) {
+    var items = [];
+    try {
+      var d = await RemielDB.getSetting('sentinelMsg_' + c.id), th = Array.isArray(d) ? d : (d && Array.isArray(d.value) ? d.value : []);
+      th.forEach(function (m) { if (m && m.text) items.push({ ts: m.ts || 0, who: m.from === 'center' ? (IT() ? 'Tu' : 'You') : first(c), text: m.text }); });
+    } catch (e) {}
+    try {
+      var ints = await RemielDB.getInteractionsByContact(c.id);
+      (ints || []).forEach(function (x) { var tx = x.note || x.text || x.notes; if (tx && (x.type === 'note' || !x.type)) items.push({ ts: x.ts || x.timestamp || x.createdAt || 0, who: IT() ? 'Nota' : 'Note', text: tx }); });
+    } catch (e) {}
+    items.sort(function (a, b) { return b.ts - a.ts; });
+    _words = { id: c.id, at: Date.now(), items: items.slice(0, 4) };
+  }
+  function when(ts) {
+    try {
+      var d = new Date(ts), now = new Date(), loc = IT() ? 'it-IT' : 'en-US';
+      var tm = d.toLocaleTimeString(loc, { hour: 'numeric', minute: '2-digit' });
+      if (d.toDateString() === now.toDateString()) return tm;
+      return d.toLocaleDateString(loc, { weekday: 'short' }) + ' ' + tm;
+    } catch (e) { return ''; }
+  }
+  function wrapText(ctx, text, maxW) {
+    var words = String(text).split(/\s+/), lines = [], line = '';
+    words.forEach(function (w) { var tryL = line ? line + ' ' + w : w; if (ctx.measureText(tryL).width > maxW && line) { lines.push(line); line = w; } else line = tryL; });
+    if (line) lines.push(line);
+    return lines;
+  }
+  function dreamWords(t) {
+    var id = focusedContactId, dr = window._dreamRect;
+    _wordsBox = null;
+    if (id == null || !dr || appState !== 'network') return;
+    try { if (WhereIs.mode() === 'whereis') return; } catch (e) {}
+    var c = DEMO_CONTACTS.filter(function (x) { return x.id === id; })[0]; if (!c) return;
+    if (_words.id !== id || Date.now() - _words.at > 4000) { _words.at = Date.now(); _words.id = id; loadWords(c); }
+    if (_words.id !== id || !_words.items.length) return;
+    var g = geo(), x0 = 18, x1 = Math.max(dr.cx - dr.r - 16, g.W * 0.46), w = x1 - x0;
+    var top = 92, floor = (function () { var n = NODES.filter(function (q) { return q.contact.id === id; })[0]; if (!n) return g.H; var p = projectNode(n); return p.sy - n.r * p.scale * FOCUS_SCALE - 28; })();
+    floor = Math.min(floor, g.cy - g.cR * 1.2);
+    if (floor < top + 40) floor = Math.min(g.H - 20, top + 160);
+    var breathe = 0.82 + 0.14 * Math.sin(t * 0.0012), y0w = top;
+    ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(56,189,248,0.55)'; ctx.shadowBlur = 14;
+    var y = top;
+    for (var k = 0; k < _words.items.length && y < floor; k++) {
+      var it = _words.items[k], fade = [1, 0.72, 0.52, 0.38][k] * breathe;
+      var big = k === 0 ? Math.max(15, Math.min(22, Math.round(g.W / 26))) : Math.max(12, Math.min(16, Math.round(g.W / 34)));
+      ctx.globalAlpha = 0.9 * fade; ctx.fillStyle = '#9fd8ff'; ctx.font = '600 ' + Math.max(10, big - 5) + 'px "JetBrains Mono",ui-monospace,monospace';
+      ctx.fillText((it.who + '  ' + when(it.ts)).toUpperCase(), x0, y); y += big;
+      ctx.globalAlpha = fade; ctx.fillStyle = '#eef8ff'; ctx.font = (k === 0 ? '500 ' : '400 ') + big + 'px "Hanken Grotesk",system-ui,sans-serif';
+      var lines = wrapText(ctx, it.text, w).slice(0, k === 0 ? 5 : 2);
+      for (var L = 0; L < lines.length && y + big < floor; L++) { ctx.fillText(lines[L], x0, y); y += big * 1.28; }
+      y += big * 0.9;
+    }
+    ctx.restore();
+    _wordsBox = { x: x0 - 6, y: y0w - 6, w: w + 12, h: Math.min(y, floor) - y0w + 6 };
+  }
   /* WHEREIS was blocked: a teammate's sphere passing over the COMMUNICATION | WHEREIS words took the tap.
      The words now always take the tap, and they are drawn over the spheres so they are never hidden. */
   function whereToggleFirst() {
@@ -255,7 +345,9 @@
     try {
       var dn = drawNetworkView;
       drawNetworkView = function (t) {
+        frontNames();
         dn(t);
+        try { dreamWords(t); } catch (e) {}
         try { if (focusedContactId != null && window._dreamRect && typeof WhereIs !== 'undefined') ctx.setTransform(DPR, 0, 0, DPR, 0, 0), WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId, window._dreamPillAvoid); } catch (e) {}
       };
     } catch (e) {}
@@ -344,24 +436,89 @@
 
   /* ── 3. The galaxy: Sentinel's, smaller and closer, always moving, never over HOME ── */
   var ORBIT_PITCH = 0.78;            /* the galaxy is seen from a little above, so the team circles HOME */
+  /* a large team on a tall, narrow screen (a phone) is seen more from the side, so its rings become bands
+     stacked above and below HOME and use the screen's height */
+  var _pitch = ORBIT_PITCH;
+  function orbitPitch() { return _pitch; }
   function geo() {
     var W = CV.width / DPR, H = CV.height / DPR, cR = netCenterR(W, H);
     return { W: W, H: H, cx: W / 2, cy: H / 2, cR: cR, s0: NET_FOV / (NET_FOV + NET_DIST) };
   }
+  /* 26 Oct (large teams): the people who need attention (a new message to HOME, an ALERT) are placed nearest
+     HOME; everyone else further out. Every ring fits the screen; when a ring cannot grow any wider, the next
+     ones sit above and below it, so no sphere ever leaves the screen. Spheres get smaller as the team grows. */
+  var _attn = {};
   function layout() {
     try {
       var g = geo(), N = NODES.length; if (!N) return;
-      var per = 8, rings = Math.ceil(N / per);
-      NODES.forEach(function (n, i) {
-        if (n._cvSpot) return;
-        var k = Math.floor(i / per), m = Math.min(per, N - k * per), a = ((i % per) / m) * Math.PI * 2 + k * 0.4;
-        var R = (g.cR * (2.15 + 0.62 * k)) / g.s0;     /* close to HOME, a second ring further out for a large team */
-        n.tx = Math.cos(a) * R; n.tz = Math.sin(a) * R; n.ty = (k % 2 ? -1 : 1) * g.cR * 0.18 / g.s0;
-        /* Sentinel's small, transparent spheres */
-        n._baseR = (g.cR * 0.40) / g.s0; n.r = n._baseR * (typeof sphereSizeMul !== 'undefined' ? sphereSizeMul : 1);
-      });
+      var mul = typeof sphereSizeMul !== 'undefined' ? sphereSizeMul : 1;
+      var f = N <= 8 ? 1 : N <= 16 ? 0.8 : 0.66, rS = g.cR * 0.40 * f;          /* sphere radius on screen */
+      var order = NODES.slice().sort(function (a, b) { return (_attn[b.contact.id] ? 1 : 0) - (_attn[a.contact.id] ? 1 : 0); });
+      /* does a ring of screen radius R at height ty stay fully on screen from every side as it turns? */
+      _pitch = ORBIT_PITCH;
+      /* a large team on a tall, narrow screen (a phone): a globe around HOME, as wide as the screen and as tall
+         as it can be, turning; the people who need attention sit on its middle band, nearest HOME */
+      if (N > 12 && g.W < g.H * 0.8) {
+        _pitch = 0.22;
+        var ax = g.W / 2 - rS * 1.15 - 10, ay = Math.min(g.H / 2 - rS - 96, ax * 2.1);
+        var pts = [];
+        for (var k = 0; k < N; k++) { var fy = 1 - 2 * (k + 0.5) / N, fr = Math.sqrt(Math.max(0, 1 - fy * fy)), th = k * 2.399963229728653; pts.push({ x: Math.cos(th) * fr * ax, z: Math.sin(th) * fr * ax, y: fy * ay, m: Math.abs(fy) }); }
+        pts.sort(function (a, b) { return a.m - b.m; });
+        order.forEach(function (n, k) {
+          n._baseR = rS / g.s0; n.r = n._baseR * mul;
+          if (n._cvSpot) return;
+          n.tx = pts[k].x / g.s0; n.ty = pts[k].y / g.s0; n.tz = pts[k].z / g.s0;
+        });
+        return;
+      }
+      var cp = Math.cos(_pitch), sp = Math.sin(_pitch);
+      function fits(R, ty) {
+        for (var q = 0; q < 24; q++) {
+          var a = q / 24 * Math.PI * 2, x = Math.cos(a) * R / g.s0, z = Math.sin(a) * R / g.s0, y = ty / g.s0;
+          var y2 = y * cp - z * sp, z2 = y * sp + z * cp + NET_DIST, sc = NET_FOV / Math.max(60, NET_FOV + z2), rr = rS / g.s0 * sc * 1.15 + 14;
+          var sx = x * sc + g.W / 2, sy = y2 * sc + g.H / 2;
+          if (sx - rr < 4 || sx + rr > g.W - 4 || sy - rr < 70 || sy + rr > g.H - 6) return false;
+        }
+        return true;
+      }
+      function widest(ty) { var lo = g.cR * 1.2, hi = Math.max(g.W, g.H); if (!fits(lo, ty)) return lo; for (var b = 0; b < 18; b++) { var mid = (lo + hi) / 2; if (fits(mid, ty)) lo = mid; else hi = mid; } return lo; }
+      var maxR = widest(0);
+      var R = Math.min(maxR, g.cR * 1.16 + rS + 26), layer = 0, i = 0, ring = 0;
+      while (i < order.length) {
+        var cap = Math.max(4, Math.floor(2 * Math.PI * R / (rS * 2.9)));
+        if (N <= 8) cap = 8;
+        var m = Math.min(cap, order.length - i);
+        var ty = layer === 0 ? (ring % 2 ? -1 : 1) * g.cR * 0.18 : (layer % 2 ? -1 : 1) * Math.ceil(layer / 2) * rS * 3.4;
+        if (layer > 0) { R = Math.min(R, widest(ty)); cap = Math.max(4, Math.floor(2 * Math.PI * R / (rS * 2.9))); m = Math.min(cap, order.length - i); }
+        for (var j = 0; j < m; j++, i++) {
+          var n = order[i];
+          n._baseR = (rS / g.s0); n.r = n._baseR * mul;
+          if (n._cvSpot) continue;
+          var a = (j / m) * Math.PI * 2 + ring * 0.45;
+          n.tx = Math.cos(a) * R / g.s0; n.tz = Math.sin(a) * R / g.s0; n.ty = ty / g.s0;
+        }
+        ring++;
+        var next = R + rS * 2.6;
+        if (next <= maxR) R = next; else { R = maxR; layer++; }
+      }
     } catch (e) {}
   }
+  /* who needs attention: a message to HOME in the last day that HOME has not answered */
+  async function attention() {
+    var out = {};
+    var list = people();
+    for (var i = 0; i < list.length; i++) {
+      try {
+        var d = await RemielDB.getSetting('sentinelMsg_' + list[i].id), th = Array.isArray(d) ? d : (d && Array.isArray(d.value) ? d.value : []);
+        var last = th[th.length - 1];
+        if (last && last.from !== 'center' && Date.now() - (last.ts || 0) < 864e5) out[list[i].id] = 1;
+      } catch (e) {}
+    }
+    var was = JSON.stringify(Object.keys(_attn).sort()), now = JSON.stringify(Object.keys(out).sort());
+    _attn = out;
+    if (was !== now) layout();
+  }
+  var __proj = null;
   function wrapGalaxy() {
     if (wrapGalaxy.done || typeof buildNodes !== 'function' || typeof projectNode !== 'function') return;
     wrapGalaxy.done = true;
@@ -369,7 +526,7 @@
     var rt = rebuildNodeTargets; rebuildNodeTargets = function () { rt(); layout(); };
     /* The rule (26 Oct): the centre sphere is never covered by a revolving sphere. Whatever the turn, a sphere
        that would reach HOME's sphere is kept just outside it. */
-    var pn = projectNode;
+    var pn = projectNode; __proj = function (node) { var p = pn(node); return p; };
     projectNode = function (node) {
       var p = pn(node);
       try {
@@ -378,16 +535,24 @@
         var r = node.r * p.scale * f, need = g.cR * 1.16 + r + 18;   /* room for the name wrapped under the sphere too */
         var dx = p.sx - g.cx, dy = p.sy - g.cy, d = Math.hypot(dx, dy);
         if (d < need) { if (d < 0.5) { dx = 0; dy = 1; d = 1; } p.sx = g.cx + dx / d * need; p.sy = g.cy + dy / d * need; }
-        /* while someone is chosen, the other spheres stay off the dream picture as well */
+        /* while someone is chosen, the other spheres stay off the dream picture, the words, the chosen person
+           with their labels, and the logo and name at the top; a few passes settle any knock-on push */
         var dr = window._dreamRect;
         if (dr && focusedContactId != null && node.contact.id !== focusedContactId) {
-          var ex = p.sx - dr.cx, ey = p.sy - dr.cy, ed = Math.hypot(ex, ey), en = dr.r + r + 6;
-          if (ed < en) {
-            if (ed < 0.5) { ex = -1; ey = 1; ed = Math.SQRT2; }
-            p.sx = dr.cx + ex / ed * en; p.sy = dr.cy + ey / ed * en;
-            /* and still never over HOME */
+          var rects = (window.__cvAvoid || []).concat([{ x: 0, y: 0, w: g.W, h: 70 }]);
+          for (var pass = 0; pass < 4; pass++) {
+            var ex = p.sx - dr.cx, ey = p.sy - dr.cy, ed = Math.hypot(ex, ey), en = dr.r + r + 6;
+            if (ed < en) { if (ed < 0.5) { ex = -1; ey = 1; ed = Math.SQRT2; } p.sx = dr.cx + ex / ed * en; p.sy = dr.cy + ey / ed * en; }
+            rects.forEach(function (q) {
+              var L = q.x - r - 4, T = q.y - r - 4, Rr = q.x + q.w + r + 4, B = q.y + q.h + r + 4;
+              if (p.sx > L && p.sx < Rr && p.sy > T && p.sy < B) {
+                var dl = p.sx - L, dr2 = Rr - p.sx, dt = p.sy - T, db = B - p.sy, mn = Math.min(dl, dr2, dt, db);
+                if (mn === dl) p.sx = L; else if (mn === dr2) p.sx = Rr; else if (mn === dt) p.sy = T; else p.sy = B;
+              }
+            });
             var hx = p.sx - g.cx, hy = p.sy - g.cy, hd = Math.hypot(hx, hy);
             if (hd < need) { p.sx = g.cx + hx / (hd || 1) * need; p.sy = g.cy + hy / (hd || 1) * need; }
+            p.sx = Math.max(r + 2, Math.min(g.W - r - 2, p.sx)); p.sy = Math.max(r + 2, Math.min(g.H - r - 2, p.sy));
           }
         }
       } catch (e) {}
@@ -400,7 +565,7 @@
     try {
       if (appState !== 'network') return;
       if (focusedContactId != null) return;
-      if (!netDragging) { netSpin = true; netPitch += (ORBIT_PITCH - netPitch) * 0.04; }
+      if (!netDragging) { netSpin = true; netPitch += (orbitPitch() - netPitch) * 0.04; }
     } catch (e) {}
   }
 
@@ -628,7 +793,7 @@
       var g = geo(), y0 = netYaw, best = null;
       /* 1. the turn that brings the chosen sphere nearest the viewer, on the left */
       for (var i = 0; i < 72; i++) {
-        netYaw = y0 + i * Math.PI / 36; netPitch = ORBIT_PITCH;
+        netYaw = y0 + i * Math.PI / 36; netPitch = orbitPitch();
         var q = projectNode(node), sc = q.z + Math.abs(q.sx - g.W * 0.3) * 2;
         if (!best || sc < best.s) best = { s: sc, yaw: netYaw };
       }
@@ -637,7 +802,7 @@
             HOME or the dream picture */
       var sp = spotOf(), z2 = NET_DIST - 160, s = NET_FOV / (NET_FOV + z2);
       var xp = (sp.x - g.W / 2) / s, y2 = (sp.y - g.H / 2) / s, z2p = z2 - NET_DIST;
-      var cp = Math.cos(ORBIT_PITCH), spi = Math.sin(ORBIT_PITCH), cy = Math.cos(best.yaw), sy = Math.sin(best.yaw);
+      var cp = Math.cos(orbitPitch()), spi = Math.sin(orbitPitch()), cy = Math.cos(best.yaw), sy = Math.sin(best.yaw);
       var y = y2 * cp + z2p * spi, z1 = -y2 * spi + z2p * cp;
       var x = xp * cy - z1 * sy, z = xp * sy + z1 * cy;
       restoreSpot();
@@ -651,7 +816,7 @@
     if (_spot) { var n = NODES.filter(function (x) { return x.contact.id === _spot.node.contact.id; })[0]; if (n && n !== _spot.node) { _spot.node = n; n._cvSpot = { tx: n.tx, ty: n.ty, tz: n.tz }; } if (n) { n.tx = _spot.x; n.ty = _spot.y; n.tz = _spot.z; } }
     if (!_aim) return;
     var d = _aim.yaw - netYaw; d = Math.atan2(Math.sin(d), Math.cos(d));
-    netYaw += d * 0.12; netPitch += (ORBIT_PITCH - netPitch) * 0.12; netSpin = false; netVelYaw = 0; netVelPitch = 0;
+    netYaw += d * 0.12; netPitch += (orbitPitch() - netPitch) * 0.12; netSpin = false; netVelYaw = 0; netVelPitch = 0;
     if (Math.abs(d) < 0.002) { netYaw = _aim.yaw; _aim = null; }
   }
   function mapFloor() {
@@ -826,9 +991,10 @@
     setInterval(toGalaxy, 700);
     setInterval(function () { try { if (authed() && !document.hidden) syncTeam(); } catch (e) {} }, 8000);   /* a new teammate appears within seconds */
     var kick = setInterval(function () { if (authed()) { clearInterval(kick); syncTeam(); } }, 1500);
+    setInterval(function () { try { if (!document.hidden) attention(); } catch (e) {} }, 8000);
     /* someone changed language: the ring and the labels follow */
     document.addEventListener('click', function (e) { if (e.target && e.target.closest && e.target.closest('[data-lang],.lang-btn')) setTimeout(function () { ring.rebuild(); }, 50); }, true);
   }
   var boot = setInterval(function () { start(); if (start.done) clearInterval(boot); }, 200);
-  window.Covara = { ring: ring, labels: labels, syncTeam: syncTeam, team: team, people: people, run: run };
+  window.Covara = { attn: function () { return _attn; }, layout: layout, ring: ring, labels: labels, syncTeam: syncTeam, team: team, people: people, run: run };
 })();
