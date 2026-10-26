@@ -1328,7 +1328,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-25.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-26.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3075,21 +3075,20 @@ function tripAnswerText(R, C){ const A=tripAnswer(R, C);
 const ansPaperRow = (w, e) => '<span class="notr">'+e(w.name)+'</span>'+(w.kind?' · '+e(w.kind):'')+' · '+e(w.near)+' · '+winHTML(w.r);
 /* The Portrait. At the press of Portrait, everything Remiel hears around you is known and safe, and leaves the screen and the radar. While it is lit
    (green), only what is new to the Portrait shows, and any device of the Portrait that starts to move: it comes closer while you stand, keeps pace with
-   you, follows you round a stop or a corner, or leaves and comes back. Phones, watches and AirTags change their Bluetooth address every few minutes, so
-   the Portrait keeps how many of each kind it held: a new address is new only when its kind rises above that number, and a named device is matched by
-   its name. A Portrait belongs to one place: 300 ft or more from it, it pauses, and it lights again when you are back. Trackers in it stay hidden unless
+   you, follows you round a stop or a corner, or leaves and comes back. Phones, watches and AirTags change their Bluetooth address every few minutes: a new
+   address is the Portrait device it replaces only when that device fell silent as it appeared, at the same strength, and no other device could make
+   the match; a named device is matched by its name. A Portrait belongs to one place: 300 ft or more from it, it pauses, and it lights again when you are back. Trackers in it stay hidden unless
    they move. Your Watch list and what you filed as Threat always show. Something new within 40 ft, or a device of the Portrait moving toward you, buzzes
    the phone and raises a banner. Pressing Portrait again closes it (grey). The trip record keeps every device either way, with its times. */
-const PORT={hide:new Set(), why:new Map(), at:0, away:false, awayM:0, gone:0};
-const PORT_M=90, PORT_NEAR=12, PORT_HAND=5000, PORT_LIVE=20000;
+const PORT={hide:new Set(), why:new Map(), at:0, away:false, awayM:0, gone:0, taken:new Set(), r0:new Map()};
+const PORT_M=90, PORT_NEAR=12, PORT_SWAP={gap:10000, db:6, min:-85, wait:5000};
 const portOn = () => !!(P.portrait && P.portrait.on);
 const portLit = () => portOn() && !PORT.away;
 const portHidden = d => portLit() && PORT.hide.has(d.sig);
-function portOpen(){ const now=Date.now(), nowS=now+LIVE.skew, me=ePos(), sigs=[], names=[], counts={};
-  LIVE.devs.forEach(d=>{ if(d.sim || !(d.present || nowS-d.seenMobile<LIVE_PRESENT)) return; sigs.push(d.sig); if(d.adv && !rotates(d)) names.push(d.adv);
-    if(d.band==='ble'){ const k=sigKey(d); counts[k]=(counts[k]||0)+1; } });
-  P.portrait={on:true, t:now, at:me && me.acc<=POS_MAX_ACC ? {lat:+me.lat.toFixed(6), lon:+me.lon.toFixed(6)} : null, sigs, names:[...new Set(names)], counts, n:sigs.length};
-  PORT.away=false; PORT.gone=0; save(); PORT.at=0; portTick();
+function portOpen(){ const now=Date.now(), nowS=now+LIVE.skew, me=ePos(), sigs=[], names=[];
+  LIVE.devs.forEach(d=>{ if(d.sim || !(d.present || nowS-d.seenMobile<LIVE_PRESENT)) return; sigs.push(d.sig); if(d.adv && !rotates(d)) names.push(d.adv); });
+  P.portrait={on:true, t:now, at:me && me.acc<=POS_MAX_ACC ? {lat:+me.lat.toFixed(6), lon:+me.lon.toFixed(6)} : null, sigs, names:[...new Set(names)], n:sigs.length};
+  PORT.away=false; PORT.gone=0; PORT.taken=new Set(); PORT.r0=new Map(); save(); PORT.at=0; portTick();
   if(W.on) wEvent('port', 'Portrait taken at '+hms(now)+': '+(sigs.length===1?'1 device':sigs.length+' devices')+' known and hidden.', '', now);
   toast(sigs.length ? 'Portrait on: '+(sigs.length===1?'1 device around you is':sigs.length+' devices around you are')+' known and hidden. Only new and moving devices show.' : 'Portrait on, but Remiel hears nothing just now. Start listening, then take the Portrait again.');
   S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
@@ -3112,22 +3111,40 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<1500) return; PORT.at=
   else if(!p.at){ let any=false; LIVE.devs.forEach(d=>{ if(!any && S0.has(d.sig) && nowS-d.seenMobile<60000) any=true; }); if(any) PORT.gone=0; else if(!PORT.gone) PORT.gone=now; away=!!PORT.gone && now-PORT.gone>60000 && S0.size>0; PORT.awayM=0; }
   if(away!==PORT.away){ PORT.away=away; if(W.on) wEvent('port', away ? 'Portrait paused at '+hms(now)+(PORT.awayM?': you are '+du(PORT.awayM)+' from it.':': none of its devices is heard.') : 'Portrait lit again at '+hms(now)+': you are back.', '', now); }
   if(PORT.away) return;
-  const by={};
+  const cand=[];
   // every device the radar may still show, fading ones included: a Portrait device stays hidden after it falls silent
   LIVE.devs.forEach(d=>{ if(d.sim) return; const live=d.present || nowS-d.seenMobile<LIVE_PRESENT;
     if(fileOfD(d)==='threat' || (P.watch||{})[d.sig]) return;          // your threats always show
     const mv=live && portMoving(d); if(mv){ PORT.why.set(d.sig, 'moving'); return; }
     if(S0.has(d.sig) || (d.adv && N0.has(d.adv))){ PORT.hide.add(d.sig); return; }
     if(d.band!=='ble' || (d.adv && !rotates(d))){ if(live) PORT.why.set(d.sig, 'new'); return; }          // a network or a named device the Portrait did not hold
-    (by[sigKey(d)]=by[sigKey(d)]||[]).push(d); });
-  // A new address stands in for a Portrait device of its kind that fell silent as it appeared (phones and watches change address every few
-  // minutes). A device of the kind still holds its place while it is heard after the newcomer appeared; beyond the Portrait's number of that kind,
-  // the newcomer is new. Remiel waits PORT_HAND after a newcomer appears before it decides, so a change of address never shows or buzzes.
-  const hold = (o, c) => nowS-o.seenMobile<PORT_LIVE && o.seenMobile>(c.since||0)+PORT_HAND;
-  Object.keys(by).forEach(k=>{ const held=[]; LIVE.devs.forEach(o=>{ if(PORT.hide.has(o.sig) && o.band==='ble' && sigKey(o)===k) held.push(o); });
-    by[k].sort((a,b)=>(a.since||0)-(b.since||0)).forEach(c=>{ const used=held.filter(o=>hold(o, c)).length;
-      if(used<(p.counts[k]||0)){ held.push(c); PORT.hide.add(c.sig); } else PORT.why.set(c.sig, 'new'); }); });
+    cand.push(d); });
+  // A new address is a Portrait device under a new address only when that device fell silent within PORT_SWAP.gap of the newcomer's first report,
+  // both were heard well (PORT_SWAP.min or stronger) at strengths within PORT_SWAP.db of each other, and they are of one maker, kind and name; of
+  // several such, the closest pairs in strength are made first, each device once. Remiel waits PORT_SWAP.wait after a newcomer appears before it decides,
+  // so a change of address never shows or buzzes. A Portrait device that fades because you walked away leaves no place for a stranger: the stranger is new.
+  cand.forEach(c=>{ if(!PORT.r0.has(c.sig)) PORT.r0.set(c.sig, typeof c.rssi==='number' ? c.rssi : null); });
+  let grew=false; const pend=[], pairs=[];
+  cand.forEach(c=>{ const live=c.present || nowS-c.seenMobile<LIVE_PRESENT;
+    if(live && nowS-(c.firstSeen||0)<PORT_SWAP.wait){ PORT.hide.add(c.sig); return; }          // just appeared: Remiel is deciding
+    const r=PORT.r0.get(c.sig); pend.push(c);
+    if(typeof r==='number' && r>=PORT_SWAP.min) LIVE.devs.forEach(o=>{ if(o===c || o.sim || o.band!=='ble' || !S0.has(o.sig) || PORT.taken.has(o.sig)) return;
+      if((o.cls||'')!==(c.cls||'') || (o.hint||'')!==(c.hint||'') || (o.adv||'')!==(c.adv||'')) return;
+      const gap=(c.firstSeen||0)-(o.seenMobile||0); if(!(gap>0 && gap<=PORT_SWAP.gap)) return;
+      if(typeof o.rssi!=='number' || o.rssi<PORT_SWAP.min || Math.abs(o.rssi-r)>PORT_SWAP.db) return;
+      pairs.push([Math.abs(o.rssi-r)+gap/100000, c, o]); }); });
+  const got=new Set();          // the closest pairs first, each newcomer and each Portrait device once, so several changing at one moment pair up rightly
+  pairs.sort((a,b)=>a[0]-b[0]).forEach(([k,c,o])=>{ if(got.has(c.sig) || PORT.taken.has(o.sig)) return; got.add(c.sig); PORT.taken.add(o.sig); S0.add(c.sig); (p.sigs=p.sigs||[]).push(c.sig); grew=true; });
+  pend.forEach(c=>{ const live=c.present || nowS-c.seenMobile<LIVE_PRESENT; if(S0.has(c.sig)) PORT.hide.add(c.sig); else if(live) PORT.why.set(c.sig, 'new'); });
+  if(grew){ portTrim(p); save(); }
+  if(PORT.r0.size>3000) [...PORT.r0.keys()].forEach(k=>{ if(!LIVE.devs.has(k)) PORT.r0.delete(k); });
   portAlerts(p); }
+// The Portrait keeps every address it took over, up to 1500 beyond what it first held: a changed address never comes back, so the oldest go first.
+function portTrim(p){ const n0=p.n||0, s=p.sigs||[]; if(s.length>n0+1500) p.sigs=s.slice(0,n0).concat(s.slice(-1500)); }
+// A trip joins a phone's new address to its first one for the length of the trip. When the trip starts or ends those joins are let go, so a
+// Portrait device known under a joined address keeps that address in the Portrait.
+function portCarry(){ const p=P.portrait, A=LIVE.alias; if(!p || !p.on || !A) return; const S0=new Set(p.sigs||[]); let n=0;
+  Object.keys(A).forEach(a=>{ if(S0.has(A[a]) && !S0.has(a)){ (p.sigs=p.sigs||[]).push(a); S0.add(a); n++; } }); if(n){ portTrim(p); save(); } }
 // New within 40 ft, or a device of the Portrait moving toward you: a buzz, a banner and a line in the trip record, once each.
 function portAlerts(p){ const nowS=Date.now()+LIVE.skew; PORT.why.forEach((w, sig)=>{ const d=LIVE.devs.get(sig); if(!d || !(d.dist>0) || nowS-d.seenMobile>=LIVE_PRESENT) return;
     const near=d.dist<=PORT_NEAR, toward=w==='moving' && (d.vel<0 || near); if(!(w==='new' ? near : toward)) return;
@@ -8434,7 +8451,7 @@ function winLines(r){ const L=winsOf(r); if(!L) return []; const out=[];
   return out; }
 const winNow = r => { const L=winsOf(r); return L && r.here ? L[L.length-1] : null; };          // the window it is in now, on a trip
 function walkStart(t0, a, at){
-  tripKeep(); const back=!!at; LIVE.alias={}; LIVE.devs.forEach(d=>{ d.ids=1; });
+  tripKeep(); const back=!!at; portCarry(); LIVE.alias={}; LIVE.devs.forEach(d=>{ d.ids=1; });
   Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, off:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0, contacts:[], modes:[], groups:[], sgs:[], pd:{gps:0, used:0, rough:0, held:0, net:0, first:0, last:0, gaps:[], out:0}});
   { const N=NATIVE(), st=N ? (nativeStatus()||{}) : null; if(st){ W.pd.a0=typeof st.gpsAge==='number' ? st.gpsAge : null; W.pd.st={app:st.version||null, locationOn:st.locationOn, permission:st.permission, listening:st.listening}; } }
   if(a){ W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10}); Object.assign(W.pd, {gps:1, used:1, first:W.t0, last:W.t0, la:a.lat, lo:a.lon}); }
@@ -8443,7 +8460,7 @@ function walkStart(t0, a, at){
   if(back) walkTick(at, [...LIVE.devs.keys()]); else { wLock(); walkTick(); }
   wSave(true); renderVicinity();
 }
-function walkStop(t1){ if(!W.on) return; if(!t1) walkTick(); W.on=false; LIVE.alias={}; W.t1=Math.max(W.t0+1000, t1||Date.now()); if(W.pd){ const st=NATIVE() ? (nativeStatus()||{}) : {}; W.pd.a2=typeof st.gpsAge==='number' ? st.gpsAge : null; }
+function walkStop(t1){ if(!W.on) return; if(!t1) walkTick(); W.on=false; portCarry(); LIVE.alias={}; W.t1=Math.max(W.t0+1000, t1||Date.now()); if(W.pd){ const st=NATIVE() ? (nativeStatus()||{}) : {}; W.pd.a2=typeof st.gpsAge==='number' ? st.gpsAge : null; }
   if(!(W.route||[]).length){ const why=phNoHear(); wEvent('warn','No position was received during this trip. '+(why||pdSum()), '', W.t1-1); } wEvent('stop','Trip ended.','',W.t1); try{ if(_wLock) _wLock.release(); }catch(e){} _wLock=null; TRIP.a=null; tripKeep(); wSave(true); renderVicinity(); }
 // Positions in time order, live or from the app's own record. A trip taken with the screen off is recognized and recorded in full.
 function tripStep(q, t, hearing, back){
