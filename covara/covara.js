@@ -24,7 +24,9 @@
       aTitleAll: 'ALERT your team', aSubAll: 'Everyone on your team is told at once and sees where you are.', aTitle: 'ALERT {n}', aSub: 'Only {n} is told, and sees where you are.',
       aHold: 'Hold to send', aHolding: 'Keep holding', aSentAll: 'Your team has been told.', aSent: '{n} has been told.', aFail: 'The ALERT could not be sent. Check the internet, or call 911.', cancel: 'Cancel',
       cTitle: 'Team code', cSub: 'Give this code to the person joining your team. It works for 24 hours.', cFail: 'A code could not be made. Check the internet.', cShare: 'Share', cCopied: 'Copied.',
-      added: '{n} is on your team.', pending: 'wants to join' },
+      added: '{n} is on your team.', pending: 'wants to join',
+      jTitle: 'Join a team', jSub: 'Someone gave you their team code? Type it here.', jPh: '6-digit code', jGo: 'Join', jBad: 'That code is not right, or it has expired. Ask for a new one.',
+      jOwn: 'That is your own team code. Give it to the person joining you.', jFail: 'Could not join. Check the internet.', jDone: 'You are on {n}’s team.', jBusy: 'Joining…', or: 'or' },
     it: { contact: 'Contatti', health: 'Salute', journal: 'Diario', tools: 'Strumenti', where: 'WHEREIS / Sicurezza', covara: 'Covara', alert: 'ALLERTA',
       video: 'Videochiamata', phone: 'Telefonata', message: 'Messaggio', email: 'Email', hHealth: 'Salute', visits: 'Visite', meds: 'Medicine', records: 'Cartelle',
       notes: 'Note', calendar: 'Calendario', alarms: 'Sveglie', invites: 'Inviti', camera: 'Fotocamera', words: 'Parole', mode: 'Vista',
@@ -39,7 +41,9 @@
       aTitleAll: 'ALLERTA al team', aSubAll: 'Tutto il team viene avvisato subito e vede dove sei.', aTitle: 'ALLERTA a {n}', aSub: 'Viene avvisato solo {n}, che vede dove sei.',
       aHold: 'Tieni premuto per inviare', aHolding: 'Continua a tenere premuto', aSentAll: 'Il team è stato avvisato.', aSent: '{n} è stato avvisato.', aFail: 'Non è stato possibile inviare l’allerta. Controlla internet o chiama il 112.', cancel: 'Annulla',
       cTitle: 'Codice team', cSub: 'Dai questo codice a chi entra nel tuo team. Vale 24 ore.', cFail: 'Non è stato possibile creare un codice. Controlla internet.', cShare: 'Condividi', cCopied: 'Copiato.',
-      added: '{n} è nel tuo team.', pending: 'vuole entrare' }
+      added: '{n} è nel tuo team.', pending: 'vuole entrare',
+      jTitle: 'Entra in un team', jSub: 'Qualcuno ti ha dato il suo codice team? Scrivilo qui.', jPh: 'Codice di 6 cifre', jGo: 'Entra', jBad: 'Il codice non è giusto o è scaduto. Chiedine uno nuovo.',
+      jOwn: 'Questo è il codice del tuo team. Dallo a chi entra con te.', jFail: 'Non è stato possibile entrare. Controlla internet.', jDone: 'Sei nel team di {n}.', jBusy: 'Entro…', or: 'oppure' }
   };
   function t(k, p) { var s = (IT() ? S.it : S.en)[k] || S.en[k] || k; if (p) Object.keys(p).forEach(function (x) { s = s.split('{' + x + '}').join(p[x]); }); return s; }
   function esc(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -581,17 +585,63 @@
       setTimeout(function () { el.remove(); }, r.ok ? 2200 : 6000);
     }
   }
+  /* Team code: one card for both sides. Your own code to give someone (it works for 24 hours), and a place
+     to type the code someone gave you. A shared code also arrives as a link that joins by itself. */
+  var _myCode = '';
   async function codeCard() {
+    if (!authed()) { try { await SyncEngine.ensureIdentity(); } catch (e) {} }
     var r = await api('/care/code', { method: 'POST' }).catch(function () { return { ok: false }; });
-    if (!r.ok || !r.data.code) return toast(t('cFail'));
-    var code = String(r.data.code);
-    var el = card('<h2>' + esc(t('cTitle')) + '</h2><p>' + esc(t('cSub')) + '</p><div class="code">' + esc(code) + '</div><button class="go" type="button">' + esc(t('cShare')) + '</button>');
-    el.querySelector('.go').onclick = async function () {
-      var text = (IT() ? 'Il mio codice team Covara: ' : 'My Covara team code: ') + code + ' https://beverly-index.com/covara/';
+    var code = r.ok && r.data.code ? String(r.data.code) : '';
+    _myCode = code;
+    var el = card('<h2>' + esc(t('cTitle')) + '</h2>' +
+      (code ? '<p>' + esc(t('cSub')) + '</p><div class="code">' + esc(code) + '</div><button class="go" type="button" data-share>' + esc(t('cShare')) + '</button>' : '<p>' + esc(t('cFail')) + '</p>') +
+      '<h2 style="margin-top:20px">' + esc(t('jTitle')) + '</h2><p>' + esc(t('jSub')) + '</p>' +
+      '<input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="' + esc(t('jPh')) + '" style="font:800 22px \'JetBrains Mono\',monospace;letter-spacing:.2em;text-align:center">' +
+      '<button class="go" type="button" data-join>' + esc(t('jGo')) + '</button>');
+    var sh = el.querySelector('[data-share]');
+    if (sh) sh.onclick = async function () {
+      var link = 'https://beverly-index.com/covara/?join=' + code;
+      var text = (IT() ? 'Entra nel mio team Covara. Codice: ' : 'Join my Covara team. Code: ') + code + '  ' + link;
       try { if (navigator.share) { await navigator.share({ text: text }); return; } } catch (e) { return; }
       try { await navigator.clipboard.writeText(text); toast(t('cCopied')); } catch (e) {}
     };
+    var inp = el.querySelector('input'), jb = el.querySelector('[data-join]');
+    inp.addEventListener('input', function () { inp.value = inp.value.replace(/\D/g, '').slice(0, 6); });
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') jb.click(); });
+    jb.onclick = async function () {
+      var c = inp.value.trim();
+      if (!/^\d{6}$/.test(c)) return toast(t('jBad'));
+      jb.disabled = true; jb.textContent = t('jBusy');
+      var ok = await join(c);
+      jb.disabled = false; jb.textContent = t('jGo');
+      if (ok) el.remove();
+    };
   }
+  async function join(code) {
+    if (code === _myCode) { toast(t('jOwn')); return false; }
+    if (!authed()) { try { await SyncEngine.ensureIdentity(); } catch (e) {} }
+    var r = await api('/care/claim', { method: 'POST', body: JSON.stringify({ code: code }) }).catch(function () { return { ok: false, status: 0 }; });
+    if (r.status === 404 || r.status === 410) { toast(t('jBad')); return false; }
+    if (r.status === 400 && /own/i.test(String((r.data || {}).detail || ''))) { toast(t('jOwn')); return false; }
+    if (!r.ok) { toast((r.data && r.data.detail) || t('jFail')); return false; }
+    var h = r.data.link && r.data.link.home ? r.data.link.home : {};
+    await syncTeam();
+    toast(t('jDone', { n: String(h.name || '').split(/\s+/)[0] }));
+    return true;
+  }
+  /* a link with ?join=123456: joins as soon as this phone is set up and signed in */
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search).get('join');
+      if (q && /^\d{6}$/.test(q)) { lsSet('rc:joinCode', q); history.replaceState(null, '', location.pathname); }
+    } catch (e) {}
+    var iv = setInterval(function () {
+      var c = lsGet('rc:joinCode'); if (!c) { clearInterval(iv); return; }
+      if (!authed() || typeof appState === 'undefined' || appState !== 'network') return;
+      clearInterval(iv); try { localStorage.removeItem('rc:joinCode'); } catch (e) {}
+      join(c);
+    }, 1000);
+  })();
 
   /* ── 8. One loop keeps it all in step with Sentinel's own frame ── */
   function loop() {
@@ -610,7 +660,7 @@
     quiet(); teamFilter(); wrapGalaxy();
     requestAnimationFrame(loop);
     setInterval(toGalaxy, 700);
-    setInterval(function () { try { if (authed()) syncTeam(); } catch (e) {} }, 30000);
+    setInterval(function () { try { if (authed() && !document.hidden) syncTeam(); } catch (e) {} }, 8000);   /* a new teammate appears within seconds */
     var kick = setInterval(function () { if (authed()) { clearInterval(kick); syncTeam(); } }, 1500);
     /* someone changed language: the ring and the labels follow */
     document.addEventListener('click', function (e) { if (e.target && e.target.closest && e.target.closest('[data-lang],.lang-btn')) setTimeout(function () { ring.rebuild(); }, 50); }, true);
