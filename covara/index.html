@@ -9358,7 +9358,19 @@ function beginVideoIntro() {
     if (appRevealed || _crossfaded) return;
     _crossfaded = true;
     introEl.classList.add('active');
-    videoEl.play().catch(function() { revealApp(); });
+    videoEl.muted = false; videoEl.volume = 1;
+    videoEl.play().catch(function() {
+      videoEl.muted = true;
+      videoEl.play().then(function () {
+        try {
+          var chip = document.createElement('button'); chip.type = 'button'; chip.id = 'cvSoundChip'; chip.textContent = (typeof I18n !== 'undefined' && String(I18n.locale || 'en').slice(0, 2) === 'it') ? 'Tocca per il suono' : 'Tap for sound';
+          chip.style.cssText = 'position:fixed;top:calc(max(10px,env(safe-area-inset-top,0px)) + 64px);left:max(12px,env(safe-area-inset-left,0px));z-index:100005;padding:10px 16px;border-radius:16px;border:1px solid rgba(150,210,255,.55);background:linear-gradient(155deg,rgba(70,130,235,.24),rgba(14,30,78,.38));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:#eef6ff;font:600 14px "Hanken Grotesk",system-ui,sans-serif;cursor:pointer';
+          chip.onclick = function (e) { e.stopPropagation(); videoEl.muted = false; videoEl.volume = 1; chip.remove(); };
+          document.body.appendChild(chip);
+          videoEl.addEventListener('ended', function () { chip.remove(); }, { once: true });
+        } catch (e) {}
+      }).catch(function () { revealApp(); });
+    });
     videoEl.addEventListener('ended', function() { revealApp(); }, { once: true });
     videoEl.addEventListener('stalled', function() { revealApp(); }, { once: true });
     requestAnimationFrame(function() {
@@ -9396,6 +9408,7 @@ function beginVideoIntro() {
 }
 
 function _stopIntroMedia() {
+  try { var _ch = document.getElementById('cvSoundChip'); if (_ch) _ch.remove(); } catch (e) {}
   try {
     const videoEl = document.getElementById('introVideo');
     if (videoEl) {
@@ -29927,9 +29940,12 @@ function drawNetworkView(t) {
       const _nfs = Math.max(9, Math.min(14, Math.round(12 * s)));
       ctx.font = `600 ${_nfs}px "Hanken Grotesk", system-ui, sans-serif`;
       const _lbl = sphereLabel(node.contact);
+      if (window.CovaraArcName) { try { window.CovaraArcName(ctx, _lbl, sx, sy, r, _nfs); } catch (e) {} }
+      else {
       const _nmW = ctx.measureText(_lbl).width;
       const _nmX = Math.max(6 + _nmW / 2, Math.min(W - 6 - _nmW / 2, sx));
       ctx.fillText(_lbl, _nmX, sy + r + 12 * s);
+      }
     }
     var _roleTxt = (s > 0.38) ? contactRole(node.contact) : '';
     var _roleY = 0;
@@ -45450,6 +45466,6 @@ try { _resolveAppScriptReady(); } catch (e) {}
 
   <!-- Hidden host for GIF images so browser keeps animating them for canvas -->
   <div id="gifAnimationHost"></div>
-<script src="covara.js?v=207"></script>
+<script src="covara.js?v=208"></script>
 </body>
 </html>

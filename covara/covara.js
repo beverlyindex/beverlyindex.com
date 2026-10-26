@@ -25,6 +25,7 @@
       aHold: 'Hold to send', aHolding: 'Keep holding', aSentAll: 'Your team has been told.', aSent: '{n} has been told.', aFail: 'The ALERT could not be sent. Check the internet, or call 911.', cancel: 'Cancel',
       cTitle: 'Team code', cSub: 'Give this code to the person joining your team. It works for 24 hours.', cFail: 'A code could not be made. Check the internet.', cShare: 'Share', cCopied: 'Copied.',
       added: '{n} is on your team.', pending: 'wants to join',
+      pVideo: 'Video', pPhone: 'Phone',
       callOne: '{n} is not on Covara yet, so {n} cannot be called. Give {n} your team code: tap your sphere, then Covara, then Team code.',
       callMany: '{n} are not on Covara yet, so they cannot be called. Give them your team code: tap your sphere, then Covara, then Team code.',
       jTitle: 'Join a team', jSub: 'Someone gave you their team code? Type it here.', jPh: '6-digit code', jGo: 'Join', jBad: 'That code is not right, or it has expired. Ask for a new one.',
@@ -47,6 +48,7 @@
       aHold: 'Tieni premuto per inviare', aHolding: 'Continua a tenere premuto', aSentAll: 'Il team è stato avvisato.', aSent: '{n} è stato avvisato.', aFail: 'Non è stato possibile inviare l’allerta. Controlla internet o chiama il 112.', cancel: 'Annulla',
       cTitle: 'Codice team', cSub: 'Dai questo codice a chi entra nel tuo team. Vale 24 ore.', cFail: 'Non è stato possibile creare un codice. Controlla internet.', cShare: 'Condividi', cCopied: 'Copiato.',
       added: '{n} è nel tuo team.', pending: 'vuole entrare',
+      pVideo: 'Video', pPhone: 'Telefono',
       callOne: '{n} non è ancora su Covara, quindi non si può chiamare. Dai a {n} il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       callMany: '{n} non sono ancora su Covara, quindi non si possono chiamare. Dai loro il tuo codice team: tocca la tua sfera, poi Covara, poi Codice team.',
       jTitle: 'Entra in un team', jSub: 'Qualcuno ti ha dato il suo codice team? Scrivilo qui.', jPh: 'Codice di 6 cifre', jGo: 'Entra', jBad: 'Il codice non è giusto o è scaduto. Chiedine uno nuovo.',
@@ -179,7 +181,25 @@
     try { openBluf = function () {}; } catch (e) {}                 /* no cards: everything is reached from the spheres */
     try { enterDetail = function () {}; } catch (e) {}
     try { var gh = getContactHeadline; getContactHeadline = function (c) { var h = gh(c); try { var nl = I18n.t('hl.new'); if (h && (h === nl || /^NOTHING LOGGED YET$/i.test(h))) return ''; } catch (e) {} return h; }; } catch (e) {}
-    try { sphereLabel = function (c) { return String((c && (c.first || c.last)) || '').trim(); }; } catch (e) {}   /* first names under the spheres: a family shares a surname */
+    try { sphereLabel = function (c) { return [c && c.first, c && c.last].filter(function (x) { return x && String(x).trim() && x !== '\u200b'; }).join(' ').trim(); }; } catch (e) {}   /* first and last name */
+    /* 26 Oct: the name wraps around the bottom of the sphere, reading left to right, so it reads as part of it */
+    window.CovaraArcName = function (ctx, text, sx, sy, r, fs) {
+      if (!text) return;
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      var R0 = r + fs * 0.95, widths = [], total = 0, sp = fs * 0.06;
+      for (var i = 0; i < text.length; i++) { var w = ctx.measureText(text[i]).width + sp; widths.push(w); total += w; }
+      var span = total / R0;
+      if (span > Math.PI * 1.15) { R0 = total / (Math.PI * 1.15); span = Math.PI * 1.15; }
+      var a = Math.PI / 2 + span / 2;
+      for (var j = 0; j < text.length; j++) {
+        var half = widths[j] / 2 / R0; a -= half;
+        ctx.save(); ctx.translate(sx + R0 * Math.cos(a), sy + R0 * Math.sin(a)); ctx.rotate(a - Math.PI / 2);
+        ctx.fillText(text[j], 0, 0); ctx.restore();
+        a -= half;
+      }
+      ctx.restore();
+    };
     try { Object.keys(SentinelGuide).forEach(function (k) { if (typeof SentinelGuide[k] === 'function') SentinelGuide[k] = function () {}; }); } catch (e) {}
     /* a tap on HOME opens the ring of 7 at once (below); Sentinel's own late, double-tap-timed route is closed */
     try { SentinelViews.openPanel = function () {}; } catch (e) {}
@@ -230,7 +250,7 @@
       var dn = drawNetworkView;
       drawNetworkView = function (t) {
         dn(t);
-        try { if (focusedContactId != null && window._dreamRect && typeof WhereIs !== 'undefined') WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId, window._dreamPillAvoid); } catch (e) {}
+        try { if (focusedContactId != null && window._dreamRect && typeof WhereIs !== 'undefined') ctx.setTransform(DPR, 0, 0, DPR, 0, 0), WhereIs.drawToggle(ctx, window._dreamRect, focusedContactId, window._dreamPillAvoid); } catch (e) {}
       };
     } catch (e) {}
   }
@@ -515,7 +535,7 @@
       el.innerHTML = ''; els = [];
       keys.forEach(function (k) {
         var b = document.createElement('div'); b.className = 'cvl' + (k === 'alert' ? ' alert' : k === 'add' ? ' gold' : ''); b.setAttribute('role', 'button'); b.tabIndex = 0;
-        b.textContent = k === 'where' ? t('where') : t(k);
+        b.textContent = mode === 'person' && (k === 'video' || k === 'phone') ? t(k === 'video' ? 'pVideo' : 'pPhone') : (k === 'where' ? t('where') : t(k));
         press(b, function () { onPick(k); });
         el.appendChild(b); els.push(b);
       });
