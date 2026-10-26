@@ -14433,6 +14433,8 @@ const I18n = (function () {
     "whereis.stAsked": "You asked {when}. Waiting for {first} to answer.",
     "whereis.stDeclined": "{first} chose not to share location right now.",
     "whereis.stNotShared": "{first} is not sharing location with you. Tap the map, then Ask for location.",
+    "whereis.cvNoPhone": "No location from {first} yet. Add the mobile number of {first} and the map shows the area it belongs to.",
+    "whereis.cvHomeMap": "Home map: the rooms show once {first} shares location.",
     "whereis.stNotLinked": "{first} is not on Covara yet. Where {first} is shows here once {first} joins your team.",
     "whereis.askFailed": "The request did not go through. Check the connection and try again.",
     "whereis.alreadySharing": "{first} already shares location with you.",
@@ -14472,6 +14474,8 @@ const I18n = (function () {
     "whereis.stAsked": "Hai chiesto {when}. In attesa della risposta di {first}.",
     "whereis.stDeclined": "{first} ha scelto di non condividere la posizione per ora.",
     "whereis.stNotShared": "{first} non condivide la posizione con te. Tocca la mappa, poi Chiedi la posizione.",
+    "whereis.cvNoPhone": "Ancora nessuna posizione da {first}. Aggiungi il cellulare di {first} e la mappa mostra la zona a cui appartiene.",
+    "whereis.cvHomeMap": "Mappa di casa: le stanze compaiono quando {first} condivide la posizione.",
     "whereis.stNotLinked": "{first} non è ancora su Covara. Qui compare dove si trova quando entra nel tuo team.",
     "whereis.askFailed": "La richiesta non è andata a buon fine. Controlla la connessione e riprova.",
     "whereis.alreadySharing": "{first} condivide già la posizione con te.",
@@ -14785,7 +14789,7 @@ const I18n = (function () {
     "comm.brief.more": "+{n} more this week",
     "comm.brief.week": "This week",
     "comm.brief.last": "Last contact",
-    "comm.brief.days": "Last 7 days",
+    "comm.brief.days": "This week",
     "comm.brief.hint": "Tap for the full 30 days",
     "comm.inPerson": "in person",
     "comm.loggedNote": "logged note",
@@ -14849,7 +14853,7 @@ const I18n = (function () {
     "comm.brief.more": "+{n} altri questa settimana",
     "comm.brief.week": "Questa settimana",
     "comm.brief.last": "Ultimo contatto",
-    "comm.brief.days": "Ultimi 7 giorni",
+    "comm.brief.days": "Questa settimana",
     "comm.brief.hint": "Tocca per tutti i 30 giorni",
     "comm.inPerson": "di persona",
     "comm.loggedNote": "nota registrata",
@@ -22130,8 +22134,9 @@ const Comm = (() => {
   function _stripHtml(items) {
     const today = _dayStart(new Date()), loc = _it() ? 'it-IT' : 'en-US';
     let cells = '';
-    for (let d = 6; d >= 0; d--) {
-      const k = today - d * DAY_MS, next = k + DAY_MS;
+    const _mon = today - ((new Date(today).getDay() + 6) % 7) * DAY_MS;
+    for (let _i = 0; _i < 7; _i++) {
+      const k = _mon + _i * DAY_MS, next = k + DAY_MS, d = Math.round((today - k) / DAY_MS);
       const kinds = {}; let n = 0;
       items.forEach(it => { if (it.ts >= k && it.ts < next) { kinds[_dotKind(it)] = 1; n++; } });
       let letter = '';
@@ -22167,7 +22172,7 @@ const Comm = (() => {
     let wx = ''; try { wx = Warnings.briefHtml(c, false); } catch (e) {}
     return wx + '<div class="db-top"><span class="db-label">' + _esc(_t('comm.label', 'COMMUNICATION')) + '</span><span class="db-name">' + _esc(_first(c)) + '</span></div>' +
       head + week + last +
-      '<div class="db-t">' + _esc(_t('comm.brief.days', 'Last 7 days')) + '</div>' + _stripHtml(items) +
+      '<div class="db-t">' + _esc(_t('comm.brief.days', 'This week')) + '</div>' + _stripHtml(items) +
       (phone && !iso ? '' : '<div class="db-hint">' + _esc(_t('comm.brief.hint', 'Tap for the full 30 days')) + '</div>');
   }
   /* Four spots on a phone, in order: top left, bottom left, bottom right, top right. The
@@ -23010,7 +23015,7 @@ const WhereIs = (() => {
       _lines(ctx, [_t('whereis.apxWordCap', 'APPROXIMATE')], cx, y, '700 ' + Math.max(8, fS - 1) + 'px ' + mono, '#fbbf24', fS + 4);
     } else if (!entry) {
       /* No map tiles: the general area in words (what to do is in the circle below), else the state */
-      const msg = apx ? approxText(apx) : _noneMsg(c);
+      const msg = apx ? approxText(apx) : (!c.phone ? _t('whereis.cvNoPhone', 'No location from {first} yet. Add the mobile number of {first} and the map shows the area it belongs to.', { first: _first(c) }) : _noneMsg(c));
       _lines(ctx, _wrap(msg, Math.round(R * 1.5 / 6.2), 5), cx, cy + R * 0.02, '500 ' + fS + 'px ' + sans, '#f0eef5', fS + 4);
     } else {
       if (mapOk) pulseDot(ctx, cx, cy, t, _lit_());
@@ -23033,7 +23038,7 @@ const WhereIs = (() => {
     const r2 = dr.r * 0.5 * _fit;
     const cx2 = cx, cy2 = cy + R + r2 + 10;
     if (cy2 + r2 > H - 4) return;
-    if (!entry && !apx) return;
+    const _noPhone = !entry && !apx && !(c.phone);
     const place = entry && entry.place ? entry.place : null;
     const plan = place ? _places.find(p => String(p.id) === String(place.id)) : null;
     const planUrl = plan && plan.floorplan_url ? plan.floorplan_url : null;
@@ -23060,7 +23065,8 @@ const WhereIs = (() => {
     if (!entry) {
       /* No position: what is going on and what to do, in the Place circle */
       const st = stateFor(c);
-      if (apx || st !== 'signin') lines = _wrap(stateText(c, st), maxC + 4, 6).map(l => ({ t: l }));
+      if (true) lines = _wrap(_t('whereis.cvHomeMap', 'Home map: the rooms show once {first} shares location.', { first: _first(c) }), maxC + 4, 4).map(l => ({ t: l }));
+      else if (apx || st !== 'signin') lines = _wrap(stateText(c, st), maxC + 4, 6).map(l => ({ t: l }));
     }
     else if (place) {
       lines = _wrap(place.name || '', maxC, 2).map(l => ({ t: l, b: true }));
@@ -29429,7 +29435,11 @@ function drawNetworkView(t) {
     var _drR, _drCx, _drCy;
     if (_drIso && W <= 480) { _drR = W * 0.30; _drCx = W / 2; _drCy = _drR + H * 0.07; }
     else if (_drIso) { _drR = Math.min(W, H) * 0.40; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
-    else { _drR = Math.min(W, H) * 0.28; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
+    else {
+      _drR = Math.min(W, H) * 0.28; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06;
+      const _hR = netCenterR(W, H) * 1.22 + 14;
+      for (let _k = 0; _k < 40 && Math.hypot(_drCx - W / 2, _drCy - H / 2) < _drR + _hR; _k++) { _drR *= 0.96; _drCx = W - _drR - W * 0.05; _drCy = _drR + H * 0.06; }
+    }
     ctx.beginPath();
     ctx.arc(_drCx, _drCy, _drR, 0, Math.PI * 2);
     ctx.clip();
@@ -45466,6 +45476,6 @@ try { _resolveAppScriptReady(); } catch (e) {}
 
   <!-- Hidden host for GIF images so browser keeps animating them for canvas -->
   <div id="gifAnimationHost"></div>
-<script src="covara.js?v=208"></script>
+<script src="covara.js?v=209"></script>
 </body>
 </html>

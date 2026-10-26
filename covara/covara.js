@@ -131,6 +131,12 @@
     'html.cv.cv-sending .sentinel-msg-overlay{opacity:0!important}',
     /* one thing at a time under the logo: a card or a message there sets aside what was there, and the labels beside a sphere wait behind it */
     'html.cv .sentinel-msg-overlay{z-index:9500!important}',
+    /* the labels and the ring wait behind any card that is open */
+    'html.cv:has(.contact-modal-overlay.open) #cvLabels,html.cv:has(.contact-modal-overlay.open) #cvRing,html.cv:has(.quick-dial-overlay.open) #cvLabels,html.cv:has(.ui-confirm-overlay) #cvLabels,html.cv:has(.settings-panel.open) #cvLabels,html.cv:has(.settings-panel.open) #cvRing{visibility:hidden!important}',
+    /* Edit Person: a transparent glass card under the logo */
+    'html.cv .contact-modal-overlay{z-index:9600!important;align-items:flex-start!important;justify-content:flex-start!important;padding:var(--cvTop) 12px 16px var(--cvLeft)!important;background:rgba(6,15,36,.28)!important}',
+    'html.cv .contact-modal{width:var(--cvW)!important;max-width:none!important;max-height:calc(100dvh - var(--cvTop) - 16px)!important;background:linear-gradient(155deg,rgba(70,130,235,.22),rgba(14,30,78,.42))!important;border:1px solid rgba(150,210,255,.5)!important;border-radius:20px!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.3)!important}',
+    'html.cv .contact-modal input,html.cv .contact-modal textarea,html.cv .contact-modal select{background:rgba(20,44,100,.3)!important;border-color:rgba(150,200,255,.4)!important;color:#fff!important}',
     'html.cv.cv-where #dreamBrief,html.cv.cv-where #dreamComm{display:none!important}',
     'html.cv .settings-panel{inset:auto!important;top:var(--cvTop)!important;left:var(--cvLeft)!important;width:var(--cvW)!important;max-height:calc(100dvh - var(--cvTop) - 16px)!important;border-radius:20px;border:1px solid rgba(150,210,255,.5);',
     'background:linear-gradient(155deg,rgba(70,130,235,.22),rgba(14,30,78,.42))!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 0 22px rgba(70,150,255,.3);padding:0 14px 14px!important;box-sizing:border-box}',
@@ -369,9 +375,21 @@
       try {
         if (appState !== 'network') return p;
         var g = geo(), f = (focusedContactId === node.contact.id ? FOCUS_SCALE : 1);
-        var r = node.r * p.scale * f, need = g.cR * 1.16 + r + 6;
+        var r = node.r * p.scale * f, need = g.cR * 1.16 + r + 18;   /* room for the name wrapped under the sphere too */
         var dx = p.sx - g.cx, dy = p.sy - g.cy, d = Math.hypot(dx, dy);
         if (d < need) { if (d < 0.5) { dx = 0; dy = 1; d = 1; } p.sx = g.cx + dx / d * need; p.sy = g.cy + dy / d * need; }
+        /* while someone is chosen, the other spheres stay off the dream picture as well */
+        var dr = window._dreamRect;
+        if (dr && focusedContactId != null && node.contact.id !== focusedContactId) {
+          var ex = p.sx - dr.cx, ey = p.sy - dr.cy, ed = Math.hypot(ex, ey), en = dr.r + r + 6;
+          if (ed < en) {
+            if (ed < 0.5) { ex = -1; ey = 1; ed = Math.SQRT2; }
+            p.sx = dr.cx + ex / ed * en; p.sy = dr.cy + ey / ed * en;
+            /* and still never over HOME */
+            var hx = p.sx - g.cx, hy = p.sy - g.cy, hd = Math.hypot(hx, hy);
+            if (hd < need) { p.sx = g.cx + hx / (hd || 1) * need; p.sy = g.cy + hy / (hd || 1) * need; }
+          }
+        }
       } catch (e) {}
       return p;
     };
