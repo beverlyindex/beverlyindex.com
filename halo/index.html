@@ -3220,6 +3220,14 @@ function tripStart(){ if(W.on) return; const me=ePos(), fresh=me && Date.now()-m
   toast('Trip started. Remiel is recording your path and every device along it.'); }
 function wpSweep(w){ LIVE.devs.forEach(d=>{ if(!d.present || d.band==='cell' || quietAp(d) || !(d.dist<=WP_M || (d.cls==='Vehicle' && d.dist<=40))) return; const e=w.devs[d.id], m=Math.max(1,Math.round(d.dist));
     if(!e || m<e.m) w.devs[d.id]={id:d.id, sig:d.sig, name:devName(d), kind:kindShort(d), cls:d.cls, m, yours:isYours(d)}; }); }
+// The minute before you pressed it: what came within 50 ft of you then is in the waypoint too, with its nearest distance in that minute. You often
+// press it a moment after you see something.
+function wpBack(w){ const t0=w.t-WP_MS; Object.values(W.devs||{}).forEach(r=>{ if(!r || r.sim || r.band==='cell') return; const d=LIVE.devs.get(r.sig); if(d && quietAp(d)) return; let m=Infinity;
+    (r.w||[]).forEach(x=>{ if(x[3]>=t0 && x[3]<=w.t) m=Math.min(m, x[2]); });
+    (r.dl||[]).forEach(x=>{ if(x[0]>=t0 && x[0]<=w.t) m=Math.min(m, x[1]); });
+    if(r.minT>=t0 && r.minT<=w.t) m=Math.min(m, r.min);
+    if(!(m<=WP_M || (r.cls==='Vehicle' && m<=40))) return; m=Math.max(1, Math.round(m)); const e=w.devs[r.id]; if(e && e.m<=m) return;
+    w.devs[r.id]={id:r.id, sig:r.sig, name:d ? devName(d) : (r.label||r.call||'Device'), kind:kindShort(d||{cls:r.cls||'Unknown', hint:r.hint||'', band:r.band||'ble'}), cls:r.cls, m, yours:d ? isYours(d) : !!r.mine}; }); }
 function wpClose(w){ if(w.done) return; w.done=true; const ds=Object.values(w.devs||{}).filter(x=>!x.yours).sort((a,b)=>a.m-b.m); P.wp=P.wp||{}; ds.forEach(x=>{ P.wp[x.sig]={t:w.t, n:w.n, trip:W.t0}; });
   { const ks=Object.keys(P.wp); if(ks.length>600) ks.sort((a,b)=>P.wp[a].t-P.wp[b].t).slice(0,ks.length-600).forEach(k=>delete P.wp[k]); } save();
   wEvent('mark','Waypoint '+w.n+': '+ds.length+(ds.length===1?' device':' devices')+' within '+du(WP_M)+'.','',w.t+1);
@@ -3230,8 +3238,8 @@ function tripWaypoint(){ if(!W.on) return; W.wps=W.wps||[]; const open=W.wps.fin
   if(open) return toast('Waypoint '+open.n+' is saved. It keeps recording for one minute from '+hhmm(open.t)+'.');
   if(W.wps.length>=60) return toast('This trip holds 60 waypoints, the most one trip keeps.');
   const now=Date.now(), me=ePos(), w={n:W.wps.length+1, t:now, pos:me?{lat:+me.lat.toFixed(6), lon:+me.lon.toFixed(6)}:null, devs:{}, note:'', done:false}; W.wps.push(w);
-  wpSweep(w); wEvent('mark','Waypoint '+w.n+' set.','',now); wSave(true); buzz(60); renderVicinity();
-  toast('Waypoint '+w.n+' saved at '+hhmm(now)+'. Remiel records every device within '+du(WP_M)+' for one minute.'); }
+  wpBack(w); wpSweep(w); wEvent('mark','Waypoint '+w.n+' set.','',now); wSave(true); buzz(60); renderVicinity();
+  toast('Waypoint '+w.n+' saved at '+hhmm(now)+'. Remiel records every device within '+du(WP_M)+' in the minute before and the minute after.'); }
 function tripEnd(){ if(!W.on) return; const open=(W.wps||[]).find(x=>!x.done);
   if(open){ S.endArm=0; const c=new Date(open.t+WP_MS); return toast('Waypoint '+open.n+' is saved, and the trip keeps recording. End is ready again at '+hhmm(open.t+WP_MS)+':'+String(c.getSeconds()).padStart(2,'0')+', when the waypoint closes.'); }
   confirmAsk({ title:'End the trip?', yes:'End the trip', no:'Keep recording', kept:'The trip keeps recording.', go:tripEndNow,
