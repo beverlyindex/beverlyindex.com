@@ -1286,8 +1286,8 @@ button.loc-row:active{transform:translateY(2px);box-shadow:inset 0 2px 7px rgba(
     <div class="xbar wbar" id="wBar" hidden aria-label="Every device around you">
       <div class="xlead"><b>Watchers</b><span id="wBarN"></span></div><div class="track" id="trackW"></div>
     </div>
-    <div class="ticker">
-      <div class="lead seg"><button data-act="mode" data-m="a" class="m-a">Attackers</button></div><div class="track" id="trackA"></div>
+    <div class="xbar abar" id="aBar" hidden aria-label="The latest attacks">
+      <div class="xlead"><b>Attackers</b><span id="aBarN"></span></div><div class="track" id="trackA"></div>
     </div>
 
     <nav class="nav" id="navMobile">
@@ -4211,7 +4211,7 @@ function actNeed(a){ const act=a.dataset.act; if(ACT_PLAN[act]) return ACT_PLAN[
   if(act==='pull'){ const id=a.dataset.id; if(id==='health' || id==='trap' || id==='ai' || id==='global' || id==='path') return 'wa'; }
   if(act==='res' || act==='path-go') return act==='path-go' ? 'wa' : ((x=>x && x.side==='a' ? 'wa' : 'watchers')(T(a.dataset.id)));
   return ''; }
-const ALERT_PLAN = key => { const k=String(key).split(':')[0]; return ['port','chg','tagpace','with','seen','watch','cam','drone','twin','tower','2g','ray','recog','chk','near','tagf','bk','fam','cl','hm','grp','skim','sgc','sgw'].indexOf(k)>=0 ? 'watchers' : (k==='kev' || k==='path') ? 'wa' : ['room','late','care','carelate','appt','roomcare'].indexOf(k)>=0 ? 'full' : 'free'; };
+const ALERT_PLAN = key => { const k=String(key).split(':')[0]; return ['port','chg','tagpace','with','seen','watch','cam','drone','twin','tower','2g','ray','recog','chk','near','tagf','bk','fam','cl','hm','grp','skim','sgc','sgw'].indexOf(k)>=0 ? 'watchers' : (k==='kev' || k==='atk' || k==='path') ? 'wa' : ['room','late','care','carelate','appt','roomcare'].indexOf(k)>=0 ? 'full' : 'free'; };
 function planMarks(){ const p=planNow(), app=el('app'); if(app) app.dataset.plan=p;
   document.querySelectorAll('.nav button[data-view]').forEach(b=>b.classList.toggle('lk', !can(VIEW_PLAN[b.dataset.view])));
   document.querySelectorAll('section[data-pane]').forEach(sec=>{ const v=sec.dataset.pane, lk=!can(VIEW_PLAN[v]); sec.classList.toggle('locked', lk); let c=sec.querySelector(':scope > .lockcard');
@@ -9230,7 +9230,12 @@ function alertScan(){ let known=0; const chg=[];
 function alertFeed(){ let list=[]; try{ list=kevMine(); }catch(e){ return; }
   const first=!P.kevSeen; P.kevSeen=P.kevSeen||{}; let n=0;
   list.forEach(v=>{ if(P.kevSeen[v.cve]) return; P.kevSeen[v.cve]=1; n++; if(!first) { const w=kevWords(v); alertRaise('kev:'+v.cve, w.name+' '+w.are+' under attack', 'A flaw in '+w.it+' is being used against people now ('+v.cve+'). If you own one, update it today. Patch Clock has the steps.', {res:'p_patch'}); } });
-  if(n) save(); }
+  // an attack in the news that concerns you: an alert for each new one, the first reading sets the baseline, and several at once share one alert
+  let A=[]; try{ A=atkMine().filter(f=>!f.kev); }catch(e){}
+  const firstA=!P.atkSeen; P.atkSeen=P.atkSeen||{}; const fresh=A.filter(f=>!P.atkSeen[f.k]), now=Date.now(); fresh.forEach(f=>{ P.atkSeen[f.k]=now; });
+  Object.keys(P.atkSeen).forEach(k=>{ if(now-P.atkSeen[k]>60*86400000) delete P.atkSeen[k]; });
+  if(fresh.length && !firstA){ const f=fresh[0]; alertRaise(f.k, 'An attack that concerns you', String(f.t).replace(/[.\s]+$/,'')+'. It concerns '+f.why+'.'+(fresh.length>1?' And '+(fresh.length-1)+' more.':'')+' Open Attackers to read it, and keep your phone and apps up to date.', {view:'attackers'}); }
+  if(n || fresh.length || firstA) save(); }
 // What the app itself raised while the screen was off, and which banner you tapped.
 function alertNativeTick(){ const N=NATIVE(); if(!N) return;
   try{ if(typeof N.takeAlerts==='function'){ const xs=JSON.parse(N.takeAlerts()||'[]')||[];
@@ -9384,7 +9389,41 @@ function newsRender(b){ const sec=(title, items)=>'<div class="nw-h">'+esc(title
   let w=[], a=[]; try{ w=myFindings('w').concat(liveFeedW(), FEED_W); a=myFindings('a').concat(liveFeedA(), FEED_A); }catch(e){ w=FEED_W; a=FEED_A; }
   b.innerHTML='<h3 id="fsTitle">Security news</h3><p class="fs-p">What concerns you comes first, marked in gold. Then the wider news, each item with its source.</p>'+sec('Watchers', w)+sec('Attackers', a)+
     '<div class="formrow fs-btns"><button class="btn primary" data-act="file-close">Close</button></div>'; }
-function fillTickers(){ fillWBar(true); if(el('trackA')) fillTicker('trackA', myFindings('a').concat(liveFeedA(), FEED_A)); }
+function fillTickers(){ fillWBar(true); fillABar(); }
+// The Attacker Bar. The latest attacks reported by the sources Remiel reads scroll past. Those that concern you come first, in red, each saying what of
+// yours it concerns: a flaw under attack in your kind of phone or your home network equipment (the CISA register of exploited flaws), or a report from
+// the last 14 days that names your kind of phone, its Bluetooth, your home router, or the maker of a device you marked as yours or your household's.
+const ATK_DAYS=14;
+const ATK_MK=[[/samsung|galaxy/i,'Samsung',/\bsamsung\b|\bgalaxy\b/i], [/apple|airpods|iphone|ipad|macbook|imac/i,'Apple',/\bapple\b|\biphone\b|\bipad\b|\bmacos\b|\bairpods\b|\bairtag\b/i],
+  [/desktop-|laptop-|windows|microsoft|surface/i,'Windows',/\bwindows\b|\bmicrosoft\b/i], [/quest|oculus|\bmeta\b/i,'Meta Quest',/\bmeta quest\b|\boculus\b|\bquest (?:2|3|3s|pro)\b/i],
+  [/pixel|\bnest\b|chromecast/i,'Google',/\bpixel\b|\bgoogle nest\b|\bchromecast\b/i], [/sony/i,'Sony',/\bsony\b/i], [/bose/i,'Bose',/\bbose\b/i], [/jbl|harman/i,'JBL',/\bjbl\b/i],
+  [/garmin/i,'Garmin',/\bgarmin\b/i], [/fitbit/i,'Fitbit',/\bfitbit\b/i], [/xiaomi|redmi|mi band/i,'Xiaomi',/\bxiaomi\b|\bredmi\b/i], [/tesla/i,'Tesla',/\btesla\b/i],
+  [/tp-?link|\bdeco\b/i,'TP-Link',/\btp-link\b/i], [/netgear|orbi/i,'Netgear',/\bnetgear\b/i]];
+function atkOwned(){ const t=[]; LIVE.devs.forEach(d=>{ if(!d.sim && isYours(d)) t.push((d.hint||'')+' '+(d.adv||'')+' '+labelOf(d)); });
+  const R=P.homeRole||{}; Object.keys(R).forEach(k=>{ if(R[k]!=='mine' && R[k]!=='house') return; const h=ELOG.hist.get(k); if(h) t.push((h.hint||'')+' '+(h.name||'')); });
+  PAIRED.list.forEach(x=>t.push((x.name||'')+' '+(x.kind||''))); return t.join(' | '); }
+function atkKeys(){ const p=plat(), K=[p==='iphone' ? {re:/\biphone\b|\bios\b|\bipados\b|\bsafari\b/i, why:'your iPhone'} : {re:/\bandroid\b|\bpixel\b|\bgoogle play\b|\bplay store\b|\bchrome\b/i, why:'your Android phone'},
+    {re:/\bbluetooth\b/i, why:'your phone\'s Bluetooth'}];
+  if(pv('wifihome')!==false) K.push({re:/\brouters?\b/i, why:'your home router'});
+  const own=atkOwned(); ATK_MK.forEach(([o, name, re])=>{ if(o.test(own) && !(name==='Apple' && p==='iphone')) K.push({re, why:'your '+LK(name)+' devices'}); });
+  return K; }
+const atkHash = s => { let h=0; s=String(s||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return (h>>>0).toString(36); };
+const kevWhy = v => { const p=v.platforms||[]; return p.indexOf('android')>=0 ? 'your Android phone' : p.indexOf('apple')>=0 ? 'your Apple devices' : p.indexOf('browser')>=0 ? 'your browser' : 'your home network equipment'; };
+function atkMine(){ const g=S.global, out=[], seen=new Set(); if(!g) return out; const old=Date.now()-ATK_DAYS*86400000;
+  let kv=[]; try{ kv=kevMine(); }catch(e){}
+  kv.slice(0,6).forEach(v=>{ const w=kevWords(v); out.push({k:'kev:'+v.cve, kev:true, t:'Under attack now: '+w.name+' ('+LK(v.cve)+').', why:kevWhy(v), src:'CISA · '+fmtD(v.added), u:v.u}); });
+  const K=atkKeys(); [].concat((g.news||[]).slice(0,30), (g.ai||[]).slice(0,12), (g.consumer||[]).slice(0,8)).forEach(x=>{ if(!x || !x.t) return; const ts=Date.parse(x.d||''); if(!(ts>=old)) return;
+    const hit=K.find(k=>k.re.test(x.t)); if(!hit) return; const key='atk:'+atkHash(x.u||x.t); if(seen.has(key)) return; seen.add(key);
+    out.push({k:key, t:x.t, why:hit.why, src:(x.src||'')+' · '+fmtD(x.d), u:x.u}); });
+  return out; }
+function abarItem(f, hot){ const inner='<i style="--mk:'+(hot?LOOK.red:LOOK.grey)+'"></i>'+(hot?'<em class="xthr">Threat to you</em>':'')+'<b'+(f.kev?'':' translate="no"')+'>'+esc(f.t)+'</b>'+(hot && f.why?'<span>Concerns '+esc(f.why)+'</span>':'')+'<small translate="no">'+esc(f.src||'')+'</small>';
+  return f.u ? '<a class="xi'+(hot?' hot':'')+'" href="'+esc(f.u)+'" target="_blank" rel="noopener">'+inner+'</a>' : '<span class="xi'+(hot?' hot':'')+'">'+inner+'</span>'; }
+function fillABar(){ const tr=el('trackA'); if(!tr) return; let mine=[], rest=[]; try{ mine=atkMine(); }catch(e){}
+  try{ rest=liveFeedA().concat(FEED_A); }catch(e){ rest=FEED_A; }
+  const us=new Set(mine.map(f=>f.u).filter(Boolean)), ts=new Set(mine.map(f=>f.t)); rest=rest.filter(f=>!(f.u && us.has(f.u)) && !ts.has(f.t));
+  const h=mine.map(f=>abarItem(f, true)).concat(rest.slice(0,30).map(f=>abarItem(f, false))).join('');
+  const n=el('aBarN'); if(n){ n.textContent=mine.length ? String(mine.length) : ''; n.classList.toggle('hot', mine.length>0); }
+  barSet(tr, h); }
 // The Watcher Bar. Every device around you scrolls past: red first, then amber, then the rest by distance, yours last. Each says what it most likely
 // is and how far it is, in words you can picture. Tap one to open it. A finger on the bar holds it still.
 const SEE_M=[[1.5,'right next to you'],[5,'a few steps away'],[15,'close by'],[35,'across the street'],[90,'down the street']];
