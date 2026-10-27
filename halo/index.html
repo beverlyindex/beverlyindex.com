@@ -839,6 +839,11 @@ body:not(.expert) .nav [data-view="evidence"]{order:3} body:not(.expert) .nav [d
 .xp-card{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border:1px solid var(--line2);border-radius:14px;background:rgba(255,255,255,.035)}
 .xp-t{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0} .xp-t b{color:#fff} .xp-t span{color:var(--mut);font-size:13px;line-height:1.4} .xp-card .btn{flex:none}
 #vicCard:not(.simple) #simRad{display:none} #simRad:empty{display:none}
+.pm-go{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;margin:12px 0 4px;padding:18px 14px;border-radius:18px;border:1px solid rgba(120,170,255,.55);background:linear-gradient(180deg,#2b6fe0,#1a4fb8);color:#fff;font:inherit;cursor:pointer;box-shadow:0 10px 30px -12px rgba(43,111,224,.9),inset 0 1px 0 rgba(255,255,255,.25)}
+.pm-go b{font-family:var(--disp);font-size:22px;letter-spacing:.08em;text-transform:uppercase} .pm-go span{font-size:13px;color:#dbe7ff}
+.pm-bar{margin:12px 0 4px;padding:12px;border-radius:16px;border:1px solid rgba(62,224,138,.45);background:rgba(20,60,40,.32)}
+.pm-l{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .pm-l b{color:#fff;font-size:15px} .pm-l span{color:var(--mut);font-size:13px}
+.pm-btns{display:flex;gap:8px;margin-top:10px} .pm-btns .btn{flex:1} .pm-btns .pm-stop{border-color:rgba(255,90,90,.6);color:#ffb4b4}
 .sr-box{margin:12px 0 4px;border:1px solid var(--line2);border-radius:18px;padding:8px 10px 12px;background:radial-gradient(circle at 50% 46%,rgba(40,70,130,.28),rgba(8,12,24,.55) 72%)}
 .sr-svg{display:block;width:100%;max-width:360px;margin:0 auto;overflow:visible} .sr-ring{fill:none;stroke:rgba(143,180,255,.24);stroke-width:1} .sr-ring.o{stroke-dasharray:3 4}
 .sr-rl{fill:#7f8db0;font:500 10px var(--mono);letter-spacing:.04em} .sr-dot{cursor:pointer} .sr-n{fill:#0a1020;font:700 11px var(--sans)}
@@ -3398,7 +3403,7 @@ function simRadHTML(){ const M=nowModel(); if(!M.live) return ''; const L=M.all.
   return '<div class="sr-box">'+g+(rows?'<div class="sr-list">'+rows+'</div>':'')+'<div class="sr-cap"><span>'+esc(cap)+(n?(cap?' ':'')+esc(n===1?'1 device around you.':n+' devices around you.'):'')+'</span><button class="btn sm" data-act="map-full">Open the map</button></div></div>'; }
 function statusRender(){ const det=detOn(), card=el('vicCard'), m=can('watchers') ? statusModel() : null; document.body.classList.toggle('wsimple', !det); if(card) card.classList.toggle('simple', !det);
   setHTML(el('stTop'), m ? statusHTML('w', m)+(det ? '' : posBan()) : '');
-  setHTML(el('topTrip'), m ? tripStrip() : '');
+  setHTML(el('topTrip'), m ? (det ? tripStrip() : protectHTML()) : '');          // the simple view: one button
   setHTML(el('simRad'), m && !det ? simRadHTML() : '');          // the simple radar, in the simple view only
   setHTML(el('detTog'), m && m.act!=='details' && !P.expert ? '<button class="det-tog'+(det?' on':'')+'" data-act="details" aria-expanded="'+(det?'true':'false')+'">'+(det?'Hide details':'Show details')+'</button>' : '');          // when green, the status button is the one for Details
   const ov=el('stOv'); if(ov) setHTML(ov, m ? statusHTML('ov', m) : ''); fillWBar(); }
@@ -3430,6 +3435,22 @@ function tripSketch(R, o){ const raw=(R.route||[]).filter(okLL), rt=smoothLL(raw
     '<circle cx="'+px(a)+'" cy="'+py(a)+'" r="6" fill="#0b1224" stroke="#e9f0ff" stroke-width="2.2"/><circle cx="'+px(b)+'" cy="'+py(b)+'" r="6" fill="'+(R.on?'#4ae88a':'#e9f0ff')+'"/>'+
     (R.wps||[]).filter(w=>w.pos).map(w=>'<circle cx="'+px(w.pos)+'" cy="'+py(w.pos)+'" r="8" fill="#C5A55A"/><text x="'+px(w.pos)+'" y="'+(py(w.pos)+3.6)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#1A1A2E">'+w.n+'</text>').join('')+
     '<path d="M12 '+(H0-8)+' h'+(L*sc).toFixed(1)+'" stroke="#93a6cc" stroke-width="1.5"/><text x="'+(18+L*sc).toFixed(1)+'" y="'+(H0-4)+'" font-size="10.5" fill="#93a6cc">'+esc(du(L))+'</text></svg></div>'; }
+// Protect me: listening, a trip and the Portrait, in one press. While it is on: how long, whether the Portrait is on, a button for this moment
+// (a waypoint) and Stop, which ends the trip, closes the Portrait and stops listening.
+function protectHTML(){ if(W.on){ const wp=W.wps||[], open=wp.find(x=>!x.done);
+    return '<div class="pm-bar"><div class="pm-l"><span class="dot live"></span><b>Protecting you</b><span>'+esc(walkDur(Date.now()-W.t0))+' · '+esc(portLit()?'Portrait on':portBuilding()?'Taking your Portrait':'Portrait off')+'</span></div>'+
+      '<div class="pm-btns"><button class="btn mk'+(open?' on':'')+'" data-act="trip-wp">'+(open?'Moment saved':'Mark this moment')+'</button><button class="btn pm-stop" data-act="protect-stop">Stop</button></div></div>'; }
+  return '<button class="pm-go" data-act="protect"><b>Protect me</b><span>Listening, a trip and your Portrait, in one press</span></button>'; }
+function protectStart(){ const N=NATIVE(), st=N ? (nativeStatus()||{}) : null;
+  if(!PH.on || PH.lost || (st && st.listening===false)) phStart();
+  P.portIntro=P.portIntro||Date.now(); save();
+  if(!W.on) tripStart();
+  if(!portOn()) portOpen();
+  toast('Remiel is protecting you: listening, recording this trip and taking your Portrait.'); renderVicinity(); }
+function protectStop(){ if(!W.on){ if(portOn()) portClose(); renderVicinity(); return; }
+  if((W.wps||[]).some(x=>!x.done)) return tripEnd();          // a waypoint still recording: End waits for it, and says until when
+  confirmAsk({ title:'Stop protecting?', yes:'Stop', no:'Keep protecting', kept:'Remiel keeps protecting you.', text:'Your trip ends and is kept in Trips. The Portrait closes, and listening stops.',
+    go:()=>{ tripEndNow(); if(portOn()) portClose(); phStop(); } }); }
 function tripStrip(){ if(W.on){ const st=walkStats(), wp=W.wps||[], open=wp.find(x=>!x.done), idle=W.idle && Date.now()-W.idle.t>10*60000, arm=false;
     return '<div class="tripbar on" id="tripBar"><div class="tb-l"><span class="dot live"></span><b>Trip recording</b><span>'+esc(walkDur(Date.now()-W.t0))+' · '+esc(du(st.distance_m))+' · '+st.heard+' heard'+(wp.length?' · '+wp.length+(wp.length===1?' waypoint':' waypoints'):'')+(idle?' · in one place for '+Math.round((Date.now()-W.idle.t)/60000)+' minutes':'')+'</span>'+(onWheels()?'<span> · '+MODE_WORD[TMODE.cur]+'</span>':'')+'<span>'+(W.test?' · test data':'')+'</span></div>'+
       tripSketch(W,{h:130})+'<div class="loc-bar tb-btns"><button class="btn primary mk'+(open?' on':'')+'" data-act="trip-wp" aria-label="Mark a waypoint">'+(open?'Saved':'Waypoint')+'</button><button class="btn" data-act="subj-new" data-k="car" aria-label="Record a sighting of a car or a person">Sighting</button><button class="btn end'+(open?' off':arm?' arm':'')+'" data-act="trip-end" aria-label="End the trip">End</button></div>'+
@@ -9756,6 +9777,8 @@ document.addEventListener('click', e=>{
     case 'loc-steps': { const t=T('w_ble'); if(t){ S.open.add(t.id); setView('watchers'); setTimeout(()=>{ const c=el('tp-'+t.id); if(c) c.scrollIntoView({block:'start'}); },80); } break; }
     case 'trip-start': { a.classList.add('on'); a.textContent='Starting'; setTimeout(tripStart, 30); break; }
     case 'trip-wp': tripWaypoint(); break;
+    case 'protect': protectStart(); break;
+    case 'protect-stop': protectStop(); break;
     case 'subj-new': subjOpen(a.dataset.k, {trip:+a.dataset.trip||0, wp:+a.dataset.wp||0, sig:a.dataset.sig||'', subj:a.dataset.id||''}); break;
     case 'subj-pick': if(S.subjDraft){ S.subjDraft.pick=a.dataset.id; a.parentNode.querySelectorAll('.chipbtn').forEach(b=>b.classList.toggle('on', b===a)); } break;
     case 'subj-did': if(S.subjDraft){ const on=S.subjDraft.did!==a.dataset.k; S.subjDraft.did=on?a.dataset.k:''; a.parentNode.querySelectorAll('.chipbtn').forEach(b=>b.classList.toggle('on', on && b===a)); } break;
