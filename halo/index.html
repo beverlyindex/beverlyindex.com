@@ -1409,7 +1409,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-27.08', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-27.09', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3254,7 +3254,7 @@ function portAtStart(){ const p=P.portrait; if(!p || !p.on || !W.on || p.build) 
 function portReveal(d){ const nowS=Date.now()+LIVE.skew;
   if(d.withYou) return 'keeps pace with you'; if(d.maybe) return 'may be keeping pace with you';
   if(d.chk && nowS-d.chk.t<120000 && (d.chk.k==='closer' || d.chk.k==='follow' || d.chk.k==='pace')) return d.chk.k==='closer' ? 'came closer while you stood still' : d.chk.k==='follow' ? 'followed you round a corner' : 'kept pace and stopped when you stopped';
-  if(d.vel<0 && (d.dist||99)<=PORT_FAR && d.mov && d.mov.v && nowS-d.mov.t<MOVE.keep) return 'is coming toward you';
+  if(towardYou(d) && (d.dist||99)<=PORT_FAR && d.mov && d.mov.v && nowS-d.mov.t<MOVE.keep) return 'is coming toward you';
   return ''; }
 // How a new device moves, for its line and its banner.
 function portMoving(d){ const nowS=Date.now()+LIVE.skew;
@@ -3294,7 +3294,7 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<400) return; PORT.at=n
   if(grew){ portTrim(p); save(); }
   if(PORT.r0.size>3000) [...PORT.r0.keys()].forEach(k=>{ if(!LIVE.devs.has(k)) PORT.r0.delete(k); });
   PORT.why.forEach((w, sig)=>{ const d=LIVE.devs.get(sig); if(!d) return;          // what the map draws
-    if(w==='moving' || (portCarried(d) && ((d.dist||99)<=PORT_NEAR || portApproach(d))) || (portMoving(d) && d.vel<0)) PORT.show.add(sig); });
+    if(w==='moving' || (portCarried(d) && ((d.dist||99)<=PORT_NEAR || portApproach(d))) || (portMoving(d) && towardYou(d))) PORT.show.add(sig); });
   portAlerts(p); }
 // Could this newcomer be a Portrait device that has just changed its address? Only if one of the Portrait's own devices of its kind went silent within
 // PORT_SWAP.gap before it appeared, at about its strength. If none did, the newcomer is new at once, with no wait.
@@ -3314,13 +3314,24 @@ function portCarry(){ const p=P.portrait, A=LIVE.alias; if(!p || !p.on || !A) re
 // you: a buzz, a banner and a line in the trip record, once each. Devices that arrive together share one buzz and one banner. A network, home
 // electronics or a bus or tram unit that is new shows in the list, named, without a buzz.
 const portCarried = d => d.band==='ble' && !houseDev(d) && (d.cls==='Tag' || d.cls==='Phone' || d.cls==='Wearable' || grpPhone(d) || isWorn(d) || (/^(Apple|Samsung|Google)\b/.test(d.hint||'') && !/AirPlay|beacon/i.test(d.hint||'')));
-// Coming closer: within PORT_FAR, and the last two readings both clearly nearer than the ones before, or a steady fall over the last readings.
-const portApproach = d => { const h=d.hist||[]; if(!((d.dist||99)<=PORT_FAR) || h.length<3) return false; if(d.vel<0) return true;
-  const L=h.slice(-4), a=Math.max(...L.slice(0, L.length-2)), b=Math.max(...L.slice(-2)); return b<=a*0.7 && a-b>=4; };
+// Coming toward you, not you walking toward it. A device that stays in place reads nearer as you walk up to it, at about your own pace. So while you
+// move, a device counts as coming toward you only when it closed on you by half as much again as you moved, and 3 m more, over the same seconds.
+// Standing still, a clear fall in its distance is enough, as before.
+function youMove(){ return !!TMODE.t && Date.now()-TMODE.t<60000 && !TMODE.still; }
+function ownMoved(t0, t1){ const a=posAt(t0-LIVE.skew), b=posAt(t1-LIVE.skew); if(a && b) return Math.hypot(b.x-a.x, b.y-a.y); return youMove() ? TMODE.v*Math.max(0,t1-t0)/1000 : 0; }
+function beyondOwn(close, own){ return own<3 || close>1.5*own+3; }
+function closeRead(d){ const h=d.hist||[], ht=d.ht||[], n=h.length; if(n<4 || ht.length!==n) return null; const k=Math.floor(n/2);
+  return {close:median(h.slice(0,k))-median(h.slice(k)), own:ownMoved(median(ht.slice(0,k)), median(ht.slice(k)))}; }
+function towardYou(d){ if(!(d.vel<0)) return false; const c=closeRead(d); return c ? beyondOwn(c.close, c.own) : !youMove(); }
+// Coming closer: within PORT_FAR, and the last two readings both clearly nearer than the ones before, or a steady fall over the last readings,
+// in each case by more than your own movement explains.
+const portApproach = d => { const h=d.hist||[]; if(!((d.dist||99)<=PORT_FAR) || h.length<3) return false; if(d.vel<0) return towardYou(d);
+  const L=h.slice(-4), a=Math.max(...L.slice(0, L.length-2)), b=Math.max(...L.slice(-2)); if(!(b<=a*0.7 && a-b>=4)) return false;
+  const T=(d.ht||[]).slice(-L.length); return T.length===L.length ? beyondOwn(a-b, ownMoved(T[0], T[T.length-1])) : !youMove(); };
 function portAlerts(p){ const nowS=Date.now()+LIVE.skew, day=new Date().toISOString().slice(0,10), F=[];
   PORT.why.forEach((w, sig)=>{ const d=LIVE.devs.get(sig); if(!d || !(d.dist>0) || nowS-d.seenMobile>=LIVE_PRESENT) return;
     const key='port:'+sig+':'+p.t; if((P.alerted||{})[key]===day) return;
-    const near=d.dist<=PORT_NEAR, mv=w==='moving' ? portReveal(d) : portMoving(d), toward=!!mv && (w==='moving' || d.vel<0 || near), app=w==='new' && portCarried(d) && portApproach(d);
+    const near=d.dist<=PORT_NEAR, mv=w==='moving' ? portReveal(d) : portMoving(d), toward=!!mv && (w==='moving' || towardYou(d) || near), app=w==='new' && portCarried(d) && portApproach(d);
     if(!(w==='new' ? (near && portCarried(d)) || app || toward : toward)) return;
     const txt=devName(d)+' '+(w==='new' ? 'is new to your Portrait'+(mv?', and '+mv:app && !near?', and is coming toward you':'') : mv||'is moving')+'.'+alWhere(d);
     F.push({d, w, key, txt}); });
@@ -8030,7 +8041,7 @@ function ingestReport(sid, rowT, p, off){
     if(!station && rssi!==null) legAdd(d, (pos && !(pos.acc>POS_MAX_ACC))?pos:null, rssi, at);
     if(!station && rssi!==null && band==='ble') msPush(d, at, rssi, (okLL(p.pos) && pos && !(pos.acc>15))?pos:null);          // only a fix of this report's own, good to 15 m, says where you stood
     if(DIRS.turn && !station && rssi!==null && band==='ble' && !p.sim) turnRec(d, rssi, at);
-    d.hist.push(reading); if(d.hist.length>12) d.hist.shift();
+    d.hist.push(reading); (d.ht=d.ht||[]).push(at); if(d.hist.length>12) d.hist.shift(); while(d.ht.length>d.hist.length) d.ht.shift();          // each distance keeps the moment it was read
     if(!station && !p.sim) elogHear(d, at-LIVE.skew, reading, (pos && !(pos.acc>POS_MAX_ACC))?pos:null);
   }
 }
