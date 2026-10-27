@@ -834,10 +834,12 @@ select.inp.sm{padding:4px 8px;font-size:12px;width:auto;min-width:0}
 .xbar[hidden]{display:none}
 /* the simple view, the default: four sections, Watchers first; Expert view brings back every screen */
 .lb-s{display:none} body:not(.expert) .lb-x{display:none} body:not(.expert) .lb-s{display:revert}
-body:not(.expert) .nav [data-view="responder"]{display:none} body:not(.expert) .nav [data-view="watchers"]{order:1} body:not(.expert) .nav [data-view="attackers"]{order:2}
+body:not(.expert) .nav [data-view="responder"],body:not(.expert) .nav [data-view="attackers"]{display:none} body:not(.expert) .nav [data-view="watchers"]{order:1} body:not(.expert) .nav [data-view="attackers"]{order:2}
 body:not(.expert) .nav [data-view="evidence"]{order:3} body:not(.expert) .nav [data-view="overview"]{order:4} body:not(.expert) #ovVic{display:none} body.expert #evTrips{display:none}
 .xp-card{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border:1px solid var(--line2);border-radius:14px;background:rgba(255,255,255,.035)}
 .xp-t{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0} .xp-t b{color:#fff} .xp-t span{color:var(--mut);font-size:13px;line-height:1.4} .xp-card .btn{flex:none}
+.at-card{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;border-color:rgba(255,120,120,.35)} .at-card .at-n{flex:none;min-width:26px;padding:3px 9px;border-radius:999px;background:rgba(255,59,78,.22);color:#ffb4b4;font-weight:700;text-align:center}
+.at-card .at-go{flex:none;color:#c3cbda;font-size:20px}
 #vicCard:not(.simple) #simRad{display:none} #simRad:empty{display:none}
 .pm-go{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;margin:12px 0 4px;padding:18px 14px;border-radius:18px;border:1px solid rgba(120,170,255,.55);background:linear-gradient(180deg,#2b6fe0,#1a4fb8);color:#fff;font:inherit;cursor:pointer;box-shadow:0 10px 30px -12px rgba(43,111,224,.9),inset 0 1px 0 rgba(255,255,255,.25)}
 .pm-go b{font-family:var(--disp);font-size:22px;letter-spacing:.08em;text-transform:uppercase} .pm-go span{font-size:13px;color:#dbe7ff}
@@ -1401,7 +1403,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-27.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-27.06', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2614,7 +2616,10 @@ const ovEndHTML = () => '<div class="formrow" style="margin:22px 0 0;justify-con
      '<div class="limit" style="margin-top:6px;text-align:center">End session stops listening on this device and locks Remiel. Your records are kept.</div>'+
      '<div class="limit" style="margin-top:16px;text-align:center"><button class="linkbtn" data-act="plans" id="plansLink">Plans · yours: '+esc(PLAN_NAME[planNow()])+'</button> · <a href="#" data-act="terms">Terms of use</a></div>';
 // Settings, in the simple view: your devices, your account and your plan, and the switch for Expert view.
-function renderSettings(){ let h='<div class="pagehead"><h2>Settings</h2><p>Your devices, your account and your plan, and how much Remiel shows.</p></div>'+langMini()+expertCard()+ovInst()+planCard();
+// Attackers, in the simple view, opens from here: the attacks Remiel tracks against phones, accounts and networks, and the latest news, with its own bar.
+function atCard(){ if(!can('wa')) return ''; let n=0; try{ n=atkMine().length; }catch(e){}
+  return '<button class="xp-card at-card" data-act="go-attackers"><div class="xp-t"><b>Attackers</b><span>The attacks Remiel tracks against phones, accounts and networks, and the latest news. '+esc(n ? (n===1?'1 concerns you now.':n+' concern you now.') : 'None concerns you now.')+'</span></div>'+(n?'<span class="at-n">'+n+'</span>':'')+'<span class="at-go" aria-hidden="true">&#8250;</span></button>'; }
+function renderSettings(){ let h='<div class="pagehead"><h2>Settings</h2><p>Your devices, your account and your plan, and how much Remiel shows.</p></div>'+langMini()+expertCard()+atCard()+ovInst()+planCard();
   h+='<div class="stack">'+(can('watchers') ? sigPull()+rosterPull()+filesPull()+profilePull() : '')+devicesPull()+'</div>';
   el('ovMain').innerHTML=h; statusRender(); setHTML(el('ovEnd'), ovEndHTML()); el('homeMini').style.display='none'; }
 function renderOverview(){ if(!P.expert) return renderSettings();
@@ -9746,6 +9751,7 @@ document.addEventListener('click', e=>{
     case 'cell-reg': { P.cellCheck=!P.cellCheck; save(); if(P.cellCheck && CELL.serving && cellLive()){ _cellAsk=0; cellAsk(CELL.serving); } rerender(); break; }
     case 'path-go': { const nx=pathState().next; if(nx) pathGo(nx.go()); break; }
     case 'alert-open': alertGo(); break;
+    case 'go-attackers': setView('attackers'); break;
     case 'quiet-open': S.fs={mode:'quiet'}; fsRender(); ovShow('fsheet'); statusRender(); break;
     case 'quiet-go': { const k=a.dataset.k, x=(P.quietAl||[]).find(q=>q.key===k); S.fs=null; ovHide('fsheet'); if(!x) break; S.banners=(S.banners||[]).filter(b=>b.key!==k); S.banners.unshift(Object.assign({}, x)); alertGo(k); break; }
     case 'al-fb': { const k=a.dataset.k, ok=a.dataset.v==='1', x=(S.banners||[]).find(q=>q.key===k)||(P.quietAl||[]).find(q=>q.key===k)||{}; P.alFb=P.alFb||{};
@@ -9881,7 +9887,7 @@ document.addEventListener('click', e=>{
     case 'port-intro': portIntro(); break;
     case 'news': S.fs={mode:'news'}; fsRender(); ovShow('fsheet'); break;
     case 'expert': { P.expert=!P.expert; save(); document.body.classList.toggle('expert', !!P.expert); S._rsig=''; if(!P.expert && S.view==='responder') setView(homeView()); else rerender(); statusRender(); backBar();
-      toast(P.expert ? 'Expert view is on: every screen and every detail.' : 'The simple view: Watchers, Attackers, Trips and Settings.'); break; }
+      toast(P.expert ? 'Expert view is on: every screen and every detail.' : 'The simple view: Watchers, Trips and Settings. Attackers opens from Settings.'); break; }
     case 'details': P.det=!P.det; save(); S._rsig=''; renderVicinity(); statusRender(); if(oneMode()) setTimeout(()=>{ try{ omResize(); mapFullTick(true); }catch(e){} }, 60); break;
     case 'st-go': setView('watchers'); break;
     case 'port-go': S.fs=null; ovHide('fsheet'); if(!portOn()) portOpen(); break;
