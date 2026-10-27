@@ -3285,7 +3285,7 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<400) return; PORT.at=n
     pend.push(c);
     if(typeof r==='number' && r>=PORT_SWAP.min) LIVE.devs.forEach(o=>{ if(o===c || o.sim || o.band!=='ble' || !S0.has(o.sig) || PORT.taken.has(o.sig)) return;
       if((o.cls||'')!==(c.cls||'') || (o.hint||'')!==(c.hint||'') || (o.adv||'')!==(c.adv||'')) return;
-      const gap=(c.firstSeen||0)-(o.seenMobile||0); if(!(gap>0 && gap<=PORT_SWAP.gap)) return;
+      const gap=(c.firstSeen||0)-(o.seenMobile||0); if(!(gap>0 && gap<=(c.cls==='Tag'?STITCH.tagGap:PORT_SWAP.gap))) return;
       if(typeof o.rssi!=='number' || o.rssi<PORT_SWAP.min || Math.abs(o.rssi-r)>PORT_SWAP.db) return;
       pairs.push([Math.abs(o.rssi-r)+gap/100000, c, o]); }); });
   const got=new Set();          // the closest pairs first, each newcomer and each Portrait device once, so several changing at one moment pair up rightly
@@ -3301,7 +3301,7 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<400) return; PORT.at=n
 function portMaySwap(c, r, S0){ if(typeof r!=='number' || r<PORT_SWAP.min) return false; let hit=false;
   LIVE.devs.forEach(o=>{ if(hit || o===c || o.sim || o.band!=='ble' || !S0.has(o.sig) || PORT.taken.has(o.sig)) return;
     if((o.cls||'')!==(c.cls||'') || (o.hint||'')!==(c.hint||'') || (o.adv||'')!==(c.adv||'')) return;
-    const so=o.seenMobile||0, f=c.firstSeen||0; if(so<f-PORT_SWAP.gap || so>f+2500) return;          // it fell silent as the newcomer appeared, not heard since
+    const so=o.seenMobile||0, f=c.firstSeen||0; if(so<f-(c.cls==='Tag'?STITCH.tagGap:PORT_SWAP.gap) || so>f+2500) return;          // it fell silent as the newcomer appeared, not heard since
     if(typeof o.rssi!=='number' || o.rssi<PORT_SWAP.min || Math.abs(o.rssi-r)>PORT_SWAP.db) return; hit=true; });
   return hit; }
 // The Portrait keeps every address it took over, up to 1500 beyond what it first held: a changed address never comes back, so the oldest go first.
@@ -8051,10 +8051,10 @@ function ingestReport(sid, rowT, p, off){
   }
 }
 /* One name for a phone through the whole trip. Phones, watches and earphones change their Bluetooth address every few minutes.
-   When one goes silent and, within 3.5 seconds, a new address of the same maker, kind and name appears at a strength within 6 dB of it,
+   When one goes silent and, within 3.5 seconds (30 seconds for a tracker tag, which can fall silent while it changes), a new address of the same maker, kind and name appears at a strength within 6 dB of it,
    close enough to read well (-85 dBm or stronger), the new address is the same device, and its readings join the old one for the rest of the trip.
    Never joined: two addresses heard in the same moment, a silence longer than that, a match that more than one device could make, or anything across trips. */
-const STITCH={gap:3500, db:6, min:-85, nameGap:10*60000};
+const STITCH={gap:3500, tagGap:30000, db:6, min:-85, nameGap:10*60000};
 function stitchFrom(s, r, at, busy){ const cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown', hint=typeof s.hint==='string'?s.hint.slice(0,40):'', nm=typeof s.name==='string'?s.name.trim().slice(0,40):'';
   let hit=null, n=0;
   // a name with a serial in it (VOLVO373, a car; DESKTOP-KS7PU98, a computer) is one device, unless it is only a model's name, such as a tracker's (GV300TP), which many units share: a new address with that same name, heard after the old one fell silent, is it again
@@ -8063,7 +8063,7 @@ function stitchFrom(s, r, at, busy){ const cls=CLS.indexOf(s.cls)>=0?s.cls:'Unkn
   if(r<STITCH.min || (cls==='Unknown' && !makerOf({hint}))) return null;          // a device that says nothing of what it is could be anyone's
   LIVE.devs.forEach(c=>{ if(c.band!=='ble' || c.sim || c.mine || busy.has(c.sig) || (c.cls||'Unknown')!==cls || (c.hint||'')!==hint) return;
     if(nm && c.adv && nm!==c.adv) return;
-    const gap=at-(c.seenMobile||0); if(!(gap>0 && gap<=STITCH.gap) || (c.seenMobile||0)<W.t0+LIVE.skew) return;
+    const gap=at-(c.seenMobile||0); if(!(gap>0 && gap<=(cls==='Tag'?STITCH.tagGap:STITCH.gap)) || (c.seenMobile||0)<W.t0+LIVE.skew) return;
     if(typeof c.rssi!=='number' || c.rssi<STITCH.min || Math.abs(c.rssi-r)>STITCH.db) return;
     n++; hit=c; });
   return n===1 ? hit : null; }
