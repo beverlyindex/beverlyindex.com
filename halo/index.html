@@ -846,6 +846,7 @@ body:not(.expert) .nav [data-view="evidence"]{order:3} body:not(.expert) .nav [d
 .ya-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:rgba(255,255,255,.035);font-size:13.5px;color:#dfe6f3}
 .ya-row.ask{border-color:rgba(120,170,255,.5);background:rgba(43,111,224,.12)} .ya-row b{color:#fff;font-size:15px} .ya-btns{display:flex;gap:8px} .ya-btns .btn{min-width:72px} .ya-more{margin-left:auto}
 .pm-btns{display:flex;gap:8px;margin-top:10px}
+.fb-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:6px} .fb-q{color:var(--mut);font-size:12.5px} .fb-b{padding:3px 12px} .fb-done{color:#9fe3bd;font-size:12.5px}
 .q-chip{display:block;width:100%;margin:8px 0 0;padding:9px 12px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.035);color:#c3cbda;font:inherit;font-size:13px;text-align:left;cursor:pointer}
 .q-chip.new{border-color:rgba(255,196,87,.6);color:#ffdfae;background:rgba(255,196,87,.08)}
 .q-list{display:flex;flex-direction:column;gap:8px;margin:6px 0 4px} .q-i{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:rgba(255,255,255,.03)}
@@ -3846,6 +3847,8 @@ async function tripFile(R){ if(!R.cor || R.cor.v!==3){ try{ await tripCor(R); }c
   rep.version=2; rep.name=tripName(R); rep.devices.forEach(x=>{ x.tag=(TAG[C.tags[x.id]]||TAG.fresh).w; x.record=C.hw[x.id]||''; const r=(R.devs||{})[x.id]||{};
     x.motion=r.mv?'moving':r.v==='fixed'?'stays in place':'not yet known'; if(r.mv){ x.speed_mps=r.mv; x.speedClass=speedClass(r.mv); x.signalChange_dB=r.mvDb||0; x.youStoodStill=!!r.mvS; } x.wornOrCarried=!!r.wn; if(r.dr) x.drone=r.rid||true; });
   rep.contacts=(R.contacts||[]).map(c=>({t:iso(c.t), youWereAt:c.pos, provedMoving:!!c.mv, youStoodStill:c.mv ? !!c.still : (c.stood==null ? null : !!c.stood), speed_mps:c.v||0, inEarshot_s:c.s||0, words:contactLine(c), devices:c.devs.map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, wornOrCarried:!!x.worn, provedMoving:!!x.mv}))}));
+  { const t1=(R.t1||Date.now())+600000; rep.alertChecks=Object.values(P.alFb||{}).filter(x=>x.t>=R.t0 && x.t<=t1).map(x=>({t:iso(x.t), alert:x.title, text:x.text, right:!!x.ok}));          // your answers to Was this right?
+    rep.quietAlerts=(P.quietAl||[]).filter(x=>x.t>=R.t0 && x.t<=(R.t1||Date.now())).map(x=>({t:iso(x.t), title:x.title, text:x.text})); }
   rep.portraits=(R.ports||[]).map(x=>({taken:iso(x.t), complete:iso(x.t1), devices:x.n, arrivalsMarked:!!x.marks, account:(x.acct||[]).map(a=>({name:a.n, kind:a.k, nearest_m:a.m, arrivedDuringBuild:!!a.late}))}));
   rep.waypoints=(R.wps||[]).map(w=>({n:w.n, t:iso(w.t), youWereAt:w.pos, note:w.note||'', devices:Object.values(w.devs||{}).map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, yours:!!x.yours, tag:(TAG[C.tags[x.id]]||TAG.fresh).w, passedYou:wpPassed(R,w,x)}))}));
   rep.whatHappened=tripFindings(R, C).map(f=>({t:iso(f.t), text:f.text+(f.win?' In range '+winText(f.win)+'.':''), devices:(f.devs||[]).map(r=>r.id)}));
@@ -9128,8 +9131,10 @@ function alertRaise(key, title, text, go, quiet){
   S.banners=(S.banners||[]).filter(b=>b.key!==key); S.banners.unshift({key, title, text, kind, go:go||null, t:Date.now()}); S.banners.length=Math.min(S.banners.length,6);
   renderAlerts(); if(!quiet) alertSystem(key, kind ? kind+' · '+title : title, text);
   return true; }
+function fbHTML(key){ const f=(P.alFb||{})[key], k=esc(key); return f ? '<span class="fb-done">'+esc(f.ok?'You said: right':'You said: wrong')+'</span>'
+  : '<span class="fb-q">Was this right?</span><button class="chipbtn fb-b" data-act="al-fb" data-k="'+k+'" data-v="1">Yes</button><button class="chipbtn fb-b" data-act="al-fb" data-k="'+k+'" data-v="0">No</button>'; }
 function renderAlerts(){ const box=el('alertBar'); if(!box) return; const bs=S.banners||[], b=bs[0];
-  setHTML(box, b ? '<div class="alertb" role="alert"><span class="dot" style="background:var(--action);margin-top:5px"></span><span class="tx">'+(b.kind?'<i class="al-kind">'+esc(b.kind)+'</i>':'')+'<b>'+esc(b.title)+'</b>'+esc(b.text)+(bs.length>1?'<span class="more">'+(bs.length-1)+' more after this one</span>':'')+'</span>'+
+  setHTML(box, b ? '<div class="alertb" role="alert"><span class="dot" style="background:var(--action);margin-top:5px"></span><span class="tx">'+(b.kind?'<i class="al-kind">'+esc(b.kind)+'</i>':'')+'<b>'+esc(b.title)+'</b>'+esc(b.text)+'<span class="fb-row">'+fbHTML(b.key)+'</span>'+(bs.length>1?'<span class="more">'+(bs.length-1)+' more after this one</span>':'')+'</span>'+
     (b.go?'<button class="btn sm primary" data-act="alert-open">Open</button>':'')+'<button class="x" data-act="alert-x" title="Put away" aria-label="Put away">&times;</button></div>' : ''); }
 function alertGo(key){ const bs=S.banners||[], b=(key?bs.find(x=>x.key===key):bs[0]) || (/^ray:/.test(String(key||'')) ? {key, go:{res:'w_tower'}} : null); if(!b) return; S.banners=bs.filter(x=>x!==b); renderAlerts(); const g=b.go; if(!g) return;
   if(g.art){ artOpen(g.art); return; }
@@ -9730,6 +9735,10 @@ document.addEventListener('click', e=>{
     case 'alert-open': alertGo(); break;
     case 'quiet-open': S.fs={mode:'quiet'}; fsRender(); ovShow('fsheet'); statusRender(); break;
     case 'quiet-go': { const k=a.dataset.k, x=(P.quietAl||[]).find(q=>q.key===k); S.fs=null; ovHide('fsheet'); if(!x) break; S.banners=(S.banners||[]).filter(b=>b.key!==k); S.banners.unshift(Object.assign({}, x)); alertGo(k); break; }
+    case 'al-fb': { const k=a.dataset.k, ok=a.dataset.v==='1', x=(S.banners||[]).find(q=>q.key===k)||(P.quietAl||[]).find(q=>q.key===k)||{}; P.alFb=P.alFb||{};
+      P.alFb[k]={ok, t:Date.now(), title:x.title||'', text:String(x.text||'').slice(0,240)}; const ks=Object.keys(P.alFb); if(ks.length>300) ks.sort((p,q)=>P.alFb[p].t-P.alFb[q].t).slice(0,ks.length-250).forEach(q=>delete P.alFb[q]);
+      save(); if(W.on) wEvent('note','Alert check: '+(x.title||'an alert')+': '+(ok?'right':'wrong')+'.'); renderAlerts(); if(S.fs && S.fs.mode==='quiet') fsRender();
+      toast(ok ? 'Thank you. Noted as right.' : 'Thank you. Noted as wrong. Your answer helps Remiel get better.'); break; }
     case 'quiet-clear': P.quietAl=[]; save(); fsRender(); statusRender(); break;
     case 'alert-x': S.banners=(S.banners||[]).slice(1); renderAlerts(); break;
     case 'alert-ask': alertAsk(); break;
