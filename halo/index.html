@@ -1339,7 +1339,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-26.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-27.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -2818,7 +2818,7 @@ async function elogRender(){ const box=el('elogBox'); if(!box) return; const E=S
     const back='<div class="loc-bar"><button class="btn" data-act="elog-back">All artifacts</button></div></div>';
     if(!r && !d){ box.innerHTML=head('Artifacts')+'<p class="limit">Nothing is on record for this device yet.</p>'+back; return; }
     const tg=d&&d.present ? tagOf(d) : r ? recTag(r) : 'fresh', name=d?devName(d):recName(r), kind=d?kindShort(d):recKind(r), wp=(P.wp||{})[E.k], open=ELOG.open.get(E.k);
-    const sig=[['Maker and kind', esc(kind)], ['Broadcast name', esc((d&&d.adv)||(r&&r.name)||'')], ['Address', (d?d.randomizes:(r&&r.rnd))===true?'Changes its address':(r&&r.rnd===false)||(d&&d.randomizes===false)?'Keeps one address':''],
+    const sig=[['Code', esc(d ? devCode(d) : r && r.id ? String(r.id).slice(-3).toUpperCase() : '')], ['Maker and kind', esc(kind)], ['Broadcast name', esc((d&&d.adv)||(r&&r.name)||'')], ['Address', (d?d.randomizes:(r&&r.rnd))===true?'Changes its address':(r&&r.rnd===false)||(d&&d.randomizes===false)?'Keeps one address':''],
       ['Declared power', (d&&d.tx!=null)?d.tx+' dBm':(r&&r.tx!=null)?r.tx+' dBm':''], ['Strength received', r&&r.r0!=null ? (r.r0===r.r1?r.r0+' dBm':r.r0+' to '+r.r1+' dBm') : d&&typeof d.rssi==='number' ? Math.round(d.rssi)+' dBm' : ''],
       ['Paired with this phone', (d&&d.paired)||(r&&r.pr)?'Yes':''], ['How it behaves', d&&d.present&&motionOf(d).m==='moving'?'Moving now'+paceChip(d.mov.v).replace(' · ',', ')+(d.mov.still?', read while you stood still':''):r&&(r.fx||0)>0?'Stays in place':d&&d.verdict==='fixed'?'Stays in place':d&&d.withYou?'Moves with you':''], ['Usual stay in earshot', r&&r.enc?walkDur((r.secs||0)*1000/r.enc):'']].filter(x=>x[1]).concat(d&&d.rid?droneRows(d.rid, d.present?ePos():null):[]);
     let h=head(esc(name))+'<div class="idsub">'+esc(kind)+'</div>'+
@@ -3984,7 +3984,12 @@ function langSeed(){ if(!LANG.on) return; const now=Date.now(); if(LANG.seedAt &
     Object.values(whLoad()).forEach(v=>{ LK(v.r); LK(v.a); LK(v.c); });
     if(S.global && S.global!==LANG.seedG){ LANG.seedG=S.global; let n=0; const walk=(v,d)=>{ if(n>2500 || d>6 || v==null) return; if(typeof v==='string'){ if(v.length>2 && v.length<400 && !/^https?:/.test(v) && /[A-Za-z]/.test(v)){ LK(v); n++; } } else if(typeof v==='object') Object.values(v).forEach(x=>walk(x,d+1)); }; walk(S.global,0); }
   }catch(e){} }
-const L_AUTO=/(?:Unidentified )?(?:[A-Z][\w.&'-]* )?(?:phone|wearable|tracker|computer|vehicle|Wi-Fi access point|cell tower|camera|surveillance device|device) #[A-Z0-9]{3}(?![A-Za-z0-9])|\b(?:Phone|Wearable|Tracker|Computer|Vehicle|Camera|Device|Beacon) #[A-Z0-9]{3}(?![A-Za-z0-9])|\bL(?=[a-z]*\d)[a-z0-9]{9,16}\b|\b[\w-]+(?:\.[\w-]+)*\.(?:apk|json|pdf|csv)\b|\bhalo1\.[\w.-]{20,}/g;
+// The plain names devices go by (see friendlyKind), longest first; with a code after them they are a device's name in the records.
+const FRIENDLY=["iPhone or Apple Watch", "iPhone, iPad or Mac", "Apple TV or speaker", "AirPods or Beats", "Earbuds or speaker", "Samsung SmartTag", "Bus or tram unit", "Windows computer", "Find My tracker", "Chipolo tracker", "Unknown device", "Wi-Fi network", "Wi-Fi camera", "Apple device", "Tile tracker", "Car tracker", "Hearing aid", "Cell tower", "Wearable", "Computer", "Earbuds", "AirPods", "Tracker", "Vehicle", "AirTag", "Camera", "Beacon", "Watch", "Phone", "Drone", "Car"];
+const rxEsc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const FRIENDLY_CODED=new RegExp('^('+FRIENDLY.map(rxEsc).join('|')+') (#[A-Z0-9]{3})$');
+const L_AUTO0=/(?:Unidentified )?(?:[A-Z][\w.&'-]* )?(?:phone|wearable|tracker|computer|vehicle|Wi-Fi access point|cell tower|camera|surveillance device|device) #[A-Z0-9]{3}(?![A-Za-z0-9])|\b(?:Phone|Wearable|Tracker|Computer|Vehicle|Camera|Device|Beacon) #[A-Z0-9]{3}(?![A-Za-z0-9])|\bL(?=[a-z]*\d)[a-z0-9]{9,16}\b|\b[\w-]+(?:\.[\w-]+)*\.(?:apk|json|pdf|csv)\b|\bhalo1\.[\w.-]{20,}/g;
+const L_AUTO=new RegExp('(?:'+FRIENDLY.map(rxEsc).join('|')+') #[A-Z0-9]{3}(?![A-Za-z0-9])|'+L_AUTO0.source, 'g');
 const L_KEEP=/^(?:sha256 [0-9a-f]+|[0-9a-f]{12,}|https?:\/\/\S+|\S+@\S+\.\S+|RH-[A-Z0-9X]{4}-\d{4}|[A-Z0-9]{2,}(?:[-_:][A-Z0-9]+)+|[^A-Za-z]*[A-Za-z]?[^A-Za-z]*)$/i;
 function langLook(t){ const S=LANG.S, x=S[t]; if(x!==undefined) return typeof x==='string' ? x : x[1];
   const k=langTokens(t); if(k.v.length && S[k.s]!==undefined) return langFill(S[k.s], k.v);
@@ -4042,7 +4047,9 @@ function langWatch(){ if(LANG.obs || !window.MutationObserver) return;
   LANG.obs.observe(document.documentElement,{subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:LANG_ATTRS}); }
 function langUse(l){ LANG.cur=l; LANG.target=LANG.probe ? 'it' : l; LANG.on=LANG.target!=='en';
   if(LANG.on && !LANG.S){ let j={s:{},r:[]}; try{ j=JSON.parse(document.getElementById('lang-'+LANG.target).textContent); }catch(e){} LANG.S=j.s||{}; LANG.R=(j.r||[]).map(r=>[new RegExp(r[0]), r[1]]); LANG.keep=new Set(j.keep||[]);
-    const kw=j.kind||{}, un=j.unid||'Unidentified'; LANG.N=[[/^(Unidentified )?(?:(.+?) )?(phone|wearable|tracker|computer|vehicle|Wi-Fi access point|cell tower|camera|surveillance device|device) (#[A-Z0-9]{2,4})$/, m=>{ const k=kw[m[3]]||[m[3],'m']; return k[0].charAt(0).toUpperCase()+k[0].slice(1)+(m[2]?' '+m[2]:'')+(m[1]?' '+(k[1]==='f'?(j.unidF||un):un):'')+' '+m[4]; }],
+    const kw=j.kind||{}, un=j.unid||'Unidentified'; LANG.N=[[FRIENDLY_CODED, m=>{ const x=LANG.S['name:'+m[1]]; return (typeof x==='string'?x:m[1])+' '+m[2]; }],
+      [/^\u2060(.+)\u2060$/, m=>{ const x=LANG.S['name:'+m[1]], mk=/^(.+) device$/.exec(m[1]), md=LANG.S['name:§ device']; return '\u2060'+(typeof x==='string' ? x : mk && typeof md==='string' ? md.replace('§', mk[1]) : m[1])+'\u2060'; }],
+      [/^(Unidentified )?(?:(.+?) )?(phone|wearable|tracker|computer|vehicle|Wi-Fi access point|cell tower|camera|surveillance device|device) (#[A-Z0-9]{2,4})$/, m=>{ const k=kw[m[3]]||[m[3],'m']; return k[0].charAt(0).toUpperCase()+k[0].slice(1)+(m[2]?' '+m[2]:'')+(m[1]?' '+(k[1]==='f'?(j.unidF||un):un):'')+' '+m[4]; }],
       [/^(Phone|Wearable|Tracker|Computer|Vehicle|Camera|Device) (#[A-Z0-9]{2,4})$/, m=>{ const k=kw[m[1].toLowerCase()]||[m[1],'m']; return k[0].charAt(0).toUpperCase()+k[0].slice(1)+' '+m[2]; }],
       [PLAIN_RE, m=>{ const pl=j.plain||{}, mk=/^an? ([A-Z][\w-]*) device$/.exec(m[1]); const w=pl[m[1]] || (mk && pl['a § device'] ? pl['a § device'].replace('§', mk[1]) : null); return (w||m[1])+(m[2]?' ('+m[2]+')':''); }],
       [/^Drone (#[A-Z0-9]{2,4})$/, m=>(j.drone||'Drone')+' '+m[1]], [/^(.+) (#[A-Z0-9]{3})$/, m=>{ const x=LANG.S[m[1]]; return (typeof x==='string'?x:m[1])+' '+m[2]; }], [/^Trip, (Sun|Mon|Tue|Wed|Thu|Fri|Sat) (\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec), (\d\d:\d\d)$/, m=>(j.trip||'Trip')+', '+L_IT.dow[L_DOW.indexOf(m[1])]+' '+m[2]+' '+L_IT.mon[L_MON.indexOf(m[3])]+', '+m[4]]]; }
@@ -5934,7 +5941,12 @@ const labelOf = d => { const l=d && d.live && P.labels && P.labels[d.id]; return
 const randName = n => { n=String(n||''); return n.length>=20 && /^[A-Za-z0-9]+$/.test(n) && /[a-z]/.test(n) && /[A-Z]/.test(n) && /\d/.test(n); };
 const nameShow = n => randName(n) ? n.slice(0,6)+'…'+n.slice(-4) : n;
 const KIND_SHOW={'Access point':'Wi-Fi network'};
-const devName = d => d.live ? (LK(labelOf(d)) || LK(nameShow(d.adv)) || d.name) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
+// A plain name on the screen is held between two invisible word joiners, so the translation knows it as a name, and "Watch" the device is never
+// taken for "Watch" the word.
+const NM = x => '\u2060'+x+'\u2060';
+const autoNamed = d => / #[A-Z0-9]{3}$/.test(d.name||'');
+const devCode = d => ((d && d.name || '').match(/#([A-Z0-9]{3})$/)||[])[1] || '';
+const devName = d => d.live ? (LK(labelOf(d)) || LK(nameShow(d.adv)) || (autoNamed(d) ? LK(NM(friendlyKind(d))) : d.name)) : ((d.cls==='Unknown'&&d.identity<2)?'Unknown':d.name);
 const kindText = d => (isDrone(d) ? (d.hint||'Drone') : d.cls==='Unknown' ? (d.hint || '') : (KIND_SHOW[d.cls]||d.cls)+(d.hint?', '+(d.band==='wifi'?d.hint.replace(/^Secured network/,'secured').replace(/^Open network/,'open'):d.hint):''))+(d.live && d.paired ? ' · paired with this phone' : '')+(d.live && randName(d.adv) && !labelOf(d) ? ' · machine-made name, typical of a link between Wi-Fi units' : '')+(d.live && labelOf(d) && (d.adv||d.name)!==labelOf(d) ? ' · '+(nameShow(d.adv)||d.name) : '');
 const flagOf = d => d.mine?'Yours':d.sigFit?'Fits your signature':d.withYou?'Moving with you':d.maybe?'Staying with you so far':d.homeAway?'Heard at home and away':d.onRoute?'Seen on your route':d.verdict==='fixed'?'Stays in place':(!d.knownBefore?'New':'Known');
 const strengthHTML = n => '<span class="strength">'+[0,1,2].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</span>';
@@ -5972,7 +5984,7 @@ function renderRoster(){
     (list.some(d=>d.live)?'<div class="limit" style="padding:8px 6px 0">'+NAME_NOTE+'</div>':'');
   S._rsig=sig;
 }
-const liveKV = d => '<span class="k">Distance</span><span class="v">'+du(d.dist)+' · '+band(d)+'</span><span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm</span>'+
+const liveKV = d => (c=>c?'<span class="k">Code</span><span class="v notr">'+c+'</span>':'')(devCode(d))+'<span class="k">Distance</span><span class="v">'+du(d.dist)+' · '+band(d)+'</span><span class="k">Signal</span><span class="v">'+Math.round(d.rssi)+' dBm</span>'+
     '<span class="k">Trend</span><span class="v '+(d.trend==='Approaching'?'warnc':'')+'">'+d.trend+'</span><span class="k">Identity</span><span class="v">'+strengthHTML(d.identity)+'</span>';
 function deviceBody(d){
   return '<div class="dsec"><h4>Proximity</h4><div class="kv" data-live>'+liveKV(d)+'</div></div>'+
@@ -6558,7 +6570,8 @@ const radHash = s => { let x=2166136261; for(const ch of String(s)){ x^=ch.charC
 // The side of the circle, in degrees clockwise from the top.
 const radBrg = (d,c) => { const h=radHash(d.id); return c==='F' ? -32+h*64 : c==='N' ? 40+h*130 : 190+h*130; };
 // A short name for a dot: the name you gave it, the name it broadcasts, or its tag.
-const shortName = d => { const own=labelOf(d); if(own) return LK(own).slice(0,18); const nm=devName(d), tag=(String(d.name||'').match(/#\w+$/)||[])[0]; return LK((nm===d.name && tag) ? tag : String(nm).slice(0,18)); };          // a name, so the translation keeps it as it is
+const FRIENDLY_SHORT={'iPhone or Apple Watch':'iPhone or Watch', 'iPhone, iPad or Mac':'iPhone, iPad, Mac', 'Apple TV or speaker':'Apple TV, speaker', 'Earbuds or speaker':'Earbuds, speaker', 'Bus or tram unit':'Bus or tram'};
+const shortName = d => { const own=labelOf(d); if(own) return LK(own).slice(0,18); if(d.live && !d.adv && autoNamed(d)){ const f=friendlyKind(d); return FRIENDLY_SHORT[f]||f; } const nm=devName(d), tag=(String(d.name||'').match(/#\w+$/)||[])[0]; return LK((nm===d.name && tag) ? tag : String(nm).slice(0,18)); };          // on the map, a short plain name          // a name, so the translation keeps it as it is
 const ftShort = m => du(m);
 function radColors(){ if(RAD.C) return RAD.C; const cs=getComputedStyle(document.documentElement), g=k=>cs.getPropertyValue(k).trim()||'#e9f0ff'; RAD.C=
   {Y:LOOK.blue, K:LOOK.blue, N:LOOK.green, F:LOOK.red, ink:g('--ink'), mut:g('--mut'), line:g('--line2'), gold:'#C5A55A', bg:'#070b16', mono:g('--mono')||'monospace', disp:g('--disp')||'sans-serif', sans:g('--sans')||'sans-serif'}; return RAD.C; }
@@ -7678,8 +7691,26 @@ const callsign = (h,h2) => W1[h%W1.length]+' '+W2[(h>>>8)%W2.length]+' '+(10+h2%
 const MAKERS=['Apple','Microsoft','Samsung','Google','Tile','Chipolo','Garmin','Bose','Sony','Harman','Amazon','Xiaomi','Huawei','LG','Huami','Espressif','Nokia','Intel','Meta','Fitbit','Tesla','Flock'];
 const KIND_WORD={Phone:'phone',Wearable:'wearable',Tag:'tracker',Laptop:'computer',Vehicle:'vehicle','Access point':'Wi-Fi access point','Cell tower':'cell tower',Camera:'camera',Unknown:'device'};
 const makerOf = d => { const w=(d.hint||'').split(/[ ,]/)[0]; return MAKERS.indexOf(w)>=0 ? w : ''; };
-const autoName = d => { const m=makerOf(d), code=' #'+d.id.slice(-3).toUpperCase();
-  return (m ? m+' '+KIND_WORD[d.cls] : d.cls!=='Unknown' ? KIND_WORD[d.cls].charAt(0).toUpperCase()+KIND_WORD[d.cls].slice(1) : d.hint ? d.hint.split(',')[0] : 'Device')+code; };
+const autoName = d => friendlyKind({hint:d.hint||'', cls:d.cls||'Unknown', band:d.band||'ble', rid:d.rid, adv:d.adv||''})+' #'+String(d.id||'').slice(-3).toUpperCase();
+/* What a device is, as a short plain name a person uses: what its own signal says it is, and no more. Apple's broadcast does not say which of its
+   devices it is; iPhones and Watches are by far the most heard, and the details say "Apple phone, watch, tablet or computer". */
+function friendlyKind(d){ if(!d) return 'Unknown device'; const h=d.hint||'', n=d.adv||'', hn=h+' '+n, c=d.cls||'Unknown';
+  if(isDrone(d)) return 'Drone';
+  if(d.band==='cell' || c==='Cell tower') return 'Cell tower';
+  if(d.band==='wifi' || c==='Access point') return c==='Camera' ? 'Wi-Fi camera' : 'Wi-Fi network';
+  if(c==='Tag') return /AirTag/.test(h) ? 'AirTag' : /Find My network tag/.test(h) ? 'Find My tracker' : /SmartTag/.test(h) ? 'Samsung SmartTag' : /Tile/.test(h) ? 'Tile tracker' : /Chipolo/.test(h) ? 'Chipolo tracker' : /GPS tracker/i.test(h) ? 'Car tracker' : 'Tracker';
+  if(c==='Wearable') return /AirPods/.test(hn) ? 'AirPods' : /hearing aid/i.test(hn) ? 'Hearing aid' : EAR_RE.test(hn) ? 'Earbuds' : WATCH_RE.test(hn) ? 'Watch' : /Fast Pair/.test(h) ? 'Earbuds or speaker' : 'Wearable';
+  if(c==='Phone') return 'Phone';
+  if(c==='Laptop') return /Microsoft|Windows/.test(h) ? 'Windows computer' : 'Computer';
+  if(c==='Vehicle') return /bus or tram/.test(h) ? 'Bus or tram unit' : /^Car\b/.test(h) ? 'Car' : 'Vehicle';
+  if(c==='Camera') return 'Camera';
+  if(/^Apple, iPhone, iPad, Mac or Watch/.test(h)) return 'iPhone or Apple Watch';
+  if(/^Apple, iPhone, iPad or Mac/.test(h)) return 'iPhone, iPad or Mac';
+  if(/^Apple, AirPods/.test(h)) return 'AirPods or Beats';
+  if(/^Apple, AirPlay/.test(h)) return 'Apple TV or speaker';
+  if(/^Apple/.test(h)) return 'Apple device';
+  if(/Beacon/i.test(h)) return 'Beacon';
+  const m=makerOf(d); return m ? m+' device' : 'Unknown device'; }
 // One reading: rough. Walls and the device's own power move it a great deal. Bluetooth transmits more weakly than Wi-Fi.
 const distOf = (rssi,band) => band==='ble' ? Math.pow(10, (-55-rssi)/25) : Math.pow(10, (-40-rssi)/27);
 const compass = b => ['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round(b/45)%8];
