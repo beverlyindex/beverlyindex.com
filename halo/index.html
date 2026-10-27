@@ -4016,24 +4016,30 @@ async function subjReportHTML(id){ const x=subjOf(id); if(!x) return null; const
   const rec={}; for(const sg of ss) rec[sg.id]=await subjRecorded(sg);
   const ph={}; for(const sg of ss) if(sg.ph) ph[sg.id]=await subjPhGet('sp:'+sg.id);
   const e=esc, who=(P.repName||'').trim(), first=ss[0], last=ss[ss.length-1], cover=ss.find(sg=>ph[sg.id]);
-  let h='<h1>Report of sightings</h1><p class="rp-sub">'+e(x.kind==='car'?'A car':'A person')+' seen near the person named below, on '+ss.length+(ss.length===1?' occasion':' occasions')+'</p>'+
+  let h='<h1>Report of sightings</h1>'+
     '<div class="rp-meta">'+(who?'Prepared by ':'Prepared by: ')+(who?'<b>'+e(LK(who))+'</b>':'<span class="rp-blank">name</span>')+' &nbsp;·&nbsp; Made '+e(dateLong(Date.now()))+', '+hhmm(Date.now())+' with Remiel Technologies</div>'+
     (who?'':'<div class="rp-noprint subj-row" style="margin:10px 0"><input class="inp" id="repName" maxlength="60" autocomplete="off" placeholder="Your full name, as it should appear"><button class="btn sm primary" data-act="rep-name" data-id="'+e(id)+'">Add my name</button></div>');
-  h+='<h2>1. What was seen</h2><div class="rp-wide"><table>'+
+  const tf=[]; for(const t0 of Object.keys(trips)){ if(trips[t0]===W && W.on) continue; try{ const f=await tripFile(trips[t0]); const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(f.text)))].map(z=>z.toString(16).padStart(2,'0')).join(''); tf.push({name:f.name, text:f.text, hash}); }catch(err){} }
+  const what = x.kind==='car' ? [x.plate, x.colour, x.make].filter(Boolean).map(v=>LK(v)).join(', ') : LK(x.desc||'');
+  h+=rpBluf({cls:'t2', level:e(LK(x.name))+(what?' <span class="rp-bl-w">('+e(what)+')</span>':''),
+    line:e((x.kind==='car'?'A car':'A person')+' seen near '+(who?LK(who):'the person named above')+' on '+ss.length+(ss.length===1?' occasion.':' occasions.')),
+    todo:['Give this report to the police'+(tf.length?', with '+(tf.length===1?'its trip file':'its '+tf.length+' trip files'):'')+'.'],
+    facts:[['First seen:', e(first?dateLong(first.t)+', '+hhmm(first.t):'')], ['Latest:', e(last?dateLong(last.t)+', '+hhmm(last.t):'')], ['Devices present at two sightings or more:', rep.length?e(rep.map(b=>LK(b.d.name)).join(', ')):'none'], ['Trip files attached:', String(tf.length)]]});
+  let sn=0; const H2=t=>'<h2>'+(++sn)+'. '+t+'</h2>';
+  h+=H2('What was seen')+'<div class="rp-wide"><table>'+
     [['Name given', LK(x.name)], ['Kind', x.kind==='car'?'Car':'Person']].concat(x.kind==='car'?[['Plate', LK(x.plate||'')], ['Colour', LK(x.colour||'')], ['Make and model', LK(x.make||'')]]:[['Description', LK(x.desc||'')]])
       .concat([['Sightings', String(ss.length)], ['First', first?dateLong(first.t)+', '+hhmm(first.t):''], ['Latest', last?dateLong(last.t)+', '+hhmm(last.t):'']])
       .filter(r=>r[1]).map(r=>'<tr><th>'+r[0]+'</th><td>'+e(r[1])+'</td></tr>').join('')+'</table></div>'+(cover?'<img class="rp-photo" src="'+ph[cover.id]+'" alt="Photo taken at a sighting">':'');
-  h+='<h2>2. Each sighting, in time order</h2>';
+  if(rep.length) h+=H2('Devices present at two sightings or more')+'<ul class="rp-sum">'+rep.map(b=>'<li>'+e(LK(b.d.name))+' was near you at '+b.n+' sightings:<ul>'+b.at.map(t=>'<li>'+e(dateLong(t))+', '+hhmm(t)+'</li>').join('')+'</ul></li>').join('')+'</ul>';
+  h+=H2('Each sighting, in time order');
   ss.forEach((sg,i)=>{ const R=trips[sg.trip], pl=placeWords(sg.lat,sg.lon), devs=sg.devs||[];
     h+='<div class="rp-sight"><h3>Sighting '+(i+1)+': '+e(dateLong(sg.t))+', '+hhmm(sg.t)+'</h3><div class="rp-wide"><table>'+
-      [['Place', (pl?pl+' · ':'')+(sg.lat!=null?sg.lat.toFixed(5)+', '+sg.lon.toFixed(5):'')], ['What it did', subjDidW(sg.did)], ['In your words', sg.note||''], ['On a trip', R?LK(tripName(R))+(sg.wp?' · waypoint '+sg.wp:''):'']]
-        .filter(r=>r[1]).map(r=>'<tr><th>'+r[0]+'</th><td'+(r[0]==='In your words'?' class="notr" translate="no"':'')+'>'+e(r[0]==='Place'?LK(r[1]):r[1])+'</td></tr>').join('')+'</table></div>'+
+      [['Place', pl ? LK(pl) : sg.lat!=null ? 'Shown on the map below' : ''], ['What it did', subjDidW(sg.did)], ['In your words', sg.note||''], ['On a trip', R?LK(tripName(R))+(sg.wp?' · waypoint '+sg.wp:''):'']]
+        .filter(r=>r[1]).map(r=>'<tr><th>'+r[0]+'</th><td'+(r[0]==='In your words'?' class="notr" translate="no"':'')+'>'+e(r[1])+'</td></tr>').join('')+'</table></div>'+
       ((sg.lat!=null || R)?subjMap(R, sg.lat, sg.lon):'')+(ph[sg.id]?'<img class="rp-photo" src="'+ph[sg.id]+'" alt="Photo of this sighting">':'')+
       ((rec[sg.id]||[]).length?'<p><b>Recorded by the phone</b></p><ul class="rp-sum">'+rec[sg.id].map(t=>'<li>'+e(t)+'</li>').join('')+'</ul>':'')+
       (devs.length?'<p><b>Devices within '+du(30)+' of the phone at that moment: '+devs.length+'</b></p><ul class="rp-sum">'+devs.slice(0,12).map(d=>'<li>'+e(LK(d.name))+', about '+du(d.m)+' away</li>').join('')+'</ul>':'')+'</div>'; });
-  if(rep.length) h+='<h2>3. Devices present at two sightings or more</h2><ul class="rp-sum">'+rep.map(b=>'<li>'+e(LK(b.d.name))+' was near you at '+b.n+' sightings:<ul>'+b.at.map(t=>'<li>'+e(dateLong(t))+', '+hhmm(t)+'</li>').join('')+'</ul></li>').join('')+'</ul>';
-  const tf=[]; for(const t0 of Object.keys(trips)){ if(trips[t0]===W && W.on) continue; try{ const f=await tripFile(trips[t0]); const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(f.text)))].map(z=>z.toString(16).padStart(2,'0')).join(''); tf.push({name:f.name, text:f.text, hash}); }catch(err){} }
-  h+='<h2>'+(rep.length?'4':'3')+'. How this was recorded</h2><p>Remiel Technologies is an app on the phone of the person named above. On a trip it records the phone\'s position and the Bluetooth signals of the devices around it, and estimates each device\'s distance from the strength of its signal. Each sighting in this report was entered by that person at the time shown. '+(tf.length?'The phone\'s record of each trip is attached as a data file:':'')+'</p>'+
+  h+=H2('How this was recorded')+'<p>Remiel Technologies is an app on the phone of the person named above. On a trip it records the phone\'s position and the Bluetooth signals of the devices around it, and estimates each device\'s distance from the strength of its signal. Each sighting in this report was entered by that person at the time shown. '+(tf.length?'The phone\'s record of each trip is attached as a data file:':'')+'</p>'+
     (tf.length?'<ul class="rp-sum">'+tf.map(f=>'<li>'+e(f.name)+' · SHA-256 '+e(f.hash)+'</li>').join('')+'</ul>':'');
   h+='<div class="rp-noprint subj-row" style="margin-top:16px"><button class="btn sm primary" data-act="rep-share" data-id="'+e(id)+'">Share the report and its trip files</button></div>';
   return {h, files:tf, x}; }
