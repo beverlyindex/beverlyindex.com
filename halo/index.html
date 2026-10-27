@@ -7008,25 +7008,30 @@ function rpClose(){ cancelAnimationFrame(RP.raf); const b=el('rpSheet'); if(b){ 
    When you confirm, every one of them reads Yours everywhere: blue, with your name and a white ring. Anything else near you is not yours. ---------- */
 const SU={timer:0, skip:new Set(), cand:'', step:1}, SU_NEAR=0.7, SU_DB=-60;
 function suCands(){ return [...LIVE.devs.values()].filter(d=>d.present && d.band==='ble' && !d.sim && !d.mine && !SU.skip.has(d.id) && typeof d.rssi==='number' && (d.dist<=SU_NEAR || d.rssi>=SU_DB)).sort((a,b)=>b.rssi-a.rssi); }
-function suOpen(){ const b=el('suSheet'); if(!b) return; SU.step=1; SU.cand=''; b.classList.remove('hidden'); suRender(); clearInterval(SU.timer); SU.timer=setInterval(suRender, 1000); }
+function suOpen(){ const b=el('suSheet'); if(!b) return; SU.step=1;          // step 1: listening; step 2: your devices, if you like; step 3: done
+  SU.cand=''; b.classList.remove('hidden'); suRender(); clearInterval(SU.timer); SU.timer=setInterval(suRender, 1000); }
 function suClose(){ clearInterval(SU.timer); SU.timer=0; const b=el('suSheet'); if(b){ b.classList.add('hidden'); b.innerHTML=''; b._h=''; } }
 function suMine(){ return [...LIVE.devs.values()].filter(d=>d.mine && !d.sim).concat(PAIRED.list.map(x=>({paired:true, id:'p:'+x.name, name:x.name, kind:x.kind}))); }
 function suRender(){ const b=el('suSheet'); if(!b || b.classList.contains('hidden')) return; if(document.activeElement && document.activeElement.id==='suName') return;
   const mine=suMine(), list=mine.length ? mine.map(d=>'<div class="rowline"><span><b>'+esc(d.paired?d.name:devName(d))+'</b><br><span class="mono" style="font-size:11px;color:var(--mut)">'+esc(d.paired?(d.kind||'Paired with this phone'):kindText(d))+'</span></span>'+(d.paired?'<span class="mono" style="color:var(--clear)">Paired</span>':'<button class="x" data-act="su-drop" data-id="'+esc(d.id)+'" title="Not mine">&times;</button>')+'</div>').join('') : '<p class="limit">None yet.</p>';
-  let h='<div class="su-card" role="dialog" aria-label="Set up your devices"><div class="dos-h"><span class="dos-dot" style="--mk:'+LOOK.blue+'"></span><div><b>Your devices</b><small>Set-up · step '+SU.step+' of 2</small></div><button class="x" data-act="su-later" aria-label="Later">&times;</button></div>';
-  if(SU.step===1){ const c=suCands(), d=c[0], clear=d && (!c[1] || d.rssi-c[1].rssi>=6); SU.cand=clear?d.id:'';
+  let h='<div class="su-card" role="dialog" aria-label="Set up Remiel"><div class="dos-h"><span class="dos-dot" style="--mk:'+LOOK.blue+'"></span><div><b>'+(SU.step===1?'Let Remiel listen':SU.step===2?'Your devices':'You are set')+'</b><small>Set-up · step '+SU.step+' of 3</small></div><button class="x" data-act="su-later" aria-label="Later">&times;</button></div>';
+  if(SU.step===1){ const N=NATIVE(), st=N ? (nativeStatus()||{}) : {}, ok=PH.on && (!N || (st.permission==='granted' && st.locationOn!==false && st.listening!==false));
+    h+='<p>Remiel listens for the Bluetooth and Wi-Fi devices around you, and uses your location to tell where each one was. Allow both, and keep Bluetooth and Location switched on.</p>';
+    h+= ok ? '<div class="su-found"><span class="dos-dot" style="--mk:'+LOOK.green+'"></span><div><b>Remiel is listening</b><small>Bluetooth, Wi-Fi and location are allowed.</small></div></div><div class="formrow"><button class="btn primary" data-act="su-next">Next</button></div>'
+      : '<div class="formrow"><button class="btn primary" data-act="ph-start">Allow and start listening</button></div>'+(st.locationOn===false?'<p class="limit">Location is switched off on this phone. Open the phone\'s Settings, tap Location and switch it on.</p>':''); }
+  else if(SU.step===2){ const c=suCands(), d=c[0], clear=d && (!c[1] || d.rssi-c[1].rssi>=6); SU.cand=clear?d.id:'';
     h+='<p>Hold one of your own devices right next to this phone, within 2 ft: your watch, earbuds, tablet, laptop, car key. Remiel finds it. Name it and press <b>Mine</b>. Then the next one.</p>';
     h+= clear ? '<div class="su-found"><span class="dos-dot" style="--mk:'+LOOK.green+'"></span><div><b>Found: '+esc(devName(d))+'</b><small>'+esc(kindText(d)||'Kind not broadcast')+(d.adv?' · broadcasts "'+esc(d.adv)+'"':'')+' · '+Math.round(d.rssi)+' dBm, '+esc(du(Math.max(0.3,d.dist)))+'</small></div></div>'+
         '<input id="suName" maxlength="40" placeholder="Your name for it, for example My watch" value="'+esc(labelOf(d)||'')+'" aria-label="Your name for this device">'+
         '<div class="formrow"><button class="btn primary" data-act="su-save" data-id="'+esc(d.id)+'">Mine</button><button class="btn" data-act="su-skip" data-id="'+esc(d.id)+'">Not this one</button></div>'
       : '<div class="su-wait"><span class="su-ring"></span>'+(c.length>1?'Two devices are this close. Move one away.':'Listening for a device within 2 ft of this phone…')+'</div>';
-    h+='<div class="dos-sec"><h4>Yours so far · '+mine.length+'</h4>'+list+'</div><div class="formrow"><button class="btn'+(mine.length?' primary':'')+'" data-act="su-next">'+(mine.length?'That is all of them':'I have none to add')+'</button></div>'; }
-  else { h+='<p>These are yours. Everywhere in Remiel they show in blue, with your name and a white ring, and they never raise an alarm. Anything else near you is not yours.</p>'+
+    h+='<div class="dos-sec"><h4>Yours so far · '+mine.length+'</h4>'+list+'</div><div class="formrow"><button class="btn'+(mine.length?' primary':'')+'" data-act="su-next">'+(mine.length?'That is all of them':'Skip this step')+'</button></div>'; }
+  else { h+='<p>'+(mine.length?'These are yours. Everywhere in Remiel they show in blue, with your name and a white ring, and they never raise an alarm. Anything else near you is not yours.':'You can add your own devices later, in Settings, My devices.')+' When you go out, press <b>Protect me</b> on Watchers.</p>'+
       '<div class="dos-sec"><h4>Yours · '+mine.length+'</h4>'+list+'</div><div class="formrow"><button class="btn primary" data-act="su-done">Confirm</button><button class="btn" data-act="su-back">Add another</button></div>'; }
   h+='</div>'; if(b._h!==h){ b.innerHTML=h; b._h=h; } }
 function suSave(id){ const d=findDevice(id)||renDev(id); if(!d || !d.live) return; const i=el('suName'), v=i?String(i.value||'').trim():''; if(v) labelSet(d, v);
   if(!d.mine){ sigAdd(d); P.mine=P.mine||{}; P.mine[d.id]=1; d.mine=true; } save(); if(!d.sim) logEvidence('note','Set-up: marked as yours: '+(v||devName(d))+' ('+kindText(d)+').'); SU.cand=''; const b=el('suSheet'); if(b) b._h=''; toast((v||devName(d))+' is yours.'); suRender(); }
-function suMaybe(){ if(P.setupDone || P.setupLater || S._suAsked || !booted || !(PH.native && PH.on) || (W && (W.test || W.on)) || S.mapFull || S.view!==homeView()) return; S._suAsked=true; suOpen(); }
+function suMaybe(){ if(P.setupDone || P.setupLater || S._suAsked || !booted || !NATIVE() || (W && (W.test || W.on)) || S.mapFull || S.view!==homeView()) return; S._suAsked=true; suOpen(); }
 
 /* ---------- Home roster. Every device your phone has heard at home, sorted into Mine, Household and Neighbours, each with the reason Remiel gives,
    and one tap to confirm. Heard through a wall every day but never close, and never anywhere else: a neighbour's. Close inside your home and also with you
@@ -9896,8 +9901,8 @@ document.addEventListener('click', e=>{
     case 'su-save': suSave(a.dataset.id); break;
     case 'su-skip': SU.skip.add(a.dataset.id); el('suSheet')._h=''; suRender(); break;
     case 'su-drop': { const d=findDevice(a.dataset.id)||renDev(a.dataset.id); if(d){ sigDrop(d); d.mine=false; save(); } el('suSheet')._h=''; suRender(); break; }
-    case 'su-next': SU.step=2; el('suSheet')._h=''; suRender(); break;
-    case 'su-back': SU.step=1; el('suSheet')._h=''; suRender(); break;
+    case 'su-next': SU.step=Math.min(3, SU.step+1); el('suSheet')._h=''; suRender(); break;
+    case 'su-back': SU.step=2; el('suSheet')._h=''; suRender(); break;
     case 'su-done': { P.setupDone=Date.now(); save(); logEvidence('note','Set-up confirmed: '+suMine().length+' devices marked as yours.'); suClose(); toast('Done. Your devices now read Yours everywhere.'); S._rsig=''; renderVicinity(); break; }
     case 'su-later': { P.setupLater=Date.now(); save(); suClose(); toast('You can finish this any time in My devices.'); break; }
     case 'subj-mode': { if(S.subjDraft){ S.subjDraft.mode=a.dataset.k; subjSheet(); } break; }
@@ -10017,7 +10022,7 @@ function boot(){
   fetch(API+'/health',{cache:'no-store'}).then(r=>r.json()).then(j=>{ S.features=(j&&j.features)||{}; if(booted) softRender(); }).catch(()=>{});
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') alertNativeTick(); });
   if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.haloOpen) alertGo(e.data.haloOpen); });
-  autoListen();
+  autoListen(); setTimeout(()=>{ try{ suMaybe(); }catch(e){} }, 3000);          // set-up, once, at the start: it begins with letting Remiel listen
   if(/[?&]get=app\b/.test(location.search)){ try{ history.replaceState(history.state,'',location.pathname); }catch(e){} setTimeout(()=>{ const b=document.createElement('button'); b.dataset.act='go-install'; b.style.display='none'; document.body.appendChild(b); b.click(); b.remove(); }, 400); }
 }
 updStart();
