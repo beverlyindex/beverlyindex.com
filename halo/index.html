@@ -845,7 +845,11 @@ body:not(.expert) .nav [data-view="evidence"]{order:3} body:not(.expert) .nav [d
 .pm-l{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .pm-l b{color:#fff;font-size:15px} .pm-l span{color:var(--mut);font-size:13px}
 .ya-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:rgba(255,255,255,.035);font-size:13.5px;color:#dfe6f3}
 .ya-row.ask{border-color:rgba(120,170,255,.5);background:rgba(43,111,224,.12)} .ya-row b{color:#fff;font-size:15px} .ya-btns{display:flex;gap:8px} .ya-btns .btn{min-width:72px} .ya-more{margin-left:auto}
-.pm-btns{display:flex;gap:8px;margin-top:10px} .pm-btns .btn{flex:1} .pm-btns .pm-stop{border-color:rgba(255,90,90,.6);color:#ffb4b4}
+.pm-btns{display:flex;gap:8px;margin-top:10px}
+.q-chip{display:block;width:100%;margin:8px 0 0;padding:9px 12px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.035);color:#c3cbda;font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.q-chip.new{border-color:rgba(255,196,87,.6);color:#ffdfae;background:rgba(255,196,87,.08)}
+.q-list{display:flex;flex-direction:column;gap:8px;margin:6px 0 4px} .q-i{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:rgba(255,255,255,.03)}
+.q-i small{color:var(--dim);font-family:var(--mono);font-size:11px} .q-i b{color:#fff} .q-i span{color:#c3cbda;font-size:13px;line-height:1.4} .q-a{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin-top:6px} .pm-btns .btn{flex:1} .pm-btns .pm-stop{border-color:rgba(255,90,90,.6);color:#ffb4b4}
 .sr-box{margin:12px 0 4px;border:1px solid var(--line2);border-radius:18px;padding:8px 10px 12px;background:radial-gradient(circle at 50% 46%,rgba(40,70,130,.28),rgba(8,12,24,.55) 72%)}
 .sr-svg{display:block;width:100%;max-width:360px;margin:0 auto;overflow:visible} .sr-ring{fill:none;stroke:rgba(143,180,255,.24);stroke-width:1} .sr-ring.o{stroke-dasharray:3 4}
 .sr-rl{fill:#7f8db0;font:500 10px var(--mono);letter-spacing:.04em} .sr-dot{cursor:pointer} .sr-n{fill:#0a1020;font:700 11px var(--sans)}
@@ -1392,7 +1396,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-27.04', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-27.05', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3409,11 +3413,11 @@ function simRadHTML(){ const M=nowModel(); if(!M.live) return ''; const L=M.all.
   const cap=L.length ? '' : 'Nothing around you needs a look.';
   return '<div class="sr-box">'+g+(rows?'<div class="sr-list">'+rows+'</div>':'')+'<div class="sr-cap"><span>'+esc(cap)+(n?(cap?' ':'')+esc(n===1?'1 device around you.':n+' devices around you.'):'')+'</span><button class="btn sm" data-act="map-full">Open the map</button></div></div>'; }
 function statusRender(){ const det=detOn(), card=el('vicCard'), m=can('watchers') ? statusModel() : null; document.body.classList.toggle('wsimple', !det); if(card) card.classList.toggle('simple', !det);
-  setHTML(el('stTop'), m ? statusHTML('w', m)+(det ? '' : posBan()) : '');
+  setHTML(el('stTop'), m ? statusHTML('w', m)+quietChip()+(det ? '' : posBan()) : '');
   setHTML(el('topTrip'), m ? (det ? tripStrip() : protectHTML()) : '');          // the simple view: one button
   setHTML(el('simRad'), m && !det ? simRadHTML() : '');          // the simple radar, in the simple view only
   setHTML(el('detTog'), m && m.act!=='details' && !P.expert ? '<button class="det-tog'+(det?' on':'')+'" data-act="details" aria-expanded="'+(det?'true':'false')+'">'+(det?'Hide details':'Show details')+'</button>' : '');          // when green, the status button is the one for Details
-  const ov=el('stOv'); if(ov) setHTML(ov, m ? statusHTML('ov', m) : ''); fillWBar(); }
+  const ov=el('stOv'); if(ov) setHTML(ov, m ? statusHTML('ov', m)+quietChip() : ''); fillWBar(); }
 function locRender(){ const box=el('locBox'); if(!box || !locMode()) return; const M=nowModel(), seen=M.red.concat(M.watch, M.sus, M.amber);
   let h=(STORE_FULL && Date.now()-STORE_FULL<600000 ? '<div class="fixbar"><span>The browser store on this phone is full. Your trips and your record are kept in the phone\'s database, and Remiel keeps recording.</span></div>' : '')+((P.units==='mi'||P.units==='km') ? '' : '<div class="fixbar unitask"><span>Choose how distances read.</span><button class="btn sm primary" data-act="units" data-u="mi">Feet and miles</button><button class="btn sm primary" data-act="units" data-u="km">Meters and kilometers</button></div>');
   h+=posBan();
@@ -5042,7 +5046,8 @@ function routeShow(){ const d=routeData(); [MAP,MACRO,FULL].forEach(m=>{ if(!m) 
 function routeOnMap(){ const L=routeLineNow(); mapFullOpen().then(()=>{ routeShow(); if(!FULL || !L) return; MF.follow=false; el('mfFollow').classList.remove('on'); mfTouched(true);
   try{ let w=180,e2=-180,s=90,n=-90; L.forEach(c=>{ w=Math.min(w,c[0]); e2=Math.max(e2,c[0]); s=Math.min(s,c[1]); n=Math.max(n,c[1]); }); FULL.fitBounds([[w,s],[e2,n]],{padding:{top:120,bottom:160,left:40,right:70},duration:0,maxZoom:17}); }catch(e){} }); }
 document.addEventListener('keydown', ev=>{ if(ev.key==='Enter' && ev.target && (ev.target.id==='planTo' || ev.target.id==='planFrom')){ ev.preventDefault(); planGo(); } });
-const buzz = p => { try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} };
+const ALQ={until:0};          // a quiet alert never buzzes: the buzz that follows it in the same moment is skipped
+const buzz = p => { if(Date.now()<ALQ.until) return; try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} };
 
 /* ---------- Watchers and Attackers screens ---------- */
 function renderWatchers(){
@@ -9098,6 +9103,20 @@ function devType(d){ if(!d) return ''; const h=d.hint||'', n=d.adv||'', hn=h+' '
   if(/Beacon/i.test(h)) return 'Beacon (shop, venue or transit)';
   if(n && !randName(n)) return 'Kind not known: only its name';
   return makerOf(d) ? 'Kind not known: only its maker' : 'Unknown: gives no name or maker'; }
+// Which alerts buzz and show at once. The three red ones: a device keeping pace with you or following you (moving with you, keeping pace, round a
+// corner, out of a stop with you), a tracker traveling with you, and your Watch list or a device you flagged near you. Four more, because each needs you
+// at that moment: something new in the Portrait you turned on, a card skimmer at the machine in front of you, Remiel unable to hear or without GPS, and
+// the care alarms of Responders. An attack that concerns your own devices shows too, as the Attacker Bar promises, without a buzz. Everything else goes
+// into the quiet list.
+const AL_LOUD=new Set(['with','tagpace','tagf','watch','near','cl','sgw','port','skim','deaf','nogps','room','late','care','carelate','appt','roomcare','kev','atk']);
+function alLoud(key){ key=String(key); const k=key.split(':')[0]; return k==='chk' ? /:follow$/.test(key) : AL_LOUD.has(k); }
+function quietAdd(x){ P.quietAl=(P.quietAl||[]).filter(q=>q.key!==x.key); P.quietAl.unshift(x); P.quietAl.length=Math.min(P.quietAl.length,40); save(); ALQ.until=Date.now()+150; try{ statusRender(); }catch(e){} }
+function quietChip(){ const L=P.quietAl||[]; if(!L.length) return ''; const n=L.filter(x=>x.t>(P.quietSeen||0)).length;
+  return '<button class="q-chip'+(n?' new':'')+'" data-act="quiet-open">'+esc(n ? (n===1?'1 new in your quiet list':n+' new in your quiet list') : 'Quiet list · '+L.length)+'</button>'; }
+function quietRender(b){ const L=P.quietAl||[]; P.quietSeen=Date.now(); save();
+  b.innerHTML='<h3 id="fsTitle">Quiet list</h3><p class="fs-p">Alerts worth knowing that do not need you this moment. They do not buzz. Red alerts still buzz and show at once: a device keeping pace with you, a tracker traveling with you, and your Watch list near you.</p>'+
+    (L.length ? '<div class="q-list">'+L.map(x=>'<div class="q-i"><small>'+esc(hhmm(x.t))+(x.kind?' · '+esc(x.kind):'')+'</small><b>'+esc(x.title)+'</b><span>'+esc(x.text)+'</span><div class="q-a">'+(x.go?'<button class="btn sm" data-act="quiet-go" data-k="'+esc(x.key)+'">Open</button>':'')+fbHTML(x.key)+'</div></div>').join('')+'</div>' : '<p class="limit">Nothing in the quiet list.</p>')+
+    '<div class="formrow fs-btns">'+(L.length?'<button class="btn" data-act="quiet-clear">Clear the list</button>':'')+'<button class="btn primary" data-act="file-close">Close</button></div>'; }
 function alertRaise(key, title, text, go, quiet){
   if(!can(ALERT_PLAN(key))) return false;
   const day=new Date().toISOString().slice(0,10); P.alerted=P.alerted||{};
@@ -9105,6 +9124,7 @@ function alertRaise(key, title, text, go, quiet){
   const ks=Object.keys(P.alerted); if(ks.length>300) ks.filter(k=>P.alerted[k]!==day).slice(0,ks.length-200).forEach(k=>delete P.alerted[k]);
   save();
   const dv=go && go.dev ? findDevice(go.dev) : null, kind=go && go.kind ? go.kind : dv && dv.live ? devType(dv) : '';          // what it most likely is, first
+  if(!alLoud(key)){ quietAdd({key, title, text, kind, go:go||null, t:Date.now()}); return true; }          // not red: into the quiet list
   S.banners=(S.banners||[]).filter(b=>b.key!==key); S.banners.unshift({key, title, text, kind, go:go||null, t:Date.now()}); S.banners.length=Math.min(S.banners.length,6);
   renderAlerts(); if(!quiet) alertSystem(key, kind ? kind+' · '+title : title, text);
   return true; }
@@ -9166,7 +9186,7 @@ function fileSet(sig, f, quiet){ if(!sig) return false; f=FILE[f]?f:''; const wa
   return true; }
 // The File sheet: one device, its file, your name for it and a note.
 function fileOpen(sig){ if(!sig) return; S.fs={k:sig, pick:fileOf(sig)}; fsRender(); ovShow('fsheet'); }
-function fsRender(){ const F=S.fs, b=el('fsBody'); if(!F || !b) return; if(F.mode==='sort') return sortRender(b); if(F.mode==='home') return homeSigRender(b); if(F.mode==='port') return portIntroRender(b); if(F.mode==='news') return newsRender(b); const k=F.k, w=watchInfo(k), d=w.d, h=ELOG.hist.get(k)||{}, nm=watchName(k), lbl=(P.labels||{})[w.id]||'', was=fileOf(k);
+function fsRender(){ const F=S.fs, b=el('fsBody'); if(!F || !b) return; if(F.mode==='quiet') return quietRender(b); if(F.mode==='sort') return sortRender(b); if(F.mode==='home') return homeSigRender(b); if(F.mode==='port') return portIntroRender(b); if(F.mode==='news') return newsRender(b); const k=F.k, w=watchInfo(k), d=w.d, h=ELOG.hist.get(k)||{}, nm=watchName(k), lbl=(P.labels||{})[w.id]||'', was=fileOf(k);
   const rot = d ? d.randomizes===true : rosterRot({name:w.adv, cls:w.cls, hint:w.hint}), live=!!(d && d.present);
   const opt = f => '<button class="fs-opt'+(F.pick===f.k?' on':'')+'" data-act="file-pick" data-f="'+f.k+'" style="--fc:'+FILE_C[f.k]+'" aria-pressed="'+(F.pick===f.k?'true':'false')+'"><i class="sdot" style="--mk:'+FILE_C[f.k]+'"></i><b>'+esc(f.w)+'</b><small>'+esc(f.s)+'</small></button>';
   let x='<h3 id="fsTitle">Mark this device</h3><div class="fs-dev"><b>'+esc(nm)+'</b><small>'+esc([d?kindShort(d):(w.hint||KIND_WORD[w.cls]||''), live?'here now, '+duAbout(d):h.last?'last heard '+whenW(h.last):''].filter(Boolean).join(' · '))+'</small></div>'+
@@ -9707,6 +9727,9 @@ document.addEventListener('click', e=>{
     case 'cell-reg': { P.cellCheck=!P.cellCheck; save(); if(P.cellCheck && CELL.serving && cellLive()){ _cellAsk=0; cellAsk(CELL.serving); } rerender(); break; }
     case 'path-go': { const nx=pathState().next; if(nx) pathGo(nx.go()); break; }
     case 'alert-open': alertGo(); break;
+    case 'quiet-open': S.fs={mode:'quiet'}; fsRender(); ovShow('fsheet'); statusRender(); break;
+    case 'quiet-go': { const k=a.dataset.k, x=(P.quietAl||[]).find(q=>q.key===k); S.fs=null; ovHide('fsheet'); if(!x) break; S.banners=(S.banners||[]).filter(b=>b.key!==k); S.banners.unshift(Object.assign({}, x)); alertGo(k); break; }
+    case 'quiet-clear': P.quietAl=[]; save(); fsRender(); statusRender(); break;
     case 'alert-x': S.banners=(S.banners||[]).slice(1); renderAlerts(); break;
     case 'alert-ask': alertAsk(); break;
     case 'shelf': S.shelf=a.dataset.s; rerender(); break;
