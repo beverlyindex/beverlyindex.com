@@ -836,7 +836,7 @@ select.inp.sm{padding:4px 8px;font-size:12px;width:auto;min-width:0}
 /* tickers */
 .ticker{display:none!important}          /* the news has its own page now: Security news */
 /* the Signal Bar and the Threat Bar: one at the bottom of its own page, just above the menu bar, never together */
-.xbar{position:relative;flex:none;height:46px;overflow:hidden;border-top:1px solid var(--line);background:rgba(8,14,28,.78);display:flex;align-items:center}
+.xbar{position:relative;flex:none;height:46px;overflow:hidden;border-top:1px solid var(--line);background:rgba(8,14,28,.78);display:flex;align-items:center;padding-left:134px}
 .xbar[hidden]{display:none}
 /* the simple view, the default: four sections, Signals first; Expert view brings back every screen */
 .lb-s{display:none} body:not(.expert) .lb-x{display:none} body:not(.expert) .lb-s{display:revert}
@@ -874,7 +874,7 @@ body:not(.expert) .nav [data-view="evidence"]{order:3} body:not(.expert) .nav [d
 .xbar .xlead b{color:#fff;font-weight:700}
 .xbar .xlead span{min-width:22px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.09);color:#dfe6f3;text-align:center;letter-spacing:0} .xbar .xlead span:empty{display:none}
 .xbar .xlead span.hot{background:rgba(255,59,78,.22);color:#ffb4b4;box-shadow:0 0 10px -2px rgba(255,59,78,.7)}
-.xbar .track{display:flex;white-space:nowrap;padding-left:134px;animation:marq 40s linear infinite;will-change:transform}
+.xbar .track{display:flex;white-space:nowrap;animation:marq 40s linear infinite;will-change:transform}
 .xbar .xrun{display:flex;gap:24px;padding-right:24px}
 .xbar.hold .track,.xbar:hover .track{animation-play-state:paused}
 .xi{display:inline-flex;align-items:center;gap:7px;border:0;background:none;color:var(--ink);font:inherit;font-size:13px;padding:6px 2px;cursor:pointer;text-decoration:none;white-space:nowrap}
@@ -1409,7 +1409,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-27.09', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-27.10', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -9573,10 +9573,13 @@ function fillWBar(force){ const tr=el('trackW'); if(!tr || (!force && S.view!=='
     : !L.length ? '<span class="xi"><i style="--mk:'+LOOK.green+'"></i><b>Nothing heard around you just now.</b></span>' : L.slice(0,60).map(x=>wbarItem(x.d, x.rk, x.why)).join('');
   const n=el('wBarN'); if(n){ n.textContent=live ? String(L.length) : ''; n.classList.toggle('hot', L.some(x=>x.rk===0)); }
   barSet(tr, h); }
-// Two copies side by side scroll left by one copy's width, so the bar runs on without a seam, at the same pace however long it is.
-function barSet(tr, items){ if(tr._h===items) return; tr._h=items; tr.innerHTML='<span class="xrun">'+items+'</span><span class="xrun" aria-hidden="true">'+items+'</span>';
-  const w=tr.firstChild ? tr.firstChild.offsetWidth : 0, dur=Math.max(18, Math.round(w/38)), cur=+tr._dur||0; if(w && (!cur || Math.abs(dur-cur)/cur>0.25)){ tr._dur=dur; tr.style.animationDuration=dur+'s'; } }
-const barShow = () => { const w=el('wBar'), a=el('aBar'); if(w) w.hidden=S.view!=='watchers'; if(a) a.hidden=S.view!=='attackers'; if(S.view==='watchers') fillWBar(true); };
+// Two copies side by side scroll left by one copy's width, so the bar runs on without a seam, at the same pace however long it is: 38 pixels a second.
+// A bar filled while its page is hidden has no width yet, so it is timed again each time its page opens.
+function barTime(tr){ const w=tr && tr.firstChild ? tr.firstChild.offsetWidth : 0; if(!w) return; const dur=Math.max(18, Math.round(w/38)), cur=+tr._dur||0;
+  if(!cur || Math.abs(dur-cur)/cur>0.25){ tr._dur=dur; tr.style.animationDuration=dur+'s'; } }
+function barSet(tr, items){ if(tr._h===items) return; tr._h=items; tr.innerHTML='<span class="xrun">'+items+'</span><span class="xrun" aria-hidden="true">'+items+'</span>'; barTime(tr); }
+const barShow = () => { const w=el('wBar'), a=el('aBar'); if(w) w.hidden=S.view!=='watchers'; if(a) a.hidden=S.view!=='attackers'; if(S.view==='watchers') fillWBar(true);
+  requestAnimationFrame(()=>{ if(S.view==='attackers') barTime(el('trackA')); if(S.view==='watchers') barTime(el('trackW')); }); };
 document.addEventListener('touchstart', e=>{ const b=e.target && e.target.closest && e.target.closest('.xbar'); if(!b) return; b.classList.add('hold'); clearTimeout(b._hold); b._hold=setTimeout(()=>b.classList.remove('hold'), 4000); }, {passive:true});
 
 /* ---------- navigation and rendering ---------- */
