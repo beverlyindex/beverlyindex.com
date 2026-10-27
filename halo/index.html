@@ -4878,31 +4878,51 @@ function droneRows(r, me){ const out=[]; if(!r) return out;
   return out; }
 /* A trip on paper. The same page as on the screen, set for print. */
 const whNow = (la,lo) => { if(la==null || lo==null) return ''; const v=whLoad()[whKey(la,lo)]; return v ? whText(v) : ''; };
-function tripPaperHTML(R){ const e=esc, st=withTrip(R, walkStats), C=R.cor||{tags:{},hw:{},cnt:{},cams:[]}, ds=Object.values(R.devs||{}), c=C.cnt||{}, d0=new Date(R.t0);
-  const of=t=>ds.filter(r=>C.tags[r.id]===t), red=of('with').concat(of('place')), seen=red.concat(of('watch'), of('again')), trk=ds.filter(r=>r.cls==='Tag' && C.tags[r.id]!=='yours' && seen.indexOf(r)<0);
-  const nm=r=>e((P.labels||{})[r.id]||r.label||r.adv||r.call||'Device'), kd=r=>e([r.cls==='Unknown'?'':r.cls, r.hint].filter(Boolean).join(', '));
+function tripPaperHTML(R){ const e=esc, st=withTrip(R, walkStats), C=R.cor||{tags:{},hw:{},cnt:{},cams:[]}, ds=Object.values(R.devs||{}), d0=new Date(R.t0), noPos=tripNoPos(R);
+  const tg=r=>C.tags[r.id]||'fresh', of=t=>ds.filter(r=>tg(r)===t), FLAG=['with','place','watch','again'];
+  const withs=of('with').sort((a,b)=>(b.mins||0)-(a.mins||0)), places=of('place'), watch=of('watch'), again=of('again'), tags=ds.filter(r=>r.cls==='Tag' && tg(r)!=='yours' && !r.mine), trk=tags.filter(r=>FLAG.indexOf(tg(r))<0);
+  const nm=r=>e(LK((P.labels||{})[r.id]||r.label||r.adv||r.call||'Device')), kd=r=>e([r.cls==='Unknown'?'':r.cls, r.hint].filter(Boolean).join(', '));
   const tbl=(head,rows)=>'<div class="rp-wide"><table><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join('')+'</table></div>';
-  const where=p=>p?e(whNow(p.lat,p.lon)):'', mv=r=>[r.mv?'Moving'+paceChip(r.mv).replace(' · ',', '):r.v==='fixed'?'Stays in place':'', r.wn&&r.v!=='fixed'?'Worn or carried':'', r.dr?'Drone':''].filter(Boolean).join('; ');
-  const nW=of('with').length, nP=of('place').length, k=seen.length-red.length;
-  const line = (nW||nP) ? [nW?nW+(nW===1?' device moved with you':' devices moved with you'):'', nP?nP+(nP===1?' device had been seen before, in a different place':' devices had been seen before, in a different place'):''].filter(Boolean).join(', and ')
-    : k ? k+(k===1?' device had been seen here before':' devices had been seen here before')+'. None moved with you' : 'No device on this trip had been seen before, and none moved with you';
-  let sec=0; const H=t=>'<h2>'+(++sec)+'. '+t+'</h2>', devRow=r=>[nm(r), kd(r), TAG[C.tags[r.id]||'fresh'].w, e(C.hw[r.id]||''), mv(r), hhmm(r.minT||r.first)+', '+minsIn(r.minT||r.first,R.t0), e(du(r.min)), where(r.at)];
-  let h='<h1>Remiel Technologies Trip</h1><p class="rp-sub">'+e(tripName(R))+'</p><div class="rp-meta">'+DOW3[d0.getDay()]+' '+d0.getDate()+' '+MON[d0.getMonth()]+' '+d0.getFullYear()+', '+hhmm(R.t0)+' to '+hhmm(R.t1)+' &nbsp;·&nbsp; '+e(walkDur(R.t1-R.t0))+' &nbsp;·&nbsp; '+e(du(st.distance_m))+'</div>'+
-    H('Summary')+'<p>Bottom line: <span class="rp-tier">'+e(line)+'</span></p><div class="rp-bar4"><div><span>Heard</span><b>'+st.heard+'</b></div><div><span>New</span><b>'+(c.fresh||0)+'</b></div><div><span>Neighborhood and yours</span><b>'+((c.local||0)+(c.yours||0))+'</b></div><div><span>Seen before</span><b>'+seen.length+'</b></div></div>'+
-    ((R.route||[]).length<2 ? '' : '<div class="rp-path">'+tripSketch(R,{h:190}).replace('class="tsk"','class="tsk paper"').replace(/#9fc4ff/g,'#1A1A2E').replace('fill="#0b1224" stroke="#e9f0ff"','fill="#ffffff" stroke="#1A1A2E"').replace(/fill="#e9f0ff"/g,'fill="#1A1A2E"').replace(/#93a6cc/g,'#55556b')+'</div><p class="rp-cap">The shape of your path. North is up. Open circle: start. Filled circle: end. Numbers: waypoints.</p>');
-  h+=tripSummaryPaper(R, C, H);
-  const cts=R.contacts||[];
-  if(cts.length) h+=H('Contacts')+'<p>Devices that arrived together, reached their nearest point to you in the same ten seconds, and faded again. Each line is what one person, or one vehicle, carries.</p>'+tbl(['Time','What happened','Devices','Where you were'], cts.slice(0,60).map(x=>[hhmm(x.t)+', '+minsIn(x.t,R.t0), e(contactLine(x)), x.devs.map(q=>e(q.name)+' ('+e(q.kind)+', '+e(du(q.m))+')').join('<br>'), where(x.pos)]));
-  if(seen.length) h+=H('Seen before')+tbl(['Device','Kind','Tag','On record','Motion','On this trip','Nearest','Where you were'], seen.slice(0,60).map(devRow));
-  h+=H('Waypoints')+((R.wps||[]).length ? (R.wps||[]).map(w=>{ const wd=Object.values(w.devs||{}).filter(x=>!x.yours).sort((a,b)=>a.m-b.m);
+  const where=p=>p?e(whNow(p.lat,p.lon)):'';
+  const F=tripFindings(R, C), T=tripTimeline(R, C), A=tripAnswerText(R, C), wps=R.wps||[], cts=R.contacts||[];
+  const t1=(R.t1||Date.now())+600000, checks=Object.values(P.alFb||{}).filter(x=>x.t>=R.t0 && x.t<=t1).sort((a,b)=>a.t-b.t);
+  // the bottom line
+  const level = withs.length ? (withs.length===1 ? nm(withs[0])+' followed you' : withs.length+' devices followed you') : noPos ? 'Remiel cannot tell whether anything followed you' : 'Nothing followed you';
+  const cls = withs.length ? 't3' : (places.length||watch.length||(F.length&&!noPos)) ? 't2' : noPos ? '' : 't0';
+  const line = [noPos?'No GPS position arrived on this trip.':'', withs.length||!F.length ? '' : F.length===1 ? '1 event on this trip is worth a look. It is set out in section 1.' : F.length+' events on this trip are worth a look. They are set out in section 1.'].filter(Boolean).join(' ');
+  const todo=[];
+  if(withs.length) todo.push('Open '+nm(withs[0])+' in Remiel and decide whether it is yours.', 'If it is not yours, check your bag, your coat and your car.');
+  if(places.length) todo.push('Look at '+nm(places[0])+': it was seen before in a different place.');
+  if(watch.length) todo.push(nm(watch[0])+', on your Watch list, was near you. Open it to see where.');
+  const facts=[['Devices heard:', String(ds.length)], ['Seen before:', String(places.length+watch.length+again.length)], ['Trackers heard:', String(tags.length)], ['Waypoints:', String(wps.length)], ['Close passes:', String(cts.length)]];
+  if(checks.length){ const ok=checks.filter(x=>x.ok).length; facts.push(['Your alert answers:', ok+' right, '+(checks.length-ok)+' wrong']); }
+  let sec=0, ax=0; const H=t=>'<h2>'+(++sec)+'. '+t+'</h2>', AX=t=>'<h3>'+String.fromCharCode(65+(ax++))+'. '+t+'</h3>';
+  let h='<h1>Remiel Technologies Trip Report</h1><p class="rp-sub">'+e(tripName(R))+'</p><div class="rp-meta">'+DOW3[d0.getDay()]+' '+d0.getDate()+' '+MON[d0.getMonth()]+' '+d0.getFullYear()+', '+hhmm(R.t0)+' to '+hhmm(R.t1)+' &nbsp;·&nbsp; '+e(walkDur(R.t1-R.t0))+' &nbsp;·&nbsp; '+e(du(st.distance_m))+'</div>';
+  h+=rpBluf({level:e(level), cls, line, todo, facts});
+  // what happened
+  h+=H('What happened')+'<ul class="rp-sum">'+(F.length?F.map(f=>'<li>'+e(f.text)+(f.win?'<br><small>'+winHTML(f.win)+'</small>':'')+'</li>').join(''):'<li>'+e(NOTHING_FOUND)+'</li>')+'</ul>';
+  // the devices that matter
+  const imp=[].concat(withs, places, watch, again, trk).filter((r,i,a)=>a.indexOf(r)===i);
+  h+=H('Devices that matter')+(imp.length ? '<p>Those that followed you or had been seen before come first, then every tracker heard.</p>'+tbl(['Device','Kind','What Remiel found','Nearest','When','Where you were'], imp.slice(0,60).map(r=>[nm(r), kd(r), e(C.hw[r.id]||TAG[tg(r)].w), e(du(r.min)), hhmm(r.minT||r.first)+', '+minsIn(r.minT||r.first,R.t0), where(r.at)])) : '<p>No device on this trip had been seen before, and no tracker was heard.</p>');
+  const ar=(A.rows||[]).filter(w=>imp.indexOf(w.r)<0); if(ar.length) h+='<p><b>New to this place, worth a look</b></p><ul class="rp-sum">'+ar.map(w=>'<li>'+ansPaperRow(w, e)+'</li>').join('')+'</ul>';
+  // waypoints
+  h+=H('Waypoints')+(wps.length ? wps.map(w=>{ const wd=Object.values(w.devs||{}).filter(x=>!x.yours).sort((a,b)=>a.m-b.m);
       return '<div class="rp-keep"><h3>Waypoint '+w.n+', '+hhmm(w.t)+', '+minsIn(w.t,R.t0)+(where(w.pos)?', '+where(w.pos):'')+'</h3>'+(w.note?'<p>'+e(w.note)+'</p>':'')+
-        (wd.length ? tbl(['Device','Kind','Tag','In that minute','Nearest'], wd.map(x=>[e((P.labels||{})[x.id]||x.name), e(x.kind), TAG[C.tags[x.id]||'fresh'].w, wpPassed(R,w,x)?'Passed you':'Already around you', e(du(x.m))])) : '<p>No device came within '+e(du(WP_M))+' in that minute.</p>')+'</div>'; }).join('') : '<p>No waypoint was set on this trip.</p>');
-  const drs=ds.filter(r=>r.dr); if(drs.length) h+=H('Drones heard')+tbl(['Drone','Time','Nearest','What it said of itself'], drs.map(r=>[nm(r), hhmm(r.minT||r.first)+', '+minsIn(r.minT||r.first,R.t0), e(du(r.min)), droneRows(r.rid, null).map(x=>x[0]+': '+x[1]).join('<br>')||'Named as a drone by its Wi-Fi name. It gave no position.']));
-  if(trk.length) h+=H('Trackers heard')+tbl(['Device','Kind','Tag','On record','Motion','On this trip','Nearest','Where you were'], trk.slice(0,40).map(devRow));
-  if((C.cams||[]).length) h+=H('Cameras passed')+tbl(['Camera','Time','Nearest','Where'], C.cams.map(x=>[e(x.kind+(x.name?', '+x.name:'')), hhmm(x.t)+', '+minsIn(x.t,R.t0), e(du(x.d)), e(whNow(x.la,x.lo))]));
+        (wd.length ? tbl(['Device','Kind','Record','In that minute','Nearest'], wd.map(x=>[e((P.labels||{})[x.id]||x.name), e(x.kind), TAG[C.tags[x.id]||'fresh'].w, wpPassed(R,w,x)?'Passed you':'Already around you', e(du(x.m))])) : '<p>No device came within '+e(du(WP_M))+' in that minute.</p>')+'</div>'; }).join('') : '<p>No waypoint was set on this trip.</p>');
+  // your path
+  if((R.route||[]).length>=2) h+=H('Your path')+'<div class="rp-path">'+tripSketch(R,{h:190}).replace('class="tsk"','class="tsk paper"').replace(/#9fc4ff/g,'#1A1A2E').replace('fill="#0b1224" stroke="#e9f0ff"','fill="#ffffff" stroke="#1A1A2E"').replace(/fill="#e9f0ff"/g,'fill="#1A1A2E"').replace(/#93a6cc/g,'#55556b')+'</div><p class="rp-cap">North is up. Open circle: start. Filled circle: end. Numbers: waypoints.</p>';
+  // your answers
+  if(checks.length) h+=H('Your answers to Was this right?')+tbl(['Time','Alert','Your answer'], checks.map(x=>[hms(x.t), e(x.title), x.ok?'Right':'Wrong']));
+  // the annex
+  h+='<h2 class="rp-annex">Annex: supporting detail</h2>';
+  if(T.length) h+=AX('Timeline, to the second')+'<ul class="rp-sum">'+T.map(x=>'<li><b>'+hms(x.t)+'</b> '+tlLine(x, e)+'</li>').join('')+'</ul>';
+  if(cts.length) h+=AX('Close passes')+'<p>Devices that arrived together, reached their nearest point to you in the same ten seconds, and faded again. Each line is what one person, or one vehicle, carries.</p>'+tbl(['Time','What happened','Devices','Where you were'], cts.slice(0,60).map(x=>[hhmm(x.t)+', '+minsIn(x.t,R.t0), e(contactLine(x)), x.devs.map(q=>e(q.name)+' ('+e(q.kind)+', '+e(du(q.m))+')').join('<br>'), where(x.pos)]));
+  const drs=ds.filter(r=>r.dr); if(drs.length) h+=AX('Drones heard')+tbl(['Drone','Time','Nearest','What it said of itself'], drs.map(r=>[nm(r), hhmm(r.minT||r.first)+', '+minsIn(r.minT||r.first,R.t0), e(du(r.min)), droneRows(r.rid, null).map(x=>x[0]+': '+x[1]).join('<br>')||'Named as a drone by its Wi-Fi name. It gave no position.']));
+  if((C.cams||[]).length) h+=AX('Cameras passed')+tbl(['Camera','Time','Nearest','Where'], C.cams.map(x=>[e(x.kind+(x.name?', '+x.name:'')), hhmm(x.t)+', '+minsIn(x.t,R.t0), e(du(x.d)), e(whNow(x.la,x.lo))]));
+  h+=AX('Every device heard')+'<p>'+(ds.length===1?'1 device':ds.length+' devices')+', in the order first heard. The data file holds every reading.</p>'+tbl(['Device','Kind','Record','First heard','Nearest'], ds.slice().sort((a,b)=>(a.first||0)-(b.first||0)).map(r=>[nm(r), kd(r), e(TAG[tg(r)].w), r.first?hms(r.first):'', e(du(r.min))]));
   return h+'<div class="rp-foot">Generated by Remiel Technologies. Recorded on your own device. The data file that goes with this trip holds every device and every reading. Whether a court accepts this record is for the court.</div>'; }
 async function tripPrint(){ const T=S.trips; if(!T || !T.t0) return; const R=await tripGet(T.t0); if(!R) return; if(!R.cor || R.cor.v!==3){ try{ await tripCorrelate(R); }catch(e){} }
-  paperShow('Remiel Technologies Trip', tripPaperHTML(R), {kind:'trip2', line:tripName(R)}); }
+  paperShow('Remiel Technologies Trip Report', tripPaperHTML(R), {kind:'trip2', line:tripName(R)}); }
 
 /* ---------- Plan a route. You say where you are going, by name, by coordinates or by drawing the route on the map. Before you leave, Remiel
    lists what is along that route now: the cameras and tower sites of the public record, and the devices your own encounter log holds there.
