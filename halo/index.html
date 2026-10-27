@@ -829,6 +829,21 @@ select.inp.sm{padding:4px 8px;font-size:12px;width:auto;min-width:0}
 
 /* tickers */
 .ticker{display:none!important}          /* the news has its own page now: Security news */
+/* the Watcher Bar and the Attacker Bar: one at the bottom of its own page, just above the menu bar, never together */
+.xbar{position:relative;flex:none;height:46px;overflow:hidden;border-top:1px solid var(--line);background:rgba(8,14,28,.78);display:flex;align-items:center}
+.xbar[hidden]{display:none}
+.xbar .xlead{position:absolute;left:0;top:0;bottom:0;z-index:2;display:flex;align-items:center;gap:7px;padding:0 26px 0 12px;background:linear-gradient(90deg,#080d1a 80%,rgba(8,13,26,0));font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.xbar .xlead b{color:#fff;font-weight:700}
+.xbar .xlead span{min-width:22px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.09);color:#dfe6f3;text-align:center;letter-spacing:0} .xbar .xlead span:empty{display:none}
+.xbar .xlead span.hot{background:rgba(255,59,78,.22);color:#ffb4b4;box-shadow:0 0 10px -2px rgba(255,59,78,.7)}
+.xbar .track{display:flex;white-space:nowrap;padding-left:134px;animation:marq 40s linear infinite;will-change:transform}
+.xbar .xrun{display:flex;gap:24px;padding-right:24px}
+.xbar.hold .track,.xbar:hover .track{animation-play-state:paused}
+.xi{display:inline-flex;align-items:center;gap:7px;border:0;background:none;color:var(--ink);font:inherit;font-size:13px;padding:6px 2px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.xi i{width:9px;height:9px;border-radius:50%;background:var(--mk);box-shadow:0 0 8px var(--mk);flex:none}
+.xi b{font-weight:600} .xi span{color:var(--mut)} .xi em{font-style:normal;color:var(--dim)} .xi small{color:var(--dim);font-family:var(--mono);font-size:11px}
+.xi.hot b,.xi.hot em{color:#ffb4b4} .xi.warm em{color:#ffd99a} .xi.hot .xthr{color:#fff;background:rgba(255,59,78,.8);border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700;letter-spacing:.04em}
+body.calm .xbar .track{animation:none} body.calm .xbar{overflow-x:auto}
 .ticker0{position:relative;height:50px;overflow:hidden;border-top:1px solid var(--line);background:rgba(8,14,28,.55);display:flex;align-items:center}
 .ticker .lead{position:absolute;left:0;top:0;bottom:0;z-index:2;display:flex;align-items:center;
   padding:0 34px 0 12px;background:linear-gradient(90deg,#080d1a 86%,rgba(8,13,26,0))}
@@ -1268,8 +1283,8 @@ button.loc-row:active{transform:translateY(2px);box-shadow:inset 0 2px 7px rgba(
       </div>
     </div>
 
-    <div class="ticker">
-      <div class="lead seg"><button data-act="mode" data-m="w" class="m-w">Watchers</button></div><div class="track" id="trackW"></div>
+    <div class="xbar wbar" id="wBar" hidden aria-label="Every device around you">
+      <div class="xlead"><b>Watchers</b><span id="wBarN"></span></div><div class="track" id="trackW"></div>
     </div>
     <div class="ticker">
       <div class="lead seg"><button data-act="mode" data-m="a" class="m-a">Attackers</button></div><div class="track" id="trackA"></div>
@@ -1355,7 +1370,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-27.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-27.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3325,7 +3340,7 @@ function statusRender(){ const det=!!P.det, card=el('vicCard'), m=can('watchers'
   setHTML(el('stTop'), m ? statusHTML('w', m)+(det ? '' : posBan()) : '');
   setHTML(el('topTrip'), m ? tripStrip() : '');
   setHTML(el('detTog'), m && m.act!=='details' ? '<button class="det-tog'+(det?' on':'')+'" data-act="details" aria-expanded="'+(det?'true':'false')+'">'+(det?'Hide details':'Show details')+'</button>' : '');          // when green, the status button is the one for Details
-  const ov=el('stOv'); if(ov) setHTML(ov, m ? statusHTML('ov', m) : ''); }
+  const ov=el('stOv'); if(ov) setHTML(ov, m ? statusHTML('ov', m) : ''); fillWBar(); }
 function locRender(){ const box=el('locBox'); if(!box || !locMode()) return; const M=nowModel(), seen=M.red.concat(M.watch, M.sus, M.amber);
   let h=(STORE_FULL && Date.now()-STORE_FULL<600000 ? '<div class="fixbar"><span>The browser store on this phone is full. Your trips and your record are kept in the phone\'s database, and Remiel keeps recording.</span></div>' : '')+((P.units==='mi'||P.units==='km') ? '' : '<div class="fixbar unitask"><span>Choose how distances read.</span><button class="btn sm primary" data-act="units" data-u="mi">Feet and miles</button><button class="btn sm primary" data-act="units" data-u="km">Meters and kilometers</button></div>');
   h+=posBan();
@@ -9369,7 +9384,32 @@ function newsRender(b){ const sec=(title, items)=>'<div class="nw-h">'+esc(title
   let w=[], a=[]; try{ w=myFindings('w').concat(liveFeedW(), FEED_W); a=myFindings('a').concat(liveFeedA(), FEED_A); }catch(e){ w=FEED_W; a=FEED_A; }
   b.innerHTML='<h3 id="fsTitle">Security news</h3><p class="fs-p">What concerns you comes first, marked in gold. Then the wider news, each item with its source.</p>'+sec('Watchers', w)+sec('Attackers', a)+
     '<div class="formrow fs-btns"><button class="btn primary" data-act="file-close">Close</button></div>'; }
-function fillTickers(){ if(!el('trackW')) return; fillTicker('trackW', myFindings('w').concat(liveFeedW(), FEED_W)); fillTicker('trackA', myFindings('a').concat(liveFeedA(), FEED_A)); }
+function fillTickers(){ fillWBar(true); if(el('trackA')) fillTicker('trackA', myFindings('a').concat(liveFeedA(), FEED_A)); }
+// The Watcher Bar. Every device around you scrolls past: red first, then amber, then the rest by distance, yours last. Each says what it most likely
+// is and how far it is, in words you can picture. Tap one to open it. A finger on the bar holds it still.
+const SEE_M=[[1.5,'right next to you'],[5,'a few steps away'],[15,'close by'],[35,'across the street'],[90,'down the street']];
+const seeW = m => { m=+m; if(!(m>0)) return ''; for(const [x,w] of SEE_M) if(m<=x) return w; return 'farther off'; };
+function wbarRank(d){ const tg=tagOf(d), nowS=Date.now()+LIVE.skew, ck=!!(d.chk && nowS-d.chk.t<120000);
+  if(tg==='with') return [0,'moving with you']; if(tg==='watch') return [0,'on your Watch list']; if(d.maybe && d.cls==='Tag') return [0,'staying with you'];
+  if(ck && d.chk.k==='closer') return [0,'came closer when you stopped']; if(ck && d.chk.k==='follow') return [0,'followed you round a corner'];
+  if(tg==='place') return [1,'seen before somewhere else']; if(tg==='sus') return [1,'marked Suspicious']; if(d.maybe) return [1,'staying with you so far']; if(ck && d.chk.k==='pace') return [1,'keeping pace with you'];
+  if(portLit() && PORT.why.get(d.sig)==='new') return [2,'new to your Portrait'];
+  return tg==='yours' ? [4,'one of yours'] : [3,'']; }
+function wbarItem(d, rk, why){ const col=rk===0?LOOK.red:rk===1?LOOK.amber:TAG[tagOf(d)].c, far=seeW(d.dist);
+  return '<button class="xi'+(rk===0?' hot':rk===1?' warm':'')+'" data-act="art" data-k="'+esc(d.sig)+'"><i style="--mk:'+col+'"></i><b>'+esc(devName(d))+'</b>'+(far?'<span>'+esc(far)+'</span>':'')+(why?'<em>'+esc(why)+'</em>':'')+'</button>'; }
+const WBAR={at:0};
+function fillWBar(force){ const tr=el('trackW'); if(!tr || (!force && S.view!=='watchers')) return; const now=Date.now(); if(!force && now-WBAR.at<2000) return; WBAR.at=now;
+  const V=vis(), live=V.mode==='live'||V.mode==='sim', L=live ? mfDevices().filter(d=>d.present!==false).map(d=>{ const r=wbarRank(d); return {d, rk:r[0], why:r[1]}; }) : [];
+  L.sort((a,b)=>a.rk-b.rk || (a.d.dist||99)-(b.d.dist||99));
+  const h=!live ? '<button class="xi" data-act="ph-start"><i style="--mk:'+LOOK.grey+'"></i><b>Not listening.</b><span>Start listening, and every device around you shows here.</span></button>'
+    : !L.length ? '<span class="xi"><i style="--mk:'+LOOK.green+'"></i><b>Nothing heard around you just now.</b></span>' : L.slice(0,60).map(x=>wbarItem(x.d, x.rk, x.why)).join('');
+  const n=el('wBarN'); if(n){ n.textContent=live ? String(L.length) : ''; n.classList.toggle('hot', L.some(x=>x.rk===0)); }
+  barSet(tr, h); }
+// Two copies side by side scroll left by one copy's width, so the bar runs on without a seam, at the same pace however long it is.
+function barSet(tr, items){ if(tr._h===items) return; tr._h=items; tr.innerHTML='<span class="xrun">'+items+'</span><span class="xrun" aria-hidden="true">'+items+'</span>';
+  const w=tr.firstChild ? tr.firstChild.offsetWidth : 0, dur=Math.max(18, Math.round(w/38)), cur=+tr._dur||0; if(w && (!cur || Math.abs(dur-cur)/cur>0.25)){ tr._dur=dur; tr.style.animationDuration=dur+'s'; } }
+const barShow = () => { const w=el('wBar'), a=el('aBar'); if(w) w.hidden=S.view!=='watchers'; if(a) a.hidden=S.view!=='attackers'; if(S.view==='watchers') fillWBar(true); };
+document.addEventListener('touchstart', e=>{ const b=e.target && e.target.closest && e.target.closest('.xbar'); if(!b) return; b.classList.add('hold'); clearTimeout(b._hold); b._hold=setTimeout(()=>b.classList.remove('hold'), 4000); }, {passive:true});
 
 /* ---------- navigation and rendering ---------- */
 function placeVicinity(v){ const host = v==='watchers' ? el('wVic') : el('ovVic'), card=el('vicCard'); if(card.parentNode!==host) host.appendChild(card); }
@@ -9412,7 +9452,7 @@ function setView(v){
   const was=S.view;
   S.view=v;
   document.querySelectorAll('[data-pane]').forEach(p=>p.classList.toggle('hidden',p.dataset.pane!==v));
-  document.querySelectorAll('.nav button[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  document.querySelectorAll('.nav button[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===v)); barShow();
   if(v==='overview'||v==='watchers') placeVicinity(v);
   S.oneMap = oneMode() && (v==='overview'||v==='watchers'); if(S.oneMap && FULL && !S.mapFull) setTimeout(()=>{ omResize(); mapFullTick(true); },80);
   ({overview:['wMain','aMain','hMain'], watchers:['ovMain','aMain','hMain'], attackers:['ovMain','wMain','hMain'], responder:['ovMain','wMain','aMain'], evidence:['ovMain','wMain','aMain','hMain']}[v]||[]).forEach(id=>{ el(id).innerHTML=''; });   // one live copy of each record, so ids stay unique
@@ -9428,7 +9468,7 @@ function render(){
   else if(S.view==='attackers') renderAttackers();
   else if(S.view==='responder') renderResponder();
   else renderEvidence();
-  document.querySelectorAll('.ticker [data-m]').forEach(b=>b.classList.toggle('on', (b.dataset.m==='w'&&S.view==='watchers')||(b.dataset.m==='a'&&S.view==='attackers')));
+  barShow();
   backRows();
   try{ pathCheck(); }catch(e){}
 }
