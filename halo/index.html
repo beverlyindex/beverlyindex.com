@@ -1370,7 +1370,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-27.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-10-27.03', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -3317,17 +3317,33 @@ const nowFilt = M => !M.live || !M.all.length ? '' : '<div class="loc-filt"><but
    followed you round a corner. Amber, Worth a look: a device seen before in a different place, one you filed as Suspicious, one staying with you so
    far or keeping pace, or, under a Portrait, something new that a person carries close to you or coming closer. Green, You're clear, otherwise.
    Grey when Remiel is not listening. Everything else is under Details. */
+// What turns Remiel red, and only this: a device keeping pace with you (moving with you, keeping pace and stopping when you stop, or following you round
+// a corner), a tracker traveling with you, or a device on your Watch list near you. Amber: seen before somewhere else, marked Suspicious, staying with
+// you so far, came closer when you stopped, or new to your Portrait and close or coming closer. Everything else is quiet.
+function sevOf(d){ if(!d || isYours(d)) return {lv:'', k:'', why:''}; const tg=tagOf(d), nowS=Date.now()+LIVE.skew, ck=!!(d.chk && nowS-d.chk.t<120000);
+  if(d.cls==='Tag' && (tg==='with' || d.maybe)) return {lv:'red', k:'tag', why:'traveling with you'};
+  if(tg==='with') return {lv:'red', k:'with', why:'moving with you'};
+  if(ck && d.chk.k==='pace') return {lv:'red', k:'pace', why:'keeping pace with you'};
+  if(ck && d.chk.k==='follow') return {lv:'red', k:'follow', why:'followed you round a corner'};
+  if(tg==='watch') return {lv:'red', k:'watch', why:'on your Watch list'};
+  if(tg==='place') return {lv:'amber', k:'place', why:'seen before somewhere else'};
+  if(tg==='sus') return {lv:'amber', k:'sus', why:'marked Suspicious'};
+  if(d.maybe) return {lv:'amber', k:'maybe', why:'staying with you so far'};
+  if(ck && d.chk.k==='closer') return {lv:'amber', k:'closer', why:'came closer when you stopped'};
+  if(portLit() && PORT.show.has(d.sig) && PORT.why.get(d.sig)==='new') return {lv:'amber', k:'port', why:(d.dist||99)<=PORT_NEAR ? 'new and close to you' : 'new and coming toward you'};
+  return {lv:'', k:'', why:''}; }
+const SEV_ORD={tag:0, with:1, pace:2, follow:3, watch:4};
 function statusModel(){ const M=nowModel(), nowS=Date.now()+LIVE.skew;
   if(!M.live) return {c:'off', t:'Not listening', s:'Remiel hears nothing just now. Start listening, and Remiel tells you at once if anything around you needs a look.', act:'ph-start', b:'Start listening'};
-  const other=M.all.filter(r=>!isYours(r.d)), ck=r=>!!(r.d.chk && nowS-r.d.chk.t<120000), nm=d=>devName(d), far=d=>' It is '+duAbout(d)+' from you.';
-  const red=other.filter(r=>r.tag==='with' || r.tag==='watch' || (r.d.maybe && r.d.cls==='Tag') || (ck(r) && (r.d.chk.k==='closer' || r.d.chk.k==='follow'))).sort((a,b)=>(a.tag==='with'?0:1)-(b.tag==='with'?0:1) || a.d.dist-b.d.dist);
+  const V=M.all.map(r=>({d:r.d, v:sevOf(r.d)})), nm=d=>devName(d), far=d=>' It is '+duAbout(d)+' from you.';
   const more=n=>n>1 ? (n===2?' And 1 more.':' And '+(n-1)+' more.') : '';
-  if(red.length){ const r=red[0], d=r.d;
-    const s=r.tag==='with' ? nm(d)+' is moving with you.' : r.tag==='watch' ? nm(d)+', on your Watch list, is near you.' : (d.maybe && d.cls==='Tag') ? nm(d)+' has stayed with you so far.' : d.chk.k==='closer' ? nm(d)+' came closer when you stopped.' : nm(d)+' followed you round a corner.';
+  const red=V.filter(x=>x.v.lv==='red').sort((a,b)=>SEV_ORD[a.v.k]-SEV_ORD[b.v.k] || a.d.dist-b.d.dist);
+  if(red.length){ const d=red[0].d, k=red[0].v.k;
+    const s=k==='tag' ? (tagOf(d)==='with' ? nm(d)+' is traveling with you.' : nm(d)+' has stayed with you so far.') : k==='with' ? nm(d)+' is moving with you.' : k==='pace' ? nm(d)+' kept pace with you and stopped when you stopped.' : k==='follow' ? nm(d)+' followed you round a corner.' : nm(d)+', on your Watch list, is near you.';
     return {c:'red', t:'Act now', s:s+far(d)+more(red.length), act:'art', k:d.sig, b:'See it'}; }
-  const amb=other.filter(r=>r.tag==='place' || r.tag==='sus' || r.d.maybe || (ck(r) && r.d.chk.k==='pace') || (portLit() && PORT.show.has(r.d.sig) && PORT.why.get(r.d.sig)==='new')).sort((a,b)=>a.d.dist-b.d.dist);
-  if(amb.length){ const r=amb[0], d=r.d;
-    const s=r.tag==='place' ? nm(d)+' was seen before in a different place.' : r.tag==='sus' ? nm(d)+', which you filed as Suspicious, is near you.' : d.maybe ? nm(d)+' has stayed with you so far.' : ck(r) ? nm(d)+' is keeping pace with you.' : (d.dist||99)<=PORT_NEAR ? nm(d)+' is new and close to you.' : nm(d)+' is new and coming toward you.';
+  const amb=V.filter(x=>x.v.lv==='amber').sort((a,b)=>a.d.dist-b.d.dist);
+  if(amb.length){ const d=amb[0].d, k=amb[0].v.k;
+    const s=k==='place' ? nm(d)+' was seen before in a different place.' : k==='sus' ? nm(d)+', which you filed as Suspicious, is near you.' : k==='maybe' ? nm(d)+' has stayed with you so far.' : k==='closer' ? nm(d)+' came closer when you stopped.' : (d.dist||99)<=PORT_NEAR ? nm(d)+' is new and close to you.' : nm(d)+' is new and coming toward you.';
     return {c:'amber', t:'Worth a look', s:s+far(d)+more(amb.length), act:'art', k:d.sig, b:'See it'}; }
   const F=ansFollow(M), n=M.all.length;
   const s=F.k==='no' ? 'Nothing is following you. '+(n===1?'1 device':n+' devices')+' around you, none with you.' : /No GPS/.test(F.s||'') ? 'No sign of anything following you. Remiel needs GPS to test for a follower.' : 'No sign of anything following you. Remiel keeps testing as you move.';
@@ -9428,12 +9444,9 @@ function fillABar(){ const tr=el('trackA'); if(!tr) return; let mine=[], rest=[]
 // is and how far it is, in words you can picture. Tap one to open it. A finger on the bar holds it still.
 const SEE_M=[[1.5,'right next to you'],[5,'a few steps away'],[15,'close by'],[35,'across the street'],[90,'down the street']];
 const seeW = m => { m=+m; if(!(m>0)) return ''; for(const [x,w] of SEE_M) if(m<=x) return w; return 'farther off'; };
-function wbarRank(d){ const tg=tagOf(d), nowS=Date.now()+LIVE.skew, ck=!!(d.chk && nowS-d.chk.t<120000);
-  if(tg==='with') return [0,'moving with you']; if(tg==='watch') return [0,'on your Watch list']; if(d.maybe && d.cls==='Tag') return [0,'staying with you'];
-  if(ck && d.chk.k==='closer') return [0,'came closer when you stopped']; if(ck && d.chk.k==='follow') return [0,'followed you round a corner'];
-  if(tg==='place') return [1,'seen before somewhere else']; if(tg==='sus') return [1,'marked Suspicious']; if(d.maybe) return [1,'staying with you so far']; if(ck && d.chk.k==='pace') return [1,'keeping pace with you'];
+function wbarRank(d){ const v=sevOf(d); if(v.lv==='red') return [0, v.why]; if(v.lv==='amber') return [1, v.why];
   if(portLit() && PORT.why.get(d.sig)==='new') return [2,'new to your Portrait'];
-  return tg==='yours' ? [4,'one of yours'] : [3,'']; }
+  return tagOf(d)==='yours' ? [4,'one of yours'] : [3,'']; }
 function wbarItem(d, rk, why){ const col=rk===0?LOOK.red:rk===1?LOOK.amber:TAG[tagOf(d)].c, far=seeW(d.dist);
   return '<button class="xi'+(rk===0?' hot':rk===1?' warm':'')+'" data-act="art" data-k="'+esc(d.sig)+'"><i style="--mk:'+col+'"></i><b>'+esc(devName(d))+'</b>'+(far?'<span>'+esc(far)+'</span>':'')+(why?'<em>'+esc(why)+'</em>':'')+'</button>'; }
 const WBAR={at:0};
