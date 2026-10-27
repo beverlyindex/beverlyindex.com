@@ -6638,7 +6638,7 @@ function mapFullTick(force){ if(force) mfScale();
 /* ---------- The radar. It sits over the full map and shows every device in range around you at once. Distance is measured; direction is not,
    so here the side of the circle says who a device is: flagged at the top, new on the right, known and yours on the left. Every dot carries its name
    and distance. Each pulses with its signal: the stronger, the faster. A short tail shows whether it is closing on you or moving off. ---------- */
-const radNamed = d => { if(!d) return false; if(d.id===MF.sel || labelOf(d)) return true; const lk=lookOf(d); return !lk.mine && (lk.threat || lk.back || lk.c===LOOK.amber || (tagOf(d)==='fresh' && (d.dist||99)<=15)); };
+const radNamed = d => { if(!d) return false; if(d.id===MF.sel) return true; return !!sevOf(d).lv; };          // a name only on what matters, and on the dot you picked
 const RAD={on:true, mode:'map', raf:0, hits:[], trail:new Map(), last:0, only:'', more:[]};          // mode: off, map (the live map is the radar), who (who is around, by kind)
 const radCat = d => { const t=tagOf(d); return (t==='yours'||t==='known')?'Y':(t==='with'||t==='place'||t==='watch'||t==='sus'||d.maybe)?'F':(t==='local'||t==='again'||t==='pub')?'K':'N'; };
 const RAD_W={Y:'Yours',K:'Known here',N:'New',F:'Flagged'};
@@ -6708,12 +6708,12 @@ function radDraw(now){ const cv=el('mfRadar'); if(!cv) return; const r=cv.getBou
     if(sel){ x.beginPath(); x.arc(px,py,s+10,0,Math.PI*2); x.strokeStyle=C.ink; x.lineWidth=1.5; x.stroke(); }
     x.restore();
     RAD.hits.push([px,py,Math.max(12,s+8),d.id]); });
-  // the dots that matter are named: yours that you named, any you named, red and amber, and new ones within 50 ft. The rest are named in their card, a tap away
+  // the dots that matter are named, at most five: red, then amber, and the one you picked. The rest are named in their card, a tap away
   const boxes=[]; RAD.hits.forEach(h=>boxes.push([h[0]-4,h[1]-4,8,8]));
   const hit=(bx,by,bw,bh)=>bx<4||by<top||bx+bw>W-side-4||by+bh>H-bot||boxes.some(b=>bx<b[0]+b[2]&&bx+bw>b[0]&&by<b[1]+b[3]&&by+bh>b[1]);
   x.textBaseline='middle'; x.textAlign='left';
-  const more={F:[],N:[],K:[]}; RAD.more=[];
-  dots.slice().sort((p,q)=>(q.d.id===MF.sel)-(p.d.id===MF.sel) || (q.c==='F')-(p.c==='F') || p.m-q.m).forEach(o=>{ if(!radNamed(o.d)) return; const t1=o.e.name, t2=o.e.rng+(o.d.chk&&nowS-o.d.chk.t<60000?(o.d.chk.k==='closer'?' · '+langText('came closer'):o.d.chk.k==='follow'?' · '+langText('followed the turn'):''):'');
+  const more={F:[],N:[],K:[]}; RAD.more=[]; let named=0;
+  dots.slice().sort((p,q)=>(q.d.id===MF.sel)-(p.d.id===MF.sel) || (sevOf(q.d).lv==='red')-(sevOf(p.d).lv==='red') || (q.c==='F')-(p.c==='F') || p.m-q.m).forEach(o=>{ if(!radNamed(o.d)) return; if(named>=5 && o.d.id!==MF.sel){ more[o.c==='Y'?'K':o.c].push(o.d.id); return; } const t1=o.e.name, t2=o.e.rng+(o.d.chk&&nowS-o.d.chk.t<60000?(o.d.chk.k==='closer'?' · '+langText('came closer'):o.d.chk.k==='follow'?' · '+langText('followed the turn'):''):'');
     x.font='600 11px '+C.mono; const w1=x.measureText(t1).width; x.font='400 10px '+C.mono; const w=Math.max(w1, x.measureText(t2).width)+6, h=26;
     const s=2.5+6*o.near+5, right=o.px>=cx; let spot=null;
     const tries=[[right?s:-s-w, -h/2],[right?-s-w:s, -h/2],[-w/2,-s-h],[-w/2,s]];
@@ -6721,7 +6721,7 @@ function radDraw(now){ const cv=el('mfRadar'); if(!cv) return; const r=cv.getBou
     if(!spot) for(let k=1;k<=6 && !spot;k++) for(const sg of [-1,1]){ const bx=o.px+(right?s+8:-s-8-w), by=o.py-h/2+sg*k*14; if(!hit(bx,by,w,h)){ spot=[bx,by,true]; break; } }
     if(!spot && (o.d.id===MF.sel || o.c==='F')) spot=[o.px+(right?s:-s-w), o.py-h/2, false];          // the one you picked, and anything flagged, is always named
     if(!spot){ more[o.c==='Y'?'K':o.c].push(o.d.id); return; }
-    const [bx,by,lead]=spot; boxes.push([bx,by,w,h]);
+    const [bx,by,lead]=spot; boxes.push([bx,by,w,h]); named++;
     x.save(); x.globalAlpha=Math.max(.35,o.vis);
     if(lead){ x.beginPath(); x.moveTo(o.px,o.py); x.lineTo(right?bx:bx+w, by+h/2); x.strokeStyle=o.col; x.globalAlpha=.5; x.lineWidth=1; x.stroke(); x.globalAlpha=1; }
     x.fillStyle='rgba(7,11,22,.72)'; x.fillRect(bx,by,w,h);
