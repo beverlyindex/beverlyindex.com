@@ -516,6 +516,10 @@ select.inp{flex:none}
 .walk-e .with{color:var(--action);font-weight:600} .walk-e .placed{color:var(--clear)} .walk-e .gone,.walk-e .gap{color:var(--mut)} .walk-e .warn{color:var(--warn)}
 .alertb{display:flex;align-items:flex-start;gap:10px;margin:0 0 10px;padding:11px 12px;border:1px solid rgba(255,90,90,.6);border-left:5px solid var(--action);border-radius:12px;background:linear-gradient(180deg,rgba(120,22,30,.5),rgba(60,12,20,.5));box-shadow:0 8px 22px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);font-size:13.5px;line-height:1.4}
 .alertb .tx{flex:1;min-width:0} .alertb .tx b{display:block;color:#fff;font-size:14.5px;margin-bottom:2px} .alertb .more{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:4px;display:block}
+.nw-h{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:14px 0 6px} .nw-list{display:flex;flex-direction:column;gap:8px}
+.nw-i{display:block;padding:10px 12px;border:1px solid var(--line2);border-radius:12px;background:rgba(255,255,255,.03);color:var(--ink);text-decoration:none;font-size:13.5px;line-height:1.4}
+.nw-i b{display:block;font-weight:600} .nw-i small{display:block;margin-top:3px;color:var(--dim);font-family:var(--mono);font-size:11px} .nw-i.mine{border-color:rgba(255,196,87,.55);background:rgba(255,196,87,.08)} .nw-i.mine b{color:#ffdfae}
+.news-btn{margin-top:4px}
 .alertb .al-kind{display:block;font-style:normal;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#ffd27a;margin-bottom:3px} .alertb .x{background:none;border:0;color:var(--mut);font-size:20px;line-height:1;padding:2px 4px}
 .rate{display:inline-flex;align-items:center;gap:6px;vertical-align:middle;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--rc);border:1px solid var(--rc);border-radius:999px;padding:1px 9px 1px 2px;white-space:nowrap;background:rgba(0,0,0,.25)}
 .rate b{flex:none;display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--rc);color:#0a0f1e;font-size:11px;font-weight:700}
@@ -814,7 +818,8 @@ select.inp.sm{padding:4px 8px;font-size:12px;width:auto;min-width:0}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
 
 /* tickers */
-.ticker{position:relative;height:50px;overflow:hidden;border-top:1px solid var(--line);background:rgba(8,14,28,.55);display:flex;align-items:center}
+.ticker{display:none!important}          /* the news has its own page now: Security news */
+.ticker0{position:relative;height:50px;overflow:hidden;border-top:1px solid var(--line);background:rgba(8,14,28,.55);display:flex;align-items:center}
 .ticker .lead{position:absolute;left:0;top:0;bottom:0;z-index:2;display:flex;align-items:center;
   padding:0 34px 0 12px;background:linear-gradient(90deg,#080d1a 86%,rgba(8,13,26,0))}
 .ticker .track{display:flex;gap:40px;white-space:nowrap;padding-left:158px;animation:marq 60s linear infinite;font-size:12.5px;color:var(--mut)}
@@ -2551,7 +2556,7 @@ function renderOverview(){
   if(!g && can('wa')) h+='<div class="prelim">Register as of '+REGISTER_DATE+'. '+(S.globalErr?'Remiel keeps trying the live feed':'Reaching the live feed')+'</div>';
   const kevN=(g&&g.kev)?g.kev.recent.length:0, answered=PROFILE_Q.filter(q=>pv(q.k)!==null).length;
   const openN=THREATS.filter(t=>t.shelf==='real'&&scopeOf(t)===true&&isOpen(t)).length;
-  h+=planCard()+'<div class="home4" id="homeTiles">'+homeTiles()+'</div>';
+  h+=planCard()+'<div class="home4" id="homeTiles">'+homeTiles()+'</div><div class="formrow" style="margin:0 0 12px"><button class="btn wide news-btn" data-act="news">Security news</button></div>';
   if(can('wa')) h+='<div class="verdict"><div class="ring">'+a.n+'</div><div><div class="vt">'+esc(a.title)+'</div><div class="vs">'+a.s+'</div><div class="vm">'+esc(a.meta)+'</div>'+
      '<div class="chips"><span class="chip '+(a.side==='Watchers'?'w':a.side==='Attackers'?'a':'')+'">'+esc(a.side)+'</span><span class="chip real">'+real+' Real &amp; Imminent</span><span class="chip pot">'+pot+' Potential</span></div></div></div>';
   if(can('full')){ const lr=reportLast(); h+='<div class="formrow" style="margin:0 0 12px"><button class="btn gold wide" data-act="report-new">New report: every threat in the register, explained</button>'+(lr?'<button class="btn wide" data-act="report">Last report, No. '+lr.n+', '+hhmm(lr.t)+'</button>':'')+'</div>'; }
@@ -4913,7 +4918,7 @@ function grouped(side, list, lead){ const used=new Set(); let h='';
   return h; }
 function renderAttackers(){
   const list=THREATS.filter(t=>t.side==='a' && t.shelf===S.shelf);
-  el('aMain').innerHTML='<div class="pagehead"><h2>Attackers</h2><p>The technologies used against people that Remiel tracks: AI, spyware, trackers, data brokers, network sensing. Real &amp; Imminent is in use against people now. Potential is demonstrated or announced.</p></div>'+
+  el('aMain').innerHTML='<div class="pagehead"><h2>Attackers</h2><p>The technologies used against people that Remiel tracks: AI, spyware, trackers, data brokers, network sensing. Real &amp; Imminent is in use against people now. Potential is demonstrated or announced.</p><button class="btn sm news-btn" data-act="news">Security news</button></div>'+
     '<div class="seg" style="margin-bottom:14px"><button data-act="shelf" data-s="real" class="m-a '+(S.shelf==='real'?'on':'')+'" style="min-width:150px">Real &amp; Imminent</button>'+
     '<button data-act="shelf" data-s="potential" class="m-auto '+(S.shelf==='potential'?'on':'')+'" style="min-width:150px">Potential</button></div>'+
     '<div class="stack">'+(S.shelf==='real'?grouped('a',list,trapPull()+aiPull()):list.map(threatPull).join(''))+'</div>';
@@ -9010,7 +9015,7 @@ function fileSet(sig, f, quiet){ if(!sig) return false; f=FILE[f]?f:''; const wa
   return true; }
 // The File sheet: one device, its file, your name for it and a note.
 function fileOpen(sig){ if(!sig) return; S.fs={k:sig, pick:fileOf(sig)}; fsRender(); ovShow('fsheet'); }
-function fsRender(){ const F=S.fs, b=el('fsBody'); if(!F || !b) return; if(F.mode==='sort') return sortRender(b); if(F.mode==='home') return homeSigRender(b); if(F.mode==='port') return portIntroRender(b); const k=F.k, w=watchInfo(k), d=w.d, h=ELOG.hist.get(k)||{}, nm=watchName(k), lbl=(P.labels||{})[w.id]||'', was=fileOf(k);
+function fsRender(){ const F=S.fs, b=el('fsBody'); if(!F || !b) return; if(F.mode==='sort') return sortRender(b); if(F.mode==='home') return homeSigRender(b); if(F.mode==='port') return portIntroRender(b); if(F.mode==='news') return newsRender(b); const k=F.k, w=watchInfo(k), d=w.d, h=ELOG.hist.get(k)||{}, nm=watchName(k), lbl=(P.labels||{})[w.id]||'', was=fileOf(k);
   const rot = d ? d.randomizes===true : rosterRot({name:w.adv, cls:w.cls, hint:w.hint}), live=!!(d && d.present);
   const opt = f => '<button class="fs-opt'+(F.pick===f.k?' on':'')+'" data-act="file-pick" data-f="'+f.k+'" style="--fc:'+FILE_C[f.k]+'" aria-pressed="'+(F.pick===f.k?'true':'false')+'"><i class="sdot" style="--mk:'+FILE_C[f.k]+'"></i><b>'+esc(f.w)+'</b><small>'+esc(f.s)+'</small></button>';
   let x='<h3 id="fsTitle">File this device</h3><div class="fs-dev"><b>'+esc(nm)+'</b><small>'+esc([d?kindShort(d):(w.hint||KIND_WORD[w.cls]||''), live?'here now, '+duAbout(d):h.last?'last heard '+whenW(h.last):''].filter(Boolean).join(' · '))+'</small></div>'+
@@ -9319,6 +9324,12 @@ function myFindings(side){
     .forEach(r=>out.push({t:'Your finding: '+r.text.slice(0,140), src:'Evidence · '+new Date(r.t).toLocaleDateString()+' '+hhmm(r.t), mine:true}));
   return out;
 }
+// Security news: what concerns you now first (your own sensors and findings, flaws under attack in your own devices), then the world, each with its source.
+function newsRender(b){ const sec=(title, items)=>'<div class="nw-h">'+esc(title)+'</div><div class="nw-list">'+items.map(f=>{ const inner='<b>'+esc(f.t)+'</b><small>'+esc(f.src||'')+'</small>';
+    return f.u ? '<a class="nw-i'+(f.mine?' mine':'')+'" href="'+esc(f.u)+'" target="_blank" rel="noopener">'+inner+'</a>' : '<div class="nw-i'+(f.mine?' mine':'')+'">'+inner+'</div>'; }).join('')+'</div>';
+  let w=[], a=[]; try{ w=myFindings('w').concat(liveFeedW(), FEED_W); a=myFindings('a').concat(liveFeedA(), FEED_A); }catch(e){ w=FEED_W; a=FEED_A; }
+  b.innerHTML='<h3 id="fsTitle">Security news</h3><p class="fs-p">What concerns you comes first, marked in gold. Then the wider news, each item with its source.</p>'+sec('Watchers', w)+sec('Attackers', a)+
+    '<div class="formrow fs-btns"><button class="btn primary" data-act="file-close">Close</button></div>'; }
 function fillTickers(){ if(!el('trackW')) return; fillTicker('trackW', myFindings('w').concat(liveFeedW(), FEED_W)); fillTicker('trackA', myFindings('a').concat(liveFeedA(), FEED_A)); }
 
 /* ---------- navigation and rendering ---------- */
@@ -9601,6 +9612,7 @@ document.addEventListener('click', e=>{
     case 'port': portToggle(); break;
     case 'port-acct': S.portAcct=!S.portAcct; S._rsig=''; renderVicinity(); break;
     case 'port-intro': portIntro(); break;
+    case 'news': S.fs={mode:'news'}; fsRender(); ovShow('fsheet'); break;
     case 'port-go': S.fs=null; ovHide('fsheet'); if(!portOn()) portOpen(); break;
     case 'hs-open': homeSigOpen(); break;
     case 'hs-up': case 'hs-dn': { const F=S.fs; if(F && F.mode==='home'){ const k=a.dataset.k; F.set[k]=Math.max(0, Math.min(30, (F.set[k]||0)+(act==='hs-up'?1:-1))); fsRender(); } break; }
