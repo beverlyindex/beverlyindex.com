@@ -7167,136 +7167,61 @@ function reportHTML(){
   const tbl=(head,rows)=>'<div class="rp-wide"><table><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+'</table></div>';
   const vicWord = live ? (withYou.length?plural(withYou.length,'device','devices')+' with you':plural(near.length,'device','devices')+' in range') : V.mode==='live' ? 'Test data only' : 'Unknown';
   const sideWord = side=>{ const xs=applies.filter(r=>r.t.side===side), o=xs.filter(r=>r.n&&r.dn<r.n).length; return !answered?'Profile to answer':!xs.length?'None apply':o?o+' of '+xs.length+' open':'Defended'; };
-  let h='';
-  // ---- title
-  h+='<h1>Remiel Technologies Full Report</h1><p class="rp-sub">Every threat in the Remiel register, and where you stand against each</p>'+
+  const km=kevMine(), prev=(P.reports||[])[0];
+  const trend=!prev?'':prev.open===open.length&&prev.tier===a.t?'Unchanged since the report of '+dstr(new Date(prev.t))+': '+plural(open.length,'threat','threats')+' open then and now.'
+    :open.length<prev.open?'Improving. Open threats fell from '+prev.open+' to '+open.length+' since the report of '+dstr(new Date(prev.t))+'.':open.length>prev.open?'Worsening. Open threats rose from '+prev.open+' to '+open.length+' since the report of '+dstr(new Date(prev.t))+'.':'The bottom line moved from '+(prev.tier<0?'Unknown':TIER_NAME[prev.tier])+' to '+tier+' since the report of '+dstr(new Date(prev.t))+'.';
+  // every action, the most serious first
+  const plan=[];
+  if(withYou.length) plan.push([e(devName(withYou[0]))+' is moving with you. Open it in Signals and decide whether it is yours; if it is not, check your bag, your coat and your car.', 'Moving with you']);
+  if(!answered||unknown.length) plan.push(['Answer the '+(PROFILE_Q.length-answered)+' open profile questions', 'Your profile']);
+  for(let pass=0; pass<2 && plan.length<10; pass++) open.forEach(r=>{ if(plan.length>=10) return; const d=doneMap(r.t), ss=stepsOf(r.t).filter(x=>!d[x.i]); const x=ss[pass]; if(x) plan.push([e(x.t), e(r.t.name)]); });
+  if(km.length && plan.length<10) plan.push(['Install the update for '+e(kevWords(km[0]).name)+(km.length>1?' and for the other products in section 4':''), 'Flaws under attack']);
+  if(!hc.at && plan.length<10) plan.push(['Run the Device Health Check on each device you own', 'Device Health Check']);
+  const why = withYou.length ? e(withYou.map(devName).join(', '))+' '+(withYou.length===1?'is':'are')+' moving with you.'
+    : !answered ? 'Answer your profile, and Remiel rates every threat for you.'
+    : open.length ? (open.length===1 ? '1 threat that applies to you has defense steps still open.' : open.length+' threats that apply to you have defense steps still open.')+' The most serious is '+e(open[0].t.name)+'.'
+    : applies.length ? 'Every defense step that applies to you is done.' : 'None of the threats in use today applies to you.';
+  const facts=[['Around you now:', e(vicWord)], ['Threats that apply to you:', !answered ? 'answer your profile' : applies.length+' of '+R.length+(open.length ? ', '+open.length+' with steps open' : ', all defended')],
+    ['This device:', !hc.at ? 'health check not run yet' : hc.att ? plural(hc.att,'item needs','items need')+' attention' : 'in order']];
+  if(km.length) facts.push(['Flaws under attack:', plural(km.length,'flaw touches','flaws touch')+' your kind of phone or home network equipment']);
+  if(trend) facts.push(['Trend:', e(trend)]);
+  let sn=0, ax=0; const H2=t=>'<h2>'+(++sn)+'. '+t+'</h2>', AX=t=>'<h3>'+String.fromCharCode(65+(ax++))+'. '+t+'</h3>';
+  let h='<h1>Remiel Technologies Full Report</h1><p class="rp-sub">Where you stand, and what to do next</p>'+
      '<div class="rp-meta">Report RH-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+
      ' &nbsp;·&nbsp; '+dstr(now)+', '+tstr(now)+' &nbsp;·&nbsp; Prepared on '+e(Y.name||'this device')+' ('+e(HK_NAME[HK()])+') &nbsp;·&nbsp; Register as of '+e(REGISTER_DATE)+'</div>';
-  // ---- 1 summary
-  h+='<h2>1. Summary</h2><p>Bottom line: <span class="rp-tier">'+e(tier)+'</span></p>'+
-     '<div class="rp-bar4"><div><span>Signals</span><b>'+e(sideWord('w'))+'</b></div><div><span>Attackers</span><b>'+e(sideWord('a'))+'</b></div><div><span>Around you</span><b>'+e(vicWord)+'</b></div><div><span>This device</span><b>'+e(!hc.at?'Not checked':hc.att?hc.att+' need attention':'In order')+'</b></div></div>';
-  if(!answered) h+='<p>Answer your profile and Remiel matches every threat in its register to you. It takes about two minutes, and it is the first action in the plan below.</p>';
-  else h+='<p>'+plural(applies.length,'threat','threats')+' of the '+R.length+' in use against people today '+(applies.length===1?'is':'are')+' real to you, on the strength of your own profile answers. '+
-       (done.length?plural(done.length,'has','have')+' every defense step ticked. ':'')+
-       (open.length?plural(open.length,'still has','still have')+' steps to tick. Start with '+e(open[0].t.name)+': what it reaches is '+e(lowerFirst(open[0].t.impact))+'.':'Every defense step that applies to you is ticked.')+
-       (unknown.length?' '+plural(unknown.length,'more is','more are')+' decided as soon as you answer the remaining profile questions.':'')+'</p>';
-  h+='<p>'+(live ? 'A sensor is reporting, and '+plural(near.length,'device is','devices are')+' in range. '+(withYou.length?e(withYou.map(devName).join(', '))+' '+(withYou.length===1?'has':'have')+' met the test for moving with you. Treat this as the first priority, and read the advisory in section 8 before you act.':'None has met the test for moving with you.')+(route.length?' '+plural(route.length,'device has','devices have')+' been heard in more than one place on your route.':'')
-        : V.mode==='live' ? 'The sensor data on this account is test data.'
-        : e(stateWords(ls).long))+'</p>';
-  const first=open.slice(0,3).map(r=>({r, s:nextStep(r)})).filter(x=>x.s);
-  if(first.length) h+='<p>What to do first: '+first.map((x,i)=>'('+(i+1)+') '+e(x.s.t.replace(/\.$/,''))+', which belongs to '+e(x.r.t.name)).join('; ')+'. The full plan is in section 7.</p>';
-  // ---- 2 reason and scope
-  const sens=Object.keys(P.sensors||{}).map(k=>P.sensors[k]);
-  h+='<h2>2. Reason for this report, and what was assessed</h2><p>This report was run on request. It sets out every threat in the Remiel register, rates each one for you from 1 to 5, and records what you have done about it. It draws on four things: your profile answers, the steps you have ticked, what your own sensors have reported, and public sources. Everything is processed on your own devices.</p>'+
-    tbl(['What was assessed','State at the time of the report'],[
-      ['Your profile',answered+' of '+PROFILE_Q.length+' questions answered'],
-      ['Phone platform used for the steps',e(PLAT_NAME[plat()])],
-      ['Sensors on the account',sens.length?e(sens.map(x=>x.name+' ('+(SENSOR_KIND[x.kind]||x.kind)+')').join(', ')):'None'],
-      ['Devices near you',e(live?'Live from your sensor':V.mode==='live'?'Test data':stateWords(ls).cov)],
-      ['Bluetooth, Wi-Fi and cell signals',e(['ble','wifi','cell'].map(b=>({ble:'Bluetooth',wifi:'Wi-Fi',cell:'Cell'})[b]+': '+(LIVE.bands[b]&&Date.now()+LIVE.skew-LIVE.bands[b]<3*LIVE_SILENT?'reported'+(b==='wifi'?', '+wifiNow().length+' access points':b==='cell'&&cellWords()?', '+cellWords():''):(b==='ble'||NATIVE()?'reports when listening':'reported by the Remiel Android app'))).join('. '))],
-      ['Your position',e(S.pos?'Live, within '+du(S.pos.acc):'Starts when location is allowed')],
-      ['Global feed',e(g?'Live, generated '+fmtDT(g.generated)+', '+g.sources.filter(x=>x.ok).length+' of '+g.sources.length+' sources':'Register of '+REGISTER_DATE)],
-      ['Remiel account',e(SY.status==='on'?'Signed in, '+plural((SY.devices||[]).length,'device','devices'):'Not signed in')]]);
-  // ---- 3 around you
-  h+='<h2>3. What is around you</h2>';
-  if(live && near.length){ const ds=[...near].sort((x,y)=>(y.withYou?1:0)-(x.withYou?1:0)||x.dist-y.dist).slice(0,14);
-    h+='<p>These are the devices your sensor heard at the time of the report, nearest and most serious first.</p>'+
-      tbl(['Device','Kind','Distance','Placement','Standing'], ds.map(d=>[e(devName(d)), e(kindText(d)), e(distText(d)), e(d.fix?'Placed, within '+du(d.fix.unc):d.sector?'Direction rough':'Direction pending'), e(d.mine?'Yours':d.withYou?'With you':d.onRoute?'Seen on your route':d.knownBefore?'Known':'New')]))+
+  h+=rpBluf({level:e(tier), cls:a.t<0?'':a.t>=3?'t3':a.t>=1?'t2':'t0', line:why, todo:plan.slice(0,3).map(x=>x[0]), facts});
+  // what to do
+  h+=H2('What to do')+(plan.length ? '<p>In order, the most serious first. Each action is one step from its record in Remiel, where the full procedure is set out.</p>'+tbl(['Action','For'], plan.map((x,i)=>[(i+1)+'. '+x[0], x[1]])) : '<p>Nothing is outstanding. Run this report again next week.</p>');
+  if(withYou.length) h+='<h3>Before you act</h3><ul class="rp-list">'+['Reach a safe place, or the police, before you disable a tracker you find. Whoever placed it may be told when it stops.','Record what you found before you erase or reset a phone. Evidence keeps it, fingerprinted and dated.','Talk about your findings on a device you trust.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+  // what is around you
+  h+=H2('What is around you');
+  if(live && near.length){ const ds=[...near].sort((x,y)=>(y.withYou?1:0)-(x.withYou?1:0)||x.dist-y.dist).slice(0,10);
+    h+=tbl(['Device','Kind','How far','Standing'], ds.map(d=>[e(devName(d)), e(kindText(d)), e(seeW(d.dist)||distText(d)), e(d.mine?'Yours':d.withYou?'With you':d.onRoute?'Seen on your route':d.knownBefore?'Known':'New')]))+
       (near.length>ds.length?'<p>'+(near.length-ds.length)+' more are listed in Signals.</p>':''); }
   else h+='<p>'+(live?'Your sensor is reporting, and nothing is in range at this moment.':'Start listening and this section lists every device around you, with its maker, its distance, its direction, and whether it is moving with you.')+'</p>';
   if(W.t0 && W.t1 && !W.test){ const st=walkStats(), wy=Object.values(W.devs).filter(r=>r.withYou&&!r.mine);
-    h+='<h3>Last recorded trip</h3><p>On '+dstr(new Date(W.t0))+', from '+hhmm(W.t0)+' to '+hhmm(W.t1)+', you covered '+e(miText(st.distance_m))+'. Your sensor heard '+plural(st.heard,'device','devices')+', placed '+st.placed+', and flagged '+st.withYou+' as moving with you'+(wy.length?': '+e(wy.map(r=>r.label||r.call).join(', ')):'')+'.'+'</p>'; }
-  // ---- 4 bottom line detail
-  const stepsAll=applies.reduce((n,r)=>n+r.n,0), stepsDone=applies.reduce((n,r)=>n+Math.min(r.dn,r.n),0), spAll=applies.reduce((n,r)=>n+r.sp.n,0), spDone=applies.reduce((n,r)=>n+r.sp.dn,0), hitsAll=THREATS.reduce((n,t)=>n+((P.hits||{})[t.id]||0),0);
-  h+='<h2>4. The bottom line in detail</h2><p>The bottom line is set by three of the components below: a device that meets the test for moving with you, the highest rating among the threats real to you, and the number of threats with defense steps still to tick. The others are shown for your record.</p>'+
-    tbl(['Component','Reading','What it means'],[
-      ['Your path',(ps=>ps.rank+', level '+ps.lvl+' of 5, '+ps.dn+' of '+ps.all+' steps done')(pathState()),'Five stages, from set-up to staying ahead'],
-      ['Threats real to you',answered?applies.length+' of '+R.length:'Profile to answer','Decided by your profile answers alone'],
-      ['Defense steps complete',stepsAll?stepsDone+' of '+stepsAll:'None to count','Each step is one setting or habit that closes one path'],
-      ['Special countermeasures complete',spAll?spDone+' of '+spAll:'None to count','Stronger steps, for a threat you believe is active'],
-      ['Findings you have logged',String(hitsAll),'Your own observations, kept in Evidence. An open finding rates its threat 4 or 5'],
-      ['Devices moving with you',live?String(withYou.length):'Starts with listening','One or more raises the bottom line to Take Action'],
-      ['Global feed',e(g?'Live, '+fmtDT(g.generated):'Register of '+REGISTER_DATE),'Flaws under active attack and public advisories'],
-      ['Device health',e(!hc.at?'Ready to run':hc.ok+' pass, '+hc.att+' to attend to'),'What this device reports about itself'],
-      ['Evidence chain',plural(P.evidence.length,'entry','entries'),'Each entry is fingerprinted and chained to the one before']]);
-  // ---- 5 register
-  const reg=rs=>tbl(['Threat','What it is','Rating','Defense','Special','Findings','Status'], rs.map(r=>['<b>'+e(r.t.name)+'</b>', e(r.t.short), r.rate?'<b>'+r.rate.n+'</b> '+e(r.rate.w):r.sc===false?'Does not apply':r.t.shelf!=='real'?'Potential':'To answer', r.n?r.dn+' of '+r.n:'None', r.sp.n?r.sp.dn+' of '+r.sp.n:'None', String(r.hits), e(r.st)]));
-  h+='<h2>5. The threat register, in full</h2><p>Every threat Remiel tracks is listed, with its rating for you. The rating names what set it. 1, every defense step ticked. 2, half or more ticked. 3, steps still open. 4, a finding or a sign on record. 5, a sign a sensor shows now, or a finding logged this week. Signals are the devices and networks around you that can reveal where you are and what you do. Attackers are those who take over a device, an account or an identity.</p>'+
-     '<h3>Signals, in use today</h3>'+reg(R.filter(r=>r.t.side==='w'))+'<h3>Attackers, in use today</h3>'+reg(R.filter(r=>r.t.side==='a'))+
-     (POT.length?'<h3>Potential: not in use against people yet</h3>'+tbl(['Threat','What it is','When','Defense'],POT.map(r=>['<b>'+e(r.t.name)+'</b>',e(r.t.short),e(r.t.imminence||'Not known'),r.n?r.dn+' of '+r.n:'None available yet'])):'');
-  const explain=R.filter(r=>r.sc!==false);
-  if(explain.length){ h+='<h3>What each one means for you</h3>';
-    explain.forEach(r=>{ const nx=nextStep(r);
-      h+='<p><b>'+e(r.t.name)+' ('+e(r.st.toLowerCase())+').</b> '+e(r.t.what)+' '+e(r.t.where)+(r.sc===null?' Answer your profile and Remiel rates it for you.':'')+
-         (nx&&r.sc!==null?' Your next step: '+e(lowerFirst(nx.t.replace(/\.$/,'')))+'.':'')+(r.n&&r.dn>=r.n?' Every defense step is complete.':'')+'</p>'; }); }
-  // ---- 6 risk assessment
-  const prev=(P.reports||[])[0];
-  const trend=!prev?'This is the first report on this device, so there is no trend yet.':prev.open===open.length&&prev.tier===a.t?'Unchanged since the report of '+dstr(new Date(prev.t))+': '+plural(open.length,'threat','threats')+' open then and now.'
-    :open.length<prev.open?'Improving. Open threats fell from '+prev.open+' to '+open.length+' since the report of '+dstr(new Date(prev.t))+'.':open.length>prev.open?'Worsening. Open threats rose from '+prev.open+' to '+open.length+' since the report of '+dstr(new Date(prev.t))+'.':'The bottom line moved from '+(prev.tier<0?'Unknown':TIER_NAME[prev.tier])+' to '+tier+' since the report of '+dstr(new Date(prev.t))+'.';
-  const prot=[], risk=[];
-  if(done.length) prot.push('Fully defended: '+e(done.map(r=>r.t.name).join(', '))+'.');
-  if(live) prot.push('A sensor is reporting, so devices near you are being recorded.');
-  if((SY.devices||[]).length>=2) prot.push('Your account is held on '+SY.devices.length+' devices, so losing one does not lose it.');
-  if(hc.at&&hc.ok) prot.push(plural(hc.ok,'device health check passes','device health checks pass')+' on this device.');
-  if(P.patch&&P.patch.length) prot.push('Security update dates are recorded for '+plural(P.patch.length,'device','devices')+'.');
-  if(withYou.length) risk.push(e(withYou.map(devName).join(', '))+' '+(withYou.length===1?'is':'are')+' moving with you.');
-  open.slice(0,6).forEach(r=>risk.push(e(r.t.name)+': '+(r.n-r.dn)+' of '+r.n+' defense steps not done. It reaches '+e(lowerFirst(r.t.impact))+'.'));
-  if(unknown.length) risk.push(plural(unknown.length,'threat is','threats are')+' waiting on your profile answers.');
-  if(!live) risk.push('Listening is off. Switch it on and Remiel watches for trackers and followers around you.');
-  if(hc.at&&hc.att) risk.push(plural(hc.att,'device health item needs','device health items need')+' attention on this device.');
-  if(!hc.at) risk.push('The Device Health Check is ready to run on this device.');
-  const km=kevMine(); if(km.length) risk.push(plural(km.length,'flaw','flaws')+' under active attack '+(km.length===1?'touches':'touch')+' your kind of phone or home network equipment.');
-  h+='<h2>6. Risk assessment</h2>'+tbl(['Item','Assessment'],[['Level','<b>'+e(tier)+'</b>'],['Trend',e(trend)],['Monitoring schedule','Run this report once a week. Run it at once after travel, after a new phone or account, and after any With you alert. Check security update dates once a month.']])+
-    '<h3>What is protecting you</h3>'+(prot.length?'<ul class="rp-list">'+prot.map(x=>'<li>'+x+'</li>').join('')+'</ul>':'<p>Nothing is recorded yet. Each completed step will appear here.</p>')+
-    '<h3>What is exposing you</h3>'+(risk.length?'<ul class="rp-list">'+risk.map(x=>'<li>'+x+'</li>').join('')+'</ul>':'<p>Nothing is recorded as open.</p>');
-  // ---- 7 defense plan
-  const plan=[]; if(!answered||unknown.length) plan.push(['Answer the '+(PROFILE_Q.length-answered)+' open profile questions','Your profile','Lets Remiel rate every threat for you']);
-  if(withYou.length) plan.push(['Open Signals and work through the record for '+e(devName(withYou[0])),'Signal Roster','Read the advisory in section 8 first']);
-  for(let pass=0; pass<2 && plan.length<10; pass++) open.forEach(r=>{ if(plan.length>=10) return; const d=doneMap(r.t), ss=stepsOf(r.t).filter(x=>!d[x.i]); const x=ss[pass]; if(x) plan.push([e(x.t), e(r.t.name), e(x.fx||'Closes one path this threat uses')]); });
-  if(!hc.at) plan.push(['Run the Device Health Check on each device you own','Device Health Check','Shows what each device reports about itself']);
-  if(!live && !Object.keys(P.sensors||{}).length) plan.push(['Add the home listener on a computer that stays at home','Devices and sync','Remiel then records the devices near your home']);
-  h+='<h2>7. Defense plan</h2>'+(plan.length?'<p>The actions are in order. The most serious open threat comes first, and each action is one step taken from its record in Remiel, where the full procedure is set out.</p>'+tbl(['','Action','Belongs to','Effect'],plan.map((x,i)=>[String(i+1)].concat(x))):'<p>No action is outstanding. Keep the monitoring schedule in section 6.</p>');
-  // ---- 8 advisory
-  h+='<h2>8. Advisory</h2><ul class="rp-list">'+
-    ['Act on patterns. A device that stays with you across a trip is a finding. A single reading is a lead.',
-     'Reach a safe place, or the police, before you disable a tracker you find. Whoever placed it may be told when it stops.',
-     'Record what you found before you erase or reset a phone. Evidence keeps it, fingerprinted and dated.',
-     'Talk about your findings on a device you trust.',
-     'Bring your Evidence export when you ask for help. It shows what was found, where and when.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>';
-  // ---- 9 global picture
-  h+='<h2>9. The wider picture</h2>';
-  if(!g) h+='<p>This section fills in as soon as the live feed is reached. The register in section 5 stands as of '+e(REGISTER_DATE)+'.</p>';
-  else { h+='<p>The feed was generated on '+e(fmtDT(g.generated))+' from '+g.sources.filter(x=>x.ok).length+' of '+g.sources.length+' public sources.'+(g.kev?' The United States catalog of flaws under active attack listed '+g.kev.recentAll+' in the last '+g.kev.windowDays+' days.':'')+'</p>';
-    if(km.length) h+='<h3>Flaws under active attack in '+e(kevFam())+'</h3>'+tbl(['Product','Flaw','Listed'],km.slice(0,8).map(v=>[e(v.vendor+' '+v.product),e(v.cve)+(v.ransomware?' (used in ransomware)':''),e(v.added)]))+'<p>The date is the day each flaw joined the catalog. Open the entry to see which products and versions it names, then install the update it gives.</p>';
-    else if(g.kev) h+='<p>No flaw listed in that period touches your kind of phone or home network equipment.</p>';
-    const items=(k,n)=>(g[k]||[]).slice(0,n).map(x=>[e(x.t),e(x.src),e(x.d)]);
-    const news=items('advisories',4).concat(items('consumer',3),items('privacy',3));
-    if(news.length) h+='<h3>Latest from the sources</h3>'+tbl(['Headline','Source','Date'],news); }
-  h+='<h3>AI agent incidents, reviewed as of '+e(AI_REVIEWED)+'</h3><p>Each was read at its primary source and has one independent corroboration. The full entries, with who each source holds responsible, are in Attackers under AI Agent Incidents.</p>'+
-     tbl(['Incident','Reported by','Date','What it means for you'],AI_INCIDENTS.slice(0,6).map(x=>[e(x.t),e(x.pn),e(fmtD(x.d)),e(x.you)]));
-  // ---- 10 device health
-  h+='<h2>10. Device health</h2>';
-  if(!hc.at) h+='<p>Run the Device Health Check and this section reports on the system, the browser, the screen lock, the clock and your account on this device. It takes a few seconds.</p>';
-  else { const LBL={ok:'Pass',att:'Attention',unk:'Yours to confirm'};
-    h+='<p>Checked on '+dstr(new Date(hc.at))+' on this '+e(HK_NAME[HK()])+'. You have confirmed '+hc.ticks+' of the '+hc.g+' settings that only you can read.</p>'+tbl(['Item','Result','Detail'],P.health.auto.items.map(x=>[e(x.name),LBL[x.st],e(x.txt)])); }
-  // ---- 11 tracking over time
-  const nextD=new Date(now.getTime()+7*86400000);
-  h+='<h2>11. Tracking over time</h2>'+((P.reports||[]).length?tbl(['Earlier report','Bottom line','Real to you','Open'],P.reports.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), x.tier<0?'Unknown':TIER_NAME[x.tier], String(x.applies), String(x.open)])):'<p>This is the first report on this device. Later reports will be compared with it here.</p>')+
-     '<p>The bottom line rises to Take Action when any device meets the test for moving with you. It rises to Warning while three or more threats real to you have open defense steps, and it falls to Watch at two or fewer. It reads Clear when every applicable defense is complete.</p><p>Next review: '+dstr(nextD)+'.</p>';
-  // ---- 12 evidence
-  h+='<h2>12. Evidence</h2><p>The Evidence chain on this device holds '+plural(P.evidence.length,'entry','entries')+'. Each entry carries a fingerprint and the fingerprint of the entry before it, so a later change to any entry can be detected.'+(P.evidence.length?' The newest fingerprint is '+e(String(P.prevHash).slice(0,16))+'.':'')+'</p>'+
-     (P.evidence.length?tbl(['When','Kind','Entry'],P.evidence.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), e(x.kind), e(x.text.length>170?x.text.slice(0,170)+' ...':x.text)])):'')+
-     ((P.log||[]).length?'<h3>Your log</h3><p>'+plural(P.log.length,'entry','entries')+' in your own words, newest first. An edited entry shows its present wording and the time of the edit; the earlier wording is kept in Remiel.</p>'+
-       tbl(['Written','Entry','Edited'],P.log.slice(0,25).map(x=>[e(stamp(x.t)), e(x.text.length>600?x.text.slice(0,600)+' ...':x.text), x.n?e(stamp(x.e))+(x.n>1?', '+x.n+' edits':''):'']))+(P.log.length>25?'<p>'+(P.log.length-25)+' earlier entries are in Remiel, under Evidence.</p>':''):'');
-  // ---- 13 limits
-  h+='<h2>13. What Remiel did for this report</h2><ul class="rp-list">'+
-    ['Matched all '+THREATS.length+' threats in its register to your profile, and counted every defense and Special step you have completed.',
-     live?'Read your sensor live, and tested each device around you for movement with you.':'Held your sensor set-up ready: listening starts with one press.',
-     g?'Read the live feed from '+g.sources.filter(x=>x.ok).length+' public sources, generated '+e(fmtDT(g.generated))+'.':'Used its register of '+e(REGISTER_DATE)+'.',
-     hc.at?'Checked what this device reports about itself, '+hc.n+' items.':'Prepared the Device Health Check for this device.',
-     'Fingerprinted and chained every Evidence entry.',
-     'Kept the record on your own devices, and encrypted what syncs between them.', 'Sent positions only for the street names and routes you asked for.'].map(x=>'<li>'+x+'</li>').join('')+'</ul>'+
-    '<div class="rp-foot">Generated by Remiel Technologies. Produced on your own device from your own entries, your own sensors and public sources. Whether a court accepts this record is for the court. Changes you make to a device, an account or software are yours to decide and yours to carry.</div>';
+    h+='<p><b>Last trip.</b> On '+dstr(new Date(W.t0))+', from '+hhmm(W.t0)+' to '+hhmm(W.t1)+', you covered '+e(miText(st.distance_m))+'. Your sensor heard '+plural(st.heard,'device','devices')+', placed '+st.placed+', and flagged '+st.withYou+' as moving with you'+(wy.length?': '+e(wy.map(r=>r.label||r.call).join(', ')):'')+'.'+'</p>'; }
+  // the threats that apply to you
+  const ord=applies.slice().sort((x,y)=>((y.rate||{}).n||0)-((x.rate||{}).n||0) || IMPACT_W(y.t.impact)-IMPACT_W(x.t.impact) || x.dn-y.dn);          // in the order of the plan
+  h+=H2('Threats that apply to you')+(!answered ? '<p>Answer your profile, and this section lists the threats that apply to you, each rated from 1 to 5.</p>'
+    : ord.length ? tbl(['Threat','Rating','Defense steps done'], ord.map(r=>['<b>'+e(r.t.name)+'</b>', r.rate?'<b>'+r.rate.n+'</b> '+e(r.rate.w):'', r.n?r.dn+' of '+r.n:'None']))+
+      '<p>The rating. 1, every defense step done. 2, half or more done. 3, steps still open. 4, a finding or a sign on record. 5, a sign a sensor shows now, or a finding logged this week.</p>'
+    : '<p>None of the threats in use today applies to you.</p>');
+  // flaws under attack in your devices
+  if(km.length) h+=H2('Flaws under active attack in your devices')+tbl(['Product','Flaw','Listed'], km.slice(0,8).map(v=>[e(v.vendor+' '+v.product), e(v.cve)+(v.ransomware?' (used in ransomware)':''), e(v.added)]))+'<p>Install the update the maker gives for each one.</p>';
+  // the annex
+  // the rest of the register: what does not apply to you, or waits on your profile, and what is not in use against people yet
+  const rest=R.filter(r=>r.sc!==true);
+  h+='<h2 class="rp-annex">Annex: supporting detail</h2>';
+  if(rest.length||POT.length) h+=AX('The rest of the register')+'<p>Signals are the devices and networks around you that can reveal where you are and what you do. Attackers are those who take over a device, an account or an identity.</p>'+
+     (rest.length?tbl(['Threat','Kind','For you'], rest.map(r=>['<b>'+e(r.t.name)+'</b>', r.t.side==='w'?'Signals':'Attackers', r.sc===false?'Does not apply':'Profile to answer'])):'')+
+     (POT.length?'<p><b>Potential: not in use against people yet</b></p>'+tbl(['Threat','When','Defense'],POT.map(r=>['<b>'+e(r.t.name)+'</b>',e(r.t.imminence||'Not known'),r.n?r.dn+' of '+r.n:'None available yet'])):'');
+  if(hc.at){ const LBL={ok:'Pass',att:'Attention',unk:'Yours to confirm'};
+    h+=AX('Device health')+'<p>Checked on '+dstr(new Date(hc.at))+' on this '+e(HK_NAME[HK()])+'. You have confirmed '+hc.ticks+' of the '+hc.g+' settings that only you can read.</p>'+tbl(['Item','Result','Detail'],P.health.auto.items.map(x=>[e(x.name),LBL[x.st],e(x.txt)])); }
+  if((P.reports||[]).length) h+=AX('Earlier reports')+tbl(['Earlier report','Bottom line','Real to you','Open'],P.reports.slice(0,6).map(x=>[dstr(new Date(x.t))+', '+tstr(new Date(x.t)), x.tier<0?'Unknown':TIER_NAME[x.tier], String(x.applies), String(x.open)]))+'<p>Next review: '+dstr(new Date(now.getTime()+7*86400000))+'.</p>';
+  h+=AX('Evidence')+'<p>The Evidence chain on this device holds '+plural(P.evidence.length,'entry','entries')+'. Each entry carries a fingerprint and the fingerprint of the entry before it, so a later change to any entry can be detected.'+(P.evidence.length?' The newest fingerprint is '+e(String(P.prevHash).slice(0,16))+'.':'')+'</p>'+
+     ((P.log||[]).length?'<p><b>Your log, newest first</b></p>'+tbl(['Written','Entry','Edited'],P.log.slice(0,10).map(x=>[e(stamp(x.t)), e(x.text.length>600?x.text.slice(0,600)+' ...':x.text), x.n?e(stamp(x.e))+(x.n>1?', '+x.n+' edits':''):'']))+(P.log.length>10?'<p>'+(P.log.length-10)+' earlier entries are in Remiel, under Trips.</p>':''):'');
+  h+='<div class="rp-foot">Generated by Remiel Technologies, on your own device, from your own entries, your own sensors and public sources. Whether a court accepts this record is for the court. Changes you make to a device, an account or software are yours to decide and yours to carry.</div>';
   return {html:h, snap:{t:now.getTime(), tier:a.t, applies:applies.length, open:open.length, att:hc.att}};
 }
 // Bottom line up front, the same in every Remiel report: the verdict, one sentence, what to do now and the key facts. Everything else follows it.
@@ -7312,12 +7237,12 @@ function paperShow(title, html, meta){
   if(!S.reportOpen){ S.reportOpen=true; NAVN++; try{ history.pushState(navSnap('report'),''); }catch(e){} }
 }
 // The report button opens the last report made on this device, exactly as it was. New report makes one from this moment.
-const reportLast = () => { try{ const j=JSON.parse(store.get('halo_report_last')||'null'); return (j && j.html && j.t) ? j : null; }catch(e){ return null; } };
+const reportLast = () => { try{ const j=JSON.parse(store.get('halo_report_last')||'null'); return (j && j.html && j.t && j.v===2) ? j : null; }catch(e){ return null; } };
 const reportLine = j => 'No. '+j.n+' · made '+fmtD(new Date(j.t).toISOString())+', '+new Date(j.t).toLocaleTimeString();
 function reportOpen(fresh){
   const last=reportLast();
   if(!fresh && last){ paperShow('Remiel Technologies Full Report', last.html, {kind:'full', line:reportLine(last)}); return; }
-  const r=reportHTML(), j={n:(P.reportN||0)+1, t:Date.now(), html:r.html}; P.reportN=j.n;
+  const r=reportHTML(), j={n:(P.reportN||0)+1, t:Date.now(), html:r.html, v:2}; P.reportN=j.n;
   try{ store.set('halo_report_last', JSON.stringify(j)); }catch(e){}
   paperShow('Remiel Technologies Full Report', r.html, {kind:'full', line:reportLine(j)});
   P.reports=P.reports||[]; const quick=P.reports.length && r.snap.t-P.reports[0].t<=60000; P.reports.unshift(r.snap); P.reports.length=Math.min(P.reports.length,12); save();
