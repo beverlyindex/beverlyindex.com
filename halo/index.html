@@ -3306,7 +3306,7 @@ function portAlerts(p){ const nowS=Date.now()+LIVE.skew, day=new Date().toISOStr
     const key='port:'+sig+':'+p.t; if((P.alerted||{})[key]===day) return;
     const near=d.dist<=PORT_NEAR, mv=w==='moving' ? portReveal(d) : portMoving(d), toward=!!mv && (w==='moving' || d.vel<0 || near), app=w==='new' && portCarried(d) && portApproach(d);
     if(!(w==='new' ? (near && portCarried(d)) || app || toward : toward)) return;
-    const txt=devName(d)+' '+(w==='new' ? 'is new to your Portrait'+(mv?', and '+mv:app && !near?', and is coming toward you':'') : mv||'is moving')+'. It is '+duAbout(d)+' from you.';
+    const txt=devName(d)+' '+(w==='new' ? 'is new to your Portrait'+(mv?', and '+mv:app && !near?', and is coming toward you':'') : mv||'is moving')+'.'+alWhere(d);
     F.push({d, w, key, txt}); });
   if(!F.length || !can(ALERT_PLAN('port'))) return;
   F.sort((a,b)=>a.d.dist-b.d.dist); const lead=F[0];
@@ -4467,7 +4467,7 @@ const fixFresh = tL => TRACK.length>0 && tL-(TRACK[TRACK.length-1].t2||TRACK[TRA
 const onFoot = mv => !!mv && mv.d/(DIRK.win/1000)<=DIRK.walkV;
 // A stop or corner check that points to a follower raises an alert, as a device traveling with you does. Yours, and devices that live here, do not.
 function chkAlert(d, k){ if(!d || d.sim || isYours(d) || QUIET_T.has(tagOf(d))) return;
-  alertRaise('chk:'+d.sig+':'+k, k==='closer'?'Something came closer when you stopped':'Something followed you round a corner', devName(d)+(k==='closer'?' came closer while you stood still.':' faded as you turned the corner, then came back.')+' It is '+duAbout(d)+' from you. Open it and decide whether it is yours.', {dev:d.id}); }
+  alertRaise('chk:'+d.sig+':'+k, k==='closer'?'Something came closer when you stopped':'Something followed you round a corner', devName(d)+(k==='closer'?' came closer while you stood still.':' faded as you turned the corner, then came back.')+alWhere(d)+' Look round, then open it.', {dev:d.id}); }
 /* ---------- Back again. A device that came close, went away, and came close again later in the same trip: the person who passed you as you went into the park
    and crossed in front of you five minutes later. One close pass is a passer-by; the return is what matters. A fixed device you simply walk past twice does not
    count: the second meeting must be somewhere else (at least BACK.apart away), or come to you while you stand still, or be a device that arrived close to begin with. ---------- */
@@ -4648,7 +4648,7 @@ function closeStep(r, d, now, live){ if(onWheels() || d.carMate || d.inCar || !r
   const apart=Math.round(Math.hypot(p.x-a[1], p.y-a[2])), who=mates.length ? walkName(d)+' and '+mates.length+(mates.length===1?' device':' devices')+' heard with it from the same moment (one person carrying them)' : walkName(d);
   const txt=who+' was about '+du(a[3])+' from you at '+hhmm(a[0])+', and now, '+du(apart)+' further on, is within '+du(Math.max(1,Math.round(m)))+' of you.';
   wEvent('closing','Closing in: '+txt, d.id, now);
-  if(live){ if(alertRaise('cl:'+d.sig+':'+W.t0, 'Something is following you', txt+' Look around. Tap its dot to mark it, or call someone.', {dev:d.id})) buzz([300,120,300,120,300]); } }
+  if(live){ if(alertRaise('cl:'+d.sig+':'+W.t0, 'Something is following you', txt+' Look round now. If you feel unsafe, go where there are people and call someone.', {dev:d.id})) buzz([300,120,300,120,300]); } }
 const backFresh = d => !!(d && d.bk && Date.now()-d.bk<BACK.show);
 // A trip event carries the phone's own time, as every other trip event does.
 function dirEvent(k, text, id, nowS){ const t=(nowS||Date.now()+LIVE.skew)-LIVE.skew; DIRS.log.push({t, k, text, id:id||''}); if(DIRS.log.length>40) DIRS.log.shift(); if(W.on) wEvent(k, text, id, t); }
@@ -8856,7 +8856,7 @@ function walkTick(at, only, q){
     if(d.mov && d.mov.v && Math.abs(nowS-d.mov.t)<20000){ const db=Math.round(Math.abs(d.mov.db));
       if(!(r.mvDb>=db)){ r.mv=+d.mov.v.toFixed(1); r.mvDb=db; r.mvS=d.mov.still?1:0; }
       if(!r.mvT){ r.mvT=now; wEvent('move','Moving: '+walkName(d)+'. Its signal '+(d.mov.db>0?'rose ':'fell ')+db+' dB in '+Math.round(d.mov.dt/1000)+' seconds'+(d.mov.still?' while you stood still':', faster than your own movement explains')+(paceW(d.mov.v)?', '+paceW(d.mov.v):'')+'.', d.id); } }
-    if((P.watch||{})[d.sig] && !isYours(d) && (!r.wt || now-r.last0>ELOG.OCC_MS)){ r.wt=now; wEvent('watch','On your Watch list: '+walkName(d)+' is near you, '+distText(d)+'.', d.id); if(!back) alertRaise('watch:'+d.sig+':'+Math.floor(now/ELOG.OCC_MS), 'A device on your Watch list is near you', devName(d)+' is '+duAbout(d)+' from you.', {art:d.sig}); }
+    if((P.watch||{})[d.sig] && !isYours(d) && (!r.wt || now-r.last0>ELOG.OCC_MS)){ r.wt=now; wEvent('watch','On your Watch list: '+walkName(d)+' is near you, '+distText(d)+'.', d.id); if(!back) alertRaise('watch:'+d.sig+':'+Math.floor(now/ELOG.OCC_MS), 'A device on your Watch list is near you', devName(d)+' is near you.'+alWhere(d)+' Look round and keep your distance. Open it to see its story.', {art:d.sig}); }
     r.last0=now; backStep(r, d, now, lastPrev, !back || Date.now()-now<120000); closeStep(r, d, now, !back || Date.now()-now<120000); if(r.bk && !d.bk && Date.now()-r.bk<BACK.show) d.bk=r.bk;
     if(isWorn(d)) r.wn=1; if(isDrone(d)){ r.dr=1; if(d.rid) r.rid=d.rid; }
     if(d.leg){ r.v=d.verdict||''; r.legs=d.leg.legs; r.share=+d.leg.share.toFixed(2); r.spread=Math.round(d.leg.spread); r.level=Math.round(d.leg.level); r.drift=Math.round(d.leg.drift); r.rate=+d.leg.rate.toFixed(2); } };
@@ -9323,16 +9323,16 @@ function chgOf(d){ return !d.sim && !isYours(d) && d.band==='ble' && !!chgKind(d
 function alertScan(){ let known=0; const chg=[];
   LIVE.devs.forEach(d=>{
     if(d.sim || isYours(d) || !d.present || fileQuiet(d)) return;          // yours, your household's, and people you know
-    if(d.withYou){ watchMark(d.sig); if(alertRaise('with:'+d.sig, d.cls==='Tag'?(driving()?'A tracker is traveling in your vehicle':'A tracker is traveling with you'):d.band==='wifi'?'A hotspot is traveling with you':driving()?'A device is keeping pace with your vehicle':'A device is traveling with you', devName(d)+' '+followText(d)+'. Open it and decide whether it is yours. Remiel identifies devices, not people.', {art:d.sig})) buzz([220,120,220]); }
+    if(d.withYou){ watchMark(d.sig); if(alertRaise('with:'+d.sig, d.cls==='Tag'?(driving()?'A tracker is traveling in your vehicle':'A tracker is traveling with you'):d.band==='wifi'?'A hotspot is traveling with you':driving()?'A device is keeping pace with your vehicle':'A device is traveling with you', devName(d)+' '+followText(d)+'.'+alWhere(d)+(d.cls==='Tag'?' Check your bag, your coat and your car, then open it.':' Look round, then open it.')+' Remiel identifies devices, not people.', {art:d.sig})) buzz([220,120,220]); }
     else { const tp=tagPace(d);
       if(tp){ const title=tp.away?'A tracker away from its owner may be keeping pace with you':'A tracker may be keeping pace with you',
           txt=devName(d)+' has been heard across your last '+du(d.leg.reach)+' for '+Math.round(d.mins)+' minutes. It stayed about '+du(d.dist)+' from you while you walked '+du(tp.moved)+'.'+(tp.away?' It says it is away from its owner.':'');
-        if(alertRaise('tagpace:'+d.sig+':'+(W.on?W.t0:Math.floor(Date.now()/3600000)), title, txt+' Look around. Open it to see its story, or mark it.', {dev:d.id})){ buzz([220,120,220]); if(W.on) wEvent('warn','Keeping pace: '+txt, d.id); } }
+        if(alertRaise('tagpace:'+d.sig+':'+(W.on?W.t0:Math.floor(Date.now()/3600000)), title, txt+' Check your bag, your coat and your car, then open it.', {dev:d.id})){ buzz([220,120,220]); if(W.on) wEvent('warn','Keeping pace: '+txt, d.id); } }
       const tg=tagOf(d), sn=d._seen; if(d.band==='ble' && (tg==='local' || tg==='again')) known++; if(tg==='fresh' && chgOf(d)){ d.chgAt=d.chgAt||Date.now(); chg.push(d); }          // once judged to stand in one place, it stays counted as new and standing
       if(tg==='place'){ const me=ePos(), home=fileOfD(d)==='nb' || (sn.h && (sn.h.days||0)>=3 && oneSpot(sn.h.pl.filter(p=>!me || distLL(me.lat,me.lon,p[0],p[1])>ELOG.FAR_M), NBHD_R));          // always at one spot, on three days or more: it belongs somewhere else
         if(alertRaise('seen:'+d.sig+(me?':'+me.lat.toFixed(2)+','+me.lon.toFixed(2):''), home?'A device from your neighborhood is away from its usual place':'Seen before, in a different place',
             home ? devName(d)+(fileOfD(d)==='nb'?' is one you marked as Neighborhood, heard there on ':' is usually at one spot on your routes, heard there on ')+sn.h.days+' days. It is now '+duAbout(d)+' from you, '+du(sn.far.m)+' from that spot.' : devName(d)+' is '+duAbout(d)+' from you. Remiel recorded it '+whenW(sn.far.p[3])+', '+du(sn.far.m)+' from here.', {art:d.sig})){ buzz([220,120,220]); if(home && W.on) wEvent('chg', 'Away from its usual place: '+devName(d)+' is usually at one spot on your routes, heard there on '+sn.h.days+' days. It was '+duAbout(d)+' from you, '+du(sn.far.m)+' from that spot.', d.id); } }
-      else if(tg==='watch' && watchNear(d)) alertRaise('watch:'+d.sig+':'+Math.floor(Date.now()/ELOG.OCC_MS), 'A device on your Watch list is near you', devName(d)+' is '+duAbout(d)+' from you.', {art:d.sig}); }
+      else if(tg==='watch' && watchNear(d)) alertRaise('watch:'+d.sig+':'+Math.floor(Date.now()/ELOG.OCC_MS), 'A device on your Watch list is near you', devName(d)+' is near you.'+alWhere(d)+' Look round and keep your distance. Open it to see its story.', {art:d.sig}); }
     if(KNOWN_F.indexOf(fileOfD(d))>=0) return;          // a camera or a drone you marked as known: you know it is there
     if(isDrone(d)){ const dw=droneWords(d); alertRaise('drone:'+d.sig, 'A drone is broadcasting near you', devName(d)+(dw?' · '+dw:', '+duAbout(d)+' from you by its signal')+'. Open it to read what it says of itself.', {art:d.sig}); }
     else if(d.cls==='Camera') alertRaise('cam:'+d.sig, /Raven/.test(d.hint)?'A gunshot detector is in range':'A plate camera is in range', devName(d)+' is broadcasting '+distText(d)+' from you. Remiel places it on the map as you move.', {dev:d.id}); });
@@ -9545,6 +9545,7 @@ function fillABar(){ const tr=el('trackA'); if(!tr) return; let mine=[], rest=[]
 // is and how far it is, in words you can picture. Tap one to open it. A finger on the bar holds it still.
 const SEE_M=[[1.5,'right next to you'],[5,'a few steps away'],[15,'close by'],[35,'across the street'],[90,'down the street']];
 const seeW = m => { m=+m; if(!(m>0)) return ''; for(const [x,w] of SEE_M) if(m<=x) return w; return 'farther off'; };
+const alWhere = d => { const w=d && d.dist>0 ? seeW(d.dist) : ''; return w ? ' It is '+w+'.' : ''; };          // where, in an alert
 function wbarRank(d){ const v=sevOf(d); if(v.lv==='red') return [0, v.why]; if(v.lv==='amber') return [1, v.why];
   if(portLit() && PORT.why.get(d.sig)==='new') return [2,'new to your Portrait'];
   return tagOf(d)==='yours' ? [4,'one of yours'] : portHidden(d) ? [3,'in your Portrait'] : [3,'']; }
