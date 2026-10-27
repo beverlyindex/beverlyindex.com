@@ -8037,7 +8037,7 @@ function ingestReport(sid, rowT, p, off){
     if(!d){ if(!devsRoom(band, at)) continue;
       const hsh=hash32(s.id), h2=hash32('~'+s.id);
       d={ id:'L'+hsh.toString(36)+h2.toString(36), sig:s.id, live:true, name:callsign(hsh,h2), glyph:GLY[hsh%GLY.length], firstSeen:at, timesSeen:0, samples:[], hist:[], handleBrg:hsh%360, fix:null, sector:null, fresh:0, seenMobile:0, seenStation:0 }; LIVE.devs.set(s.id,d); }
-    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; { const nw=typeof s.name==='string' ? s.name.replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40) : ''; if(nw && (!d.adv || nw.length>d.adv.length || !d.advT || at-d.advT>86400000)){ d.adv=nw; d.advT=at; } else if(!d.adv) d.adv=''; } d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; { const vn=(band==='ble' && (d.cls==='Unknown'||d.cls==='Vehicle'||d.cls==='Wearable')) ? vehName(d.adv) : ''; if(vn && (d.cls!=='Wearable' || vn==='Car, by its name')){ d.cls='Vehicle'; d.hint=vn; } } if(s.rid && typeof s.rid==='object') d.rid=s.rid; d.name=isDrone(d)?'Drone #'+d.id.slice(-3).toUpperCase():autoName(d); d.rssi=rssi!==null?rssi:rssiOf(reading);
+    d.cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown'; d.band=band; { const nw=typeof s.name==='string' && nameOK(s.name) ? s.name.replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40) : ''; if(nw && (!d.adv || nw.length>d.adv.length || !d.advT || at-d.advT>86400000)){ d.adv=nw; d.advT=at; } else if(!d.adv) d.adv=''; } d.hint=typeof s.hint==='string'?s.hint.slice(0,40):''; { const vn=(band==='ble' && (d.cls==='Unknown'||d.cls==='Vehicle'||d.cls==='Wearable')) ? vehName(d.adv) : ''; if(vn && (d.cls!=='Wearable' || vn==='Car, by its name')){ d.cls='Vehicle'; d.hint=vn; } } if(s.rid && typeof s.rid==='object') d.rid=s.rid; d.name=isDrone(d)?'Drone #'+d.id.slice(-3).toUpperCase():autoName(d); d.rssi=rssi!==null?rssi:rssiOf(reading);
     d.lastSeen=Math.max(d.lastSeen||0, at); d.firstSeen=Math.min(d.firstSeen, at); d.timesSeen++; d.sensor=sid; d.identity=Math.max(1,Math.min(3,(s.conf|0)||2));
     if(station) d.seenStation=Math.max(d.seenStation, at); else { d.seenMobile=Math.max(d.seenMobile, at); if(away) d.seenAway=Math.max(d.seenAway||0, at); }
     d.sim = d.sim===undefined ? !!p.sim : (d.sim && !!p.sim);            // one real report makes a device real. Test data cannot hide it
@@ -8492,6 +8492,8 @@ const nativeStatus = () => { try{ return JSON.parse(NATIVE().status()); }catch(e
 const phCan = () => !!NATIVE() || !!(navigator.bluetooth && navigator.bluetooth.requestLEScan);
 const hexBytes = h => { h=String(h||''); const o=new Uint8Array(h.length>>1); for(let i=0;i<o.length;i++) o[i]=parseInt(h.substr(i*2,2),16)||0; return o; };
 const dv = b => new DataView(b.buffer, b.byteOffset, b.byteLength);
+// A broadcast name with no letter in it ("4", "0000") names nothing: the device goes by its kind, as one with no name does.
+function nameOK(n){ return /\p{L}/u.test(String(n||'')); }
 async function nativeDrain(){
   const N=NATIVE(); if(!N || PH.busy) return; PH.busy=true;
   try{ PH.nstat=nativeStatus();
@@ -8505,12 +8507,12 @@ async function nativeDrain(){
         pdCount(q.src, q.lat, q.lon, acc, used, b.t); }
       const list=[];
       for(const x of (b.s||[])){ if(!x || typeof x.r!=='number') continue;
-        if(x.cl){ let k=codKind(x.cod); const nm=String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); let pr=false; try{ pr=await isPaired(x.a); }catch(e){}
+        if(x.cl){ let k=codKind(x.cod); const nm=!nameOK(x.n) ? '' : String(x.n||'').replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,40); let pr=false; try{ pr=await isPaired(x.a); }catch(e){}
           if(nm) ONE.cn.set(String(x.a), nm); if(trackerName(nm)) k={cls:'Tag', hint:trackerName(nm)};
           if(oneSame(String(x.a), nm, b.t) || (!nm && !pr && k.cls==='Unknown')){ PH.heard++; continue; }          // the scan already holds this device, or the search answer carries neither a name nor a kind
           ONE.bc.set(String(x.a), {t:b.t, nm});
           list.push({id:'bc:'+hash32(String(x.a)).toString(36), rssi:x.r, band:'ble', cls:k.cls, name:nm, hint:k.hint, conf:nm?3:2, flags:pr?['paired']:[]}); PH.heard++; continue; }
-        const ev={device:{id:x.a,name:x.n||''}, rssi:x.r, uuids:x.u||[],
+        const ev={device:{id:x.a,name:nameOK(x.n)?x.n:''}, rssi:x.r, uuids:x.u||[],
           manufacturerData:new Map(Object.keys(x.m||{}).map(k=>[+k, dv(hexBytes(x.m[k]))])), serviceData:new Map(Object.keys(x.d||{}).map(k=>[k, dv(hexBytes(x.d[k]))]))};
         try{ const d=await phDescribe(ev), pr=await isPaired(x.a), ak=apKind(x.ap);
           if(ak && d.cls==='Unknown'){ d.cls=ak[0]; d.hint=(d.hint?d.hint.split(',')[0]+', ':'')+ak[1]; d.conf=Math.max(d.conf,2); }          // the device says what it is
