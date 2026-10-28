@@ -4366,7 +4366,10 @@ function actNeed(a){ const act=a.dataset.act; if(ACT_PLAN[act]) return ACT_PLAN[
   if(act==='pull'){ const id=a.dataset.id; if(id==='health' || id==='trap' || id==='ai' || id==='global' || id==='path') return 'wa'; }
   if(act==='res' || act==='path-go') return act==='path-go' ? 'wa' : ((x=>x && x.side==='a' ? 'wa' : 'watchers')(T(a.dataset.id)));
   return ''; }
-const ALERT_PLAN = key => { const k=String(key).split(':')[0]; return ['chg','tagpace','with','seen','watch','cam','drone','twin','tower','2g','ray','recog','chk','near','tagf','bk','fam','cl','hm','grp','skim','sgc','sgw'].indexOf(k)>=0 ? 'watchers' : (k==='kev' || k==='atk' || k==='path') ? 'wa' : k==='room' ? 'full' : k==='late' ? 'watchers' : 'free'; };
+// The red alerts reach every plan: a device or a tracker moving with you or keeping pace, following you round a corner or out of a stop, and
+// your Watch list or a device you flagged near you. Each stays red and buzzes, as on every plan.
+const ALERT_RED=['with','tagpace','cl','sgw','watch','near','tagf'];
+const ALERT_PLAN = key => { const k=String(key).split(':')[0]; if(ALERT_RED.indexOf(k)>=0 || (k==='chk' && /:follow$/.test(String(key)))) return 'free'; return ['chg','tagpace','with','seen','watch','cam','drone','twin','tower','2g','ray','recog','chk','near','tagf','bk','fam','cl','hm','grp','skim','sgc','sgw'].indexOf(k)>=0 ? 'watchers' : (k==='kev' || k==='atk' || k==='path') ? 'wa' : k==='room' ? 'full' : k==='late' ? 'watchers' : 'free'; };
 function planMarks(){ const p=planNow(), app=el('app'); if(app) app.dataset.plan=p;
   document.querySelectorAll('.nav button[data-view]').forEach(b=>b.classList.toggle('lk', !can(VIEW_PLAN[b.dataset.view])));
   document.querySelectorAll('section[data-pane]').forEach(sec=>{ const v=sec.dataset.pane, lk=!can(VIEW_PLAN[v]); sec.classList.toggle('locked', lk); let c=sec.querySelector(':scope > .lockcard');
