@@ -42,6 +42,7 @@
   <div class="err" id="err"></div>
   <div class="foot"><a href="https://beverly-index.com">← Return to beverly-index.com</a></div>
 </div>
+<script src="/assets/bigate.js"></script>
 <script>
 /* ── Telemetry helper ── */
 var CC_URL='https://beverlyindex-com.vercel.app';
@@ -62,20 +63,13 @@ function t(ev,extra){
 }
 (function(){var s=sessionStorage.getItem('cc:sid');if(!s){s=Math.random().toString(36).slice(2)+Date.now().toString(36);sessionStorage.setItem('cc:sid',s);}})();
 
-const KEYS={
-  'f29ea87b1fba4fec9f9efa1fc9ea4c3110b4c62024e930681843ee073569f8f6':'primary',
-  '2dfff49a919dda77992069e38094e3e2e8a699a3ac8e080d45664465d1700ffb':'tester'
-};
-async function hashCode(c){
-  const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('carecircle:'+c));
-  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
-}
 async function attempt(){
   const el=document.getElementById('code'), err=document.getElementById('err');
   const code=el.value.trim().toUpperCase();
   if(!code) return;
   if(!(window.crypto&&crypto.subtle)){ err.textContent='This gate requires a secure (https) connection.'; return; }
-  const who=KEYS[await hashCode(code)];
+  let who=null;
+  try{ const r=await BIGate.check('app.enc.json', code); who=r&&r.who; }catch(e){ err.textContent='Could not reach the access service. Check your connection.'; return; }
   if(who){
     sessionStorage.setItem('cc:access', code);
     sessionStorage.setItem('cc:who', who);
