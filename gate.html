@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Private Access | Beverly Index</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+  :root { --bg:#080a10; --surface:#0e1219; --text:#e0e4ec; --dim:#8a93a3; --accent:#38bdf8; --gold:#d3b577; --err:#f87171; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); color:var(--text);
+         font-family:"DM Sans",system-ui,-apple-system,sans-serif; padding:24px 16px; }
+  .card { width:100%; max-width:420px; background:var(--surface); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:36px 28px; text-align:center; }
+  .brand { font-family:Georgia,serif; letter-spacing:.18em; font-size:.9rem; color:var(--gold); margin-bottom:20px; }
+  h1 { font-family:Georgia,serif; font-weight:400; font-size:1.6rem; margin-bottom:8px; }
+  p { color:var(--dim); font-size:.95rem; line-height:1.5; margin-bottom:22px; }
+  input { width:100%; padding:14px 16px; border-radius:10px; border:1px solid rgba(255,255,255,.14); background:#0a0d14; color:var(--text);
+          font-size:1rem; letter-spacing:.08em; text-align:center; }
+  input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(56,189,248,.25); }
+  button { width:100%; margin-top:12px; padding:14px; border:0; border-radius:10px; background:var(--accent); color:#06121c; font-weight:700; font-size:1rem; cursor:pointer; }
+  button[disabled] { opacity:.6; cursor:default; }
+  .err { color:var(--err); font-size:.9rem; min-height:1.3em; margin-top:12px; }
+  .back { display:inline-block; margin-top:22px; color:var(--dim); font-size:.85rem; text-decoration:none; }
+  .back:hover { color:var(--text); }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="brand">BEVERLY INDEX</div>
+  <h1 id="title">Private access</h1>
+  <p>This area is in private evaluation. Enter your access code to continue.</p>
+  <form id="f" autocomplete="off">
+    <input id="code" type="password" placeholder="Access code" aria-label="Access code" required>
+    <button id="go" type="submit">Enter</button>
+  </form>
+  <div class="err" id="err" role="alert"></div>
+  <a class="back" href="/">Return to beverly-index.com</a>
+</main>
+<script>
+(function(){
+  var NAMES = { carecircle:'Remiel Amicura', pathfinder:'PATHFINDER', remiel:'Remiel Sentinel', covara:'Remiel: Covara',
+                halo:'Remiel: Personal Protection', proteus:'PROTEUS', optics:'REMIEL Optics' };
+  // Apps whose own code screen sits on index.html: go straight to the app after the server check.
+  var APP_PAGE = { carecircle:'/carecircle/app.html', pathfinder:'/pathfinder/app.html', remiel:'/remiel/app.html' };
+  var q = new URLSearchParams(location.search);
+  var area = q.get('area') || '';
+  var next = q.get('next') || '/';
+  if (APP_PAGE[area] && (next === '/' + area + '/' || next === '/' + area + '/index.html')) next = APP_PAGE[area];
+  if (NAMES[area]) document.getElementById('title').textContent = NAMES[area];
+  var err = document.getElementById('err'), btn = document.getElementById('go');
+  document.getElementById('f').addEventListener('submit', function(e){
+    e.preventDefault();
+    var code = document.getElementById('code').value.trim();
+    if (!code) return;
+    btn.disabled = true; err.textContent = '';
+    fetch('/api/unlock', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+      body: JSON.stringify({ area: area, code: code, next: next }) })
+      .then(function(r){ return r.json().then(function(j){ return { ok:r.ok, j:j }; }); })
+      .then(function(x){
+        if (x.ok && x.j.ok) { location.replace(x.j.next || '/'); return; }
+        err.textContent = (x.j && x.j.error) || 'That code is not valid.';
+        btn.disabled = false;
+      })
+      .catch(function(){ err.textContent = 'Connection problem. Please try again.'; btn.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>
