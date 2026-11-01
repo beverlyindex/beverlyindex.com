@@ -36,7 +36,7 @@ No access code is stored in this repository.
 To add or change a code, compute the hash and update `GATE_KEYS`:
 
 ```
-python3 -c "import hashlib;print(hashlib.sha256(('carecircle:'+'NEW-CODE').upper().replace('CARECIRCLE:','carecircle:').encode()).hexdigest())"
+python3 -c "import hashlib;print(hashlib.sha256(('carecircle:'+'NEW-CODE'.strip().upper()).encode()).hexdigest())"
 ```
 
 ## Hosting requirement
