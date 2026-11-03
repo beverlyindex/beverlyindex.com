@@ -3251,7 +3251,7 @@ function portOpen(){ const now=Date.now(), nowS=now+LIVE.skew, me=ePos(), N=NATI
 function portAdd(p, d){ const m=Math.max(1, Math.round(d.dist||0)), a=p.acct[d.sig];
   if(a){ if(d.dist>0 && m<a.m) a.m=m; return; }
   p.sigs.push(d.sig); if(d.adv && !rotates(d)) p.names.push(d.adv);
-  p.acct[d.sig]={n:devName(d), k:devType(d), m, late:!!p.marks && (d.firstSeen||0)>=p.t+LIVE.skew, r:portHomeKind(d)?1:0, tg:isAirTag(d)?1:0}; }
+  p.acct[d.sig]={id:d.id, n:devName(d), k:devType(d), m, late:!!p.marks && (d.firstSeen||0)>=p.t+LIVE.skew, r:portHomeKind(d)?1:0, tg:isAirTag(d)?1:0}; }
 function portBuildTick(){ const p=P.portrait; if(!p || !p.on || !p.build){ clearInterval(PORT.bt); PORT.bt=0; return; } const now=Date.now();
   if(!p.b0){ if(LIVE.seen.mobile>0 && LIVE.seen.mobile-LIVE.skew>=p.t) p.b0=now;          // the first report after the press starts the ten seconds
     else if(now-p.t>PORT_BUILD.wait){ portCancel('Remiel heard nothing for 30 seconds, so no Portrait was taken. Check that Remiel is listening, then press Portrait again.'); return; } }
@@ -3270,7 +3270,9 @@ function portCancel(msg){ const p=P.portrait; if(p && p.build) useBack(); clearI
   toast(msg||'Portrait cancelled.'); S._rsig=''; renderVicinity(); if(S.mapFull||S.oneMap) mapFullTick(false); }
 // The account goes into the trip, so the trip file carries what the Portrait held.
 function portKeep(p){ if(!W.on || !p || p.build) return; W.ports=W.ports||[]; if(W.ports.some(x=>x.t===p.t)) return;
-  W.ports.push({t:p.t, t1:p.t1||p.t, n:p.n||0, marks:!!p.marks, acct:Object.values(p.acct||{}).map(a=>({n:a.n, k:a.k, m:a.m, late:!!a.late}))}); }
+  W.ports.push({t:p.t, t1:p.t1||p.t, n:p.n||0, marks:!!p.marks, at:p.at||null, acct:Object.values(p.acct||{}).map(a=>({id:a.id||null, n:a.n, k:a.k, m:a.m, late:!!a.late})), over:[]}); }
+// An address the Portrait took over during a trip: a device of it that changed its address, or one of its own back where it was taken.
+function portOver(p, c, how){ if(!W.on || !p) return; const x=(W.ports||[]).find(x=>x.t===p.t); if(!x) return; x.over=x.over||[]; if(x.over.length<600) x.over.push({id:c.id, t:Date.now(), how}); }
 // While it builds, the button and the account change every second without redrawing the screen.
 function portPaint(){ const w=document.createElement('div'); w.innerHTML=portBar(); const nb=w.firstChild; if(!nb) return;
   document.querySelectorAll('.port-bar').forEach(e=>{ const ob=e.querySelector('.portbtn'), nbb=nb.querySelector('.portbtn'), oa=e.querySelector('.port-acct'), na=nb.querySelector('.port-acct');
@@ -3335,11 +3337,11 @@ function portTick(){ const now=Date.now(); if(now-PORT.at<400) return; PORT.at=n
       if(typeof o.rssi!=='number' || o.rssi<PORT_SWAP.min || Math.abs(o.rssi-r)>PORT_SWAP.db) return;
       pairs.push([Math.abs(o.rssi-r)+gap/100000, c, o]); }); });
   const got=new Set();          // the closest pairs first, each newcomer and each Portrait device once, so several changing at one moment pair up rightly
-  pairs.sort((a,b)=>a[0]-b[0]).forEach(([k,c,o])=>{ if(got.has(c.sig) || PORT.taken.has(o.sig)) return; got.add(c.sig); PORT.taken.add(o.sig); S0.add(c.sig); (p.sigs=p.sigs||[]).push(c.sig); grew=true; });
+  pairs.sort((a,b)=>a[0]-b[0]).forEach(([k,c,o])=>{ if(got.has(c.sig) || PORT.taken.has(o.sig)) return; got.add(c.sig); PORT.taken.add(o.sig); S0.add(c.sig); (p.sigs=p.sigs||[]).push(c.sig); grew=true; portOver(p, c, 'swap'); });
   { const me=ePos(); if(p.at && me && !(me.acc>POS_MAX_ACC) && distLL(p.at.lat,p.at.lon,me.lat,me.lon)<=PORT_HOME.m){ const cap=portHomeCap(p); let known=0;          // back where it was taken
       LIVE.devs.forEach(d=>{ if(!d.sim && S0.has(d.sig) && portHomeKind(d) && (d.dist||99)<=PORT_FAR && (d.present || nowS-d.seenMobile<LIVE_PRESENT)) known++; });
       pend.forEach(c=>{ if(known>=cap || S0.has(c.sig) || c.withYou || c.maybe || !portHomeKind(c) || !((c.dist||99)<=PORT_NEAR) || !(c.present || nowS-c.seenMobile<LIVE_PRESENT)) return;
-        (p.hm=p.hm||{})[c.sig]=1; S0.add(c.sig); (p.sigs=p.sigs||[]).push(c.sig); grew=true; known++; portHomeNote(p, c); }); } }
+        (p.hm=p.hm||{})[c.sig]=1; S0.add(c.sig); (p.sigs=p.sigs||[]).push(c.sig); grew=true; known++; portHomeNote(p, c); portOver(p, c, 'home'); }); } }
   pend.forEach(c=>{ const live=c.present || nowS-c.seenMobile<LIVE_PRESENT; if(S0.has(c.sig)){ if(live && portReveal(c) && !portHomeCalm(p, c)) PORT.why.set(c.sig, 'moving'); else PORT.hide.add(c.sig); } else if(live) PORT.why.set(c.sig, 'new'); });
   if(grew){ portTrim(p); save(); }
   if(PORT.r0.size>3000) [...PORT.r0.keys()].forEach(k=>{ if(!LIVE.devs.has(k)) PORT.r0.delete(k); });
@@ -3942,7 +3944,8 @@ async function tripFile(R){ if(!R.cor || R.cor.v!==3){ try{ await tripCor(R); }c
   rep.contacts=(R.contacts||[]).map(c=>({t:iso(c.t), youWereAt:c.pos, provedMoving:!!c.mv, youStoodStill:c.mv ? !!c.still : (c.stood==null ? null : !!c.stood), speed_mps:c.v||0, inEarshot_s:c.s||0, words:contactLine(c), devices:c.devs.map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, wornOrCarried:!!x.worn, provedMoving:!!x.mv}))}));
   { const t1=(R.t1||Date.now())+600000; rep.alertChecks=Object.values(P.alFb||{}).filter(x=>x.t>=R.t0 && x.t<=t1).map(x=>({t:iso(x.t), alert:x.title, text:x.text, right:!!x.ok}));          // your answers to Was this right?
     rep.quietAlerts=(P.quietAl||[]).filter(x=>x.t>=R.t0 && x.t<=(R.t1||Date.now())).map(x=>({t:iso(x.t), title:x.title, text:x.text})); }
-  rep.portraits=(R.ports||[]).map(x=>({taken:iso(x.t), complete:iso(x.t1), devices:x.n, arrivalsMarked:!!x.marks, account:(x.acct||[]).map(a=>({name:a.n, kind:a.k, nearest_m:a.m, arrivedDuringBuild:!!a.late}))}));
+  rep.portraits=(R.ports||[]).map(x=>({taken:iso(x.t), complete:iso(x.t1), takenAt:x.at||null, devices:x.n, arrivalsMarked:!!x.marks, account:(x.acct||[]).map(a=>({id:a.id||null, name:a.n, kind:a.k, nearest_m:a.m, arrivedDuringBuild:!!a.late})),
+    takenOver:(x.over||[]).map(o=>({id:o.id, t:iso(o.t), why:o.how==='home' ? 'one of its own, back where the Portrait was taken' : 'a device of the Portrait under a new address'}))}));
   rep.waypoints=(R.wps||[]).map(w=>({n:w.n, t:iso(w.t), youWereAt:w.pos, note:w.note||'', devices:Object.values(w.devs||{}).map(x=>({id:x.id, name:x.name, kind:x.kind, nearest_m:x.m, yours:!!x.yours, tag:(TAG[C.tags[x.id]]||TAG.fresh).w, passedYou:wpPassed(R,w,x)}))}));
   rep.whatHappened=tripFindings(R, C).map(f=>({t:iso(f.t), text:f.text+(f.win?' In range '+winText(f.win)+'.':''), devices:(f.devs||[]).map(r=>r.id)}));
   { const A=tripAnswerText(R, C); rep.answer={following:A.following, notUsualHere:A.notUsualHere, worthALook:A.worthALook, notUsualCount:A.notUsualCount}; }
