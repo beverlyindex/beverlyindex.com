@@ -2965,7 +2965,7 @@ const minsIn = (t, t0) => { const m=Math.round((t-t0)/60000); return m<1?'at the
 const kindShort = d => kindText(d).replace(/^Tag, (?=[A-Z])/,'').split(' · ')[0];
 /* Tags. Red: moving with you, or on record at a place well away from here. Blue: on your Watch list. Amber: seen here on an earlier occasion.
    Green: yours. Gray: local, a device that lives in this area. White: first sighting. A tracker or a vehicle is never set aside as local. */
-const HOUSE_RE=/television|display|speaker|printer|soundbar|qled|oled|\buhd\b|laserjet|webos|echo dot|set-top|\btv\b|\[av\]|fridge|refrigerator|freezer|dishwasher|washer|dryer|oven|microwave|cooktop|hob\b|vacuum|desktop computer|xbox|playstation|keyboard|bulb|lamp|light strip|thermostat|air condition|air purifier|living room|dining room|kitchen|bedroom|bathroom|soggiorno|salotto|sala da pranzo|cucina|camera da letto|bagno|lavastoviglie|lavatrice|frigorifero|forno/i;
+const HOUSE_RE=/television|display|speaker|printer|soundbar|qled|oled|\buhd\b|laserjet|webos|echo dot|set-top|\btv\b|\[av\]|fridge|refrigerator|freezer|dishwasher|washer|dryer|oven|microwave|cooktop|hob\b|vacuum|desktop computer|xbox|playstation|keyboard|bulb|lamp|light strip|thermostat|air condition|air purifier|living room|dining room|kitchen|bedroom|bathroom|soggiorno|salotto|sala da pranzo|cucina|camera da letto|bagno|lavastoviglie|lavatrice|frigorifero|forno|\bacton\b|\bstanmore\b|\bwoburn\b|\bsamsung (?:qn|qe|ue|un|gq|q)\d{2,3}[a-z]{0,3}\b/i;          // Marshall's home speakers; a Samsung TV by its model, such as QN700B
 /* One colour language for devices, the same on the radar, the maps and the lists. Red is a threat: bright when it is moving with you or closing in, dull when it stays put.
    Amber is possible: it has kept with you so far, or was seen here before. Green has never been seen before. Blue is familiar: yours, or a device that lives here.
    A dot that flashes is in your vicinity and on the move; a steady one is staying where it is. The brighter, the nearer. */
@@ -8941,7 +8941,7 @@ function alertSystem(key, title, text){ title=langOut(title); text=langOut(text)
    hidden; what Remiel can name is the kind hidden devices use: a hobby Bluetooth module, a GPS tracker, or a device that gives no name or maker. */
 const MIC_RE=/(?<![a-z])(dji ?mic|wireless ?go|rode|hollyland|lark ?(m1|m2|c1|max|150)|boya|saramonic|comica|synco|microphone|lavalier|wireless mic)(?![a-z])/i;
 const LIGHT_RE=/(?<![a-z])(govee|ihoment|hue|lifx|yeelight|nanoleaf|elk-bledom|triones|lednet|magic ?home|bulb|lamp|light ?strip|led ?strip)(?![a-z])/i;
-const AV_RE=/(?<![a-z])(television|tv|\[tv\]|soundbar|speaker|display|\[av\]|qled|oled|uhd|webos|jbl|marshall|acton|stanmore|woburn|sonos|bose|ultimea|poseidon|tribit|soundcore|ue boom|beosound|harman|echo dot|homepod|set-top)(?![a-z])/i;
+const AV_RE=/(?<![a-z])(television|tv|\[tv\]|soundbar|speaker|display|\[av\]|qled|oled|uhd|webos|jbl|marshall|acton|stanmore|woburn|sonos|bose|ultimea|poseidon|tribit|soundcore|ue boom|beosound|harman|echo dot|homepod|set-top|samsung (?:qn|qe|ue|un|gq|q)\d{2,3}[a-z]{0,3})(?![a-z])/i;
 const EAR_RE=/airpods|beats|buds|earbud|earphone|headset|headphone|jabra|jlab|sony w[hf]|\bw[hf]-\d|soundcore life|jbl (tune|live|wave|junior|endurance|reflect|tour)/i;
 const WATCH_RE=/watch|smart band|fitness|garmin|fitbit|whoop|amazfit|oura|polar |suunto|coros|mi band|huawei band/i;
 function devType(d){ if(!d) return ''; const h=d.hint||'', n=d.adv||'', hn=h+' '+n;
@@ -8950,7 +8950,7 @@ function devType(d){ if(!d) return ''; const h=d.hint||'', n=d.adv||'', hn=h+' '
   if(d.band==='wifi') return d.cls==='Camera' ? 'Wi-Fi camera' : d.cls==='Vehicle' ? 'Car (its Wi-Fi)' : /iphone|android|galaxy|pixel|hotspot|redmi|xiaomi|oppo|huawei/i.test(n) ? 'Phone hotspot' : 'Wi-Fi network (router or hotspot)';
   if(d.cls==='Tag') return /AirTag/.test(h) ? 'AirTag (tracker)' : /Find My network tag/.test(h) ? 'Find My tracker (not made by Apple)' : /SmartTag/.test(h) ? 'Samsung SmartTag (tracker)' : /Tile/.test(h) ? 'Tile (tracker)' : /Chipolo/.test(h) ? 'Chipolo (tracker)'
     : /Find My Device network/.test(h) ? 'Tracker or beacon (Google network)' : /GPS tracker/i.test(h) ? 'Vehicle GPS tracker' : 'Tracker';
-  if(d.cls==='Wearable') return /AirPods/.test(hn) ? 'AirPods (earbuds)' : /hearing aid/i.test(hn) ? 'Hearing aid' : EAR_RE.test(hn) ? 'Earbuds or headphones' : WATCH_RE.test(hn) ? 'Watch or fitness band' : /Fast Pair/.test(h) ? 'Earbuds, headphones or speaker' : 'Wearable';
+  if(d.cls==='Wearable') return houseDev(d) ? 'TV, soundbar or speaker' : /AirPods/.test(hn) ? 'AirPods (earbuds)' : /hearing aid/i.test(hn) ? 'Hearing aid' : EAR_RE.test(hn) ? 'Earbuds or headphones' : WATCH_RE.test(hn) ? 'Watch or fitness band' : /Fast Pair/.test(h) ? 'Earbuds, headphones or speaker' : 'Wearable';
   if(d.cls==='Phone') return 'Phone';
   if(d.cls==='Laptop') return /Microsoft|Windows/.test(h) ? 'Computer (Windows)' : 'Computer';
   if(d.cls==='Vehicle') return /bus or tram/.test(h) ? 'Bus or tram' : /^Car\b/.test(h) ? 'Car' : 'Vehicle';
