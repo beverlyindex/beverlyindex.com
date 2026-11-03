@@ -1420,7 +1420,7 @@ let STORE_FULL=0;
 /* ---------- the build of this console, and how it stays current ----------
    A page that stays open, as it does inside the Remiel Android app, would otherwise keep running the build it first loaded.
    The console asks the site which build is current, and loads it at a moment that costs you nothing. */
-const BUILD='2026-10-28.02', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
+const BUILD='2026-11-03.01', BUILD_RE=/^\d{4}-\d{2}-\d{2}\.\d{2}$/;
 const UPD={remote:'', at:0, held:false, busy:false};
 const updTries = () => { try{ const j=JSON.parse(store.get('halo_upd')||'null'); if(j && j.b) return j; }catch(e){} return {b:'',n:0,t:0}; };
 function updSafe(){                                       // a reload now would interrupt nothing
@@ -7889,10 +7889,12 @@ function ingestReport(sid, rowT, p, off){
    close enough to read well (-85 dBm or stronger), the new address is the same device, and its readings join the old one for the rest of the trip.
    Never joined: two addresses heard in the same moment, a silence longer than that, a match that more than one device could make, or anything across trips. */
 const STITCH={gap:3500, tagGap:30000, db:6, min:-85, nameGap:10*60000};
+// A name heard on two addresses at the same moment belongs to more than one device, a model's name, so it never joins two addresses on this trip.
+const NAME_MANY=new Set();
 function stitchFrom(s, r, at, busy){ const cls=CLS.indexOf(s.cls)>=0?s.cls:'Unknown', hint=typeof s.hint==='string'?s.hint.slice(0,40):'', nm=typeof s.name==='string'?s.name.trim().slice(0,40):'';
   let hit=null, n=0;
   // a name with a serial in it (VOLVO373, a car; DESKTOP-KS7PU98, a computer) is one device, unless it is only a model's name, such as a tracker's (GV300TP), which many units share: a new address with that same name, heard after the old one fell silent, is it again
-  if(nm && NAME_ID.test(nm) && !trackerName(nm) && !HOUSE_RE.test(nm)){ LIVE.devs.forEach(c=>{ if(c.band!=='ble' || c.sim || c.mine || busy.has(c.sig) || c.adv!==nm) return; const gap=at-(c.seenMobile||0);
+  if(nm && NAME_ID.test(nm) && !trackerName(nm) && !HOUSE_RE.test(nm) && !NAME_MANY.has(nm)){ LIVE.devs.forEach(c=>{ if(c.band!=='ble' || c.sim || c.mine || busy.has(c.sig) || c.adv!==nm) return; const gap=at-(c.seenMobile||0);
       if(gap>=1000 && gap<=STITCH.nameGap && (c.seenMobile||0)>=W.t0+LIVE.skew){ n++; hit=c; } }); if(n===1) return hit; hit=null; n=0; }
   if(r<STITCH.min || (cls==='Unknown' && !makerOf({hint}))) return null;          // a device that says nothing of what it is could be anyone's
   LIVE.devs.forEach(c=>{ if(c.band!=='ble' || c.sim || c.mine || busy.has(c.sig) || (c.cls||'Unknown')!==cls || (c.hint||'')!==hint) return;
@@ -7904,9 +7906,11 @@ function stitchFrom(s, r, at, busy){ const cls=CLS.indexOf(s.cls)>=0?s.cls:'Unkn
 function stitchPlan(list, at){ LIVE.alias=LIVE.alias||{}; const A=LIVE.alias, ids=new Set(list.map(x=>x && x.id).filter(Boolean));
   Object.keys(A).forEach(k=>{ if(ids.has(A[k])) delete A[k]; });          // a changed address never comes back: the old one heard again means they were two devices after all
   const busy=new Set([...ids].map(k=>A[k]||k)), claim=new Map();
+  { const by=new Map(); list.forEach(x=>{ const nm=x && typeof x.name==='string' ? x.name.trim() : ''; if(!nm || typeof x.id!=='string') return; const k=A[x.id]||x.id; if(!by.has(nm)) by.set(nm, new Set()); by.get(nm).add(k); });
+    by.forEach((v, nm)=>{ if(v.size>1) NAME_MANY.add(nm); }); }
   list.forEach(x=>{ if(!x || typeof x.id!=='string' || A[x.id] || LIVE.devs.has(x.id) || (x.band && x.band!=='ble') || typeof x.rssi!=='number') return;
     const nm=typeof x.name==='string' ? x.name.trim() : '';
-    if(nm && NAME_ID.test(nm) && !HOUSE_RE.test(nm)){ let same=null; LIVE.devs.forEach(d=>{ if(!same && d.band==='ble' && d.adv===nm && !busy.has(d.sig)) same=d; });          // VOLVO373 under a new address is still VOLVO373
+    if(nm && NAME_ID.test(nm) && !HOUSE_RE.test(nm) && !trackerName(nm) && !NAME_MANY.has(nm)){ let same=null; LIVE.devs.forEach(d=>{ if(!same && d.band==='ble' && d.adv===nm && !busy.has(d.sig)) same=d; });          // VOLVO373 under a new address is still VOLVO373; a model's name that many units share (a tracker's, GV300TP), or a name heard on two addresses at once, never joins two
       if(same){ A[x.id]=same.sig; same.ids=(same.ids||1)+1; busy.add(same.sig); return; } }
     const c=stitchFrom(x, x.rssi, at, busy); if(c){ const L=claim.get(c)||[]; L.push(x.id); claim.set(c,L); } });
   claim.forEach((L,c)=>{ if(L.length===1){ A[L[0]]=c.sig; c.ids=(c.ids||1)+1; } }); }
@@ -8594,7 +8598,7 @@ function winLines(r){ const L=winsOf(r); if(!L) return []; const out=[];
   return out; }
 const winNow = r => { const L=winsOf(r); return L && r.here ? L[L.length-1] : null; };          // the window it is in now, on a trip
 function walkStart(t0, a, at){
-  tripKeep(); const back=!!at; portCarry(); LIVE.alias={}; LIVE.devs.forEach(d=>{ d.ids=1; });
+  tripKeep(); const back=!!at; portCarry(); LIVE.alias={}; NAME_MANY.clear(); LIVE.devs.forEach(d=>{ d.ids=1; });
   Object.assign(W,{on:true, t0:t0||Date.now(), t1:0, events:[], devs:{}, aps:{}, route:[], dist:0, gaps:0, off:0, test:false, saved:'', silent:false, rough:false, closed:false, kept:false, idle:null, cells:{}, g2:false, settled:false, tw:[], plan:null, wps:[], name:'', arch:false, cor:null, act:0, staleAt:0, cut:0, contacts:[], modes:[], groups:[], sgs:[], ports:[], pd:{gps:0, used:0, rough:0, held:0, net:0, first:0, last:0, gaps:[], out:0}});
   { const N=NATIVE(), st=N ? (nativeStatus()||{}) : null; if(st){ W.pd.a0=typeof st.gpsAge==='number' ? st.gpsAge : null; W.pd.st={app:st.version||null, locationOn:st.locationOn, permission:st.permission, listening:st.listening}; } }
   if(a){ W.route.push({t:W.t0, lat:+a.lat.toFixed(6), lon:+a.lon.toFixed(6), acc:10}); Object.assign(W.pd, {gps:1, used:1, first:W.t0, last:W.t0, la:a.lat, lo:a.lon}); }
