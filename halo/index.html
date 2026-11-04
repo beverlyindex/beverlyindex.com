@@ -3224,7 +3224,7 @@ const portHomeKind = d => d.band==='ble' && d.cls!=='Tag' && rotates(d) && portC
 // how many the Portrait held within PORT_FAR: counted when it was taken, or, for a Portrait taken before that count was kept, read from its account
 function portHomeCap(p){ if(typeof p.rot==='number') return p.rot;
   return Object.values(p.acct||{}).filter(a=>a.m<=PORT_FAR && /^(Apple|Samsung|Google|Phone|Watch|Earbuds)/i.test(a.k||'') && !/AirTag|tracker|SmartTag|Apple TV|Windows/i.test(a.k||'')).length; }
-const portHomeCalm = (p, d) => !!(p.hm && p.hm[d.sig]) && portReveal(d)==='is coming toward you';
+const portHomeCalm = (p, d) => (!!(p.hm && p.hm[d.sig]) || homeKnown(d)) && portReveal(d)==='is coming toward you';          // near home, a device of your home walking toward you is your household's
 function portHouseNote(d){ PORT.hn=PORT.hn||new Set(); if(PORT.hn.has(d.sig)) return; PORT.hn.add(d.sig); if(W.on) wEvent('port', 'Portrait, at home: '+devName(d)+' is one of the trackers usual at your home, so it stays quiet.', d.id); }
 function portHomeNote(p, c){ PORT.homeN=(PORT.homeN||0)+1; const n=PORT.homeN;
   if(W.on) wEvent('port', 'Portrait, back where it was taken: '+devName(c)+' is most likely one of the Portrait\'s own devices under a new address. It joins your Portrait, without a buzz.'+alWhere(c), c.id);
@@ -4807,7 +4807,7 @@ function stopCheck(nowS){ const tL=nowS-LIVE.skew, fresh=fixFresh(tL), mv=fresh?
       if(db>=DIRK.stopDb){ const cs=commonShift(d, S0.t+LIVE.skew, nowS, db);
         if(cs.n>=4 ? Math.abs(db-cs.med)<DIRK.stopDb : db<DIRK.loneDb) return;          // everything rose together, or too few others to tell the phone moving from the device
         d.chk={k:'closer', t:nowS}; chkAlert(d,'closer'); dirEvent('chk-closer', 'Stop check: '+walkName(d)+' came closer while you stood still, from about '+du(distOf(r0,d.band))+' to '+du(distOf(r1,d.band))+'.', d.id, nowS); }
-      else if(S0.pace.has(sig) && Math.abs(db)<=3){ d.chk={k:'pace', t:nowS}; dirEvent('chk-pace', 'Stop check: '+walkName(d)+' kept pace while you walked, and stayed about '+du(distOf(r1,d.band))+' away when you stopped.', d.id, nowS); } });
+      else if(S0.pace.has(sig) && Math.abs(db)<=3 && !homeKnown(d)){ d.chk={k:'pace', t:nowS}; dirEvent('chk-pace', 'Stop check: '+walkName(d)+' kept pace while you walked, and stayed about '+du(distOf(r1,d.band))+' away when you stopped.', d.id, nowS); } });
     return; }
   if(fresh && still && still.d<2.5 && DIRS.walkSince && tL-DIRS.walkT<15000 && DIRS.walkT-DIRS.walkSince>=DIRK.stopWalk){          // you have just stopped, after walking a minute or more
     const devs=new Map(), pace=new Set();
@@ -7997,6 +7997,16 @@ function solveFix(d){ d.fresh=0; d.base=baselineOf(d.samples);
   if(e.unc<=FIX_MAX_UNC){ const ll=toLL(e.x,e.y); d.fix={x:e.x,y:e.y,lat:ll.lat,lon:ll.lon,unc:e.unc,n:d.samples.length}; }
   else if(e.brg!==null && e.dev<=SECTOR_HALF) d.sector={brg:e.brg, half:SECTOR_HALF, n:d.samples.length}; }
 const followSpan = d => d.cls==='Cell tower'||d.band==='cell' ? Infinity : (d.band==='wifi'||d.cls==='Access point') ? FOLLOW_SPAN.wifi : FOLLOW_SPAN.ble;
+/* One verdict on following near home. A device of your home is heard all round a walk near home, at about the same strength, which reads as
+   moving with you. So a device Remiel knows from your home (held by a Portrait taken there, marked Household or Neighbor, one of the usual
+   number at home, or heard around home on three days or more) is never taken for one staying or traveling with you while you are within
+   HOME_ZONE.m of home. A tracker and a camera are always tested, and farther out every device is tested as before. ---------- */
+const HOME_ZONE={m:300};
+function homeKnown(d){ if(d.cls==='Tag' || d.cls==='Camera' || d.band!=='ble') return false; const h=P.home&&P.home.loc, me=ePos();
+  if(!okLL(h) || !me || me.acc>POS_MAX_ACC || distLL(h.lat,h.lon,me.lat,me.lon)>HOME_ZONE.m) return false;
+  const p=P.portrait; if(p && p.on && !p.build && p.at && distLL(p.at.lat,p.at.lon,h.lat,h.lon)<=HTAG.home && (p.sigs||[]).indexOf(d.sig)>=0) return true;
+  const f=(P.homeRole||{})[d.sig]; if(f==='house' || f==='nb' || d._hab==='home') return true;
+  const x=histFor(d.sig, d.adv); return !!(x && x.days>=3 && x.pl.some(q=>distLL(h.lat,h.lon,q[0],q[1])<=HOME_ZONE.m)); }
 function liveDerive(d, nowS){
   const keep=d.band==='wifi'?3*LIVE_PRESENT:LIVE_PRESENT, held=scanQuiet(), mob=nowS-held-d.seenMobile<keep, sta=nowS-d.seenStation<keep;      // Wi-Fi is scanned every 30 seconds. Time the scanner was quiet does not count against a device
   d.linger = !mob && d.seenMobile>0 && nowS-held-d.seenMobile<FOLLOW.linger;              // just lost: it fades on the map instead of vanishing
@@ -8035,6 +8045,8 @@ function liveDerive(d, nowS){
   // In a private car (only a few devices aboard) the people who rode with you stay calm once you get out together; on a bus or a train they do not.
   if(driving() && d.present && !d.mine && d.cls!=='Tag' && d.band==='ble' && (d.withYou || d.maybe) && (d.dist||99)<=TMOVE.inCar) d.inCar=Date.now();
   if(d.carMate || (driving() && d.inCar)){ d.withYou=false; d.maybe=false; }
+  if((d.withYou || d.maybe || (d.chk && (d.chk.k==='pace' || d.chk.k==='follow'))) && homeKnown(d)){ d.withYou=false; d.maybe=false; d.tested=false; d.homeCalm=Date.now();          // one verdict near home: a device of your home is not with you
+    if(d.verdict==='with' || d.verdict==='maybe') d.verdict='near'; if(d.chk && d.chk.k!=='closer') d.chk=null; }
   d.homeAway = !d.mine && d.seenStation>0 && (d.seenAway||0)>0;         // heard by your home listener, and by a sensor with you away from home
   d.onRoute = !d.mine && (!!d.fRoute || d.homeAway); d.knownBefore = d.mine || !!d.fKnown;
 }
