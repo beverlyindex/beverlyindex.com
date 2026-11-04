@@ -3027,7 +3027,7 @@ function seenInfo(sig, me, t0, ref, name){ const h=histFor(sig, name); if(!h) re
    raise it), and one more than usual stands out. At home you can set the usual numbers yourself. You are at home by GPS, or, indoors without GPS,
    when a device you marked as Household is close. A follower, your Watch list, one seen in another place and one you marked as Suspicious are never
    made quiet by habit. */
-const PSIG={quiet:new Set(), place:null, at:0, saved:0, near:-85, cellM:30, days:7, need:3};
+const PSIG={quiet:new Set(), cand:new Set(), place:null, at:0, saved:0, near:-85, cellM:30, days:7, need:3};
 const psigGet = () => { const g=P.psig||(P.psig={home:{set:{}, days:{}}, cells:{}}); g.home=g.home||{set:{}, days:{}}; g.home.set=g.home.set||{}; g.home.days=g.home.days||{}; g.cells=g.cells||{}; return g; };
 const psigCell = q => Math.floor(q.lat/0.0005)+','+Math.floor(q.lon/0.0007);          // about 55 m by 55 m in southern Europe
 // At home: by GPS near your home, or, with no fresh GPS, a device you marked as Household heard close by in the last minute.
@@ -3044,8 +3044,8 @@ function psigUsualAt(me, k){ const la0=Math.floor(me.lat/0.0005), lo0=Math.floor
   for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){ const c=(la0+i)+','+(lo0+j), cl=(la0+i+0.5)*0.0005, cn=(lo0+j+0.5)*0.0007; if(distLL(me.lat,me.lon,cl,cn)<=60) u=Math.max(u, psigUsual(c, k)); }
   return u; }
 function psigTick(){ const now=Date.now(); if(now-PSIG.at<2000) return; PSIG.at=now;
-  const home=homeNow(), me=ePos(), place=home ? 'home' : (me && me.acc<=POS_MAX_ACC ? psigCell(me) : null); PSIG.place=place; PSIG.quiet=new Set(); if(!place) return;
-  const by={}; LIVE.devs.forEach(d=>{ if(!habOk(d)) return; if(home ? !(d.rssi>=PSIG.near) : !(d.dist<=PSIG.cellM)) return; (by[sigKey(d)]=by[sigKey(d)]||[]).push(d); });
+  const home=homeNow(), me=ePos(), place=home ? 'home' : (me && me.acc<=POS_MAX_ACC ? psigCell(me) : null); PSIG.place=place; PSIG.quiet=new Set(); PSIG.cand=new Set(); if(!place) return;
+  const by={}; LIVE.devs.forEach(d=>{ if(!habOk(d)) return; if(home ? !(d.rssi>=PSIG.near) : !(d.dist<=PSIG.cellM)) return; (by[sigKey(d)]=by[sigKey(d)]||[]).push(d); PSIG.cand.add(d.sig); });          // cand: what was weighed
   const g=psigGet(), R=home ? g.home : (g.cells[place]=g.cells[place]||{days:{}, t:0}), day=new Date().toISOString().slice(0,10);
   const rec=R.days[day]=R.days[day]||{}; Object.keys(by).forEach(k=>{ rec[k]=Math.max(rec[k]||0, by[k].length); });
   { const ds=Object.keys(R.days).sort(); if(ds.length>10) ds.slice(0, ds.length-10).forEach(x=>delete R.days[x]); }
@@ -3314,7 +3314,7 @@ function portMoving(d){ const nowS=Date.now()+LIVE.skew;
 function portTick(){ const now=Date.now(); if(now-PORT.at<400) return; PORT.at=now; PORT.hide=new Set(); PORT.why=new Map(); PORT.show=new Set(); const p=P.portrait; if(!p || !p.on) return;
   if(p.build){ if(!PORT.bt){ if(now-p.t>60000) portDone(); else PORT.bt=setInterval(portBuildTick, 1000); } return; }          // a build cut short by a restart finishes with what it holds
   const nowS=now+LIVE.skew, S0=new Set(p.sigs||[]), N0=new Set(p.names||[]);
-  if(PSIG.place==='home'){ let late=false; LIVE.devs.forEach(d=>{ if(!late && !d.sim && d.cls==='Tag' && (d.firstSeen||0)-LIVE.skew>PSIG.at) late=true; }); if(late){ PSIG.at=0; try{ psigTick(); }catch(e){} } }          // a tracker that just came is weighed against what is usual at home first
+  if(PSIG.place==='home'){ let late=false; LIVE.devs.forEach(d=>{ if(!late && !d.sim && d.cls==='Tag' && !PSIG.cand.has(d.sig) && ((habOk(d) && d.rssi>=PSIG.near) || (d.firstSeen||0)-LIVE.skew>PSIG.at)) late=true; }); if(late){ PSIG.at=0; try{ psigTick(); }catch(e){} } }          // a tracker not yet weighed against what is usual at home is weighed first, before it can buzz
   const cand=[];
   // every device the radar may still show, fading ones included: a Portrait device stays hidden after it falls silent
   LIVE.devs.forEach(d=>{ if(d.sim) return; const live=d.present || nowS-d.seenMobile<LIVE_PRESENT;
