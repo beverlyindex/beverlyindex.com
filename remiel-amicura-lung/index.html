@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Remiel Amicura Lung</title>
+<style>
+  :root{--bg:#06142f;--ink:#eaf4ff;--dim:#9fb6d8;--acc:#22C8FF}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
+  body{background:radial-gradient(ellipse at 50% 35%,#1b3f7d 0%,#0e2756 40%,#040c1f 100%);color:var(--ink);
+    font-family:"Hanken Grotesk","Segoe UI",system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;min-height:100vh}
+  .card{width:min(420px,92vw);text-align:center;margin:auto}
+  .logo{width:min(260px,70vw);height:auto;display:block;margin:0 auto 14px;filter:drop-shadow(0 0 22px rgba(56,189,248,.35))}
+  h1{font-size:22px;font-weight:700;margin-bottom:8px}
+  p.sub{color:var(--dim);font-size:14px;line-height:1.6;margin-bottom:24px}
+  input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(34,200,255,.45);border-radius:12px;color:var(--ink);
+    font-size:19px;letter-spacing:.16em;text-align:center;padding:13px 14px;outline:none;text-transform:uppercase}
+  input:focus{border-color:var(--acc);box-shadow:0 0 0 4px rgba(34,200,255,.15)}
+  button{margin-top:14px;width:100%;background:var(--acc);border:none;color:#04121f;font-size:15px;font-weight:700;padding:13px;border-radius:12px;cursor:pointer}
+  button:hover{filter:brightness(1.08)}
+  .err{color:#ff9b9b;font-size:13px;margin-top:12px;min-height:18px}
+  .foot{margin-top:28px;color:var(--dim);font-size:11.5px}
+  .shake{animation:sh .35s}
+  @keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+</style>
+</head>
+<body>
+<div class="card">
+  <img class="logo" src="logo.png" alt="Remiel Amicura Lung">
+  <h1>Remiel Amicura Lung</h1>
+  <p class="sub">For the California Lung Cancer Coalition.<br>In private evaluation. Enter your access code to continue.</p>
+  <input id="code" autocomplete="off" spellcheck="false" placeholder="Your access code" aria-label="Access code">
+  <button id="go">Enter</button>
+  <div class="err" id="err"></div>
+  <div class="foot">Beverly Index LLC</div>
+</div>
+<script>
+const KEYS={"d8ee676985509f3cc3811422a787bf8f584269e6f3212af737ca9101b8b94516": "primary", "882c8b5905622d9aa9a334fd5a9b297c19652cc705e29816825e744dec090466": "woc", "51196d47708367dd52e656fd64bf3c4e6a09dd4deea43ee85b7c4dddbd620317": "coalition"};
+const SALT='amicura-lung:', SK='remiel-amicura-lung:access';
+async function hashCode(c){
+  const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(SALT+c));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function attempt(){
+  const el=document.getElementById('code'), err=document.getElementById('err');
+  const code=el.value.trim().toUpperCase();
+  if(!code) return;
+  if(!(window.crypto&&crypto.subtle)){ err.textContent='This page requires a secure (https) connection.'; return; }
+  const who=KEYS[await hashCode(code)];
+  if(who){
+    try{ sessionStorage.setItem(SK, code); sessionStorage.setItem(SK+':who', who); }catch(e){}
+    try{ localStorage.setItem(SK, code); }catch(e){}
+    await Promise.race([notifyAccess(who).catch(()=>{}), new Promise(r=>setTimeout(r,1800))]);
+    location.replace('app.html');
+  } else {
+    err.textContent='That code was not recognized.';
+    el.value=''; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); el.focus();
+  }
+}
+async function notifyAccess(who){
+  try{
+    let ip='unknown';
+    try{ const r=await Promise.race([fetch('https://api.ipify.org?format=json'), new Promise((_,rej)=>setTimeout(rej,600))]); ip=(await r.json()).ip; }catch(e){}
+    const body='Identity: '+who+'\nIP: '+ip+'\nMachine: '+navigator.userAgent+'\nScreen: '+screen.width+'x'+screen.height+
+      '\nTimezone: '+Intl.DateTimeFormat().resolvedOptions().timeZone+'\nLocal time: '+new Date().toString();
+    return fetch('https://ntfy.sh/bi-cc-f03017c5381b7562f8',{method:'POST',
+      headers:{'Title':'Remiel Amicura Lung access: '+who,'Email':'rrbjr@remielengine.ai','Tags':'key'}, body:body, keepalive:true});
+  }catch(e){}
+}
+(function(){ try{ const c=localStorage.getItem(SK)||sessionStorage.getItem(SK); if(c){ document.getElementById('code').value=c; } }catch(e){} })();
+document.getElementById('go').onclick=attempt;
+document.getElementById('code').addEventListener('keydown',e=>{ if(e.key==='Enter') attempt(); });
+document.getElementById('code').focus();
+</script>
+</body>
+</html>
